@@ -51,6 +51,7 @@ def test_secret_create_all_ns():
                                                              secret,
                                                              new_ns1,
                                                              keyvaluepair)
+    c_client.delete(new_ns)
 
 
 def test_secret_create_single_ns():
@@ -147,6 +148,7 @@ def test_secret_edit_all_ns():
                                                        updatedsecretdata)
     create_and_validate_workload_with_secret_as_env_variable(
         p_client, secret, new_ns1, updatedsecretdata)
+    c_client.delete(new_ns)
 
 
 def test_secret_edit_single_ns():
@@ -242,7 +244,8 @@ def test_rbac_secret_create_cluster_member(remove_resource):
 
     user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-mem"))
+                                        random_test_name("rbac-cluster-mem"),
+                                        ns_name=random_test_name("ns-cluster-mem"))
     p_client = get_project_client_for_token(project, user_token)
     rbac_secret_create(p_client, ns)
 
@@ -257,13 +260,13 @@ def test_rbac_secret_create_cluster_member(remove_resource):
                         random_test_name("rbac-cluster-owner"))
     cluster_member_client = get_project_client_for_token(ownerproject,
                                                          user_token)
+    remove_resource(project)
+    remove_resource(ownerproject)
     with pytest.raises(ApiError) as e:
         create_secret(keyvaluepair, singlenamespace=False,
                       p_client=cluster_member_client)
     assert e.value.error.status == 403
     assert e.value.error.code == 'PermissionDenied'
-
-    remove_resource(project)
 
 
 @if_test_rbac
@@ -276,7 +279,8 @@ def test_rbac_secret_edit_cluster_member(remove_resource):
 
     user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-mem"))
+                                        random_test_name("rbac-cluster-mem"),
+                                        ns_name=random_test_name("ns-cluster-mem"))
     p_client = get_project_client_for_token(project, user_token)
     rbac_secret_edit(p_client, ns, project=project)
 
@@ -300,14 +304,14 @@ def test_rbac_secret_edit_cluster_member(remove_resource):
                                                          user_token)
     ownersecret = create_secret(keyvaluepair, singlenamespace=False,
                                 p_client=cluster_owner_client)
+    remove_resource(project)
+    remove_resource(ownerproject)
 
     with pytest.raises(ApiError) as e:
         cluster_member_client.update(ownersecret, namespaceId='NULL',
                                      data=updated_dict)
     assert e.value.error.status == 404
     assert e.value.error.code == 'NotFound'
-
-    remove_resource(project)
 
 
 @if_test_rbac
@@ -321,7 +325,8 @@ def test_rbac_secret_delete_cluster_member(remove_resource):
     keyvaluepair = {"testall": "valueall"}
     user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-mem"))
+                                        random_test_name("rbac-cluster-mem"),
+                                        ns_name=random_test_name("ns-cluster-mem"))
     p_client = get_project_client_for_token(project, user_token)
     rbac_secret_delete(p_client, ns)
 
@@ -339,13 +344,13 @@ def test_rbac_secret_delete_cluster_member(remove_resource):
                                                          user_token)
     ownersecret = create_secret(keyvaluepair, singlenamespace=False,
                                 p_client=cluster_owner_client)
+    remove_resource(project)
+    remove_resource(ownerproject)
 
     with pytest.raises(ApiError) as e:
         delete_secret(cluster_member_client, ownersecret, ns, keyvaluepair)
     assert e.value.error.status == 403
     assert e.value.error.code == 'Forbidden'
-
-    remove_resource(project)
 
 
 @if_test_rbac
@@ -395,14 +400,13 @@ def test_rbac_secret_edit_project_readonly_member(remove_resource):
     value2 = ("valueallnew")
     updated_dict = {"testall": value1, "testallnew": value2}
 
+    remove_resource(secret)
     with pytest.raises(ApiError) as e:
         readonly_user_client.update(secret,
                                     namespaceId=ns['name'],
                                     data=updated_dict)
     assert e.value.error.status == 404
     assert e.value.error.code == 'NotFound'
-
-    remove_resource(secret)
 
 
 @if_test_rbac
@@ -425,13 +429,12 @@ def test_rbac_secret_delete_project_readonly(remove_resource):
     # As a cluster owner, create a secret
     secret = create_secret(keyvaluepair, p_client=cluster_owner_p_client,
                            ns=ns)
+    remove_resource(secret)
     # Assert read-only user cannot delete the secret
     with pytest.raises(ApiError) as e:
         delete_secret(readonly_user_client, secret, ns, keyvaluepair)
     assert e.value.error.status == 403
     assert e.value.error.code == 'Forbidden'
-
-    remove_resource(secret)
 
 
 def rbac_secret_create(p_client, ns):
