@@ -1516,13 +1516,25 @@ def wait_for_mcapp_to_active(client, multiClusterApp,
 
 def wait_for_app_to_active(client, app_id,
                            timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
-    time.sleep(5)
-    # When the app is deployed it goes into Active state for a short
-    # period of time and then into installing/deploying.
+    """
+    First wait for app to come in deployment state, then wait for it get
+    in active state. This is to avoid wrongly conclude that app is active
+    as app goes to state installing > active > deploying > active
+    @param client: Project client
+    @param app_id: App id of deployed app.
+    @param timeout: Max time allowed to wait for app to become active.
+    @return: app object
+    """
     app_data = client.list_app(id=app_id).data
     start = time.time()
     assert len(app_data) >= 1, "Cannot find app"
     application = app_data[0]
+    while application.state != "deploying":
+        if time.time() - start > timeout / 3:
+            break
+        time.sleep(.2)
+        app_data = client.list_app(id=app_id).data
+        application = app_data[0]
     while application.state != "active":
         if time.time() - start > timeout:
             raise AssertionError(
@@ -1689,8 +1701,10 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
     app_name = parameters[len(parameters)-2].split("=")[1]
     workloads = proj_client.list_workload(namespaceId=ns).data
     for wl in workloads:
+        print("Workload {} , state - {}".format(wl.id, wl.state))
         assert wl.state == "active"
         chart_deployed = get_chart_info(wl.workloadLabels)
+        print("Chart detail of app - {}".format(chart_deployed))
         # '-' check is to make sure chart has both app name and version.
         if app_name in chart_deployed and '-' in chart_deployed:
             assert chart_deployed == chart, "the chart version is wrong"
