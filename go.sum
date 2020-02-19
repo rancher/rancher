@@ -16,6 +16,8 @@ github.com/Azure/azure-sdk-for-go v23.2.0+incompatible/go.mod h1:9XXNKU+eRnpl9mo
 github.com/Azure/azure-sdk-for-go v32.5.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/azure-sdk-for-go v35.0.0+incompatible h1:PkmdmQUmeSdQQ5258f4SyCf2Zcz0w67qztEg37cOR7U=
 github.com/Azure/azure-sdk-for-go v35.0.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
+github.com/Azure/azure-sdk-for-go v36.2.0+incompatible h1:09cv2WoH0g6jl6m2iT+R9qcIPZKhXEL0sbmLhxP895s=
+github.com/Azure/azure-sdk-for-go v36.2.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/azure-storage-blob-go v0.0.0-20181022225951-5152f14ace1c/go.mod h1:oGfmITT1V6x//CswqY2gtAHND+xIP64/qL7a5QJix0Y=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=
@@ -47,6 +49,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DataDog/zstd v1.4.1 h1:3oxKN3wbHibqx897utPC2LTQU4J+IHWWJO+glkAkpFM=
 github.com/DataDog/zstd v1.4.1/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
+github.com/GGGitBoy/kontainer-engine-1 v0.0.4-dev.0.20200219021919-c89d8fc03397 h1:Mo5PQL8UMyTnPNYbHxhUvkO1A5vdPnc76U70E14dTu4=
+github.com/GGGitBoy/kontainer-engine-1 v0.0.4-dev.0.20200219021919-c89d8fc03397/go.mod h1:wMwjA8Uth1F9SRc2sNuC84zPGfV8UEBsmT2erGoOINA=
 github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534/go.mod h1:iroGtC8B3tQiqtds1l+mgk/BBOrxbqjH+eUfFQYRc14=
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab/go.mod h1:3VYc5hodBMJ5+l/7J4xAyMeuM2PNuepvHlGs8yilUCA=
 github.com/Jeffail/gabs v1.1.1/go.mod h1:6xMvQMK4k33lb7GUUpaAPh6nKMmemQeg5d4gn7/bOXc=
@@ -807,8 +811,6 @@ github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932/go.mod h
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200123225253-a5b9f3e0b2df/go.mod h1:MkY6hsQLw3cHrb0V/Fmn4ur2c5PBIpLIe+gvMWoTXGI=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054 h1:yvMQKfMyjGWaPmD8dhYk0wZTsjxCZbNPXXa7pziRns0=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054/go.mod h1:MkY6hsQLw3cHrb0V/Fmn4ur2c5PBIpLIe+gvMWoTXGI=
-github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415 h1:01lzETFuWDv5POYCtil4LLFXIv3GfwFmrU6URkDqQI8=
-github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415/go.mod h1:3KvQxniSDxN8Ohdsv0ZmsqZXRdj/5ow2r1nZUv4GjsI=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=

@@ -1,8 +1,8 @@
 # cloud.google.com/go v0.43.0
 cloud.google.com/go/compute/metadata
-# github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
+# github.com/Azure/azure-sdk-for-go v36.2.0+incompatible
 github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2017-09-30/containerservice
-github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2018-03-31/containerservice
+github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2019-10-01/containerservice
 github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac
 github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network
 github.com/Azure/azure-sdk-for-go/services/preview/operationalinsights/mgmt/2015-11-01-preview/operationalinsights
@@ -323,7 +323,7 @@ github.com/rancher/dynamiclistener/storage/memory
 # github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
-# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
+# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415 => github.com/GGGitBoy/kontainer-engine-1 v0.0.4-dev.0.20200219021919-c89d8fc03397
 github.com/rancher/kontainer-engine/cluster
 github.com/rancher/kontainer-engine/drivers/aks
 github.com/rancher/kontainer-engine/drivers/eks
@@ -1101,7 +1101,6 @@ k8s.io/gengo/types
 # k8s.io/klog v1.0.0
 k8s.io/klog
 # k8s.io/kube-aggregator v0.17.2 => k8s.io/kube-aggregator v0.17.2
-k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset
