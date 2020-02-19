@@ -26,9 +26,8 @@ import (
 )
 
 const (
-	crtKeyIndex    = "crtKeyIndex"
-	nodeKeyIndex   = "nodeKeyIndex"
-	importedDriver = "imported"
+	crtKeyIndex  = "crtKeyIndex"
+	nodeKeyIndex = "nodeKeyIndex"
 
 	Token  = "X-API-Tunnel-Token"
 	Params = "X-API-Tunnel-Params"
@@ -270,7 +269,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		err error
 	)
 
-	if cluster.Status.Driver != importedDriver && cluster.Status.Driver != "" {
+	if cluster.Status.Driver != v3.ClusterDriverImported && cluster.Status.Driver != "" {
 		return cluster, true, nil
 	}
 
@@ -282,7 +281,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	}
 	if driver == "" {
 		logrus.Debugf("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
-		cluster.Status.Driver = importedDriver
+		cluster.Status.Driver = v3.ClusterDriverImported
 		changed = true
 	}
 
@@ -290,7 +289,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	token := inCluster.Token
 	caCert := inCluster.CACert
 
-	if cluster.Status.Driver == importedDriver {
+	if cluster.Status.Driver == v3.ClusterDriverImported {
 		if cluster.Status.APIEndpoint != apiEndpoint ||
 			cluster.Status.ServiceAccountToken != token ||
 			cluster.Status.CACert != caCert {

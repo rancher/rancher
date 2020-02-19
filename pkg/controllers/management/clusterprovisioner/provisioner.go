@@ -94,7 +94,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	logrus.Infof("Deleting cluster [%s]", cluster.Name)
-	if skipProvisioning(cluster) ||
+	if skipLocalAndImported(cluster) ||
 		cluster.Status.Driver == "" {
 		return nil, nil
 	}
@@ -297,6 +297,12 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	v3.ClusterConditionProvisioned.Message(cluster, "")
 	v3.ClusterConditionProvisioned.Reason(cluster, "")
 	v3.ClusterConditionPending.True(cluster)
+
+	err = k3sClusterConfig(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
 	return cluster, nil
 }
 
@@ -338,7 +344,8 @@ func (p *Provisioner) provision(cluster *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
-	if skipProvisioning(cluster) {
+
+	if skipLocalAndImported(cluster) {
 		return cluster, nil
 	}
 
@@ -385,9 +392,8 @@ func (p *Provisioner) backoffFailure(cluster *v3.Cluster, spec *v3.ClusterSpec) 
 	return false, 0
 }
 
-// reconcileCluster returns true if waiting or false if ready to provision
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
-	if skipProvisioning(cluster) {
+	if skipLocalAndImported(cluster) {
 		return cluster, nil
 	}
 
@@ -627,8 +633,8 @@ func (p *Provisioner) censorGenericEngineConfig(input v3.ClusterSpec) (v3.Cluste
 	return input, nil
 }
 
-func skipProvisioning(cluster *v3.Cluster) bool {
-	return cluster.Status.Driver == v3.ClusterDriverLocal || cluster.Status.Driver == v3.ClusterDriverImported
+func skipLocalAndImported(cluster *v3.Cluster) bool {
+	return cluster.Status.Driver == v3.ClusterDriverLocal || cluster.Status.Driver == v3.ClusterDriverImported || cluster.Status.Driver == v3.ClusterDriverK3s
 }
 
 func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverName, clusterName string) (*v3.ClusterSpec, interface{}, error) {
@@ -658,8 +664,8 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 			return nil, nil, err
 		}
 
-		copy := *spec.RancherKubernetesEngineConfig
-		spec.RancherKubernetesEngineConfig = &copy
+		rkeCopy := *spec.RancherKubernetesEngineConfig
+		spec.RancherKubernetesEngineConfig = &rkeCopy
 		spec.RancherKubernetesEngineConfig.Nodes = nodes
 		spec.RancherKubernetesEngineConfig.SystemImages = *systemImages
 
@@ -946,4 +952,23 @@ func GetBackupFilename(backup *v3.EtcdBackup) string {
 		snapshot = strings.TrimSuffix(backup.Spec.Filename, path.Ext(backup.Spec.Filename))
 	}
 	return snapshot
+}
+
+// transform an imported cluster into a k3s cluster using its discovered version
+func k3sClusterConfig(cluster *v3.Cluster) error {
+	// version is not found until cluster is provisioned
+	if cluster.Status.Driver == "" || cluster.Status.Version == nil {
+		return &controller.ForgetError{
+			Err:    fmt.Errorf("waiting for full cluster configuration"),
+			Reason: "Pending"}
+	}
+	// TODO Rancher may support upgrading the local cluster if its k3s in the future
+	if cluster.Name == v3.ClusterDriverLocal || cluster.Status.Driver == v3.ClusterDriverK3s {
+		return nil
+	}
+
+	if strings.Contains(cluster.Status.Version.String(), "k3s") {
+		cluster.Status.Driver = v3.ClusterDriverK3s
+	}
+	return nil
 }
