@@ -38,9 +38,22 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
 	if request.Method == http.MethodGet {
-		if resource.Values["value"] == nil {
-			// if value is nil, then this ensure default value will be used
-			resource.Values["value"] = resource.Values["default"]
-		}
+		resource.Values["value"] = getEffectiveValue(resource)
 	}
+}
+
+func getEffectiveValue(resource *types.RawResource) bool {
+	if val := resource.Values["value"]; val != nil {
+		val, _ := val.(bool)
+		return val
+	}
+
+	var val bool
+	// if value is nil, then this ensure default value will be usedq
+	status, ok := resource.Values["status"].(map[string]interface{})
+	if ok {
+		val, _ = status["default"].(bool)
+	}
+
+	return val
 }
