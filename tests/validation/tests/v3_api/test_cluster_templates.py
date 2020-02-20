@@ -200,7 +200,7 @@ def test_cluster_template_create_with_questions():
     assert s3backupconfig['type'] == '/v3/schemas/s3BackupConfig'
     backupId = etcdbackupdata[0]['id']
     print("BackupId", backupId)
-    wait_for_backup_to_active(standard_user_client, cluster, backupname)
+    wait_for_backup_to_active(cluster, backupname)
 
     cluster_cleanup(standard_user_client, cluster)
 
