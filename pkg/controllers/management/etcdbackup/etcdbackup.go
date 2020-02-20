@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
-	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -121,20 +120,26 @@ func (c *Controller) Updated(b *v3.EtcdBackup) (runtime.Object, error) {
 }
 
 func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Duration) error {
-	for range ticker.Context(ctx, interval) {
-		clusters, err := c.clusterLister.List("", labels.NewSelector())
-		if err != nil {
-			logrus.Error(fmt.Errorf("[etcd-backup] clusterBackupSync faild: %v", err))
-			return err
-		}
-		for _, cluster := range clusters {
-			logrus.Debugf("[etcd-backup] Checking backups for cluster: %s", cluster.Name)
-			if err := c.doClusterBackupSync(cluster); err != nil && !apierrors.IsConflict(err) {
+	tryTicker := time.NewTicker(interval)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-tryTicker.C:
+			clusters, err := c.clusterLister.List("", labels.NewSelector())
+			if err != nil {
 				logrus.Error(fmt.Errorf("[etcd-backup] clusterBackupSync faild: %v", err))
+				return err
+			}
+			for _, cluster := range clusters {
+				logrus.Debugf("[etcd-backup] Checking backups for cluster: %s", cluster.Name)
+				if err := c.doClusterBackupSync(cluster); err != nil && !apierrors.IsConflict(err) {
+					logrus.Error(fmt.Errorf("[etcd-backup] clusterBackupSync faild: %v", err))
+				}
 			}
 		}
 	}
-	return nil
 }
 
 func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
