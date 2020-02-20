@@ -239,7 +239,11 @@ func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 
 func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
 	if s.hasLdapGroupSearch() {
-		return s.ldapProvider.SearchPrincipals(searchKey, principalType, token)
+		principals, err := s.ldapProvider.SearchPrincipals(searchKey, principalType, token)
+		// only give response from ldap if it's configured
+		if !ldap.IsNotConfigured(err) {
+			return principals, err
+		}
 	}
 
 	var principals []v3.Principal
@@ -269,7 +273,11 @@ func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principa
 	}
 
 	if s.hasLdapGroupSearch() {
-		return s.ldapProvider.GetPrincipal(principalID, token)
+		p, err := s.ldapProvider.GetPrincipal(principalID, token)
+		// only give response from ldap if it's configured
+		if !ldap.IsNotConfigured(err) {
+			return p, err
+		}
 	}
 
 	p := v3.Principal{
@@ -334,9 +342,21 @@ func splitPrincipalID(principalID string) (string, string) {
 func (s *Provider) combineSamlAndLdapConfig(config *v3.SamlConfig) runtime.Object {
 	// if errors we might not want to turn on ldap
 	ldapConfig, _, err := ldap.GetLDAPConfig(s.ldapProvider)
+
+	// can be misconfigured but still want it saved
 	if err != nil {
 		logrus.Warnf("error pulling %s ldap configs: %s\n", s.name, err)
-		return config
+
+		// if the the config subkey not in the crd
+		if ldapConfig == nil {
+			return config
+		}
+
+		// only return the saml config on other errors
+		// if not configured it might have data in it we want to keep
+		if !ldap.IsNotConfigured(err) {
+			return config
+		}
 	}
 
 	var fullConfig runtime.Object
