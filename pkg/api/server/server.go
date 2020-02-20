@@ -9,6 +9,7 @@ import (
 	rancherapi "github.com/rancher/rancher/pkg/api"
 	"github.com/rancher/rancher/pkg/api/controllers/catalog"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamicschema"
+	"github.com/rancher/rancher/pkg/api/controllers/feature"
 	"github.com/rancher/rancher/pkg/api/controllers/samlconfig"
 	"github.com/rancher/rancher/pkg/api/controllers/settings"
 	"github.com/rancher/rancher/pkg/api/controllers/usercontrollers"
@@ -46,6 +47,7 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 
 	catalog.Register(ctx, scaledContext)
 	dynamicschema.Register(ctx, scaledContext, server.Schemas)
+	feature.Register(ctx, scaledContext)
 	whitelistproxyNodeDriver.Register(ctx, scaledContext)
 	whitelistproxyKontainerDriver.Register(ctx, scaledContext)
 	samlconfig.Register(ctx, scaledContext)
