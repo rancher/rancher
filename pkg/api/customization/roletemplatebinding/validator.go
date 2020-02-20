@@ -2,6 +2,7 @@ package roletemplatebinding
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -35,14 +36,31 @@ type validator struct {
 }
 
 func (v *validator) validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	roleTemplate, err := v.validateRoleTemplateBinding(data[v.field])
+	roleTemplateName := data[v.field]
+	if roleTemplateName == nil && request.Method == http.MethodPut {
+		return nil
+	}
+
+	roleTemplate, err := v.validateRoleTemplateBinding(roleTemplateName)
 	if err != nil {
 		return err
 	}
 
 	if roleTemplate.Context != v.context {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Cannot edit context [%s] from [%s] context",
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Cannot reference context [%s] from [%s] context",
 			roleTemplate.Context, v.context))
+	}
+
+	if request.Method == http.MethodPut {
+		return nil
+	}
+
+	hasUserTarget := data["userId"] != nil || data["userPrincipalId"] != nil
+	hasGroupTarget := data["groupId"] != nil || data["groupPrincipalId"] != nil
+
+	if (hasUserTarget && hasGroupTarget) || (!hasUserTarget && !hasGroupTarget) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must target a user [userId]/[userPrincipalId] "+
+			"OR a group [groupId]/[groupPrincipalId]")
 	}
 
 	return nil
