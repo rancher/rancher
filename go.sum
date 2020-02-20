@@ -831,8 +831,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.5 h1:J/LMSTNFSrq7BEfsWtIfHkEHJzg/KUelDTS2PHcZC5Y=
 github.com/rancher/security-scan v0.1.5/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200214232004-4218314653de h1:3hKl4KLdqLTmHoPALKdD20CcK912Yep5wD2S5yp9Bho=
-github.com/rancher/steve v0.0.0-20200214232004-4218314653de/go.mod h1:7ZBnovLHyBOVx6/UWtJr1cWqaVUnSlXCeSGAtU8gQBU=
+github.com/rancher/steve v0.0.0-20200220230643-5b94b82bc6c8 h1:QSKbR6Ofqgw5gN4+a5cAzFHNdaZhF0YqQPkMQh7wEQY=
+github.com/rancher/steve v0.0.0-20200220230643-5b94b82bc6c8/go.mod h1:bkgSSJEq2bb9wi32171lCntgUQsXnQ6nNdE97mlF6oA=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee h1:kYxNoRYCC9wP72ou8HxHwudy8fiE1iurEmASWFvMBT0=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
 github.com/rancher/types v0.0.0-20200218191331-dc762fc27c91 h1:IitaXkx6eqd4nCQMzJkGriaNWk/kDKfO5CasK3AXhp4=
