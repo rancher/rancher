@@ -83,7 +83,7 @@ require (
 	github.com/rancher/rke v1.1.0-rc6
 	github.com/rancher/security-scan v0.1.5
 	github.com/rancher/steve v0.0.0-20200214232004-4218314653de
-	github.com/rancher/types v0.0.0-20200218191331-dc762fc27c91
+	github.com/rancher/types v0.0.0-20200219204417-26b7145e8f0a
 	github.com/rancher/wrangler v0.4.2-0.20200215064225-8abf292acf7b
 	github.com/rancher/wrangler-api v0.4.1
 	github.com/robfig/cron v1.1.0
