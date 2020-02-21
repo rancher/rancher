@@ -185,7 +185,7 @@ func rebuildClusterWithRotatedCertificates(ctx context.Context,
 	}
 	if isLegacyKubeAPI {
 		log.Infof(ctx, "[controlplane] Redeploying controlplane to update kubeapi parameters")
-		if err := kubeCluster.DeployControlPlane(ctx, svcOptionData, true); err != nil {
+		if err := kubeCluster.DeployControlPlane(ctx, svcOptionData); err != nil {
 			return APIURL, caCrt, clientCert, clientKey, nil, err
 		}
 	}

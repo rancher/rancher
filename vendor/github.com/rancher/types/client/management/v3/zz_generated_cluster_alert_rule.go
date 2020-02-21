@@ -9,6 +9,7 @@ const (
 	ClusterAlertRuleFieldAlertState            = "alertState"
 	ClusterAlertRuleFieldAnnotations           = "annotations"
 	ClusterAlertRuleFieldClusterID             = "clusterId"
+	ClusterAlertRuleFieldClusterScanRule       = "clusterScanRule"
 	ClusterAlertRuleFieldCreated               = "created"
 	ClusterAlertRuleFieldCreatorID             = "creatorId"
 	ClusterAlertRuleFieldEventRule             = "eventRule"
@@ -37,6 +38,7 @@ type ClusterAlertRule struct {
 	AlertState            string             `json:"alertState,omitempty" yaml:"alertState,omitempty"`
 	Annotations           map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	ClusterID             string             `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterScanRule       *ClusterScanRule   `json:"clusterScanRule,omitempty" yaml:"clusterScanRule,omitempty"`
 	Created               string             `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	EventRule             *EventRule         `json:"eventRule,omitempty" yaml:"eventRule,omitempty"`

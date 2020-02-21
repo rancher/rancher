@@ -3,6 +3,7 @@ package client
 const (
 	ClusterAlertRuleSpecType                       = "clusterAlertRuleSpec"
 	ClusterAlertRuleSpecFieldClusterID             = "clusterId"
+	ClusterAlertRuleSpecFieldClusterScanRule       = "clusterScanRule"
 	ClusterAlertRuleSpecFieldDisplayName           = "displayName"
 	ClusterAlertRuleSpecFieldEventRule             = "eventRule"
 	ClusterAlertRuleSpecFieldGroupID               = "groupId"
@@ -18,6 +19,7 @@ const (
 
 type ClusterAlertRuleSpec struct {
 	ClusterID             string             `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterScanRule       *ClusterScanRule   `json:"clusterScanRule,omitempty" yaml:"clusterScanRule,omitempty"`
 	DisplayName           string             `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	EventRule             *EventRule         `json:"eventRule,omitempty" yaml:"eventRule,omitempty"`
 	GroupID               string             `json:"groupId,omitempty" yaml:"groupId,omitempty"`

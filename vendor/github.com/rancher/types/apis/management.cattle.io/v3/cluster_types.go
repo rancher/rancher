@@ -68,9 +68,7 @@ const (
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
 	ClusterDriverRKE      = "rancherKubernetesEngine"
-	ClusterDriverGKE      = "googleKubernetesEngine"
-	ClusterDriverEKS      = "amazonElasticContainerService"
-	ClusterDriverAKS      = "azureKubernetesService"
+	ClusterDriverK3s      = "k3s"
 )
 
 // +genclient
@@ -103,6 +101,7 @@ type ClusterSpecBase struct {
 	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring" norman:"default=false"`
 	WindowsPreferedCluster               bool                           `json:"windowsPreferedCluster" norman:"noupdate"`
 	LocalClusterAuthEndpoint             LocalClusterAuthEndpoint       `json:"localClusterAuthEndpoint,omitempty"`
+	ScheduledClusterScan                 *ScheduledClusterScan          `json:"scheduledClusterScan,omitempty"`
 }
 
 type ClusterSpec struct {
@@ -110,6 +109,7 @@ type ClusterSpec struct {
 	DisplayName                         string              `json:"displayName" norman:"required"`
 	Description                         string              `json:"description"`
 	Internal                            bool                `json:"internal" norman:"nocreate,noupdate"`
+	K3sConfig                           *K3sConfig          `json:"k3sConfig,omitempty"`
 	ImportedConfig                      *ImportedConfig     `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
 	GoogleKubernetesEngineConfig        *MapStringInterface `json:"googleKubernetesEngineConfig,omitempty"`
 	AzureKubernetesServiceConfig        *MapStringInterface `json:"azureKubernetesServiceConfig,omitempty"`
@@ -131,27 +131,28 @@ type ClusterStatus struct {
 	Conditions []ClusterCondition `json:"conditions,omitempty"`
 	// Component statuses will represent cluster's components (etcd/controller/scheduler) health
 	// https://kubernetes.io/docs/api-reference/v1.8/#componentstatus-v1-core
-	Driver                               string                    `json:"driver"`
-	AgentImage                           string                    `json:"agentImage"`
-	AgentFeatures                        map[string]bool           `json:"agentFeatures,omitempty"`
-	AuthImage                            string                    `json:"authImage"`
-	ComponentStatuses                    []ClusterComponentStatus  `json:"componentStatuses,omitempty"`
-	APIEndpoint                          string                    `json:"apiEndpoint,omitempty"`
-	ServiceAccountToken                  string                    `json:"serviceAccountToken,omitempty"`
-	CACert                               string                    `json:"caCert,omitempty"`
-	Capacity                             v1.ResourceList           `json:"capacity,omitempty"`
-	Allocatable                          v1.ResourceList           `json:"allocatable,omitempty"`
-	AppliedSpec                          ClusterSpec               `json:"appliedSpec,omitempty"`
-	FailedSpec                           *ClusterSpec              `json:"failedSpec,omitempty"`
-	Requested                            v1.ResourceList           `json:"requested,omitempty"`
-	Limits                               v1.ResourceList           `json:"limits,omitempty"`
-	Version                              *version.Info             `json:"version,omitempty"`
-	AppliedPodSecurityPolicyTemplateName string                    `json:"appliedPodSecurityPolicyTemplateId"`
-	AppliedEnableNetworkPolicy           bool                      `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
-	Capabilities                         Capabilities              `json:"capabilities,omitempty"`
-	MonitoringStatus                     *MonitoringStatus         `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
-	IstioEnabled                         bool                      `json:"istioEnabled,omitempty" norman:"nocreate,noupdate,default=false"`
-	CertificatesExpiration               map[string]CertExpiration `json:"certificatesExpiration,omitempty"`
+	Driver                               string                      `json:"driver"`
+	AgentImage                           string                      `json:"agentImage"`
+	AgentFeatures                        map[string]bool             `json:"agentFeatures,omitempty"`
+	AuthImage                            string                      `json:"authImage"`
+	ComponentStatuses                    []ClusterComponentStatus    `json:"componentStatuses,omitempty"`
+	APIEndpoint                          string                      `json:"apiEndpoint,omitempty"`
+	ServiceAccountToken                  string                      `json:"serviceAccountToken,omitempty"`
+	CACert                               string                      `json:"caCert,omitempty"`
+	Capacity                             v1.ResourceList             `json:"capacity,omitempty"`
+	Allocatable                          v1.ResourceList             `json:"allocatable,omitempty"`
+	AppliedSpec                          ClusterSpec                 `json:"appliedSpec,omitempty"`
+	FailedSpec                           *ClusterSpec                `json:"failedSpec,omitempty"`
+	Requested                            v1.ResourceList             `json:"requested,omitempty"`
+	Limits                               v1.ResourceList             `json:"limits,omitempty"`
+	Version                              *version.Info               `json:"version,omitempty"`
+	AppliedPodSecurityPolicyTemplateName string                      `json:"appliedPodSecurityPolicyTemplateId"`
+	AppliedEnableNetworkPolicy           bool                        `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
+	Capabilities                         Capabilities                `json:"capabilities,omitempty"`
+	MonitoringStatus                     *MonitoringStatus           `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
+	IstioEnabled                         bool                        `json:"istioEnabled,omitempty" norman:"nocreate,noupdate,default=false"`
+	CertificatesExpiration               map[string]CertExpiration   `json:"certificatesExpiration,omitempty"`
+	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty"`
 }
 
 type ClusterComponentStatus struct {

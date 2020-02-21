@@ -98,6 +98,24 @@ var amiForRegionAndVersion = map[string]map[string]string{
 		"me-south-1":     "ami-05c110c75b8ae1fe3",
 		"sa-east-1":      "ami-02fcd63b41f21e854",
 	},
+	"1.11": map[string]string{
+		"us-east-2":      "ami-0c2d37a56f30b2cd0",
+		"us-east-1":      "ami-01435d4abb8836f9c",
+		"us-west-2":      "ami-0c1cd0372838861f6",
+		"ap-east-1":      "ami-030dee9ad8a9a5c1b",
+		"ap-south-1":     "ami-0db960e929a6c75da",
+		"ap-northeast-1": "ami-0298c1ab8a5599cf9",
+		"ap-northeast-2": "ami-0baf575e00e61712d",
+		"ap-southeast-1": "ami-030dc075fc6872ad7",
+		"ap-southeast-2": "ami-02fa3014ad1a00b7d",
+		"eu-central-1":   "ami-0434110cf5309f4e1",
+		"eu-west-1":      "ami-0f0e88de9379b9c95",
+		"eu-west-2":      "ami-03f8f3f1528d93e04",
+		"eu-west-3":      "ami-01988ee99f98966f7",
+		"eu-north-1":     "ami-0fc608c08cb99d7fd",
+		"me-south-1":     "ami-0d42009e1907c9803",
+		"sa-east-1":      "ami-03d871c12f6433d06",
+	},
 }
 
 type Driver struct {
@@ -334,7 +352,8 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.AMI = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ami").(string)
 	state.AssociateWorkerNodePublicIP, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "associate-worker-node-public-ip", "associateWorkerNodePublicIp").(*bool)
 	state.KeyPairName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "keyPairName").(string)
-	state.EBSEncryption = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "ebsEncryption", "EBSEncryption").(bool)
+	state.EBSEncryption = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "ebs-encryption", "EBSEncryption").(bool)
+
 	// UserData
 	state.UserData = options.GetValueFromDriverOptions(driverOptions, types.StringType, "user-data", "userData").(string)
 
