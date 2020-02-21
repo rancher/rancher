@@ -3,12 +3,12 @@ package clusterdeploy
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -246,14 +246,14 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			time.Sleep(2 * time.Second)
 		}
 		if err != nil {
-			return cluster, types.NewErrors(err, errors.New(string(output)))
+			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl apply failed")
 		}
 		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AuthImage != "" {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
 		if err != nil {
-			return cluster, types.NewErrors(err, errors.New(string(output)))
+			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
 		}
 		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
