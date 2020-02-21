@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rancher/steve/pkg/schemaserver/urlbuilder"
 )
 
 type RouterFunc func(h Handlers) http.Handler
@@ -20,6 +21,7 @@ func Routes(h Handlers) http.Handler {
 	m := mux.NewRouter()
 	m.UseEncodedPath()
 	m.StrictSlash(true)
+	m.Use(urlbuilder.RedirectRewrite)
 
 	m.Path("/").Handler(h.APIRoot).HeadersRegexp("Accepts", ".*json.*")
 	m.Path("/{name:v1}").Handler(h.APIRoot)
