@@ -11,6 +11,7 @@ const (
 	AlertmanagerFieldAnnotations          = "annotations"
 	AlertmanagerFieldBaseImage            = "baseImage"
 	AlertmanagerFieldConfigMaps           = "configMaps"
+	AlertmanagerFieldConfigSecret         = "configSecret"
 	AlertmanagerFieldContainers           = "containers"
 	AlertmanagerFieldCreated              = "created"
 	AlertmanagerFieldCreatorID            = "creatorId"
@@ -59,6 +60,7 @@ type Alertmanager struct {
 	Annotations          map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	BaseImage            string                 `json:"baseImage,omitempty" yaml:"baseImage,omitempty"`
 	ConfigMaps           []string               `json:"configMaps,omitempty" yaml:"configMaps,omitempty"`
+	ConfigSecret         string                 `json:"configSecret,omitempty" yaml:"configSecret,omitempty"`
 	Containers           []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created              string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`

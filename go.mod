@@ -9,6 +9,7 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
+	github.com/rancher/types => github.com/daxmc99/types v0.0.0-20200221224941-441383db245d
 
 	k8s.io/api => k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.17.2
@@ -35,16 +36,16 @@ replace (
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.9.0
-	github.com/Azure/go-autorest/autorest/adal v0.5.0
+	github.com/Azure/azure-sdk-for-go v36.1.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.9.3-0.20191028180845-3492b2aff503
+	github.com/Azure/go-autorest/autorest/adal v0.8.1-0.20191028180845-3492b2aff503
 	github.com/DataDog/zstd v1.4.1 // indirect
-	github.com/aws/aws-sdk-go v1.24.1
+	github.com/aws/aws-sdk-go v1.25.48
 	github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1 // indirect
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/etcd v3.3.15+incompatible
-	github.com/coreos/prometheus-operator v0.33.0
+	github.com/coreos/prometheus-operator v0.36.0
 	github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -71,8 +72,8 @@ require (
 	github.com/pierrec/lz4 v2.2.6+incompatible // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.4.0
-	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
-	github.com/prometheus/common v0.6.0
+	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
+	github.com/prometheus/common v0.7.0
 	github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
@@ -103,10 +104,10 @@ require (
 	golang.org/x/crypto v0.0.0-20200207205829-a95e85b341fd
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	google.golang.org/api v0.7.0
-	google.golang.org/grpc v1.24.0
+	google.golang.org/api v0.14.0
+	google.golang.org/grpc v1.25.1
 	gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175 // indirect
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.5
@@ -115,7 +116,7 @@ require (
 	k8s.io/apimachinery v0.17.2
 	k8s.io/apiserver v0.17.2
 	k8s.io/cli-runtime v0.17.2
-	k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible
+	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kubernetes v1.17.2
-	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+	k8s.io/utils v0.0.0-20191114200735-6ca3b61696b6
 )

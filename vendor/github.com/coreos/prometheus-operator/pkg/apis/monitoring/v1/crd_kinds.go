@@ -32,6 +32,7 @@ type CrdKinds struct {
 	ServiceMonitor CrdKind
 	PodMonitor     CrdKind
 	PrometheusRule CrdKind
+	ThanosRuler    CrdKind
 }
 
 var DefaultCrdKinds = CrdKinds{
@@ -41,6 +42,7 @@ var DefaultCrdKinds = CrdKinds{
 	PodMonitor:     CrdKind{Plural: PodMonitorName, Kind: PodMonitorsKind, SpecName: "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1.PodMonitor"},
 	Alertmanager:   CrdKind{Plural: AlertmanagerName, Kind: AlertmanagersKind, SpecName: "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1.Alertmanager"},
 	PrometheusRule: CrdKind{Plural: PrometheusRuleName, Kind: PrometheusRuleKind, SpecName: "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1.PrometheusRule"},
+	ThanosRuler:    CrdKind{Plural: ThanosRulerName, Kind: ThanosRulerKind, SpecName: "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1.ThanosRuler"},
 }
 
 // Implement the flag.Value interface
@@ -52,12 +54,13 @@ func (crdkinds *CrdKinds) String() string {
 func (crdkinds *CrdKinds) Set(value string) error {
 	*crdkinds = DefaultCrdKinds
 	if value == "" {
-		value = fmt.Sprintf("%s=%s:%s,%s=%s:%s,%s=%s:%s,%s=%s:%s,%s=%s:%s",
+		value = fmt.Sprintf("%s=%s:%s,%s=%s:%s,%s=%s:%s,%s=%s:%s,%s=%s:%s,%s=%s:%s",
 			PrometheusKindKey, PrometheusesKind, PrometheusName,
 			AlertManagerKindKey, AlertmanagersKind, AlertmanagerName,
 			ServiceMonitorKindKey, ServiceMonitorsKind, ServiceMonitorName,
 			PodMonitorKindKey, PodMonitorsKind, PodMonitorName,
 			PrometheusRuleKindKey, PrometheusRuleKind, PrometheusRuleName,
+			ThanosRulerKindKey, ThanosRulerKind, ThanosRulerName,
 		)
 	}
 	splited := strings.Split(value, ",")
@@ -76,6 +79,8 @@ func (crdkinds *CrdKinds) Set(value string) error {
 			(*crdkinds).Alertmanager = crdKind
 		case PrometheusRuleKindKey:
 			(*crdkinds).PrometheusRule = crdKind
+		case ThanosRulerKindKey:
+			(*crdkinds).ThanosRuler = crdKind
 		default:
 			fmt.Printf("Warning: unknown kind: %s... ignoring", kindKey)
 		}
