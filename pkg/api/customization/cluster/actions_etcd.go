@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -38,7 +40,12 @@ func (a ActionHandler) BackupEtcdHandler(actionName string, action *types.Action
 		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
 	}
 
-	newBackup := etcdbackup.NewBackupObject(cluster, true)
+	newBackup, err := etcdbackup.NewBackupObject(cluster, true)
+	if err != nil {
+		response["message"] = "failed to initialize etcdbackup object"
+		apiContext.WriteResponse(http.StatusInternalServerError, response)
+		return errors.Wrapf(err, "failed to initialize etcdbackup object")
+	}
 
 	backup, err := a.BackupClient.Create(newBackup)
 	if err != nil {
@@ -88,13 +95,14 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
 	}
 
+	var backup *v3.EtcdBackup
 	clusterBackupConfig := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
 	if clusterBackupConfig != nil && clusterBackupConfig.S3BackupConfig == nil {
 		ns, name := ref.Parse(input.EtcdBackupID)
 		if ns == "" || name == "" {
 			return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid input id %s", input.EtcdBackupID))
 		}
-		backup, err := a.BackupClient.GetNamespaced(ns, name, v1.GetOptions{})
+		backup, err = a.BackupClient.GetNamespaced(ns, name, v1.GetOptions{})
 		if err != nil {
 			response["message"] = "error getting backup config"
 			apiContext.WriteResponse(http.StatusInternalServerError, response)
@@ -106,8 +114,32 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 		}
 	}
 
+	if input.RestoreRkeConfig != "" && backup.Status.ClusterObject == "" {
+		// attempting to restore rke config and the backup does not contain data, probably pre 2.4 backup
+		return httperror.NewAPIError(httperror.MethodNotAllowed,
+			fmt.Sprintf("unable to restore RKE config, backup contains no cluster object: %s", input.EtcdBackupID))
+	}
+
+	// backup was taken in 2.4+ and has content
+	switch strings.ToLower(input.RestoreRkeConfig) {
+	case "kubernetesVersion":
+		// restore from copy stored inline to not have to decompress object
+		cluster.Spec.RancherKubernetesEngineConfig.Version = backup.Status.KubernetesVersion
+	case "all":
+		clusterBackup, err := etcdbackup.DecompressCluster(backup.Status.ClusterObject)
+		if err != nil {
+			response["message"] = "error decompressing cluster object"
+			apiContext.WriteResponse(http.StatusInternalServerError, response)
+			return errors.Wrap(err,
+				fmt.Sprintf("error decompressing cluster object for backupid %s: %s", input.EtcdBackupID, err))
+		}
+		cluster.Spec.RancherKubernetesEngineConfig = clusterBackup.Spec.RancherKubernetesEngineConfig
+	}
+
+	// flag cluster for restore
 	cluster.Spec.RancherKubernetesEngineConfig.Restore.SnapshotName = input.EtcdBackupID
 	cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore = true
+
 	if _, err = a.ClusterClient.Update(cluster); err != nil {
 		response["message"] = "failed to update cluster object"
 		apiContext.WriteResponse(http.StatusInternalServerError, response)
