@@ -17,9 +17,11 @@ func ParseRequestURL(r *http.Request) string {
 
 func GetHost(r *http.Request, scheme string) string {
 	host := r.Header.Get(ForwardedAPIHostHeader)
-	if host == "" {
-		host = strings.Split(r.Header.Get(ForwardedHostHeader), ",")[0]
+	if host != "" {
+		return host
 	}
+
+	host = strings.Split(r.Header.Get(ForwardedHostHeader), ",")[0]
 	if host == "" {
 		host = r.Host
 	}
@@ -39,7 +41,7 @@ func GetHost(r *http.Request, scheme string) string {
 
 	hostname, _, err := net.SplitHostPort(host)
 	if err != nil {
-		return host
+		hostname = host
 	}
 
 	return strings.Join([]string{hostname, port}, ":")
