@@ -97,14 +97,11 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "CoreDNS"
 spec:
+  replicas: 1
   strategy:
-{{if .UpdateStrategy}}
-{{ toYaml .UpdateStrategy | indent 4}}
-{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-{{end}}
   selector:
     matchLabels:
       k8s-app: kube-dns
@@ -269,11 +266,7 @@ spec:
           - --target=Deployment/coredns
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
-{{if .LinearAutoscalerParams}}
-          - --default-params={"linear":{{.LinearAutoscalerParams}}}
-{{else}}
           - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1}}
-{{end}}
           - --logtostderr=true
           - --v=2
 {{- if eq .RBACConfig "rbac"}}
@@ -406,14 +399,11 @@ metadata:
     k8s-app: kube-dns
     kubernetes.io/name: "CoreDNS"
 spec:
+  replicas: 1
   strategy:
-{{if .UpdateStrategy}}
-{{ toYaml .UpdateStrategy | indent 4}}
-{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-{{end}}
   selector:
     matchLabels:
       k8s-app: kube-dns
@@ -577,11 +567,7 @@ spec:
           - --target=Deployment/coredns
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
-{{if .LinearAutoscalerParams}}
-          - --default-params={"linear":{{.LinearAutoscalerParams}}}
-{{else}}
           - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1,"preventSinglePointFailure":true}}
-{{end}}
           - --logtostderr=true
           - --v=2
 {{- if eq .RBACConfig "rbac"}}
@@ -715,13 +701,9 @@ metadata:
 spec:
   replicas: 1
   strategy:
-{{if .UpdateStrategy}}
-{{ toYaml .UpdateStrategy | indent 4}}
-{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-{{end}}
   selector:
     matchLabels:
       k8s-app: kube-dns
@@ -893,11 +875,7 @@ spec:
           - --target=Deployment/coredns
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
-{{if .LinearAutoscalerParams}}
-          - --default-params={"linear":{{.LinearAutoscalerParams}}}
-{{else}}
           - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1,"preventSinglePointFailure":true}}
-{{end}}
           - --nodelabels=node-role.kubernetes.io/worker=true,beta.kubernetes.io/os=linux
           - --logtostderr=true
           - --v=2

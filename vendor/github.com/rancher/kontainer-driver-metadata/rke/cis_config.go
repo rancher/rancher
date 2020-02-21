@@ -23,11 +23,5 @@ func loadCisBenchmarkVersionInfo() map[string]v3.CisBenchmarkVersionInfo {
 		"cis-1.4": {
 			MinKubernetesVersion: "1.13",
 		},
-		"rke-cis-1.5": {
-			MinKubernetesVersion: "1.15",
-		},
-		"cis-1.5": {
-			MinKubernetesVersion: "1.15",
-		},
 	}
 }

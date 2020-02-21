@@ -32,8 +32,9 @@ github.com/Masterminds/goutils
 github.com/Masterminds/semver/v3
 # github.com/Masterminds/sprig/v3 v3.0.0
 github.com/Masterminds/sprig/v3
-# github.com/Microsoft/go-winio v0.4.12
+# github.com/Microsoft/go-winio v0.4.14
 github.com/Microsoft/go-winio
+github.com/Microsoft/go-winio/pkg/guid
 # github.com/PuerkitoBio/purell v1.1.1
 github.com/PuerkitoBio/purell
 # github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
@@ -89,7 +90,7 @@ github.com/beorn7/perks/quantile
 github.com/bep/debounce
 # github.com/blang/semver v3.5.1+incompatible
 github.com/blang/semver
-# github.com/containerd/containerd v1.3.0-beta.0.0.20190808172034-23faecfb66ab
+# github.com/containerd/containerd v1.3.0
 github.com/containerd/containerd/errdefs
 # github.com/coreos/etcd v3.3.15+incompatible
 github.com/coreos/etcd/client
@@ -118,7 +119,7 @@ github.com/dgrijalva/jwt-go
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
 github.com/docker/distribution/registry/api/errcode
-# github.com/docker/docker v0.7.3-0.20190808172531-150530564a14
+# github.com/docker/docker v1.4.2-0.20190924003213-a8608b5b67c7
 github.com/docker/docker/api
 github.com/docker/docker/api/types
 github.com/docker/docker/api/types/blkiodev
@@ -303,9 +304,9 @@ github.com/prometheus/client_golang/api/prometheus/v1
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
-# github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
+# github.com/prometheus/client_model v0.2.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.6.0
+# github.com/prometheus/common v0.9.1
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
@@ -320,10 +321,10 @@ github.com/rancher/dynamiclistener/server
 github.com/rancher/dynamiclistener/storage/file
 github.com/rancher/dynamiclistener/storage/kubernetes
 github.com/rancher/dynamiclistener/storage/memory
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
-# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200212233641-64154ac214a7
+# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
 github.com/rancher/kontainer-engine/cluster
 github.com/rancher/kontainer-engine/drivers/aks
 github.com/rancher/kontainer-engine/drivers/eks
@@ -349,7 +350,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200221203008-9bd5ca9698ed
+# github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -397,7 +398,7 @@ github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.5
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
-# github.com/rancher/rke v1.1.0-rc6
+# github.com/rancher/rke v1.1.0-rc4.0.20200205094053-56d4c1b93702
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -422,7 +423,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.5
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200221201742-c069f32bbe2f
+# github.com/rancher/steve v0.0.0-20200214232004-4218314653de
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
@@ -453,7 +454,7 @@ github.com/rancher/steve/pkg/server/resources/common
 github.com/rancher/steve/pkg/server/resources/counts
 github.com/rancher/steve/pkg/server/router
 github.com/rancher/steve/pkg/server/store/proxy
-# github.com/rancher/types v0.0.0-20200220172136-2eaa9b5bc71b
+# github.com/rancher/types v0.0.0-20200224175835-5ddaf240b0fa
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
@@ -744,7 +745,7 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175
 gopkg.in/asn1-ber.v1
-# gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
+# gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 gopkg.in/check.v1
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
@@ -754,7 +755,7 @@ gopkg.in/ini.v1
 gopkg.in/ldap.v2
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
-# gopkg.in/yaml.v2 v2.2.5
+# gopkg.in/yaml.v2 v2.2.8
 gopkg.in/yaml.v2
 # k8s.io/api v0.17.2 => k8s.io/api v0.17.2
 k8s.io/api/admissionregistration/v1
@@ -1118,8 +1119,6 @@ k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1
 # k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/util/proto
-# k8s.io/kubectl v0.17.2 => k8s.io/kubectl v0.17.2
-k8s.io/kubectl/pkg/drain
 # k8s.io/kubernetes v1.17.2 => k8s.io/kubernetes v1.17.2
 k8s.io/kubernetes/pkg/api/service
 k8s.io/kubernetes/pkg/api/v1/pod
