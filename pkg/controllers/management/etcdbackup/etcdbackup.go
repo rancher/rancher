@@ -1,10 +1,15 @@
 package etcdbackup
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -187,7 +192,10 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 }
 
 func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error) {
-	newBackup := NewBackupObject(cluster, false)
+	newBackup, err := NewBackupObject(cluster, false)
+	if err != nil {
+		return nil, err
+	}
 	v3.BackupConditionCreated.CreateUnknownIfNotExists(newBackup)
 	return c.backupClient.Create(newBackup)
 
@@ -261,7 +269,7 @@ func (c *Controller) rotateExpiredBackups(cluster *v3.Cluster, clusterBackups []
 	return nil
 }
 
-func NewBackupObject(cluster *v3.Cluster, manual bool) *v3.EtcdBackup {
+func NewBackupObject(cluster *v3.Cluster, manual bool) (*v3.EtcdBackup, error) {
 	controller := true
 	typeFlag := "r"     // recurring is the default
 	providerFlag := "l" // local is the default
@@ -273,6 +281,12 @@ func NewBackupObject(cluster *v3.Cluster, manual bool) *v3.EtcdBackup {
 		providerFlag = "s" // s3 backup
 	}
 	prefix := fmt.Sprintf("%s-%s%s-", cluster.Name, typeFlag, providerFlag)
+
+	compressedCluster, err := CompressCluster(cluster)
+	if err != nil {
+		return nil, err
+	}
+
 	return &v3.EtcdBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    cluster.Name,
@@ -288,10 +302,66 @@ func NewBackupObject(cluster *v3.Cluster, manual bool) *v3.EtcdBackup {
 			},
 		},
 		Spec: v3.EtcdBackupSpec{
-			ClusterID: cluster.Name,
-			Manual:    manual,
+			ClusterID:         cluster.Name,
+			ClusterObject:     compressedCluster,
+			Manual:            manual,
+			KubernetesVersion: cluster.Spec.RancherKubernetesEngineConfig.Version,
 		},
+	}, nil
+}
+
+func CompressCluster(cluster *v3.Cluster) (string, error) {
+	jsonCluster, err := json.Marshal(cluster)
+	if err != nil {
+		return "", err
 	}
+
+	var gzCluster bytes.Buffer
+	gz := gzip.NewWriter(&gzCluster)
+
+	_, err = gz.Write([]byte(jsonCluster))
+	if err != nil {
+		return "", err
+	}
+
+	if err = gz.Flush(); err != nil {
+		return "", err
+	}
+
+	if err := gz.Close(); err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(gzCluster.Bytes()), nil
+}
+
+func DecompressCluster(cluster string) (*v3.Cluster, error) {
+	clusterGzip, err := base64.StdEncoding.DecodeString(cluster)
+	if err != nil {
+		return nil, fmt.Errorf("error base64.DecodeString: %v", err)
+	}
+
+	buffer := bytes.NewBuffer(clusterGzip)
+
+	var gz io.Reader
+	gz, err = gzip.NewReader(buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	var clusterJSON bytes.Buffer
+	_, err = io.Copy(&clusterJSON, gz)
+	if err != nil {
+		return nil, err
+	}
+
+	c := v3.Cluster{}
+	err = json.Unmarshal(clusterJSON.Bytes(), &c)
+	if err != nil {
+		return nil, err
+	}
+
+	return &c, nil
 }
 
 func generateBackupFilename(snapshotName string, backupConfig *v3.BackupConfig) string {
