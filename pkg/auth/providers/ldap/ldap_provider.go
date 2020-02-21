@@ -32,6 +32,7 @@ const (
 )
 
 var (
+	errNotConfigured       = fmt.Errorf("not configured")
 	testAndApplyInputTypes = map[string]string{
 		FreeIpaName:  client.FreeIpaTestAndApplyInputType,
 		OpenLdapName: client.OpenLdapTestAndApplyInputType,
@@ -82,6 +83,10 @@ func GetLDAPConfig(authProvider common.AuthProvider) (*v3.LdapConfig, *x509.Cert
 	return ldapProvider.getLDAPConfig()
 }
 
+func IsNotConfigured(err error) bool {
+	return err == errNotConfigured
+}
+
 func (p *ldapProvider) GetName() string {
 	return p.providerName
 }
@@ -122,6 +127,9 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 
 	config, caPool, err := p.getLDAPConfig()
 	if err != nil {
+		if IsNotConfigured(err) {
+			return principals, err
+		}
 		logrus.Warnf("ldap search principals failed to get ldap config: %s\n", err)
 		return principals, nil
 	}
@@ -154,6 +162,9 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 func (p *ldapProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	config, caPool, err := p.getLDAPConfig()
 	if err != nil {
+		if IsNotConfigured(err) {
+			return v3.Principal{}, err
+		}
 		return v3.Principal{}, nil
 	}
 
@@ -211,10 +222,16 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 	storedLdapConfig := &v3.LdapConfig{}
 
 	if p.samlSearchProvider() && ldapConfigKey[p.providerName] != "" {
-		if subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]; ok {
-			storedLdapConfigMap = subLdapConfig.(map[string]interface{})
+		subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]
+		if !ok {
+			return nil, nil, errNotConfigured
 		}
+
+		storedLdapConfigMap = subLdapConfig.(map[string]interface{})
 		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
+		if len(storedLdapConfig.Servers) != 1 {
+			return storedLdapConfig, nil, errNotConfigured
+		}
 	} else {
 		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
 		metadataMap, ok := storedLdapConfigMap["metadata"].(map[string]interface{})
