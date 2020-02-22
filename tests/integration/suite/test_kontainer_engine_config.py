@@ -39,7 +39,7 @@ def test_eks_config_appears_correctly(admin_mc, remove_resource):
             "displayName": "EKS-api-cluster",
             "driverName": "amazonelasticcontainerservice",
             "instanceType": "t3.small",
-            "kubernetesVersion": "1.11",
+            "kubernetesVersion": "1.14",
             "maximumNodes": 3,
             "minimumNodes": 1,
             "region": "us-east-2",

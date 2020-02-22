@@ -323,7 +323,7 @@ github.com/rancher/dynamiclistener/storage/memory
 # github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
-# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
+# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200212233641-64154ac214a7
 github.com/rancher/kontainer-engine/cluster
 github.com/rancher/kontainer-engine/drivers/aks
 github.com/rancher/kontainer-engine/drivers/eks

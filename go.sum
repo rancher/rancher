@@ -807,8 +807,8 @@ github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932/go.mod h
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200123225253-a5b9f3e0b2df/go.mod h1:MkY6hsQLw3cHrb0V/Fmn4ur2c5PBIpLIe+gvMWoTXGI=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054 h1:yvMQKfMyjGWaPmD8dhYk0wZTsjxCZbNPXXa7pziRns0=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054/go.mod h1:MkY6hsQLw3cHrb0V/Fmn4ur2c5PBIpLIe+gvMWoTXGI=
-github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415 h1:01lzETFuWDv5POYCtil4LLFXIv3GfwFmrU6URkDqQI8=
-github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415/go.mod h1:3KvQxniSDxN8Ohdsv0ZmsqZXRdj/5ow2r1nZUv4GjsI=
+github.com/rancher/kontainer-engine v0.0.4-dev.0.20200212233641-64154ac214a7 h1:hnJPUZVXIhp2k+H4q4DooXqrqo2eADaAcpxeqOz8ppU=
+github.com/rancher/kontainer-engine v0.0.4-dev.0.20200212233641-64154ac214a7/go.mod h1:3KvQxniSDxN8Ohdsv0ZmsqZXRdj/5ow2r1nZUv4GjsI=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
