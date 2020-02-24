@@ -18,9 +18,4 @@ const (
 	// error type
 
 	Failed cond.Cond = "Failed"
-
-	// generic type
-	// these will not trigger any state change on the object
-
-	Alerted cond.Cond = "Alerted"
 )

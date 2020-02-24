@@ -11,11 +11,11 @@ const (
 	ClusterScanFieldCreated              = "created"
 	ClusterScanFieldCreatorID            = "creatorId"
 	ClusterScanFieldLabels               = "labels"
+	ClusterScanFieldManual               = "manual"
 	ClusterScanFieldName                 = "name"
 	ClusterScanFieldNamespaceId          = "namespaceId"
 	ClusterScanFieldOwnerReferences      = "ownerReferences"
 	ClusterScanFieldRemoved              = "removed"
-	ClusterScanFieldRunType              = "runType"
 	ClusterScanFieldScanConfig           = "scanConfig"
 	ClusterScanFieldScanType             = "scanType"
 	ClusterScanFieldState                = "state"
@@ -32,11 +32,11 @@ type ClusterScan struct {
 	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Labels               map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Manual               bool               `json:"manual,omitempty" yaml:"manual,omitempty"`
 	Name                 string             `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string             `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed              string             `json:"removed,omitempty" yaml:"removed,omitempty"`
-	RunType              string             `json:"runType,omitempty" yaml:"runType,omitempty"`
 	ScanConfig           *ClusterScanConfig `json:"scanConfig,omitempty" yaml:"scanConfig,omitempty"`
 	ScanType             string             `json:"scanType,omitempty" yaml:"scanType,omitempty"`
 	State                string             `json:"state,omitempty" yaml:"state,omitempty"`

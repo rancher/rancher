@@ -62,6 +62,10 @@ type EtcdBackupSpec struct {
 	Filename string `yaml:"filename" json:"filename,omitempty" norman:"noupdate"`
 	// backupConfig
 	BackupConfig BackupConfig `yaml:",omitempty" json:"backupConfig,omitempty" norman:"noupdate"`
+	// version of k8s in the backup pulled from rke config
+	KubernetesVersion string `yaml:"kubernetesVersion" json:"kubernetesVersion,omitempty" norman:"noupdate"`
+	// json + gzipped + base64 backup of the cluster object when the backup was created
+	ClusterObject string `yaml:"clusterObject" json:"clusterObject,omitempty" norman:"type=password,noupdate"`
 }
 
 type EtcdBackupStatus struct {

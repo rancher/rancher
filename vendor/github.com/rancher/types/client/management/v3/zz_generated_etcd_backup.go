@@ -9,9 +9,11 @@ const (
 	EtcdBackupFieldAnnotations          = "annotations"
 	EtcdBackupFieldBackupConfig         = "backupConfig"
 	EtcdBackupFieldClusterID            = "clusterId"
+	EtcdBackupFieldClusterObject        = "clusterObject"
 	EtcdBackupFieldCreated              = "created"
 	EtcdBackupFieldCreatorID            = "creatorId"
 	EtcdBackupFieldFilename             = "filename"
+	EtcdBackupFieldKubernetesVersion    = "kubernetesVersion"
 	EtcdBackupFieldLabels               = "labels"
 	EtcdBackupFieldManual               = "manual"
 	EtcdBackupFieldName                 = "name"
@@ -30,9 +32,11 @@ type EtcdBackup struct {
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	BackupConfig         *BackupConfig     `json:"backupConfig,omitempty" yaml:"backupConfig,omitempty"`
 	ClusterID            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterObject        string            `json:"clusterObject,omitempty" yaml:"clusterObject,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Filename             string            `json:"filename,omitempty" yaml:"filename,omitempty"`
+	KubernetesVersion    string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Manual               bool              `json:"manual,omitempty" yaml:"manual,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
