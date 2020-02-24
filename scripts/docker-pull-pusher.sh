@@ -1,14 +1,20 @@
 #!/bin/sh
 set -e
+set -x
 
 function mirror_image {
-  image_src="${1}"
-  image_dst="${2}"
-  image_tag="${3}"
-
-  docker pull "${image_src}:${image_tag}"
-  docker tag "${image_src}:${image_tag}" "${image_dst}:${image_tag}"
-  docker push "${image_dst}:${image_tag}"
+  manifest_dst="${1}"
+  shift
+  for arg in "$@"; do
+    arch=$(cut -d';' -f1 <<<"$arg")
+    image_src=$(cut -d';' -f2 <<<"$arg")
+    docker pull ${image_src}
+    docker tag ${image_src} ${manifest_dst}-${arch}
+    docker push ${manifest_dst}-${arch}
+    docker manifest create --amend ${manifest_dst} ${manifest_dst}-${arch}
+    docker manifest annotate ${manifest_dst} ${manifest_dst}-${arch} --arch ${arch}
+  done
+  docker manifest push -p ${manifest_dst}
 }
 
 # Check to see if a pipe exists on stdin.
@@ -16,6 +22,9 @@ if [ -p /dev/stdin ]; then
   echo "Data was piped to this script!"
   # If we want to read the input line by line
   while IFS= read -r line; do
+          if [ "$(echo "${line}" | head -c 1)" = "#" ]; then
+              continue
+          fi
           echo "Line: ${line}"
           mirror_image ${line}
   done
@@ -27,6 +36,9 @@ else
           input="${1}"
           while IFS= read -r line
           do
+            if [ "$(echo "${line}" | head -c 1)" = "#" ]; then
+              continue
+            fi
             echo "Line: ${line}"
             mirror_image ${line}
           done < "${input}"

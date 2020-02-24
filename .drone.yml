@@ -83,13 +83,14 @@ steps:
   - name: docker
     path: /var/run/docker.sock
   environment:
+    DOCKER_CLI_EXPERIMENTAL: enabled
     PASSWORD:
       from_secret: docker_password
     USERNAME:
       from_secret: docker_username
   commands:
   - docker login -u $USERNAME -p $PASSWORD
-  - cat scripts/istio-images-mirror | ./scripts/docker-pull-pusher.sh
+  - cat scripts/rancher-images-mirror | ./scripts/docker-pull-pusher.sh
   settings:
     custom_dns: 1.1.1.1
   when:

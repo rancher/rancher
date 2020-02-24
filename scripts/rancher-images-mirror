@@ -1,0 +1,47 @@
+# The image script will follow the format:
+# ${image_destination}:${tag} ${arch1};${image_source1}:${tag} ${arch2};${image_source1}:${tag} ${arch3};${image_source1}:${tag} ...
+# For example, giving the following line:
+#
+# rancher/coreos-etcd:v1 amd;coreos/etcd:v1 arm;coreos/etcd:v1-arm arm64;coreos/etcd:v1-arm64 windows-1903;coreos/etcd:v1-windows-1903
+#
+# Mirror scripts will create and tag the manifest:
+#
+#                            |amd ---->           rancher/coreos-etcd:v1-amd          -----> coreos/etcd:v1
+#                            |arm ---->           rancher/coreos-etcd:v1-arm          -----> coreos/etcd:v1-arm
+# rancher/coreos-etcd:v1 ----|arm64 ---->         rancher/coreos-etcd:v1-arm64        -----> coreos/etcd:v1-arm64
+#                            |windows-1903 ---->  rancher/coreos-etcd:v1-windows-1903 -----> coreos/etcd:v1-windows-1903
+#
+#
+#rancher/istio-sidecar_injector:1.4.4 amd64;istio/sidecar_injector:1.4.4
+#rancher/istio-galley:1.4.4 amd64;istio/galley:1.4.4
+#rancher/istio-mixer:1.4.4 amd64;istio/mixer:1.4.4
+#rancher/istio-pilot:1.4.4 amd64;istio/pilot:1.4.4
+#rancher/istio-citadel:1.4.4 amd64;istio/citadel:1.4.4
+#rancher/istio-kubectl:1.4.4 amd64;istio/kubectl:1.4.4
+#rancher/istio-proxyv2:1.4.4 amd64;istio/proxyv2:1.4.4
+#rancher/istio-node-agent-k8s:1.4.4 amd64;istio/node-agent-k8s:1.4.4
+#rancher/jaegertracing-all-in-one:1.14 amd64;jaegertracing/all-in-one:1.4.4
+#rancher/openzipkin-zipkin:2.14.2 amd64;openzipkin/zipkin:2.14.2
+#rancher/kiali-kiali:v1.9 amd64;kiali/kiali:v1.9
+#rancher/pstauffer-curl:v1.0.3 amd64;pstauffer/curl:v1.0.3
+#rancher/coredns-coredns:1.1.2 amd64;coredns/coredns:1.1.2
+#rancher/istio-coredns-plugin:0.2-istio-1.1 amd64;istio/coredns-plugin:0.2-istio-1.1
+#rancher/coreos-prometheus-operator:v0.36.0 amd64;quay.io/coreos/prometheus-operator:v0.36.0
+#rancher/coreos-prometheus-config-reloader:v0.36.0 amd64;quay.io/coreos/prometheus-config-reloader:v0.36.0
+#rancher/coreos-kube-state-metrics:v1.9.4 amd64;quay.io/coreos/kube-state-metrics:v1.9.4
+#rancher/plugins-docker:18.09 amd64;plugins/docker:18.09
+#rancher/minio-minio:RELEASE.2020-02-07T23-28-16Z amd64;minio/minio:RELEASE.2020-02-07T23-28-16Z
+#rancher/grafana-grafana:6.6.1 amd64;grafana/grafana:6.6.1
+#rancher/prom-prometheus:v2.16.0 amd64;prom/prometheus:v2.16.0
+#rancher/prom-alertmanager:v0.20.0 amd64;prom/alertmanager:v0.20.0
+#rancher/prom-node-exporter:v0.18.1 amd64;prom/node-exporter:v0.18.1
+#rancher/nginx:1.17.4-alpine amd64;library/nginx:1.17.4-alpine
+#rancher/jenkins-jnlp-slave:3.40-1 amd64;jenkins/jnlp-slave:3.40-1
+#rancher/thanos:v0.10.1 amd64;thanosio/thanos:v0.10.1
+#rancher/jetstack-cert-manager-controller:v0.8.1 amd64;quay.io/jetstack/cert-manager-controller:v0.8.1
+#rancher/calico-node:v3.10.2 amd64;quay.io/calico/node:v3.10.2
+#rancher/calico-cni:v3.10.2 amd64;quay.io/calico/cni:v3.10.2
+#rancher/calico-kube-controllers:v3.10.2 amd64;quay.io/calico/kube-controllers:v3.10.2
+#rancher/calico-pod2daemon-flexvol:v3.10.2 amd64;quay.io/calico/pod2daemon-flexvol:v3.10.2
+rancher/kubernetes-external-dns:v0.6.0 amd64;us.gcr.io/k8s-artifacts-prod/external-dns/external-dns:v0.6.0
+# Do not remove this line. This is to add line feed so script won't break
