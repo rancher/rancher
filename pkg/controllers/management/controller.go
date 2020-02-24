@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/controllers/management/catalog"
+	"github.com/rancher/rancher/pkg/controllers/management/certsexpiration"
 	"github.com/rancher/rancher/pkg/controllers/management/cloudcredential"
 	"github.com/rancher/rancher/pkg/controllers/management/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
@@ -37,6 +38,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 
 	// a-z
 	catalog.Register(ctx, management)
+	certsexpiration.Register(ctx, management)
 	cluster.Register(ctx, management)
 	clusterdeploy.Register(ctx, management, manager)
 	clustergc.Register(ctx, management)

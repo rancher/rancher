@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/rancher/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/rkecerts"
 	rkecluster "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
-	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/rke/services"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -65,7 +64,7 @@ func (c Controller) sync(key string, cluster *v3.Cluster) (runtime.Object, error
 		return cluster, err
 	}
 	for certName, certObj := range certBundle {
-		info, err := getCertExpiration(certObj.CertificatePEM)
+		info, err := rkecerts.GetCertExpiration(certObj.CertificatePEM)
 		if err != nil {
 			logrus.Debugf("failed to get expiration date for certificate [%s] for cluster [%s]:%v", certName, key, err)
 			continue
@@ -90,7 +89,7 @@ func (c Controller) getClusterCertificateBundle(clusterName string) (map[string]
 		return nil, err
 	}
 	if currentState != nil {
-		cleanCertificateBundle(currentState.CertificatesBundle)
+		rkecerts.CleanCertificateBundle(currentState.CertificatesBundle)
 		return currentState.CertificatesBundle, nil
 	}
 
@@ -99,7 +98,7 @@ func (c Controller) getClusterCertificateBundle(clusterName string) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	cleanCertificateBundle(certs)
+	rkecerts.CleanCertificateBundle(certs)
 	return certs, nil
 }
 
@@ -138,35 +137,6 @@ func (c Controller) getCertsFromUserCluster() (map[string]pki.CertificatePKI, er
 		}
 	}
 	return certs, nil
-}
-
-func cleanCertificateBundle(certs map[string]pki.CertificatePKI) {
-	for name := range certs {
-		if strings.Contains(name, "client") ||
-			strings.Contains(name, "token") ||
-			strings.Contains(name, "header") ||
-			strings.Contains(name, "admin") {
-			delete(certs, name)
-		}
-	}
-}
-
-func getCertificateExpDate(c string) (*time.Time, error) {
-	certs, err := cert.ParseCertsPEM([]byte(c))
-	if err != nil {
-		return nil, err
-	}
-	return &certs[0].NotAfter, nil
-}
-
-func getCertExpiration(c string) (v3.CertExpiration, error) {
-	date, err := getCertificateExpDate(c)
-	if err != nil {
-		return v3.CertExpiration{}, err
-	}
-	return v3.CertExpiration{
-		ExpirationDate: date.Format(time.RFC3339),
-	}, nil
 }
 
 //deleteUnusedCerts removes unused certs and cleans up kubelet certs when GenerateServingCertificate is disabled
