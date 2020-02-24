@@ -40,6 +40,7 @@ type MultiClusterAppSpec struct {
 type MultiClusterAppStatus struct {
 	Conditions   []v3.AppCondition `json:"conditions,omitempty"`
 	RevisionName string            `json:"revisionName,omitempty" norman:"type=reference[multiClusterAppRevision],required"`
+	HelmVersion  string            `json:"helmVersion,omitempty" norman:"nocreate,noupdate"`
 }
 
 type Target struct {
