@@ -107,14 +107,14 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 		return httperror.NewFieldAPIError(httperror.MissingRequired, "", "A clusterTemplateRevision to create a cluster")
 	}
 
-	canAccess, err := v.isTemplateAccessible(request, &spec)
+	err = v.accessTemplate(request, &spec)
 	if err != nil {
+		if httperror.IsForbidden(err) || httperror.IsNotFound(err) {
+			return httperror.NewAPIError(httperror.NotFound, "The clusterTemplateRevision is not found")
+		}
 		return err
 	}
 
-	if !canAccess {
-		return httperror.NewFieldAPIError(httperror.NotFound, "", "The clusterTemplateRevision is not found")
-	}
 	return nil
 }
 
@@ -129,21 +129,21 @@ func (v *Validator) checkClusterForEnforcement(spec *mgmtclient.Cluster) bool {
 	return false
 }
 
-func (v *Validator) isTemplateAccessible(request *types.APIContext, spec *mgmtclient.Cluster) (bool, error) {
+func (v *Validator) accessTemplate(request *types.APIContext, spec *mgmtclient.Cluster) error {
 	split := strings.SplitN(spec.ClusterTemplateRevisionID, ":", 2)
 	if len(split) != 2 {
-		return false, fmt.Errorf("error in splitting clusterTemplateRevision name %v", spec.ClusterTemplateRevisionID)
+		return fmt.Errorf("error in splitting clusterTemplateRevision name %v", spec.ClusterTemplateRevisionID)
 	}
 	revName := split[1]
 	clusterTempRev, err := v.ClusterTemplateRevisionLister.Get(namespace.GlobalNamespace, revName)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	var ctMap map[string]interface{}
 	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.ClusterTemplateType, clusterTempRev.Spec.ClusterTemplateName, &ctMap); err != nil {
-		return false, httperror.WrapAPIError(err, httperror.PermissionDenied, fmt.Sprintf("unable to access clusterTemplate by id: %v", err))
+		return err
 	}
 
-	return true, nil
+	return nil
 }
