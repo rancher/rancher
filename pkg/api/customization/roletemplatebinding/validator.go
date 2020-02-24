@@ -55,8 +55,13 @@ func (v *validator) validator(request *types.APIContext, schema *types.Schema, d
 		return nil
 	}
 
-	hasUserTarget := data["userId"] != nil || data["userPrincipalId"] != nil
-	hasGroupTarget := data["groupId"] != nil || data["groupPrincipalId"] != nil
+	userID, _ := data["userId"].(string)
+	userPrincipalID, _ := data["userPrincipalId"].(string)
+	groupID, _ := data["groupId"].(string)
+	groupPrincipalID, _ := data["groupPrincipalId"].(string)
+
+	hasUserTarget := userID != "" || userPrincipalID != ""
+	hasGroupTarget := groupID != "" || groupPrincipalID != ""
 
 	if (hasUserTarget && hasGroupTarget) || (!hasUserTarget && !hasGroupTarget) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must target a user [userId]/[userPrincipalId] "+
