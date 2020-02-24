@@ -70,7 +70,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/rancher-helm /usr/bin/tini /usr/bin/telemetry /usr/bin/rancher-tiller /usr/bin/k3s /usr/bin/kubectl
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.3.36
+ENV CATTLE_UI_VERSION 2.3.37
 ENV CATTLE_CLI_VERSION v2.3.2
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
