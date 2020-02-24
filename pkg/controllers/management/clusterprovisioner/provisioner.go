@@ -970,6 +970,7 @@ func k3sClusterConfig(cluster *v3.Cluster) error {
 	if cluster.Name == v3.ClusterDriverLocal || cluster.Status.Driver == v3.ClusterDriverK3s {
 		return nil
 	}
+
 	if strings.Contains(cluster.Status.Version.String(), "k3s") {
 		cluster.Status.Driver = v3.ClusterDriverK3s
 		// only set these values on init
