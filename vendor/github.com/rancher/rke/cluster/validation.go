@@ -3,14 +3,14 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rke/metadata"
+	"k8s.io/api/core/v1"
 	"strings"
 
 	"github.com/rancher/rke/log"
-	"github.com/rancher/rke/metadata"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -192,39 +192,6 @@ func ValidateHostCount(c *Cluster) error {
 	}
 	if len(c.EtcdHosts) > 0 && len(c.Services.Etcd.ExternalURLs) > 0 {
 		return fmt.Errorf("Cluster can't have both internal and external etcd")
-	}
-	return nil
-}
-
-func (c *Cluster) ValidateHostCountForUpgrade() error {
-	var inactiveControlPlaneHosts, inactiveWorkerOnlyHosts []string
-	var workerOnlyHosts int
-	for _, host := range c.InactiveHosts {
-		if host.IsControl {
-			inactiveControlPlaneHosts = append(inactiveControlPlaneHosts, host.HostnameOverride)
-		}
-		if !host.IsEtcd && !host.IsControl {
-			inactiveWorkerOnlyHosts = append(inactiveWorkerOnlyHosts, host.HostnameOverride)
-		}
-		// not breaking out of the loop so we can log all of the inactive hosts
-	}
-	if len(inactiveControlPlaneHosts) >= 1 {
-		return fmt.Errorf("cannot proceed with upgrade of controlplane if one or more controlplane hosts are inactive; found inactive hosts: %v", strings.Join(inactiveControlPlaneHosts, ","))
-	}
-
-	for _, host := range c.WorkerHosts {
-		if host.IsControl || host.IsEtcd {
-			continue
-		}
-		workerOnlyHosts++
-	}
-
-	maxUnavailable, err := services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailable, workerOnlyHosts)
-	if err != nil {
-		return err
-	}
-	if len(inactiveWorkerOnlyHosts) >= maxUnavailable {
-		return fmt.Errorf("cannot proceed with upgrade of worker components since %v (>=maxUnavailable) hosts are inactive; found inactive hosts: %v", len(inactiveWorkerOnlyHosts), strings.Join(inactiveWorkerOnlyHosts, ","))
 	}
 	return nil
 }

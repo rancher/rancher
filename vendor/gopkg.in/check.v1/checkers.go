@@ -161,6 +161,10 @@ func (checker *notNilChecker) Check(params []interface{}, names []string) (resul
 // Equals checker.
 
 func diffworthy(a interface{}) bool {
+	if a == nil {
+		return false
+	}
+
 	t := reflect.TypeOf(a)
 	switch t.Kind() {
 	case reflect.Array, reflect.Map, reflect.Slice, reflect.Struct, reflect.String, reflect.Ptr:

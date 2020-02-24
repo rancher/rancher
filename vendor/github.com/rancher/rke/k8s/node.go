@@ -18,8 +18,6 @@ const (
 	InternalAddressAnnotation = "rke.cattle.io/internal-ip"
 	ExternalAddressAnnotation = "rke.cattle.io/external-ip"
 	AWSCloudProvider          = "aws"
-	MaxRetries                = 5
-	RetryInterval             = 5
 )
 
 func DeleteNode(k8sClient *kubernetes.Clientset, nodeName, cloudProvider string) error {
@@ -39,35 +37,26 @@ func GetNodeList(k8sClient *kubernetes.Clientset) (*v1.NodeList, error) {
 }
 
 func GetNode(k8sClient *kubernetes.Clientset, nodeName string) (*v1.Node, error) {
-	var listErr error
-	for retries := 0; retries < MaxRetries; retries++ {
-		nodes, err := GetNodeList(k8sClient)
-		if err != nil {
-			listErr = err
-			time.Sleep(time.Second * RetryInterval)
-			continue
-		}
-		for _, node := range nodes.Items {
-			if strings.ToLower(node.Labels[HostnameLabel]) == strings.ToLower(nodeName) {
-				return &node, nil
-			}
-		}
-		time.Sleep(time.Second * RetryInterval)
+	nodes, err := GetNodeList(k8sClient)
+	if err != nil {
+		return nil, err
 	}
-	if listErr != nil {
-		return nil, listErr
+	for _, node := range nodes.Items {
+		if strings.ToLower(node.Labels[HostnameLabel]) == strings.ToLower(nodeName) {
+			return &node, nil
+		}
 	}
 	return nil, apierrors.NewNotFound(schema.GroupResource{}, nodeName)
 }
 
 func CordonUncordon(k8sClient *kubernetes.Clientset, nodeName string, cordoned bool) error {
 	updated := false
-	for retries := 0; retries < MaxRetries; retries++ {
+	for retries := 0; retries <= 5; retries++ {
 		node, err := GetNode(k8sClient, nodeName)
 		if err != nil {
 			logrus.Debugf("Error getting node %s: %v", nodeName, err)
-			// no need to retry here since GetNode already retries
-			return err
+			time.Sleep(time.Second * 5)
+			continue
 		}
 		if node.Spec.Unschedulable == cordoned {
 			logrus.Debugf("Node %s is already cordoned: %v", nodeName, cordoned)
@@ -77,7 +66,7 @@ func CordonUncordon(k8sClient *kubernetes.Clientset, nodeName string, cordoned b
 		_, err = k8sClient.CoreV1().Nodes().Update(node)
 		if err != nil {
 			logrus.Debugf("Error setting cordoned state for node %s: %v", nodeName, err)
-			time.Sleep(time.Second * RetryInterval)
+			time.Sleep(time.Second * 5)
 			continue
 		}
 		updated = true
@@ -91,7 +80,7 @@ func CordonUncordon(k8sClient *kubernetes.Clientset, nodeName string, cordoned b
 func IsNodeReady(node v1.Node) bool {
 	nodeConditions := node.Status.Conditions
 	for _, condition := range nodeConditions {
-		if condition.Type == v1.NodeReady && condition.Status == v1.ConditionTrue {
+		if condition.Type == "Ready" && condition.Status == v1.ConditionTrue {
 			return true
 		}
 	}

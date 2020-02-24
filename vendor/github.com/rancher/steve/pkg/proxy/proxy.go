@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -123,6 +124,7 @@ func stripLeaveSlash(prefix string, h http.Handler) http.Handler {
 			p = "/" + p
 		}
 		req.URL.Path = p
+		fmt.Println(req.Method, " ", req.URL.String())
 		h.ServeHTTP(w, req)
 	})
 }

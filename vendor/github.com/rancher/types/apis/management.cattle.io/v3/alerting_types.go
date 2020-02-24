@@ -161,6 +161,7 @@ type ClusterAlertRuleSpec struct {
 	EventRule         *EventRule         `json:"eventRule,omitempty"`
 	SystemServiceRule *SystemServiceRule `json:"systemServiceRule,omitempty"`
 	MetricRule        *MetricRule        `json:"metricRule,omitempty"`
+	ClusterScanRule   *ClusterScanRule   `json:"clusterScanRule,omitempty"`
 }
 
 type ProjectAlertRule struct {
@@ -197,6 +198,11 @@ type CommonRuleField struct {
 	Severity    string `json:"severity,omitempty" norman:"required,options=info|critical|warning,default=critical"`
 	Inherited   *bool  `json:"inherited,omitempty" norman:"default=true"`
 	TimingField
+}
+
+type ClusterScanRule struct {
+	ScanRunType  ClusterScanRunType `json:"scanRunType,omitempty" norman:"required,options=manual|scheduled,default=scheduled"`
+	FailuresOnly bool               `json:"failuresOnly,omitempty"`
 }
 
 type MetricRule struct {

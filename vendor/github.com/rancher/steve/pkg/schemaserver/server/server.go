@@ -3,7 +3,6 @@ package server
 import (
 	"net/http"
 
-	"github.com/rancher/steve/pkg/schemaserver/builtin"
 	"github.com/rancher/steve/pkg/schemaserver/handlers"
 	"github.com/rancher/steve/pkg/schemaserver/parse"
 	"github.com/rancher/steve/pkg/schemaserver/types"
@@ -40,7 +39,7 @@ type Defaults struct {
 
 func DefaultAPIServer() *Server {
 	s := &Server{
-		Schemas: types.EmptyAPISchemas().MustAddSchemas(builtin.Schemas),
+		Schemas: types.EmptyAPISchemas(),
 		ResponseWriters: map[string]types.ResponseWriter{
 			"json": &writer.EncodingResponseWriter{
 				ContentType: "application/json",
@@ -151,10 +150,6 @@ func (s *Server) Handle(apiOp *types.APIRequest) {
 }
 
 func (s *Server) handle(apiOp *types.APIRequest, parser parse.Parser) {
-	if apiOp.Schemas == nil {
-		apiOp.Schemas = s.Schemas
-	}
-
 	if err := parser(apiOp, parse.MuxURLParser); err != nil {
 		// ensure defaults set so writer is assigned
 		s.setDefaults(apiOp)

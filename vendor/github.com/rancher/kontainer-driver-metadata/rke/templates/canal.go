@@ -221,13 +221,9 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
-{{if .UpdateStrategy}}
-{{ toYaml .UpdateStrategy | indent 4}}
-{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-{{end}}
   template:
     metadata:
       labels:
@@ -774,10 +770,8 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if .MTU }}
-{{- if ne .MTU 0 }}
+{{- if ne (default 0 .MTU) 0}}
           "mtu": {{.MTU}},
-{{- end}}
 {{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
@@ -826,13 +820,9 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
-{{if .UpdateStrategy}}
-{{ toYaml .UpdateStrategy | indent 4}}
-{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-{{end}}
   template:
     metadata:
       labels:
@@ -1390,10 +1380,8 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if .MTU }}
-{{- if ne .MTU 0 }}
+{{- if ne (default 0 .MTU) 0}}
           "mtu": {{.MTU}},
-{{- end}}
 {{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
@@ -1442,13 +1430,9 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
-{{if .UpdateStrategy}}
-{{ toYaml .UpdateStrategy | indent 4}}
-{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-{{end}}
   template:
     metadata:
       labels:
@@ -1845,10 +1829,8 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if .MTU }}
-{{- if ne .MTU 0 }}
+{{- if ne (default 0 .MTU) 0}}
           "mtu": {{.MTU}},
-{{- end}}
 {{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
@@ -2195,13 +2177,9 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
-{{if .UpdateStrategy}}
-{{ toYaml .UpdateStrategy | indent 4}}
-{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-{{end}}
   template:
     metadata:
       labels:
@@ -2481,10 +2459,8 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if .MTU }}
-{{- if ne .MTU 0 }}
+{{- if ne (default 0 .MTU) 0}}
           "mtu": {{.MTU}},
-{{- end}}
 {{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
@@ -2832,13 +2808,9 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
-{{if .UpdateStrategy}}
-{{ toYaml .UpdateStrategy | indent 4}}
-{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
-{{end}}
   template:
     metadata:
       labels:

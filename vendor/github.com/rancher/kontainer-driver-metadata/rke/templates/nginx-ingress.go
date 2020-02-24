@@ -168,10 +168,6 @@ spec:
   selector:
     matchLabels:
       app: ingress-nginx
-{{if .UpdateStrategy}}
-  updateStrategy:
-{{ toYaml .UpdateStrategy | indent 4}}
-{{end}}
   template:
     metadata:
       labels:
@@ -531,10 +527,6 @@ spec:
   selector:
     matchLabels:
       app: ingress-nginx
-{{if .UpdateStrategy}}
-  updateStrategy:
-{{ toYaml .UpdateStrategy | indent 4}}
-{{end}}
   template:
     metadata:
       labels:
