@@ -38,7 +38,15 @@ func (a *APISchemas) MustImportAndCustomize(obj interface{}, f func(*APISchema))
 		Schema: schema,
 	}
 	a.Schemas[schema.ID] = apiSchema
+	a.addToIndex(apiSchema)
 	f(apiSchema)
+}
+
+func (a *APISchemas) MustAddSchemas(schemas *APISchemas) *APISchemas {
+	if err := a.AddSchemas(schemas); err != nil {
+		logrus.Fatalf("failed to add schemas: %v", err)
+	}
+	return a
 }
 
 func (a *APISchemas) AddSchemas(schema *APISchemas) error {
@@ -50,14 +58,18 @@ func (a *APISchemas) AddSchemas(schema *APISchemas) error {
 	return nil
 }
 
+func (a *APISchemas) addToIndex(schema *APISchema) {
+	a.index[strings.ToLower(schema.ID)] = schema
+	a.index[strings.ToLower(schema.PluralName)] = schema
+}
+
 func (a *APISchemas) AddSchema(schema APISchema) error {
 	if err := a.InternalSchemas.AddSchema(*schema.Schema); err != nil {
 		return err
 	}
 	schema.Schema = a.InternalSchemas.Schema(schema.ID)
 	a.Schemas[schema.ID] = &schema
-	a.index[strings.ToLower(schema.ID)] = &schema
-	a.index[strings.ToLower(schema.PluralName)] = &schema
+	a.addToIndex(&schema)
 	return nil
 }
 

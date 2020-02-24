@@ -6,9 +6,6 @@ var Mirrors = map[string]string{}
 
 func Mirror(image string) string {
 	orig := image
-	if strings.HasPrefix(image, "weaveworks") {
-		return image
-	}
 
 	image = strings.Replace(image, "gcr.io/google_containers", "rancher", 1)
 	image = strings.Replace(image, "quay.io/coreos/", "rancher/coreos-", 1)
@@ -24,6 +21,7 @@ func Mirror(image string) string {
 	image = strings.Replace(image, "quay.io/pires", "rancher", 1)
 	image = strings.Replace(image, "coredns/", "rancher/coredns-", 1)
 	image = strings.Replace(image, "minio/", "rancher/minio-", 1)
+	image = strings.Replace(image, "weaveworks/", "rancher/weaveworks-", 1)
 
 	Mirrors[image] = orig
 	return image
