@@ -289,7 +289,8 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, fmt.Errorf("failed to query %q App in %s Project, %v", appName, systemProjectName, err)
 	}
-	if app.Name == appName {
+
+	if app != nil && app.Name == appName {
 		if app.DeletionTimestamp != nil {
 			return false, fmt.Errorf("stale %q App in %s Project is still on terminating", appName, systemProjectName)
 		}
