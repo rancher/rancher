@@ -398,7 +398,7 @@ github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.5
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
-# github.com/rancher/rke v1.1.0-rc4.0.20200205094053-56d4c1b93702
+# github.com/rancher/rke v1.1.0-rc6.0.20200224180657-6664be5e3b1c
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -409,6 +409,7 @@ github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
 github.com/rancher/rke/cluster
 github.com/rancher/rke/cmd
+github.com/rancher/rke/data
 github.com/rancher/rke/dind
 github.com/rancher/rke/docker
 github.com/rancher/rke/hosts
@@ -488,6 +489,7 @@ github.com/rancher/types/config
 github.com/rancher/types/config/dialer
 github.com/rancher/types/factory
 github.com/rancher/types/image
+github.com/rancher/types/kdm
 github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
@@ -1119,6 +1121,8 @@ k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1
 # k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/util/proto
+# k8s.io/kubectl v0.17.2 => k8s.io/kubectl v0.17.2
+k8s.io/kubectl/pkg/drain
 # k8s.io/kubernetes v1.17.2 => k8s.io/kubernetes v1.17.2
 k8s.io/kubernetes/pkg/api/service
 k8s.io/kubernetes/pkg/api/v1/pod
