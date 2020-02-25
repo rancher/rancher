@@ -1,12 +1,11 @@
 package clusterprovisioner
 
 import (
-	"github.com/rancher/kontainer-driver-metadata/rke/templates"
-
 	kontainerengine "github.com/rancher/kontainer-engine/drivers/rke"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/kdm"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,14 +21,14 @@ type rkeStore struct {
 }
 
 var addonMap = map[string]bool{
-	templates.Calico:        true,
-	templates.Flannel:       true,
-	templates.Canal:         true,
-	templates.Weave:         true,
-	templates.NginxIngress:  true,
-	templates.MetricsServer: true,
-	templates.KubeDNS:       true,
-	templates.CoreDNS:       true,
+	kdm.Calico:        true,
+	kdm.Flannel:       true,
+	kdm.Canal:         true,
+	kdm.Weave:         true,
+	kdm.NginxIngress:  true,
+	kdm.MetricsServer: true,
+	kdm.KubeDNS:       true,
+	kdm.CoreDNS:       true,
 }
 
 func NewDataStore(addonLister v3.RKEAddonLister, addons v3.RKEAddonInterface,
