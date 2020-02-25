@@ -70,7 +70,7 @@ func (a ActionHandler) refresh(apiContext *types.APIContext) error {
 		msg := fmt.Sprintf("failed to get settings %v", err)
 		return httperror.WrapAPIError(err, httperror.ServerError, msg)
 	}
-	if err := a.MetadataHandler.Refresh(url, false); err != nil {
+	if err := a.MetadataHandler.Refresh(url); err != nil {
 		msg := fmt.Sprintf("failed to refresh %v", err)
 		return httperror.WrapAPIError(err, httperror.ServerError, msg)
 	}

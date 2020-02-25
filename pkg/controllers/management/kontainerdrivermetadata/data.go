@@ -3,20 +3,21 @@ package kontainerdrivermetadata
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/blang/semver"
 	mVersion "github.com/mcuadros/go-version"
-	"github.com/rancher/kontainer-driver-metadata/rke"
-	"github.com/rancher/kontainer-driver-metadata/rke/templates"
 	"github.com/rancher/norman/types/convert"
 	setting2 "github.com/rancher/rancher/pkg/api/store/setting"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/kdm"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ const (
 const (
 	APIVersion           = "management.cattle.io/v3"
 	RancherVersionDev    = "2.4"
+	DataJSONLocation     = "/var/lib/rancher-data/driver-metadata/data.json"
 	sendRKELabel         = "io.cattle.rke_store"
 	svcOptionLinuxKey    = "service-option-linux-key"
 	svcOptionWindowsKey  = "service-option-windows-key"
@@ -59,7 +61,16 @@ var rancherUpdateSettingMap = map[string]settings.Setting{
 	settings.KubernetesVersionToServiceOptions.Name: settings.KubernetesVersionToServiceOptions,
 }
 
-func (md *MetadataController) createOrUpdateMetadata(data Data) error {
+func (md *MetadataController) loadDataFromLocal() (kdm.Data, error) {
+	logrus.Infof("Retrieve data.json from local path %v", DataJSONLocation)
+	data, err := ioutil.ReadFile(DataJSONLocation)
+	if err != nil {
+		return kdm.Data{}, err
+	}
+	return kdm.FromData(data)
+}
+
+func (md *MetadataController) createOrUpdateMetadata(data kdm.Data) error {
 	if err := md.saveSystemImages(data.K8sVersionRKESystemImages, data.K8sVersionedTemplates,
 		data.K8sVersionInfo, data.K8sVersionServiceOptions, data.K8sVersionWindowsServiceOptions, data.RancherDefaultK8sVersions); err != nil {
 		return err
@@ -67,7 +78,7 @@ func (md *MetadataController) createOrUpdateMetadata(data Data) error {
 	if err := md.saveAllServiceOptions(data.K8sVersionServiceOptions, data.K8sVersionWindowsServiceOptions); err != nil {
 		return err
 	}
-	if err := md.saveAddons(data.K8sVersionedTemplates); err != nil {
+	if err := md.saveAddons(data); err != nil {
 		return err
 	}
 	if err := md.saveCisConfigParams(data.CisConfigParams); err != nil {
@@ -79,21 +90,28 @@ func (md *MetadataController) createOrUpdateMetadata(data Data) error {
 	return nil
 }
 
-func (md *MetadataController) createOrUpdateMetadataDefaults() error {
-	if err := md.saveSystemImages(rke.DriverData.K8sVersionRKESystemImages, rke.DriverData.K8sVersionedTemplates,
-		rke.DriverData.K8sVersionInfo, rke.DriverData.K8sVersionServiceOptions, rke.DriverData.K8sVersionWindowsServiceOptions, rke.DriverData.RancherDefaultK8sVersions); err != nil {
+func (md *MetadataController) createOrUpdateMetadataFromLocal() error {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return nil
+	}
+	driverData, err := md.loadDataFromLocal()
+	if err != nil {
 		return err
 	}
-	if err := md.saveAllServiceOptions(rke.DriverData.K8sVersionServiceOptions, rke.DriverData.K8sVersionWindowsServiceOptions); err != nil {
+	if err := md.saveSystemImages(driverData.K8sVersionRKESystemImages, driverData.K8sVersionedTemplates,
+		driverData.K8sVersionInfo, driverData.K8sVersionServiceOptions, driverData.K8sVersionWindowsServiceOptions, driverData.RancherDefaultK8sVersions); err != nil {
 		return err
 	}
-	if err := md.saveAddons(rke.DriverData.K8sVersionedTemplates); err != nil {
+	if err := md.saveAllServiceOptions(driverData.K8sVersionServiceOptions, driverData.K8sVersionWindowsServiceOptions); err != nil {
 		return err
 	}
-	if err := md.saveCisConfigParams(rke.DriverData.CisConfigParams); err != nil {
+	if err := md.saveAddons(driverData); err != nil {
+		return err
+	}
+	if err := md.saveCisConfigParams(driverData.CisConfigParams); err != nil {
 		return fmt.Errorf("error saving cisDefaultConfigs: %v", err)
 	}
-	if err := md.saveCisBenchmarkVersions(rke.DriverData.CisBenchmarkVersionInfo); err != nil {
+	if err := md.saveCisBenchmarkVersions(driverData.CisBenchmarkVersionInfo); err != nil {
 		return fmt.Errorf("error saving cisBechmarkVersions: %v", err)
 	}
 	return nil
@@ -176,9 +194,9 @@ func (md *MetadataController) saveAllServiceOptions(linuxSvcOptions map[string]v
 	return nil
 }
 
-func (md *MetadataController) saveServiceOptions(K8sVersionServiceOptions map[string]v3.KubernetesServicesOptions, osType OSType) error {
-	rkeDataKeys := getRKEVendorOptions(osType)
-	for k8sVersion, serviceOptions := range K8sVersionServiceOptions {
+func (md *MetadataController) saveServiceOptions(k8sVersionServiceOptions map[string]v3.KubernetesServicesOptions, osType OSType) error {
+	rkeDataKeys := getRKEVendorOptions(k8sVersionServiceOptions)
+	for k8sVersion, serviceOptions := range k8sVersionServiceOptions {
 		if err := md.createOrUpdateServiceOptionCRD(k8sVersion, serviceOptions, rkeDataKeys, osType); err != nil {
 			return err
 		}
@@ -186,9 +204,10 @@ func (md *MetadataController) saveServiceOptions(K8sVersionServiceOptions map[st
 	return nil
 }
 
-func (md *MetadataController) saveAddons(K8sVersionedTemplates map[string]map[string]string) error {
-	rkeAddonKeys := getRKEVendorData()
-	for addon, template := range K8sVersionedTemplates[templates.TemplateKeys] {
+func (md *MetadataController) saveAddons(data kdm.Data) error {
+	k8sVersionedTemplates := data.K8sVersionedTemplates
+	rkeAddonKeys := getRKEVendorData(k8sVersionedTemplates)
+	for addon, template := range k8sVersionedTemplates[kdm.TemplateKeys] {
 		if err := md.createOrUpdateAddonCRD(addon, template, rkeAddonKeys); err != nil {
 			return err
 		}
@@ -448,7 +467,7 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 	}
 	labelMap := map[string]string{"cattle.io/creator": "norman"}
 	for addon, addonData := range data {
-		if addon == templates.TemplateKeys {
+		if addon == kdm.TemplateKeys {
 			continue
 		}
 		found := false
@@ -485,9 +504,12 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 	return labelMap, nil
 }
 
-func getRKEVendorData() map[string]bool {
+func getRKEVendorData(templates map[string]map[string]string) map[string]bool {
 	keys := map[string]bool{}
-	templateData, ok := rke.DriverData.K8sVersionedTemplates[templates.TemplateKeys]
+	if templates == nil {
+		return keys
+	}
+	templateData, ok := templates[kdm.TemplateKeys]
 	if !ok {
 		return keys
 	}
@@ -497,12 +519,7 @@ func getRKEVendorData() map[string]bool {
 	return keys
 }
 
-func getRKEVendorOptions(osType OSType) map[string]bool {
-	options := rke.DriverData.K8sVersionServiceOptions
-	if osType == Windows {
-		options = rke.DriverData.K8sVersionWindowsServiceOptions
-	}
-
+func getRKEVendorOptions(options map[string]v3.KubernetesServicesOptions) map[string]bool {
 	keys := map[string]bool{}
 	for k8sVersion := range options {
 		keys[k8sVersion] = true

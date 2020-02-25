@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -170,18 +171,12 @@ func GetEnvKey(key string) string {
 }
 
 func getMetadataConfig() string {
-	key := GetEnvKey("server-version")
-	rancherVersion := os.Getenv(key)
 	branch := os.Getenv("RANCHER_METADATA_BRANCH")
 	if branch == "" {
-		branch = "dev"
-		if releaseServerVersion(rancherVersion) {
-			branch = "master"
-		}
+		branch = "dev-v2.4"
 	}
 	data := map[string]interface{}{
-		"url":                      "https://github.com/rancher/kontainer-driver-metadata.git",
-		"branch":                   branch,
+		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
 		"refresh-interval-minutes": "1440",
 	}
 	ans, err := json.Marshal(data)
@@ -190,21 +185,4 @@ func getMetadataConfig() string {
 		return ""
 	}
 	return string(ans)
-}
-
-func releaseServerVersion(serverVersion string) bool {
-	if serverVersion == "" {
-		return false
-	}
-	splitVersion := strings.Split(serverVersion[1:], ".")
-	if len(splitVersion) != 3 {
-		return false
-	}
-	for _, part := range splitVersion {
-		//part should be a numeric value
-		if _, err := strconv.Atoi(part); err != nil {
-			return false
-		}
-	}
-	return true
 }
