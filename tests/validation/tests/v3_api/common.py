@@ -712,7 +712,7 @@ def validate_ingress(p_client, cluster, workloads, host, path,
 
 
 def validate_ingress_using_endpoint(p_client, ingress, workloads,
-                                    timeout=300):
+                                    timeout=300, certcheck=False, is_insecure=False):
     target_name_list = get_target_names(p_client, workloads)
     start = time.time()
     fqdn_available = False
@@ -727,7 +727,8 @@ def validate_ingress_using_endpoint(p_client, ingress, workloads,
         ingress = ingress_list[0]
         if hasattr(ingress, 'publicEndpoints'):
             for public_endpoint in ingress.publicEndpoints:
-                if public_endpoint["hostname"].startswith(ingress.name):
+                if public_endpoint["hostname"].startswith(ingress.name) \
+                        or certcheck:
                     fqdn_available = True
                     url = \
                         public_endpoint["protocol"].lower() + "://" + \
@@ -735,7 +736,7 @@ def validate_ingress_using_endpoint(p_client, ingress, workloads,
                     if "path" in public_endpoint.keys():
                         url += public_endpoint["path"]
     time.sleep(10)
-    validate_http_response(url, target_name_list)
+    validate_http_response(url, target_name_list, insecure=is_insecure)
 
 
 def get_target_names(p_client, workloads):
@@ -823,7 +824,7 @@ def check_if_ok(url, verify=False, headers={}):
         return False
 
 
-def validate_http_response(cmd, target_name_list, client_pod=None):
+def validate_http_response(cmd, target_name_list, client_pod=None, insecure=False):
     if client_pod is None and cmd.startswith("http://"):
         wait_until_active(cmd, 60)
     target_hit_list = target_name_list[:]
@@ -833,6 +834,8 @@ def validate_http_response(cmd, target_name_list, client_pod=None):
             break
         if client_pod is None:
             curl_cmd = "curl " + cmd
+            if insecure:
+                curl_cmd += "\t--insecure"
             result = run_command(curl_cmd)
         else:
             if is_windows():
