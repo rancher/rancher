@@ -26,10 +26,10 @@ import (
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/server/capabilities"
-	"github.com/rancher/rancher/server/responsewriter"
 	"github.com/rancher/rancher/server/ui"
 	"github.com/rancher/rancher/server/whitelist"
 	"github.com/rancher/steve/pkg/auth"
+	"github.com/rancher/steve/pkg/responsewriter"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
 )
