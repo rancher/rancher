@@ -30,6 +30,10 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpodsecuritypolicytemplate")
 	resource.AddAction(apiContext, "exportYaml")
 
+	if apiContext.ID == "" {
+		return
+	}
+
 	if err := apiContext.AccessControl.CanDo(v3.ProjectGroupVersionKind.Group, v3.ProjectResource.Name, "update", apiContext, resource.Values, apiContext.Schema); err == nil {
 		if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
 			resource.AddAction(apiContext, "disableMonitoring")
@@ -42,6 +46,29 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
 		resource.AddAction(apiContext, "viewMonitoring")
 	}
+}
+
+func CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
+	addActions := func(obj map[string]interface{}) {
+		obj["conditions"] = []interface{}{}
+		print(obj)
+	}
+	accessMap := apiContext.AccessControl.CollectionCanDo(v3.ProjectGroupVersionKind.Group, v3.ProjectResource.Name, "update", apiContext, collection.Data, apiContext.Schema, addActions)
+	for _, val := range collection.Data {
+		obj, _ := val.(*types.RawResource)
+		if obj == nil {
+			return
+		}
+		if accessMap[obj.ID] {
+			if convert.ToBool(obj.Values["enableProjectMonitoring"]) {
+				obj.AddAction(apiContext, "disableMonitoring")
+				obj.AddAction(apiContext, "editMonitoring")
+			} else {
+				obj.AddAction(apiContext, "enableMonitoring")
+			}
+		}
+	}
+
 }
 
 type Handler struct {

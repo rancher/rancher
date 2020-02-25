@@ -1,7 +1,7 @@
 package rbac
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/rancher/norman/types/slice"
 	v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -107,6 +107,52 @@ func (p *permissionIndex) get(subjectName, apiGroup, resource, verb string) []Li
 	return result
 }
 
+// userAccessCheck returns true if the given use is able to perform the given verb on the object of the given id,
+// in the given namespace
+func (p *permissionIndex) userAccess(subjectName, apiGroup, resource, verb string) map[string]bool {
+	roleRefChecked := make(map[string]bool)
+	canAccess := make(map[string]bool)
+
+	for _, binding := range p.getRoleBindings(subjectName) {
+		p.getBindingAccess(binding.RoleRef.Name, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked, canAccess)
+
+	}
+
+	for _, binding := range p.getClusterRoleBindings(subjectName) {
+		p.getBindingAccess(binding.RoleRef.Name, "*", binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked, canAccess)
+	}
+	return canAccess
+}
+
+func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind, roleAPIGroup, resource, verb string, roleRefChecked map[string]bool, canAccess map[string]bool) {
+	if roleRefChecked[fmt.Sprintf("%s:%s", bindingNamespace, roleName)] {
+		return
+	}
+
+	if roleAPIGroup != rbacGroup {
+		return
+	}
+
+	for _, rule := range p.getRules(bindingNamespace, roleKind, roleName) {
+		if !slice.ContainsString(rule.Resources, resource) {
+			continue
+		}
+
+		if !(slice.ContainsString(rule.Verbs, verb) || slice.ContainsString(rule.Verbs, "*")) {
+			continue
+		}
+
+		if len(rule.ResourceNames) == 0 {
+			canAccess[fmt.Sprintf("%s:*", bindingNamespace)] = true
+			continue
+		}
+
+		for _, name := range rule.ResourceNames {
+			canAccess[fmt.Sprintf("%s:%s", bindingNamespace, name)] = true
+		}
+	}
+}
+
 func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, kind, name, apiGroup, resource, verb string) []ListPermission {
 	nsForResourceNameGets := namespace
 	if namespace == "*" {
@@ -200,7 +246,7 @@ func matches(parts []string, val string) bool {
 		if value == "*" {
 			return true
 		}
-		if strings.EqualFold(value, val) {
+		if value == val {
 			return true
 		}
 	}

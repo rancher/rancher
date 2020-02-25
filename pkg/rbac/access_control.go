@@ -32,6 +32,10 @@ func (a *AccessControl) CanDo(apiGroup, resource, verb string, apiContext *types
 	return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("can not %v %v ", verb, schema.ID))
 }
 
+func (a *AccessControl) CollectionCanDo(apiGroup, resource, verb string, apiContext *types.APIContext, data []interface{}, schema *types.Schema, fn func(map[string]interface{})) map[string]bool {
+	return a.getObjectsCanAccess(apiContext, apiGroup, resource, verb)
+}
+
 func (a *AccessControl) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {
 	apiGroup := context["apiGroup"]
 	resource := context["resource"]
@@ -108,6 +112,17 @@ func (a *AccessControl) getPermissions(context *types.APIContext, apiGroup, reso
 	}
 
 	return permset
+}
+
+func (a *AccessControl) getObjectsCanAccess(context *types.APIContext, apiGroup, resource, verb string) map[string]bool {
+	userAccessMap := a.permissionStore.GetUserPermissions(getUser(context), apiGroup, resource, verb)
+
+	for _, group := range getGroups(context) {
+		for key, val := range a.permissionStore.GetGroupPermissions(group, apiGroup, resource, verb) {
+			userAccessMap[key] = val
+		}
+	}
+	return userAccessMap
 }
 
 func getUser(apiContext *types.APIContext) string {

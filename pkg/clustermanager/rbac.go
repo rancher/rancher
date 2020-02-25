@@ -53,6 +53,14 @@ func (m *Manager) CanDo(apiGroup, resource, verb string, apiContext *types.APICo
 	return ac.CanDo(apiGroup, resource, verb, apiContext, obj, schema)
 }
 
+func (m *Manager) CollectionCanDo(apiGroup, resource, verb string, apiContext *types.APIContext, data []interface{}, schema *types.Schema, fn func(map[string]interface{})) map[string]bool {
+	ac, err := m.getAccessControl(apiContext, schema)
+	if err != nil {
+		return make(map[string]bool)
+	}
+	return ac.CollectionCanDo(apiGroup, resource, verb, apiContext, data, schema, fn)
+}
+
 func (m *Manager) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {
 	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
