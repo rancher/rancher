@@ -83,10 +83,10 @@ require (
 	github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
-	github.com/rancher/rke v1.1.0-rc4.0.20200205094053-56d4c1b93702
+	github.com/rancher/rke v1.1.0-rc6.0.20200224180657-6664be5e3b1c
 	github.com/rancher/security-scan v0.1.5
 	github.com/rancher/steve v0.0.0-20200220230643-5b94b82bc6c8
-	github.com/rancher/types v0.0.0-20200224221130-61e7a433a90f
+	github.com/rancher/types v0.0.0-20200225170923-7f43506cf432
 	github.com/rancher/wrangler v0.4.2-0.20200215064225-8abf292acf7b
 	github.com/rancher/wrangler-api v0.4.1
 	github.com/robfig/cron v1.1.0

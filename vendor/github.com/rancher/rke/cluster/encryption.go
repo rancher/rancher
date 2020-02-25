@@ -381,9 +381,6 @@ func resolveCustomEncryptionConfig(clusterFile string) (string, *apiserverconfig
 	if err != nil {
 		return clusterFile, nil, fmt.Errorf("error unmarshalling: %v", err)
 	}
-	if err != nil {
-		return "", nil, fmt.Errorf("error unmarshalling encryption custom config: %v", err)
-	}
 	services, ok := r["services"].(map[string]interface{})
 	if services == nil || !ok {
 		return clusterFile, nil, nil
