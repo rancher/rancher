@@ -66,6 +66,10 @@ type EtcdBackupSpec struct {
 
 type EtcdBackupStatus struct {
 	Conditions []EtcdBackupCondition `json:"conditions"`
+	// version of k8s in the backup pulled from rke config
+	KubernetesVersion string `yaml:"kubernetesVersion" json:"kubernetesVersion,omitempty" norman:"noupdate"`
+	// json + gzipped + base64 backup of the cluster object when the backup was created
+	ClusterObject string `yaml:"clusterObject" json:"clusterObject,omitempty" norman:"type=password,noupdate"`
 }
 
 type EtcdBackupCondition struct {
