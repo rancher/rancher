@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
@@ -14,6 +16,8 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"sigs.k8s.io/yaml"
 )
@@ -61,7 +65,36 @@ func (c *Cluster) TunnelHosts(ctx context.Context, flags ExternalFlags) error {
 		c.RancherKubernetesEngineConfig.Nodes = removeFromRKENodes(host.RKEConfigNode, c.RancherKubernetesEngineConfig.Nodes)
 	}
 	return ValidateHostCount(c)
+}
 
+func (c *Cluster) RemoveHostsLabeledToIgnoreUpgrade(ctx context.Context) {
+	kubeClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
+	if err != nil {
+		logrus.Errorf("Error generating kube client in RemoveHostsLabeledToIgnoreUpgrade: %v", err)
+		return
+	}
+	var nodes *v1.NodeList
+	for retries := 0; retries < k8s.MaxRetries; retries++ {
+		nodes, err = kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second * k8s.RetryInterval)
+	}
+	if err != nil {
+		log.Infof(ctx, "Error listing nodes but continuing upgrade: %v", err)
+		return
+	}
+	if nodes == nil {
+		return
+	}
+	for _, node := range nodes.Items {
+		if val, ok := node.Labels[k8s.IgnoreHostDuringUpgradeLabel]; ok && val == "true" {
+			host := hosts.Host{RKEConfigNode: v3.RKEConfigNode{Address: node.Annotations[k8s.ExternalAddressAnnotation]}}
+			c.HostsLabeledToIgnoreUpgrade[host.Address] = true
+		}
+	}
+	return
 }
 
 func (c *Cluster) InvertIndexHosts() error {

@@ -10,9 +10,9 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/blang/semver"
 	"github.com/ghodss/yaml"
-	"github.com/rancher/kontainer-driver-metadata/rke/templates"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rke/metadata"
+	"github.com/rancher/types/kdm"
 	"github.com/sirupsen/logrus"
 )
 
@@ -69,7 +69,7 @@ func getTemplate(templateName, k8sVersion string) (string, error) {
 			continue
 		}
 		if testRange(toMatch) {
-			return metadata.K8sVersionToTemplates[templates.TemplateKeys][versionData[k]], nil
+			return metadata.K8sVersionToTemplates[kdm.TemplateKeys][versionData[k]], nil
 		}
 	}
 	return "", fmt.Errorf("no %s template found for k8sVersion %s", templateName, k8sVersion)
