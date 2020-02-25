@@ -417,19 +417,21 @@ class AmazonWebServices(CloudProviderBase):
                              'TargetGroupArn': targetGroupARN}]
         )
 
-    def upsert_route_53_record_cname(self, recordName, recordValue):
+    def upsert_route_53_record_cname(
+            self, record_name, record_value, action='UPSERT',
+            record_type='CNAME', record_ttl=300):
         return self._route53_client.change_resource_record_sets(
             HostedZoneId=AWS_HOSTED_ZONE_ID,
             ChangeBatch={
-                'Comment': 'update',
+                'Comment': 'Record created or updated for automation',
                 'Changes': [{
-                    'Action': 'UPSERT',
+                    'Action': action,
                     'ResourceRecordSet': {
-                        'Name': recordName,
-                        'Type': 'CNAME',
-                        'TTL': 300,
+                        'Name': record_name,
+                        'Type': record_type,
+                        'TTL': record_ttl,
                         'ResourceRecords': [{
-                            'Value': recordValue
+                            'Value': record_value
                         }]
                     }
                 }]
