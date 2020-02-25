@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	metadata "github.com/rancher/kontainer-driver-metadata/rke"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/kdm"
 	assertlib "github.com/stretchr/testify/assert"
 )
 
@@ -77,7 +77,10 @@ func TestFetchImagesFromCharts(t *testing.T) {
 }
 
 func TestFetchImagesFromSystem(t *testing.T) {
-	linuxInfo, windowsInfo := getTestK8sVersionInfo()
+	linuxInfo, windowsInfo, err := getTestK8sVersionInfo()
+	if err != nil {
+		t.Error(err)
+	}
 	toolsSystemImages := v3.ToolsSystemImages
 
 	bothImages := []string{
@@ -178,7 +181,10 @@ func TestNormalizeImages(t *testing.T) {
 
 func TestGetImages(t *testing.T) {
 	systemChartPath := cloneTestSystemChart(t)
-	linuxInfo, windowsInfo := getTestK8sVersionInfo()
+	linuxInfo, windowsInfo, err := getTestK8sVersionInfo()
+	if err != nil {
+		t.Error(err)
+	}
 	toolsSystemImages := v3.ToolsSystemImages
 
 	bothImages := []string{
@@ -252,14 +258,23 @@ func TestGetImages(t *testing.T) {
 	}
 }
 
-func getTestK8sVersionInfo() (linuxInfo, windowsInfo *kd.VersionInfo) {
-	return kd.GetK8sVersionInfo(
+func getTestK8sVersionInfo() (*kd.VersionInfo, *kd.VersionInfo, error) {
+	b, err := ioutil.ReadFile("/root/data.json")
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := kdm.FromData(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	l, w := kd.GetK8sVersionInfo(
 		kd.RancherVersionDev,
-		metadata.DriverData.K8sVersionRKESystemImages,
-		metadata.DriverData.K8sVersionServiceOptions,
-		metadata.DriverData.K8sVersionWindowsServiceOptions,
-		metadata.DriverData.K8sVersionInfo,
+		data.K8sVersionRKESystemImages,
+		data.K8sVersionServiceOptions,
+		data.K8sVersionWindowsServiceOptions,
+		data.K8sVersionInfo,
 	)
+	return l, w, nil
 }
 
 func cloneTestSystemChart(t *testing.T) string {

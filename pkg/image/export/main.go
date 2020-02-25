@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 
-	metadata "github.com/rancher/kontainer-driver-metadata/rke"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/types/image"
+	"github.com/rancher/types/kdm"
 )
 
 var (
@@ -57,12 +58,23 @@ func run(systemChartPath string, imagesFromArgs []string) error {
 	if strings.HasPrefix(rancherVersion, "v") {
 		rancherVersion = rancherVersion[1:]
 	}
+
+	// already downloaded in dapper
+	b, err := ioutil.ReadFile("/root/data.json")
+	if err != nil {
+		return err
+	}
+	data, err := kdm.FromData(b)
+	if err != nil {
+		return err
+	}
+
 	linuxInfo, windowsInfo := kd.GetK8sVersionInfo(
 		rancherVersion,
-		metadata.DriverData.K8sVersionRKESystemImages,
-		metadata.DriverData.K8sVersionServiceOptions,
-		metadata.DriverData.K8sVersionWindowsServiceOptions,
-		metadata.DriverData.K8sVersionInfo,
+		data.K8sVersionRKESystemImages,
+		data.K8sVersionServiceOptions,
+		data.K8sVersionWindowsServiceOptions,
+		data.K8sVersionInfo,
 	)
 
 	targetImages, err := img.GetImages(systemChartPath, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
