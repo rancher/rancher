@@ -3,26 +3,27 @@ package cluster
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	rkeData "github.com/rancher/kontainer-driver-metadata/rke/templates"
-	"github.com/rancher/rke/templates"
-	"os"
-	"os/exec"
-	"time"
-
 	"io/ioutil"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/rancher/rke/addons"
 	"github.com/rancher/rke/authz"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/rke/templates"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/kdm"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 const (
@@ -58,6 +59,7 @@ type ingressOptions struct {
 	AlpineImage       string
 	IngressImage      string
 	IngressBackend    string
+	UpdateStrategy    *appsv1.DaemonSetUpdateStrategy
 }
 
 type MetricsServerOptions struct {
@@ -66,6 +68,8 @@ type MetricsServerOptions struct {
 	NodeSelector       map[string]string
 	MetricsServerImage string
 	Version            string
+	UpdateStrategy     *appsv1.DeploymentStrategy
+	Replicas           *int32
 }
 
 type CoreDNSOptions struct {
@@ -77,6 +81,8 @@ type CoreDNSOptions struct {
 	ReverseCIDRs           []string
 	UpstreamNameservers    []string
 	NodeSelector           map[string]string
+	UpdateStrategy         *appsv1.DeploymentStrategy
+	LinearAutoscalerParams string
 }
 
 type KubeDNSOptions struct {
@@ -91,6 +97,8 @@ type KubeDNSOptions struct {
 	UpstreamNameservers    []string
 	StubDomains            map[string][]string
 	NodeSelector           map[string]string
+	UpdateStrategy         *appsv1.DeploymentStrategy
+	LinearAutoscalerParams string
 }
 
 type addonError struct {
@@ -270,8 +278,14 @@ func (c *Cluster) deployKubeDNS(ctx context.Context, data map[string]interface{}
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
 		StubDomains:            c.DNS.StubDomains,
 		NodeSelector:           c.DNS.NodeSelector,
+		UpdateStrategy:         c.DNS.UpdateStrategy,
 	}
-	tmplt, err := templates.GetVersionedTemplates(rkeData.KubeDNS, data, c.Version)
+	linearModeBytes, err := json.Marshal(c.DNS.LinearAutoscalerParams)
+	if err != nil {
+		return err
+	}
+	KubeDNSConfig.LinearAutoscalerParams = string(linearModeBytes)
+	tmplt, err := templates.GetVersionedTemplates(kdm.KubeDNS, data, c.Version)
 	if err != nil {
 		return err
 	}
@@ -297,8 +311,14 @@ func (c *Cluster) deployCoreDNS(ctx context.Context, data map[string]interface{}
 		UpstreamNameservers:    c.DNS.UpstreamNameservers,
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
 		NodeSelector:           c.DNS.NodeSelector,
+		UpdateStrategy:         c.DNS.UpdateStrategy,
 	}
-	tmplt, err := templates.GetVersionedTemplates(rkeData.CoreDNS, data, c.Version)
+	linearModeBytes, err := json.Marshal(c.DNS.LinearAutoscalerParams)
+	if err != nil {
+		return err
+	}
+	CoreDNSConfig.LinearAutoscalerParams = string(linearModeBytes)
+	tmplt, err := templates.GetVersionedTemplates(kdm.CoreDNS, data, c.Version)
 	if err != nil {
 		return err
 	}
@@ -341,8 +361,10 @@ func (c *Cluster) deployMetricServer(ctx context.Context, data map[string]interf
 		Options:            c.Monitoring.Options,
 		NodeSelector:       c.Monitoring.NodeSelector,
 		Version:            util.GetTagMajorVersion(versionTag),
+		UpdateStrategy:     c.Monitoring.UpdateStrategy,
+		Replicas:           c.Monitoring.Replicas,
 	}
-	tmplt, err := templates.GetVersionedTemplates(rkeData.MetricsServer, data, c.Version)
+	tmplt, err := templates.GetVersionedTemplates(kdm.MetricsServer, data, c.Version)
 	if err != nil {
 		return err
 	}
@@ -498,6 +520,7 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 		ExtraEnvs:         c.Ingress.ExtraEnvs,
 		ExtraVolumes:      c.Ingress.ExtraVolumes,
 		ExtraVolumeMounts: c.Ingress.ExtraVolumeMounts,
+		UpdateStrategy:    c.Ingress.UpdateStrategy,
 	}
 	// since nginx ingress controller 0.16.0, it can be run as non-root and doesn't require privileged anymore.
 	// So we can use securityContext instead of setting privileges via initContainer.
@@ -508,7 +531,7 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 			ingressConfig.AlpineImage = c.SystemImages.Alpine
 		}
 	}
-	tmplt, err := templates.GetVersionedTemplates(rkeData.NginxIngress, data, c.Version)
+	tmplt, err := templates.GetVersionedTemplates(kdm.NginxIngress, data, c.Version)
 	if err != nil {
 		return err
 	}
