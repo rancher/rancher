@@ -52,8 +52,14 @@ The metric {{ .CommonLabels.alert_name}} crossed the threshold
 {{ end -}}
 
 {{- define "__text_list" -}}
+{{- if eq .Status "resolved" -}}
+{{ range .Alerts.Resolved }}
+{{ template "__text_single" . }}
+{{ end -}}
+{{- else}}
 {{ range .Alerts.Firing }}
 {{ template "__text_single" . }}
+{{ end -}}
 {{ end -}}
 {{ end -}}
 
@@ -124,8 +130,14 @@ Logs: {{ .Labels.logs}}
 {{ end -}}
 
 {{- define "__email_text_list" -}}
+{{- if eq .Status "resolved" -}}
+{{ range .Alerts.Resolved }}
+{{ template "__email_text_single" . }}
+{{ end -}}
+{{- else}}
 {{ range .Alerts.Firing }}
 {{ template "__email_text_single" . }}
+{{ end -}}
 {{ end -}}
 {{ end -}}
 
