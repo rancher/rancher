@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	webhook2 "github.com/rancher/rancher/pkg/auth/webhook"
+	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/httpproxy"
@@ -108,6 +109,7 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 	root.PathPrefix("/k8s/clusters/").Handler(auditHandler)
 	root.PathPrefix("/meta").Handler(auditHandler)
 	root.PathPrefix("/v1-telemetry").Handler(auditHandler)
+	root.PathPrefix("/v1-release/channel").Handler(channelserver.NewProxy(ctx))
 	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
 	root.PathPrefix("/v1-saml").Handler(samlRoot)
 
