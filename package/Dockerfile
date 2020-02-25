@@ -22,6 +22,7 @@ ENV CATTLE_HELM_VERSION v2.14.3-rancher1
 ENV CATTLE_K3S_VERSION v1.17.2+k3s1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher32
 ENV CATTLE_ETCD_VERSION v3.4.3
+ENV CATTLE_CHANNELSERVER_VERSION v0.1.0
 ENV LOGLEVEL_VERSION v0.1.2
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.12
@@ -55,6 +56,9 @@ ENV HELM_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HE
     K3S_URL_amd64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s \
     K3S_URL_arm64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-arm64 \
     K3S_URL=K3S_URL_${ARCH} \
+    CHANNELSERVER_URL_amd64=https://github.com/rancher/channelserver/releases/download/${CATTLE_CHANNELSERVER_VERSION}/channelserver-amd64 \
+    CHANNELSERVER_URL_arm64=https://github.com/rancher/channelserver/releases/download/${CATTLE_CHANNELSERVER_VERSION}/channelserver-arm64 \
+    CHANNELSERVER_URL=CHANNELSERVER_URL_${ARCH} \
     ETCD_URL_amd64=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-amd64.tar.gz \
     ETCD_URL_arm64=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-arm64.tar.gz \
     ETCD_URL=ETCD_URL_${ARCH}
@@ -62,11 +66,12 @@ ENV HELM_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HE
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf ${!HELM_URL} > /usr/bin/rancher-helm && \
     curl -sLf ${!TILLER_URL} > /usr/bin/rancher-tiller && \
+    curl -sLf ${!CHANNELSERVER_URL} > /usr/bin/channelserver && \
     curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
     curl -sfL ${!ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
-    chmod +x /usr/bin/rancher-helm /usr/bin/tini /usr/bin/telemetry /usr/bin/rancher-tiller /usr/bin/k3s /usr/bin/kubectl && \
+    chmod +x /usr/bin/rancher-helm /usr/bin/tini /usr/bin/telemetry /usr/bin/rancher-tiller /usr/bin/k3s /usr/bin/kubectl /usr/bin/channelserver && \
     mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${RANCHER_METADATA_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
