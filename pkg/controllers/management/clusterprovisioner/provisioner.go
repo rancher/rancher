@@ -966,9 +966,19 @@ func k3sClusterConfig(cluster *v3.Cluster) error {
 	if cluster.Name == v3.ClusterDriverLocal || cluster.Status.Driver == v3.ClusterDriverK3s {
 		return nil
 	}
-
 	if strings.Contains(cluster.Status.Version.String(), "k3s") {
 		cluster.Status.Driver = v3.ClusterDriverK3s
+		// only set these values on init
+		if cluster.Spec.K3sConfig == nil {
+			cluster.Spec.K3sConfig = &v3.K3sConfig{
+				Version: cluster.Status.Version,
+				K3sUpgradeStrategy: v3.K3sUpgradeStrategy{
+					ServerConcurrency: 1,
+					WorkerConcurrency: 1,
+				},
+			}
+		}
 	}
+
 	return nil
 }
