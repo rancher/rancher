@@ -1525,9 +1525,15 @@ def wait_for_app_to_active(client, app_id,
     @param timeout: Max time allowed to wait for app to become active.
     @return: app object
     """
-    app_data = client.list_app(id=app_id).data
     start = time.time()
-    assert len(app_data) >= 1, "Cannot find app"
+    app_data = client.list_app(id=app_id).data
+    while len(app_data) == 0:
+        if time.time() - start > timeout / 10:
+            raise AssertionError(
+                "Timed out waiting for listing the app from API")
+        time.sleep(.2)
+        app_data = client.list_app(id=app_id).data
+
     application = app_data[0]
     while application.state != "deploying":
         if time.time() - start > timeout / 3:
@@ -1630,9 +1636,8 @@ def get_defaut_question_answers(client, externalId):
         return add_question
 
     questions_and_answers = {}
-    print(externalId)
+    print("external id = {}".format(externalId))
     template_revs = client.list_template_version(externalId=externalId).data
-    print(template_revs)
     assert len(template_revs) == 1
     template_rev = template_revs[0]
     questions = template_rev.questions
@@ -1652,7 +1657,7 @@ def get_defaut_question_answers(client, externalId):
                         question = sub_question["variable"]
                         questions_and_answers[question] = \
                             get_answer(sub_question)
-    print(questions_and_answers)
+    print("questions_and_answers = {}".format(questions_and_answers))
     return questions_and_answers
 
 
