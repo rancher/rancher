@@ -10,13 +10,13 @@ import (
 	"github.com/blang/semver"
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/kontainer-driver-metadata/rke"
-	"github.com/rancher/kontainer-driver-metadata/rke/templates"
 	"github.com/rancher/norman/types/convert"
 	setting2 "github.com/rancher/rancher/pkg/api/store/setting"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/kdm"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -188,7 +188,7 @@ func (md *MetadataController) saveServiceOptions(K8sVersionServiceOptions map[st
 
 func (md *MetadataController) saveAddons(K8sVersionedTemplates map[string]map[string]string) error {
 	rkeAddonKeys := getRKEVendorData()
-	for addon, template := range K8sVersionedTemplates[templates.TemplateKeys] {
+	for addon, template := range K8sVersionedTemplates[kdm.TemplateKeys] {
 		if err := md.createOrUpdateAddonCRD(addon, template, rkeAddonKeys); err != nil {
 			return err
 		}
@@ -448,7 +448,7 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 	}
 	labelMap := map[string]string{"cattle.io/creator": "norman"}
 	for addon, addonData := range data {
-		if addon == templates.TemplateKeys {
+		if addon == kdm.TemplateKeys {
 			continue
 		}
 		found := false
@@ -487,7 +487,7 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 
 func getRKEVendorData() map[string]bool {
 	keys := map[string]bool{}
-	templateData, ok := rke.DriverData.K8sVersionedTemplates[templates.TemplateKeys]
+	templateData, ok := rke.DriverData.K8sVersionedTemplates[kdm.TemplateKeys]
 	if !ok {
 		return keys
 	}
