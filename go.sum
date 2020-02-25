@@ -808,6 +808,7 @@ github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415 h1:
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415/go.mod h1:3KvQxniSDxN8Ohdsv0ZmsqZXRdj/5ow2r1nZUv4GjsI=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
+github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/norman v0.0.0-20200123223841-6d86f4e37a69/go.mod h1:XMiRH4NH6ELMELnQOoIef/g7UAtCzTxHaYRk0kMlwwQ=
 github.com/rancher/norman v0.0.0-20200211155126-fc45a55d4dfd/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
@@ -832,6 +833,8 @@ github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee/go.mod h1:rN9IgDRV1O
 github.com/rancher/types v0.0.0-20200218191331-dc762fc27c91/go.mod h1:7v/f4VGMfBQi5yQQxlFHylW6QP4w6vCxd6KKPG5sZpM=
 github.com/rancher/types v0.0.0-20200224204201-0cbd16146caf h1:wRQPQ6oV4jQoDwqzCEWnzy0dP+5SYxqSJj+rDiD1mgY=
 github.com/rancher/types v0.0.0-20200224204201-0cbd16146caf/go.mod h1:7v/f4VGMfBQi5yQQxlFHylW6QP4w6vCxd6KKPG5sZpM=
+github.com/rancher/types v0.0.0-20200225170923-7f43506cf432 h1:Tg5zSqfyu6vvLj9jp4G6VKISXGXiRQt69IEtK8Utc10=
+github.com/rancher/types v0.0.0-20200225170923-7f43506cf432/go.mod h1:7v/f4VGMfBQi5yQQxlFHylW6QP4w6vCxd6KKPG5sZpM=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.4.0/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
 github.com/rancher/wrangler v0.4.1/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
