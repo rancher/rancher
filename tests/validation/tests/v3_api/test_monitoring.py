@@ -127,8 +127,6 @@ MONITORING_OPERATOR_APP = "monitoring-operator"
 PROJECT_MONITORING_APP = "project-monitoring"
 GRAFANA_PROJECT_MONITORING = "grafana-project-monitoring"
 PROMETHEUS_PROJECT_MONITORING = "prometheus-project-monitoring"
-NUM_PROJECT_MONITOR_GRAPH = 13  # /v3/projectmonitorgraphs
-NUM_CLUSTER_MONITOR_GRAPH = 37  # /v3/clustermonitorgraphs
 
 
 def test_monitoring_cluster_graph():
@@ -696,7 +694,7 @@ def check_permission_project_graph(project, workload, token, permission=True):
     project_monitoring_obj = client.list_project_monitor_graph(projectId=p_id)
     graphs_list = project_monitoring_obj.get("data")
     if permission:
-        assert len(graphs_list) == NUM_PROJECT_MONITOR_GRAPH
+        assert len(graphs_list) > 0
     else:
         assert len(graphs_list) == 0
 
@@ -733,7 +731,7 @@ def check_permission_cluster_graph(cluster, token, permission=True):
     cluster_monitoring_obj = client.list_cluster_monitor_graph(clusterId=c_id)
     graphs_list = cluster_monitoring_obj.get("data")
     if permission:
-        assert len(graphs_list) == NUM_CLUSTER_MONITOR_GRAPH
+        assert len(graphs_list) > 0
     else:
         assert len(graphs_list) == 0
 
