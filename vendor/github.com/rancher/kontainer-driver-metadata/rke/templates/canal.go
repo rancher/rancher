@@ -221,9 +221,13 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
+{{end}}
   template:
     metadata:
       labels:
@@ -770,8 +774,10 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if ne (default 0 .MTU) 0}}
+{{- if .MTU }}
+{{- if ne .MTU 0 }}
           "mtu": {{.MTU}},
+{{- end}}
 {{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
@@ -820,9 +826,13 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
+{{end}}
   template:
     metadata:
       labels:
@@ -1380,8 +1390,10 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if ne (default 0 .MTU) 0}}
+{{- if .MTU }}
+{{- if ne .MTU 0 }}
           "mtu": {{.MTU}},
+{{- end}}
 {{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
@@ -1430,9 +1442,13 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
+{{end}}
   template:
     metadata:
       labels:
@@ -1829,8 +1845,10 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if ne (default 0 .MTU) 0}}
+{{- if .MTU }}
+{{- if ne .MTU 0 }}
           "mtu": {{.MTU}},
+{{- end}}
 {{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
@@ -2177,9 +2195,13 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
+{{end}}
   template:
     metadata:
       labels:
@@ -2420,7 +2442,11 @@ spec:
         - name: flexvol-driver-host
           hostPath:
             type: DirectoryOrCreate
+{{- if .FlexVolPluginDir }}
+            path: {{.FlexVolPluginDir}}
+{{- else }}
             path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds
+{{- end }}
 ---
 
 apiVersion: v1
@@ -2459,8 +2485,10 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if ne (default 0 .MTU) 0}}
+{{- if .MTU }}
+{{- if ne .MTU 0 }}
           "mtu": {{.MTU}},
+{{- end}}
 {{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
@@ -2808,9 +2836,13 @@ spec:
     matchLabels:
       k8s-app: canal
   updateStrategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
+{{end}}
   template:
     metadata:
       labels:
@@ -3051,7 +3083,11 @@ spec:
         - name: flexvol-driver-host
           hostPath:
             type: DirectoryOrCreate
+{{- if .FlexVolPluginDir }}
+            path: {{.FlexVolPluginDir}}
+{{- else }}
             path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds
+{{- end }}
 ---
 
 apiVersion: v1

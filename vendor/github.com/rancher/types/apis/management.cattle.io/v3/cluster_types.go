@@ -276,7 +276,8 @@ type MonitoringOutput struct {
 }
 
 type RestoreFromEtcdBackupInput struct {
-	EtcdBackupName string `json:"etcdBackupName,omitempty" norman:"type=reference[etcdBackup]"`
+	EtcdBackupName   string `json:"etcdBackupName,omitempty" norman:"type=reference[etcdBackup]"`
+	RestoreRkeConfig string `json:"restoreRkeConfig,omitempty"`
 }
 
 type RotateCertificateInput struct {

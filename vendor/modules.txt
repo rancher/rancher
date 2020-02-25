@@ -321,7 +321,7 @@ github.com/rancher/dynamiclistener/server
 github.com/rancher/dynamiclistener/storage/file
 github.com/rancher/dynamiclistener/storage/kubernetes
 github.com/rancher/dynamiclistener/storage/memory
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20200225033557-5618b682955a
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
@@ -350,7 +350,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e
+# github.com/rancher/norman v0.0.0-20200221203008-9bd5ca9698ed
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -398,7 +398,7 @@ github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.5
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
-# github.com/rancher/rke v1.1.0-rc4.0.20200205094053-56d4c1b93702
+# github.com/rancher/rke v1.1.0-rc6.0.20200224180657-6664be5e3b1c
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -409,6 +409,7 @@ github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
 github.com/rancher/rke/cluster
 github.com/rancher/rke/cmd
+github.com/rancher/rke/data
 github.com/rancher/rke/dind
 github.com/rancher/rke/docker
 github.com/rancher/rke/hosts
@@ -454,7 +455,7 @@ github.com/rancher/steve/pkg/server/resources/common
 github.com/rancher/steve/pkg/server/resources/counts
 github.com/rancher/steve/pkg/server/router
 github.com/rancher/steve/pkg/server/store/proxy
-# github.com/rancher/types v0.0.0-20200224204201-0cbd16146caf
+# github.com/rancher/types v0.0.0-20200224221130-61e7a433a90f
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
@@ -488,6 +489,7 @@ github.com/rancher/types/config
 github.com/rancher/types/config/dialer
 github.com/rancher/types/factory
 github.com/rancher/types/image
+github.com/rancher/types/kdm
 github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
@@ -1119,6 +1121,8 @@ k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1
 # k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/util/proto
+# k8s.io/kubectl v0.17.2 => k8s.io/kubectl v0.17.2
+k8s.io/kubectl/pkg/drain
 # k8s.io/kubernetes v1.17.2 => k8s.io/kubernetes v1.17.2
 k8s.io/kubernetes/pkg/api/service
 k8s.io/kubernetes/pkg/api/v1/pod

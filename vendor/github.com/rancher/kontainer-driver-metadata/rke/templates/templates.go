@@ -6,17 +6,11 @@ Will they change and require Rancher to pass them to RKE
 depending on Kubernetes version?
 */
 
-const (
-	Calico        = "calico"
-	Canal         = "canal"
-	Flannel       = "flannel"
-	Weave         = "weave"
-	CoreDNS       = "coreDNS"
-	KubeDNS       = "kubeDNS"
-	MetricsServer = "metricsServer"
-	NginxIngress  = "nginxIngress"
-	TemplateKeys  = "templateKeys"
+import (
+	"github.com/rancher/types/kdm"
+)
 
+const (
 	calicov18  = "calico-v1.8"
 	calicov113 = "calico-v1.13"
 	calicov115 = "calico-v1.15"
@@ -51,42 +45,42 @@ const (
 
 func LoadK8sVersionedTemplates() map[string]map[string]string {
 	return map[string]map[string]string{
-		Calico: {
+		kdm.Calico: {
 			">=1.16.4-rancher1":                  calicov117,
 			">=1.16.0-alpha <1.16.4-rancher1":    calicov116,
 			">=1.15.0-rancher0 <1.16.0-alpha":    calicov115,
 			">=1.13.0-rancher0 <1.15.0-rancher0": calicov113,
 			">=1.8.0-rancher0 <1.13.0-rancher0":  calicov18,
 		},
-		Canal: {
+		kdm.Canal: {
 			">=1.16.4-rancher1":                  canalv117,
 			">=1.16.0-alpha <1.16.4-rancher1":    canalv116,
 			">=1.15.0-rancher0 <1.16.0-alpha":    canalv115,
 			">=1.13.0-rancher0 <1.15.0-rancher0": canalv113,
 			">=1.8.0-rancher0 <1.13.0-rancher0":  canalv18,
 		},
-		Flannel: {
+		kdm.Flannel: {
 			">=1.16.0-alpha":                    flannelv116,
 			">=1.15.0-rancher0 <1.16.0-alpha":   flannelv115,
 			">=1.8.0-rancher0 <1.15.0-rancher0": flannelv18,
 		},
-		CoreDNS: {
+		kdm.CoreDNS: {
 			">=1.17.0-alpha":                 coreDnsv117,
 			">=1.16.0-alpha <1.17.0-alpha":   coreDnsv116,
 			">=1.8.0-rancher0 <1.16.0-alpha": coreDnsv18,
 		},
-		KubeDNS: {
+		kdm.KubeDNS: {
 			">=1.16.0-alpha":                 kubeDnsv116,
 			">=1.8.0-rancher0 <1.16.0-alpha": kubeDnsv18,
 		},
-		MetricsServer: {
+		kdm.MetricsServer: {
 			">=1.8.0-rancher0": metricsServerv18,
 		},
-		Weave: {
+		kdm.Weave: {
 			">=1.16.0-alpha":                 weavev116,
 			">=1.8.0-rancher0 <1.16.0-alpha": weavev18,
 		},
-		NginxIngress: {
+		kdm.NginxIngress: {
 			">=1.8.0-rancher0 <1.13.10-rancher1-3":  nginxIngressv18,
 			">=1.13.10-rancher1-3 <1.14.0-rancher0": nginxIngressV115,
 			">=1.14.0-rancher0 <=1.14.6-rancher1-1": nginxIngressv18,
@@ -94,7 +88,7 @@ func LoadK8sVersionedTemplates() map[string]map[string]string {
 			">=1.15.0-rancher0 <=1.15.3-rancher1-1": nginxIngressv18,
 			">=1.15.3-rancher2":                     nginxIngressV115,
 		},
-		TemplateKeys: getTemplates(),
+		kdm.TemplateKeys: getTemplates(),
 	}
 }
 

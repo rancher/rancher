@@ -4,57 +4,29 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/blang/semver"
-	"github.com/rancher/kontainer-driver-metadata/rke/templates"
-	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/blang/semver"
+	"github.com/rancher/kontainer-driver-metadata/rke/templates"
 	"github.com/rancher/types/image"
+	"github.com/rancher/types/kdm"
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	rkeDataFilePath = "./data/data.json"
 )
 
-// Data to be written in dataFilePath, dynamically populated on init() with the latest versions
-type Data struct {
-
-	// K8sVersionServiceOptions - service options per k8s version
-	K8sVersionServiceOptions  map[string]v3.KubernetesServicesOptions
-	K8sVersionRKESystemImages map[string]v3.RKESystemImages
-
-	// Addon Templates per K8s version ("default" where nothing changes for k8s version)
-	K8sVersionedTemplates map[string]map[string]string
-
-	// K8sVersionInfo - min/max RKE+Rancher versions per k8s version
-	K8sVersionInfo map[string]v3.K8sVersionInfo
-
-	//Default K8s version for every rancher version
-	RancherDefaultK8sVersions map[string]string
-
-	//Default K8s version for every rke version
-	RKEDefaultK8sVersions map[string]string
-
-	K8sVersionDockerInfo map[string][]string
-
-	// K8sVersionWindowsServiceOptions - service options per windows k8s version
-	K8sVersionWindowsServiceOptions map[string]v3.KubernetesServicesOptions
-
-	CisConfigParams         map[string]v3.CisConfigParams
-	CisBenchmarkVersionInfo map[string]v3.CisBenchmarkVersionInfo
-}
-
 var (
-	DriverData     Data
+	DriverData     kdm.Data
 	TemplateData   map[string]map[string]string
 	MissedTemplate map[string][]string
 	m              = image.Mirror
 )
 
-func init() {
-	DriverData = Data{
+func initData() {
+	DriverData = kdm.Data{
 		K8sVersionRKESystemImages: loadK8sRKESystemImages(),
 	}
 
@@ -105,7 +77,7 @@ func validateTemplateMatch() {
 		}
 		TemplateData[k8sVersion] = map[string]string{}
 		for plugin, pluginData := range DriverData.K8sVersionedTemplates {
-			if plugin == templates.TemplateKeys {
+			if plugin == kdm.TemplateKeys {
 				continue
 			}
 			matchedKey := ""
@@ -140,40 +112,35 @@ func validateTemplateMatch() {
 }
 
 func GenerateData() {
-	if len(os.Args) == 2 {
-		splitStr := strings.SplitN(os.Args[1], "=", 2)
-		if len(splitStr) == 2 {
-			if splitStr[0] == "--write-data" && splitStr[1] == "true" {
-				buf := new(bytes.Buffer)
-				enc := json.NewEncoder(buf)
-				enc.SetEscapeHTML(false)
-				enc.SetIndent("", " ")
+	initData()
 
-				if err := enc.Encode(TemplateData); err != nil {
-					panic(fmt.Sprintf("error encoding template data %v", err))
-				}
-				fmt.Println(buf.String())
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", " ")
 
-				if len(MissedTemplate) != 0 {
-					logrus.Warnf("found k8s versions without a template")
-					for plugin, data := range MissedTemplate {
-						logrus.Warnf("no %s template for k8sVersions %v \n", plugin, data)
-					}
-				}
+	if err := enc.Encode(TemplateData); err != nil {
+		panic(fmt.Sprintf("error encoding template data %v", err))
+	}
+	fmt.Println(buf.String())
 
-				fmt.Println("generating data.json")
-				//todo: zip file
-				strData, _ := json.MarshalIndent(DriverData, "", " ")
-				jsonFile, err := os.Create(rkeDataFilePath)
-				if err != nil {
-					panic(fmt.Errorf("err creating data file %v", err))
-				}
-				defer jsonFile.Close()
-				_, err = jsonFile.Write(strData)
-				if err != nil {
-					panic(fmt.Errorf("err writing jsonFile %v", err))
-				}
-			}
+	if len(MissedTemplate) != 0 {
+		logrus.Warnf("found k8s versions without a template")
+		for plugin, data := range MissedTemplate {
+			logrus.Warnf("no %s template for k8sVersions %v \n", plugin, data)
 		}
+	}
+
+	fmt.Println("generating data.json")
+	//todo: zip file
+	strData, _ := json.MarshalIndent(DriverData, "", " ")
+	jsonFile, err := os.Create(rkeDataFilePath)
+	if err != nil {
+		panic(fmt.Errorf("err creating data file %v", err))
+	}
+	defer jsonFile.Close()
+	_, err = jsonFile.Write(strData)
+	if err != nil {
+		panic(fmt.Errorf("err writing jsonFile %v", err))
 	}
 }

@@ -45,6 +45,22 @@ func loadK8sVersionServiceOptions() map[string]v3.KubernetesServicesOptions {
 			Kubeproxy:      getKubeProxyOptions(),
 			Scheduler:      getSchedulerOptions(),
 		},
+		"v1.16.6-rancher1-2": {
+			Etcd:           getETCDOptions(),
+			KubeAPI:        getKubeAPIOptions116(),
+			Kubelet:        getKubeletOptions116(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
+		"v1.16.7-rancher1-1": {
+			Etcd:           getETCDOptions(),
+			KubeAPI:        getKubeAPIOptions116(),
+			Kubelet:        getKubeletOptions116(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
 		"v1.16": {
 			KubeAPI:        getKubeAPIOptions116(),
 			Kubelet:        getKubeletOptions116(),
@@ -76,6 +92,14 @@ func loadK8sVersionServiceOptions() map[string]v3.KubernetesServicesOptions {
 			Kubeproxy:      getKubeProxyOptions(),
 			Scheduler:      getSchedulerOptions(),
 		},
+		"v1.15.10-rancher1-1": {
+			Etcd:           getETCDOptions(),
+			KubeAPI:        getKubeAPIOptions115(),
+			Kubelet:        getKubeletOptions115(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
 		"v1.15": {
 			KubeAPI:        getKubeAPIOptions115(),
 			Kubelet:        getKubeletOptions115(),
@@ -84,6 +108,14 @@ func loadK8sVersionServiceOptions() map[string]v3.KubernetesServicesOptions {
 			Scheduler:      getSchedulerOptions(),
 		},
 		"v1.14.9-rancher1-1": {
+			Etcd:           getETCDOptions(),
+			KubeAPI:        getKubeAPIOptions114(),
+			Kubelet:        getKubeletOptions(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
+		"v1.14.10-rancher1-1": {
 			Etcd:           getETCDOptions(),
 			KubeAPI:        getKubeAPIOptions114(),
 			Kubelet:        getKubeletOptions(),
