@@ -38,24 +38,28 @@ const (
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
 	return &globalRoleBindingLifecycle{
-		clusters:       management.Management.Clusters(""),
-		clusterManager: clusterManager,
-		crbClient:      management.RBAC.ClusterRoleBindings(""),
-		crbLister:      management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		grLister:       management.Management.GlobalRoles("").Controller().Lister(),
-		roles:          management.RBAC.Roles(""),
-		roleBindings:   management.RBAC.RoleBindings(""),
+		clusters:          management.Management.Clusters(""),
+		clusterManager:    clusterManager,
+		crbClient:         management.RBAC.ClusterRoleBindings(""),
+		crbLister:         management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		grLister:          management.Management.GlobalRoles("").Controller().Lister(),
+		roles:             management.RBAC.Roles(""),
+		roleLister:        management.RBAC.Roles("").Controller().Lister(),
+		roleBindings:      management.RBAC.RoleBindings(""),
+		roleBindingLister: management.RBAC.RoleBindings("").Controller().Lister(),
 	}
 }
 
 type globalRoleBindingLifecycle struct {
-	clusters       v3.ClusterInterface
-	clusterManager *clustermanager.Manager
-	crbClient      rbacv1.ClusterRoleBindingInterface
-	crbLister      rbacv1.ClusterRoleBindingLister
-	grLister       v3.GlobalRoleLister
-	roles          rbacv1.RoleInterface
-	roleBindings   rbacv1.RoleBindingInterface
+	clusters          v3.ClusterInterface
+	clusterManager    *clustermanager.Manager
+	crbClient         rbacv1.ClusterRoleBindingInterface
+	crbLister         rbacv1.ClusterRoleBindingLister
+	grLister          v3.GlobalRoleLister
+	roles             rbacv1.RoleInterface
+	roleLister        rbacv1.RoleLister
+	roleBindings      rbacv1.RoleBindingInterface
+	roleBindingLister rbacv1.RoleBindingLister
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
@@ -254,7 +258,7 @@ func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(gl
 		rules = append(rules, *catalogTemplateVersionRule)
 	}
 	if len(rules) > 0 {
-		_, err := grb.roles.GetNamespaced(namespace.GlobalNamespace, globalCatalogRole, metav1.GetOptions{})
+		_, err := grb.roleLister.Get(namespace.GlobalNamespace, globalCatalogRole)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				role := &v1.Role{
@@ -275,7 +279,7 @@ func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(gl
 		// Create a rolebinding, referring the above role, and using globalrole user.Username as the subject
 		// Check if rb exists first!
 		grbName := globalRoleBinding.UserName + "-" + globalCatalogRoleBinding
-		_, err = grb.roleBindings.GetNamespaced(namespace.GlobalNamespace, grbName, metav1.GetOptions{})
+		_, err = grb.roleBindingLister.Get(namespace.GlobalNamespace, grbName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				rb := &v1.RoleBinding{
