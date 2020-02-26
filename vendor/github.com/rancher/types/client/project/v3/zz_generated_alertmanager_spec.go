@@ -6,6 +6,7 @@ const (
 	AlertmanagerSpecFieldAffinity           = "affinity"
 	AlertmanagerSpecFieldBaseImage          = "baseImage"
 	AlertmanagerSpecFieldConfigMaps         = "configMaps"
+	AlertmanagerSpecFieldConfigSecret       = "configSecret"
 	AlertmanagerSpecFieldContainers         = "containers"
 	AlertmanagerSpecFieldExternalURL        = "externalUrl"
 	AlertmanagerSpecFieldImage              = "image"
@@ -40,6 +41,7 @@ type AlertmanagerSpec struct {
 	Affinity           *Affinity              `json:"affinity,omitempty" yaml:"affinity,omitempty"`
 	BaseImage          string                 `json:"baseImage,omitempty" yaml:"baseImage,omitempty"`
 	ConfigMaps         []string               `json:"configMaps,omitempty" yaml:"configMaps,omitempty"`
+	ConfigSecret       string                 `json:"configSecret,omitempty" yaml:"configSecret,omitempty"`
 	Containers         []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
 	ExternalURL        string                 `json:"externalUrl,omitempty" yaml:"externalUrl,omitempty"`
 	Image              string                 `json:"image,omitempty" yaml:"image,omitempty"`

@@ -17,7 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8sutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/drain"
 )
@@ -56,19 +55,7 @@ func RunWorkerPlane(ctx context.Context, allHosts []*hosts.Host, localConnDialer
 func UpgradeWorkerPlaneForWorkerAndEtcdNodes(ctx context.Context, kubeClient *kubernetes.Clientset, mixedRolesHosts []*hosts.Host, workerOnlyHosts []*hosts.Host, inactiveHosts map[string]bool, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, workerNodePlanMap map[string]v3.RKEConfigNodePlan, certMap map[string]pki.CertificatePKI, updateWorkersOnly bool, alpineImage string, upgradeStrategy *v3.NodeUpgradeStrategy, newHosts map[string]bool, maxUnavailable int) (string, error) {
 	log.Infof(ctx, "[%s] Upgrading Worker Plane..", WorkerRole)
 	var errMsgMaxUnavailableNotFailed string
-	if maxUnavailable > WorkerThreads {
-		/* upgrading a large number of nodes in parallel leads to a large number of goroutines, which has led to errors regarding too many open sockets
-		Because of this RKE switched to using workerpools. 50 workerthreads has been sufficient to optimize rke up, upgrading at most 50 nodes in parallel.
-		So the user configurable maxUnavailable will be respected only as long as it's less than 50 and capped at 50 */
-		maxUnavailable = WorkerThreads
-		logrus.Info("Setting maxUnavailable to 50, to avoid issues related to upgrading large number of nodes in parallel")
-	}
-
-	if len(inactiveHosts) > 0 {
-		maxUnavailable -= len(inactiveHosts)
-		logrus.Infof("Resetting maxUnavailable to %v since %v host(s) are found to be inactive/unavailable prior to upgrade", maxUnavailable, len(inactiveHosts))
-	}
-
+	maxUnavailable = resetMaxUnavailable(maxUnavailable, len(inactiveHosts))
 	updateNewHostsList(kubeClient, append(mixedRolesHosts, workerOnlyHosts...), newHosts)
 	if len(mixedRolesHosts) > 0 {
 		log.Infof(ctx, "First checking and processing worker components for upgrades on nodes with etcd role one at a time")
@@ -93,23 +80,6 @@ func UpgradeWorkerPlaneForWorkerAndEtcdNodes(ctx context.Context, kubeClient *ku
 
 	log.Infof(ctx, "[%s] Successfully upgraded Worker Plane..", WorkerRole)
 	return errMsgMaxUnavailableNotFailed, nil
-}
-
-func CalculateMaxUnavailable(maxUnavailableVal string, numHosts int) (int, error) {
-	// if maxUnavailable is given in percent, round down
-	maxUnavailableParsed := k8sutil.Parse(maxUnavailableVal)
-	logrus.Debugf("Provided value for maxUnavailable: %v", maxUnavailableParsed)
-	maxUnavailable, err := k8sutil.GetValueFromIntOrPercent(&maxUnavailableParsed, numHosts, false)
-	if err != nil {
-		logrus.Errorf("Unable to parse max_unavailable, should be a number or percentage of nodes, error: %v", err)
-		return 0, err
-	}
-	if maxUnavailable == 0 {
-		// In case there is only one node and rounding down maxUnvailable percentage led to 0
-		maxUnavailable = 1
-	}
-	logrus.Debugf("Parsed value of maxUnavailable: %v", maxUnavailable)
-	return maxUnavailable, nil
 }
 
 func updateNewHostsList(kubeClient *kubernetes.Clientset, allHosts []*hosts.Host, newHosts map[string]bool) {
@@ -159,7 +129,13 @@ func processWorkerPlaneForUpgrade(ctx context.Context, kubeClient *kubernetes.Cl
 					}
 					continue
 				}
-				nodes, err := getNodeListForUpgrade(kubeClient, &hostsFailed, newHosts, inactiveHosts)
+				if err := CheckNodeReady(kubeClient, runHost, WorkerRole); err != nil {
+					errList = append(errList, err)
+					hostsFailed.Store(runHost.HostnameOverride, true)
+					hostsFailedToUpgrade <- runHost.HostnameOverride
+					break
+				}
+				nodes, err := getNodeListForUpgrade(kubeClient, &hostsFailed, newHosts, inactiveHosts, WorkerRole)
 				if err != nil {
 					errList = append(errList, err)
 				}
@@ -214,9 +190,6 @@ func processWorkerPlaneForUpgrade(ctx context.Context, kubeClient *kubernetes.Cl
 func upgradeWorkerHost(ctx context.Context, kubeClient *kubernetes.Clientset, runHost *hosts.Host, drainFlag bool, drainHelper drain.Helper,
 	localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, workerNodePlanMap map[string]v3.RKEConfigNodePlan, certMap map[string]pki.CertificatePKI, updateWorkersOnly bool,
 	alpineImage string) error {
-	if err := checkNodeReady(kubeClient, runHost, WorkerRole); err != nil {
-		return err
-	}
 	// cordon and drain
 	if err := cordonAndDrainNode(kubeClient, runHost, drainFlag, drainHelper, WorkerRole); err != nil {
 		return err
@@ -226,7 +199,7 @@ func upgradeWorkerHost(ctx context.Context, kubeClient *kubernetes.Clientset, ru
 		return err
 	}
 	// consider upgrade done when kubeclient lists node as ready
-	if err := checkNodeReady(kubeClient, runHost, WorkerRole); err != nil {
+	if err := CheckNodeReady(kubeClient, runHost, WorkerRole); err != nil {
 		return err
 	}
 	// uncordon node

@@ -64,10 +64,12 @@ type RancherKubernetesEngineConfig struct {
 }
 
 type NodeUpgradeStrategy struct {
-	// MaxUnavailable input can be a number of nodes or a percentage of nodes (example, max_unavailable: 2 OR max_unavailable: 20%)
-	MaxUnavailable string          `yaml:"max_unavailable" json:"maxUnavailable,omitempty" norman:"min=1,default=10%"`
-	Drain          bool            `yaml:"drain" json:"drain,omitempty"`
-	DrainInput     *NodeDrainInput `yaml:"node_drain_input" json:"nodeDrainInput,omitempty"`
+	// MaxUnavailableWorker input can be a number of nodes or a percentage of nodes (example, max_unavailable_worker: 2 OR max_unavailable_worker: 20%)
+	MaxUnavailableWorker string `yaml:"max_unavailable_worker" json:"maxUnavailableWorker,omitempty" norman:"min=1,default=10%"`
+	// MaxUnavailableControlplane input can be a number of nodes or a percentage of nodes
+	MaxUnavailableControlplane string          `yaml:"max_unavailable_controlplane" json:"maxUnavailableControlplane,omitempty" norman:"min=1,default=1"`
+	Drain                      bool            `yaml:"drain" json:"drain,omitempty"`
+	DrainInput                 *NodeDrainInput `yaml:"node_drain_input" json:"nodeDrainInput,omitempty"`
 }
 
 type BastionHost struct {
