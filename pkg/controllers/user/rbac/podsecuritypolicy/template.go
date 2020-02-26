@@ -3,6 +3,7 @@ package podsecuritypolicy
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -37,37 +38,41 @@ func RegisterTemplate(ctx context.Context, context *config.UserContext) {
 	}
 	clusterRoleInformer.AddIndexers(clusterRoleIndexer)
 
-	lfc := &Lifecycle{
-		policies:          context.Policy.PodSecurityPolicies(""),
-		policyLister:      context.Policy.PodSecurityPolicies("").Controller().Lister(),
-		clusterRoles:      context.RBAC.ClusterRoles(""),
-		clusterRoleLister: context.RBAC.ClusterRoles("").Controller().Lister(),
+	handler := &psptHandler{
+		policies:                   context.Policy.PodSecurityPolicies(""),
+		podSecurityPolicyTemplates: context.Management.Management.PodSecurityPolicyTemplates(""),
+		clusterRoles:               context.RBAC.ClusterRoles(""),
 
 		policyIndexer:      policyInformer.GetIndexer(),
 		clusterRoleIndexer: clusterRoleInformer.GetIndexer(),
 	}
 
-	pspti := context.Management.Management.PodSecurityPolicyTemplates("")
-	psptSync := v3.NewPodSecurityPolicyTemplateLifecycleAdapter("cluster-pspt-sync_"+context.ClusterName, true, pspti, lfc)
-	context.Management.Management.PodSecurityPolicyTemplates("").AddHandler(ctx, "pspt-sync", psptSync)
+	context.Management.Management.PodSecurityPolicyTemplates("").AddHandler(ctx, "pspt-sync", handler.sync)
 }
 
-type Lifecycle struct {
-	policies          v1beta12.PodSecurityPolicyInterface
-	policyLister      v1beta12.PodSecurityPolicyLister
-	clusterRoles      v12.ClusterRoleInterface
-	clusterRoleLister v12.ClusterRoleLister
+type psptHandler struct {
+	policies                   v1beta12.PodSecurityPolicyInterface
+	podSecurityPolicyTemplates v3.PodSecurityPolicyTemplateInterface
+	clusterRoles               v12.ClusterRoleInterface
 
 	policyIndexer      cache.Indexer
 	clusterRoleIndexer cache.Indexer
 }
 
-func (l *Lifecycle) Create(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
-	return nil, nil
-}
+func (p *psptHandler) sync(key string, obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
+	if obj == nil {
+		return nil, nil
+	}
 
-func (l *Lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
-	policies, err := l.policyIndexer.ByIndex(policyByPSPTParentAnnotationIndex, obj.Name)
+	if _, ok := obj.Annotations[podSecurityPolicyTemplateUpgrade]; !ok {
+		return p.cleanPSPT(obj)
+	}
+
+	if obj.DeletionTimestamp != nil {
+		return p.remove(obj)
+	}
+
+	policies, err := p.policyIndexer.ByIndex(policyByPSPTParentAnnotationIndex, obj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting policies: %v", err)
 	}
@@ -80,7 +85,7 @@ func (l *Lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, 
 			newPolicy.Spec = obj.Spec
 			newPolicy.Annotations[podSecurityPolicyTemplateVersionAnnotation] = obj.ResourceVersion
 
-			_, err = l.policies.Update(newPolicy)
+			_, err = p.policies.Update(newPolicy)
 			if err != nil {
 				return nil, fmt.Errorf("error updating psp: %v", err)
 			}
@@ -90,34 +95,57 @@ func (l *Lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, 
 	return obj, nil
 }
 
-func (l *Lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
-	policies, err := l.policyIndexer.ByIndex(policyByPSPTParentAnnotationIndex, obj.Name)
+func (p *psptHandler) remove(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
+	policies, err := p.policyIndexer.ByIndex(policyByPSPTParentAnnotationIndex, obj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting policies: %v", err)
 	}
 
 	for _, rawPolicy := range policies {
 		policy := rawPolicy.(*policyv1beta1.PodSecurityPolicy)
-		err = l.policies.Delete(policy.Name, &v1.DeleteOptions{})
+		err = p.policies.Delete(policy.Name, &v1.DeleteOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("error deleting policy: %v", err)
 		}
 	}
 
-	clusterRoles, err := l.clusterRoleIndexer.ByIndex(clusterRoleByPSPTNameIndex, obj.Name)
+	clusterRoles, err := p.clusterRoleIndexer.ByIndex(clusterRoleByPSPTNameIndex, obj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster roles: %v", err)
 	}
 
 	for _, rawClusterRole := range clusterRoles {
 		clusterRole := rawClusterRole.(*rbac.ClusterRole)
-		err = l.clusterRoles.DeleteNamespaced(clusterRole.Namespace, clusterRole.Name, &v1.DeleteOptions{})
+		err = p.clusterRoles.DeleteNamespaced(clusterRole.Namespace, clusterRole.Name, &v1.DeleteOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("error deleting cluster role: %v", err)
 		}
 	}
 
 	return obj, nil
+}
+
+func (p *psptHandler) cleanPSPT(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
+	var newFinalizers []string
+	for _, finalizer := range obj.Finalizers {
+		if strings.HasPrefix(finalizer, "clusterscoped.controller.cattle.io/cluster-pspt-sync_") {
+			continue
+		}
+		newFinalizers = append(newFinalizers, finalizer)
+	}
+
+	newAnnos := make(map[string]string)
+	for k, v := range obj.Annotations {
+		if strings.HasPrefix(k, "lifecycle.cattle.io/create.cluster-pspt-sync_") {
+			continue
+		}
+		newAnnos[k] = v
+	}
+
+	obj.Finalizers = newFinalizers
+	obj.Annotations = newAnnos
+	obj.Annotations[podSecurityPolicyTemplateUpgrade] = "true"
+	return p.podSecurityPolicyTemplates.Update(obj)
 }
 
 func policyByPSPTParentAnnotation(obj interface{}) ([]string, error) {
