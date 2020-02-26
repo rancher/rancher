@@ -122,7 +122,7 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 
 	// backup was taken in 2.4+ and has content
 	switch strings.ToLower(input.RestoreRkeConfig) {
-	case "kubernetesVersion":
+	case "kubernetesversion":
 		// restore from copy stored inline to not have to decompress object
 		cluster.Spec.RancherKubernetesEngineConfig.Version = backup.Status.KubernetesVersion
 	case "all":
