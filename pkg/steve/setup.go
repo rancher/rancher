@@ -6,10 +6,10 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/steve/pkg/dashboard"
 	"github.com/rancher/rancher/pkg/steve/pkg/github"
 	"github.com/rancher/rancher/pkg/steve/pkg/proxy"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/steve/pkg/dashboard"
 	steve "github.com/rancher/steve/pkg/server"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 )
@@ -46,7 +46,7 @@ func Setup(server *steve.Server, config *wrangler.Context) error {
 	})
 
 	// wrap with UI
-	server.Next = dashboard.Route(server.Next)
+	server.Next = dashboard.Route(server.Next, settings.DashboardIndex.Get)
 
 	return nil
 }

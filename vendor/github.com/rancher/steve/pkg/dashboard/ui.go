@@ -4,14 +4,11 @@ import (
 	"crypto/tls"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/rancher/norman/parse"
-	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/server/responsewriter"
+	"github.com/rancher/steve/pkg/responsewriter"
+	"github.com/rancher/steve/pkg/schemaserver/parse"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,18 +23,14 @@ var (
 	}
 )
 
-func content() http.Handler {
-	return http.FileServer(http.Dir(uipath()))
+func content(uiSetting func() string) http.Handler {
+	return http.FileServer(http.Dir(uiSetting()))
 }
 
-func uipath() string {
-	return filepath.Join(settings.UIPath.Get(), "dashboard")
-}
-
-func Route(next http.Handler) http.Handler {
+func Route(next http.Handler, uiSetting func() string) http.Handler {
 	uiContent := responsewriter.NewMiddlewareChain(responsewriter.Gzip,
 		responsewriter.DenyFrameOptions,
-		responsewriter.CacheMiddleware("json", "js", "css")).Handler(content())
+		responsewriter.CacheMiddleware("json", "js", "css")).Handler(content(uiSetting))
 
 	root := mux.NewRouter()
 	root.Path("/dashboard").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -49,7 +42,7 @@ func Route(next http.Handler) http.Handler {
 	root.PathPrefix("/dashboard/engines-dist").Handler(uiContent)
 	root.Handle("/dashboard/asset-manifest.json", uiContent)
 	root.Handle("/dashboard/index.html", uiContent)
-	root.PathPrefix("/dashboard/").Handler(wrapUI(next))
+	root.PathPrefix("/dashboard/").Handler(wrapUI(next, uiSetting))
 	root.NotFoundHandler = next
 
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -63,15 +56,14 @@ func Route(next http.Handler) http.Handler {
 	})
 }
 
-func wrapUI(next http.Handler) http.Handler {
-	_, err := os.Stat(indexHTML())
-	local := err == nil
+func wrapUI(next http.Handler, uiGetter func() string) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		if parse.IsBrowser(req, true) {
-			if local && settings.UIIndex.Get() == "local" {
-				http.ServeFile(resp, req, indexHTML())
+			path := uiGetter()
+			if strings.HasPrefix(path, "http") {
+				ui(resp, req, path)
 			} else {
-				ui(resp, req)
+				http.ServeFile(resp, req, path)
 			}
 		} else {
 			next.ServeHTTP(resp, req)
@@ -79,19 +71,15 @@ func wrapUI(next http.Handler) http.Handler {
 	})
 }
 
-func indexHTML() string {
-	return filepath.Join(uipath(), "index.html")
-}
-
-func ui(resp http.ResponseWriter, req *http.Request) {
-	if err := serveIndex(resp, req); err != nil {
+func ui(resp http.ResponseWriter, req *http.Request, url string) {
+	if err := serveIndex(resp, req, url); err != nil {
 		logrus.Errorf("failed to serve UI: %v", err)
 		resp.WriteHeader(500)
 	}
 }
 
-func serveIndex(resp http.ResponseWriter, req *http.Request) error {
-	r, err := insecureClient.Get(settings.DashboardIndex.Get())
+func serveIndex(resp http.ResponseWriter, req *http.Request, url string) error {
+	r, err := insecureClient.Get(url)
 	if err != nil {
 		return err
 	}
