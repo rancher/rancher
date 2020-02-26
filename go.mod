@@ -54,7 +54,7 @@ require (
 	github.com/docker/docker v1.4.2-0.20190924003213-a8608b5b67c7
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
-	github.com/ehazlett/simplelog v0.0.0-20170112055302-9fcd579ee7c6
+	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/elazarl/goproxy v0.0.0-20190711103511-473e67f1d7d2 // indirect
 	github.com/elazarl/goproxy/ext v0.0.0-20190711103511-473e67f1d7d2 // indirect
 	github.com/frankban/quicktest v1.4.1 // indirect
