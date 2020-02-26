@@ -29,8 +29,8 @@ type NameMapper func(string) string
 
 // Built-in name getters.
 var (
-	// AllCapsUnderscore converts to format ALL_CAPS_UNDERSCORE.
-	AllCapsUnderscore NameMapper = func(raw string) string {
+	// SnackCase converts to format SNACK_CASE.
+	SnackCase NameMapper = func(raw string) string {
 		newstr := make([]rune, 0, len(raw))
 		for i, chr := range raw {
 			if isUpper := 'A' <= chr && chr <= 'Z'; isUpper {
@@ -50,7 +50,7 @@ var (
 				if i > 0 {
 					newstr = append(newstr, '_')
 				}
-				chr -= ('A' - 'a')
+				chr -= 'A' - 'a'
 			}
 			newstr = append(newstr, chr)
 		}
@@ -108,6 +108,8 @@ func setSliceWithProperType(key *Key, field reflect.Value, delim string, allowSh
 		vals, err = key.parseUint64s(strs, true, false)
 	case reflect.Float64:
 		vals, err = key.parseFloat64s(strs, true, false)
+	case reflect.Bool:
+		vals, err = key.parseBools(strs, true, false)
 	case reflectTime:
 		vals, err = key.parseTimesFormat(time.RFC3339, strs, true, false)
 	default:
@@ -132,6 +134,8 @@ func setSliceWithProperType(key *Key, field reflect.Value, delim string, allowSh
 			slice.Index(i).Set(reflect.ValueOf(vals.([]uint64)[i]))
 		case reflect.Float64:
 			slice.Index(i).Set(reflect.ValueOf(vals.([]float64)[i]))
+		case reflect.Bool:
+			slice.Index(i).Set(reflect.ValueOf(vals.([]bool)[i]))
 		case reflectTime:
 			slice.Index(i).Set(reflect.ValueOf(vals.([]time.Time)[i]))
 		}
@@ -151,23 +155,41 @@ func wrapStrictError(err error, isStrict bool) error {
 // but it does not return error for failing parsing,
 // because we want to use default value that is already assigned to struct.
 func setWithProperType(t reflect.Type, key *Key, field reflect.Value, delim string, allowShadow, isStrict bool) error {
-	switch t.Kind() {
+	vt := t
+	isPtr := t.Kind() == reflect.Ptr
+	if isPtr {
+		vt = t.Elem()
+	}
+	switch vt.Kind() {
 	case reflect.String:
-		if len(key.String()) == 0 {
-			return nil
+		stringVal := key.String()
+		if isPtr {
+			field.Set(reflect.ValueOf(&stringVal))
+		} else if len(stringVal) > 0 {
+			field.SetString(key.String())
 		}
-		field.SetString(key.String())
 	case reflect.Bool:
 		boolVal, err := key.Bool()
 		if err != nil {
 			return wrapStrictError(err, isStrict)
 		}
-		field.SetBool(boolVal)
+		if isPtr {
+			field.Set(reflect.ValueOf(&boolVal))
+		} else {
+			field.SetBool(boolVal)
+		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		durationVal, err := key.Duration()
-		// Skip zero value
-		if err == nil && int64(durationVal) > 0 {
-			field.Set(reflect.ValueOf(durationVal))
+		// ParseDuration will not return err for `0`, so check the type name
+		if vt.Name() == "Duration" {
+			durationVal, err := key.Duration()
+			if err != nil {
+				return wrapStrictError(err, isStrict)
+			}
+			if isPtr {
+				field.Set(reflect.ValueOf(&durationVal))
+			} else if int64(durationVal) > 0 {
+				field.Set(reflect.ValueOf(durationVal))
+			}
 			return nil
 		}
 
@@ -175,13 +197,23 @@ func setWithProperType(t reflect.Type, key *Key, field reflect.Value, delim stri
 		if err != nil {
 			return wrapStrictError(err, isStrict)
 		}
-		field.SetInt(intVal)
+		if isPtr {
+			pv := reflect.New(t.Elem())
+			pv.Elem().SetInt(intVal)
+			field.Set(pv)
+		} else {
+			field.SetInt(intVal)
+		}
 	//	byte is an alias for uint8, so supporting uint8 breaks support for byte
 	case reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		durationVal, err := key.Duration()
 		// Skip zero value
 		if err == nil && uint64(durationVal) > 0 {
-			field.Set(reflect.ValueOf(durationVal))
+			if isPtr {
+				field.Set(reflect.ValueOf(&durationVal))
+			} else {
+				field.Set(reflect.ValueOf(durationVal))
+			}
 			return nil
 		}
 
@@ -189,33 +221,38 @@ func setWithProperType(t reflect.Type, key *Key, field reflect.Value, delim stri
 		if err != nil {
 			return wrapStrictError(err, isStrict)
 		}
-		field.SetUint(uintVal)
+		if isPtr {
+			pv := reflect.New(t.Elem())
+			pv.Elem().SetUint(uintVal)
+			field.Set(pv)
+		} else {
+			field.SetUint(uintVal)
+		}
 
 	case reflect.Float32, reflect.Float64:
 		floatVal, err := key.Float64()
 		if err != nil {
 			return wrapStrictError(err, isStrict)
 		}
-		field.SetFloat(floatVal)
+		if isPtr {
+			pv := reflect.New(t.Elem())
+			pv.Elem().SetFloat(floatVal)
+			field.Set(pv)
+		} else {
+			field.SetFloat(floatVal)
+		}
 	case reflectTime:
 		timeVal, err := key.Time()
 		if err != nil {
 			return wrapStrictError(err, isStrict)
 		}
-		field.Set(reflect.ValueOf(timeVal))
+		if isPtr {
+			field.Set(reflect.ValueOf(&timeVal))
+		} else {
+			field.Set(reflect.ValueOf(timeVal))
+		}
 	case reflect.Slice:
 		return setSliceWithProperType(key, field, delim, allowShadow, isStrict)
-	case reflect.Ptr:
-		switch t.Elem().Kind() {
-		case reflect.Bool:
-			boolVal, err := key.Bool()
-			if err != nil {
-				return wrapStrictError(err, isStrict)
-			}
-			field.Set(reflect.ValueOf(&boolVal))
-		default:
-			return fmt.Errorf("unsupported type '%s'", t)
-		}
 	default:
 		return fmt.Errorf("unsupported type '%s'", t)
 	}
@@ -276,7 +313,6 @@ func (s *Section) mapTo(val reflect.Value, isStrict bool) error {
 				continue
 			}
 		}
-
 		if key, err := s.GetKey(fieldName); err == nil {
 			delim := parseDelim(tpField.Tag.Get("delim"))
 			if err = setWithProperType(tpField.Type, key, field, delim, allowShadow, isStrict); err != nil {
@@ -380,6 +416,8 @@ func reflectSliceWithProperType(key *Key, field reflect.Value, delim string, all
 				val = fmt.Sprint(slice.Index(i).Uint())
 			case reflect.Float64:
 				val = fmt.Sprint(slice.Index(i).Float())
+			case reflect.Bool:
+				val = fmt.Sprint(slice.Index(i).Bool())
 			case reflectTime:
 				val = slice.Index(i).Interface().(time.Time).Format(time.RFC3339)
 			default:
@@ -407,6 +445,8 @@ func reflectSliceWithProperType(key *Key, field reflect.Value, delim string, all
 			buf.WriteString(fmt.Sprint(slice.Index(i).Uint()))
 		case reflect.Float64:
 			buf.WriteString(fmt.Sprint(slice.Index(i).Float()))
+		case reflect.Bool:
+			buf.WriteString(fmt.Sprint(slice.Index(i).Bool()))
 		case reflectTime:
 			buf.WriteString(slice.Index(i).Interface().(time.Time).Format(time.RFC3339))
 		default:

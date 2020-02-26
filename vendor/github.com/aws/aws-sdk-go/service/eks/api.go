@@ -155,6 +155,250 @@ func (c *EKS) CreateClusterWithContext(ctx aws.Context, input *CreateClusterInpu
 	return out, req.Send()
 }
 
+const opCreateFargateProfile = "CreateFargateProfile"
+
+// CreateFargateProfileRequest generates a "aws/request.Request" representing the
+// client's request for the CreateFargateProfile operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See CreateFargateProfile for more information on using the CreateFargateProfile
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the CreateFargateProfileRequest method.
+//    req, resp := client.CreateFargateProfileRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/CreateFargateProfile
+func (c *EKS) CreateFargateProfileRequest(input *CreateFargateProfileInput) (req *request.Request, output *CreateFargateProfileOutput) {
+	op := &request.Operation{
+		Name:       opCreateFargateProfile,
+		HTTPMethod: "POST",
+		HTTPPath:   "/clusters/{name}/fargate-profiles",
+	}
+
+	if input == nil {
+		input = &CreateFargateProfileInput{}
+	}
+
+	output = &CreateFargateProfileOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// CreateFargateProfile API operation for Amazon Elastic Kubernetes Service.
+//
+// Creates an AWS Fargate profile for your Amazon EKS cluster. You must have
+// at least one Fargate profile in a cluster to be able to schedule pods on
+// Fargate infrastructure.
+//
+// The Fargate profile allows an administrator to declare which pods run on
+// Fargate infrastructure and specify which pods run on which Fargate profile.
+// This declaration is done through the profile’s selectors. Each profile
+// can have up to five selectors that contain a namespace and labels. A namespace
+// is required for every selector. The label field consists of multiple optional
+// key-value pairs. Pods that match the selectors are scheduled on Fargate infrastructure.
+// If a to-be-scheduled pod matches any of the selectors in the Fargate profile,
+// then that pod is scheduled on Fargate infrastructure.
+//
+// When you create a Fargate profile, you must specify a pod execution role
+// to use with the pods that are scheduled with the profile. This role is added
+// to the cluster's Kubernetes Role Based Access Control (https://kubernetes.io/docs/admin/authorization/rbac/)
+// (RBAC) for authorization so that the kubelet that is running on the Fargate
+// infrastructure can register with your Amazon EKS cluster. This role is what
+// allows Fargate infrastructure to appear in your cluster as nodes. The pod
+// execution role also provides IAM permissions to the Fargate infrastructure
+// to allow read access to Amazon ECR image repositories. For more information,
+// see Pod Execution Role (https://docs.aws.amazon.com/eks/latest/userguide/pod-execution-role.html)
+// in the Amazon EKS User Guide.
+//
+// Fargate profiles are immutable. However, you can create a new updated profile
+// to replace an existing profile and then delete the original after the updated
+// profile has finished creating.
+//
+// If any Fargate profiles in a cluster are in the DELETING status, you must
+// wait for that Fargate profile to finish deleting before you can create any
+// other profiles in that cluster.
+//
+// For more information, see AWS Fargate Profile (https://docs.aws.amazon.com/eks/latest/userguide/fargate-profile.html)
+// in the Amazon EKS User Guide.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation CreateFargateProfile for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeInvalidRequestException "InvalidRequestException"
+//   The request is invalid given the state of the cluster. Check the state of
+//   the cluster and the associated operations.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeResourceLimitExceededException "ResourceLimitExceededException"
+//   You have encountered a service limit on the specified resource.
+//
+//   * ErrCodeUnsupportedAvailabilityZoneException "UnsupportedAvailabilityZoneException"
+//   At least one of your specified cluster subnets is in an Availability Zone
+//   that does not support Amazon EKS. The exception output specifies the supported
+//   Availability Zones for your account, from which you can choose subnets for
+//   your cluster.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/CreateFargateProfile
+func (c *EKS) CreateFargateProfile(input *CreateFargateProfileInput) (*CreateFargateProfileOutput, error) {
+	req, out := c.CreateFargateProfileRequest(input)
+	return out, req.Send()
+}
+
+// CreateFargateProfileWithContext is the same as CreateFargateProfile with the addition of
+// the ability to pass a context and additional request options.
+//
+// See CreateFargateProfile for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) CreateFargateProfileWithContext(ctx aws.Context, input *CreateFargateProfileInput, opts ...request.Option) (*CreateFargateProfileOutput, error) {
+	req, out := c.CreateFargateProfileRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+const opCreateNodegroup = "CreateNodegroup"
+
+// CreateNodegroupRequest generates a "aws/request.Request" representing the
+// client's request for the CreateNodegroup operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See CreateNodegroup for more information on using the CreateNodegroup
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the CreateNodegroupRequest method.
+//    req, resp := client.CreateNodegroupRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/CreateNodegroup
+func (c *EKS) CreateNodegroupRequest(input *CreateNodegroupInput) (req *request.Request, output *CreateNodegroupOutput) {
+	op := &request.Operation{
+		Name:       opCreateNodegroup,
+		HTTPMethod: "POST",
+		HTTPPath:   "/clusters/{name}/node-groups",
+	}
+
+	if input == nil {
+		input = &CreateNodegroupInput{}
+	}
+
+	output = &CreateNodegroupOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// CreateNodegroup API operation for Amazon Elastic Kubernetes Service.
+//
+// Creates a managed worker node group for an Amazon EKS cluster. You can only
+// create a node group for your cluster that is equal to the current Kubernetes
+// version for the cluster. All node groups are created with the latest AMI
+// release version for the respective minor Kubernetes version of the cluster.
+//
+// An Amazon EKS managed node group is an Amazon EC2 Auto Scaling group and
+// associated Amazon EC2 instances that are managed by AWS for an Amazon EKS
+// cluster. Each node group uses a version of the Amazon EKS-optimized Amazon
+// Linux 2 AMI. For more information, see Managed Node Groups (https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
+// in the Amazon EKS User Guide.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation CreateNodegroup for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeResourceInUseException "ResourceInUseException"
+//   The specified resource is in use.
+//
+//   * ErrCodeResourceLimitExceededException "ResourceLimitExceededException"
+//   You have encountered a service limit on the specified resource.
+//
+//   * ErrCodeInvalidRequestException "InvalidRequestException"
+//   The request is invalid given the state of the cluster. Check the state of
+//   the cluster and the associated operations.
+//
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeServiceUnavailableException "ServiceUnavailableException"
+//   The service is unavailable. Back off and retry the operation.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/CreateNodegroup
+func (c *EKS) CreateNodegroup(input *CreateNodegroupInput) (*CreateNodegroupOutput, error) {
+	req, out := c.CreateNodegroupRequest(input)
+	return out, req.Send()
+}
+
+// CreateNodegroupWithContext is the same as CreateNodegroup with the addition of
+// the ability to pass a context and additional request options.
+//
+// See CreateNodegroup for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) CreateNodegroupWithContext(ctx aws.Context, input *CreateNodegroupInput, opts ...request.Option) (*CreateNodegroupOutput, error) {
+	req, out := c.CreateNodegroupRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
 const opDeleteCluster = "DeleteCluster"
 
 // DeleteClusterRequest generates a "aws/request.Request" representing the
@@ -208,6 +452,9 @@ func (c *EKS) DeleteClusterRequest(input *DeleteClusterInput) (req *request.Requ
 // For more information, see Deleting a Cluster (https://docs.aws.amazon.com/eks/latest/userguide/delete-cluster.html)
 // in the Amazon EKS User Guide.
 //
+// If you have managed node groups or Fargate profiles attached to the cluster,
+// you must delete them first. For more information, see DeleteNodegroup andDeleteFargateProfile.
+//
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
 // the error.
@@ -221,7 +468,8 @@ func (c *EKS) DeleteClusterRequest(input *DeleteClusterInput) (req *request.Requ
 //
 //   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
 //   The specified resource could not be found. You can view your available clusters
-//   with ListClusters. Amazon EKS clusters are Region-specific.
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
 //
 //   * ErrCodeClientException "ClientException"
 //   These errors are usually caused by a client action. Actions can include using
@@ -251,6 +499,208 @@ func (c *EKS) DeleteCluster(input *DeleteClusterInput) (*DeleteClusterOutput, er
 // for more information on using Contexts.
 func (c *EKS) DeleteClusterWithContext(ctx aws.Context, input *DeleteClusterInput, opts ...request.Option) (*DeleteClusterOutput, error) {
 	req, out := c.DeleteClusterRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+const opDeleteFargateProfile = "DeleteFargateProfile"
+
+// DeleteFargateProfileRequest generates a "aws/request.Request" representing the
+// client's request for the DeleteFargateProfile operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See DeleteFargateProfile for more information on using the DeleteFargateProfile
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the DeleteFargateProfileRequest method.
+//    req, resp := client.DeleteFargateProfileRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DeleteFargateProfile
+func (c *EKS) DeleteFargateProfileRequest(input *DeleteFargateProfileInput) (req *request.Request, output *DeleteFargateProfileOutput) {
+	op := &request.Operation{
+		Name:       opDeleteFargateProfile,
+		HTTPMethod: "DELETE",
+		HTTPPath:   "/clusters/{name}/fargate-profiles/{fargateProfileName}",
+	}
+
+	if input == nil {
+		input = &DeleteFargateProfileInput{}
+	}
+
+	output = &DeleteFargateProfileOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// DeleteFargateProfile API operation for Amazon Elastic Kubernetes Service.
+//
+// Deletes an AWS Fargate profile.
+//
+// When you delete a Fargate profile, any pods that were scheduled onto Fargate
+// infrastructure with the profile are deleted. If those pods match another
+// Fargate profile, then they are scheduled on Fargate infrastructure with that
+// profile. If they no longer match any Fargate profiles, then they are not
+// scheduled on Fargate infrastructure.
+//
+// Only one Fargate profile in a cluster can be in the DELETING status at a
+// time. You must wait for a Fargate profile to finish deleting before you can
+// delete any other profiles in that cluster.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation DeleteFargateProfile for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
+//   The specified resource could not be found. You can view your available clusters
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DeleteFargateProfile
+func (c *EKS) DeleteFargateProfile(input *DeleteFargateProfileInput) (*DeleteFargateProfileOutput, error) {
+	req, out := c.DeleteFargateProfileRequest(input)
+	return out, req.Send()
+}
+
+// DeleteFargateProfileWithContext is the same as DeleteFargateProfile with the addition of
+// the ability to pass a context and additional request options.
+//
+// See DeleteFargateProfile for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) DeleteFargateProfileWithContext(ctx aws.Context, input *DeleteFargateProfileInput, opts ...request.Option) (*DeleteFargateProfileOutput, error) {
+	req, out := c.DeleteFargateProfileRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+const opDeleteNodegroup = "DeleteNodegroup"
+
+// DeleteNodegroupRequest generates a "aws/request.Request" representing the
+// client's request for the DeleteNodegroup operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See DeleteNodegroup for more information on using the DeleteNodegroup
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the DeleteNodegroupRequest method.
+//    req, resp := client.DeleteNodegroupRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DeleteNodegroup
+func (c *EKS) DeleteNodegroupRequest(input *DeleteNodegroupInput) (req *request.Request, output *DeleteNodegroupOutput) {
+	op := &request.Operation{
+		Name:       opDeleteNodegroup,
+		HTTPMethod: "DELETE",
+		HTTPPath:   "/clusters/{name}/node-groups/{nodegroupName}",
+	}
+
+	if input == nil {
+		input = &DeleteNodegroupInput{}
+	}
+
+	output = &DeleteNodegroupOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// DeleteNodegroup API operation for Amazon Elastic Kubernetes Service.
+//
+// Deletes an Amazon EKS node group for a cluster.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation DeleteNodegroup for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeResourceInUseException "ResourceInUseException"
+//   The specified resource is in use.
+//
+//   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
+//   The specified resource could not be found. You can view your available clusters
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
+//
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeServiceUnavailableException "ServiceUnavailableException"
+//   The service is unavailable. Back off and retry the operation.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DeleteNodegroup
+func (c *EKS) DeleteNodegroup(input *DeleteNodegroupInput) (*DeleteNodegroupOutput, error) {
+	req, out := c.DeleteNodegroupRequest(input)
+	return out, req.Send()
+}
+
+// DeleteNodegroupWithContext is the same as DeleteNodegroup with the addition of
+// the ability to pass a context and additional request options.
+//
+// See DeleteNodegroup for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) DeleteNodegroupWithContext(ctx aws.Context, input *DeleteNodegroupInput, opts ...request.Option) (*DeleteNodegroupOutput, error) {
+	req, out := c.DeleteNodegroupRequest(input)
 	req.SetContext(ctx)
 	req.ApplyOptions(opts...)
 	return out, req.Send()
@@ -320,7 +770,8 @@ func (c *EKS) DescribeClusterRequest(input *DescribeClusterInput) (req *request.
 // Returned Error Codes:
 //   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
 //   The specified resource could not be found. You can view your available clusters
-//   with ListClusters. Amazon EKS clusters are Region-specific.
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
 //
 //   * ErrCodeClientException "ClientException"
 //   These errors are usually caused by a client action. Actions can include using
@@ -350,6 +801,195 @@ func (c *EKS) DescribeCluster(input *DescribeClusterInput) (*DescribeClusterOutp
 // for more information on using Contexts.
 func (c *EKS) DescribeClusterWithContext(ctx aws.Context, input *DescribeClusterInput, opts ...request.Option) (*DescribeClusterOutput, error) {
 	req, out := c.DescribeClusterRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+const opDescribeFargateProfile = "DescribeFargateProfile"
+
+// DescribeFargateProfileRequest generates a "aws/request.Request" representing the
+// client's request for the DescribeFargateProfile operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See DescribeFargateProfile for more information on using the DescribeFargateProfile
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the DescribeFargateProfileRequest method.
+//    req, resp := client.DescribeFargateProfileRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DescribeFargateProfile
+func (c *EKS) DescribeFargateProfileRequest(input *DescribeFargateProfileInput) (req *request.Request, output *DescribeFargateProfileOutput) {
+	op := &request.Operation{
+		Name:       opDescribeFargateProfile,
+		HTTPMethod: "GET",
+		HTTPPath:   "/clusters/{name}/fargate-profiles/{fargateProfileName}",
+	}
+
+	if input == nil {
+		input = &DescribeFargateProfileInput{}
+	}
+
+	output = &DescribeFargateProfileOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// DescribeFargateProfile API operation for Amazon Elastic Kubernetes Service.
+//
+// Returns descriptive information about an AWS Fargate profile.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation DescribeFargateProfile for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
+//   The specified resource could not be found. You can view your available clusters
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DescribeFargateProfile
+func (c *EKS) DescribeFargateProfile(input *DescribeFargateProfileInput) (*DescribeFargateProfileOutput, error) {
+	req, out := c.DescribeFargateProfileRequest(input)
+	return out, req.Send()
+}
+
+// DescribeFargateProfileWithContext is the same as DescribeFargateProfile with the addition of
+// the ability to pass a context and additional request options.
+//
+// See DescribeFargateProfile for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) DescribeFargateProfileWithContext(ctx aws.Context, input *DescribeFargateProfileInput, opts ...request.Option) (*DescribeFargateProfileOutput, error) {
+	req, out := c.DescribeFargateProfileRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+const opDescribeNodegroup = "DescribeNodegroup"
+
+// DescribeNodegroupRequest generates a "aws/request.Request" representing the
+// client's request for the DescribeNodegroup operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See DescribeNodegroup for more information on using the DescribeNodegroup
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the DescribeNodegroupRequest method.
+//    req, resp := client.DescribeNodegroupRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DescribeNodegroup
+func (c *EKS) DescribeNodegroupRequest(input *DescribeNodegroupInput) (req *request.Request, output *DescribeNodegroupOutput) {
+	op := &request.Operation{
+		Name:       opDescribeNodegroup,
+		HTTPMethod: "GET",
+		HTTPPath:   "/clusters/{name}/node-groups/{nodegroupName}",
+	}
+
+	if input == nil {
+		input = &DescribeNodegroupInput{}
+	}
+
+	output = &DescribeNodegroupOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// DescribeNodegroup API operation for Amazon Elastic Kubernetes Service.
+//
+// Returns descriptive information about an Amazon EKS node group.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation DescribeNodegroup for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
+//   The specified resource could not be found. You can view your available clusters
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeServiceUnavailableException "ServiceUnavailableException"
+//   The service is unavailable. Back off and retry the operation.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DescribeNodegroup
+func (c *EKS) DescribeNodegroup(input *DescribeNodegroupInput) (*DescribeNodegroupOutput, error) {
+	req, out := c.DescribeNodegroupRequest(input)
+	return out, req.Send()
+}
+
+// DescribeNodegroupWithContext is the same as DescribeNodegroup with the addition of
+// the ability to pass a context and additional request options.
+//
+// See DescribeNodegroup for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) DescribeNodegroupWithContext(ctx aws.Context, input *DescribeNodegroupInput, opts ...request.Option) (*DescribeNodegroupOutput, error) {
+	req, out := c.DescribeNodegroupRequest(input)
 	req.SetContext(ctx)
 	req.ApplyOptions(opts...)
 	return out, req.Send()
@@ -399,7 +1039,8 @@ func (c *EKS) DescribeUpdateRequest(input *DescribeUpdateInput) (req *request.Re
 
 // DescribeUpdate API operation for Amazon Elastic Kubernetes Service.
 //
-// Returns descriptive information about an update against your Amazon EKS cluster.
+// Returns descriptive information about an update against your Amazon EKS cluster
+// or associated managed node group.
 //
 // When the status of the update is Succeeded, the update is complete. If an
 // update fails, the status is Failed, and an error detail explains the reason
@@ -427,7 +1068,8 @@ func (c *EKS) DescribeUpdateRequest(input *DescribeUpdateInput) (req *request.Re
 //
 //   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
 //   The specified resource could not be found. You can view your available clusters
-//   with ListClusters. Amazon EKS clusters are Region-specific.
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/DescribeUpdate
 func (c *EKS) DescribeUpdate(input *DescribeUpdateInput) (*DescribeUpdateOutput, error) {
@@ -591,10 +1233,319 @@ func (c *EKS) ListClustersPagesWithContext(ctx aws.Context, input *ListClustersI
 		},
 	}
 
-	cont := true
-	for p.Next() && cont {
-		cont = fn(p.Page().(*ListClustersOutput), !p.HasNextPage())
+	for p.Next() {
+		if !fn(p.Page().(*ListClustersOutput), !p.HasNextPage()) {
+			break
+		}
 	}
+
+	return p.Err()
+}
+
+const opListFargateProfiles = "ListFargateProfiles"
+
+// ListFargateProfilesRequest generates a "aws/request.Request" representing the
+// client's request for the ListFargateProfiles operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See ListFargateProfiles for more information on using the ListFargateProfiles
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the ListFargateProfilesRequest method.
+//    req, resp := client.ListFargateProfilesRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/ListFargateProfiles
+func (c *EKS) ListFargateProfilesRequest(input *ListFargateProfilesInput) (req *request.Request, output *ListFargateProfilesOutput) {
+	op := &request.Operation{
+		Name:       opListFargateProfiles,
+		HTTPMethod: "GET",
+		HTTPPath:   "/clusters/{name}/fargate-profiles",
+		Paginator: &request.Paginator{
+			InputTokens:     []string{"nextToken"},
+			OutputTokens:    []string{"nextToken"},
+			LimitToken:      "maxResults",
+			TruncationToken: "",
+		},
+	}
+
+	if input == nil {
+		input = &ListFargateProfilesInput{}
+	}
+
+	output = &ListFargateProfilesOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// ListFargateProfiles API operation for Amazon Elastic Kubernetes Service.
+//
+// Lists the AWS Fargate profiles associated with the specified cluster in your
+// AWS account in the specified Region.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation ListFargateProfiles for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
+//   The specified resource could not be found. You can view your available clusters
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/ListFargateProfiles
+func (c *EKS) ListFargateProfiles(input *ListFargateProfilesInput) (*ListFargateProfilesOutput, error) {
+	req, out := c.ListFargateProfilesRequest(input)
+	return out, req.Send()
+}
+
+// ListFargateProfilesWithContext is the same as ListFargateProfiles with the addition of
+// the ability to pass a context and additional request options.
+//
+// See ListFargateProfiles for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) ListFargateProfilesWithContext(ctx aws.Context, input *ListFargateProfilesInput, opts ...request.Option) (*ListFargateProfilesOutput, error) {
+	req, out := c.ListFargateProfilesRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+// ListFargateProfilesPages iterates over the pages of a ListFargateProfiles operation,
+// calling the "fn" function with the response data for each page. To stop
+// iterating, return false from the fn function.
+//
+// See ListFargateProfiles method for more information on how to use this operation.
+//
+// Note: This operation can generate multiple requests to a service.
+//
+//    // Example iterating over at most 3 pages of a ListFargateProfiles operation.
+//    pageNum := 0
+//    err := client.ListFargateProfilesPages(params,
+//        func(page *eks.ListFargateProfilesOutput, lastPage bool) bool {
+//            pageNum++
+//            fmt.Println(page)
+//            return pageNum <= 3
+//        })
+//
+func (c *EKS) ListFargateProfilesPages(input *ListFargateProfilesInput, fn func(*ListFargateProfilesOutput, bool) bool) error {
+	return c.ListFargateProfilesPagesWithContext(aws.BackgroundContext(), input, fn)
+}
+
+// ListFargateProfilesPagesWithContext same as ListFargateProfilesPages except
+// it takes a Context and allows setting request options on the pages.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) ListFargateProfilesPagesWithContext(ctx aws.Context, input *ListFargateProfilesInput, fn func(*ListFargateProfilesOutput, bool) bool, opts ...request.Option) error {
+	p := request.Pagination{
+		NewRequest: func() (*request.Request, error) {
+			var inCpy *ListFargateProfilesInput
+			if input != nil {
+				tmp := *input
+				inCpy = &tmp
+			}
+			req, _ := c.ListFargateProfilesRequest(inCpy)
+			req.SetContext(ctx)
+			req.ApplyOptions(opts...)
+			return req, nil
+		},
+	}
+
+	for p.Next() {
+		if !fn(p.Page().(*ListFargateProfilesOutput), !p.HasNextPage()) {
+			break
+		}
+	}
+
+	return p.Err()
+}
+
+const opListNodegroups = "ListNodegroups"
+
+// ListNodegroupsRequest generates a "aws/request.Request" representing the
+// client's request for the ListNodegroups operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See ListNodegroups for more information on using the ListNodegroups
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the ListNodegroupsRequest method.
+//    req, resp := client.ListNodegroupsRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/ListNodegroups
+func (c *EKS) ListNodegroupsRequest(input *ListNodegroupsInput) (req *request.Request, output *ListNodegroupsOutput) {
+	op := &request.Operation{
+		Name:       opListNodegroups,
+		HTTPMethod: "GET",
+		HTTPPath:   "/clusters/{name}/node-groups",
+		Paginator: &request.Paginator{
+			InputTokens:     []string{"nextToken"},
+			OutputTokens:    []string{"nextToken"},
+			LimitToken:      "maxResults",
+			TruncationToken: "",
+		},
+	}
+
+	if input == nil {
+		input = &ListNodegroupsInput{}
+	}
+
+	output = &ListNodegroupsOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// ListNodegroups API operation for Amazon Elastic Kubernetes Service.
+//
+// Lists the Amazon EKS node groups associated with the specified cluster in
+// your AWS account in the specified Region.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation ListNodegroups for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeServiceUnavailableException "ServiceUnavailableException"
+//   The service is unavailable. Back off and retry the operation.
+//
+//   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
+//   The specified resource could not be found. You can view your available clusters
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/ListNodegroups
+func (c *EKS) ListNodegroups(input *ListNodegroupsInput) (*ListNodegroupsOutput, error) {
+	req, out := c.ListNodegroupsRequest(input)
+	return out, req.Send()
+}
+
+// ListNodegroupsWithContext is the same as ListNodegroups with the addition of
+// the ability to pass a context and additional request options.
+//
+// See ListNodegroups for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) ListNodegroupsWithContext(ctx aws.Context, input *ListNodegroupsInput, opts ...request.Option) (*ListNodegroupsOutput, error) {
+	req, out := c.ListNodegroupsRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+// ListNodegroupsPages iterates over the pages of a ListNodegroups operation,
+// calling the "fn" function with the response data for each page. To stop
+// iterating, return false from the fn function.
+//
+// See ListNodegroups method for more information on how to use this operation.
+//
+// Note: This operation can generate multiple requests to a service.
+//
+//    // Example iterating over at most 3 pages of a ListNodegroups operation.
+//    pageNum := 0
+//    err := client.ListNodegroupsPages(params,
+//        func(page *eks.ListNodegroupsOutput, lastPage bool) bool {
+//            pageNum++
+//            fmt.Println(page)
+//            return pageNum <= 3
+//        })
+//
+func (c *EKS) ListNodegroupsPages(input *ListNodegroupsInput, fn func(*ListNodegroupsOutput, bool) bool) error {
+	return c.ListNodegroupsPagesWithContext(aws.BackgroundContext(), input, fn)
+}
+
+// ListNodegroupsPagesWithContext same as ListNodegroupsPages except
+// it takes a Context and allows setting request options on the pages.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) ListNodegroupsPagesWithContext(ctx aws.Context, input *ListNodegroupsInput, fn func(*ListNodegroupsOutput, bool) bool, opts ...request.Option) error {
+	p := request.Pagination{
+		NewRequest: func() (*request.Request, error) {
+			var inCpy *ListNodegroupsInput
+			if input != nil {
+				tmp := *input
+				inCpy = &tmp
+			}
+			req, _ := c.ListNodegroupsRequest(inCpy)
+			req.SetContext(ctx)
+			req.ApplyOptions(opts...)
+			return req, nil
+		},
+	}
+
+	for p.Next() {
+		if !fn(p.Page().(*ListNodegroupsOutput), !p.HasNextPage()) {
+			break
+		}
+	}
+
 	return p.Err()
 }
 
@@ -732,8 +1683,8 @@ func (c *EKS) ListUpdatesRequest(input *ListUpdatesInput) (req *request.Request,
 
 // ListUpdates API operation for Amazon Elastic Kubernetes Service.
 //
-// Lists the updates associated with an Amazon EKS cluster in your AWS account,
-// in the specified Region.
+// Lists the updates associated with an Amazon EKS cluster or managed node group
+// in your AWS account, in the specified Region.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -757,7 +1708,8 @@ func (c *EKS) ListUpdatesRequest(input *ListUpdatesInput) (req *request.Request,
 //
 //   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
 //   The specified resource could not be found. You can view your available clusters
-//   with ListClusters. Amazon EKS clusters are Region-specific.
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/ListUpdates
 func (c *EKS) ListUpdates(input *ListUpdatesInput) (*ListUpdatesOutput, error) {
@@ -824,10 +1776,12 @@ func (c *EKS) ListUpdatesPagesWithContext(ctx aws.Context, input *ListUpdatesInp
 		},
 	}
 
-	cont := true
-	for p.Next() && cont {
-		cont = fn(p.Page().(*ListUpdatesOutput), !p.HasNextPage())
+	for p.Next() {
+		if !fn(p.Page().(*ListUpdatesOutput), !p.HasNextPage()) {
+			break
+		}
 	}
+
 	return p.Err()
 }
 
@@ -879,7 +1833,10 @@ func (c *EKS) TagResourceRequest(input *TagResourceInput) (req *request.Request,
 // Associates the specified tags to a resource with the specified resourceArn.
 // If existing tags on a resource are not specified in the request parameters,
 // they are not changed. When a resource is deleted, the tags associated with
-// that resource are deleted as well.
+// that resource are deleted as well. Tags that you create for Amazon EKS resources
+// do not propagate to any other resources associated with the cluster. For
+// example, if you tag a cluster with this operation, that tag does not automatically
+// propagate to the subnets and worker nodes associated with the cluster.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1102,7 +2059,8 @@ func (c *EKS) UpdateClusterConfigRequest(input *UpdateClusterConfigInput) (req *
 //
 //   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
 //   The specified resource could not be found. You can view your available clusters
-//   with ListClusters. Amazon EKS clusters are Region-specific.
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
 //
 //   * ErrCodeInvalidRequestException "InvalidRequestException"
 //   The request is invalid given the state of the cluster. Check the state of
@@ -1184,6 +2142,10 @@ func (c *EKS) UpdateClusterVersionRequest(input *UpdateClusterVersionInput) (req
 // is eventually consistent). When the update is complete (either Failed or
 // Successful), the cluster status moves to Active.
 //
+// If your cluster has managed node groups attached to it, all of your node
+// groups’ Kubernetes versions must match the cluster’s Kubernetes version
+// in order to update the cluster to a new Kubernetes version.
+//
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
 // the error.
@@ -1209,7 +2171,8 @@ func (c *EKS) UpdateClusterVersionRequest(input *UpdateClusterVersionInput) (req
 //
 //   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
 //   The specified resource could not be found. You can view your available clusters
-//   with ListClusters. Amazon EKS clusters are Region-specific.
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
 //
 //   * ErrCodeInvalidRequestException "InvalidRequestException"
 //   The request is invalid given the state of the cluster. Check the state of
@@ -1235,6 +2198,253 @@ func (c *EKS) UpdateClusterVersionWithContext(ctx aws.Context, input *UpdateClus
 	req.SetContext(ctx)
 	req.ApplyOptions(opts...)
 	return out, req.Send()
+}
+
+const opUpdateNodegroupConfig = "UpdateNodegroupConfig"
+
+// UpdateNodegroupConfigRequest generates a "aws/request.Request" representing the
+// client's request for the UpdateNodegroupConfig operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See UpdateNodegroupConfig for more information on using the UpdateNodegroupConfig
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the UpdateNodegroupConfigRequest method.
+//    req, resp := client.UpdateNodegroupConfigRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/UpdateNodegroupConfig
+func (c *EKS) UpdateNodegroupConfigRequest(input *UpdateNodegroupConfigInput) (req *request.Request, output *UpdateNodegroupConfigOutput) {
+	op := &request.Operation{
+		Name:       opUpdateNodegroupConfig,
+		HTTPMethod: "POST",
+		HTTPPath:   "/clusters/{name}/node-groups/{nodegroupName}/update-config",
+	}
+
+	if input == nil {
+		input = &UpdateNodegroupConfigInput{}
+	}
+
+	output = &UpdateNodegroupConfigOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// UpdateNodegroupConfig API operation for Amazon Elastic Kubernetes Service.
+//
+// Updates an Amazon EKS managed node group configuration. Your node group continues
+// to function during the update. The response output includes an update ID
+// that you can use to track the status of your node group update with the DescribeUpdate
+// API operation. Currently you can update the Kubernetes labels for a node
+// group or the scaling configuration.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation UpdateNodegroupConfig for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeResourceInUseException "ResourceInUseException"
+//   The specified resource is in use.
+//
+//   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
+//   The specified resource could not be found. You can view your available clusters
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
+//
+//   * ErrCodeInvalidRequestException "InvalidRequestException"
+//   The request is invalid given the state of the cluster. Check the state of
+//   the cluster and the associated operations.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/UpdateNodegroupConfig
+func (c *EKS) UpdateNodegroupConfig(input *UpdateNodegroupConfigInput) (*UpdateNodegroupConfigOutput, error) {
+	req, out := c.UpdateNodegroupConfigRequest(input)
+	return out, req.Send()
+}
+
+// UpdateNodegroupConfigWithContext is the same as UpdateNodegroupConfig with the addition of
+// the ability to pass a context and additional request options.
+//
+// See UpdateNodegroupConfig for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) UpdateNodegroupConfigWithContext(ctx aws.Context, input *UpdateNodegroupConfigInput, opts ...request.Option) (*UpdateNodegroupConfigOutput, error) {
+	req, out := c.UpdateNodegroupConfigRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+const opUpdateNodegroupVersion = "UpdateNodegroupVersion"
+
+// UpdateNodegroupVersionRequest generates a "aws/request.Request" representing the
+// client's request for the UpdateNodegroupVersion operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See UpdateNodegroupVersion for more information on using the UpdateNodegroupVersion
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the UpdateNodegroupVersionRequest method.
+//    req, resp := client.UpdateNodegroupVersionRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/UpdateNodegroupVersion
+func (c *EKS) UpdateNodegroupVersionRequest(input *UpdateNodegroupVersionInput) (req *request.Request, output *UpdateNodegroupVersionOutput) {
+	op := &request.Operation{
+		Name:       opUpdateNodegroupVersion,
+		HTTPMethod: "POST",
+		HTTPPath:   "/clusters/{name}/node-groups/{nodegroupName}/update-version",
+	}
+
+	if input == nil {
+		input = &UpdateNodegroupVersionInput{}
+	}
+
+	output = &UpdateNodegroupVersionOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// UpdateNodegroupVersion API operation for Amazon Elastic Kubernetes Service.
+//
+// Updates the Kubernetes version or AMI version of an Amazon EKS managed node
+// group.
+//
+// You can update to the latest available AMI version of a node group's current
+// Kubernetes version by not specifying a Kubernetes version in the request.
+// You can update to the latest AMI version of your cluster's current Kubernetes
+// version by specifying your cluster's Kubernetes version in the request. For
+// more information, see Amazon EKS-Optimized Linux AMI Versions (https://docs.aws.amazon.com/eks/latest/userguide/eks-linux-ami-versions.html)
+// in the Amazon EKS User Guide.
+//
+// You cannot roll back a node group to an earlier Kubernetes version or AMI
+// version.
+//
+// When a node in a managed node group is terminated due to a scaling action
+// or update, the pods in that node are drained first. Amazon EKS attempts to
+// drain the nodes gracefully and will fail if it is unable to do so. You can
+// force the update if Amazon EKS is unable to drain the nodes as a result of
+// a pod disruption budget issue.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon Elastic Kubernetes Service's
+// API operation UpdateNodegroupVersion for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeClientException "ClientException"
+//   These errors are usually caused by a client action. Actions can include using
+//   an action or resource on behalf of a user that doesn't have permissions to
+//   use the action or resource or specifying an identifier that is not valid.
+//
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeResourceInUseException "ResourceInUseException"
+//   The specified resource is in use.
+//
+//   * ErrCodeResourceNotFoundException "ResourceNotFoundException"
+//   The specified resource could not be found. You can view your available clusters
+//   with ListClusters. You can view your available managed node groups with ListNodegroups.
+//   Amazon EKS clusters and node groups are Region-specific.
+//
+//   * ErrCodeInvalidRequestException "InvalidRequestException"
+//   The request is invalid given the state of the cluster. Check the state of
+//   the cluster and the associated operations.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/eks-2017-11-01/UpdateNodegroupVersion
+func (c *EKS) UpdateNodegroupVersion(input *UpdateNodegroupVersionInput) (*UpdateNodegroupVersionOutput, error) {
+	req, out := c.UpdateNodegroupVersionRequest(input)
+	return out, req.Send()
+}
+
+// UpdateNodegroupVersionWithContext is the same as UpdateNodegroupVersion with the addition of
+// the ability to pass a context and additional request options.
+//
+// See UpdateNodegroupVersion for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EKS) UpdateNodegroupVersionWithContext(ctx aws.Context, input *UpdateNodegroupVersionInput, opts ...request.Option) (*UpdateNodegroupVersionOutput, error) {
+	req, out := c.UpdateNodegroupVersionRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+// An Auto Scaling group that is associated with an Amazon EKS managed node
+// group.
+type AutoScalingGroup struct {
+	_ struct{} `type:"structure"`
+
+	// The name of the Auto Scaling group associated with an Amazon EKS managed
+	// node group.
+	Name *string `locationName:"name" type:"string"`
+}
+
+// String returns the string representation
+func (s AutoScalingGroup) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s AutoScalingGroup) GoString() string {
+	return s.String()
+}
+
+// SetName sets the Name field's value.
+func (s *AutoScalingGroup) SetName(v string) *AutoScalingGroup {
+	s.Name = &v
+	return s
 }
 
 // An object representing the certificate-authority-data for your cluster.
@@ -1314,7 +2524,8 @@ type Cluster struct {
 
 	// The metadata that you apply to the cluster to assist with categorization
 	// and organization. Each tag consists of a key and an optional value, both
-	// of which you define.
+	// of which you define. Cluster tags do not propagate to any other resources
+	// associated with the cluster.
 	Tags map[string]*string `locationName:"tags" min:"1" type:"map"`
 
 	// The Kubernetes server version for the cluster.
@@ -1566,6 +2777,382 @@ func (s *CreateClusterOutput) SetCluster(v *Cluster) *CreateClusterOutput {
 	return s
 }
 
+type CreateFargateProfileInput struct {
+	_ struct{} `type:"structure"`
+
+	// Unique, case-sensitive identifier that you provide to ensure the idempotency
+	// of the request.
+	ClientRequestToken *string `locationName:"clientRequestToken" type:"string" idempotencyToken:"true"`
+
+	// The name of the Amazon EKS cluster to apply the Fargate profile to.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The name of the Fargate profile.
+	//
+	// FargateProfileName is a required field
+	FargateProfileName *string `locationName:"fargateProfileName" type:"string" required:"true"`
+
+	// The Amazon Resource Name (ARN) of the pod execution role to use for pods
+	// that match the selectors in the Fargate profile. The pod execution role allows
+	// Fargate infrastructure to register with your cluster as a node, and it provides
+	// read access to Amazon ECR image repositories. For more information, see Pod
+	// Execution Role (https://docs.aws.amazon.com/eks/latest/userguide/pod-execution-role.html)
+	// in the Amazon EKS User Guide.
+	//
+	// PodExecutionRoleArn is a required field
+	PodExecutionRoleArn *string `locationName:"podExecutionRoleArn" type:"string" required:"true"`
+
+	// The selectors to match for pods to use this Fargate profile. Each selector
+	// must have an associated namespace. Optionally, you can also specify labels
+	// for a namespace. You may specify up to five selectors in a Fargate profile.
+	Selectors []*FargateProfileSelector `locationName:"selectors" type:"list"`
+
+	// The IDs of subnets to launch Fargate pods into. At this time, Fargate pods
+	// are not assigned public IP addresses, so only private subnets (with no direct
+	// route to an Internet Gateway) are accepted for this parameter.
+	Subnets []*string `locationName:"subnets" type:"list"`
+
+	// The metadata to apply to the Fargate profile to assist with categorization
+	// and organization. Each tag consists of a key and an optional value, both
+	// of which you define. Fargate profile tags do not propagate to any other resources
+	// associated with the Fargate profile, such as the pods that are scheduled
+	// with it.
+	Tags map[string]*string `locationName:"tags" min:"1" type:"map"`
+}
+
+// String returns the string representation
+func (s CreateFargateProfileInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s CreateFargateProfileInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateFargateProfileInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateFargateProfileInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.FargateProfileName == nil {
+		invalidParams.Add(request.NewErrParamRequired("FargateProfileName"))
+	}
+	if s.PodExecutionRoleArn == nil {
+		invalidParams.Add(request.NewErrParamRequired("PodExecutionRoleArn"))
+	}
+	if s.Tags != nil && len(s.Tags) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Tags", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClientRequestToken sets the ClientRequestToken field's value.
+func (s *CreateFargateProfileInput) SetClientRequestToken(v string) *CreateFargateProfileInput {
+	s.ClientRequestToken = &v
+	return s
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *CreateFargateProfileInput) SetClusterName(v string) *CreateFargateProfileInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetFargateProfileName sets the FargateProfileName field's value.
+func (s *CreateFargateProfileInput) SetFargateProfileName(v string) *CreateFargateProfileInput {
+	s.FargateProfileName = &v
+	return s
+}
+
+// SetPodExecutionRoleArn sets the PodExecutionRoleArn field's value.
+func (s *CreateFargateProfileInput) SetPodExecutionRoleArn(v string) *CreateFargateProfileInput {
+	s.PodExecutionRoleArn = &v
+	return s
+}
+
+// SetSelectors sets the Selectors field's value.
+func (s *CreateFargateProfileInput) SetSelectors(v []*FargateProfileSelector) *CreateFargateProfileInput {
+	s.Selectors = v
+	return s
+}
+
+// SetSubnets sets the Subnets field's value.
+func (s *CreateFargateProfileInput) SetSubnets(v []*string) *CreateFargateProfileInput {
+	s.Subnets = v
+	return s
+}
+
+// SetTags sets the Tags field's value.
+func (s *CreateFargateProfileInput) SetTags(v map[string]*string) *CreateFargateProfileInput {
+	s.Tags = v
+	return s
+}
+
+type CreateFargateProfileOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The full description of your new Fargate profile.
+	FargateProfile *FargateProfile `locationName:"fargateProfile" type:"structure"`
+}
+
+// String returns the string representation
+func (s CreateFargateProfileOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s CreateFargateProfileOutput) GoString() string {
+	return s.String()
+}
+
+// SetFargateProfile sets the FargateProfile field's value.
+func (s *CreateFargateProfileOutput) SetFargateProfile(v *FargateProfile) *CreateFargateProfileOutput {
+	s.FargateProfile = v
+	return s
+}
+
+type CreateNodegroupInput struct {
+	_ struct{} `type:"structure"`
+
+	// The AMI type for your node group. GPU instance types should use the AL2_x86_64_GPU
+	// AMI type, which uses the Amazon EKS-optimized Linux AMI with GPU support.
+	// Non-GPU instances should use the AL2_x86_64 AMI type, which uses the Amazon
+	// EKS-optimized Linux AMI.
+	AmiType *string `locationName:"amiType" type:"string" enum:"AMITypes"`
+
+	// Unique, case-sensitive identifier that you provide to ensure the idempotency
+	// of the request.
+	ClientRequestToken *string `locationName:"clientRequestToken" type:"string" idempotencyToken:"true"`
+
+	// The name of the cluster to create the node group in.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The root device disk size (in GiB) for your node group instances. The default
+	// disk size is 20 GiB.
+	DiskSize *int64 `locationName:"diskSize" type:"integer"`
+
+	// The instance type to use for your node group. Currently, you can specify
+	// a single instance type for a node group. The default value for this parameter
+	// is t3.medium. If you choose a GPU instance type, be sure to specify the AL2_x86_64_GPU
+	// with the amiType parameter.
+	InstanceTypes []*string `locationName:"instanceTypes" type:"list"`
+
+	// The Kubernetes labels to be applied to the nodes in the node group when they
+	// are created.
+	Labels map[string]*string `locationName:"labels" type:"map"`
+
+	// The IAM role associated with your node group. The Amazon EKS worker node
+	// kubelet daemon makes calls to AWS APIs on your behalf. Worker nodes receive
+	// permissions for these API calls through an IAM instance profile and associated
+	// policies. Before you can launch worker nodes and register them into a cluster,
+	// you must create an IAM role for those worker nodes to use when they are launched.
+	// For more information, see Amazon EKS Worker Node IAM Role (https://docs.aws.amazon.com/eks/latest/userguide/worker_node_IAM_role.html)
+	// in the Amazon EKS User Guide .
+	//
+	// NodeRole is a required field
+	NodeRole *string `locationName:"nodeRole" type:"string" required:"true"`
+
+	// The unique name to give your node group.
+	//
+	// NodegroupName is a required field
+	NodegroupName *string `locationName:"nodegroupName" type:"string" required:"true"`
+
+	// The AMI version of the Amazon EKS-optimized AMI to use with your node group.
+	// By default, the latest available AMI version for the node group's current
+	// Kubernetes version is used. For more information, see Amazon EKS-Optimized
+	// Linux AMI Versions (https://docs.aws.amazon.com/eks/latest/userguide/eks-linux-ami-versions.html)
+	// in the Amazon EKS User Guide.
+	ReleaseVersion *string `locationName:"releaseVersion" type:"string"`
+
+	// The remote access (SSH) configuration to use with your node group.
+	RemoteAccess *RemoteAccessConfig `locationName:"remoteAccess" type:"structure"`
+
+	// The scaling configuration details for the Auto Scaling group that is created
+	// for your node group.
+	ScalingConfig *NodegroupScalingConfig `locationName:"scalingConfig" type:"structure"`
+
+	// The subnets to use for the Auto Scaling group that is created for your node
+	// group. These subnets must have the tag key kubernetes.io/cluster/CLUSTER_NAME
+	// with a value of shared, where CLUSTER_NAME is replaced with the name of your
+	// cluster.
+	//
+	// Subnets is a required field
+	Subnets []*string `locationName:"subnets" type:"list" required:"true"`
+
+	// The metadata to apply to the node group to assist with categorization and
+	// organization. Each tag consists of a key and an optional value, both of which
+	// you define. Node group tags do not propagate to any other resources associated
+	// with the node group, such as the Amazon EC2 instances or subnets.
+	Tags map[string]*string `locationName:"tags" min:"1" type:"map"`
+
+	// The Kubernetes version to use for your managed nodes. By default, the Kubernetes
+	// version of the cluster is used, and this is the only accepted specified value.
+	Version *string `locationName:"version" type:"string"`
+}
+
+// String returns the string representation
+func (s CreateNodegroupInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s CreateNodegroupInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *CreateNodegroupInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "CreateNodegroupInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.NodeRole == nil {
+		invalidParams.Add(request.NewErrParamRequired("NodeRole"))
+	}
+	if s.NodegroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("NodegroupName"))
+	}
+	if s.Subnets == nil {
+		invalidParams.Add(request.NewErrParamRequired("Subnets"))
+	}
+	if s.Tags != nil && len(s.Tags) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("Tags", 1))
+	}
+	if s.ScalingConfig != nil {
+		if err := s.ScalingConfig.Validate(); err != nil {
+			invalidParams.AddNested("ScalingConfig", err.(request.ErrInvalidParams))
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetAmiType sets the AmiType field's value.
+func (s *CreateNodegroupInput) SetAmiType(v string) *CreateNodegroupInput {
+	s.AmiType = &v
+	return s
+}
+
+// SetClientRequestToken sets the ClientRequestToken field's value.
+func (s *CreateNodegroupInput) SetClientRequestToken(v string) *CreateNodegroupInput {
+	s.ClientRequestToken = &v
+	return s
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *CreateNodegroupInput) SetClusterName(v string) *CreateNodegroupInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetDiskSize sets the DiskSize field's value.
+func (s *CreateNodegroupInput) SetDiskSize(v int64) *CreateNodegroupInput {
+	s.DiskSize = &v
+	return s
+}
+
+// SetInstanceTypes sets the InstanceTypes field's value.
+func (s *CreateNodegroupInput) SetInstanceTypes(v []*string) *CreateNodegroupInput {
+	s.InstanceTypes = v
+	return s
+}
+
+// SetLabels sets the Labels field's value.
+func (s *CreateNodegroupInput) SetLabels(v map[string]*string) *CreateNodegroupInput {
+	s.Labels = v
+	return s
+}
+
+// SetNodeRole sets the NodeRole field's value.
+func (s *CreateNodegroupInput) SetNodeRole(v string) *CreateNodegroupInput {
+	s.NodeRole = &v
+	return s
+}
+
+// SetNodegroupName sets the NodegroupName field's value.
+func (s *CreateNodegroupInput) SetNodegroupName(v string) *CreateNodegroupInput {
+	s.NodegroupName = &v
+	return s
+}
+
+// SetReleaseVersion sets the ReleaseVersion field's value.
+func (s *CreateNodegroupInput) SetReleaseVersion(v string) *CreateNodegroupInput {
+	s.ReleaseVersion = &v
+	return s
+}
+
+// SetRemoteAccess sets the RemoteAccess field's value.
+func (s *CreateNodegroupInput) SetRemoteAccess(v *RemoteAccessConfig) *CreateNodegroupInput {
+	s.RemoteAccess = v
+	return s
+}
+
+// SetScalingConfig sets the ScalingConfig field's value.
+func (s *CreateNodegroupInput) SetScalingConfig(v *NodegroupScalingConfig) *CreateNodegroupInput {
+	s.ScalingConfig = v
+	return s
+}
+
+// SetSubnets sets the Subnets field's value.
+func (s *CreateNodegroupInput) SetSubnets(v []*string) *CreateNodegroupInput {
+	s.Subnets = v
+	return s
+}
+
+// SetTags sets the Tags field's value.
+func (s *CreateNodegroupInput) SetTags(v map[string]*string) *CreateNodegroupInput {
+	s.Tags = v
+	return s
+}
+
+// SetVersion sets the Version field's value.
+func (s *CreateNodegroupInput) SetVersion(v string) *CreateNodegroupInput {
+	s.Version = &v
+	return s
+}
+
+type CreateNodegroupOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The full description of your new node group.
+	Nodegroup *Nodegroup `locationName:"nodegroup" type:"structure"`
+}
+
+// String returns the string representation
+func (s CreateNodegroupOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s CreateNodegroupOutput) GoString() string {
+	return s.String()
+}
+
+// SetNodegroup sets the Nodegroup field's value.
+func (s *CreateNodegroupOutput) SetNodegroup(v *Nodegroup) *CreateNodegroupOutput {
+	s.Nodegroup = v
+	return s
+}
+
 type DeleteClusterInput struct {
 	_ struct{} `type:"structure"`
 
@@ -1627,6 +3214,169 @@ func (s DeleteClusterOutput) GoString() string {
 // SetCluster sets the Cluster field's value.
 func (s *DeleteClusterOutput) SetCluster(v *Cluster) *DeleteClusterOutput {
 	s.Cluster = v
+	return s
+}
+
+type DeleteFargateProfileInput struct {
+	_ struct{} `type:"structure"`
+
+	// The name of the Amazon EKS cluster associated with the Fargate profile to
+	// delete.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The name of the Fargate profile to delete.
+	//
+	// FargateProfileName is a required field
+	FargateProfileName *string `location:"uri" locationName:"fargateProfileName" type:"string" required:"true"`
+}
+
+// String returns the string representation
+func (s DeleteFargateProfileInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DeleteFargateProfileInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteFargateProfileInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteFargateProfileInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.FargateProfileName == nil {
+		invalidParams.Add(request.NewErrParamRequired("FargateProfileName"))
+	}
+	if s.FargateProfileName != nil && len(*s.FargateProfileName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("FargateProfileName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *DeleteFargateProfileInput) SetClusterName(v string) *DeleteFargateProfileInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetFargateProfileName sets the FargateProfileName field's value.
+func (s *DeleteFargateProfileInput) SetFargateProfileName(v string) *DeleteFargateProfileInput {
+	s.FargateProfileName = &v
+	return s
+}
+
+type DeleteFargateProfileOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The deleted Fargate profile.
+	FargateProfile *FargateProfile `locationName:"fargateProfile" type:"structure"`
+}
+
+// String returns the string representation
+func (s DeleteFargateProfileOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DeleteFargateProfileOutput) GoString() string {
+	return s.String()
+}
+
+// SetFargateProfile sets the FargateProfile field's value.
+func (s *DeleteFargateProfileOutput) SetFargateProfile(v *FargateProfile) *DeleteFargateProfileOutput {
+	s.FargateProfile = v
+	return s
+}
+
+type DeleteNodegroupInput struct {
+	_ struct{} `type:"structure"`
+
+	// The name of the Amazon EKS cluster that is associated with your node group.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The name of the node group to delete.
+	//
+	// NodegroupName is a required field
+	NodegroupName *string `location:"uri" locationName:"nodegroupName" type:"string" required:"true"`
+}
+
+// String returns the string representation
+func (s DeleteNodegroupInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DeleteNodegroupInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DeleteNodegroupInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DeleteNodegroupInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.NodegroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("NodegroupName"))
+	}
+	if s.NodegroupName != nil && len(*s.NodegroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("NodegroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *DeleteNodegroupInput) SetClusterName(v string) *DeleteNodegroupInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetNodegroupName sets the NodegroupName field's value.
+func (s *DeleteNodegroupInput) SetNodegroupName(v string) *DeleteNodegroupInput {
+	s.NodegroupName = &v
+	return s
+}
+
+type DeleteNodegroupOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The full description of your deleted node group.
+	Nodegroup *Nodegroup `locationName:"nodegroup" type:"structure"`
+}
+
+// String returns the string representation
+func (s DeleteNodegroupOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DeleteNodegroupOutput) GoString() string {
+	return s.String()
+}
+
+// SetNodegroup sets the Nodegroup field's value.
+func (s *DeleteNodegroupOutput) SetNodegroup(v *Nodegroup) *DeleteNodegroupOutput {
+	s.Nodegroup = v
 	return s
 }
 
@@ -1694,13 +3444,178 @@ func (s *DescribeClusterOutput) SetCluster(v *Cluster) *DescribeClusterOutput {
 	return s
 }
 
+type DescribeFargateProfileInput struct {
+	_ struct{} `type:"structure"`
+
+	// The name of the Amazon EKS cluster associated with the Fargate profile.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The name of the Fargate profile to describe.
+	//
+	// FargateProfileName is a required field
+	FargateProfileName *string `location:"uri" locationName:"fargateProfileName" type:"string" required:"true"`
+}
+
+// String returns the string representation
+func (s DescribeFargateProfileInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeFargateProfileInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeFargateProfileInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeFargateProfileInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.FargateProfileName == nil {
+		invalidParams.Add(request.NewErrParamRequired("FargateProfileName"))
+	}
+	if s.FargateProfileName != nil && len(*s.FargateProfileName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("FargateProfileName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *DescribeFargateProfileInput) SetClusterName(v string) *DescribeFargateProfileInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetFargateProfileName sets the FargateProfileName field's value.
+func (s *DescribeFargateProfileInput) SetFargateProfileName(v string) *DescribeFargateProfileInput {
+	s.FargateProfileName = &v
+	return s
+}
+
+type DescribeFargateProfileOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The full description of your Fargate profile.
+	FargateProfile *FargateProfile `locationName:"fargateProfile" type:"structure"`
+}
+
+// String returns the string representation
+func (s DescribeFargateProfileOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeFargateProfileOutput) GoString() string {
+	return s.String()
+}
+
+// SetFargateProfile sets the FargateProfile field's value.
+func (s *DescribeFargateProfileOutput) SetFargateProfile(v *FargateProfile) *DescribeFargateProfileOutput {
+	s.FargateProfile = v
+	return s
+}
+
+type DescribeNodegroupInput struct {
+	_ struct{} `type:"structure"`
+
+	// The name of the Amazon EKS cluster associated with the node group.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The name of the node group to describe.
+	//
+	// NodegroupName is a required field
+	NodegroupName *string `location:"uri" locationName:"nodegroupName" type:"string" required:"true"`
+}
+
+// String returns the string representation
+func (s DescribeNodegroupInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeNodegroupInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeNodegroupInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeNodegroupInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.NodegroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("NodegroupName"))
+	}
+	if s.NodegroupName != nil && len(*s.NodegroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("NodegroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *DescribeNodegroupInput) SetClusterName(v string) *DescribeNodegroupInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetNodegroupName sets the NodegroupName field's value.
+func (s *DescribeNodegroupInput) SetNodegroupName(v string) *DescribeNodegroupInput {
+	s.NodegroupName = &v
+	return s
+}
+
+type DescribeNodegroupOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The full description of your node group.
+	Nodegroup *Nodegroup `locationName:"nodegroup" type:"structure"`
+}
+
+// String returns the string representation
+func (s DescribeNodegroupOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeNodegroupOutput) GoString() string {
+	return s.String()
+}
+
+// SetNodegroup sets the Nodegroup field's value.
+func (s *DescribeNodegroupOutput) SetNodegroup(v *Nodegroup) *DescribeNodegroupOutput {
+	s.Nodegroup = v
+	return s
+}
+
 type DescribeUpdateInput struct {
 	_ struct{} `type:"structure"`
 
-	// The name of the Amazon EKS cluster to update.
+	// The name of the Amazon EKS cluster associated with the update.
 	//
 	// Name is a required field
 	Name *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The name of the Amazon EKS node group associated with the update.
+	NodegroupName *string `location:"querystring" locationName:"nodegroupName" type:"string"`
 
 	// The ID of the update to describe.
 	//
@@ -1743,6 +3658,12 @@ func (s *DescribeUpdateInput) Validate() error {
 // SetName sets the Name field's value.
 func (s *DescribeUpdateInput) SetName(v string) *DescribeUpdateInput {
 	s.Name = &v
+	return s
+}
+
+// SetNodegroupName sets the NodegroupName field's value.
+func (s *DescribeUpdateInput) SetNodegroupName(v string) *DescribeUpdateInput {
+	s.NodegroupName = &v
 	return s
 }
 
@@ -1836,6 +3757,144 @@ func (s *ErrorDetail) SetResourceIds(v []*string) *ErrorDetail {
 	return s
 }
 
+// An object representing an AWS Fargate profile.
+type FargateProfile struct {
+	_ struct{} `type:"structure"`
+
+	// The name of the Amazon EKS cluster that the Fargate profile belongs to.
+	ClusterName *string `locationName:"clusterName" type:"string"`
+
+	// The Unix epoch timestamp in seconds for when the Fargate profile was created.
+	CreatedAt *time.Time `locationName:"createdAt" type:"timestamp"`
+
+	// The full Amazon Resource Name (ARN) of the Fargate profile.
+	FargateProfileArn *string `locationName:"fargateProfileArn" type:"string"`
+
+	// The name of the Fargate profile.
+	FargateProfileName *string `locationName:"fargateProfileName" type:"string"`
+
+	// The Amazon Resource Name (ARN) of the pod execution role to use for pods
+	// that match the selectors in the Fargate profile. For more information, see
+	// Pod Execution Role (eks/latest/userguide/pod-execution-role.html) in the
+	// Amazon EKS User Guide.
+	PodExecutionRoleArn *string `locationName:"podExecutionRoleArn" type:"string"`
+
+	// The selectors to match for pods to use this Fargate profile.
+	Selectors []*FargateProfileSelector `locationName:"selectors" type:"list"`
+
+	// The current status of the Fargate profile.
+	Status *string `locationName:"status" type:"string" enum:"FargateProfileStatus"`
+
+	// The IDs of subnets to launch Fargate pods into.
+	Subnets []*string `locationName:"subnets" type:"list"`
+
+	// The metadata applied to the Fargate profile to assist with categorization
+	// and organization. Each tag consists of a key and an optional value, both
+	// of which you define. Fargate profile tags do not propagate to any other resources
+	// associated with the Fargate profile, such as the pods that are scheduled
+	// with it.
+	Tags map[string]*string `locationName:"tags" min:"1" type:"map"`
+}
+
+// String returns the string representation
+func (s FargateProfile) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s FargateProfile) GoString() string {
+	return s.String()
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *FargateProfile) SetClusterName(v string) *FargateProfile {
+	s.ClusterName = &v
+	return s
+}
+
+// SetCreatedAt sets the CreatedAt field's value.
+func (s *FargateProfile) SetCreatedAt(v time.Time) *FargateProfile {
+	s.CreatedAt = &v
+	return s
+}
+
+// SetFargateProfileArn sets the FargateProfileArn field's value.
+func (s *FargateProfile) SetFargateProfileArn(v string) *FargateProfile {
+	s.FargateProfileArn = &v
+	return s
+}
+
+// SetFargateProfileName sets the FargateProfileName field's value.
+func (s *FargateProfile) SetFargateProfileName(v string) *FargateProfile {
+	s.FargateProfileName = &v
+	return s
+}
+
+// SetPodExecutionRoleArn sets the PodExecutionRoleArn field's value.
+func (s *FargateProfile) SetPodExecutionRoleArn(v string) *FargateProfile {
+	s.PodExecutionRoleArn = &v
+	return s
+}
+
+// SetSelectors sets the Selectors field's value.
+func (s *FargateProfile) SetSelectors(v []*FargateProfileSelector) *FargateProfile {
+	s.Selectors = v
+	return s
+}
+
+// SetStatus sets the Status field's value.
+func (s *FargateProfile) SetStatus(v string) *FargateProfile {
+	s.Status = &v
+	return s
+}
+
+// SetSubnets sets the Subnets field's value.
+func (s *FargateProfile) SetSubnets(v []*string) *FargateProfile {
+	s.Subnets = v
+	return s
+}
+
+// SetTags sets the Tags field's value.
+func (s *FargateProfile) SetTags(v map[string]*string) *FargateProfile {
+	s.Tags = v
+	return s
+}
+
+// An object representing an AWS Fargate profile selector.
+type FargateProfileSelector struct {
+	_ struct{} `type:"structure"`
+
+	// The Kubernetes labels that the selector should match. A pod must contain
+	// all of the labels that are specified in the selector for it to be considered
+	// a match.
+	Labels map[string]*string `locationName:"labels" type:"map"`
+
+	// The Kubernetes namespace that the selector should match.
+	Namespace *string `locationName:"namespace" type:"string"`
+}
+
+// String returns the string representation
+func (s FargateProfileSelector) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s FargateProfileSelector) GoString() string {
+	return s.String()
+}
+
+// SetLabels sets the Labels field's value.
+func (s *FargateProfileSelector) SetLabels(v map[string]*string) *FargateProfileSelector {
+	s.Labels = v
+	return s
+}
+
+// SetNamespace sets the Namespace field's value.
+func (s *FargateProfileSelector) SetNamespace(v string) *FargateProfileSelector {
+	s.Namespace = &v
+	return s
+}
+
 // An object representing an identity provider for authentication credentials.
 type Identity struct {
 	_ struct{} `type:"structure"`
@@ -1858,6 +3917,98 @@ func (s Identity) GoString() string {
 // SetOidc sets the Oidc field's value.
 func (s *Identity) SetOidc(v *OIDC) *Identity {
 	s.Oidc = v
+	return s
+}
+
+// An object representing an issue with an Amazon EKS resource.
+type Issue struct {
+	_ struct{} `type:"structure"`
+
+	// A brief description of the error.
+	//
+	//    * AutoScalingGroupNotFound: We couldn't find the Auto Scaling group associated
+	//    with the managed node group. You may be able to recreate an Auto Scaling
+	//    group with the same settings to recover.
+	//
+	//    * Ec2SecurityGroupNotFound: We couldn't find the cluster security group
+	//    for the cluster. You must recreate your cluster.
+	//
+	//    * Ec2SecurityGroupDeletionFailure: We could not delete the remote access
+	//    security group for your managed node group. Remove any dependencies from
+	//    the security group.
+	//
+	//    * Ec2LaunchTemplateNotFound: We couldn't find the Amazon EC2 launch template
+	//    for your managed node group. You may be able to recreate a launch template
+	//    with the same settings to recover.
+	//
+	//    * Ec2LaunchTemplateVersionMismatch: The Amazon EC2 launch template version
+	//    for your managed node group does not match the version that Amazon EKS
+	//    created. You may be able to revert to the version that Amazon EKS created
+	//    to recover.
+	//
+	//    * IamInstanceProfileNotFound: We couldn't find the IAM instance profile
+	//    for your managed node group. You may be able to recreate an instance profile
+	//    with the same settings to recover.
+	//
+	//    * IamNodeRoleNotFound: We couldn't find the IAM role for your managed
+	//    node group. You may be able to recreate an IAM role with the same settings
+	//    to recover.
+	//
+	//    * AsgInstanceLaunchFailures: Your Auto Scaling group is experiencing failures
+	//    while attempting to launch instances.
+	//
+	//    * NodeCreationFailure: Your launched instances are unable to register
+	//    with your Amazon EKS cluster. Common causes of this failure are insufficient
+	//    worker node IAM role (https://docs.aws.amazon.com/eks/latest/userguide/worker_node_IAM_role.html)
+	//    permissions or lack of outbound internet access for the nodes.
+	//
+	//    * InstanceLimitExceeded: Your AWS account is unable to launch any more
+	//    instances of the specified instance type. You may be able to request an
+	//    Amazon EC2 instance limit increase to recover.
+	//
+	//    * InsufficientFreeAddresses: One or more of the subnets associated with
+	//    your managed node group does not have enough available IP addresses for
+	//    new nodes.
+	//
+	//    * AccessDenied: Amazon EKS or one or more of your managed nodes is unable
+	//    to communicate with your cluster API server.
+	//
+	//    * InternalFailure: These errors are usually caused by an Amazon EKS server-side
+	//    issue.
+	Code *string `locationName:"code" type:"string" enum:"NodegroupIssueCode"`
+
+	// The error message associated with the issue.
+	Message *string `locationName:"message" type:"string"`
+
+	// The AWS resources that are afflicted by this issue.
+	ResourceIds []*string `locationName:"resourceIds" type:"list"`
+}
+
+// String returns the string representation
+func (s Issue) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s Issue) GoString() string {
+	return s.String()
+}
+
+// SetCode sets the Code field's value.
+func (s *Issue) SetCode(v string) *Issue {
+	s.Code = &v
+	return s
+}
+
+// SetMessage sets the Message field's value.
+func (s *Issue) SetMessage(v string) *Issue {
+	s.Message = &v
+	return s
+}
+
+// SetResourceIds sets the ResourceIds field's value.
+func (s *Issue) SetResourceIds(v []*string) *Issue {
+	s.ResourceIds = v
 	return s
 }
 
@@ -1953,11 +4104,226 @@ func (s *ListClustersOutput) SetNextToken(v string) *ListClustersOutput {
 	return s
 }
 
+type ListFargateProfilesInput struct {
+	_ struct{} `type:"structure"`
+
+	// The name of the Amazon EKS cluster that you would like to listFargate profiles
+	// in.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The maximum number of Fargate profile results returned by ListFargateProfiles
+	// in paginated output. When you use this parameter, ListFargateProfiles returns
+	// only maxResults results in a single page along with a nextToken response
+	// element. You can see the remaining results of the initial request by sending
+	// another ListFargateProfiles request with the returned nextToken value. This
+	// value can be between 1 and 100. If you don't use this parameter, ListFargateProfiles
+	// returns up to 100 results and a nextToken value if applicable.
+	MaxResults *int64 `location:"querystring" locationName:"maxResults" min:"1" type:"integer"`
+
+	// The nextToken value returned from a previous paginated ListFargateProfiles
+	// request where maxResults was used and the results exceeded the value of that
+	// parameter. Pagination continues from the end of the previous results that
+	// returned the nextToken value.
+	NextToken *string `location:"querystring" locationName:"nextToken" type:"string"`
+}
+
+// String returns the string representation
+func (s ListFargateProfilesInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ListFargateProfilesInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ListFargateProfilesInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ListFargateProfilesInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.MaxResults != nil && *s.MaxResults < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("MaxResults", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *ListFargateProfilesInput) SetClusterName(v string) *ListFargateProfilesInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetMaxResults sets the MaxResults field's value.
+func (s *ListFargateProfilesInput) SetMaxResults(v int64) *ListFargateProfilesInput {
+	s.MaxResults = &v
+	return s
+}
+
+// SetNextToken sets the NextToken field's value.
+func (s *ListFargateProfilesInput) SetNextToken(v string) *ListFargateProfilesInput {
+	s.NextToken = &v
+	return s
+}
+
+type ListFargateProfilesOutput struct {
+	_ struct{} `type:"structure"`
+
+	// A list of all of the Fargate profiles associated with the specified cluster.
+	FargateProfileNames []*string `locationName:"fargateProfileNames" type:"list"`
+
+	// The nextToken value to include in a future ListFargateProfiles request. When
+	// the results of a ListFargateProfiles request exceed maxResults, you can use
+	// this value to retrieve the next page of results. This value is null when
+	// there are no more results to return.
+	NextToken *string `locationName:"nextToken" type:"string"`
+}
+
+// String returns the string representation
+func (s ListFargateProfilesOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ListFargateProfilesOutput) GoString() string {
+	return s.String()
+}
+
+// SetFargateProfileNames sets the FargateProfileNames field's value.
+func (s *ListFargateProfilesOutput) SetFargateProfileNames(v []*string) *ListFargateProfilesOutput {
+	s.FargateProfileNames = v
+	return s
+}
+
+// SetNextToken sets the NextToken field's value.
+func (s *ListFargateProfilesOutput) SetNextToken(v string) *ListFargateProfilesOutput {
+	s.NextToken = &v
+	return s
+}
+
+type ListNodegroupsInput struct {
+	_ struct{} `type:"structure"`
+
+	// The name of the Amazon EKS cluster that you would like to list node groups
+	// in.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The maximum number of node group results returned by ListNodegroups in paginated
+	// output. When you use this parameter, ListNodegroups returns only maxResults
+	// results in a single page along with a nextToken response element. You can
+	// see the remaining results of the initial request by sending another ListNodegroups
+	// request with the returned nextToken value. This value can be between 1 and
+	// 100. If you don't use this parameter, ListNodegroups returns up to 100 results
+	// and a nextToken value if applicable.
+	MaxResults *int64 `location:"querystring" locationName:"maxResults" min:"1" type:"integer"`
+
+	// The nextToken value returned from a previous paginated ListNodegroups request
+	// where maxResults was used and the results exceeded the value of that parameter.
+	// Pagination continues from the end of the previous results that returned the
+	// nextToken value.
+	NextToken *string `location:"querystring" locationName:"nextToken" type:"string"`
+}
+
+// String returns the string representation
+func (s ListNodegroupsInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ListNodegroupsInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ListNodegroupsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ListNodegroupsInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.MaxResults != nil && *s.MaxResults < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("MaxResults", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *ListNodegroupsInput) SetClusterName(v string) *ListNodegroupsInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetMaxResults sets the MaxResults field's value.
+func (s *ListNodegroupsInput) SetMaxResults(v int64) *ListNodegroupsInput {
+	s.MaxResults = &v
+	return s
+}
+
+// SetNextToken sets the NextToken field's value.
+func (s *ListNodegroupsInput) SetNextToken(v string) *ListNodegroupsInput {
+	s.NextToken = &v
+	return s
+}
+
+type ListNodegroupsOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The nextToken value to include in a future ListNodegroups request. When the
+	// results of a ListNodegroups request exceed maxResults, you can use this value
+	// to retrieve the next page of results. This value is null when there are no
+	// more results to return.
+	NextToken *string `locationName:"nextToken" type:"string"`
+
+	// A list of all of the node groups associated with the specified cluster.
+	Nodegroups []*string `locationName:"nodegroups" type:"list"`
+}
+
+// String returns the string representation
+func (s ListNodegroupsOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ListNodegroupsOutput) GoString() string {
+	return s.String()
+}
+
+// SetNextToken sets the NextToken field's value.
+func (s *ListNodegroupsOutput) SetNextToken(v string) *ListNodegroupsOutput {
+	s.NextToken = &v
+	return s
+}
+
+// SetNodegroups sets the Nodegroups field's value.
+func (s *ListNodegroupsOutput) SetNodegroups(v []*string) *ListNodegroupsOutput {
+	s.Nodegroups = v
+	return s
+}
+
 type ListTagsForResourceInput struct {
 	_ struct{} `type:"structure"`
 
 	// The Amazon Resource Name (ARN) that identifies the resource for which to
-	// list the tags. Currently, the supported resources are Amazon EKS clusters.
+	// list the tags. Currently, the supported resources are Amazon EKS clusters
+	// and managed node groups.
 	//
 	// ResourceArn is a required field
 	ResourceArn *string `location:"uri" locationName:"resourceArn" type:"string" required:"true"`
@@ -2040,6 +4406,9 @@ type ListUpdatesInput struct {
 	// Pagination continues from the end of the previous results that returned the
 	// nextToken value.
 	NextToken *string `location:"querystring" locationName:"nextToken" type:"string"`
+
+	// The name of the Amazon EKS managed node group to list updates for.
+	NodegroupName *string `location:"querystring" locationName:"nodegroupName" type:"string"`
 }
 
 // String returns the string representation
@@ -2086,6 +4455,12 @@ func (s *ListUpdatesInput) SetName(v string) *ListUpdatesInput {
 // SetNextToken sets the NextToken field's value.
 func (s *ListUpdatesInput) SetNextToken(v string) *ListUpdatesInput {
 	s.NextToken = &v
+	return s
+}
+
+// SetNodegroupName sets the NodegroupName field's value.
+func (s *ListUpdatesInput) SetNodegroupName(v string) *ListUpdatesInput {
+	s.NodegroupName = &v
 	return s
 }
 
@@ -2185,6 +4560,339 @@ func (s *Logging) SetClusterLogging(v []*LogSetup) *Logging {
 	return s
 }
 
+// An object representing an Amazon EKS managed node group.
+type Nodegroup struct {
+	_ struct{} `type:"structure"`
+
+	// The AMI type associated with your node group. GPU instance types should use
+	// the AL2_x86_64_GPU AMI type, which uses the Amazon EKS-optimized Linux AMI
+	// with GPU support. Non-GPU instances should use the AL2_x86_64 AMI type, which
+	// uses the Amazon EKS-optimized Linux AMI.
+	AmiType *string `locationName:"amiType" type:"string" enum:"AMITypes"`
+
+	// The name of the cluster that the managed node group resides in.
+	ClusterName *string `locationName:"clusterName" type:"string"`
+
+	// The Unix epoch timestamp in seconds for when the managed node group was created.
+	CreatedAt *time.Time `locationName:"createdAt" type:"timestamp"`
+
+	// The root device disk size (in GiB) for your node group instances. The default
+	// disk size is 20 GiB.
+	DiskSize *int64 `locationName:"diskSize" type:"integer"`
+
+	// The health status of the node group. If there are issues with your node group's
+	// health, they are listed here.
+	Health *NodegroupHealth `locationName:"health" type:"structure"`
+
+	// The instance types associated with your node group.
+	InstanceTypes []*string `locationName:"instanceTypes" type:"list"`
+
+	// The Kubernetes labels applied to the nodes in the node group.
+	//
+	// Only labels that are applied with the Amazon EKS API are shown here. There
+	// may be other Kubernetes labels applied to the nodes in this group.
+	Labels map[string]*string `locationName:"labels" type:"map"`
+
+	// The Unix epoch timestamp in seconds for when the managed node group was last
+	// modified.
+	ModifiedAt *time.Time `locationName:"modifiedAt" type:"timestamp"`
+
+	// The IAM role associated with your node group. The Amazon EKS worker node
+	// kubelet daemon makes calls to AWS APIs on your behalf. Worker nodes receive
+	// permissions for these API calls through an IAM instance profile and associated
+	// policies. Before you can launch worker nodes and register them into a cluster,
+	// you must create an IAM role for those worker nodes to use when they are launched.
+	// For more information, see Amazon EKS Worker Node IAM Role (https://docs.aws.amazon.com/eks/latest/userguide/worker_node_IAM_role.html)
+	// in the Amazon EKS User Guide .
+	NodeRole *string `locationName:"nodeRole" type:"string"`
+
+	// The Amazon Resource Name (ARN) associated with the managed node group.
+	NodegroupArn *string `locationName:"nodegroupArn" type:"string"`
+
+	// The name associated with an Amazon EKS managed node group.
+	NodegroupName *string `locationName:"nodegroupName" type:"string"`
+
+	// The AMI version of the managed node group. For more information, see Amazon
+	// EKS-Optimized Linux AMI Versions (https://docs.aws.amazon.com/eks/latest/userguide/eks-linux-ami-versions.html)
+	// in the Amazon EKS User Guide.
+	ReleaseVersion *string `locationName:"releaseVersion" type:"string"`
+
+	// The remote access (SSH) configuration that is associated with the node group.
+	RemoteAccess *RemoteAccessConfig `locationName:"remoteAccess" type:"structure"`
+
+	// The resources associated with the node group, such as Auto Scaling groups
+	// and security groups for remote access.
+	Resources *NodegroupResources `locationName:"resources" type:"structure"`
+
+	// The scaling configuration details for the Auto Scaling group that is associated
+	// with your node group.
+	ScalingConfig *NodegroupScalingConfig `locationName:"scalingConfig" type:"structure"`
+
+	// The current status of the managed node group.
+	Status *string `locationName:"status" type:"string" enum:"NodegroupStatus"`
+
+	// The subnets allowed for the Auto Scaling group that is associated with your
+	// node group. These subnets must have the following tag: kubernetes.io/cluster/CLUSTER_NAME,
+	// where CLUSTER_NAME is replaced with the name of your cluster.
+	Subnets []*string `locationName:"subnets" type:"list"`
+
+	// The metadata applied to the node group to assist with categorization and
+	// organization. Each tag consists of a key and an optional value, both of which
+	// you define. Node group tags do not propagate to any other resources associated
+	// with the node group, such as the Amazon EC2 instances or subnets.
+	Tags map[string]*string `locationName:"tags" min:"1" type:"map"`
+
+	// The Kubernetes version of the managed node group.
+	Version *string `locationName:"version" type:"string"`
+}
+
+// String returns the string representation
+func (s Nodegroup) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s Nodegroup) GoString() string {
+	return s.String()
+}
+
+// SetAmiType sets the AmiType field's value.
+func (s *Nodegroup) SetAmiType(v string) *Nodegroup {
+	s.AmiType = &v
+	return s
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *Nodegroup) SetClusterName(v string) *Nodegroup {
+	s.ClusterName = &v
+	return s
+}
+
+// SetCreatedAt sets the CreatedAt field's value.
+func (s *Nodegroup) SetCreatedAt(v time.Time) *Nodegroup {
+	s.CreatedAt = &v
+	return s
+}
+
+// SetDiskSize sets the DiskSize field's value.
+func (s *Nodegroup) SetDiskSize(v int64) *Nodegroup {
+	s.DiskSize = &v
+	return s
+}
+
+// SetHealth sets the Health field's value.
+func (s *Nodegroup) SetHealth(v *NodegroupHealth) *Nodegroup {
+	s.Health = v
+	return s
+}
+
+// SetInstanceTypes sets the InstanceTypes field's value.
+func (s *Nodegroup) SetInstanceTypes(v []*string) *Nodegroup {
+	s.InstanceTypes = v
+	return s
+}
+
+// SetLabels sets the Labels field's value.
+func (s *Nodegroup) SetLabels(v map[string]*string) *Nodegroup {
+	s.Labels = v
+	return s
+}
+
+// SetModifiedAt sets the ModifiedAt field's value.
+func (s *Nodegroup) SetModifiedAt(v time.Time) *Nodegroup {
+	s.ModifiedAt = &v
+	return s
+}
+
+// SetNodeRole sets the NodeRole field's value.
+func (s *Nodegroup) SetNodeRole(v string) *Nodegroup {
+	s.NodeRole = &v
+	return s
+}
+
+// SetNodegroupArn sets the NodegroupArn field's value.
+func (s *Nodegroup) SetNodegroupArn(v string) *Nodegroup {
+	s.NodegroupArn = &v
+	return s
+}
+
+// SetNodegroupName sets the NodegroupName field's value.
+func (s *Nodegroup) SetNodegroupName(v string) *Nodegroup {
+	s.NodegroupName = &v
+	return s
+}
+
+// SetReleaseVersion sets the ReleaseVersion field's value.
+func (s *Nodegroup) SetReleaseVersion(v string) *Nodegroup {
+	s.ReleaseVersion = &v
+	return s
+}
+
+// SetRemoteAccess sets the RemoteAccess field's value.
+func (s *Nodegroup) SetRemoteAccess(v *RemoteAccessConfig) *Nodegroup {
+	s.RemoteAccess = v
+	return s
+}
+
+// SetResources sets the Resources field's value.
+func (s *Nodegroup) SetResources(v *NodegroupResources) *Nodegroup {
+	s.Resources = v
+	return s
+}
+
+// SetScalingConfig sets the ScalingConfig field's value.
+func (s *Nodegroup) SetScalingConfig(v *NodegroupScalingConfig) *Nodegroup {
+	s.ScalingConfig = v
+	return s
+}
+
+// SetStatus sets the Status field's value.
+func (s *Nodegroup) SetStatus(v string) *Nodegroup {
+	s.Status = &v
+	return s
+}
+
+// SetSubnets sets the Subnets field's value.
+func (s *Nodegroup) SetSubnets(v []*string) *Nodegroup {
+	s.Subnets = v
+	return s
+}
+
+// SetTags sets the Tags field's value.
+func (s *Nodegroup) SetTags(v map[string]*string) *Nodegroup {
+	s.Tags = v
+	return s
+}
+
+// SetVersion sets the Version field's value.
+func (s *Nodegroup) SetVersion(v string) *Nodegroup {
+	s.Version = &v
+	return s
+}
+
+// An object representing the health status of the node group.
+type NodegroupHealth struct {
+	_ struct{} `type:"structure"`
+
+	// Any issues that are associated with the node group.
+	Issues []*Issue `locationName:"issues" type:"list"`
+}
+
+// String returns the string representation
+func (s NodegroupHealth) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s NodegroupHealth) GoString() string {
+	return s.String()
+}
+
+// SetIssues sets the Issues field's value.
+func (s *NodegroupHealth) SetIssues(v []*Issue) *NodegroupHealth {
+	s.Issues = v
+	return s
+}
+
+// An object representing the resources associated with the node group, such
+// as Auto Scaling groups and security groups for remote access.
+type NodegroupResources struct {
+	_ struct{} `type:"structure"`
+
+	// The Auto Scaling groups associated with the node group.
+	AutoScalingGroups []*AutoScalingGroup `locationName:"autoScalingGroups" type:"list"`
+
+	// The remote access security group associated with the node group. This security
+	// group controls SSH access to the worker nodes.
+	RemoteAccessSecurityGroup *string `locationName:"remoteAccessSecurityGroup" type:"string"`
+}
+
+// String returns the string representation
+func (s NodegroupResources) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s NodegroupResources) GoString() string {
+	return s.String()
+}
+
+// SetAutoScalingGroups sets the AutoScalingGroups field's value.
+func (s *NodegroupResources) SetAutoScalingGroups(v []*AutoScalingGroup) *NodegroupResources {
+	s.AutoScalingGroups = v
+	return s
+}
+
+// SetRemoteAccessSecurityGroup sets the RemoteAccessSecurityGroup field's value.
+func (s *NodegroupResources) SetRemoteAccessSecurityGroup(v string) *NodegroupResources {
+	s.RemoteAccessSecurityGroup = &v
+	return s
+}
+
+// An object representing the scaling configuration details for the Auto Scaling
+// group that is associated with your node group.
+type NodegroupScalingConfig struct {
+	_ struct{} `type:"structure"`
+
+	// The current number of worker nodes that the managed node group should maintain.
+	DesiredSize *int64 `locationName:"desiredSize" min:"1" type:"integer"`
+
+	// The maximum number of worker nodes that the managed node group can scale
+	// out to. Managed node groups can support up to 100 nodes by default.
+	MaxSize *int64 `locationName:"maxSize" min:"1" type:"integer"`
+
+	// The minimum number of worker nodes that the managed node group can scale
+	// in to. This number must be greater than zero.
+	MinSize *int64 `locationName:"minSize" min:"1" type:"integer"`
+}
+
+// String returns the string representation
+func (s NodegroupScalingConfig) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s NodegroupScalingConfig) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *NodegroupScalingConfig) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "NodegroupScalingConfig"}
+	if s.DesiredSize != nil && *s.DesiredSize < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("DesiredSize", 1))
+	}
+	if s.MaxSize != nil && *s.MaxSize < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("MaxSize", 1))
+	}
+	if s.MinSize != nil && *s.MinSize < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("MinSize", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetDesiredSize sets the DesiredSize field's value.
+func (s *NodegroupScalingConfig) SetDesiredSize(v int64) *NodegroupScalingConfig {
+	s.DesiredSize = &v
+	return s
+}
+
+// SetMaxSize sets the MaxSize field's value.
+func (s *NodegroupScalingConfig) SetMaxSize(v int64) *NodegroupScalingConfig {
+	s.MaxSize = &v
+	return s
+}
+
+// SetMinSize sets the MinSize field's value.
+func (s *NodegroupScalingConfig) SetMinSize(v int64) *NodegroupScalingConfig {
+	s.MinSize = &v
+	return s
+}
+
 // An object representing the OpenID Connect (https://openid.net/connect/) identity
 // provider information for the cluster.
 type OIDC struct {
@@ -2210,11 +4918,53 @@ func (s *OIDC) SetIssuer(v string) *OIDC {
 	return s
 }
 
+// An object representing the remote access configuration for the managed node
+// group.
+type RemoteAccessConfig struct {
+	_ struct{} `type:"structure"`
+
+	// The Amazon EC2 SSH key that provides access for SSH communication with the
+	// worker nodes in the managed node group. For more information, see Amazon
+	// EC2 Key Pairs (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html)
+	// in the Amazon Elastic Compute Cloud User Guide for Linux Instances.
+	Ec2SshKey *string `locationName:"ec2SshKey" type:"string"`
+
+	// The security groups that are allowed SSH access (port 22) to the worker nodes.
+	// If you specify an Amazon EC2 SSH key but do not specify a source security
+	// group when you create a managed node group, then port 22 on the worker nodes
+	// is opened to the internet (0.0.0.0/0). For more information, see Security
+	// Groups for Your VPC (https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html)
+	// in the Amazon Virtual Private Cloud User Guide.
+	SourceSecurityGroups []*string `locationName:"sourceSecurityGroups" type:"list"`
+}
+
+// String returns the string representation
+func (s RemoteAccessConfig) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s RemoteAccessConfig) GoString() string {
+	return s.String()
+}
+
+// SetEc2SshKey sets the Ec2SshKey field's value.
+func (s *RemoteAccessConfig) SetEc2SshKey(v string) *RemoteAccessConfig {
+	s.Ec2SshKey = &v
+	return s
+}
+
+// SetSourceSecurityGroups sets the SourceSecurityGroups field's value.
+func (s *RemoteAccessConfig) SetSourceSecurityGroups(v []*string) *RemoteAccessConfig {
+	s.SourceSecurityGroups = v
+	return s
+}
+
 type TagResourceInput struct {
 	_ struct{} `type:"structure"`
 
 	// The Amazon Resource Name (ARN) of the resource to which to add tags. Currently,
-	// the supported resources are Amazon EKS clusters.
+	// the supported resources are Amazon EKS clusters and managed node groups.
 	//
 	// ResourceArn is a required field
 	ResourceArn *string `location:"uri" locationName:"resourceArn" type:"string" required:"true"`
@@ -2287,7 +5037,8 @@ type UntagResourceInput struct {
 	_ struct{} `type:"structure"`
 
 	// The Amazon Resource Name (ARN) of the resource from which to delete tags.
-	// Currently, the supported resources are Amazon EKS clusters.
+	// Currently, the supported resources are Amazon EKS clusters and managed node
+	// groups.
 	//
 	// ResourceArn is a required field
 	ResourceArn *string `location:"uri" locationName:"resourceArn" type:"string" required:"true"`
@@ -2613,6 +5364,283 @@ func (s *UpdateClusterVersionOutput) SetUpdate(v *Update) *UpdateClusterVersionO
 	return s
 }
 
+// An object representing a Kubernetes label change for a managed node group.
+type UpdateLabelsPayload struct {
+	_ struct{} `type:"structure"`
+
+	// Kubernetes labels to be added or updated.
+	AddOrUpdateLabels map[string]*string `locationName:"addOrUpdateLabels" type:"map"`
+
+	// Kubernetes labels to be removed.
+	RemoveLabels []*string `locationName:"removeLabels" type:"list"`
+}
+
+// String returns the string representation
+func (s UpdateLabelsPayload) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s UpdateLabelsPayload) GoString() string {
+	return s.String()
+}
+
+// SetAddOrUpdateLabels sets the AddOrUpdateLabels field's value.
+func (s *UpdateLabelsPayload) SetAddOrUpdateLabels(v map[string]*string) *UpdateLabelsPayload {
+	s.AddOrUpdateLabels = v
+	return s
+}
+
+// SetRemoveLabels sets the RemoveLabels field's value.
+func (s *UpdateLabelsPayload) SetRemoveLabels(v []*string) *UpdateLabelsPayload {
+	s.RemoveLabels = v
+	return s
+}
+
+type UpdateNodegroupConfigInput struct {
+	_ struct{} `type:"structure"`
+
+	// Unique, case-sensitive identifier that you provide to ensure the idempotency
+	// of the request.
+	ClientRequestToken *string `locationName:"clientRequestToken" type:"string" idempotencyToken:"true"`
+
+	// The name of the Amazon EKS cluster that the managed node group resides in.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// The Kubernetes labels to be applied to the nodes in the node group after
+	// the update.
+	Labels *UpdateLabelsPayload `locationName:"labels" type:"structure"`
+
+	// The name of the managed node group to update.
+	//
+	// NodegroupName is a required field
+	NodegroupName *string `location:"uri" locationName:"nodegroupName" type:"string" required:"true"`
+
+	// The scaling configuration details for the Auto Scaling group after the update.
+	ScalingConfig *NodegroupScalingConfig `locationName:"scalingConfig" type:"structure"`
+}
+
+// String returns the string representation
+func (s UpdateNodegroupConfigInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s UpdateNodegroupConfigInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *UpdateNodegroupConfigInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "UpdateNodegroupConfigInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.NodegroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("NodegroupName"))
+	}
+	if s.NodegroupName != nil && len(*s.NodegroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("NodegroupName", 1))
+	}
+	if s.ScalingConfig != nil {
+		if err := s.ScalingConfig.Validate(); err != nil {
+			invalidParams.AddNested("ScalingConfig", err.(request.ErrInvalidParams))
+		}
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClientRequestToken sets the ClientRequestToken field's value.
+func (s *UpdateNodegroupConfigInput) SetClientRequestToken(v string) *UpdateNodegroupConfigInput {
+	s.ClientRequestToken = &v
+	return s
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *UpdateNodegroupConfigInput) SetClusterName(v string) *UpdateNodegroupConfigInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetLabels sets the Labels field's value.
+func (s *UpdateNodegroupConfigInput) SetLabels(v *UpdateLabelsPayload) *UpdateNodegroupConfigInput {
+	s.Labels = v
+	return s
+}
+
+// SetNodegroupName sets the NodegroupName field's value.
+func (s *UpdateNodegroupConfigInput) SetNodegroupName(v string) *UpdateNodegroupConfigInput {
+	s.NodegroupName = &v
+	return s
+}
+
+// SetScalingConfig sets the ScalingConfig field's value.
+func (s *UpdateNodegroupConfigInput) SetScalingConfig(v *NodegroupScalingConfig) *UpdateNodegroupConfigInput {
+	s.ScalingConfig = v
+	return s
+}
+
+type UpdateNodegroupConfigOutput struct {
+	_ struct{} `type:"structure"`
+
+	// An object representing an asynchronous update.
+	Update *Update `locationName:"update" type:"structure"`
+}
+
+// String returns the string representation
+func (s UpdateNodegroupConfigOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s UpdateNodegroupConfigOutput) GoString() string {
+	return s.String()
+}
+
+// SetUpdate sets the Update field's value.
+func (s *UpdateNodegroupConfigOutput) SetUpdate(v *Update) *UpdateNodegroupConfigOutput {
+	s.Update = v
+	return s
+}
+
+type UpdateNodegroupVersionInput struct {
+	_ struct{} `type:"structure"`
+
+	// Unique, case-sensitive identifier that you provide to ensure the idempotency
+	// of the request.
+	ClientRequestToken *string `locationName:"clientRequestToken" type:"string" idempotencyToken:"true"`
+
+	// The name of the Amazon EKS cluster that is associated with the managed node
+	// group to update.
+	//
+	// ClusterName is a required field
+	ClusterName *string `location:"uri" locationName:"name" type:"string" required:"true"`
+
+	// Force the update if the existing node group's pods are unable to be drained
+	// due to a pod disruption budget issue. If an update fails because pods could
+	// not be drained, you can force the update after it fails to terminate the
+	// old node whether or not any pods are running on the node.
+	Force *bool `locationName:"force" type:"boolean"`
+
+	// The name of the managed node group to update.
+	//
+	// NodegroupName is a required field
+	NodegroupName *string `location:"uri" locationName:"nodegroupName" type:"string" required:"true"`
+
+	// The AMI version of the Amazon EKS-optimized AMI to use for the update. By
+	// default, the latest available AMI version for the node group's Kubernetes
+	// version is used. For more information, see Amazon EKS-Optimized Linux AMI
+	// Versions (https://docs.aws.amazon.com/eks/latest/userguide/eks-linux-ami-versions.html)
+	// in the Amazon EKS User Guide.
+	ReleaseVersion *string `locationName:"releaseVersion" type:"string"`
+
+	// The Kubernetes version to update to. If no version is specified, then the
+	// Kubernetes version of the node group does not change. You can specify the
+	// Kubernetes version of the cluster to update the node group to the latest
+	// AMI version of the cluster's Kubernetes version.
+	Version *string `locationName:"version" type:"string"`
+}
+
+// String returns the string representation
+func (s UpdateNodegroupVersionInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s UpdateNodegroupVersionInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *UpdateNodegroupVersionInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "UpdateNodegroupVersionInput"}
+	if s.ClusterName == nil {
+		invalidParams.Add(request.NewErrParamRequired("ClusterName"))
+	}
+	if s.ClusterName != nil && len(*s.ClusterName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ClusterName", 1))
+	}
+	if s.NodegroupName == nil {
+		invalidParams.Add(request.NewErrParamRequired("NodegroupName"))
+	}
+	if s.NodegroupName != nil && len(*s.NodegroupName) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("NodegroupName", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClientRequestToken sets the ClientRequestToken field's value.
+func (s *UpdateNodegroupVersionInput) SetClientRequestToken(v string) *UpdateNodegroupVersionInput {
+	s.ClientRequestToken = &v
+	return s
+}
+
+// SetClusterName sets the ClusterName field's value.
+func (s *UpdateNodegroupVersionInput) SetClusterName(v string) *UpdateNodegroupVersionInput {
+	s.ClusterName = &v
+	return s
+}
+
+// SetForce sets the Force field's value.
+func (s *UpdateNodegroupVersionInput) SetForce(v bool) *UpdateNodegroupVersionInput {
+	s.Force = &v
+	return s
+}
+
+// SetNodegroupName sets the NodegroupName field's value.
+func (s *UpdateNodegroupVersionInput) SetNodegroupName(v string) *UpdateNodegroupVersionInput {
+	s.NodegroupName = &v
+	return s
+}
+
+// SetReleaseVersion sets the ReleaseVersion field's value.
+func (s *UpdateNodegroupVersionInput) SetReleaseVersion(v string) *UpdateNodegroupVersionInput {
+	s.ReleaseVersion = &v
+	return s
+}
+
+// SetVersion sets the Version field's value.
+func (s *UpdateNodegroupVersionInput) SetVersion(v string) *UpdateNodegroupVersionInput {
+	s.Version = &v
+	return s
+}
+
+type UpdateNodegroupVersionOutput struct {
+	_ struct{} `type:"structure"`
+
+	// An object representing an asynchronous update.
+	Update *Update `locationName:"update" type:"structure"`
+}
+
+// String returns the string representation
+func (s UpdateNodegroupVersionOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s UpdateNodegroupVersionOutput) GoString() string {
+	return s.String()
+}
+
+// SetUpdate sets the Update field's value.
+func (s *UpdateNodegroupVersionOutput) SetUpdate(v *Update) *UpdateNodegroupVersionOutput {
+	s.Update = v
+	return s
+}
+
 // An object representing the details of an update request.
 type UpdateParam struct {
 	_ struct{} `type:"structure"`
@@ -2718,6 +5746,11 @@ func (s *VpcConfigRequest) SetSubnetIds(v []*string) *VpcConfigRequest {
 type VpcConfigResponse struct {
 	_ struct{} `type:"structure"`
 
+	// The cluster security group that was created by Amazon EKS for the cluster.
+	// Managed node groups use this security group for control-plane-to-data-plane
+	// communication.
+	ClusterSecurityGroupId *string `locationName:"clusterSecurityGroupId" type:"string"`
+
 	// This parameter indicates whether the Amazon EKS private API server endpoint
 	// is enabled. If the Amazon EKS private API server endpoint is enabled, Kubernetes
 	// API requests that originate from within your cluster's VPC use the private
@@ -2752,6 +5785,12 @@ func (s VpcConfigResponse) GoString() string {
 	return s.String()
 }
 
+// SetClusterSecurityGroupId sets the ClusterSecurityGroupId field's value.
+func (s *VpcConfigResponse) SetClusterSecurityGroupId(v string) *VpcConfigResponse {
+	s.ClusterSecurityGroupId = &v
+	return s
+}
+
 // SetEndpointPrivateAccess sets the EndpointPrivateAccess field's value.
 func (s *VpcConfigResponse) SetEndpointPrivateAccess(v bool) *VpcConfigResponse {
 	s.EndpointPrivateAccess = &v
@@ -2783,6 +5822,14 @@ func (s *VpcConfigResponse) SetVpcId(v string) *VpcConfigResponse {
 }
 
 const (
+	// AMITypesAl2X8664 is a AMITypes enum value
+	AMITypesAl2X8664 = "AL2_x86_64"
+
+	// AMITypesAl2X8664Gpu is a AMITypes enum value
+	AMITypesAl2X8664Gpu = "AL2_x86_64_GPU"
+)
+
+const (
 	// ClusterStatusCreating is a ClusterStatus enum value
 	ClusterStatusCreating = "CREATING"
 
@@ -2794,6 +5841,9 @@ const (
 
 	// ClusterStatusFailed is a ClusterStatus enum value
 	ClusterStatusFailed = "FAILED"
+
+	// ClusterStatusUpdating is a ClusterStatus enum value
+	ClusterStatusUpdating = "UPDATING"
 )
 
 const (
@@ -2820,6 +5870,32 @@ const (
 
 	// ErrorCodeUnknown is a ErrorCode enum value
 	ErrorCodeUnknown = "Unknown"
+
+	// ErrorCodeNodeCreationFailure is a ErrorCode enum value
+	ErrorCodeNodeCreationFailure = "NodeCreationFailure"
+
+	// ErrorCodePodEvictionFailure is a ErrorCode enum value
+	ErrorCodePodEvictionFailure = "PodEvictionFailure"
+
+	// ErrorCodeInsufficientFreeAddresses is a ErrorCode enum value
+	ErrorCodeInsufficientFreeAddresses = "InsufficientFreeAddresses"
+)
+
+const (
+	// FargateProfileStatusCreating is a FargateProfileStatus enum value
+	FargateProfileStatusCreating = "CREATING"
+
+	// FargateProfileStatusActive is a FargateProfileStatus enum value
+	FargateProfileStatusActive = "ACTIVE"
+
+	// FargateProfileStatusDeleting is a FargateProfileStatus enum value
+	FargateProfileStatusDeleting = "DELETING"
+
+	// FargateProfileStatusCreateFailed is a FargateProfileStatus enum value
+	FargateProfileStatusCreateFailed = "CREATE_FAILED"
+
+	// FargateProfileStatusDeleteFailed is a FargateProfileStatus enum value
+	FargateProfileStatusDeleteFailed = "DELETE_FAILED"
 )
 
 const (
@@ -2840,6 +5916,67 @@ const (
 )
 
 const (
+	// NodegroupIssueCodeAutoScalingGroupNotFound is a NodegroupIssueCode enum value
+	NodegroupIssueCodeAutoScalingGroupNotFound = "AutoScalingGroupNotFound"
+
+	// NodegroupIssueCodeEc2securityGroupNotFound is a NodegroupIssueCode enum value
+	NodegroupIssueCodeEc2securityGroupNotFound = "Ec2SecurityGroupNotFound"
+
+	// NodegroupIssueCodeEc2securityGroupDeletionFailure is a NodegroupIssueCode enum value
+	NodegroupIssueCodeEc2securityGroupDeletionFailure = "Ec2SecurityGroupDeletionFailure"
+
+	// NodegroupIssueCodeEc2launchTemplateNotFound is a NodegroupIssueCode enum value
+	NodegroupIssueCodeEc2launchTemplateNotFound = "Ec2LaunchTemplateNotFound"
+
+	// NodegroupIssueCodeEc2launchTemplateVersionMismatch is a NodegroupIssueCode enum value
+	NodegroupIssueCodeEc2launchTemplateVersionMismatch = "Ec2LaunchTemplateVersionMismatch"
+
+	// NodegroupIssueCodeIamInstanceProfileNotFound is a NodegroupIssueCode enum value
+	NodegroupIssueCodeIamInstanceProfileNotFound = "IamInstanceProfileNotFound"
+
+	// NodegroupIssueCodeIamNodeRoleNotFound is a NodegroupIssueCode enum value
+	NodegroupIssueCodeIamNodeRoleNotFound = "IamNodeRoleNotFound"
+
+	// NodegroupIssueCodeAsgInstanceLaunchFailures is a NodegroupIssueCode enum value
+	NodegroupIssueCodeAsgInstanceLaunchFailures = "AsgInstanceLaunchFailures"
+
+	// NodegroupIssueCodeInstanceLimitExceeded is a NodegroupIssueCode enum value
+	NodegroupIssueCodeInstanceLimitExceeded = "InstanceLimitExceeded"
+
+	// NodegroupIssueCodeInsufficientFreeAddresses is a NodegroupIssueCode enum value
+	NodegroupIssueCodeInsufficientFreeAddresses = "InsufficientFreeAddresses"
+
+	// NodegroupIssueCodeAccessDenied is a NodegroupIssueCode enum value
+	NodegroupIssueCodeAccessDenied = "AccessDenied"
+
+	// NodegroupIssueCodeInternalFailure is a NodegroupIssueCode enum value
+	NodegroupIssueCodeInternalFailure = "InternalFailure"
+)
+
+const (
+	// NodegroupStatusCreating is a NodegroupStatus enum value
+	NodegroupStatusCreating = "CREATING"
+
+	// NodegroupStatusActive is a NodegroupStatus enum value
+	NodegroupStatusActive = "ACTIVE"
+
+	// NodegroupStatusUpdating is a NodegroupStatus enum value
+	NodegroupStatusUpdating = "UPDATING"
+
+	// NodegroupStatusDeleting is a NodegroupStatus enum value
+	NodegroupStatusDeleting = "DELETING"
+
+	// NodegroupStatusCreateFailed is a NodegroupStatus enum value
+	NodegroupStatusCreateFailed = "CREATE_FAILED"
+
+	// NodegroupStatusDeleteFailed is a NodegroupStatus enum value
+	NodegroupStatusDeleteFailed = "DELETE_FAILED"
+
+	// NodegroupStatusDegraded is a NodegroupStatus enum value
+	NodegroupStatusDegraded = "DEGRADED"
+)
+
+const (
 	// UpdateParamTypeVersion is a UpdateParamType enum value
 	UpdateParamTypeVersion = "Version"
 
@@ -2854,6 +5991,24 @@ const (
 
 	// UpdateParamTypeClusterLogging is a UpdateParamType enum value
 	UpdateParamTypeClusterLogging = "ClusterLogging"
+
+	// UpdateParamTypeDesiredSize is a UpdateParamType enum value
+	UpdateParamTypeDesiredSize = "DesiredSize"
+
+	// UpdateParamTypeLabelsToAdd is a UpdateParamType enum value
+	UpdateParamTypeLabelsToAdd = "LabelsToAdd"
+
+	// UpdateParamTypeLabelsToRemove is a UpdateParamType enum value
+	UpdateParamTypeLabelsToRemove = "LabelsToRemove"
+
+	// UpdateParamTypeMaxSize is a UpdateParamType enum value
+	UpdateParamTypeMaxSize = "MaxSize"
+
+	// UpdateParamTypeMinSize is a UpdateParamType enum value
+	UpdateParamTypeMinSize = "MinSize"
+
+	// UpdateParamTypeReleaseVersion is a UpdateParamType enum value
+	UpdateParamTypeReleaseVersion = "ReleaseVersion"
 )
 
 const (
@@ -2879,4 +6034,7 @@ const (
 
 	// UpdateTypeLoggingUpdate is a UpdateType enum value
 	UpdateTypeLoggingUpdate = "LoggingUpdate"
+
+	// UpdateTypeConfigUpdate is a UpdateType enum value
+	UpdateTypeConfigUpdate = "ConfigUpdate"
 )

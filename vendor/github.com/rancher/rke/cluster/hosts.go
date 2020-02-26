@@ -67,10 +67,10 @@ func (c *Cluster) TunnelHosts(ctx context.Context, flags ExternalFlags) error {
 	return ValidateHostCount(c)
 }
 
-func (c *Cluster) RemoveHostsLabeledToIgnoreUpgrade(ctx context.Context) {
+func (c *Cluster) FindHostsLabeledToIgnoreUpgrade(ctx context.Context) {
 	kubeClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
 	if err != nil {
-		logrus.Errorf("Error generating kube client in RemoveHostsLabeledToIgnoreUpgrade: %v", err)
+		logrus.Errorf("Error generating kube client in FindHostsLabeledToIgnoreUpgrade: %v", err)
 		return
 	}
 	var nodes *v1.NodeList
@@ -150,6 +150,46 @@ func (c *Cluster) InvertIndexHosts() error {
 		}
 	}
 	return nil
+}
+
+func (c *Cluster) CalculateMaxUnavailable() (int, int, error) {
+	var inactiveControlPlaneHosts, inactiveWorkerHosts []string
+	var workerHosts, controlHosts, maxUnavailableWorker, maxUnavailableControl int
+
+	for _, host := range c.InactiveHosts {
+		if host.IsControl && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
+			inactiveControlPlaneHosts = append(inactiveControlPlaneHosts, host.HostnameOverride)
+		}
+		if !host.IsWorker && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
+			inactiveWorkerHosts = append(inactiveWorkerHosts, host.HostnameOverride)
+		}
+		// not breaking out of the loop so we can log all of the inactive hosts
+	}
+
+	for _, host := range c.WorkerHosts {
+		if c.HostsLabeledToIgnoreUpgrade[host.Address] {
+			continue
+		}
+		workerHosts++
+	}
+	// maxUnavailable should be calculated against all hosts provided in cluster.yml except the ones labelled to be ignored for upgrade
+	workerHosts += len(inactiveWorkerHosts)
+	maxUnavailableWorker, err := services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailableWorker, workerHosts)
+	if err != nil {
+		return maxUnavailableWorker, maxUnavailableControl, err
+	}
+	for _, host := range c.ControlPlaneHosts {
+		if c.HostsLabeledToIgnoreUpgrade[host.Address] {
+			continue
+		}
+		controlHosts++
+	}
+	controlHosts += len(inactiveControlPlaneHosts)
+	maxUnavailableControl, err = services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailableControlplane, controlHosts)
+	if err != nil {
+		return maxUnavailableWorker, maxUnavailableControl, err
+	}
+	return maxUnavailableWorker, maxUnavailableControl, nil
 }
 
 func (c *Cluster) getConsolidatedAdmissionConfiguration() (*v1alpha1.AdmissionConfiguration, error) {

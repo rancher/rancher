@@ -4,6 +4,7 @@ import "k8s.io/apimachinery/pkg/util/intstr"
 
 const (
 	AlertmanagerEndpointsType                 = "alertmanagerEndpoints"
+	AlertmanagerEndpointsFieldAPIVersion      = "apiVersion"
 	AlertmanagerEndpointsFieldBearerTokenFile = "bearerTokenFile"
 	AlertmanagerEndpointsFieldName            = "name"
 	AlertmanagerEndpointsFieldNamespace       = "namespace"
@@ -14,6 +15,7 @@ const (
 )
 
 type AlertmanagerEndpoints struct {
+	APIVersion      string             `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	BearerTokenFile string             `json:"bearerTokenFile,omitempty" yaml:"bearerTokenFile,omitempty"`
 	Name            string             `json:"name,omitempty" yaml:"name,omitempty"`
 	Namespace       string             `json:"namespace,omitempty" yaml:"namespace,omitempty"`
