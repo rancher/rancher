@@ -146,6 +146,17 @@ func ToMiddleware(auth Authenticator) Middleware {
 	}
 }
 
+func AlwaysAdmin(req *http.Request) (user.Info, bool, error) {
+	return &user.DefaultInfo{
+		Name: "admin",
+		UID:  "admin",
+		Groups: []string{
+			"system:masters",
+			"system:authenticated",
+		},
+	}, true, nil
+}
+
 func Impersonation(req *http.Request) (user.Info, bool, error) {
 	userName := req.Header.Get(transport.ImpersonateUserHeader)
 	if userName == "" {

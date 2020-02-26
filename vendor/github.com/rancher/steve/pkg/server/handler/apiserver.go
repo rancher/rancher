@@ -33,6 +33,7 @@ func New(cfg *rest.Config, sf schema.Factory, authMiddleware auth.Middleware, ne
 		if err != nil {
 			return nil, err
 		}
+		authMiddleware = auth.ToMiddleware(auth.AuthenticatorFunc(auth.AlwaysAdmin))
 	} else {
 		proxy = k8sproxy.ImpersonatingHandler("/", cfg)
 	}
