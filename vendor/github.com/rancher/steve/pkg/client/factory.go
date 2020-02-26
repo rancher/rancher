@@ -50,7 +50,7 @@ func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 		}
 	})
 
-	watchClientCfg := rest.CopyConfig(cfg)
+	watchClientCfg := rest.CopyConfig(clientCfg)
 	watchClientCfg.Timeout = 30 * time.Minute
 
 	md, err := metadata.NewForConfig(cfg)

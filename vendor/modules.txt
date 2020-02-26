@@ -185,7 +185,7 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/google/go-cmp v0.3.1
+# github.com/google/go-cmp v0.4.0
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
@@ -232,7 +232,7 @@ github.com/imdario/mergo
 github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.1.0
 github.com/jonboulle/clockwork
-# github.com/json-iterator/go v1.1.8
+# github.com/json-iterator/go v1.1.9
 github.com/json-iterator/go
 # github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8 => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 github.com/knative/pkg/apis/istio
@@ -421,14 +421,16 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.5
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200220230643-5b94b82bc6c8
+# github.com/rancher/steve v0.0.0-20200226042400-e2e87cda5338
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
 github.com/rancher/steve/pkg/client
 github.com/rancher/steve/pkg/clustercache
 github.com/rancher/steve/pkg/controllers/schema
+github.com/rancher/steve/pkg/dashboard
 github.com/rancher/steve/pkg/proxy
+github.com/rancher/steve/pkg/responsewriter
 github.com/rancher/steve/pkg/schema
 github.com/rancher/steve/pkg/schema/converter
 github.com/rancher/steve/pkg/schema/table
@@ -652,7 +654,7 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20191010194322-b09406accb47
+# golang.org/x/sys v0.0.0-20200122134326-e047566fdf82
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows

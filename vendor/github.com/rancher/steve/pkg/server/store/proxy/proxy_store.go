@@ -71,11 +71,8 @@ func toAPI(schema *types.APISchema, obj runtime.Object) types.APIObject {
 		obj = moveToUnderscore(unstr)
 	}
 
-	gvr := attributes.GVR(schema)
-
-	t := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
 	apiObject := types.APIObject{
-		Type:   t,
+		Type:   schema.ID,
 		Object: obj,
 	}
 

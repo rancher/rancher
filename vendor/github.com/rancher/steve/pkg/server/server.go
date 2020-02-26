@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/clustercache"
 	schemacontroller "github.com/rancher/steve/pkg/controllers/schema"
+	"github.com/rancher/steve/pkg/dashboard"
 	"github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/steve/pkg/server/handler"
@@ -86,6 +87,10 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 	server.PostStartHooks = append(server.PostStartHooks, func() error {
 		return sync()
 	})
+
+	if server.DashboardURL != nil && server.DashboardURL() != "" {
+		handler = dashboard.Route(handler, server.DashboardURL)
+	}
 
 	return handler, sf, nil
 }

@@ -37,6 +37,7 @@ type Server struct {
 	Router          router.RouterFunc
 	PostStartHooks  []func() error
 	StartHooks      []StartHook
+	DashboardURL    func() string
 }
 
 type Controllers struct {
