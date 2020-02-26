@@ -152,7 +152,7 @@ github.com/docker/go-units
 # github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
-# github.com/ehazlett/simplelog v0.0.0-20170112055302-9fcd579ee7c6
+# github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 github.com/ehazlett/simplelog
 # github.com/emicklei/go-restful v2.9.5+incompatible
 github.com/emicklei/go-restful
