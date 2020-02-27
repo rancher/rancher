@@ -675,8 +675,10 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
-{{- if ne (default 0 .MTU) 0}}
+{{- if .MTU }}
+{{- if ne .MTU 0 }}
   veth_mtu: "{{.MTU}}"
+{{- end}}
 {{- else }}
   veth_mtu: "1440"
 {{- end}}
@@ -1359,8 +1361,10 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
-{{- if ne (default 0 .MTU) 0}}
+{{- if .MTU }}
+{{- if ne .MTU 0 }}
   veth_mtu: "{{.MTU}}"
+{{- end}}
 {{- else }}
   veth_mtu: "1440"
 {{- end}}
@@ -2098,8 +2102,10 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
-{{- if ne (default 0 .MTU) 0}}
+{{- if .MTU }}
+{{- if ne .MTU 0 }}
   veth_mtu: "{{.MTU}}"
+{{- end}}
 {{- else }}
   veth_mtu: "1440"
 {{- end}}
@@ -2590,7 +2596,11 @@ spec:
         - name: flexvol-driver-host
           hostPath:
             type: DirectoryOrCreate
+{{- if .FlexVolPluginDir }}
+            path: {{.FlexVolPluginDir}}
+{{- else }}
             path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -2890,8 +2900,10 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
-{{- if ne (default 0 .MTU) 0}}
+{{- if .MTU }}
+{{- if ne .MTU 0 }}
   veth_mtu: "{{.MTU}}"
+{{- end}}
 {{- else }}
   veth_mtu: "1440"
 {{- end}}
@@ -3382,7 +3394,11 @@ spec:
         - name: flexvol-driver-host
           hostPath:
             type: DirectoryOrCreate
+{{- if .FlexVolPluginDir }}
+            path: {{.FlexVolPluginDir}}
+{{- else }}
             path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
