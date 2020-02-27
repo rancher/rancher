@@ -15,7 +15,7 @@ func TestReconcileFeatures(t *testing.T) {
 	// testing a non-dynamic feature
 	mockFeature := v3.Feature{
 		ObjectMeta: v1.ObjectMeta{
-			Name: "steve",
+			Name: "isfalse",
 		},
 	}
 
