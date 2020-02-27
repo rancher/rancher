@@ -54,7 +54,7 @@ type refresher struct {
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
-	if r.unparsedMaxAge == maxAge {
+	if r.unparsedMaxAge == maxAge || maxAge == "" {
 		return
 	}
 

@@ -35,7 +35,7 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 }
 
 func UpdateRefreshCronTime(refreshCronTime string) {
-	if ref == nil {
+	if ref == nil || refreshCronTime == "" {
 		return
 	}
 
