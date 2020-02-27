@@ -316,7 +316,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20191126011629-6269ccdbeace
+# github.com/rancher/norman v0.0.0-20200227003532-35fa47cccad7
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -423,7 +423,7 @@ github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
-# github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
+# github.com/rancher/wrangler v0.4.1
 github.com/rancher/wrangler/pkg/leader
 github.com/rancher/wrangler/pkg/name
 github.com/rancher/wrangler/pkg/signals
@@ -540,7 +540,7 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sync v0.0.0-20190423024810-112230192c58
+# golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20190804053845-51ab0e2deafa
 golang.org/x/sys/cpu
@@ -633,7 +633,7 @@ gopkg.in/ldap.v2
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/yaml.v2 v2.2.4
 gopkg.in/yaml.v2
-# k8s.io/api v0.0.0 => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
+# k8s.io/api v0.17.0 => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1beta1
 k8s.io/api/apps/v1
@@ -672,7 +672,7 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apiextensions-apiserver v0.0.0 => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
+# k8s.io/apiextensions-apiserver v0.17.0 => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
@@ -681,7 +681,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/features
-# k8s.io/apimachinery v0.0.0 => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
+# k8s.io/apimachinery v0.17.0 => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta

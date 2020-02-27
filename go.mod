@@ -73,12 +73,12 @@ require (
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20200125025425-eef1fdc7ca9c
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191210052702-247063a5f1e8
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20191126011629-6269ccdbeace
+	github.com/rancher/norman v0.0.0-20200227003532-35fa47cccad7
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
 	github.com/rancher/rke v1.0.4
 	github.com/rancher/types v0.0.0-20191226170233-4d49bbf42146
-	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
+	github.com/rancher/wrangler v0.4.1
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
 	github.com/satori/go.uuid v1.2.0
@@ -96,7 +96,7 @@ require (
 	go.uber.org/zap v1.10.0 // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/grpc v1.23.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175 // indirect
@@ -104,9 +104,9 @@ require (
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.4
-	k8s.io/api v0.0.0
-	k8s.io/apiextensions-apiserver v0.0.0
-	k8s.io/apimachinery v0.0.0
+	k8s.io/api v0.17.0
+	k8s.io/apiextensions-apiserver v0.17.0
+	k8s.io/apimachinery v0.17.0
 	k8s.io/apiserver v0.0.0
 	k8s.io/cli-runtime v0.0.0
 	k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible
