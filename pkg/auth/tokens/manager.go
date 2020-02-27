@@ -573,23 +573,19 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 		return err
 	}
 
-	// Exists, just update if necessary
-	attribs = attribs.DeepCopy()
-
-	if m.UserAttributeChanged(attribs, provider, groupPrincipals) {
+	if needCreate {
 		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
-		if !needCreate {
-			_, err := m.userAttributes.Update(attribs)
-			if err != nil {
-				return err
-			}
+		_, err := m.userAttributes.Create(attribs)
+		if err != nil {
+			return err
 		}
-
 		return nil
 	}
 
-	if needCreate {
-		_, err := m.userAttributes.Create(attribs)
+	// Exists, just update if necessary
+	if m.UserAttributeChanged(attribs, provider, groupPrincipals) {
+		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+		_, err := m.userAttributes.Update(attribs)
 		if err != nil {
 			return err
 		}
