@@ -61,11 +61,17 @@ func CheckCSRF(apiContext *types.APIContext) error {
 		cookie = &http.Cookie{
 			Name:   csrfCookie,
 			Value:  hex.EncodeToString(bytes),
+			Path:   "/",
 			Secure: true,
 		}
+
+		http.SetCookie(apiContext.Response, cookie)
 	} else if err != nil {
 		return httperror.NewAPIError(httperror.InvalidCSRFToken, "Failed to parse cookies")
-	} else if apiContext.Method != http.MethodGet {
+	}
+
+	// Not an else-if, because this should happen even if there was no cookie to begin with.
+	if apiContext.Method != http.MethodGet {
 		/*
 		 * Very important to use apiContext.Method and not apiContext.Request.Method. The client can override the HTTP method with _method
 		 */
@@ -78,7 +84,5 @@ func CheckCSRF(apiContext *types.APIContext) error {
 		}
 	}
 
-	cookie.Path = "/"
-	http.SetCookie(apiContext.Response, cookie)
 	return nil
 }
