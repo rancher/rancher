@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -95,23 +94,26 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
 	}
 
-	var backup *v3.EtcdBackup
+	ns, name := ref.Parse(input.EtcdBackupID)
+	if ns == "" || name == "" {
+		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid input id %s", input.EtcdBackupID))
+	}
+
+	backup, err := a.BackupClient.GetNamespaced(ns, name, v1.GetOptions{})
+	if err != nil {
+		response["message"] = "error getting backup config"
+		apiContext.WriteResponse(http.StatusInternalServerError, response)
+		return errors.Wrapf(err, "failed to get backup config by ID %s", input.EtcdBackupID)
+	}
+
 	clusterBackupConfig := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
-	if clusterBackupConfig != nil && clusterBackupConfig.S3BackupConfig == nil {
-		ns, name := ref.Parse(input.EtcdBackupID)
-		if ns == "" || name == "" {
-			return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid input id %s", input.EtcdBackupID))
-		}
-		backup, err = a.BackupClient.GetNamespaced(ns, name, v1.GetOptions{})
-		if err != nil {
-			response["message"] = "error getting backup config"
-			apiContext.WriteResponse(http.StatusInternalServerError, response)
-			return errors.Wrapf(err, "failed to get backup config by ID %s", input.EtcdBackupID)
-		}
-		if backup.Spec.BackupConfig.S3BackupConfig != nil {
-			return httperror.NewAPIError(httperror.MethodNotAllowed,
-				fmt.Sprintf("restoring S3 backups with no cluster level S3 configuration is not supported %s", input.EtcdBackupID))
-		}
+	if clusterBackupConfig != nil &&
+		clusterBackupConfig.S3BackupConfig == nil &&
+		backup.Spec.BackupConfig.S3BackupConfig != nil {
+		return httperror.NewAPIError(httperror.MethodNotAllowed,
+			fmt.Sprintf(
+				"restoring S3 backups with no cluster level S3 configuration is not supported %s",
+				input.EtcdBackupID))
 	}
 
 	if input.RestoreRkeConfig != "" && backup.Status.ClusterObject == "" {
