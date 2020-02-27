@@ -6,9 +6,9 @@ import (
 	"github.com/rancher/steve/pkg/schemaserver/builtin"
 	"github.com/rancher/steve/pkg/schemaserver/handlers"
 	"github.com/rancher/steve/pkg/schemaserver/parse"
+	"github.com/rancher/steve/pkg/schemaserver/subscribe"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/steve/pkg/schemaserver/writer"
-	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 )
 
@@ -34,7 +34,6 @@ type Defaults struct {
 	CreateHandler types.RequestHandler
 	DeleteHandler types.RequestHandler
 	UpdateHandler types.RequestHandler
-	Store         types.Store
 	ErrorHandler  types.ErrorHandler
 }
 
@@ -70,6 +69,7 @@ func DefaultAPIServer() *Server {
 		URLParser: parse.MuxURLParser,
 	}
 
+	subscribe.Register(s.Schemas)
 	return s
 }
 
@@ -86,57 +86,6 @@ func (s *Server) setDefaults(ctx *types.APIRequest) {
 	if ctx.Schemas == nil {
 		ctx.Schemas = s.Schemas
 	}
-}
-
-func (s *Server) AddSchemas(schemas *types.APISchemas) error {
-	var errs []error
-
-	for _, schema := range schemas.Schemas {
-		if err := s.addSchema(*schema); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	return merr.NewErrors(errs...)
-}
-
-func (s *Server) addSchema(schema types.APISchema) error {
-	s.setupDefaults(&schema)
-	return s.Schemas.AddSchema(schema)
-}
-
-func (s *Server) setupDefaults(schema *types.APISchema) {
-	if schema.Store == nil {
-		schema.Store = s.Defaults.Store
-	}
-
-	if schema.ListHandler == nil {
-		schema.ListHandler = s.Defaults.ListHandler
-	}
-
-	if schema.CreateHandler == nil {
-		schema.CreateHandler = s.Defaults.CreateHandler
-	}
-
-	if schema.ByIDHandler == nil {
-		schema.ByIDHandler = s.Defaults.ByIDHandler
-	}
-
-	if schema.UpdateHandler == nil {
-		schema.UpdateHandler = s.Defaults.UpdateHandler
-	}
-
-	if schema.DeleteHandler == nil {
-		schema.DeleteHandler = s.Defaults.DeleteHandler
-	}
-
-	if schema.ErrorHandler == nil {
-		schema.ErrorHandler = s.Defaults.ErrorHandler
-	}
-}
-
-func (s *Server) GetSchemas() *types.APISchemas {
-	return s.Schemas
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {

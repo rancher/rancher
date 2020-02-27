@@ -2,17 +2,20 @@ package schema
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"sync"
 
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
+	"github.com/rancher/steve/pkg/schemaserver/server"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 type Factory interface {
@@ -45,6 +48,28 @@ type Template struct {
 	Store        types.Store
 	Start        func(ctx context.Context) error
 	StoreFactory func(types.Store) types.Store
+}
+
+func WrapServer(factory Factory, server *server.Server) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		user, ok := request.UserFrom(req.Context())
+		if !ok {
+			return
+		}
+
+		schemas, err := factory.Schemas(user)
+		if err != nil {
+			logrus.Errorf("failed to lookup schemas for user %v: %v", user, err)
+			http.Error(rw, "schemas failed", http.StatusInternalServerError)
+			return
+		}
+
+		server.Handle(&types.APIRequest{
+			Request:  req,
+			Response: rw,
+			Schemas:  schemas,
+		})
+	})
 }
 
 func NewCollection(ctx context.Context, baseSchema *types.APISchemas, access accesscontrol.AccessSetLookup) *Collection {

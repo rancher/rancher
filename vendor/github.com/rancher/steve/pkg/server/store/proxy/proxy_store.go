@@ -32,8 +32,10 @@ var (
 type ClientGetter interface {
 	Client(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
 	AdminClient(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
-	ClientForWatch(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
-	AdminClientForWatch(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
+	TableClient(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
+	TableAdminClient(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
+	TableClientForWatch(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
+	TableAdminClientForWatch(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
 }
 
 type Store struct {
@@ -92,7 +94,7 @@ func toAPI(schema *types.APISchema, obj runtime.Object) types.APIObject {
 }
 
 func (s *Store) byID(apiOp *types.APIRequest, schema *types.APISchema, id string) (*unstructured.Unstructured, error) {
-	k8sClient, err := s.clientGetter.Client(apiOp, schema, apiOp.Namespace)
+	k8sClient, err := s.clientGetter.TableClient(apiOp, schema, apiOp.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +186,7 @@ func tableToObjects(obj map[string]interface{}) []unstructured.Unstructured {
 }
 
 func (s *Store) ByNames(apiOp *types.APIRequest, schema *types.APISchema, names sets.String) (types.APIObjectList, error) {
-	adminClient, err := s.clientGetter.AdminClient(apiOp, schema, apiOp.Namespace)
+	adminClient, err := s.clientGetter.TableAdminClient(apiOp, schema, apiOp.Namespace)
 	if err != nil {
 		return types.APIObjectList{}, err
 	}
@@ -206,7 +208,7 @@ func (s *Store) ByNames(apiOp *types.APIRequest, schema *types.APISchema, names 
 }
 
 func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.APIObjectList, error) {
-	client, err := s.clientGetter.Client(apiOp, schema, apiOp.Namespace)
+	client, err := s.clientGetter.TableClient(apiOp, schema, apiOp.Namespace)
 	if err != nil {
 		return types.APIObjectList{}, err
 	}
@@ -287,7 +289,7 @@ func (s *Store) listAndWatch(apiOp *types.APIRequest, k8sClient dynamic.Resource
 }
 
 func (s *Store) WatchNames(apiOp *types.APIRequest, schema *types.APISchema, w types.WatchRequest, names sets.String) (chan types.APIEvent, error) {
-	adminClient, err := s.clientGetter.ClientForWatch(apiOp, schema, apiOp.Namespace)
+	adminClient, err := s.clientGetter.TableClientForWatch(apiOp, schema, apiOp.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +312,7 @@ func (s *Store) WatchNames(apiOp *types.APIRequest, schema *types.APISchema, w t
 }
 
 func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.WatchRequest) (chan types.APIEvent, error) {
-	client, err := s.clientGetter.ClientForWatch(apiOp, schema, apiOp.Namespace)
+	client, err := s.clientGetter.TableClientForWatch(apiOp, schema, apiOp.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +376,7 @@ func (s *Store) Create(apiOp *types.APIRequest, schema *types.APISchema, params 
 	gvk := attributes.GVK(schema)
 	input["apiVersion"], input["kind"] = gvk.ToAPIVersionAndKind()
 
-	k8sClient, err := s.clientGetter.Client(apiOp, schema, ns)
+	k8sClient, err := s.clientGetter.TableClient(apiOp, schema, ns)
 	if err != nil {
 		return types.APIObject{}, err
 	}
@@ -395,7 +397,7 @@ func (s *Store) Update(apiOp *types.APIRequest, schema *types.APISchema, params 
 	)
 
 	ns := types.Namespace(input)
-	k8sClient, err := s.clientGetter.Client(apiOp, schema, ns)
+	k8sClient, err := s.clientGetter.TableClient(apiOp, schema, ns)
 	if err != nil {
 		return types.APIObject{}, err
 	}
@@ -460,7 +462,7 @@ func (s *Store) Delete(apiOp *types.APIRequest, schema *types.APISchema, id stri
 		return types.APIObject{}, nil
 	}
 
-	k8sClient, err := s.clientGetter.Client(apiOp, schema, apiOp.Namespace)
+	k8sClient, err := s.clientGetter.TableClient(apiOp, schema, apiOp.Namespace)
 	if err != nil {
 		return types.APIObject{}, err
 	}

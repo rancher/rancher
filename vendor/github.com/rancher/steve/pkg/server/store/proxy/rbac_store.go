@@ -13,6 +13,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+type filterKey struct{}
+
+func AddNamespaceConstraint(req *http.Request, names ...string) *http.Request {
+	set := sets.NewString(names...)
+	ctx := context.WithValue(req.Context(), filterKey{}, set)
+	return req.WithContext(ctx)
+}
+
+func getNamespaceConstraint(req *http.Request) (sets.String, bool) {
+	set, ok := req.Context().Value(filterKey{}).(sets.String)
+	return set, ok
+}
+
 type RBACStore struct {
 	*Store
 }
@@ -24,6 +37,34 @@ type Partition struct {
 }
 
 func isPassthrough(apiOp *types.APIRequest, schema *types.APISchema, verb string) ([]Partition, bool) {
+	partitions, passthrough := isPassthroughUnconstrained(apiOp, schema, verb)
+	namespaces, ok := getNamespaceConstraint(apiOp.Request)
+	if !ok {
+		return partitions, passthrough
+	}
+
+	var result []Partition
+
+	if passthrough {
+		for namespace := range namespaces {
+			result = append(result, Partition{
+				Namespace: namespace,
+				All:       true,
+			})
+		}
+		return result, false
+	}
+
+	for _, partition := range partitions {
+		if namespaces.Has(partition.Namespace) {
+			result = append(result, partition)
+		}
+	}
+
+	return result, false
+}
+
+func isPassthroughUnconstrained(apiOp *types.APIRequest, schema *types.APISchema, verb string) ([]Partition, bool) {
 	accessListByVerb, _ := attributes.Access(schema).(accesscontrol.AccessListByVerb)
 	if accessListByVerb.All(verb) {
 		return nil, true
