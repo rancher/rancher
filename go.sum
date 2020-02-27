@@ -957,6 +957,8 @@ github.com/rancher/norman v0.0.0-20200123223841-6d86f4e37a69/go.mod h1:XMiRH4NH6
 github.com/rancher/norman v0.0.0-20200211155126-fc45a55d4dfd/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
 github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e h1:YmLbAlFRBeXQa9MNmasuEX58b9li3Ht3lnDu9baVYwg=
 github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
+github.com/rancher/norman v0.0.0-20200226193007-69ad517cedee h1:rA7JdZJbgZAj6o1TaLRZXsjA8gyJ8w20NOoDELIfxpM=
+github.com/rancher/norman v0.0.0-20200226193007-69ad517cedee/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e h1:j6+HqCET/NLPBtew2m5apL7jWw/PStQ7iGwXjgAqdvo=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e/go.mod h1:XbYHTPaXuw8ZY9bylhYKQh/nJxDaTKk3YhAxPl4Qy/k=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAXBa/AuNAG0bhMusIXVh74dc1bbYOAe+HY=
