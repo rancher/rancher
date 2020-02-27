@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/auth"
+	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/steve/pkg/server/router"
@@ -29,6 +30,7 @@ type Server struct {
 
 	RestConfig *rest.Config
 
+	ClientFactory   *client.Factory
 	BaseSchemas     *types.APISchemas
 	AccessSetLookup accesscontrol.AccessSetLookup
 	SchemaTemplates []schema.Template

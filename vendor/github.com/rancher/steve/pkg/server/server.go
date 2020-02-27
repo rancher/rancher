@@ -45,13 +45,18 @@ func setDefaults(server *Server) error {
 }
 
 func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collection, error) {
-	if err := setDefaults(server); err != nil {
+	err := setDefaults(server)
+	if err != nil {
 		return nil, nil, err
 	}
 
-	cf, err := client.NewFactory(server.RestConfig, server.AuthMiddleware != nil)
-	if err != nil {
-		return nil, nil, err
+	cf := server.ClientFactory
+	if cf == nil {
+		cf, err = client.NewFactory(server.RestConfig, server.AuthMiddleware != nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		server.ClientFactory = cf
 	}
 
 	asl := server.AccessSetLookup
