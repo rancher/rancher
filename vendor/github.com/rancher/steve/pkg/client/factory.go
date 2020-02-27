@@ -14,11 +14,13 @@ import (
 )
 
 type Factory struct {
-	impersonate    bool
-	clientCfg      *rest.Config
-	watchClientCfg *rest.Config
-	metadata       metadata.Interface
-	Config         *rest.Config
+	impersonate         bool
+	tableClientCfg      *rest.Config
+	tableWatchClientCfg *rest.Config
+	clientCfg           *rest.Config
+	watchClientCfg      *rest.Config
+	metadata            metadata.Interface
+	Config              *rest.Config
 }
 
 type addQuery struct {
@@ -41,17 +43,23 @@ func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 	clientCfg.QPS = 10000
 	clientCfg.Burst = 100
 	clientCfg.AcceptContentTypes = "application/json;as=Table;v=v1;g=meta.k8s.io"
-	clientCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+
+	watchClientCfg := rest.CopyConfig(clientCfg)
+	watchClientCfg.Timeout = 30 * time.Minute
+
+	setTable := func(rt http.RoundTripper) http.RoundTripper {
 		return &addQuery{
 			values: map[string]string{
 				"includeObject": "Object",
 			},
 			next: rt,
 		}
-	})
+	}
 
-	watchClientCfg := rest.CopyConfig(clientCfg)
-	watchClientCfg.Timeout = 30 * time.Minute
+	tableClientCfg := rest.CopyConfig(clientCfg)
+	tableClientCfg.Wrap(setTable)
+	tableWatchClientCfg := rest.CopyConfig(watchClientCfg)
+	tableWatchClientCfg.Wrap(setTable)
 
 	md, err := metadata.NewForConfig(cfg)
 	if err != nil {
@@ -59,11 +67,13 @@ func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 	}
 
 	return &Factory{
-		metadata:       md,
-		impersonate:    impersonate,
-		clientCfg:      clientCfg,
-		watchClientCfg: watchClientCfg,
-		Config:         watchClientCfg,
+		metadata:            md,
+		impersonate:         impersonate,
+		tableClientCfg:      tableClientCfg,
+		tableWatchClientCfg: tableWatchClientCfg,
+		clientCfg:           clientCfg,
+		watchClientCfg:      watchClientCfg,
+		Config:              watchClientCfg,
 	}, nil
 }
 
@@ -79,12 +89,20 @@ func (p *Factory) AdminClient(ctx *types.APIRequest, s *types.APISchema, namespa
 	return newClient(ctx, p.clientCfg, s, namespace, false)
 }
 
-func (p *Factory) ClientForWatch(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
-	return newClient(ctx, p.watchClientCfg, s, namespace, p.impersonate)
+func (p *Factory) TableClient(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
+	return newClient(ctx, p.tableClientCfg, s, namespace, p.impersonate)
 }
 
-func (p *Factory) AdminClientForWatch(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
-	return newClient(ctx, p.watchClientCfg, s, namespace, false)
+func (p *Factory) TableAdminClient(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
+	return newClient(ctx, p.tableClientCfg, s, namespace, false)
+}
+
+func (p *Factory) TableClientForWatch(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
+	return newClient(ctx, p.tableWatchClientCfg, s, namespace, p.impersonate)
+}
+
+func (p *Factory) TableAdminClientForWatch(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
+	return newClient(ctx, p.tableWatchClientCfg, s, namespace, false)
 }
 
 func newClient(ctx *types.APIRequest, cfg *rest.Config, s *types.APISchema, namespace string, impersonate bool) (dynamic.ResourceInterface, error) {

@@ -24,6 +24,7 @@ var (
 type ParsedURL struct {
 	Type       string
 	Name       string
+	Namespace  string
 	Link       string
 	Method     string
 	Action     string
@@ -79,6 +80,9 @@ func Parse(apiOp *types.APIRequest, urlParser URLParser) error {
 	}
 	if apiOp.URLPrefix == "" {
 		apiOp.URLPrefix = parsedURL.Prefix
+	}
+	if apiOp.Namespace == "" {
+		apiOp.Namespace = parsedURL.Namespace
 	}
 
 	if apiOp.URLBuilder == nil {

@@ -955,8 +955,6 @@ github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/norman v0.0.0-20200123223841-6d86f4e37a69/go.mod h1:XMiRH4NH6ELMELnQOoIef/g7UAtCzTxHaYRk0kMlwwQ=
 github.com/rancher/norman v0.0.0-20200211155126-fc45a55d4dfd/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
-github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e h1:YmLbAlFRBeXQa9MNmasuEX58b9li3Ht3lnDu9baVYwg=
-github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
 github.com/rancher/norman v0.0.0-20200226193007-69ad517cedee h1:rA7JdZJbgZAj6o1TaLRZXsjA8gyJ8w20NOoDELIfxpM=
 github.com/rancher/norman v0.0.0-20200226193007-69ad517cedee/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e h1:j6+HqCET/NLPBtew2m5apL7jWw/PStQ7iGwXjgAqdvo=
@@ -972,8 +970,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.5 h1:J/LMSTNFSrq7BEfsWtIfHkEHJzg/KUelDTS2PHcZC5Y=
 github.com/rancher/security-scan v0.1.5/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200226042400-e2e87cda5338 h1:idGhlvr9f2DYEbr5Y8SD6Pa90+1pAZzStLBXUvgUBMs=
-github.com/rancher/steve v0.0.0-20200226042400-e2e87cda5338/go.mod h1:/G0JfWp2NagVgmPZI61HinV4JwDngkYhG3DSnHpzuow=
+github.com/rancher/steve v0.0.0-20200227173451-6b6ff5337334 h1:AtARrbMCKVA7M2+1+23EJ5Apji7LrnrMqaReGlwEKyU=
+github.com/rancher/steve v0.0.0-20200227173451-6b6ff5337334/go.mod h1:/G0JfWp2NagVgmPZI61HinV4JwDngkYhG3DSnHpzuow=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
 github.com/rancher/types v0.0.0-20200226215232-12620b5bd7ff h1:BYethh0lQHdtXjhKKOYkQmSSyQfWi1Bu1lTsI4hMsjw=
 github.com/rancher/types v0.0.0-20200226215232-12620b5bd7ff/go.mod h1:P+mDk2FHGO1xiLIh+HfSbOlbKMYXTPp7PgmFN2yMMCE=
@@ -1124,6 +1122,7 @@ github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijb
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/urfave/cli v1.22.2 h1:gsqYFH8bb9ekPA12kRo0hfjngWQjkJPlN9R0N78BoUo=
 github.com/urfave/cli v1.22.2/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
+github.com/urfave/cli/v2 v2.1.1 h1:Qt8FeAtxE/vfdrLmR3rxR6JRE0RoVmbXu8+6kZtYU4k=
 github.com/urfave/cli/v2 v2.1.1/go.mod h1:SE9GqnLQmjVa0iPEY0f1w3ygNIYcIJ0OKPMoW2caLfQ=
 github.com/urfave/negroni v1.0.0/go.mod h1:Meg73S6kFm/4PpbYdq35yYWoCZ9mS/YSx+lKnmiohz4=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=

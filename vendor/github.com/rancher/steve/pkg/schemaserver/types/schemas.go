@@ -29,16 +29,30 @@ func (a *APISchemas) MustAddSchema(obj APISchema) *APISchemas {
 	return a
 }
 
-func (a *APISchemas) MustImportAndCustomize(obj interface{}, f func(*APISchema)) {
-	schema, err := a.InternalSchemas.Import(obj)
-	if err != nil {
-		panic(err)
-	}
+func (a *APISchemas) addInternalSchema(schema *schemas.Schema) *APISchema {
 	apiSchema := &APISchema{
 		Schema: schema,
 	}
 	a.Schemas[schema.ID] = apiSchema
 	a.addToIndex(apiSchema)
+
+	for _, f := range schema.ResourceFields {
+		if subType := a.InternalSchemas.Schema(f.Type); subType == nil {
+			continue
+		} else if _, ok := a.Schemas[subType.ID]; !ok {
+			a.addInternalSchema(subType)
+		}
+	}
+
+	return apiSchema
+}
+
+func (a *APISchemas) MustImportAndCustomize(obj interface{}, f func(*APISchema)) {
+	schema, err := a.InternalSchemas.Import(obj)
+	if err != nil {
+		panic(err)
+	}
+	apiSchema := a.addInternalSchema(schema)
 	f(apiSchema)
 }
 
