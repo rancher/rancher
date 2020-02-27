@@ -863,11 +863,11 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
                                         daemonSetConfig={})
     validate_workload(p_client, workload, "daemonSet", ns.name,
                       len(get_schedulable_nodes(cluster, client)))
-    pods = p_client.list_pod(workloadId=workload["id"]).data
-    scale = len(pods)
-    # test service discovery
-    validate_service_discovery(workload, scale, p_client, ns, pods)
     if not skipIngresscheck:
+        pods = p_client.list_pod(workloadId=workload["id"]).data
+        scale = len(pods)
+        # test service discovery
+        validate_service_discovery(workload, scale, p_client, ns, pods)
         host = "test" + str(random_int(10000, 99999)) + ".com"
         path = "/name.html"
         rule = {"host": host,
