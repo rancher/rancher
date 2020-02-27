@@ -57,9 +57,7 @@ func getRKEServiceOption(name string, svcOptionLister v3.RKEK8sServiceOptionList
 		}
 		svcOption, err = svcOptions.GetNamespaced(namespace.GlobalNamespace, name, metav1.GetOptions{})
 		if err != nil {
-			if !errors.IsNotFound(err) {
-				return k8sSvcOption, err
-			}
+			return k8sSvcOption, err
 		}
 	}
 	if svcOption.Labels[sendRKELabel] == "false" {
