@@ -42,6 +42,7 @@ func FlagToField(flag cli.Flag) (string, v3.Field, error) {
 	case *cli.StringSliceFlag:
 		field.Type = "array[string]"
 		field.Description = v.Usage
+		field.Nullable = true
 		field.Default.StringSliceValue = v.Value
 	case *BoolPointerFlag:
 		field.Type = "boolean"
