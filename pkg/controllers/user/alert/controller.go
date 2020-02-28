@@ -79,7 +79,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		projectAlertGroups: projectAlertGroups,
 		clusterName:        cluster.ClusterName,
 	}
-	projects := cluster.Management.Management.Projects("")
+	projects := cluster.Management.Management.Projects(cluster.ClusterName)
 	projects.AddClusterScopedLifecycle(ctx, "project-precan-alert-controller", cluster.ClusterName, projectLifecycle)
 
 	statesyncer.StartStateSyncer(ctx, cluster, alertmanager)

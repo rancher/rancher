@@ -95,10 +95,10 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
 		nsController:        workload.Core.Namespaces("").Controller(),
 		clusterLister:       workload.Management.Management.Clusters("").Controller().Lister(),
-		projectLister:       workload.Management.Management.Projects("").Controller().Lister(),
+		projectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
 		clusterName:         workload.ClusterName,
 	}
-	workload.Management.Management.Projects("").AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
+	workload.Management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
 	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
 	workload.RBAC.ClusterRoles("").AddHandler(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)

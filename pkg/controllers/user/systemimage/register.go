@@ -7,7 +7,7 @@ import (
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
-	projClient := cluster.Management.Management.Projects("")
+	projClient := cluster.Management.Management.Projects(cluster.ClusterName)
 	catalogClient := cluster.Management.Management.Catalogs("")
 	systemServices := getSystemService()
 	for _, v := range systemServices {
