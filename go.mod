@@ -76,7 +76,7 @@ require (
 	github.com/rancher/norman v0.0.0-20200227003532-35fa47cccad7
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
-	github.com/rancher/rke v1.0.5-0.20200227233955-67a473bdc97a
+	github.com/rancher/rke v1.0.5-0.20200228171237-de6fa72c4365
 	github.com/rancher/types v0.0.0-20191226170233-4d49bbf42146
 	github.com/rancher/wrangler v0.4.1
 	github.com/robfig/cron v1.1.0
