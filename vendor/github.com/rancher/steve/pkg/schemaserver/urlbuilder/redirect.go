@@ -18,6 +18,9 @@ func RedirectRewrite(next http.Handler) http.Handler {
 			ResponseWriter: rw,
 			prefix:         prefix,
 		}
+		if h, ok := rw.(http.Hijacker); ok {
+			r.Hijacker = h
+		}
 		next.ServeHTTP(r, req)
 		r.Close()
 	})
@@ -25,6 +28,7 @@ func RedirectRewrite(next http.Handler) http.Handler {
 
 type redirector struct {
 	http.ResponseWriter
+	http.Hijacker
 	prefix     string
 	from, to   string
 	tempBuffer *bytes.Buffer
