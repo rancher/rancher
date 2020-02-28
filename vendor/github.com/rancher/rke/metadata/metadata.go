@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -36,9 +37,12 @@ var (
 	c = http.Client{
 		Timeout: time.Second * 30,
 	}
+	kdmMutex = sync.Mutex{}
 )
 
 func InitMetadata(ctx context.Context) error {
+	kdmMutex.Lock()
+	defer kdmMutex.Unlock()
 	data, err := loadData()
 	if err != nil {
 		return fmt.Errorf("failed to load data.json, error: %v", err)
