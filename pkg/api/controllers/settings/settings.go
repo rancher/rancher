@@ -37,7 +37,11 @@ func (s *settingsProvider) Get(name string) string {
 	}
 	obj, err := s.settingsLister.Get("", name)
 	if err != nil {
-		return s.fallback[name]
+		val, err := s.settings.Get(name, v1.GetOptions{})
+		if err != nil {
+			return s.fallback[name]
+		}
+		obj = val
 	}
 	if obj.Value == "" {
 		return obj.Default
@@ -93,7 +97,11 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			if value != "" {
 				newSetting.Value = value
 			}
-			fallback[newSetting.Name] = newSetting.Value
+			if newSetting.Value == "" {
+				fallback[newSetting.Name] = newSetting.Default
+			} else {
+				fallback[newSetting.Name] = newSetting.Value
+			}
 			_, err := s.settings.Create(newSetting)
 			if err != nil {
 				return err
@@ -110,7 +118,11 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				obj.Value = value
 				update = true
 			}
-			fallback[obj.Name] = obj.Value
+			if obj.Value == "" {
+				fallback[obj.Name] = obj.Default
+			} else {
+				fallback[obj.Name] = obj.Value
+			}
 			if update {
 				_, err := s.settings.Update(obj)
 				if err != nil {
