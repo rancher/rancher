@@ -59,24 +59,24 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy, scaledContext)
 
-	sar := sar.NewSubjectAccessReview(clusterManager)
-
 	auth := requests.NewAuthenticator(ctx, scaledContext)
+	auth = requests.NewImpersonatingAuth(auth, sar.NewSubjectAccessReview(clusterManager))
 	if f, ok := scaledContext.Dialer.(*rancherdialer.Factory); ok {
 		auth = requests.Chain(auth, f.TunnelAuthorizer)
 	}
+
 	authMiddleware := requests.ToAuthMiddleware(auth)
 	tokenReview := &webhook2.TokenReviewer{
 		Authenticator: auth,
 	}
 
-	authedHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, rawAuthedAPIs, sar)
+	authedHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, rawAuthedAPIs)
 	if err != nil {
 		return nil, nil, err
 	}
 	authedHandler = authz.Wrap(authedHandler)
 
-	metricsHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()), sar)
+	metricsHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()))
 	if err != nil {
 		return nil, nil, err
 	}

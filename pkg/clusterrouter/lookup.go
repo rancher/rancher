@@ -13,7 +13,10 @@ type ClusterLookup interface {
 
 func GetClusterID(req *http.Request) string {
 	parts := strings.Split(req.URL.Path, "/")
-	if len(parts) > 3 && strings.HasPrefix(parts[2], "cluster") {
+	if len(parts) > 3 &&
+		parts[0] == "" &&
+		parts[1] == "k8s" &&
+		(parts[2] == "clusters" || parts[2] == "cluster") {
 		return parts[3]
 	}
 
