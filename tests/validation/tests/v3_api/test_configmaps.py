@@ -145,7 +145,7 @@ def test_rbac_cmap_cluster_member_create(remove_resource):
 
     user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("SOUMYA"))
+                                        random_test_name("rbac-cluster-mem"))
     p_client = get_project_client_for_token(project, user_token)
     rbac_configmap_create(p_client, ns)
     remove_resource(project)
