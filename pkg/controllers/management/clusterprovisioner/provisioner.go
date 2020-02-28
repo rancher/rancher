@@ -298,6 +298,10 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	v3.ClusterConditionProvisioned.Reason(cluster, "")
 	v3.ClusterConditionPending.True(cluster)
 
+	if cluster.Spec.RancherKubernetesEngineConfig != nil || cluster.Spec.GenericEngineConfig != nil {
+		return cluster, nil
+	}
+
 	err = k3sClusterConfig(cluster)
 	if err != nil {
 		return cluster, err
