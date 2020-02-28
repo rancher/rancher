@@ -96,6 +96,7 @@ func (s *Server) Wrap(next http.Handler) http.Handler {
 	server = prefix(server)
 
 	router := mux.NewRouter()
+	router.UseEncodedPath()
 	router.Path("/v1/management.cattle.io.v3.clusters/{namespace}/{type}").Handler(server)
 	router.Path("/v1/management.cattle.io.v3.clusters/{namespace}/{type}/{name}").Handler(server)
 	router.Path("/v1/management.cattle.io.v3.clusters/{namespace}/{type}/{namespace}/{name}").Handler(server)
