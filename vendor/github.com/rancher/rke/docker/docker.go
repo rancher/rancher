@@ -359,7 +359,7 @@ func StopContainer(ctx context.Context, dClient *client.Client, hostname string,
 	// Retry up to RetryCount times to see if image exists
 	for i := 1; i <= RetryCount; i++ {
 		logrus.Infof("Stopping container [%s] on host [%s] with stopTimeoutDuration [%s], try #%d", containerName, hostname, stopTimeoutDuration, i)
-		err := dClient.ContainerStop(ctx, containerName, &stopTimeoutDuration)
+		err = dClient.ContainerStop(ctx, containerName, &stopTimeoutDuration)
 		if err != nil {
 			logrus.Warningf("Can't stop Docker container [%s] for host [%s]: %v", containerName, hostname, err)
 			continue
@@ -412,10 +412,11 @@ func CreateContainer(ctx context.Context, dClient *client.Client, hostname strin
 	if dClient == nil {
 		return container.ContainerCreateCreatedBody{}, fmt.Errorf("Failed to create container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
 	}
+	var created container.ContainerCreateCreatedBody
 	var err error
 	// Retry up to RetryCount times to see if image exists
 	for i := 1; i <= RetryCount; i++ {
-		created, err := dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
+		created, err = dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
 		if err != nil {
 			logrus.Warningf("Failed to create Docker container [%s] on host [%s]: %v", containerName, hostname, err)
 			continue
@@ -429,10 +430,11 @@ func InspectContainer(ctx context.Context, dClient *client.Client, hostname stri
 	if dClient == nil {
 		return types.ContainerJSON{}, fmt.Errorf("Failed to inspect container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
 	}
+	var inspection types.ContainerJSON
 	var err error
 	// Retry up to RetryCount times to see if image exists
 	for i := 1; i <= RetryCount; i++ {
-		inspection, err := dClient.ContainerInspect(ctx, containerName)
+		inspection, err = dClient.ContainerInspect(ctx, containerName)
 		if err != nil {
 			if client.IsErrNotFound(err) {
 				return types.ContainerJSON{}, err
@@ -591,9 +593,10 @@ func ReadContainerLogs(ctx context.Context, dClient *client.Client, containerNam
 	if dClient == nil {
 		return nil, fmt.Errorf("Failed reading container logs: docker client is nil for container [%s]", containerName)
 	}
+	var logs io.ReadCloser
 	var err error
 	for i := 1; i <= RetryCount; i++ {
-		logs, err := dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{Follow: follow, ShowStdout: true, ShowStderr: true, Timestamps: false, Tail: tail})
+		logs, err = dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{Follow: follow, ShowStdout: true, ShowStderr: true, Timestamps: false, Tail: tail})
 		if err != nil {
 			logrus.Warnf("Can't read container logs for container [%s]: %v", containerName, err)
 			continue
