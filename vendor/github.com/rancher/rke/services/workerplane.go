@@ -55,7 +55,10 @@ func RunWorkerPlane(ctx context.Context, allHosts []*hosts.Host, localConnDialer
 func UpgradeWorkerPlaneForWorkerAndEtcdNodes(ctx context.Context, kubeClient *kubernetes.Clientset, mixedRolesHosts []*hosts.Host, workerOnlyHosts []*hosts.Host, inactiveHosts map[string]bool, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, workerNodePlanMap map[string]v3.RKEConfigNodePlan, certMap map[string]pki.CertificatePKI, updateWorkersOnly bool, alpineImage string, upgradeStrategy *v3.NodeUpgradeStrategy, newHosts map[string]bool, maxUnavailable int) (string, error) {
 	log.Infof(ctx, "[%s] Upgrading Worker Plane..", WorkerRole)
 	var errMsgMaxUnavailableNotFailed string
-	maxUnavailable = resetMaxUnavailable(maxUnavailable, len(inactiveHosts))
+	maxUnavailable, err := resetMaxUnavailable(maxUnavailable, len(inactiveHosts), WorkerRole)
+	if err != nil {
+		return errMsgMaxUnavailableNotFailed, err
+	}
 	updateNewHostsList(kubeClient, append(mixedRolesHosts, workerOnlyHosts...), newHosts)
 	if len(mixedRolesHosts) > 0 {
 		log.Infof(ctx, "First checking and processing worker components for upgrades on nodes with etcd role one at a time")

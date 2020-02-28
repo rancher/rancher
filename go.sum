@@ -345,6 +345,7 @@ github.com/globalsign/mgo v0.0.0-20180905125535-1ca0a4f7cbcb/go.mod h1:xkRDCp4j0
 github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8/go.mod h1:xkRDCp4j0OGD1HRkm4kmhM+pmpv3AKq5SU7GMg4oO/Q=
 github.com/go-acme/lego v2.5.0+incompatible/go.mod h1:yzMNe9CasVUhkquNvti5nAtPmG94USbYxYrZfTkIn0M=
 github.com/go-bindata/go-bindata v3.1.1+incompatible/go.mod h1:xK8Dsgwmeed+BBsSy2XTopBn/8uK2HWuGSnA11C3Joo=
+github.com/go-bindata/go-bindata v3.1.2+incompatible h1:5vjJMVhowQdPzjE1LdxyFF7YFTXg5IgGVW4gBr5IbvE=
 github.com/go-bindata/go-bindata v3.1.2+incompatible/go.mod h1:xK8Dsgwmeed+BBsSy2XTopBn/8uK2HWuGSnA11C3Joo=
 github.com/go-critic/go-critic v0.3.5-0.20190526074819-1df300866540/go.mod h1:+sE8vrLDS2M0pZkBk0wy6+nLdKexVDrl/jBqQOTDThA=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
@@ -964,10 +965,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8w
 github.com/rancher/remotedialer v0.2.5 h1:rNMMcJp5fU7FZ3wGFKSmDrXrSt8MYo5na4CzXddIr2A=
 github.com/rancher/remotedialer v0.2.5/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
 github.com/rancher/rke v1.1.0-rc4.0.20200123230443-25e7f987775d/go.mod h1:Qp9dAbW0OUkJnSXcGpD92ubpOCe93RxSaq391RDez1w=
-github.com/rancher/rke v1.1.0-rc8 h1:j1HkxahU4Hz3Bqubi/oqvGNknADKjA6QYeNH10dGLNA=
-github.com/rancher/rke v1.1.0-rc8/go.mod h1:JxWqfpJeKKb7mFHBMRJB1U4qsZ/w2DFFy6ryi6NF7pQ=
-github.com/rancher/rke v1.1.0-rc8.0.20200228204414-107d1eb79a99 h1:nH7Vdv6dKP7AQlFeBIJQb4+avto2oO3wROCIK5TMleE=
-github.com/rancher/rke v1.1.0-rc8.0.20200228204414-107d1eb79a99/go.mod h1:JxWqfpJeKKb7mFHBMRJB1U4qsZ/w2DFFy6ryi6NF7pQ=
+github.com/rancher/rke v1.1.0-rc8.0.20200228224621-81d025987b86 h1:8w9PMo81K/uo4EeefYCMo1lt4O7U/9x9EFRt0Q/4ebE=
+github.com/rancher/rke v1.1.0-rc8.0.20200228224621-81d025987b86/go.mod h1:JxWqfpJeKKb7mFHBMRJB1U4qsZ/w2DFFy6ryi6NF7pQ=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.5 h1:J/LMSTNFSrq7BEfsWtIfHkEHJzg/KUelDTS2PHcZC5Y=
