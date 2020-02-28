@@ -13,8 +13,8 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 	pnpLister := cluster.Management.Management.ProjectNetworkPolicies("").Controller().Lister()
 	pnps := cluster.Management.Management.ProjectNetworkPolicies("")
-	projectLister := cluster.Management.Management.Projects("").Controller().Lister()
-	projects := cluster.Management.Management.Projects("")
+	projectLister := cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
+	projects := cluster.Management.Management.Projects(cluster.ClusterName)
 	clusterLister := cluster.Management.Management.Clusters("").Controller().Lister()
 	clusters := cluster.Management.Management.Clusters("")
 

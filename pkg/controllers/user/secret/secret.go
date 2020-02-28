@@ -48,7 +48,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		secrets:                   clusterSecretsClient,
 		clusterNamespaceLister:    cluster.Core.Namespaces("").Controller().Lister(),
 		managementNamespaceLister: cluster.Management.Core.Namespaces("").Controller().Lister(),
-		projectLister:             cluster.Management.Management.Projects("").Controller().Lister(),
+		projectLister:             cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 		clusterName:               cluster.ClusterName,
 	}
 
