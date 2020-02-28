@@ -7,6 +7,8 @@ ENV CATTLE_HELM_VERSION v2.14.3-rancher1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher32
 ENV CATTLE_K3S_VERSION v0.8.0
 ENV CATTLE_ETCD_VERSION v3.3.14
+# version used by helm plugin install script
+ENV CATTLE_HELM_UNITTEST_VERSION v0.1.6-rancher1
 ENV GO111MODULE off
 
 RUN apt-get update && \
