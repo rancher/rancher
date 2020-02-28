@@ -33,6 +33,7 @@ func Route(next http.Handler, uiSetting func() string) http.Handler {
 		responsewriter.CacheMiddleware("json", "js", "css")).Handler(content(uiSetting))
 
 	root := mux.NewRouter()
+	root.UseEncodedPath()
 	root.Path("/dashboard").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Add("Location", "/dashboard/")
 		rw.WriteHeader(http.StatusFound)
