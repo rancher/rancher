@@ -30,14 +30,16 @@ var commonClusterAndProjectMgmtPlaneResources = map[string]bool{
 func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *crtbLifecycle) {
 	crbInformer := management.RBAC.ClusterRoleBindings("").Controller().Informer()
 	crbIndexers := map[string]cache.IndexFunc{
-		rbByRoleAndSubjectIndex: rbByRoleAndSubject,
+		rbByRoleAndSubjectIndex:     rbByRoleAndSubject,
+		membershipBindingOwnerIndex: indexByMembershipBindingOwner,
 	}
 	crbInformer.AddIndexers(crbIndexers)
 
 	rbInformer := management.RBAC.RoleBindings("").Controller().Informer()
 	rbIndexers := map[string]cache.IndexFunc{
-		rbByOwnerIndex:          rbByOwner,
-		rbByRoleAndSubjectIndex: rbByRoleAndSubject,
+		rbByOwnerIndex:              rbByOwner,
+		rbByRoleAndSubjectIndex:     rbByRoleAndSubject,
+		membershipBindingOwnerIndex: indexByMembershipBindingOwner,
 	}
 	rbInformer.AddIndexers(rbIndexers)
 
@@ -104,23 +106,25 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbUID string, cluste
 	}
 
 	key := rbRoleSubjectKey(roleName, subject)
-	set := labels.Set(map[string]string{rtbUID: membershipBindingOwner})
-	crbs, err := m.crbLister.List("", set.AsSelector())
+	crbs, err := m.crbIndexer.ByIndex(membershipBindingOwnerIndex, "/"+rtbUID)
 	if err != nil {
 		return err
 	}
 	var crb *v1.ClusterRoleBinding
 	for _, iCRB := range crbs {
-		if len(iCRB.Subjects) != 1 {
-			iKey := rbRoleSubjectKey(iCRB.RoleRef.Name, iCRB.Subjects[0])
-			if iKey == key {
-				crb = iCRB
-				continue
+		if iCRB, ok := iCRB.(*v1.ClusterRoleBinding); ok {
+			if len(iCRB.Subjects) != 1 {
+				iKey := rbRoleSubjectKey(iCRB.RoleRef.Name, iCRB.Subjects[0])
+				if iKey == key {
+					crb = iCRB
+					continue
+				}
 			}
 		}
-		if err := m.reconcileClusterMembershipBindingForDelete(roleName, rtbUID); err != nil {
-			return err
-		}
+	}
+
+	if err := m.reconcileClusterMembershipBindingForDelete(roleName, rtbUID); err != nil {
+		return err
 	}
 
 	if crb != nil {
@@ -175,23 +179,25 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbUID, namespace str
 	}
 
 	key := rbRoleSubjectKey(roleName, subject)
-	set := labels.Set(map[string]string{rtbUID: membershipBindingOwner})
-	rbs, err := m.rbLister.List("", set.AsSelector())
+	rbs, err := m.rbIndexer.ByIndex(membershipBindingOwnerIndex, namespace+"/"+rtbUID)
 	if err != nil {
 		return err
 	}
 	var rb *v1.RoleBinding
 	for _, iRB := range rbs {
-		if len(iRB.Subjects) != 1 {
-			iKey := rbRoleSubjectKey(iRB.RoleRef.Name, iRB.Subjects[0])
-			if iKey == key {
-				rb = iRB
-				continue
+		if iRB, ok := iRB.(*v1.RoleBinding); ok {
+			if len(iRB.Subjects) != 1 {
+				iKey := rbRoleSubjectKey(iRB.RoleRef.Name, iRB.Subjects[0])
+				if iKey == key {
+					rb = iRB
+					continue
+				}
 			}
 		}
-		if err := m.reconcileProjectMembershipBindingForDelete(namespace, roleName, rtbUID); err != nil {
-			return err
-		}
+	}
+
+	if err := m.reconcileProjectMembershipBindingForDelete(namespace, roleName, rtbUID); err != nil {
+		return err
 	}
 
 	if rb != nil {
@@ -300,57 +306,29 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 // The CRTB has been deleted or modified, either delete or update the membership binding so that the subject
 // is removed from the cluster if they should be
 func (m *manager) reconcileClusterMembershipBindingForDelete(roleToKeep, rtbUID string) error {
-	list := func(ns string, selector labels.Selector) ([]runtime.Object, error) {
-		rbs, err := m.crbLister.List(ns, selector)
-		if err != nil {
-			return nil, err
-		}
-
-		var items []runtime.Object
-		for _, rb := range rbs {
-			items = append(items, rb.DeepCopy())
-		}
-		return items, nil
-	}
-
 	convert := func(i interface{}) string {
 		rb, _ := i.(*v1.ClusterRoleBinding)
 		return rb.RoleRef.Name
 	}
 
-	return m.reconcileMembershipBindingForDelete("", roleToKeep, rtbUID, list, convert, m.mgmt.RBAC.ClusterRoleBindings("").ObjectClient())
+	return m.reconcileMembershipBindingForDelete("", roleToKeep, rtbUID, m.crbIndexer, convert, m.mgmt.RBAC.ClusterRoleBindings("").ObjectClient())
 }
 
 // The PRTB has been deleted, either delete or update the project membership binding so that the subject
 // is removed from the project if they should be
 func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, roleToKeep, rtbUID string) error {
-	list := func(ns string, selector labels.Selector) ([]runtime.Object, error) {
-		rbs, err := m.rbLister.List(ns, selector)
-		if err != nil {
-			return nil, err
-		}
-
-		var items []runtime.Object
-		for _, rb := range rbs {
-			items = append(items, rb.DeepCopy())
-		}
-		return items, nil
-	}
-
 	convert := func(i interface{}) string {
 		rb, _ := i.(*v1.RoleBinding)
 		return rb.RoleRef.Name
 	}
 
-	return m.reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbUID, list, convert, m.mgmt.RBAC.RoleBindings(namespace).ObjectClient())
+	return m.reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbUID, m.rbIndexer, convert, m.mgmt.RBAC.RoleBindings(namespace).ObjectClient())
 }
 
-type listFn func(ns string, selector labels.Selector) ([]runtime.Object, error)
 type convertFn func(i interface{}) string
 
-func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbUID string, list listFn, convert convertFn, client *objectclient.ObjectClient) error {
-	set := labels.Set(map[string]string{rtbUID: membershipBindingOwner})
-	roleBindings, err := list(namespace, set.AsSelector())
+func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbUID string, index cache.Indexer, convert convertFn, client *objectclient.ObjectClient) error {
+	roleBindings, err := index.ByIndex(membershipBindingOwnerIndex, namespace+"/"+rtbUID)
 	if err != nil {
 		return err
 	}
@@ -387,8 +365,10 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 			}
 		} else {
 			logrus.Infof("[%v] Updating owner label for roleBinding %v", m.controller, objMeta.GetName())
-			if _, err := client.Update(objMeta.GetName(), rb); err != nil {
-				return err
+			if rb, ok := rb.(runtime.Object); ok {
+				if _, err := client.Update(objMeta.GetName(), rb); err != nil {
+					return err
+				}
 			}
 		}
 	}
