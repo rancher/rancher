@@ -45,7 +45,7 @@ def test_deploy_rancher_server():
     time.sleep(120)
     RANCHER_SERVER_URL = "https://" + aws_nodes[0].public_ip_address
     print(RANCHER_SERVER_URL)
-    wait_until_active(RANCHER_SERVER_URL)
+    wait_until_active(RANCHER_SERVER_URL, timeout=300)
 
     RANCHER_SET_DEBUG_CMD = \
         "sudo docker exec rancher-server loglevel --set debug"
