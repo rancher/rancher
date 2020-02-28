@@ -120,7 +120,11 @@ func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptionData map[stri
 	etcdNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
 	// Build etcd node plan map
 	for _, etcdHost := range c.EtcdHosts {
-		etcdNodePlanMap[etcdHost.Address] = BuildRKEConfigNodePlan(ctx, c, etcdHost, etcdHost.DockerInfo, svcOptionData)
+		svcOptions, err := c.GetKubernetesServicesOptions(etcdHost.DockerInfo.OSType, svcOptionData)
+		if err != nil {
+			return "", err
+		}
+		etcdNodePlanMap[etcdHost.Address] = BuildRKEConfigNodePlan(ctx, c, etcdHost, etcdHost.DockerInfo, svcOptions)
 	}
 
 	if len(c.Services.Etcd.ExternalURLs) > 0 {
@@ -136,7 +140,11 @@ func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptionData map[stri
 	// Build cp node plan map
 	var notReadyHosts []*hosts.Host
 	for _, cpHost := range c.ControlPlaneHosts {
-		cpNodePlanMap[cpHost.Address] = BuildRKEConfigNodePlan(ctx, c, cpHost, cpHost.DockerInfo, svcOptionData)
+		svcOptions, err := c.GetKubernetesServicesOptions(cpHost.DockerInfo.OSType, svcOptionData)
+		if err != nil {
+			return "", err
+		}
+		cpNodePlanMap[cpHost.Address] = BuildRKEConfigNodePlan(ctx, c, cpHost, cpHost.DockerInfo, svcOptions)
 		if err := services.CheckNodeReady(kubeClient, cpHost, services.ControlRole); err != nil {
 			notReadyHosts = append(notReadyHosts, cpHost)
 		}
@@ -215,7 +223,11 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 	var notReadyHosts []*hosts.Host
 	allHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for _, host := range allHosts {
-		workerNodePlanMap[host.Address] = BuildRKEConfigNodePlan(ctx, c, host, host.DockerInfo, svcOptionData)
+		svcOptions, err := c.GetKubernetesServicesOptions(host.DockerInfo.OSType, svcOptionData)
+		if err != nil {
+			return "", err
+		}
+		workerNodePlanMap[host.Address] = BuildRKEConfigNodePlan(ctx, c, host, host.DockerInfo, svcOptions)
 		if host.IsControl || c.HostsLabeledToIgnoreUpgrade[host.Address] {
 			continue
 		}
