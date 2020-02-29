@@ -298,6 +298,7 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	v3.ClusterConditionProvisioned.Reason(cluster, "")
 	v3.ClusterConditionPending.True(cluster)
 
+	fmt.Printf("\ncluster provisioned condition set to: %v\n", v3.ClusterConditionProvisioned.GetStatus(cluster))
 	err = k3sClusterConfig(cluster)
 	if err != nil {
 		return cluster, err
@@ -958,6 +959,7 @@ func GetBackupFilename(backup *v3.EtcdBackup) string {
 func k3sClusterConfig(cluster *v3.Cluster) error {
 	// version is not found until cluster is provisioned
 	if cluster.Status.Driver == "" || cluster.Status.Version == nil {
+		fmt.Printf("\nReturning error from k3sClusterConfig for cluster %v, driver: %v, version: %v\n", cluster.Name, cluster.Status.Driver, cluster.Status.Version)
 		return &controller.ForgetError{
 			Err:    fmt.Errorf("waiting for full cluster configuration"),
 			Reason: "Pending"}

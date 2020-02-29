@@ -85,7 +85,11 @@ type ConfigGetter interface {
 
 // Create creates a cluster
 func (c *Cluster) Create(ctx context.Context) error {
+	fmt.Printf("\nIn Create for cluster %v, c.Status: %v\n", c.Name, c.Status)
+	logrus.Infof("\nIn Create for cluster %v, c.Status: %v\n", c.Name, c.Status)
 	if c.RootCACert != "" && c.Status == "" {
+		fmt.Printf("\nSetting cluster %v to %v\n", c.Name, Init)
+		logrus.Infof("\nSetting cluster %v to %v\n", c.Name, Init)
 		c.PersistStore.PersistStatus(*c, Init)
 	}
 	err := c.createInner(ctx)
@@ -181,10 +185,11 @@ func (c *Cluster) RemoveLegacyServiceAccount(ctx context.Context) error {
 func (c *Cluster) createInner(ctx context.Context) error {
 	// check if it is already created
 	c.restore()
-
+	logrus.Infof("\ncreateInner: cluster %v has c.Status: %v\n", c.Name, c.Status)
+	fmt.Printf("\ncreateInner: cluster %v has c.Status: %v\n", c.Name, c.Status)
 	var info *types.ClusterInfo
 	if c.Status == Error {
-		logrus.Errorf("Cluster %s previously failed to create", c.Name)
+		logrus.Errorf("createInner: Cluster %s previously failed to create", c.Name)
 		info = toInfo(c)
 	}
 
@@ -192,7 +197,7 @@ func (c *Cluster) createInner(ctx context.Context) error {
 		logrus.Infof("Cluster %s already exists.", c.Name)
 		return ErrClusterExists
 	}
-
+	fmt.Printf("\ncreateInner: cluster %v has c.Status so calling create: %v\n", c.Name, c.Status)
 	if err := c.create(ctx, info); err != nil {
 		return err
 	}
@@ -207,7 +212,7 @@ func (c *Cluster) Update(ctx context.Context) error {
 	}
 
 	if c.Status == Error {
-		logrus.Errorf("Cluster %s previously failed to create", c.Name)
+		logrus.Errorf("Update: Cluster %s previously failed to create", c.Name)
 		return c.Create(ctx)
 	}
 
