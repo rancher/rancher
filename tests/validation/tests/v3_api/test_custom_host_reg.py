@@ -14,12 +14,14 @@ rke_config = {"authentication": {"type": "authnConfig", "strategy": "x509"},
 AUTO_DEPLOY_CUSTOM_CLUSTER = ast.literal_eval(
     os.environ.get('RANCHER_AUTO_DEPLOY_CUSTOM_CLUSTER', "True"))
 KEYPAIR_NAME_PREFIX = os.environ.get('RANCHER_KEYPAIR_NAME_PREFIX', "")
-RANCHER_CLUSTER_NAME = os.environ.get('RANCHER_CLUSTER_NAME',"")
-RANCHER_ELASTIC_SEARCH_ENDPOINT = os.environ.get('RANCHER_ELASTIC_SEARCH_ENDPOINT',"")
+RANCHER_CLUSTER_NAME = os.environ.get('RANCHER_CLUSTER_NAME', "")
+RANCHER_ELASTIC_SEARCH_ENDPOINT = os.environ.get(
+    'RANCHER_ELASTIC_SEARCH_ENDPOINT', "")
+
 
 def test_add_custom_host():
     aws_nodes = AmazonWebServices().create_multiple_nodes(
-        HOST_COUNT, random_test_name(HOST_NAME))
+        HOST_COUNT, random_test_name("testsa"+HOST_NAME))
     if AGENT_REG_CMD != "":
         for aws_node in aws_nodes:
             additional_options = " --address " + aws_node.public_ip_address + \
@@ -27,6 +29,7 @@ def test_add_custom_host():
                                  aws_node.private_ip_address
             agent_cmd = AGENT_REG_CMD + additional_options
             aws_node.execute_command(agent_cmd)
+            print("Nodes: " + aws_node.public_ip_address)
 
 
 def test_delete_keypair():
@@ -54,8 +57,8 @@ def test_deploy_rancher_server():
     token = set_url_password_token(RANCHER_SERVER_URL)
     admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                   token=token, verify=False)
-    AUTH_URL = RANCHER_SERVER_URL + \
-               "/v3-public/localproviders/local?action=login"
+    AUTH_URL = \
+        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
     user, user_token = create_user(admin_client, AUTH_URL)
 
     env_details = "env.CATTLE_TEST_URL='" + RANCHER_SERVER_URL + "'\n"
@@ -114,18 +117,16 @@ def test_cluster_enable_logging_elasticsearch():
     client = get_user_client()
     cluster = get_cluster_by_name(client, RANCHER_CLUSTER_NAME)
     cluster_name = cluster.name
-    cluster_logging = \
-        client.create_cluster_logging(name=random_test_name("elasticsearch"),
-                                      clusterId=cluster.id,
-                                      elasticsearchConfig={
-                                          "dateFormat": "YYYY-MM-DD",
-                                          "sslVerify": False,
-                                          "sslVersion": "TLSv1_2",
-                                          "indexPrefix": cluster_name,
-                                          "endpoint":
-                                              RANCHER_ELASTIC_SEARCH_ENDPOINT
-                                      }
-                                      )
+    client.create_cluster_logging(name=random_test_name("elasticsearch"),
+                                  clusterId=cluster.id,
+                                  elasticsearchConfig={
+                                      "dateFormat": "YYYY-MM-DD",
+                                      "sslVerify": False,
+                                      "sslVersion": "TLSv1_2",
+                                      "indexPrefix": cluster_name,
+                                      "endpoint":
+                                          RANCHER_ELASTIC_SEARCH_ENDPOINT}
+                                  )
     projects = client.list_project(name="System",
                                    clusterId=cluster.id).data
     assert len(projects) == 1

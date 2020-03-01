@@ -651,12 +651,8 @@ def test_edit_cluster_k8s_version():
 
 def test_delete_cluster():
     client = get_user_client()
-    if len(evaluate_clustername()) > 0:
-        clusters = client.list_cluster(name=evaluate_clustername()).data
-    else:
-        clusters = client.list_cluster().data
-    for cluster in clusters:
-        delete_cluster(client, cluster)
+    cluster = get_cluster_by_name(client, CLUSTER_NAME)
+    delete_cluster(client, cluster)
 
 
 def validate_rke_dm_host_1(node_template,
