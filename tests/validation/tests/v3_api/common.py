@@ -1131,7 +1131,7 @@ def delete_cluster(client, cluster):
             nodes = client.list_node(clusterId=cluster.id).data
             filters = [
                 {'Name': 'tag:Name',
-                 'Values': ['testcustom*', 'teststess*']}]
+                 'Values': ['testcustom*', 'teststress*', 'testsa*']}]
             ip_filter = {}
             ip_list = []
             ip_filter['Name'] = \

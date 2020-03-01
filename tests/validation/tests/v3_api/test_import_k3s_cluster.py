@@ -5,7 +5,9 @@ from .common import *  # NOQA
 DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            'resource')
 RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
-RANCHER_K3S_NO_OF_WORKER_NODES = os.environ.get("RANCHER_AWS_NO_OF_WORKER_NODES", 3)
+HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
+RANCHER_K3S_NO_OF_WORKER_NODES = \
+    os.environ.get("RANCHER_AWS_NO_OF_WORKER_NODES", 3)
 
 def test_import_k3s_cluster():
 
@@ -37,7 +39,7 @@ def test_import_k3s_cluster():
     is_file = os.path.isfile(k3s_clusterfilepath)
     assert is_file
 
-    clustername = random_test_name("testk3simport")
+    clustername = random_test_name("testcustom-k3s")
     cluster = client.create_cluster(name=clustername)
     cluster_token = create_custom_host_registration_token(client, cluster)
     command = cluster_token.insecureCommand
@@ -60,7 +62,8 @@ def test_import_k3s_cluster():
 def create_nodes():
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
-            int(RANCHER_K3S_NO_OF_WORKER_NODES), random_test_name("testk3s"))
+            int(RANCHER_K3S_NO_OF_WORKER_NODES),
+            random_test_name("testcustom-k3s"+"-"+HOST_NAME))
     assert len(aws_nodes) == int(RANCHER_K3S_NO_OF_WORKER_NODES)
     for aws_node in aws_nodes:
         print("AWS NODE PUBLIC IP {}".format(aws_node.public_ip_address))
