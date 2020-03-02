@@ -102,62 +102,41 @@ func initFeatures(ctx context.Context, scaledContext *config.ScaledContext, cfg 
 	return nil
 }
 
-func buildScaledContext(ctx context.Context, clientConfig clientcmd.ClientConfig, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
+func buildScaledContext(ctx context.Context, clientConfig clientcmd.ClientConfig, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, *wrangler.Context, error) {
 	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	restConfig.Timeout = 30 * time.Second
 
 	kubeConfig, err := clientConfig.RawConfig()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	if err := k8scheck.Wait(ctx, *restConfig); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	scaledContext, err := config.NewScaledContext(*restConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	scaledContext.KubeConfig = kubeConfig
 
 	if err := initFeatures(ctx, scaledContext, cfg); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	dialerFactory, err := dialer.NewFactory(scaledContext)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	scaledContext.Dialer = dialerFactory
 	scaledContext.PeerManager, err = tunnelserver.NewPeerManager(ctx, scaledContext, dialerFactory.TunnelServer)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext)
-	scaledContext.AccessControl = manager
-	scaledContext.ClientGetter = manager
-
-	userManager, err := common.NewUserManager(scaledContext)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	scaledContext.UserManager = userManager
-	scaledContext.RunContext = ctx
-
-	return scaledContext, manager, nil
-}
-
-func New(ctx context.Context, clientConfig clientcmd.ClientConfig, cfg *Config) (*Rancher, error) {
-	scaledContext, clusterManager, err := buildScaledContext(ctx, clientConfig, cfg)
-	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	var tunnelServer *remotedialer.Server
@@ -165,16 +144,35 @@ func New(ctx context.Context, clientConfig clientcmd.ClientConfig, cfg *Config) 
 		tunnelServer = df.TunnelServer
 	}
 
-	wranglerContext, err := wrangler.NewContext(steveserver.RestConfigDefaults(&scaledContext.RESTConfig), tunnelServer)
+	wranglerContext, err := wrangler.NewContext(ctx, steveserver.RestConfigDefaults(&scaledContext.RESTConfig), tunnelServer)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	userManager, err := common.NewUserManager(scaledContext)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	scaledContext.UserManager = userManager
+	scaledContext.RunContext = ctx
+
+	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
+	scaledContext.AccessControl = manager
+	scaledContext.ClientGetter = manager
+
+	return scaledContext, manager, wranglerContext, nil
+}
+
+func New(ctx context.Context, clientConfig clientcmd.ClientConfig, cfg *Config) (*Rancher, error) {
+	scaledContext, clusterManager, wranglerContext, err := buildScaledContext(ctx, clientConfig, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	asl := accesscontrol.NewAccessStore(ctx, features.Steve.Enabled(), wranglerContext.RBAC)
-
 	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
 
-	authMiddleware, handler, err := server.Start(ctx, localClusterEnabled(*cfg), scaledContext, clusterManager, auditLogWriter, rbac.NewAccessControlHandler(asl))
+	authMiddleware, handler, err := server.Start(ctx, localClusterEnabled(*cfg), scaledContext, clusterManager, auditLogWriter, rbac.NewAccessControlHandler())
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +189,7 @@ func New(ctx context.Context, clientConfig clientcmd.ClientConfig, cfg *Config) 
 	}
 
 	rancher := &Rancher{
-		AccessSetLookup: asl,
+		AccessSetLookup: wranglerContext.ASL,
 		Config:          *cfg,
 		Handler:         handler,
 		Auth:            authMiddleware,
