@@ -206,6 +206,13 @@ func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Fi
 		},
 	}
 
+	if obj.Name == "amazonelasticcontainerservice" {
+		if val, ok := resourceFields["subnets"]; ok {
+			val.Update = false
+			resourceFields["subnets"] = val
+		}
+	}
+
 	return resourceFields, nil
 }
 
