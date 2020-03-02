@@ -7,7 +7,7 @@ IMAGE=$(docker inspect -f '{{.Config.Image}}' $ID)
 bash -c "$1"
 
 docker run --privileged --net host --pid host -v /:/host --rm --entrypoint /usr/bin/share-mnt $IMAGE "${@:2}" -- norun
-while ! docker start kubelet; do
+while ! docker restart kubelet; do
     sleep 2
 done
 docker kill --signal=SIGTERM $ID
