@@ -77,12 +77,14 @@ func run(systemChartPath string, imagesFromArgs []string) error {
 		data.K8sVersionInfo,
 	)
 
-	targetImages, err := img.GetImages(systemChartPath, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
+	k3sUpgradeImages := getK3sUpgradeImages(data.K3S)
+
+	targetImages, err := img.GetImages(systemChartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
 	if err != nil {
 		return err
 	}
 
-	targetWindowsImages, err := img.GetImages(systemChartPath, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
+	targetWindowsImages, err := img.GetImages(systemChartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
 	if err != nil {
 		return err
 	}
@@ -216,6 +218,20 @@ func getWindowsAgentImage() string {
 		return ""
 	}
 	return fmt.Sprintf("%s/rancher-agent:%s", repo, tag)
+}
+
+func getK3sUpgradeImages(k3sData map[string]interface{}) []string {
+	k3sImages := make([]string, 0)
+	imageFormat := "rancher/k3s-upgrade:%s"
+	channels, _ := k3sData["channels"].([]interface{})
+	for _, channel := range channels {
+		channelMap, _ := channel.(map[string]interface{})
+		if version, _ := channelMap["latest"].(string); version != "" {
+			version = strings.Replace(version, "+", "-", -1)
+			k3sImages = append(k3sImages, fmt.Sprintf(imageFormat, version))
+		}
+	}
+	return k3sImages
 }
 
 func getScript(arch, fileType string) string {
