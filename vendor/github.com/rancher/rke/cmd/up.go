@@ -169,7 +169,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 			return APIURL, caCrt, clientCert, clientKey, nil, err
 		}
 		logrus.Infof("Setting maxUnavailable for worker nodes to: %v", maxUnavailableWorker)
-		logrus.Infof("Setting maxUnavailable for control nodes to: %v", maxUnavailableControl)
+		logrus.Infof("Setting maxUnavailable for controlplane nodes to: %v", maxUnavailableControl)
 		kubeCluster.MaxUnavailableForWorkerNodes, kubeCluster.MaxUnavailableForControlNodes = maxUnavailableWorker, maxUnavailableControl
 	}
 
