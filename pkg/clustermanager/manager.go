@@ -137,20 +137,16 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	if !controllers {
 		return nil
 	}
-	// Prior to k8s v1.14, we simply did a DiscoveryClient.Version() check to see if the user cluster is alive
-	// As of k8s v1.14, kubeapi returns a successful version response even if etcd is not available.
-	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
-	if _, err := r.cluster.K8sClient.CoreV1().Namespaces().Get("kube-system", v1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrapf(err, "failed to contact server")
-	}
 
 	r.Lock()
 	defer r.Unlock()
 	if !r.started {
-		if err := m.doStart(r, clusterOwner); err != nil {
-			m.Stop(r.clusterRec)
-			return err
-		}
+		go func() {
+			if err := m.doStart(r, clusterOwner); err != nil {
+				m.markUnavailable(r.clusterRec.Name)
+				m.Stop(r.clusterRec)
+			}
+		}()
 		r.started = true
 		r.owner = clusterOwner
 	}
@@ -180,6 +176,25 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		}
 	}()
 
+	for i := 0; ; i++ {
+		// Prior to k8s v1.14, we simply did a DiscoveryClient.Version() check to see if the user cluster is alive
+		// As of k8s v1.14, kubeapi returns a successful version response even if etcd is not available.
+		// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
+		if _, err := rec.cluster.K8sClient.CoreV1().Namespaces().Get("kube-system", v1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			if i == 2 {
+				m.markUnavailable(rec.cluster.ClusterName)
+			}
+			select {
+			case <-rec.ctx.Done():
+				return rec.ctx.Err()
+			case <-time.After(5 * time.Second):
+				continue
+			}
+		}
+
+		break
+	}
+
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 	if clusterOwner {
 		if err := clusterController.Register(transaction, rec.cluster, rec.clusterRec, m, m); err != nil {
@@ -206,7 +221,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	}()
 
 	select {
-	case <-time.After(30 * time.Second):
+	case <-time.After(10 * time.Minute):
 		rec.cancel()
 		return fmt.Errorf("timeout syncing controllers")
 	case err := <-done:

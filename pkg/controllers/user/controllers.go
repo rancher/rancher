@@ -44,9 +44,9 @@ import (
 	"github.com/rancher/types/factory"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
+func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
 	rbac.Register(ctx, cluster)
-	healthsyncer.Register(ctx, cluster, clusterManager)
+	healthsyncer.Register(ctx, cluster)
 	helm.Register(ctx, cluster, kubeConfigGetter)
 	logging.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)

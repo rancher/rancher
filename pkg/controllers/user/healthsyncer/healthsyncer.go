@@ -39,7 +39,7 @@ type HealthSyncer struct {
 	namespaces        corev1.NamespaceInterface
 }
 
-func Register(ctx context.Context, workload *config.UserContext, clusterManager ClusterControllerLifecycle) {
+func Register(ctx context.Context, workload *config.UserContext) {
 	h := &HealthSyncer{
 		ctx:               ctx,
 		clusterName:       workload.ClusterName,
@@ -98,8 +98,8 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	newObj, err := v3.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
 		for i := 0; ; i++ {
 			err := h.getComponentStatus(cluster)
-			if err == nil || i > 2 {
-				return cluster, err
+			if err == nil || i > 1 {
+				return cluster, errors.Wrap(err, "cluster health check failed")
 			}
 			select {
 			case <-h.ctx.Done():
