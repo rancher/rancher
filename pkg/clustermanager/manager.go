@@ -13,16 +13,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rke/pki/cert"
+	"github.com/rancher/steve/pkg/accesscontrol"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
+	rbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,14 +33,14 @@ import (
 )
 
 type Manager struct {
-	httpsPort          int
-	ScaledContext      *config.ScaledContext
-	clusterLister      v3.ClusterLister
-	clusters           v3.ClusterInterface
-	controllers        sync.Map
-	watchAccessControl types.AccessControl
-	accessControl      types.AccessControl
-	dialer             dialer.Factory
+	httpsPort     int
+	ScaledContext *config.ScaledContext
+	clusterLister v3.ClusterLister
+	clusters      v3.ClusterInterface
+	controllers   sync.Map
+	accessControl types.AccessControl
+	rbac          rbacv1.Interface
+	dialer        dialer.Factory
 }
 
 type record struct {
@@ -53,14 +54,13 @@ type record struct {
 	cancel        context.CancelFunc
 }
 
-func NewManager(httpsPort int, context *config.ScaledContext) *Manager {
+func NewManager(httpsPort int, context *config.ScaledContext, rbacControllers rbacv1.Interface, asl accesscontrol.AccessSetLookup) *Manager {
 	return &Manager{
-		httpsPort:          httpsPort,
-		ScaledContext:      context,
-		accessControl:      rbac.NewContextBased(),
-		watchAccessControl: rbac.NewAccessControl(context.RBAC),
-		clusterLister:      context.Management.Clusters("").Controller().Lister(),
-		clusters:           context.Management.Clusters(""),
+		httpsPort:     httpsPort,
+		ScaledContext: context,
+		accessControl: rbac.NewAccessControlWithASL("", rbacControllers, asl),
+		clusterLister: context.Management.Clusters("").Controller().Lister(),
+		clusters:      context.Management.Clusters(""),
 	}
 }
 
@@ -197,7 +197,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 	if clusterOwner {
-		if err := clusterController.Register(transaction, rec.cluster, rec.clusterRec, m, m); err != nil {
+		if err := clusterController.Register(transaction, rec.cluster, rec.clusterRec, m); err != nil {
 			transaction.Rollback()
 			return err
 		}
@@ -376,7 +376,7 @@ func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, e
 	s := &record{
 		cluster:       clusterContext,
 		clusterRec:    cluster,
-		accessControl: rbac.NewAccessControl(clusterContext.RBAC),
+		accessControl: rbac.NewAccessControl(ctx, cluster.Name, clusterContext.RBACw),
 	}
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
@@ -389,12 +389,9 @@ func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext typ
 		return nil, err
 	}
 	if record == nil {
-		if apiContext.Request.Method == http.MethodGet && apiContext.Type == "subscribe" {
-			// Watches should not cache the RBAC because it is long lived
-			return m.watchAccessControl, nil
-		}
 		return m.accessControl, nil
 	}
+
 	return record.accessControl, nil
 }
 
