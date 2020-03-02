@@ -96,7 +96,7 @@ def test_websocket_view_logs():
 def create_project_client(request):
     client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
-    p = client.list_project(name="System").data[0]
+    p = client.list_project(name="System", clusterId=cluster.id).data[0]
     p_client = get_project_client_for_token(p, USER_TOKEN)
     wl = p_client.list_workload(name="nginx-ingress-controller").data[0]
     pod = p_client.list_pod(workloadId=wl.id).data[0]
