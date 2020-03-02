@@ -14,13 +14,14 @@ import (
 )
 
 const (
-	clusterResource           = "clusters"
-	membershipBindingOwner    = "memberhsip-binding-owner"
-	crtbInProjectBindingOwner = "crtb-in-project-binding-owner"
-	prtbInClusterBindingOwner = "prtb-in-cluster-binding-owner"
-	rbByOwnerIndex            = "auth.management.cattle.io/rb-by-owner"
-	rbByRoleAndSubjectIndex   = "auth.management.cattle.io/crb-by-role-and-subject"
-	ctrbMGMTController        = "mgmt-auth-crtb-controller"
+	clusterResource             = "clusters"
+	membershipBindingOwner      = "memberhsip-binding-owner"
+	membershipBindingOwnerIndex = "auth.management.cattle.io/membership-binding-owner"
+	crtbInProjectBindingOwner   = "crtb-in-project-binding-owner"
+	prtbInClusterBindingOwner   = "prtb-in-cluster-binding-owner"
+	rbByOwnerIndex              = "auth.management.cattle.io/rb-by-owner"
+	rbByRoleAndSubjectIndex     = "auth.management.cattle.io/crb-by-role-and-subject"
+	ctrbMGMTController          = "mgmt-auth-crtb-controller"
 )
 
 var clusterManagmentPlaneResources = map[string]string{

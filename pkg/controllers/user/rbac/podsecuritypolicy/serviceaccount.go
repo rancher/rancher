@@ -61,7 +61,7 @@ func RegisterServiceAccount(ctx context.Context, context *config.UserContext) {
 		roleBindingLister: context.RBAC.RoleBindings("").Controller().Lister(),
 		roleLister:        context.RBAC.ClusterRoles("").Controller().Lister(),
 		namespaceLister:   context.Core.Namespaces("").Controller().Lister(),
-		projectLister:     context.Management.Management.Projects("").Controller().Lister(),
+		projectLister:     context.Management.Management.Projects(context.ClusterName).Controller().Lister(),
 		psptpbLister: context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").
 			Controller().Lister(),
 	}

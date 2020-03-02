@@ -2,6 +2,8 @@ package auth
 
 import (
 	v1 "k8s.io/api/rbac/v1"
+	meta2 "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func rbByOwner(obj interface{}) ([]string, error) {
@@ -32,6 +34,23 @@ func rbRoleSubjectKeys(roleName string, subjects []v1.Subject) []string {
 		keys = append(keys, rbRoleSubjectKey(roleName, s))
 	}
 	return keys
+}
+
+func indexByMembershipBindingOwner(obj interface{}) ([]string, error) {
+	if obj, ok := obj.(runtime.Object); ok {
+		meta, err := meta2.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range meta.GetLabels() {
+			if v == membershipBindingOwner {
+				return []string{meta.GetNamespace() + "/" + k}, nil
+			}
+		}
+	}
+
+	return nil, nil
 }
 
 func rbByRoleAndSubject(obj interface{}) ([]string, error) {

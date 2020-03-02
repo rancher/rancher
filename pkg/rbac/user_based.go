@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/authorization"
 	"github.com/rancher/norman/httperror"
@@ -16,44 +17,45 @@ import (
 	"k8s.io/client-go/transport"
 )
 
-func NewAccessControlHandler(as accesscontrol.AccessSetLookup) auth.Middleware {
+func NewAccessControlHandler() auth.Middleware {
 	return func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
-		ac := newUserLookupAccess(as)
-		ctx := context.WithValue(req.Context(), contextKey{}, ac)
+		val := map[string]types.AccessControl{}
+		ctx := context.WithValue(req.Context(), contextKey{}, val)
 		req = req.WithContext(ctx)
 		next.ServeHTTP(rw, req)
 	}
 }
 
-func newUserLookupAccess(accessStore accesscontrol.AccessSetLookup) types.AccessControl {
-	return &lazyContext{
-		factory: func(ctx *types.APIContext) types.AccessControl {
-			userName := ctx.Request.Header.Get(transport.ImpersonateUserHeader)
-			groups := ctx.Request.Header[transport.ImpersonateGroupHeader]
-			user := &user2.DefaultInfo{
-				Name:   userName,
-				Groups: groups,
-			}
-			accessSet := accessStore.AccessFor(user)
-			return &userCachedAccess{
-				access: accessSet,
-			}
-		},
+func newUserLookupAccess(ctx *types.APIContext, accessStore accesscontrol.AccessSetLookup) types.AccessControl {
+	userName := ctx.Request.Header.Get(transport.ImpersonateUserHeader)
+	groups := ctx.Request.Header[transport.ImpersonateGroupHeader]
+	user := &user2.DefaultInfo{
+		Name:   userName,
+		Groups: groups,
+	}
+	accessSet := accessStore.AccessFor(user)
+	return &userCachedAccess{
+		expires: time.Now().Add(3 * time.Second),
+		access:  accessSet,
 	}
 }
 
 type userCachedAccess struct {
 	authorization.AllAccess
-	access *accesscontrol.AccessSet
+	expires time.Time
+	access  *accesscontrol.AccessSet
+}
+
+func (a *userCachedAccess) Expired() bool {
+	return time.Now().After(a.expires)
 }
 
 func (a *userCachedAccess) CanDo(apiGroup, resource, verb string, apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
-	set := a.access.AccessListFor(verb, schema2.GroupResource{
+	name, ns := getNameAndNS(obj)
+	if !a.access.Grants(verb, schema2.GroupResource{
 		Group:    apiGroup,
 		Resource: resource,
-	})
-	name, ns := getNameAndNS(obj)
-	if !set.Grants(ns, name) {
+	}, ns, name) {
 		return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("can not %v %v ", verb, schema.ID))
 	}
 	return nil
@@ -67,19 +69,19 @@ func (a *userCachedAccess) FilterList(apiContext *types.APIContext, schema *type
 		return objs
 	}
 
-	listSet := a.access.AccessListFor("list", schema2.GroupResource{
+	if len(objs) == 0 {
+		return objs
+	}
+
+	gr := schema2.GroupResource{
 		Group:    apiGroup,
 		Resource: resource,
-	})
-	getSet := a.access.AccessListFor("get", schema2.GroupResource{
-		Group:    apiGroup,
-		Resource: resource,
-	})
+	}
 
 	result := make([]map[string]interface{}, 0, len(objs))
 	for _, obj := range objs {
 		name, ns := getNameAndNS(obj)
-		if listSet.Grants(ns, name) || getSet.Grants(ns, name) {
+		if a.access.Grants("list", gr, ns, name) || a.access.Grants("get", gr, ns, name) {
 			result = append(result, obj)
 		}
 	}
@@ -94,21 +96,18 @@ func (a *userCachedAccess) Filter(apiContext *types.APIContext, schema *types.Sc
 		return obj
 	}
 
-	set := a.access.AccessListFor("list", schema2.GroupResource{
+	name, ns := getNameAndNS(obj)
+	if a.access.Grants("list", schema2.GroupResource{
 		Group:    apiGroup,
 		Resource: resource,
-	})
-
-	name, ns := getNameAndNS(obj)
-	if set.Grants(ns, name) {
+	}, ns, name) {
 		return obj
 	}
 
-	set = a.access.AccessListFor("get", schema2.GroupResource{
+	if a.access.Grants("get", schema2.GroupResource{
 		Group:    apiGroup,
 		Resource: resource,
-	})
-	if set.Grants(ns, name) {
+	}, ns, name) {
 		return obj
 	}
 

@@ -7,4 +7,4 @@ cd $(dirname $0)
 ./build
 ./test
 ./package
-./chart/ci
+#./chart/ci

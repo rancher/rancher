@@ -33,7 +33,7 @@ var settings = map[string]string{
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
-	projects := cluster.Management.Management.Projects("")
+	projects := cluster.Management.Management.Projects(cluster.ClusterName)
 	projectSyncer := &Syncer{
 		systemAccountManager:           systemaccount.NewManager(cluster.Management),
 		configMaps:                     cluster.Core.ConfigMaps(""),

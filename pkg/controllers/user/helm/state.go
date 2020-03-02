@@ -27,7 +27,7 @@ func StartStateCalculator(ctx context.Context, cluster *config.UserContext) {
 		apps:             apps,
 		multiClusterApps: cluster.Management.Management.MultiClusterApps(""),
 		namespaceLister:  cluster.Core.Namespaces("").Controller().Lister(),
-		projectLister:    cluster.Management.Management.Projects("").Controller().Lister(),
+		projectLister:    cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 		clusterName:      cluster.ClusterName,
 	}
 	w.workloadLister = util.NewWorkloadController(ctx, cluster.UserOnlyContext(), w.sync)

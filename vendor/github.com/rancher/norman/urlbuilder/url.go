@@ -200,7 +200,7 @@ func (u *urlBuilder) ResourceLinkByID(schema *types.Schema, id string) string {
 }
 
 func (u *urlBuilder) constructBasicURL(version types.APIVersion, parts ...string) string {
-	buffer := bytes.Buffer{}
+	buffer := strings.Builder{}
 
 	buffer.WriteString(u.responseURLBase)
 	if version.Path == "" {
