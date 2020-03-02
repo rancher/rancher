@@ -14,6 +14,25 @@ type Summary struct {
 	Message       []string
 }
 
+func dedupMessage(messages []string) []string {
+	if len(messages) <= 1 {
+		return messages
+	}
+
+	seen := map[string]bool{}
+	var result []string
+
+	for _, message := range messages {
+		if seen[message] {
+			continue
+		}
+		seen[message] = true
+		result = append(result, message)
+	}
+
+	return result
+}
+
 func Summarize(unstr *unstructured.Unstructured) Summary {
 	var (
 		obj     data.Object
@@ -35,5 +54,6 @@ func Summarize(unstr *unstructured.Unstructured) Summary {
 	}
 
 	summary.State = strings.ToLower(summary.State)
+	summary.Message = dedupMessage(summary.Message)
 	return summary
 }
