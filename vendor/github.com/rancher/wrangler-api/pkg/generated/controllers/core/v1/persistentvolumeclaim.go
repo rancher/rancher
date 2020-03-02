@@ -233,6 +233,7 @@ func (c *persistentVolumeClaimCache) GetByIndex(indexName, key string) (result [
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v1.PersistentVolumeClaim, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v1.PersistentVolumeClaim))
 	}

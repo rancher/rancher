@@ -239,8 +239,8 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 		logrus.Debugf("DesiredSet - Created %s %s for %s", gvk, k, debugID)
 	}
 
-	deleteF := func(k objectset.ObjectKey) {
-		if err := o.delete(nsed, k.Namespace, k.Name, client); err != nil {
+	deleteF := func(k objectset.ObjectKey, force bool) {
+		if err := o.delete(nsed, k.Namespace, k.Name, client, force); err != nil {
 			o.err(errors.Wrapf(err, "failed to delete %s %s for %s", k, gvk, debugID))
 			return
 		}
@@ -250,7 +250,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 	updateF := func(k objectset.ObjectKey) {
 		err := o.compareObjects(gvk, patcher, client, debugID, existing[k], objs[k], len(toCreate) > 0 || len(toDelete) > 0)
 		if err == ErrReplace {
-			deleteF(k)
+			deleteF(k, true)
 			o.err(fmt.Errorf("DesiredSet - Replace Wait %s %s for %s", gvk, k, debugID))
 		} else if err != nil {
 			o.err(errors.Wrapf(err, "failed to update %s %s for %s", k, gvk, debugID))
@@ -266,7 +266,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 	}
 
 	for _, k := range toDelete {
-		deleteF(k)
+		deleteF(k, false)
 	}
 }
 

@@ -70,7 +70,18 @@ func (s *Schemas) Import(obj interface{}, externalOverrides ...interface{}) (*Sc
 		types = append(types, reflect.TypeOf(override))
 	}
 
-	return s.importType(reflect.TypeOf(obj), types...)
+	var (
+		v = reflect.ValueOf(obj)
+		t reflect.Type
+	)
+
+	if v.Kind() == reflect.Ptr {
+		t = v.Elem().Type()
+	} else {
+		t = v.Type()
+	}
+
+	return s.importType(t, types...)
 }
 
 func (s *Schemas) newSchemaFromType(t reflect.Type, typeName string) (*Schema, error) {

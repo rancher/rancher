@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -50,10 +52,21 @@ type Target struct {
 	Healthstate string `json:"healthState,omitempty"`
 }
 
+func (t *Target) ObjClusterName() string {
+	if parts := strings.SplitN(t.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}
+
 type Answer struct {
 	ProjectName string            `json:"projectName,omitempty" norman:"type=reference[project]"`
 	ClusterName string            `json:"clusterName,omitempty" norman:"type=reference[cluster]"`
 	Values      map[string]string `json:"values,omitempty" norman:"required"`
+}
+
+func (a *Answer) ObjClusterName() string {
+	return a.ClusterName
 }
 
 type Member struct {

@@ -2,12 +2,15 @@ package crd
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/rancher/wrangler/pkg/data/convert"
 	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/pkg/schemas/openapi"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -31,6 +34,7 @@ type CRD struct {
 	PluralName   string
 	NonNamespace bool
 	Schema       *v1beta1.JSONSchemaProps
+	SchemaObject interface{}
 	Columns      []v1beta1.CustomResourceColumnDefinition
 	Status       bool
 	Scale        bool
@@ -40,6 +44,11 @@ type CRD struct {
 
 func (c CRD) WithSchema(schema *v1beta1.JSONSchemaProps) CRD {
 	c.Schema = schema
+	return c
+}
+
+func (c CRD) WithSchemaFromStruct(obj interface{}) CRD {
+	c.SchemaObject = obj
 	return c
 }
 
@@ -68,7 +77,15 @@ func (c CRD) WithShortNames(shortNames ...string) CRD {
 	return c
 }
 
-func (c CRD) ToCustomResourceDefinition() apiext.CustomResourceDefinition {
+func (c CRD) ToCustomResourceDefinition() (apiext.CustomResourceDefinition, error) {
+	if c.SchemaObject != nil && c.GVK.Kind == "" {
+		t := reflect.TypeOf(c.SchemaObject)
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		c.GVK.Kind = t.Name()
+	}
+
 	plural := c.PluralName
 	if plural == "" {
 		plural = strings.ToLower(name.GuessPluralName(c.GVK.Kind))
@@ -106,6 +123,16 @@ func (c CRD) ToCustomResourceDefinition() apiext.CustomResourceDefinition {
 		}
 	}
 
+	if c.SchemaObject != nil {
+		schema, err := openapi.ToOpenAPIFromStruct(c.SchemaObject)
+		if err != nil {
+			return apiext.CustomResourceDefinition{}, err
+		}
+		crd.Spec.Validation = &apiext.CustomResourceValidation{
+			OpenAPIV3Schema: schema,
+		}
+	}
+
 	if c.Status {
 		crd.Spec.Subresources = &apiext.CustomResourceSubresources{
 			Status: &apiext.CustomResourceSubresourceStatus{},
@@ -126,17 +153,37 @@ func (c CRD) ToCustomResourceDefinition() apiext.CustomResourceDefinition {
 		crd.Spec.Scope = apiext.NamespaceScoped
 	}
 
-	return crd
+	return crd, nil
 }
 
 func NamespacedType(name string) CRD {
 	kindGroup, version := kv.Split(name, "/")
 	kind, group := kv.Split(kindGroup, ".")
+	kind = convert.Capitalize(kind)
+	group = strings.ToLower(group)
 
 	return FromGV(schema.GroupVersion{
 		Group:   group,
 		Version: version,
 	}, kind)
+}
+
+func New(group, version string) CRD {
+	return CRD{
+		GVK: schema.GroupVersionKind{
+			Group:   group,
+			Version: version,
+		},
+		PluralName:   "",
+		NonNamespace: false,
+		Schema:       nil,
+		SchemaObject: nil,
+		Columns:      nil,
+		Status:       false,
+		Scale:        false,
+		Categories:   nil,
+		ShortNames:   nil,
+	}
 }
 
 func NamespacedTypes(names ...string) (ret []CRD) {
@@ -276,11 +323,15 @@ func (f *Factory) createCRD(crdDef CRD, ready map[string]*apiext.CustomResourceD
 		plural = strings.ToLower(name.GuessPluralName(crdDef.GVK.Kind))
 	}
 
-	crd := crdDef.ToCustomResourceDefinition()
+	crd, err := crdDef.ToCustomResourceDefinition()
+	if err != nil {
+		return nil, err
+	}
 
 	existing, ok := ready[crd.Name]
 	if ok {
-		if !equality.Semantic.DeepEqual(crd.Spec.Validation, existing.Spec.Validation) ||
+		if !equality.Semantic.DeepEqual(crd.Spec.Subresources, existing.Spec.Subresources) ||
+			!equality.Semantic.DeepEqual(crd.Spec.Validation, existing.Spec.Validation) ||
 			!equality.Semantic.DeepEqual(crd.Spec.Versions, existing.Spec.Versions) {
 			existing.Spec = crd.Spec
 			logrus.Infof("Updating CRD %s", crd.Name)

@@ -233,6 +233,7 @@ func (c *podCache) GetByIndex(indexName, key string) (result []*v1.Pod, err erro
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v1.Pod, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v1.Pod))
 	}

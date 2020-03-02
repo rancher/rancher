@@ -152,6 +152,10 @@ type NodePool struct {
 	Status NodePoolStatus `json:"status"`
 }
 
+func (n *NodePool) ObjClusterName() string {
+	return n.Spec.ObjClusterName()
+}
+
 type NodePoolSpec struct {
 	Etcd             bool   `json:"etcd"`
 	ControlPlane     bool   `json:"controlPlane"`
@@ -168,6 +172,10 @@ type NodePoolSpec struct {
 	ClusterName string `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
 
 	DeleteNotReadyAfterSecs time.Duration `json:"deleteNotReadyAfterSecs" norman:"default=0,max=31540000,min=0"`
+}
+
+func (n *NodePoolSpec) ObjClusterName() string {
+	return n.ClusterName
 }
 
 type NodePoolStatus struct {

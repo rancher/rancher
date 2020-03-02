@@ -233,6 +233,7 @@ func (c *customResourceDefinitionCache) GetByIndex(indexName, key string) (resul
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v1beta1.CustomResourceDefinition, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v1beta1.CustomResourceDefinition))
 	}
