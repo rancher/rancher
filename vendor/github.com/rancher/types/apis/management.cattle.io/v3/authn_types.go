@@ -29,6 +29,10 @@ type Token struct {
 	Enabled         *bool             `json:"enabled,omitempty" norman:"default=true"`
 }
 
+func (t *Token) ObjClusterName() string {
+	return t.ClusterName
+}
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

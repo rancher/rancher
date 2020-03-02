@@ -51,8 +51,8 @@ func (o *desiredSet) get(nsed bool, namespace, name string, client dynamic.Names
 	return client.Get(name, v1.GetOptions{})
 }
 
-func (o *desiredSet) delete(nsed bool, namespace, name string, client dynamic.NamespaceableResourceInterface) error {
-	if o.noDelete {
+func (o *desiredSet) delete(nsed bool, namespace, name string, client dynamic.NamespaceableResourceInterface, force bool) error {
+	if o.noDelete && !force {
 		return nil
 	}
 	opts := &v1.DeleteOptions{

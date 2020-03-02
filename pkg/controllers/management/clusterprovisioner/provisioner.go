@@ -975,7 +975,7 @@ func k3sClusterConfig(cluster *v3.Cluster) error {
 		// only set these values on init
 		if cluster.Spec.K3sConfig == nil {
 			cluster.Spec.K3sConfig = &v3.K3sConfig{
-				Version: cluster.Status.Version,
+				Version: cluster.Status.Version.String(),
 				K3sUpgradeStrategy: v3.K3sUpgradeStrategy{
 					ServerConcurrency: 1,
 					WorkerConcurrency: 1,

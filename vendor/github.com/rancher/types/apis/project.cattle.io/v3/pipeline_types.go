@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
@@ -24,6 +26,13 @@ type SourceCodeProvider struct {
 
 	ProjectName string `json:"projectName" norman:"type=reference[project]"`
 	Type        string `json:"type" norman:"options=github|gitlab|bitbucketcloud|bitbucketserver"`
+}
+
+func (s *SourceCodeProvider) ObjClusterName() string {
+	if parts := strings.SplitN(s.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 type OauthProvider struct {
@@ -59,6 +68,13 @@ type SourceCodeProviderConfig struct {
 	ProjectName string `json:"projectName" norman:"required,type=reference[project]"`
 	Type        string `json:"type" norman:"noupdate,options=github|gitlab|bitbucketcloud|bitbucketserver"`
 	Enabled     bool   `json:"enabled,omitempty"`
+}
+
+func (s *SourceCodeProviderConfig) ObjClusterName() string {
+	if parts := strings.SplitN(s.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 type GithubPipelineConfig struct {
@@ -118,6 +134,10 @@ type Pipeline struct {
 	Status PipelineStatus `json:"status"`
 }
 
+func (p *Pipeline) ObjClusterName() string {
+	return p.Spec.ObjClusterName()
+}
+
 type PipelineExecution struct {
 	types.Namespaced
 
@@ -126,6 +146,10 @@ type PipelineExecution struct {
 
 	Spec   PipelineExecutionSpec   `json:"spec"`
 	Status PipelineExecutionStatus `json:"status"`
+}
+
+func (p *PipelineExecution) ObjClusterName() string {
+	return p.Spec.ObjClusterName()
 }
 
 type PipelineSetting struct {
@@ -140,6 +164,13 @@ type PipelineSetting struct {
 	Customized bool   `json:"customized" norman:"nocreate,noupdate"`
 }
 
+func (p *PipelineSetting) ObjClusterName() string {
+	if parts := strings.SplitN(p.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}
+
 type SourceCodeCredential struct {
 	types.Namespaced
 
@@ -150,6 +181,10 @@ type SourceCodeCredential struct {
 	Status SourceCodeCredentialStatus `json:"status"`
 }
 
+func (s *SourceCodeCredential) ObjClusterName() string {
+	return s.Spec.ObjClusterName()
+}
+
 type SourceCodeRepository struct {
 	types.Namespaced
 
@@ -158,6 +193,10 @@ type SourceCodeRepository struct {
 
 	Spec   SourceCodeRepositorySpec   `json:"spec"`
 	Status SourceCodeRepositoryStatus `json:"status"`
+}
+
+func (s *SourceCodeRepository) ObjClusterName() string {
+	return s.Spec.ObjClusterName()
 }
 
 type PipelineStatus struct {
@@ -182,6 +221,13 @@ type PipelineSpec struct {
 
 	RepositoryURL            string `json:"repositoryUrl,omitempty" yaml:"repositoryUrl,omitempty"`
 	SourceCodeCredentialName string `json:"sourceCodeCredentialName,omitempty" yaml:"sourceCodeCredentialName,omitempty" norman:"type=reference[sourceCodeCredential],noupdate"`
+}
+
+func (p *PipelineSpec) ObjClusterName() string {
+	if parts := strings.SplitN(p.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 type PipelineConfig struct {
@@ -314,6 +360,13 @@ type PipelineExecutionSpec struct {
 	Email           string         `json:"email,omitempty"`
 }
 
+func (p *PipelineExecutionSpec) ObjClusterName() string {
+	if parts := strings.SplitN(p.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}
+
 type PipelineExecutionStatus struct {
 	Conditions []PipelineCondition `json:"conditions,omitempty"`
 
@@ -351,6 +404,13 @@ type SourceCodeCredentialSpec struct {
 	Expiry         string `json:"expiry,omitempty"`
 }
 
+func (s *SourceCodeCredentialSpec) ObjClusterName() string {
+	if parts := strings.SplitN(s.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}
+
 type SourceCodeCredentialStatus struct {
 	Logout bool `json:"logout,omitempty"`
 }
@@ -364,6 +424,13 @@ type SourceCodeRepositorySpec struct {
 	Permissions              RepoPerm `json:"permissions,omitempty"`
 	Language                 string   `json:"language,omitempty"`
 	DefaultBranch            string   `json:"defaultBranch,omitempty"`
+}
+
+func (s *SourceCodeRepositorySpec) ObjClusterName() string {
+	if parts := strings.SplitN(s.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 type SourceCodeRepositoryStatus struct {

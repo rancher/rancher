@@ -233,6 +233,7 @@ func (c *nodeCache) GetByIndex(indexName, key string) (result []*v1.Node, err er
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v1.Node, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v1.Node))
 	}

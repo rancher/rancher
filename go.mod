@@ -79,15 +79,15 @@ require (
 	github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200212233641-64154ac214a7
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200226193007-69ad517cedee
+	github.com/rancher/norman v0.0.0-20200302172514-1ee4db8c9219
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
 	github.com/rancher/rke v1.1.0-rc9
 	github.com/rancher/security-scan v0.1.5
 	github.com/rancher/steve v0.0.0-20200301160008-283790802c5d
-	github.com/rancher/types v0.0.0-20200226215232-12620b5bd7ff
-	github.com/rancher/wrangler v0.4.2-0.20200215064225-8abf292acf7b
-	github.com/rancher/wrangler-api v0.4.1
+	github.com/rancher/types v0.0.0-20200302213109-da0de2cf9d95
+	github.com/rancher/wrangler v0.5.0
+	github.com/rancher/wrangler-api v0.5.0
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
 	github.com/satori/go.uuid v1.2.0

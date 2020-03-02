@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -8,6 +10,13 @@ import (
 type ProjectNetworkPolicySpec struct {
 	ProjectName string `json:"projectName,omitempty" norman:"required,type=reference[project]"`
 	Description string `json:"description"`
+}
+
+func (p *ProjectNetworkPolicySpec) ObjClusterName() string {
+	if parts := strings.SplitN(p.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 type ProjectNetworkPolicyStatus struct {

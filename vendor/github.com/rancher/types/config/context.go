@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient/dynamic"
@@ -30,6 +31,8 @@ import (
 	"github.com/rancher/types/config/dialer"
 	"github.com/rancher/types/peermanager"
 	"github.com/rancher/types/user"
+	"github.com/rancher/wrangler-api/pkg/generated/controllers/rbac"
+	wrbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -204,6 +207,9 @@ type UserContext struct {
 	Istio          istiov1alpha3.Interface
 	Storage        storagev1.Interface
 	Policy         policyv1beta1.Interface
+
+	RBACw wrbacv1.Interface
+	rbacw *rbac.Factory
 }
 
 func (w *UserContext) controllers() []controller.Starter {
@@ -221,6 +227,7 @@ func (w *UserContext) controllers() []controller.Starter {
 		w.Cluster,
 		w.Storage,
 		w.Policy,
+		w.rbacw,
 	}
 }
 
@@ -453,6 +460,14 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	if err != nil {
 		return nil, err
 	}
+
+	wranglerConf := config
+	wranglerConf.Timeout = 30 * time.Minute
+	context.rbacw, err = rbac.NewFactoryFromConfig(&wranglerConf)
+	if err != nil {
+		return nil, err
+	}
+	context.RBACw = context.rbacw.Rbac().V1()
 
 	dynamicConfig := config
 	if dynamicConfig.NegotiatedSerializer == nil {

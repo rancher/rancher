@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +28,10 @@ type Project struct {
 
 	Spec   ProjectSpec   `json:"spec,omitempty"`
 	Status ProjectStatus `json:"status"`
+}
+
+func (p *Project) ObjClusterName() string {
+	return p.Spec.ObjClusterName()
 }
 
 type ProjectStatus struct {
@@ -57,6 +63,10 @@ type ProjectSpec struct {
 	NamespaceDefaultResourceQuota *NamespaceResourceQuota `json:"namespaceDefaultResourceQuota,omitempty"`
 	ContainerDefaultResourceLimit *ContainerResourceLimit `json:"containerDefaultResourceLimit,omitempty"`
 	EnableProjectMonitoring       bool                    `json:"enableProjectMonitoring" norman:"default=false"`
+}
+
+func (p *ProjectSpec) ObjClusterName() string {
+	return p.ClusterName
 }
 
 type GlobalRole struct {
@@ -128,6 +138,13 @@ type ProjectRoleTemplateBinding struct {
 	ServiceAccount     string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
 }
 
+func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
+	if parts := strings.SplitN(p.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}
+
 type ClusterRoleTemplateBinding struct {
 	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
@@ -139,6 +156,10 @@ type ClusterRoleTemplateBinding struct {
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 	ClusterName        string `json:"clusterName,omitempty" norman:"required,noupdate,type=reference[cluster]"`
 	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
+}
+
+func (c *ClusterRoleTemplateBinding) ObjClusterName() string {
+	return c.ClusterName
 }
 
 type SetPodSecurityPolicyTemplateInput struct {
