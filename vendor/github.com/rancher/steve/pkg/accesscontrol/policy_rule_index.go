@@ -1,6 +1,10 @@
 package accesscontrol
 
 import (
+	"hash"
+	"sort"
+	"strings"
+
 	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -16,12 +20,13 @@ type policyRuleIndex struct {
 	rCache              v1.RoleCache
 	crbCache            v1.ClusterRoleBindingCache
 	rbCache             v1.RoleBindingCache
+	revisions           *roleRevisionIndex
 	kind                string
 	roleIndexKey        string
 	clusterRoleIndexKey string
 }
 
-func newPolicyRuleIndex(user bool, rbac v1.Interface) *policyRuleIndex {
+func newPolicyRuleIndex(user bool, revisions *roleRevisionIndex, rbac v1.Interface) *policyRuleIndex {
 	key := "Group"
 	if user {
 		key = "User"
@@ -34,6 +39,7 @@ func newPolicyRuleIndex(user bool, rbac v1.Interface) *policyRuleIndex {
 		rbCache:             rbac.RoleBinding().Cache(),
 		clusterRoleIndexKey: "crb" + key,
 		roleIndexKey:        "rb" + key,
+		revisions:           revisions,
 	}
 
 	pi.crbCache.AddIndexer(pi.clusterRoleIndexKey, pi.clusterRoleBindingBySubjectIndexer)
@@ -60,24 +66,27 @@ func (p *policyRuleIndex) roleBindingBySubject(rb *rbacv1.RoleBinding) (result [
 	return
 }
 
-func (p *policyRuleIndex) addRolesToMap(roles map[roleKey]struct{}, subjectName string) {
+var null = []byte{'\x00'}
+
+func (p *policyRuleIndex) addRolesToHash(digest hash.Hash, subjectName string) {
 	for _, crb := range p.getClusterRoleBindings(subjectName) {
-		roles[roleKey{
-			name: crb.RoleRef.Name,
-		}] = struct{}{}
+		digest.Write([]byte(crb.RoleRef.Name))
+		digest.Write([]byte(p.revisions.roleRevision("", crb.RoleRef.Name)))
+		digest.Write(null)
 	}
 
 	for _, rb := range p.getRoleBindings(subjectName) {
 		switch rb.RoleRef.Kind {
 		case "Role":
-			roles[roleKey{
-				name:      rb.RoleRef.Name,
-				namespace: rb.Namespace,
-			}] = struct{}{}
+			digest.Write([]byte(rb.RoleRef.Name))
+			digest.Write([]byte(rb.Namespace))
+			digest.Write([]byte(p.revisions.roleRevision(rb.Namespace, rb.RoleRef.Name)))
+			digest.Write(null)
 		case "ClusterRole":
-			roles[roleKey{
-				name: rb.RoleRef.Name,
-			}] = struct{}{}
+			digest.Write([]byte(rb.RoleRef.Name))
+			digest.Write([]byte(rb.Namespace))
+			digest.Write([]byte(p.revisions.roleRevision(rb.Namespace, rb.RoleRef.Name)))
+			digest.Write(null)
 		}
 	}
 }
@@ -145,6 +154,9 @@ func (p *policyRuleIndex) getClusterRoleBindings(subjectName string) []*rbacv1.C
 	if err != nil {
 		return nil
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
 	return result
 }
 
@@ -153,5 +165,13 @@ func (p *policyRuleIndex) getRoleBindings(subjectName string) []*rbacv1.RoleBind
 	if err != nil {
 		return nil
 	}
+	sort.Slice(result, func(i, j int) bool {
+		if i := strings.Compare(result[i].Namespace, result[j].Namespace); i < 0 {
+			return true
+		} else if i > 0 {
+			return false
+		}
+		return result[i].Name < result[j].Name
+	})
 	return result
 }

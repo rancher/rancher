@@ -34,7 +34,9 @@ func Routes(h Handlers) http.Handler {
 	m.Path("/v1/{type:schemas}/{name:.*}").Handler(h.GenericResource)
 	m.Path("/v1/{type}").Handler(h.GenericResource)
 	m.Path("/v1/{type}/{name}").Handler(h.GenericResource)
-	m.PathPrefix("/api").Handler(h.K8sProxy)
+	m.Path("/api").Handler(h.K8sProxy) // Can't just prefix this as UI needs /apikeys path
+	m.PathPrefix("/api/").Handler(h.K8sProxy)
+	m.PathPrefix("/apis").Handler(h.K8sProxy)
 	m.PathPrefix("/openapi").Handler(h.K8sProxy)
 	m.PathPrefix("/version").Handler(h.K8sProxy)
 	m.NotFoundHandler = h.Next
