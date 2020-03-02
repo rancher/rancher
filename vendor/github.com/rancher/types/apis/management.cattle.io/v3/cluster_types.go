@@ -3,6 +3,7 @@ package v3
 import (
 	"bytes"
 	"encoding/gob"
+	"strings"
 
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
@@ -212,8 +213,16 @@ type ClusterRegistrationToken struct {
 	Status ClusterRegistrationTokenStatus `json:"status"`
 }
 
+func (c *ClusterRegistrationToken) ObjClusterName() string {
+	return c.Spec.ObjClusterName()
+}
+
 type ClusterRegistrationTokenSpec struct {
 	ClusterName string `json:"clusterName" norman:"required,type=reference[cluster]"`
+}
+
+func (c *ClusterRegistrationTokenSpec) ObjClusterName() string {
+	return c.ClusterName
 }
 
 type ClusterRegistrationTokenStatus struct {
@@ -238,6 +247,13 @@ type ImportClusterYamlInput struct {
 	DefaultNamespace string `json:"defaultNamespace,omitempty"`
 	Namespace        string `json:"namespace,omitempty"`
 	ProjectName      string `json:"projectName,omitempty" norman:"type=reference[project]"`
+}
+
+func (i *ImportClusterYamlInput) ObjClusterName() string {
+	if parts := strings.SplitN(i.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 type ImportYamlOutput struct {

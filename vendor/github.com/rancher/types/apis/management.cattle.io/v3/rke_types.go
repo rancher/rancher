@@ -63,6 +63,10 @@ type RancherKubernetesEngineConfig struct {
 	UpgradeStrategy *NodeUpgradeStrategy `yaml:"upgrade_strategy,omitempty" json:"upgradeStrategy,omitempty"`
 }
 
+func (r *RancherKubernetesEngineConfig) ObjClusterName() string {
+	return r.ClusterName
+}
+
 type NodeUpgradeStrategy struct {
 	// MaxUnavailableWorker input can be a number of nodes or a percentage of nodes (example, max_unavailable_worker: 2 OR max_unavailable_worker: 20%)
 	MaxUnavailableWorker string `yaml:"max_unavailable_worker" json:"maxUnavailableWorker,omitempty" norman:"min=1,default=10%"`
@@ -848,7 +852,12 @@ type DNSConfig struct {
 }
 
 type Nodelocal struct {
+	// link-local IP for nodelocal DNS
 	IPAddress string `yaml:"ipaddress" json:"ipAddress,omitempy"`
+	// Nodelocal DNS daemonset upgrade strategy
+	UpdateStrategy *appsv1.DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
+	// NodeSelector key pair
+	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 }
 
 // LinearAutoscalerParams contains fields expected by the cluster-proportional-autoscaler https://github.com/kubernetes-incubator/cluster-proportional-autoscaler/blob/0c61e63fc81449abdd52315aa27179a17e5d1580/pkg/autoscaler/controller/linearcontroller/linear_controller.go#L50

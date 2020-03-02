@@ -298,6 +298,7 @@ func (c *{{.lowerName}}Cache) GetByIndex(indexName, key string) (result []*{{.ve
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*{{.version}}.{{.type}}, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*{{.version}}.{{.type}}))
 	}

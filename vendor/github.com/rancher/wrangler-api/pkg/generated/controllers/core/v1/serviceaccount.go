@@ -226,6 +226,7 @@ func (c *serviceAccountCache) GetByIndex(indexName, key string) (result []*v1.Se
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v1.ServiceAccount, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v1.ServiceAccount))
 	}

@@ -226,6 +226,7 @@ func (c *roleCache) GetByIndex(indexName, key string) (result []*v1.Role, err er
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v1.Role, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v1.Role))
 	}

@@ -226,6 +226,7 @@ func (c *configMapCache) GetByIndex(indexName, key string) (result []*v1.ConfigM
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v1.ConfigMap, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v1.ConfigMap))
 	}

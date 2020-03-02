@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +31,13 @@ type AppSpec struct {
 	Prune               bool              `json:"prune,omitempty"`
 	MultiClusterAppName string            `json:"multiClusterAppName,omitempty" norman:"type=reference[/v3/schemas/multiclusterapp]"`
 	ValuesYaml          string            `json:"valuesYaml,omitempty"`
+}
+
+func (a *AppSpec) ObjClusterName() string {
+	if parts := strings.SplitN(a.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 var (
@@ -76,6 +85,13 @@ type AppRevisionSpec struct {
 	ProjectName string `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
 }
 
+func (a *AppRevisionSpec) ObjClusterName() string {
+	if parts := strings.SplitN(a.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}
+
 type AppRevisionStatus struct {
 	ProjectName string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
 	ExternalID  string            `json:"externalId"`
@@ -83,6 +99,13 @@ type AppRevisionStatus struct {
 	Digest      string            `json:"digest"`
 	ValuesYaml  string            `json:"valuesYaml,omitempty"`
 	Files       map[string]string `json:"files,omitempty"`
+}
+
+func (a *AppRevisionStatus) ObjClusterName() string {
+	if parts := strings.SplitN(a.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 type AppUpgradeConfig struct {

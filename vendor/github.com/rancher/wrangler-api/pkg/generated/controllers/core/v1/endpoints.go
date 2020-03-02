@@ -226,6 +226,7 @@ func (c *endpointsCache) GetByIndex(indexName, key string) (result []*v1.Endpoin
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v1.Endpoints, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v1.Endpoints))
 	}
