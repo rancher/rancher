@@ -156,7 +156,7 @@ func getMetadataConfig() string {
 	rancherVersion := os.Getenv(key)
 	branch := os.Getenv("RANCHER_METADATA_BRANCH")
 	if branch == "" {
-		branch = "dev"
+		branch = "dev-v2.3"
 		if releaseServerVersion(rancherVersion) {
 			branch = "master"
 		}
