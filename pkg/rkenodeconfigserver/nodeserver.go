@@ -229,7 +229,8 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 					return nil, errors.Wrapf(err, "failed to generate kubelet certificate")
 				}
 			}
-			certString, err := bundle.Marshal()
+
+			certString, err := bundle.SafeMarshal()
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to marshal certificates bundle")
 			}

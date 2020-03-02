@@ -82,6 +82,18 @@ func (b *Bundle) Marshal() (string, error) {
 	return output.String(), err
 }
 
+// SafeMarshal removes the kube-ca cert key from the cert bundle before marshalling
+func (b *Bundle) SafeMarshal() (string, error) {
+	output := &bytes.Buffer{}
+	certs := b.certs
+	if pkiCert, ok := certs[pki.CACertName]; ok {
+		pkiCert.Key = nil
+	}
+	err := rkecerts.Save(certs, output)
+	return output.String(), err
+
+}
+
 func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
 	certs := librke.New().GenerateRKENodeCerts(context.Background(), *config, nodeAddress, b.certs)
 	return &Bundle{
