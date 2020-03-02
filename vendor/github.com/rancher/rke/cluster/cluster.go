@@ -138,16 +138,12 @@ func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptionData map[stri
 	// Deploy Control plane
 	cpNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
 	// Build cp node plan map
-	var notReadyHosts []*hosts.Host
 	for _, cpHost := range c.ControlPlaneHosts {
 		svcOptions, err := c.GetKubernetesServicesOptions(cpHost.DockerInfo.OSType, svcOptionData)
 		if err != nil {
 			return "", err
 		}
 		cpNodePlanMap[cpHost.Address] = BuildRKEConfigNodePlan(ctx, c, cpHost, cpHost.DockerInfo, svcOptions)
-		if err := services.CheckNodeReady(kubeClient, cpHost, services.ControlRole); err != nil {
-			notReadyHosts = append(notReadyHosts, cpHost)
-		}
 	}
 
 	if !reconcileCluster {
@@ -162,16 +158,17 @@ func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptionData map[stri
 		}
 		return "", nil
 	}
-	return c.UpgradeControlPlane(ctx, kubeClient, cpNodePlanMap, notReadyHosts)
+	return c.UpgradeControlPlane(ctx, kubeClient, cpNodePlanMap)
 }
 
-func (c *Cluster) UpgradeControlPlane(ctx context.Context, kubeClient *kubernetes.Clientset, cpNodePlanMap map[string]v3.RKEConfigNodePlan, notReadyHosts []*hosts.Host) (string, error) {
+func (c *Cluster) UpgradeControlPlane(ctx context.Context, kubeClient *kubernetes.Clientset, cpNodePlanMap map[string]v3.RKEConfigNodePlan) (string, error) {
 	inactiveHosts := make(map[string]bool)
-	var controlPlaneHosts []*hosts.Host
+	var controlPlaneHosts, notReadyHosts []*hosts.Host
 	var notReadyHostNames []string
 
 	for _, host := range c.InactiveHosts {
-		if !c.HostsLabeledToIgnoreUpgrade[host.Address] {
+		// include only hosts with controlplane role
+		if host.IsControl && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
 			inactiveHosts[host.HostnameOverride] = true
 		}
 	}
@@ -179,23 +176,30 @@ func (c *Cluster) UpgradeControlPlane(ctx context.Context, kubeClient *kubernete
 		if !c.HostsLabeledToIgnoreUpgrade[host.Address] {
 			controlPlaneHosts = append(controlPlaneHosts, host)
 		}
+		if c.NewHosts[host.HostnameOverride] {
+			continue
+		}
+		// find existing nodes that are in NotReady state
+		if err := services.CheckNodeReady(kubeClient, host, services.ControlRole); err != nil {
+			notReadyHosts = append(notReadyHosts, host)
+			notReadyHostNames = append(notReadyHostNames, host.HostnameOverride)
+		}
 	}
 
-	for _, host := range notReadyHosts {
-		notReadyHostNames = append(notReadyHostNames, host.HostnameOverride)
-	}
-	// attempt upgrade on NotReady hosts without respecting maxUnavailable
-	logrus.Infof("Attempting upgrade of controlplane components on following hosts in NotReady status: %v", strings.Join(notReadyHostNames, ","))
-
-	services.RunControlPlane(ctx, notReadyHosts,
-		c.LocalConnDialerFactory,
-		c.PrivateRegistriesMap,
-		cpNodePlanMap,
-		c.UpdateWorkersOnly,
-		c.SystemImages.Alpine,
-		c.Certificates)
-	for _, host := range notReadyHosts {
-		services.CheckNodeReady(kubeClient, host, services.ControlRole)
+	if len(notReadyHostNames) > 0 {
+		// attempt upgrade on NotReady hosts without respecting max_unavailable_controlplane
+		logrus.Infof("Attempting upgrade of controlplane components on following hosts in NotReady status: %v", strings.Join(notReadyHostNames, ","))
+		services.RunControlPlane(ctx, notReadyHosts,
+			c.LocalConnDialerFactory,
+			c.PrivateRegistriesMap,
+			cpNodePlanMap,
+			c.UpdateWorkersOnly,
+			c.SystemImages.Alpine,
+			c.Certificates)
+		// Calling CheckNodeReady wil give some time for nodes to get in Ready state
+		for _, host := range notReadyHosts {
+			services.CheckNodeReady(kubeClient, host, services.ControlRole)
+		}
 	}
 	// rolling upgrade respecting maxUnavailable
 	errMsgMaxUnavailableNotFailed, err := services.UpgradeControlPlaneNodes(ctx, kubeClient, controlPlaneHosts,
@@ -220,7 +224,6 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 	// Deploy Worker plane
 	workerNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
 	// Build cp node plan map
-	var notReadyHosts []*hosts.Host
 	allHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for _, host := range allHosts {
 		svcOptions, err := c.GetKubernetesServicesOptions(host.DockerInfo.OSType, svcOptionData)
@@ -230,9 +233,6 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 		workerNodePlanMap[host.Address] = BuildRKEConfigNodePlan(ctx, c, host, host.DockerInfo, svcOptions)
 		if host.IsControl || c.HostsLabeledToIgnoreUpgrade[host.Address] {
 			continue
-		}
-		if err := services.CheckNodeReady(kubeClient, host, services.WorkerRole); err != nil {
-			notReadyHosts = append(notReadyHosts, host)
 		}
 		if !host.IsEtcd {
 			// separating hosts with only worker role so they undergo upgrade in maxUnavailable batches
@@ -257,32 +257,46 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 		return "", nil
 	}
 
-	return c.UpgradeWorkerPlane(ctx, kubeClient, workerNodePlanMap, notReadyHosts, etcdAndWorkerHosts, workerOnlyHosts)
+	return c.UpgradeWorkerPlane(ctx, kubeClient, workerNodePlanMap, etcdAndWorkerHosts, workerOnlyHosts)
 }
 
-func (c *Cluster) UpgradeWorkerPlane(ctx context.Context, kubeClient *kubernetes.Clientset, workerNodePlanMap map[string]v3.RKEConfigNodePlan, notReadyHosts, etcdAndWorkerHosts, workerOnlyHosts []*hosts.Host) (string, error) {
+func (c *Cluster) UpgradeWorkerPlane(ctx context.Context, kubeClient *kubernetes.Clientset, workerNodePlanMap map[string]v3.RKEConfigNodePlan, etcdAndWorkerHosts, workerOnlyHosts []*hosts.Host) (string, error) {
 	inactiveHosts := make(map[string]bool)
+	var notReadyHosts []*hosts.Host
 	var notReadyHostNames []string
+
 	for _, host := range c.InactiveHosts {
-		if !c.HostsLabeledToIgnoreUpgrade[host.Address] {
+		// if host has controlplane role, it already has worker components upgraded
+		if !host.IsControl && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
 			inactiveHosts[host.HostnameOverride] = true
 		}
 	}
-	for _, host := range notReadyHosts {
-		notReadyHostNames = append(notReadyHostNames, host.HostnameOverride)
+	for _, host := range append(etcdAndWorkerHosts, workerOnlyHosts...) {
+		if c.NewHosts[host.HostnameOverride] {
+			continue
+		}
+		// find existing nodes that are in NotReady state
+		if err := services.CheckNodeReady(kubeClient, host, services.WorkerRole); err != nil {
+			notReadyHosts = append(notReadyHosts, host)
+			notReadyHostNames = append(notReadyHostNames, host.HostnameOverride)
+		}
 	}
-	// attempt upgrade on NotReady hosts without respecting maxUnavailable
-	logrus.Infof("Attempting upgrade of worker components on following hosts in NotReady status: %v", strings.Join(notReadyHostNames, ","))
-	services.RunWorkerPlane(ctx, notReadyHosts,
-		c.LocalConnDialerFactory,
-		c.PrivateRegistriesMap,
-		workerNodePlanMap,
-		c.Certificates,
-		c.UpdateWorkersOnly,
-		c.SystemImages.Alpine)
-	for _, host := range notReadyHosts {
-		services.CheckNodeReady(kubeClient, host, services.WorkerRole)
+	if len(notReadyHostNames) > 0 {
+		// attempt upgrade on NotReady hosts without respecting max_unavailable_worker
+		logrus.Infof("Attempting upgrade of worker components on following hosts in NotReady status: %v", strings.Join(notReadyHostNames, ","))
+		services.RunWorkerPlane(ctx, notReadyHosts,
+			c.LocalConnDialerFactory,
+			c.PrivateRegistriesMap,
+			workerNodePlanMap,
+			c.Certificates,
+			c.UpdateWorkersOnly,
+			c.SystemImages.Alpine)
+		// Calling CheckNodeReady wil give some time for nodes to get in Ready state
+		for _, host := range notReadyHosts {
+			services.CheckNodeReady(kubeClient, host, services.WorkerRole)
+		}
 	}
+
 	errMsgMaxUnavailableNotFailed, err := services.UpgradeWorkerPlaneForWorkerAndEtcdNodes(ctx, kubeClient, etcdAndWorkerHosts, workerOnlyHosts, inactiveHosts,
 		c.LocalConnDialerFactory,
 		c.PrivateRegistriesMap,
