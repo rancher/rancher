@@ -58,6 +58,28 @@ func (a *AccessSet) Merge(right *AccessSet) {
 	}
 }
 
+func (a AccessSet) Grants(verb string, gr schema.GroupResource, namespace, name string) bool {
+	for _, v := range []string{All, verb} {
+		for _, g := range []string{All, gr.Group} {
+			for _, r := range []string{All, gr.Resource} {
+				for k := range a.set[key{
+					verb: v,
+					gr: schema.GroupResource{
+						Group:    g,
+						Resource: r,
+					},
+				}] {
+					if k.Grants(namespace, name) {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 func (a AccessSet) AccessListFor(verb string, gr schema.GroupResource) (result AccessList) {
 	dedup := map[Access]bool{}
 	for _, v := range []string{All, verb} {

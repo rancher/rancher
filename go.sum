@@ -973,6 +973,8 @@ github.com/rancher/security-scan v0.1.5 h1:J/LMSTNFSrq7BEfsWtIfHkEHJzg/KUelDTS2P
 github.com/rancher/security-scan v0.1.5/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
 github.com/rancher/steve v0.0.0-20200301160008-283790802c5d h1:UbnnjFrhg9GoEsd58yUz82UtSKvx1PrlBLVAHV/b/hc=
 github.com/rancher/steve v0.0.0-20200301160008-283790802c5d/go.mod h1:/G0JfWp2NagVgmPZI61HinV4JwDngkYhG3DSnHpzuow=
+github.com/rancher/steve v0.0.0-20200302181905-c76454ac605e h1:8uhFBC+5BO5cueMLi3YaDobqtE7mIasbE4lPY+jOLiI=
+github.com/rancher/steve v0.0.0-20200302181905-c76454ac605e/go.mod h1:/G0JfWp2NagVgmPZI61HinV4JwDngkYhG3DSnHpzuow=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
 github.com/rancher/types v0.0.0-20200226215232-12620b5bd7ff h1:BYethh0lQHdtXjhKKOYkQmSSyQfWi1Bu1lTsI4hMsjw=
 github.com/rancher/types v0.0.0-20200226215232-12620b5bd7ff/go.mod h1:P+mDk2FHGO1xiLIh+HfSbOlbKMYXTPp7PgmFN2yMMCE=
