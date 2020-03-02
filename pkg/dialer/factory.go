@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/remotedialer"
@@ -189,7 +191,24 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 		}
 	}
 
-	return nil, fmt.Errorf("waiting for cluster agent to connect")
+	logrus.Debugf("No active connection for cluster [%s] will wait for about 30 seconds", cluster.Name)
+	for i := 0; i < 4; i++ {
+		if f.TunnelServer.HasSession(cluster.Name) {
+			logrus.Debugf("Cluster [%s] has reconnected, resuming", cluster.Name)
+			logrus.Debugf("dialerFactory: tunnel session found for cluster [%s]", cluster.Name)
+			cd := f.TunnelServer.Dialer(cluster.Name, 15*time.Second)
+			return func(network, address string) (net.Conn, error) {
+				if cluster.Status.Driver == v3.ClusterDriverRKE {
+					address = f.translateClusterAddress(cluster, hostPort, address)
+				}
+				logrus.Debugf("dialerFactory: returning network [%s] and address [%s] as clusterDialer", network, address)
+				return cd(network, address)
+			}, nil
+		}
+		time.Sleep(wait.Jitter(5*time.Second, 1))
+	}
+
+	return nil, fmt.Errorf("waiting for cluster [%s] agent to connect", cluster.Name)
 }
 
 func hostPort(cluster *v3.Cluster) string {
