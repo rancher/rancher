@@ -19,6 +19,13 @@ import (
 
 const (
 	nodeAlertGroupName = "node-alert"
+
+	// cluster scan related
+	clusterScanAlertGroupName                    = "cluster-scan-alert"
+	clusterScanManualAllAlertRuleName            = "cluster-scan-manual-all"
+	clusterScanManualFailureOnlyAlertRuleName    = "cluster-scan-manual-failure-only"
+	clusterScanScheduledAllAlertRuleName         = "cluster-scan-scheduled-all"
+	clusterScanScheduledFailureOnlyAlertRuleName = "cluster-scan-scheduled--failure-only"
 )
 
 var (
@@ -317,6 +324,102 @@ var entries = []entry{
 					EventRule: &v3.EventRule{
 						EventType:    "Warning",
 						ResourceKind: "Deployment",
+					},
+				},
+				Status: v3.AlertStatus{
+					AlertState: "active",
+				},
+			},
+		},
+	},
+	{
+
+		group: v3.ClusterAlertGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterScanAlertGroupName,
+			},
+			Spec: v3.ClusterGroupSpec{
+				CommonGroupField: v3.CommonGroupField{
+					Description: "Alert for Cluster Scans, both manual and scheduled",
+					DisplayName: "A set of alerts for cluster scans",
+					TimingField: defaultTimingField,
+				},
+			},
+			Status: v3.AlertStatus{
+				AlertState: "active",
+			},
+		},
+		rules: []v3.ClusterAlertRule{
+			v3.ClusterAlertRule{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterScanManualAllAlertRuleName,
+				},
+				Spec: v3.ClusterAlertRuleSpec{
+					CommonRuleField: v3.CommonRuleField{
+						Severity:    SeverityInfo,
+						DisplayName: "Manual Cluster Scan Completed",
+						TimingField: defaultTimingField,
+					},
+					ClusterScanRule: &v3.ClusterScanRule{
+						ScanRunType:  v3.ClusterScanRunTypeManual,
+						FailuresOnly: false,
+					},
+				},
+				Status: v3.AlertStatus{
+					AlertState: "inactive",
+				},
+			},
+			v3.ClusterAlertRule{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterScanManualFailureOnlyAlertRuleName,
+				},
+				Spec: v3.ClusterAlertRuleSpec{
+					CommonRuleField: v3.CommonRuleField{
+						Severity:    SeverityWarning,
+						DisplayName: "Manual Cluster Scan has Failures",
+						TimingField: defaultTimingField,
+					},
+					ClusterScanRule: &v3.ClusterScanRule{
+						ScanRunType:  v3.ClusterScanRunTypeManual,
+						FailuresOnly: true,
+					},
+				},
+				Status: v3.AlertStatus{
+					AlertState: "inactive",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterScanScheduledAllAlertRuleName,
+				},
+				Spec: v3.ClusterAlertRuleSpec{
+					CommonRuleField: v3.CommonRuleField{
+						Severity:    SeverityInfo,
+						DisplayName: "Scheduled Cluster Scan Completed",
+						TimingField: defaultTimingField,
+					},
+					ClusterScanRule: &v3.ClusterScanRule{
+						ScanRunType:  v3.ClusterScanRunTypeScheduled,
+						FailuresOnly: false,
+					},
+				},
+				Status: v3.AlertStatus{
+					AlertState: "inactive",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterScanScheduledFailureOnlyAlertRuleName,
+				},
+				Spec: v3.ClusterAlertRuleSpec{
+					CommonRuleField: v3.CommonRuleField{
+						Severity:    SeverityWarning,
+						DisplayName: "Scheduled Cluster Scan has Failures",
+						TimingField: defaultTimingField,
+					},
+					ClusterScanRule: &v3.ClusterScanRule{
+						ScanRunType:  v3.ClusterScanRunTypeScheduled,
+						FailuresOnly: true,
 					},
 				},
 				Status: v3.AlertStatus{

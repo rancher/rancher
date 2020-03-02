@@ -15,10 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	ScanOutputFileName = "output.json"
-)
-
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if err := apiContext.AccessControl.CanDo(mgmtv3.ClusterScanGroupVersionKind.Group, mgmtv3.ClusterScanResource.Name, "read", apiContext, resource.Values, apiContext.Schema); err == nil {
 		s, ok := resource.Values["status"]
@@ -69,7 +65,7 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 		return err
 	}
 
-	reportJSON, err := report.Generate([]byte(cm.Data[ScanOutputFileName]))
+	reportJSON, err := report.GetJSONBytes([]byte(cm.Data[mgmtv3.DefaultScanOutputFileName]))
 	if err != nil {
 		return err
 	}

@@ -32,6 +32,24 @@ func GetCisConfigParams(
 	return c.Params, nil
 }
 
+func GetCisBenchmarkVersionInfo(
+	name string,
+	cisBenchmarkVersionLister v3.CisBenchmarkVersionLister,
+	cisBenchmarkVersion v3.CisBenchmarkVersionInterface,
+) (v3.CisBenchmarkVersionInfo, error) {
+	b, err := cisBenchmarkVersionLister.Get(namespace.GlobalNamespace, name)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return v3.CisBenchmarkVersionInfo{}, err
+		}
+		b, err = cisBenchmarkVersion.GetNamespaced(namespace.GlobalNamespace, name, metav1.GetOptions{})
+		if err != nil {
+			return v3.CisBenchmarkVersionInfo{}, err
+		}
+	}
+	return b.Info, nil
+}
+
 func GetRKESystemImages(k8sVersion string, sysImageLister v3.RKEK8sSystemImageLister, sysImages v3.RKEK8sSystemImageInterface) (v3.RKESystemImages, error) {
 	name := k8sVersion
 	sysImage, err := sysImageLister.Get(namespace.GlobalNamespace, name)

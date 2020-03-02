@@ -86,35 +86,19 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 		}
 	}
 
-	newCisScan := cis.NewCisScan(cluster, cisScanConfig)
-	cisScan, err := a.ClusterScanClient.Create(newCisScan)
+	isManual := true
+	cisScan, err := cis.LaunchScan(
+		isManual,
+		cisScanConfig,
+		cluster,
+		a.ClusterClient,
+		a.ClusterScanClient,
+		RetryIntervalInMilliseconds,
+		NumberOfRetriesForClusterUpdate,
+	)
 	if err != nil {
-		return httperror.WrapAPIError(err, httperror.ServerError,
-			fmt.Sprintf("failed to create cis scan object"))
+		return httperror.NewAPIError(httperror.ServerError, err.Error())
 	}
-
-	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Annotations[v3.RunCisScanAnnotation] = cisScan.Name
-
-	// Can't add either too many retries or longer interval as this an API handler
-	for i := 0; i < NumberOfRetriesForClusterUpdate; i++ {
-		_, err = a.ClusterClient.Update(updatedCluster)
-		if err == nil {
-			break
-		}
-		time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
-		cluster, err = a.ClusterClient.Get(apiContext.ID, v1.GetOptions{})
-		if err != nil {
-			logrus.Errorf("error fetching cluster with id %v: %v", apiContext.ID, err)
-			continue
-		}
-		updatedCluster = cluster.DeepCopy()
-		updatedCluster.Annotations[v3.RunCisScanAnnotation] = cisScan.Name
-	}
-	if err != nil {
-		return httperror.WrapAPIError(err, httperror.ServerError, "failed to update cluster annotation for cis scan")
-	}
-
 	cisScanJSON, err := json.Marshal(cisScan)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError,
