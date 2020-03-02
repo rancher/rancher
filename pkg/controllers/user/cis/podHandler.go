@@ -13,7 +13,7 @@ import (
 )
 
 type podHandler struct {
-	mgmtCtxClusterScanClient v3.ClusterScanInterface
+	clusterScanClient v3.ClusterScanInterface
 }
 
 func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) {
@@ -31,7 +31,7 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) 
 		return nil, nil
 	}
 
-	cs, err := ph.mgmtCtxClusterScanClient.Get(owner, v1.GetOptions{})
+	cs, err := ph.clusterScanClient.Get(owner, v1.GetOptions{})
 	if err != nil {
 		if !kerrors.IsNotFound(err) {
 			return nil, fmt.Errorf("error fetching cluster scan object: %v", owner)
@@ -47,7 +47,7 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) 
 				v3.ClusterScanConditionFailed.Message(cs, done)
 			}
 		}
-		_, err = ph.mgmtCtxClusterScanClient.Update(cs)
+		_, err = ph.clusterScanClient.Update(cs)
 		if err != nil {
 			return nil, fmt.Errorf("error updating condition of cluster scan object: %v", owner)
 		}
