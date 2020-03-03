@@ -762,7 +762,8 @@ def validate_rke_dm_host_4(node_template,
     node_pool = node_pools[0]
 
     # Increase the scale of the node pool to 3
-    node_pool = client.update(node_pool, quantity=3)
+    node_pool = client.update(node_pool, nodeTemplateId=node_template.id,
+                              quantity=3)
     cluster = validate_cluster(client, cluster, intermediate_state="updating")
     nodes = client.list_node(clusterId=cluster.id).data
     assert len(nodes) == 3
