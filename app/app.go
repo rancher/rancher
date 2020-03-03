@@ -47,6 +47,7 @@ type Config struct {
 	HTTPSListenPort   int
 	K8sMode           string
 	Debug             bool
+	Trace             bool
 	NoCACerts         bool
 	AuditLogPath      string
 	AuditLogMaxage    int
