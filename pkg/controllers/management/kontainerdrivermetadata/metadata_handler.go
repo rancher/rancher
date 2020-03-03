@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -92,7 +93,11 @@ func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Obje
 		return nil, fmt.Errorf("failed to get %s namespace", namespace.GlobalNamespace)
 	}
 
-	settingValues, err := getSettingValues()
+	value := setting.Value
+	if value == "" {
+		value = setting.Default
+	}
+	settingValues, err := getSettingValues(value)
 	if err != nil {
 		return nil, fmt.Errorf("error getting setting values: %v", err)
 	}
@@ -144,7 +149,7 @@ func (m *MetadataController) Refresh(url *MetadataURL) error {
 }
 
 func GetURLSettingValue() (*MetadataURL, error) {
-	settingValues, err := getSettingValues()
+	settingValues, err := getSettingValues(settings.RkeMetadataConfig.Get())
 	if err != nil {
 		return nil, err
 	}
