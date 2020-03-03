@@ -65,6 +65,10 @@ type Node struct {
 	Status NodeStatus `json:"status"`
 }
 
+func (in *Node) ObjClusterName() string {
+	return in.Namespace
+}
+
 type MetadataUpdate struct {
 	Labels      MapDelta `json:"labels,omitempty"`
 	Annotations MapDelta `json:"annotations,omitempty"`
