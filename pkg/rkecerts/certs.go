@@ -88,6 +88,7 @@ func (b *Bundle) SafeMarshal() (string, error) {
 	certs := b.certs
 	if pkiCert, ok := certs[pki.CACertName]; ok {
 		pkiCert.Key = nil
+		certs[pki.CACertName] = pkiCert
 	}
 	err := rkecerts.Save(certs, output)
 	return output.String(), err
