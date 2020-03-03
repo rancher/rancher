@@ -108,9 +108,9 @@ func getDataGit(urlPath, branch string) (kdm.Data, error) {
 	return data, nil
 }
 
-func getSettingValues() (map[string]interface{}, error) {
+func getSettingValues(value string) (map[string]interface{}, error) {
 	urlData := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(settings.RkeMetadataConfig.Get()), &urlData); err != nil {
+	if err := json.Unmarshal([]byte(value), &urlData); err != nil {
 		return nil, fmt.Errorf("unmarshal err %v", err)
 	}
 	return urlData, nil
