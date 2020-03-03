@@ -117,7 +117,7 @@ func (n *nodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	if node == nil || node.DeletionTimestamp != nil {
 		return true, nil
 	}
-	existing, err := n.nodesSyncer.getMachineForNode(node, true)
+	existing, err := n.nodesSyncer.getMachineForNodeFromCache(node)
 	if err != nil {
 		return false, err
 	}
@@ -348,10 +348,12 @@ func (m *nodesSyncer) reconcileAll() error {
 		return err
 	}
 
+	nodeCache := &NodeCache{}
+
 	// reconcile machines for existing nodes
 	for name, node := range nodeMap {
 		machine := machineMap[name]
-		err = m.reconcileNodeForNode(machine, node, nodeToPodMap)
+		err = m.reconcileNodeForNode(machine, node, nodeCache, nodeToPodMap)
 		if err != nil {
 			return err
 		}
@@ -374,9 +376,9 @@ func (m *nodesSyncer) reconcileAll() error {
 	return nil
 }
 
-func (m *nodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *nodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, nodeCache *NodeCache, pods map[string][]*corev1.Pod) error {
 	if machine == nil {
-		return m.createNode(node, pods)
+		return m.createNode(node, nodeCache, pods)
 	}
 	return m.updateNode(machine, node, pods)
 }
@@ -416,7 +418,7 @@ func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 	return nil
 }
 
-func (m *nodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *nodesSyncer) createNode(node *corev1.Node, nodeCache *NodeCache, pods map[string][]*corev1.Pod) error {
 	// respect user defined name or label
 	if nodehelper.IgnoreNode(node.Name, node.Labels) {
 		logrus.Debugf("Skipping v3.node creation for [%v] node", node.Name)
@@ -424,7 +426,7 @@ func (m *nodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 	}
 
 	// try to get machine from api, in case cache didn't get the update
-	existing, err := m.getMachineForNode(node, false)
+	existing, err := m.getMachineForNode(node, nodeCache)
 	if err != nil {
 		return err
 	}
@@ -449,27 +451,45 @@ func (m *nodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 	return nil
 }
 
-func (m *nodesSyncer) getMachineForNode(node *corev1.Node, cache bool) (*v3.Node, error) {
-	if cache {
-		return nodehelper.GetMachineForNode(node, m.clusterNamespace, m.machineLister)
-	}
+func (m *nodesSyncer) getMachineForNodeFromCache(node *corev1.Node) (*v3.Node, error) {
+	return nodehelper.GetMachineForNode(node, m.clusterNamespace, m.machineLister)
+}
 
-	labelsSearchSet := labels.Set{nodehelper.LabelNodeName: node.Name}
-	machines, err := m.machines.List(metav1.ListOptions{LabelSelector: labelsSearchSet.AsSelector().String()})
-	if err != nil {
-		return nil, err
+type NodeCache struct {
+	all    []*v3.Node
+	byName map[string][]*v3.Node
+}
+
+func (n *NodeCache) Add(machine *v3.Node) {
+	if n.byName == nil {
+		n.byName = map[string][]*v3.Node{}
 	}
-	if len(machines.Items) == 0 {
-		machines, err = m.machines.List(metav1.ListOptions{})
+	if name, ok := machine.Labels[nodehelper.LabelNodeName]; ok {
+		n.byName[name] = append(n.byName[name], machine)
+	}
+	n.all = append(n.all, machine)
+}
+
+func (m *nodesSyncer) getMachineForNode(node *corev1.Node, nodeCache *NodeCache) (*v3.Node, error) {
+	if len(nodeCache.all) == 0 {
+		machines, err := m.machines.List(metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
+		for i := range machines.Items {
+			nodeCache.Add(&machines.Items[i])
+		}
 	}
 
-	for _, machine := range machines.Items {
+	machines := nodeCache.byName[node.Name]
+	if len(machines) == 0 {
+		machines = nodeCache.all
+	}
+
+	for _, machine := range machines {
 		if machine.Namespace == m.clusterNamespace {
-			if nodehelper.IsNodeForNode(node, &machine) {
-				return &machine, nil
+			if nodehelper.IsNodeForNode(node, machine) {
+				return machine, nil
 			}
 		}
 	}
