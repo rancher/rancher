@@ -37,7 +37,7 @@ type SystemTokens struct {
 	tokenCacheMutex sync.RWMutex
 }
 
-// Multiple rancher management servers might attempt to use the same key name
+// Multiple rancher management servers might attempt to use the same token name
 // Because the token is hashed, any regeneration of an existing token name invalidates all previous tokens
 // So to avoid those HA bugs, we need to uniquely create and re-use each token for each
 // requesting management server, which we do here by generating a random string.
@@ -50,38 +50,41 @@ func getIdentifier() string {
 }
 
 // EnsureSystemToken gets or creates tokens for management use, and keeps them in memory inside contexts.
-// Appends identifier to key name
+// Appends identifier to token name
 // TTL defaults to 1 hour, after that this method will auto-refresh. If your token will be in use for more
 // than one hour without calling this method again you must pass in an overrideTTL.
 // However, the overrideTTL must not be 0, otherwise the token will never be cleaned up.
-func (t *SystemTokens) EnsureSystemToken(key, description, kind, username string, overrideTTL *int64) (string, error) {
+func (t *SystemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64) (string, error) {
 	if overrideTTL != nil && *overrideTTL == 0 {
 		return "", errors.New("TTL for system token must not be zero") // no way to cleanup token
 	}
-	key = fmt.Sprintf("%s-%s", key, t.haIdentifier) // append hashed identifier, see getIdentifier
-	token, err := t.tokenLister.Get("", key)
+	tokenName = fmt.Sprintf("%s-%s", tokenName, t.haIdentifier) // append hashed identifier, see getIdentifier
+	token, err := t.tokenLister.Get("", tokenName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
 
 	if err == nil && !tokens.IsExpired(*token) {
-		t.tokenCacheMutex.RLock()
-		val, ok := t.tokenCache[key]
-		t.tokenCacheMutex.RUnlock()
-		if ok {
-			return val, nil
+		if tokenVal := t.getTokenValue(tokenName); tokenVal != "" {
+			return tokenVal, nil
 		}
 	}
 	// needs fresh token because its missing or expired
-	val, err := t.createOrUpdateSystemToken(key, description, kind, username, overrideTTL)
+	val, err := t.createOrUpdateSystemToken(tokenName, description, kind, username, overrideTTL)
 	if err != nil {
 		return "", err
 	}
-
-	t.tokenCacheMutex.Lock()
-	defer t.tokenCacheMutex.Unlock()
-	t.tokenCache[key] = val
 	return val, nil
+}
+
+func (t *SystemTokens) getTokenValue(tokenName string) string {
+	t.tokenCacheMutex.RLock()
+	val, ok := t.tokenCache[tokenName]
+	t.tokenCacheMutex.RUnlock()
+	if ok {
+		return val
+	}
+	return ""
 }
 
 // Creates token obj with hashed token, returns token. Overwrites if pre-existing.
@@ -95,21 +98,11 @@ func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 	}
 
 	token, err := t.tokenLister.Get("", tokenName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
-	}
-	if token != nil {
-		token.Token = key
-		err = tokens.ConvertTokenKeyToHash(token)
-		if err != nil {
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
 			return "", err
 		}
-		logrus.Infof("Updating system token for %v, token: %v", userName, tokenName)
-		token, err = t.tokenClient.Update(token)
-		if err != nil {
-			return "", err
-		}
-	} else {
+		// not found error, make new token
 		token = &v3.Token{
 			ObjectMeta: v1.ObjectMeta{
 				Name: tokenName,
@@ -143,8 +136,31 @@ func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 		logrus.Infof("Creating system token for %v, token: %v", userName, tokenName)
 		token, err = t.tokenClient.Create(token)
 		if err != nil {
+			// race condition on create, someone else just created so return that val instead
+			if apierrors.IsAlreadyExists(err) {
+				if tokenVal := t.getTokenValue(tokenName); tokenVal != "" {
+					return tokenVal, nil
+				}
+				return "", fmt.Errorf("system token not found in cache: %s", tokenName)
+			}
+			return "", err
+		}
+	} else {
+		token.Token = key
+		err = tokens.ConvertTokenKeyToHash(token)
+		if err != nil {
+			return "", err
+		}
+		logrus.Infof("Updating system token for %v, token: %v", userName, tokenName)
+		token, err = t.tokenClient.Update(token)
+		if err != nil {
 			return "", err
 		}
 	}
-	return token.Name + ":" + key, nil
+	// Fresh token needs saving in cache
+	fullVal := fmt.Sprintf("%s:%s", token.Name, key)
+	t.tokenCacheMutex.Lock()
+	defer t.tokenCacheMutex.Unlock()
+	t.tokenCache[tokenName] = fullVal
+	return fullVal, nil
 }
