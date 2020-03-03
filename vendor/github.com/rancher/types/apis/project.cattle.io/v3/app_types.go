@@ -18,6 +18,10 @@ type App struct {
 	Status AppStatus `json:"status,omitempty"`
 }
 
+func (a *App) ObjClusterName() string {
+	return a.Spec.ObjClusterName()
+}
+
 type AppSpec struct {
 	ProjectName         string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
 	Description         string            `json:"description,omitempty"`

@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -25,6 +26,7 @@ import (
 	"github.com/rancher/types/config/dialer"
 	rbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +43,7 @@ type Manager struct {
 	accessControl types.AccessControl
 	rbac          rbacv1.Interface
 	dialer        dialer.Factory
+	startSem      *semaphore.Weighted
 }
 
 type record struct {
@@ -61,6 +64,7 @@ func NewManager(httpsPort int, context *config.ScaledContext, rbacControllers rb
 		accessControl: rbac.NewAccessControlWithASL("", rbacControllers, asl),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
 		clusters:      context.Management.Clusters(""),
+		startSem:      semaphore.NewWeighted(int64(settings.ClusterControllerStartCount.GetInt())),
 	}
 }
 
@@ -194,6 +198,11 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 		break
 	}
+
+	if err := m.startSem.Acquire(rec.ctx, 1); err != nil {
+		return err
+	}
+	defer m.startSem.Release(1)
 
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 	if clusterOwner {

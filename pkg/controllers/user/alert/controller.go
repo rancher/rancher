@@ -191,7 +191,7 @@ func (l *alertGroupCleaner) Clean(clusterGroup *v3.ClusterAlertGroup, projectGro
 		}
 
 		for _, v := range list.Items {
-			if controller.ObjectInCluster(l.clusterName, v) {
+			if controller.ObjectInCluster(l.clusterName, &v) {
 				if v.Spec.GroupName == groupName {
 					if err := l.projectAlertRules.DeleteNamespaced(v.Namespace, v.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 						return err
