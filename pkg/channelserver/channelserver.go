@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/sirupsen/logrus"
@@ -46,7 +47,9 @@ func run() chan error {
 			"--url", url,
 			"--url=/var/lib/rancher-data/driver-metadata/data.json",
 			"--refresh-interval", interval,
-			"--listen-address=0.0.0.0:8115")
+			"--listen-address=0.0.0.0:8115",
+			"--channel-server-version", getChannelServerArg(),
+			getChannelServerArg())
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		done <- cmd.Run()
@@ -75,4 +78,15 @@ func Start(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
+}
+
+// getChannelServerArg will return with an argument to pass to channel server
+// to indicate the server version that is running. If the current version is
+// not a proper release version, the argument will be empty.
+func getChannelServerArg() string {
+	serverVersion := settings.ServerVersion.Get()
+	if !utils.ReleaseServerVersion(serverVersion) {
+		return ""
+	}
+	return serverVersion
 }
