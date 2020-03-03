@@ -68,6 +68,11 @@ func main() {
 			Usage:       "Enable debug logs",
 			Destination: &config.Debug,
 		},
+		cli.BoolFlag{
+			Name:        "trace",
+			Usage:       "Enable trace logs",
+			Destination: &config.Trace,
+		},
 		cli.StringFlag{
 			Name:        "add-local",
 			Usage:       "Add local cluster (true, false, auto)",
@@ -177,10 +182,6 @@ func main() {
 }
 
 func initLogs(c *cli.Context, cfg app.Config) {
-	if cfg.Debug {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-
 	switch c.String("log-format") {
 	case "simple":
 		logrus.SetFormatter(&simplelog.StandardFormatter{})
@@ -190,6 +191,15 @@ func initLogs(c *cli.Context, cfg app.Config) {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
 	logrus.SetOutput(os.Stdout)
+	if cfg.Debug {
+		logrus.SetLevel(logrus.DebugLevel)
+		logrus.Debugf("Loglevel set to [%v]", logrus.DebugLevel)
+	}
+	if cfg.Trace {
+		logrus.SetLevel(logrus.TraceLevel)
+		logrus.Tracef("Loglevel set to [%v]", logrus.TraceLevel)
+	}
+
 	logserver.StartServerWithDefaults()
 }
 
