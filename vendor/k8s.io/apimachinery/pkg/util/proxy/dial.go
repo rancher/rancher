@@ -81,6 +81,12 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 				tlsConfigCopy.ServerName = inferredHost
 				tlsConfig = tlsConfigCopy
 			}
+
+			// Since this method is primary used within a "Connection: Upgrade" call we assume the caller is
+			// going to write HTTP/1.1 request to the wire. http2 should not be allowed in the TLSConfig.NextProtos,
+			// so we explicitly set that here.
+			tlsConfig.NextProtos = []string{"http/1.1"}
+
 			tlsConn = tls.Client(netConn, tlsConfig)
 			if err := tlsConn.Handshake(); err != nil {
 				netConn.Close()
