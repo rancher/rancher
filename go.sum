@@ -167,8 +167,6 @@ github.com/boltdb/bolt v1.3.1/go.mod h1:clJnj/oiGkjum5o1McbSZDSLxVThjynRyGBgiAx2
 github.com/bradfitz/go-smtpd v0.0.0-20170404230938-deb6d6237625/go.mod h1:HYsPBTaaSFSlLx/70C2HPIMNZpVV8+vt/A+FMnYP11g=
 github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b/go.mod h1:H0wQNHz2YrLsuXOZozoeDmnHXkNCRmMW0gwFWDfEZDA=
 github.com/brancz/gojsontoyaml v0.0.0-20190425155809-e8bd32d46b3d/go.mod h1:IyUJYN1gvWjtLF5ZuygmxbnsAyP3aJS6cHzIuZY50B0=
-github.com/brendarearden/types v0.0.0-20200303192431-db66b084c040 h1:9rKez+dqEfY0aW+1vSVk6YWJ7Kk1+XumXpzWaSFBZMQ=
-github.com/brendarearden/types v0.0.0-20200303192431-db66b084c040/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
 github.com/bugsnag/bugsnag-go v0.0.0-20151120182711-02e952891c52/go.mod h1:2oa8nejYd4cQ/b0hMIopN0lCRxU0bueqREvZLWFrtK8=
 github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0BsqsP2LwDJ9aOkm/6J86V6lyAXCoQWGw3K50=
 github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
@@ -896,6 +894,8 @@ github.com/prometheus/prometheus v0.0.0-20180315085919-58e2a31db8de/go.mod h1:oA
 github.com/prometheus/prometheus v1.8.2-0.20200107122003-4708915ac6ef/go.mod h1:7U90zPoLkWjEIQcy/rweQla82OCTUzxVHE51G3OhJbI=
 github.com/prometheus/prometheus v2.3.2+incompatible/go.mod h1:oAIUtOny2rjMX0OWN5vPR5/q/twIROJvdqnQKDdil/s=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
+github.com/prometheus/tsdb v0.8.0 h1:w1tAGxsBMLkuGrFMhqgcCeBkM5d1YI24udArs+aASuQ=
+github.com/prometheus/tsdb v0.8.0/go.mod h1:fSI0j+IUQrDd7+ZtR9WKIGtoYAYAJUKcKhYLG25tN4g=
 github.com/quasilyte/go-consistent v0.0.0-20190521200055-c6f3937de18c/go.mod h1:5STLWrekHfjyYwxBRVRXNOSewLJ3PWfDJd1VyTS21fI=
 github.com/quobyte/api v0.1.2/go.mod h1:jL7lIHrmqQ7yh05OJ+eEEdHr0u/kmT1Ff9iHd+4H6VI=
 github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4bJ1FwuaBZ6dt1VcDX5/O662mwR8GWqS4l68H6hkoYQ=
@@ -934,6 +934,8 @@ github.com/rancher/system-upgrade-controller v0.3.1/go.mod h1:/2W/8WEqCSrz66hOYr
 github.com/rancher/types v0.0.0-20200303162837-300a04e6f743/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
 github.com/rancher/types v0.0.0-20200304001827-068a357fa053 h1:8IucmgkU1URdPq1FVGzg9Bg+N/TyC4SXpzW7kMcpVSU=
 github.com/rancher/types v0.0.0-20200304001827-068a357fa053/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
+github.com/rancher/types v0.0.0-20200305160044-e8e610dd9e01 h1:NmO8066VGBZpVlOV91pFSbjnIOTWU6hEIXkTt6ZfNRs=
+github.com/rancher/types v0.0.0-20200305160044-e8e610dd9e01/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.2.1-0.20191025041946-1fd360590735/go.mod h1:zmXTOSzU0vhumCyl0+Acq2FEP5WJOJRqnCQDegknyWA=
 github.com/rancher/wrangler v0.4.0/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
