@@ -53,5 +53,17 @@ func (n *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 			return nil, err
 		}
 	}
+
+	if obj.Annotations[tokenUtil.TokenHashed] != "true" {
+		newObj := obj.DeepCopy()
+		err := tokenUtil.ConvertTokenKeyToHash(newObj)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := n.tokens.Update(newObj); err != nil {
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }

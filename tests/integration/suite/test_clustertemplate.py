@@ -243,7 +243,8 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
 
 
 @pytest.mark.nonparallel
-def test_check_enforcement(admin_mc, remove_resource, user_factory):
+def test_check_enforcement(admin_mc, remove_resource,
+                           list_remove_resource, user_factory):
     cluster_template = create_cluster_template(admin_mc, remove_resource,
                                                [], admin_mc)
     templateId = cluster_template.id
@@ -260,7 +261,10 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     cluster = client.create_cluster(
             name=random_str(), rancherKubernetesEngineConfig={
                 "accessKey": "asdfsd"})
-    remove_resource(cluster)
+    remove_list = [cluster]
+    # This will be called before remove_resource,
+    # as clusters must be deleted before their cluster_template
+    list_remove_resource(remove_list)
 
     # a user cannot create an rke cluster without template
     user = user_factory()
@@ -280,20 +284,20 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     assert e.value.error.status == 422
 
     # a user can create a non-rke cluster without template
-    cluster = user_client.create_cluster(
+    cluster2 = user_client.create_cluster(
             name=random_str(), amazonElasticContainerServiceConfig={
                 "accessKey": "asdfsd"})
-    remove_resource(cluster)
+    remove_list.append(cluster2)
 
     # a user can create an rke cluster with a public template
     template_reloaded = client.by_id_cluster_template(templateId)
     new_members = [{"groupPrincipalId": "*", "accessType": "read-only"}]
     client.update(template_reloaded, members=new_members)
 
-    cluster2 = wait_for_cluster_create(user_client, name=random_str(),
+    cluster3 = wait_for_cluster_create(user_client, name=random_str(),
                                        clusterTemplateRevisionId=rev.id,
                                        description="template from cluster")
-    remove_resource(cluster2)
+    remove_list.append(cluster3)
     client.update_by_id_setting(id='cluster-template-enforcement',
                                 value="false")
 

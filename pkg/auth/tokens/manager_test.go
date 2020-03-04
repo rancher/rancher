@@ -18,6 +18,7 @@ type DummyIndexer struct {
 }
 
 type TestCase struct {
+	name    string
 	token   string
 	userID  string
 	receive bool
@@ -40,30 +41,35 @@ func TestTokenStreamTransformer(t *testing.T) {
 
 	testCases := []TestCase{
 		{
+			name:    "valid token",
 			token:   "testname:testkey",
 			userID:  "testuser",
 			receive: true,
 			err:     "",
 		},
 		{
+			name:    "invalid token name",
 			token:   "wrongname:testkey",
 			userID:  "testuser",
 			receive: false,
 			err:     "422: [TokenStreamTransformer] failed: Invalid auth token value",
 		},
 		{
+			name:    "invalid token key",
 			token:   "testname:wrongkey",
 			userID:  "testname",
 			receive: false,
 			err:     "422: [TokenStreamTransformer] failed: Invalid auth token value",
 		},
 		{
+			name:    "invalid user for token",
 			token:   "testname:testkey",
 			userID:  "diffname",
 			receive: false,
 			err:     "",
 		},
 		{
+			name:    "no token provided",
 			token:   "",
 			userID:  "testuser",
 			receive: false,
@@ -79,10 +85,10 @@ func TestTokenStreamTransformer(t *testing.T) {
 
 		df, err := tokenManager.TokenStreamTransformer(apiCtx, nil, dataStream, nil)
 		if testCase.err == "" {
-			assert.Nil(err)
+			assert.Nilf(err, "\"%s\" should not return an error but did", testCase.name)
 		} else {
-			assert.NotNil(err)
-			assert.Contains(err.Error(), testCase.err)
+			assert.NotNilf(err, "\"%s\" should return an error but did not", testCase.name)
+			assert.Containsf(err.Error(), testCase.err, "\"%s\" returned error that did not match", testCase.name)
 		}
 
 		ticker := time.NewTicker(1 * time.Second)
@@ -90,7 +96,7 @@ func TestTokenStreamTransformer(t *testing.T) {
 
 		// test data is received when data stream contains matching userID
 		dataStream <- map[string]interface{}{"labels": map[string]interface{}{UserIDLabel: testCase.userID}}
-		assert.Equal(<-dataReceived, testCase.receive)
+		assert.Equalf(<-dataReceived, testCase.receive, "\"%s\" receive value \"%t\" was not correct", testCase.name, testCase.receive)
 		close(dataStream)
 		ticker.Stop()
 	}
@@ -121,7 +127,7 @@ func (d *DummyIndexer) ListIndexFuncValues(indexName string) []string {
 func (d *DummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
 	return []interface{}{
 		&v3.Token{
-			Token: "testkey",
+			Token: "$1:fc5d88fa6e60a091:15:8:1:dUzBSmpqILPEsA/DzulT0lf4T8xu6juX2NU0sMqLXYADzUiYIB3yFMN4EvLSD7PJ1N0g9Rd99sB3Nfe8YW5eDg", // "testkey"
 			ObjectMeta: v1.ObjectMeta{
 				Name: "testname",
 			},

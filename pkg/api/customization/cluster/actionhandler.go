@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/randomtoken"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/user"
@@ -108,12 +109,20 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 
 func (a ActionHandler) getClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	return a.UserMgr.EnsureClusterToken(clusterID, fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID), "Kubeconfig token", "kubeconfig", userName)
+	name, err := kubeconfigTokenName(userName, clusterID)
+	if err != nil {
+		return "", err
+	}
+	return a.UserMgr.EnsureClusterToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName, nil)
 }
 
 func (a ActionHandler) getToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	return a.UserMgr.EnsureToken("kubeconfig-"+userName, "Kubeconfig token", "kubeconfig", userName)
+	name, err := kubeconfigTokenName(userName, "")
+	if err != nil {
+		return "", err
+	}
+	return a.UserMgr.EnsureToken(name, "Kubeconfig token", "kubeconfig", userName, nil)
 }
 
 func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
@@ -123,4 +132,16 @@ func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmt
 	}
 
 	return a.ClusterManager.KubeConfig(cluster.ID, token), nil
+}
+
+func kubeconfigTokenName(userName, clusterID string) (string, error) {
+	randString, err := randomtoken.Generate()
+	if err != nil {
+		return "", err
+	}
+	randString = randString[0:5]
+	if clusterID != "" {
+		return fmt.Sprintf("kubeconfig-%s-%s.%s", userName, randString, clusterID), nil
+	}
+	return fmt.Sprintf("kubeconfig-%s-%s", userName, randString), nil
 }

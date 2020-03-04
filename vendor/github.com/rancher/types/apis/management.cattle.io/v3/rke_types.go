@@ -853,7 +853,7 @@ type DNSConfig struct {
 
 type Nodelocal struct {
 	// link-local IP for nodelocal DNS
-	IPAddress string `yaml:"ipaddress" json:"ipAddress,omitempy"`
+	IPAddress string `yaml:"ip_address" json:"ipAddress,omitempy"`
 	// Nodelocal DNS daemonset upgrade strategy
 	UpdateStrategy *appsv1.DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
 	// NodeSelector key pair

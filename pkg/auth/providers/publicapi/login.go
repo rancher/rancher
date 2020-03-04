@@ -52,7 +52,7 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 
 	w := request.Response
 
-	token, responseType, err := h.createLoginToken(request)
+	token, unhashedTokenKey, responseType, err := h.createLoginToken(request)
 	if err != nil {
 		// if user fails to authenticate, hide the details of the exact error. bad credentials will already be APIErrors
 		// otherwise, return a generic error message
@@ -65,7 +65,7 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 	if responseType == "cookie" {
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
-			Value:    token.ObjectMeta.Name + ":" + token.Token,
+			Value:    token.ObjectMeta.Name + ":" + unhashedTokenKey,
 			Secure:   true,
 			Path:     "/",
 			HttpOnly: true,
@@ -78,14 +78,15 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
 		}
-		tokenData["token"] = token.ObjectMeta.Name + ":" + token.Token
+		tokenData["token"] = token.ObjectMeta.Name + ":" + unhashedTokenKey
 		request.WriteResponse(http.StatusCreated, tokenData)
 	}
 
 	return nil
 }
 
-func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, string, error) {
+// createLoginToken returns token, unhashed token key (where applicable), responseType and error
+func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, string, string, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
 	var providerToken string
@@ -94,14 +95,14 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	bytes, err := ioutil.ReadAll(request.Request.Body)
 	if err != nil {
 		logrus.Errorf("login failed with error: %v", err)
-		return v3.Token{}, "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
 	generic := &v3public.GenericLogin{}
 	err = json.Unmarshal(bytes, generic)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
-		return v3.Token{}, "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 	responseType := generic.ResponseType
 	description := generic.Description
@@ -152,13 +153,13 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		input = &v3public.GoogleOauthLogin{}
 		providerName = googleoauth.Name
 	default:
-		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
+		return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
 
 	err = json.Unmarshal(bytes, input)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
-		return v3.Token{}, "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
 	// Authenticate User
@@ -168,28 +169,28 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	if providerName == saml.PingName || providerName == saml.ADFSName || providerName == saml.KeyCloakName ||
 		providerName == saml.OKTAName || providerName == saml.ShibbolethName {
 		err = saml.PerformSamlLogin(providerName, request, input)
-		return v3.Token{}, "saml", err
+		return v3.Token{}, "", "saml", err
 	}
 
 	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
 	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
-		return v3.Token{}, "", err
+		return v3.Token{}, "", "", err
 	}
 
 	displayName := userPrincipal.DisplayName
 	if displayName == "" {
 		displayName = userPrincipal.LoginName
 	}
-	user, err := h.userMGR.EnsureUser(userPrincipal.Name, displayName)
+	currUser, err := h.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
-		return v3.Token{}, "", err
+		return v3.Token{}, "", "", err
 	}
 
-	if user.Enabled != nil && !*user.Enabled {
-		return v3.Token{}, "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
+	if currUser.Enabled != nil && !*currUser.Enabled {
+		return v3.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
 	}
 
-	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
-	return rToken, responseType, err
+	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
+	return rToken, unhashedTokenKey, responseType, err
 }
