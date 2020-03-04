@@ -591,7 +591,7 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
     assert e.value.error.status == 422
 
 
-def wait_for_workload(client, ns, timeout=60, count=0):
+def wait_for_workload(client, ns, timeout=240, count=0):
     start = time.time()
     interval = 0.5
     workloads = client.list_workload(namespaceId=ns)
