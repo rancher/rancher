@@ -62,6 +62,7 @@ require (
 	github.com/google/go-querystring v1.0.0
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
+	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/mattn/go-colorable v0.1.2
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
@@ -81,7 +82,7 @@ require (
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
 	github.com/rancher/rke v1.1.0-rc9
-	github.com/rancher/security-scan v0.1.5
+	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200302231302-020fd6252623
 	github.com/rancher/system-upgrade-controller v0.3.1
 	github.com/rancher/types v0.0.0-20200304001827-068a357fa053

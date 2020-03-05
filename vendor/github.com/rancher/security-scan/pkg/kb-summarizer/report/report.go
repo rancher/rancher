@@ -20,10 +20,11 @@ const (
 type State string
 
 const (
-	Pass  State = "pass"
-	Fail  State = "fail"
-	Skip  State = "skip"
-	Mixed State = "mixed"
+	Pass          State = "pass"
+	Fail          State = "fail"
+	Skip          State = "skip"
+	Mixed         State = "mixed"
+	NotApplicable State = "notApplicable"
 )
 
 type Check struct {
@@ -42,13 +43,14 @@ type Group struct {
 }
 
 type Report struct {
-	Version string                `json:"version"`
-	Total   int                   `json:"total"`
-	Pass    int                   `json:"pass"`
-	Fail    int                   `json:"fail"`
-	Skip    int                   `json:"skip"`
-	Nodes   map[NodeType][]string `json:"nodes"`
-	Results []*Group              `json:"results"`
+	Version       string                `json:"version"`
+	Total         int                   `json:"total"`
+	Pass          int                   `json:"pass"`
+	Fail          int                   `json:"fail"`
+	Skip          int                   `json:"skip"`
+	NotApplicable int                   `json:"notApplicable"`
+	Nodes         map[NodeType][]string `json:"nodes"`
+	Results       []*Group              `json:"results"`
 }
 
 func nodeTypeMapper(nodeType summarizer.NodeType) NodeType {
@@ -73,6 +75,8 @@ func mapState(state summarizer.State) State {
 		return Skip
 	case summarizer.Mixed:
 		return Mixed
+	case summarizer.NotApplicable:
+		return NotApplicable
 	}
 	return Fail
 }
@@ -133,12 +137,13 @@ func mapReport(internalReport *summarizer.SummarizedReport) (*Report, error) {
 	externalReport.Pass = internalReport.Pass
 	externalReport.Fail = internalReport.Fail
 	externalReport.Skip = internalReport.Skip
+	externalReport.NotApplicable = internalReport.NotApplicable
 	externalReport.Nodes = mapNodes(internalReport.Nodes)
 
 	return externalReport, nil
 }
 
-func Generate(data []byte) ([]byte, error) {
+func GetJSONBytes(data []byte) ([]byte, error) {
 	internalReport := &summarizer.SummarizedReport{}
 	err := json.Unmarshal(data, &internalReport)
 	if err != nil {
@@ -154,4 +159,13 @@ func Generate(data []byte) ([]byte, error) {
 	}
 
 	return extData, nil
+}
+
+func Get(data []byte) (*Report, error) {
+	internalReport := &summarizer.SummarizedReport{}
+	err := json.Unmarshal(data, &internalReport)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling data into internal report: %v", err)
+	}
+	return mapReport(internalReport)
 }

@@ -105,6 +105,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	watcher.StartPodWatcher(ctx, cluster, alertmanager)
 	watcher.StartWorkloadWatcher(ctx, cluster, alertmanager)
 	watcher.StartNodeWatcher(ctx, cluster, alertmanager)
+	watcher.StartClusterScanWatcher(ctx, cluster, alertmanager)
 
 }
 

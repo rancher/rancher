@@ -3,7 +3,6 @@ package cis
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
@@ -12,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rke/util"
+	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	rcorev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -23,35 +23,48 @@ import (
 )
 
 const (
-	NumberOfRetriesForConfigMapCreate = 3
-	RetryIntervalInMilliseconds       = 100
-	ConfigFileName                    = "config.json"
-	CurrentBenchmarkKey               = "current"
+	// helm chart variable names
+	varOwner                      = "owner"
+	varUserSkipConfigMapName      = "userSkipConfigMapName"
+	varDefaultSkipConfigMapName   = "defaultSkipConfigMapName"
+	varNotApplicableConfigMapName = "notApplicableConfigMapName"
+	varDebugMaster                = "debugMaster"
+	varDebugWorker                = "debugWorker"
+	varOverrideBenchmarkVersion   = "overrideBenchmarkVersion"
+)
+
+var (
+	SonobuoyMasterLabel = map[string]string{"run": "sonobuoy-master"}
 )
 
 type cisScanHandler struct {
+	clusterNamespace             string
+	clusterClient                v3.ClusterInterface
 	clusterLister                v3.ClusterLister
 	projectLister                v3.ProjectLister
-	mgmtCtxClusterClient         v3.ClusterInterface
-	mgmtCtxAppClient             projv3.AppInterface
-	mgmtCtxTemplateVersionLister v3.CatalogTemplateVersionLister
-	mgmtCtxClusterScanClient     v3.ClusterScanInterface
-	userCtxNSClient              rcorev1.NamespaceInterface
-	userCtxCMLister              rcorev1.ConfigMapLister
-	clusterNamespace             string
+	appClient                    projv3.AppInterface
+	catalogTemplateVersionLister v3.CatalogTemplateVersionLister
+	clusterScanClient            v3.ClusterScanInterface
+	nsClient                     rcorev1.NamespaceInterface
+	cmClient                     rcorev1.ConfigMapInterface
+	cmLister                     rcorev1.ConfigMapLister
 	systemAccountManager         *systemaccount.Manager
-	configMapsClient             rcorev1.ConfigMapInterface
-	cisConfig                    v3.CisConfigInterface
+	cisConfigClient              v3.CisConfigInterface
 	cisConfigLister              v3.CisConfigLister
+	cisBenchmarkVersionClient    v3.CisBenchmarkVersionInterface
+	cisBenchmarkVersionLister    v3.CisBenchmarkVersionLister
+	podLister                    rcorev1.PodLister
 }
 
 type appInfo struct {
-	appName                  string
-	clusterName              string
-	skipConfigMapName        string
-	debugMaster              string
-	debugWorker              string
-	overrideBenchmarkVersion string
+	appName                        string
+	clusterName                    string
+	userSkipConfigMapName          string
+	defaultSkipConfigMapName       string
+	notApplicableSkipConfigMapName string
+	debugMaster                    string
+	debugWorker                    string
+	overrideBenchmarkVersion       string
 }
 
 type OverrideSkipInfoData struct {
@@ -82,6 +95,11 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		v3.ClusterScanConditionFailed.Message(cs, "cannot run scan on a windows cluster")
 		return cs, nil
 	}
+
+	if err := isRunnerPodRemoved(csh.podLister); err != nil {
+		return cs, fmt.Errorf("cisScanHandler: Create: %v, will retry", err)
+	}
+
 	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
 		currentK8sVersion := cluster.Spec.RancherKubernetesEngineConfig.Version
@@ -89,7 +107,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		cisConfigParams, err := kontainerdrivermetadata.GetCisConfigParams(
 			shortK8sVersion,
 			csh.cisConfigLister,
-			csh.cisConfig,
+			csh.cisConfigClient,
 		)
 		if err != nil {
 			logrus.Debugf("cisScanHandler: Create: benchmark version not found for k8s version: %v(%v), using default",
@@ -97,11 +115,20 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 			cisConfigParams, err = kontainerdrivermetadata.GetCisConfigParams(
 				"default",
 				csh.cisConfigLister,
-				csh.cisConfig,
+				csh.cisConfigClient,
 			)
 			if err != nil {
 				return cs, fmt.Errorf("error fetching default cis config: %v", err)
 			}
+		}
+		benchmarkInfo, err := kontainerdrivermetadata.GetCisBenchmarkVersionInfo(
+			cisConfigParams.BenchmarkVersion,
+			csh.cisBenchmarkVersionLister,
+			csh.cisBenchmarkVersionClient,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("cisScanHandler: Create: error fetching benchmark version info %v: %v",
+				cisConfigParams.BenchmarkVersion, err)
 		}
 		logrus.Debugf("cisScanHandler: Create: k8sVersion: %v, benchmarkVersion: %v",
 			currentK8sVersion, cisConfigParams.BenchmarkVersion)
@@ -133,44 +160,33 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 			// create the cm
 			skipDataBytes, err := getOverrideSkipInfoData(cs.Spec.ScanConfig.CisScanConfig.OverrideSkip)
 			if err != nil {
-				logrus.Errorf("cisScanHandler: Create: error getting overrideSkip: %v", err)
-			} else {
-				cm = &v1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						Kind: "ConfigMap",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: getOverrideConfigMapName(cs),
-					},
-					Data: map[string]string{
-						ConfigFileName: string(skipDataBytes),
-					},
-				}
-				success := false
-				for i := 0; i < NumberOfRetriesForConfigMapCreate; i++ {
-					cm, err = csh.configMapsClient.Create(cm)
-					if err == nil || kerrors.IsAlreadyExists(err) {
-						logrus.Infof("cisScanHandler: Create: created skip override configmap %v with contents: %v", cm.Name, string(skipDataBytes))
-						success = true
-						break
-					}
-					time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
-				}
-				if !success {
-					cm = nil
-					logrus.Errorf("cisScanHandler: Create: error creating configmap: %v", err)
-				}
+				v3.ClusterScanConditionFailed.True(cs)
+				v3.ClusterScanConditionFailed.Message(cs, fmt.Sprintf("error getting overrideSkip: %v", err))
+				return cs, nil
+			}
+			cm = getConfigMapObject(getOverrideConfigMapName(cs), string(skipDataBytes))
+			if err := createConfigMapWithRetry(csh.cmClient, cm); err != nil {
+				return cs, fmt.Errorf("cisScanHandler: Create: %v", err)
 			}
 		} else {
 			// Check if the configmap is populated
-			cm, err = csh.userCtxCMLister.Get(v3.DefaultNamespaceForCis, v3.ConfigMapNameForUserConfig)
+			userSkipConfigMapName := getUserSkipConfigMapName()
+			cm, err = csh.cmLister.Get(v3.DefaultNamespaceForCis, userSkipConfigMapName)
 			if err != nil && !kerrors.IsNotFound(err) {
-				return cs, fmt.Errorf("cisScanHandler: Create: error fetching configmap %v: %v", err, v3.ConfigMapNameForUserConfig)
+				return cs, fmt.Errorf("cisScanHandler: Create: error fetching configmap %v: %v", err, userSkipConfigMapName)
 			}
 		}
 		if cm != nil {
-			appInfo.skipConfigMapName = cm.Name
+			appInfo.userSkipConfigMapName = cm.Name
 		}
+
+		if benchmarkInfo.Managed {
+			appInfo.notApplicableSkipConfigMapName = getNotApplicableConfigMapName(cisConfigParams.BenchmarkVersion)
+			if cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
+				appInfo.defaultSkipConfigMapName = getDefaultSkipConfigMapName(cisConfigParams.BenchmarkVersion)
+			}
+		}
+
 		// Deploy the system helm chart
 		if err := csh.deployApp(appInfo); err != nil {
 			return cs, fmt.Errorf("cisScanHandler: Create: error deploying app: %v", err)
@@ -184,7 +200,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 	logrus.Debugf("cisScanHandler: Remove: %+v", cs)
 	// Delete the configmap associated with this scan
-	err := csh.configMapsClient.Delete(cs.Name, &metav1.DeleteOptions{})
+	err := csh.cmClient.Delete(cs.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		if !kerrors.IsNotFound(err) {
 			return cs, fmt.Errorf("cisScanHandler: Remove: error deleting cm=%v", cs.Name)
@@ -204,7 +220,7 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 	if cs.Spec.ScanConfig.CisScanConfig != nil {
 		if cs.Spec.ScanConfig.CisScanConfig.OverrideSkip != nil {
 			// Delete the configmap
-			err := csh.configMapsClient.Delete(getOverrideConfigMapName(cs), nil)
+			err := csh.cmClient.Delete(getOverrideConfigMapName(cs), nil)
 			if err != nil && !kerrors.IsNotFound(err) {
 				return nil, fmt.Errorf("cisScanHandler: Remove: error deleting configmap: %v", err)
 			}
@@ -219,7 +235,7 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 	if owner, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok && owner == cs.Name {
 		updatedCluster := cluster.DeepCopy()
 		delete(updatedCluster.Annotations, v3.RunCisScanAnnotation)
-		if _, err := csh.mgmtCtxClusterClient.Update(updatedCluster); err != nil {
+		if _, err := csh.clusterClient.Update(updatedCluster); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Remove: failed to update cluster about CIS scan completion")
 		}
 	}
@@ -244,11 +260,15 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 		if cs.Spec.ScanConfig.CisScanConfig != nil {
 			if cs.Spec.ScanConfig.CisScanConfig.OverrideSkip != nil {
 				// Delete the configmap
-				err := csh.configMapsClient.Delete(getOverrideConfigMapName(cs), nil)
+				err := csh.cmClient.Delete(getOverrideConfigMapName(cs), nil)
 				if err != nil && !kerrors.IsNotFound(err) {
 					return nil, fmt.Errorf("cisScanHandler: Updated: error deleting configmap: %v", err)
 				}
 			}
+		}
+
+		if err := isRunnerPodRemoved(csh.podLister); err != nil {
+			return cs, fmt.Errorf("cisScanHandler: Updated: %v, will retry", err)
 		}
 
 		cluster, err := csh.clusterLister.Get("", csh.clusterNamespace)
@@ -258,18 +278,40 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 
 		updatedCluster := cluster.DeepCopy()
 		delete(updatedCluster.Annotations, v3.RunCisScanAnnotation)
-		if _, err := csh.mgmtCtxClusterClient.Update(updatedCluster); err != nil {
+		if _, err := csh.clusterClient.Update(updatedCluster); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Updated: failed to update cluster about CIS scan completion")
 		}
 
+		cm, err := csh.cmClient.Get(cs.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("cisScanHandler: Updated: error fetching configmap %v: %v", cs.Name, err)
+		}
+		r, err := report.Get([]byte(cm.Data[v3.DefaultScanOutputFileName]))
+		if err != nil {
+			return nil, fmt.Errorf("cisScanHandler: Updated: error getting report from configmap %v: %v", cs.Name, err)
+		}
+		if r == nil {
+			return nil, fmt.Errorf("cisScanHandler: Updated: error: got empty report from configmap %v", cs.Name)
+		}
+
+		cisScanStatus := &v3.CisScanStatus{
+			Total:         r.Total,
+			Pass:          r.Pass,
+			Fail:          r.Fail,
+			Skip:          r.Skip,
+			NotApplicable: r.NotApplicable,
+		}
+
+		cs.Status.CisScanStatus = cisScanStatus
 		v3.ClusterScanConditionCompleted.True(cs)
+		v3.ClusterScanConditionAlerted.Unknown(cs)
 	}
 	return cs, nil
 }
 
 func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 	appCatalogID := settings.SystemCISBenchmarkCatalogID.Get()
-	err := utils.DetectAppCatalogExistence(appCatalogID, csh.mgmtCtxTemplateVersionLister)
+	err := utils.DetectAppCatalogExistence(appCatalogID, csh.catalogTemplateVersionLister)
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}
@@ -282,19 +324,21 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 	if err != nil {
 		return err
 	}
-	appProjectName, err := utils.EnsureAppProjectName(csh.userCtxNSClient, appDeployProjectID, appInfo.clusterName, v3.DefaultNamespaceForCis, creator.Name)
+	appProjectName, err := utils.EnsureAppProjectName(csh.nsClient, appDeployProjectID, appInfo.clusterName, v3.DefaultNamespaceForCis, creator.Name)
 	if err != nil {
 		return err
 	}
 
 	appAnswers := map[string]string{
-		"owner":                    appInfo.appName,
-		"skipConfigMapName":        appInfo.skipConfigMapName,
-		"debugMaster":              appInfo.debugMaster,
-		"debugWorker":              appInfo.debugWorker,
-		"overrideBenchmarkVersion": appInfo.overrideBenchmarkVersion,
+		varOwner:                      appInfo.appName,
+		varUserSkipConfigMapName:      appInfo.userSkipConfigMapName,
+		varDefaultSkipConfigMapName:   appInfo.defaultSkipConfigMapName,
+		varNotApplicableConfigMapName: appInfo.notApplicableSkipConfigMapName,
+		varDebugMaster:                appInfo.debugMaster,
+		varDebugWorker:                appInfo.debugWorker,
+		varOverrideBenchmarkVersion:   appInfo.overrideBenchmarkVersion,
 	}
-	logrus.Debugf("cisScanHandler: deployApp: appAnswers: %v", appAnswers)
+	logrus.Debugf("cisScanHandler: deployApp: appAnswers: %+v", appAnswers)
 	app := &projv3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{creatorIDAnno: creator.Name},
@@ -310,7 +354,7 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 		},
 	}
 
-	_, err = utils.DeployApp(csh.mgmtCtxAppClient, appDeployProjectID, app, false)
+	_, err = utils.DeployApp(csh.appClient, appDeployProjectID, app, false)
 	if err != nil {
 		return err
 	}
@@ -327,7 +371,7 @@ func (csh *cisScanHandler) deleteApp(appInfo *appInfo) error {
 		return nil
 	}
 
-	err = utils.DeleteApp(csh.mgmtCtxAppClient, appDeployProjectID, appInfo.appName)
+	err = utils.DeleteApp(csh.appClient, appDeployProjectID, appInfo.appName)
 	if err != nil {
 		if !kerrors.IsNotFound(err) {
 			return err

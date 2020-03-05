@@ -196,6 +196,10 @@ github.com/googleapis/gnostic/extensions
 github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.1
 github.com/gorilla/websocket
+# github.com/hashicorp/errwrap v1.0.0
+github.com/hashicorp/errwrap
+# github.com/hashicorp/go-multierror v1.0.0
+github.com/hashicorp/go-multierror
 # github.com/hashicorp/golang-lru v0.5.3
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
@@ -404,7 +408,7 @@ github.com/rancher/rke/pki/cert
 github.com/rancher/rke/services
 github.com/rancher/rke/templates
 github.com/rancher/rke/util
-# github.com/rancher/security-scan v0.1.5
+# github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
 # github.com/rancher/steve v0.0.0-20200302231302-020fd6252623
