@@ -56,6 +56,8 @@ AZURE_SUBSCRIPTION_ID no default, your Azure subscription id
 AZURE_CLIENT_ID no default, your app / client id
 AZURE_CLIENT_SECRET no default, your app / client secret
 AZURE_TENANT_ID no default your Azure tenant id, for use with Azure cloud provider
+AZURE_CUSTOM_IMAGE no default a Azure custom image's ARM resource identifier, for use on custom image tests
+AZURE_GALLERY_IMAGE_VERSION no default a Azure gallery image version's ARM resource identifier, for use on custom image tests
 ```
 
 ### v3_api test variables:
