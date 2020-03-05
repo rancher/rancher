@@ -119,7 +119,8 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 	// if rancher plans exist, do we need to update?
 	if masterPlan.Name != "" || workerPlan.Name != "" {
 		if masterPlan.Name != "" {
-			newMaster := configureMasterPlan(masterPlan, cluster.Spec.K3sConfig.Version, cluster.Spec.K3sConfig.ServerConcurrency)
+			newMaster := configureMasterPlan(masterPlan, cluster.Spec.K3sConfig.Version, cluster.Spec.K3sConfig.ServerConcurrency,
+				cluster.Spec.K3sConfig.DrainServerNodes)
 
 			if !cmp(masterPlan, newMaster) {
 				planClient = planConfig.Plans(systemUpgradeNS)
@@ -131,7 +132,8 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 		}
 
 		if workerPlan.Name != "" {
-			newWorker := configureWorkerPlan(workerPlan, cluster.Spec.K3sConfig.Version, cluster.Spec.K3sConfig.WorkerConcurrency)
+			newWorker := configureWorkerPlan(workerPlan, cluster.Spec.K3sConfig.Version, cluster.Spec.K3sConfig.WorkerConcurrency,
+				cluster.Spec.K3sConfig.DrainWorkerNodes)
 
 			if !cmp(workerPlan, newWorker) {
 				planClient = planConfig.Plans(systemUpgradeNS)
@@ -145,13 +147,13 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 	} else { // create the plans
 		planClient = planConfig.Plans(systemUpgradeNS)
 		masterPlan = generateMasterPlan(cluster.Spec.K3sConfig.Version,
-			cluster.Spec.K3sConfig.ServerConcurrency)
+			cluster.Spec.K3sConfig.ServerConcurrency, cluster.Spec.K3sConfig.DrainServerNodes)
 		_, err = planClient.Create(&masterPlan)
 		if err != nil {
 			return err
 		}
 		workerPlan = generateWorkerPlan(cluster.Spec.K3sConfig.Version,
-			cluster.Spec.K3sConfig.WorkerConcurrency)
+			cluster.Spec.K3sConfig.WorkerConcurrency, cluster.Spec.K3sConfig.DrainWorkerNodes)
 		_, err = planClient.Create(&workerPlan)
 		if err != nil {
 			return err

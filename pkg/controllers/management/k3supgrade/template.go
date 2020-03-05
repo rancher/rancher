@@ -29,9 +29,6 @@ var genericPlan = planv1.Plan{
 		Secrets:            nil,
 		Prepare:            nil,
 		Cordon:             false,
-		Drain: &planv1.DrainSpec{
-			Force: true,
-		},
 		Upgrade: &planv1.ContainerSpec{
 			Image: upgradeImage,
 		},
@@ -39,11 +36,17 @@ var genericPlan = planv1.Plan{
 	Status: planv1.PlanStatus{},
 }
 
-func generateMasterPlan(version string, concurrency int) planv1.Plan {
+func generateMasterPlan(version string, concurrency int, drain bool) planv1.Plan {
 	masterPlan := genericPlan
 	masterPlan.Name = k3sMasterPlanName
 	masterPlan.Spec.Version = version
 	masterPlan.Spec.Concurrency = int64(concurrency)
+
+	if drain {
+		masterPlan.Spec.Drain = &planv1.DrainSpec{
+			Force: true,
+		}
+	}
 
 	// only select master nodes
 	masterPlan.Spec.NodeSelector = &metav1.LabelSelector{
@@ -58,11 +61,17 @@ func generateMasterPlan(version string, concurrency int) planv1.Plan {
 	return masterPlan
 }
 
-func generateWorkerPlan(version string, concurrency int) planv1.Plan {
+func generateWorkerPlan(version string, concurrency int, drain bool) planv1.Plan {
 	workerPlan := genericPlan
 	workerPlan.Name = k3sWorkerPlanName
 	workerPlan.Spec.Version = version
 	workerPlan.Spec.Concurrency = int64(concurrency)
+
+	if drain {
+		workerPlan.Spec.Drain = &planv1.DrainSpec{
+			Force: true,
+		}
+	}
 
 	// worker plans wait for master plans to complete
 	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
@@ -81,10 +90,16 @@ func generateWorkerPlan(version string, concurrency int) planv1.Plan {
 	return workerPlan
 }
 
-func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int) planv1.Plan {
+func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int, drain bool) planv1.Plan {
 	masterPlan.Name = k3sMasterPlanName
 	masterPlan.Spec.Version = version
 	masterPlan.Spec.Concurrency = int64(concurrency)
+
+	if drain {
+		masterPlan.Spec.Drain = &planv1.DrainSpec{
+			Force: true,
+		}
+	}
 
 	// only select master nodes
 	masterPlan.Spec.NodeSelector = &metav1.LabelSelector{
@@ -98,10 +113,16 @@ func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int
 	return masterPlan
 }
 
-func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int) planv1.Plan {
+func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int, drain bool) planv1.Plan {
 	workerPlan.Name = k3sWorkerPlanName
 	workerPlan.Spec.Version = version
 	workerPlan.Spec.Concurrency = int64(concurrency)
+
+	if drain {
+		workerPlan.Spec.Drain = &planv1.DrainSpec{
+			Force: true,
+		}
+	}
 
 	// worker plans wait for master plans to complete
 	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
