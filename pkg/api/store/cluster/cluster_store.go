@@ -34,6 +34,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -192,6 +193,9 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 	// enable local backups for rke clusters by default
 	enableLocalBackup(data)
+	if err := setNodeUpgradeStrategy(data, nil); err != nil {
+		return nil, err
+	}
 
 	data, err = r.transposeDynamicFieldToGenericConfig(data)
 	if err != nil {
@@ -467,7 +471,9 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err != nil {
 		return nil, err
 	}
-
+	if err := setNodeUpgradeStrategy(data, existingCluster); err != nil {
+		return nil, err
+	}
 	data, err = r.transposeDynamicFieldToGenericConfig(data)
 	if err != nil {
 		return nil, err
@@ -643,6 +649,71 @@ func validateNetworkFlag(data map[string]interface{}, create bool) error {
 		}
 	}
 
+	return nil
+}
+
+func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
+	rkeConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig")
+	if rkeConfig == nil {
+		return nil
+	}
+	rkeConfigMap := convert.ToMapInterface(rkeConfig)
+	upgradeStrategy := rkeConfigMap["upgradeStrategy"]
+	oldUpgradeStrategy := values.GetValueN(oldData, "rancherKubernetesEngineConfig", "upgradeStrategy")
+	if upgradeStrategy == nil {
+		if oldUpgradeStrategy != nil {
+			upgradeStrategy = oldUpgradeStrategy
+		} else {
+			upgradeStrategy = &v3.NodeUpgradeStrategy{
+				MaxUnavailableWorker:       "10%",
+				MaxUnavailableControlplane: "1",
+				Drain:                      false,
+			}
+		}
+		values.PutValue(newData, upgradeStrategy, "rancherKubernetesEngineConfig", "upgradeStrategy")
+		return nil
+	}
+	upgradeStrategyMap := convert.ToMapInterface(upgradeStrategy)
+	if control, ok := upgradeStrategyMap["maxUnavailableControlplane"]; ok {
+		if err := validateUnavailable(convert.ToString(control)); err != nil {
+			return fmt.Errorf("maxUnavailableControlplane is invalid: %v", err)
+		}
+	}
+	if worker, ok := upgradeStrategyMap["maxUnavailableWorker"]; ok {
+		if err := validateUnavailable(convert.ToString(worker)); err != nil {
+			return fmt.Errorf("maxUnavailableWorker is invalid: %v", err)
+		}
+	}
+	nodeDrainInput := upgradeStrategyMap["nodeDrainInput"]
+	if nodeDrainInput == nil {
+		oldDrainInput := convert.ToMapInterface(oldUpgradeStrategy)["nodeDrainInput"]
+		if oldDrainInput != nil {
+			nodeDrainInput = oldDrainInput
+		} else {
+			nodeDrainInput = &v3.NodeDrainInput{
+				IgnoreDaemonSets: true,
+				GracePeriod:      -1,
+				Timeout:          60,
+			}
+		}
+		values.PutValue(newData, nodeDrainInput, "rancherKubernetesEngineConfig", "upgradeStrategy", "nodeDrainInput")
+	}
+	return nil
+}
+
+func validateUnavailable(input string) error {
+	parsed := intstr.Parse(input)
+	if parsed.Type == intstr.Int && parsed.IntVal < 1 {
+		return fmt.Errorf("value must be greater than 0: %s", input)
+	} else if parsed.Type == intstr.String {
+		if strings.HasPrefix(parsed.StrVal, "-") || strings.HasPrefix(parsed.StrVal, "0") {
+			return fmt.Errorf("value must be greater than 0: %s", input)
+		}
+		s := strings.Replace(parsed.StrVal, "%", "", -1)
+		if _, err := strconv.Atoi(s); err != nil {
+			return fmt.Errorf("value must be valid int %s: %v", parsed.StrVal, err)
+		}
+	}
 	return nil
 }
 
