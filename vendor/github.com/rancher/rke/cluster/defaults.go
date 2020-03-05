@@ -65,6 +65,10 @@ const (
 	DefaultFlannelBackendVxLanPort = "8472"
 	DefaultFlannelBackendVxLanVNI  = "1"
 
+	DefaultCalicoFlexVolPluginDirectory = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds"
+
+	DefaultCanalFlexVolPluginDirectory = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds"
+
 	KubeAPIArgAdmissionControlConfigFile             = "admission-control-config-file"
 	DefaultKubeAPIArgAdmissionControlConfigFileValue = "/etc/kubernetes/admission.yaml"
 
@@ -503,7 +507,8 @@ func (c *Cluster) setClusterNetworkDefaults() {
 	switch c.Network.Plugin {
 	case CalicoNetworkPlugin:
 		networkPluginConfigDefaultsMap = map[string]string{
-			CalicoCloudProvider: DefaultNetworkCloudProvider,
+			CalicoCloudProvider:          DefaultNetworkCloudProvider,
+			CalicoFlexVolPluginDirectory: DefaultCalicoFlexVolPluginDirectory,
 		}
 	case FlannelNetworkPlugin:
 		networkPluginConfigDefaultsMap = map[string]string{
@@ -516,6 +521,7 @@ func (c *Cluster) setClusterNetworkDefaults() {
 			CanalFlannelBackendType:                 DefaultFlannelBackendVxLan,
 			CanalFlannelBackendPort:                 DefaultFlannelBackendVxLanPort,
 			CanalFlannelBackendVxLanNetworkIdentify: DefaultFlannelBackendVxLanVNI,
+			CanalFlexVolPluginDirectory:             DefaultCanalFlexVolPluginDirectory,
 		}
 	}
 	if c.Network.CalicoNetworkProvider != nil {

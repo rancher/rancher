@@ -4234,14 +4234,16 @@
   }
  },
  "k3s": {
-  "channels": [
+  "releases": [
    {
-    "latest": "v1.17.3+k3s1",
-    "name": "v1.17"
+    "maxChannelServerVersion": "v2.4.0",
+    "minChannelServerVersion": "v2.4.0",
+    "version": "v1.17.3+k3s1"
    },
    {
-    "latest": "v1.16.7+k3s1",
-    "name": "v1.16"
+    "maxChannelServerVersion": "v2.4.0",
+    "minChannelServerVersion": "v2.4.0",
+    "version": "v1.16.7+k3s1"
    }
   ]
  }
