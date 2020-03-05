@@ -1,14 +1,18 @@
+import base64
+import pytest
+import time
 import urllib
 from .common import CATTLE_TEST_URL
+from .common import USER_TOKEN
+from .common import TEST_IMAGE
 from .common import create_kubeconfig
+from .common import create_connection
+from .common import create_project_and_ns
 from .common import get_user_client_and_cluster
 from .common import get_project_client_for_token
+from .common import random_test_name
+from .common import validate_workload
 from .common import WebsocketLogParse
-from .common import USER_TOKEN
-from .common import create_connection
-import base64
-import time
-import pytest
 
 namespace = {"cluster": None, "shell_url": None, "pod": None, "ns": ""}
 
@@ -23,8 +27,8 @@ def test_websocket_launch_kubectl():
     validate_command_execution(ws, cmd, logparse, checks)
     logparse.last_message = ''
 
-    cmd = "kubectl get daemonset -n ingress-nginx --no-headers -o name"
-    checks = ["daemonset.apps/nginx-ingress-controller"]
+    cmd = "kubectl get ns -o name"
+    checks = ["namespace/kube-system"]
     validate_command_execution(ws, cmd, logparse, checks)
     logparse.last_message = ''
 
@@ -57,8 +61,8 @@ def test_websocket_exec_shell():
     logparse = WebsocketLogParse()
     logparse.start_thread(target=logparse.receiver, args=(ws, True))
 
-    cmd = "pwd"
-    checks = ["/etc/nginx"]
+    cmd = "ls"
+    checks = ["bin", "boot", "dev"]
     validate_command_execution(ws, cmd, logparse, checks)
     logparse.last_message = ''
 
@@ -85,7 +89,7 @@ def test_websocket_view_logs():
     logparse.start_thread(target=logparse.receiver, args=(ws, False))
 
     print('\noutput:\n' + logparse.last_message + '\n')
-    assert 'NGINX Ingress controller' in logparse.last_message, \
+    assert 'websocket' in logparse.last_message, \
         "failed to view logs"
     logparse.last_message = ''
 
@@ -96,14 +100,31 @@ def test_websocket_view_logs():
 def create_project_client(request):
     client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
-    p = client.list_project(name="System", clusterId=cluster.id).data[0]
-    p_client = get_project_client_for_token(p, USER_TOKEN)
-    wl = p_client.list_workload(name="nginx-ingress-controller").data[0]
+    project, ns = create_project_and_ns(USER_TOKEN,
+                                        cluster,
+                                        random_test_name("websocket"))
+    p_client = get_project_client_for_token(project, USER_TOKEN)
+    con = [{"name": random_test_name(),
+            "image": TEST_IMAGE,
+            "entrypoint": ["/bin/sh"],
+            "command": ["-c",
+                        "while true; do echo websocket; sleep 1s; done;"
+                        ],
+            }]
+    wl = p_client.create_workload(name=random_test_name(),
+                                        containers=con,
+                                        namespaceId=ns.id)
+    validate_workload(p_client, wl, "deployment", ns.name)
     pod = p_client.list_pod(workloadId=wl.id).data[0]
-    namespace["ns"] = "ingress-nginx"
+    namespace["ns"] = ns.name
     namespace["pod"] = pod
     namespace["cluster"] = cluster
     namespace["shell_url"] = cluster.get("links").get("shell")
+
+    def fin():
+        client.delete(project)
+
+    request.addfinalizer(fin)
 
 
 def send_a_command(ws_connection, command):
@@ -111,7 +132,7 @@ def send_a_command(ws_connection, command):
     ws_connection.send('0' + cmd_enc)
     # sends the command to the webSocket
     ws_connection.send('0DQ==')
-    time.sleep(3)
+    time.sleep(5)
 
 
 def validate_command_execution(websocket, command, log_obj, checking):
