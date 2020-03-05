@@ -56,6 +56,7 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 			if err != nil {
 				logrus.Errorf("error converting failInterface to int: %v", err)
 				resource.Values["state"] = errorState
+				return
 			}
 			if fail > 0 {
 				resource.Values["state"] = failedState
