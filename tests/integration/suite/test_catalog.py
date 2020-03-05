@@ -1,11 +1,9 @@
 import pytest
 import time
 from rancher import ApiError
-from .conftest import wait_for
-
 from .common import wait_for_template_to_be_created, \
     wait_for_template_to_be_deleted, random_str, wait_for_atleast_workload
-from .conftest import set_server_version
+from .conftest import set_server_version, wait_for, DEFAULT_CATALOG
 
 
 def test_catalog(admin_mc, remove_resource):
@@ -293,10 +291,9 @@ def test_invalid_catalog_chart_names(admin_mc, remove_resource):
     error"""
     client = admin_mc.client
     name = random_str()
-    url = "https://github.com/rancher/integration-test-charts"
     catalog = client.create_catalog(name=name,
                                     branch="broke-charts",
-                                    url=url,
+                                    url=DEFAULT_CATALOG,
                                     )
     remove_resource(catalog)
     wait_for_template_to_be_created(client, catalog.id)
@@ -330,10 +327,9 @@ def test_invalid_catalog_chart_urls(admin_mc, remove_resource):
     """Test chart with file:// and local:// url paths"""
     client = admin_mc.client
     name = random_str()
-    url = "https://github.com/rancher/integration-test-charts"
     catalog = client.create_catalog(name=name,
                                     branch="invalid-urls",
-                                    url=url,
+                                    url=DEFAULT_CATALOG,
                                     )
     remove_resource(catalog)
     wait_for_template_to_be_created(client, catalog.id)
@@ -367,3 +363,34 @@ def test_invalid_catalog_chart_urls(admin_mc, remove_resource):
     client.delete(catalog)
     wait_for_template_to_be_deleted(client, name)
     assert not client.list_catalog(name=name).data
+
+
+def test_catalog_has_helmversion(admin_mc, remove_resource):
+    """Test to see that the helm version can be added to a catalog
+    on create and that the value is passed to the template"""
+    client = admin_mc.client
+    name1 = random_str()
+    name2 = random_str()
+    catalog1 = client.create_catalog(name=name1,
+                                     branch="master",
+                                     url=DEFAULT_CATALOG,
+                                     )
+    remove_resource(catalog1)
+    catalog2 = client.create_catalog(name=name2,
+                                     branch="master",
+                                     url=DEFAULT_CATALOG,
+                                     helmVersion="helm_v3"
+                                     )
+
+    remove_resource(catalog2)
+    wait_for_template_to_be_created(client, name1)
+    wait_for_template_to_be_created(client, name2)
+    assert "helm_v3" not in catalog1
+    assert catalog2.helmVersion == "helm_v3"
+    templates1 = client.list_template(catalogId=catalog1.id).data
+    for template in templates1:
+        assert "helmVersion" not in template.status
+    templates2 = client.list_template(catalogId=catalog2.id).data
+    for template in templates2:
+        assert "helmVersion" in template.status
+        assert template.status.helmVersion == "helm_v3"
