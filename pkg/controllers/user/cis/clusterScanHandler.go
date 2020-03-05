@@ -181,9 +181,13 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 
 		if benchmarkInfo.Managed {
-			appInfo.notApplicableSkipConfigMapName = getNotApplicableConfigMapName(cisConfigParams.BenchmarkVersion)
+			bv := cisConfigParams.BenchmarkVersion
+			if cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion != "" {
+				bv = cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
+			}
+			appInfo.notApplicableSkipConfigMapName = getNotApplicableConfigMapName(bv)
 			if cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
-				appInfo.defaultSkipConfigMapName = getDefaultSkipConfigMapName(cisConfigParams.BenchmarkVersion)
+				appInfo.defaultSkipConfigMapName = getDefaultSkipConfigMapName(bv)
 			}
 		}
 
