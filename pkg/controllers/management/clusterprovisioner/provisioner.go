@@ -297,6 +297,7 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	v3.ClusterConditionProvisioned.Message(cluster, "")
 	v3.ClusterConditionProvisioned.Reason(cluster, "")
 	v3.ClusterConditionPending.True(cluster)
+	logrus.Infof("RAJASHREE_RANCHER [update]: cluster %v provisioned condition: %v", cluster.Name, v3.ClusterConditionProvisioned.GetStatus(cluster))
 
 	if cluster.Spec.RancherKubernetesEngineConfig != nil || cluster.Spec.GenericEngineConfig != nil {
 		return cluster, nil
@@ -342,6 +343,7 @@ func (p *Provisioner) Create(cluster *v3.Cluster) (runtime.Object, error) {
 
 func (p *Provisioner) provision(cluster *v3.Cluster) (*v3.Cluster, error) {
 	obj, err := v3.ClusterConditionProvisioned.Do(cluster, func() (runtime.Object, error) {
+		logrus.Infof("RAJASHREE_RANCHER [provision]: calling reconcile with create=true for %v", cluster.Name)
 		return p.update(cluster, true)
 	})
 	return obj.(*v3.Cluster), err

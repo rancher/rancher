@@ -242,6 +242,7 @@ func (e *EngineService) Create(ctx context.Context, name string, kontainerDriver
 	defer cls.Driver.Close()
 
 	if err := cls.Create(ctx); err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE: Error from driver create for %v: %v", cls.Name, err)
 		return "", "", "", err
 	}
 	endpoint := cls.Endpoint

@@ -85,15 +85,26 @@ type ConfigGetter interface {
 
 // Create creates a cluster
 func (c *Cluster) Create(ctx context.Context) error {
+	logrus.Infof("RAJASHREE_LOGS_KE [Create]: Create called for %v", c.Name)
 	if c.RootCACert != "" && c.Status == "" {
-		c.PersistStore.PersistStatus(*c, Init)
+		logrus.Infof("RAJASHREE_LOGS_KE [Create]: Persisting state Init for %v", c.Name)
+		err := c.PersistStore.PersistStatus(*c, Init)
+		if err != nil {
+			logrus.Errorf("RAJASHREE_LOGS_KE [Create]: Error when persisting state Init for %v: %v", c.Name, err)
+		}
 	}
 	err := c.createInner(ctx)
 	if err != nil {
 		if err == ErrClusterExists {
-			c.PersistStore.PersistStatus(*c, Running)
+			pErr := c.PersistStore.PersistStatus(*c, Running)
+			if pErr != nil {
+				logrus.Errorf("RAJASHREE_LOGS_KE [Create]: Error when persisting state Running for %v: %v", c.Name, err)
+			}
 		} else {
-			c.PersistStore.PersistStatus(*c, Error)
+			pErr := c.PersistStore.PersistStatus(*c, Error)
+			if pErr != nil {
+				logrus.Errorf("RAJASHREE_LOGS_KE [Create]: Error when persisting state Error for %v: %v", c.Name, err)
+			}
 		}
 		return err
 	}
@@ -101,11 +112,13 @@ func (c *Cluster) Create(ctx context.Context) error {
 }
 
 func (c *Cluster) create(ctx context.Context, clusterInfo *types.ClusterInfo) error {
+	logrus.Infof("RAJASHREE_LOGS_KE [create]: in create cluster %v state is: %v", c.Name, c.Status)
 	if c.Status == PostCheck {
 		return nil
 	}
 
 	if err := c.PersistStore.PersistStatus(*c, PreCreating); err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE [create]: Error when persisting state PreCreating for %v: %v", c.Name, err)
 		return err
 	}
 
@@ -121,6 +134,7 @@ func (c *Cluster) create(ctx context.Context, clusterInfo *types.ClusterInfo) er
 	}
 
 	if err := c.PersistStore.PersistStatus(*c, Creating); err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE [create]: Error when persisting state Creating for %v: %v", c.Name, err)
 		return err
 	}
 
@@ -129,22 +143,26 @@ func (c *Cluster) create(ctx context.Context, clusterInfo *types.ClusterInfo) er
 	if info != nil {
 		transformClusterInfo(c, info)
 	}
+	logrus.Infof("RAJASHREE_LOGS_KE [create]: in create cluster %v state after calling create is: %v", c.Name, c.Status)
 	return err
 }
 
 func (c *Cluster) PostCheck(ctx context.Context) error {
+	logrus.Infof("RAJASHREE_LOGS_KE [PostCheck]: Persisting state PostCheck for %v", c.Name)
 	if err := c.PersistStore.PersistStatus(*c, PostCheck); err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE [PostCheck]: Error when persisting state PostCheck for %v: %v", c.Name, err)
 		return err
 	}
-
+	logrus.Infof("RAJASHREE_LOGS_KE [PostCheck]: Cluster %v state is %v -1", c.Name, c.Status)
 	// receive cluster info back
 	info, err := c.Driver.PostCheck(ctx, toInfo(c))
 	if err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE [PostCheck]: Error from PostCheck %v: %v", c.Name, err)
 		return err
 	}
 
 	transformClusterInfo(c, info)
-
+	logrus.Infof("RAJASHREE_LOGS_KE [PostCheck]: Cluster %v state is %v -2", c.Name, c.Status)
 	// persist cluster info
 	return c.Store()
 }
@@ -180,20 +198,24 @@ func (c *Cluster) RemoveLegacyServiceAccount(ctx context.Context) error {
 
 func (c *Cluster) createInner(ctx context.Context) error {
 	// check if it is already created
-	c.restore()
-
+	err := c.restore()
+	if err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE [createInner]: Error when restoring cluster %v: %v", c.Name, err)
+	}
+	logrus.Infof("RAJASHREE_LOGS_KE [createInner]: Cluster %v restored state is: %v -1", c.Name, c.Status)
 	var info *types.ClusterInfo
 	if c.Status == Error {
 		logrus.Errorf("Cluster %s previously failed to create", c.Name)
 		info = toInfo(c)
 	}
-
+	logrus.Infof("RAJASHREE_LOGS_KE [createInner]: Cluster %v restored state is: %v -2	", c.Name, c.Status)
 	if c.Status == Updating || c.Status == Running || c.Status == PostCheck || c.Status == Init {
 		logrus.Infof("Cluster %s already exists.", c.Name)
 		return ErrClusterExists
 	}
 
 	if err := c.create(ctx, info); err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE [createInner]: Error creating cluster %v: %v", c.Name, err)
 		return err
 	}
 
@@ -203,6 +225,7 @@ func (c *Cluster) createInner(ctx context.Context) error {
 // Update updates a cluster
 func (c *Cluster) Update(ctx context.Context) error {
 	if err := c.restore(); err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE [Update]: Error when restoring cluster %v: %v", c.Name, err)
 		return err
 	}
 
@@ -235,7 +258,10 @@ func (c *Cluster) Update(ctx context.Context) error {
 		driverOpts.StringOptions[k] = v
 	}
 
+	logrus.Infof("RAJASHREE_LOGS_KE [Update]: Persisting state Updating for %v", c.Name)
+
 	if err := c.PersistStore.PersistStatus(*c, Updating); err != nil {
+		logrus.Errorf("RAJASHREE_LOGS_KE [Update]: Error persisting State Updating %v: %v", c.Name, err)
 		return err
 	}
 

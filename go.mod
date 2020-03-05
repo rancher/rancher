@@ -10,6 +10,8 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
 
+	github.com/rancher/kontainer-engine => github.com/mrajashree/kontainer-engine v0.0.4-dev.0.20200306213650-c583110f1611
+
 	k8s.io/api => k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.17.2
 	k8s.io/apimachinery => github.com/rancher/apimachinery v0.17.2-rancher.1
@@ -45,7 +47,7 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/containerd/containerd v1.3.0 // indirect
-	github.com/coreos/etcd v3.3.15+incompatible
+	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/coreos/prometheus-operator v0.36.0
 	github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9
 	github.com/davecgh/go-spew v1.1.1

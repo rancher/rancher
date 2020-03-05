@@ -2,6 +2,7 @@ package clusterprovisioner
 
 import (
 	"encoding/json"
+	"hash/fnv"
 
 	"github.com/rancher/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/encryptedstore"
@@ -49,17 +50,40 @@ func (s *engineStore) Remove(name string) error {
 	return s.store.Remove(name)
 }
 
-func (s *engineStore) Store(cluster cluster.Cluster) error {
-	content, err := json.Marshal(cluster)
+func (s *engineStore) Store(cls cluster.Cluster) error {
+	content, err := json.Marshal(cls)
 	if err != nil {
 		return err
 	}
-	return s.store.Set(cluster.Name, map[string]string{
+	h := fnv.New32a()
+	hash, err := h.Write(content)
+	if err != nil {
+		logrus.Errorf("RAJASHREE_PRO_STORE [Store]: Error hashing cluster %v: %v", cls.Name, err)
+	}
+	logrus.Infof("RAJASHREE_PRO_STORE [Store]: Marshaled content for cluster %v: %v", cls.Name, hash)
+	err = s.store.Set(cls.Name, map[string]string{
 		dataKey: string(content),
 	})
+	if err != nil {
+		logrus.Errorf("RAJASHREE_PRO_STORE [Store]: Error storing cluster %v: %v", cls.Name, err)
+	}
+	// Debug: checking if state saved
+	var checkCluster cluster.Cluster
+	data, err := s.store.Get(cls.Name)
+	if err != nil {
+		logrus.Errorf("RAJASHREE_PRO_STORE [Store]: Error getting cluster %v: %v", cls.Name, err)
+	}
+	err = json.Unmarshal([]byte(data[dataKey]), &checkCluster)
+	if err != nil {
+		logrus.Errorf("RAJASHREE_PRO_STORE [Store]: Error unmarshaling cluster %v: %v", cls.Name, err)
+		return nil
+	}
+	logrus.Infof("RAJASHREE_PRO_STORE [Store]: Stored cluster state for %v: %v", cls.Name, checkCluster.Status)
+	return nil
 }
 
 func (s *engineStore) PersistStatus(cluster cluster.Cluster, status string) error {
 	cluster.Status = status
+	logrus.Infof("RAJASHREE_PRO_STORE [PersistStatus]: Storing cluster %v in status %v", cluster.Name, status)
 	return s.Store(cluster)
 }

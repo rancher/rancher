@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	v1 "github.com/rancher/types/apis/core/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,16 +68,24 @@ func (g *GenericEncryptedStore) Set(name string, data map[string]string) error {
 }
 
 func (g *GenericEncryptedStore) set(name string, data map[string]string, try int) error {
+	logrus.Infof("RAJASHREE_SECRET [set]: set secret called for %v try %v", g.getKey(name), try)
 	sec, err := g.secretLister.Get(g.namespace, g.getKey(name))
 	if errors.IsNotFound(err) {
+		logrus.Infof("RAJASHREE_SECRET [set]: secret not found for %v try %v", g.getKey(name), try)
 		sec = &corev1.Secret{}
 		sec.Name = g.getKey(name)
 		sec.StringData = data
-		if _, err := g.secrets.Create(sec); err != nil && !errors.IsAlreadyExists(err) {
-			return err
+		if _, err := g.secrets.Create(sec); err != nil {
+			logrus.Errorf("RAJASHREE_SECRET [set]: Error creating secret for %v try %v: %v", sec.Name, try, err)
+			if !errors.IsAlreadyExists(err) {
+				logrus.Errorf("RAJASHREE_SECRET [set]: error when creating secret %v try %v: %v", sec.Name, try, err)
+				return err
+			}
 		}
+		logrus.Errorf("RAJASHREE_SECRET [set]: created secret for %v try %v", sec.Name, try)
 		return nil
 	} else if err != nil {
+		logrus.Errorf("RAJASHREE_SECRET [set]: error getting secret for %v try %v: %v", sec.Name, try, err)
 		return err
 	}
 
@@ -85,14 +94,22 @@ func (g *GenericEncryptedStore) set(name string, data map[string]string, try int
 		sec.Data = map[string][]byte{}
 	}
 	for k, v := range data {
+		logrus.Infof("RAJASHREE_SECRET [set]: filling secret %v with key %v on try %v", g.getKey(name), k, try)
 		sec.Data[k] = []byte(v)
 	}
 
 	if !reflect.DeepEqual(orig, sec) {
+		logrus.Infof("RAJASHREE_SECRET [set]: updating existing secret %v try %v", g.getKey(name), try)
 		_, err = g.secrets.Update(sec)
 		if err != nil && try < 5 {
+			logrus.Errorf("RAJASHREE_SECRET [set]: error when updating secret %v on try %v: %v", sec.Name, try, err)
 			return g.set(name, data, try+1)
 		}
+	} else {
+		logrus.Infof("RAJASHREE_SECRET [set]: secrets for %v are equal on try %v", g.getKey(name), try)
+	}
+	if err != nil {
+		logrus.Errorf("RAJASHREE_SECRET [set]: error updating secret %v on try %v: %v", sec.Name, try, err)
 	}
 	return err
 }

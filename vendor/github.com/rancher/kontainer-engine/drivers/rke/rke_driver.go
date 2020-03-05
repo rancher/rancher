@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -158,11 +159,14 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, info *ty
 
 	certsStr := ""
 	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
+	logrus.Infof("RAJASHREE_LOGS_KE: Got clusterFilePath for cluster %v: %v", rkeConfig.ClusterName, externalFlags.ClusterFilePath)
+
 	APIURL, caCrt, clientCert, clientKey, certs, err := clusterUp(ctx, &rkeConfig, dialers, externalFlags, data)
 	if len(certs) > 0 {
 		certsStr, err = rkecerts.ToString(certs)
 	}
 	if err != nil && certsStr == "" {
+		logrus.Infof("RAJASHREE_LOGS_KE: Saving partial state for cluster: %v", rkeConfig.ClusterName)
 		return d.save(&types.ClusterInfo{
 			Metadata: map[string]string{
 				"Config": yaml,
@@ -428,7 +432,12 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 }
 
 func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
-	os.MkdirAll(rancherPath, 0700)
+	err := os.MkdirAll(rancherPath, 0700)
+	if err != nil {
+		if info != nil {
+			logrus.Errorf("RAJASHREE_LOGS_KE: Error when creating rancherPath for restore of %v: %v", info.Endpoint, err)
+		}
+	}
 	dir, err := ioutil.TempDir(rancherPath, "rke-")
 	if err != nil {
 		return "", err
@@ -437,11 +446,17 @@ func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 	if info != nil {
 		state := info.Metadata["state"]
 		if state != "" {
-			ioutil.WriteFile(kubeConfig(dir), []byte(state), 0600)
+			wErr := ioutil.WriteFile(kubeConfig(dir), []byte(state), 0600)
+			if wErr != nil {
+				logrus.Errorf("RAJASHREE_LOGS_KE: Error when writing kubeconfig restore of %v: %v", info.Endpoint, err)
+			}
 		}
 		fullState := info.Metadata["fullState"]
 		if fullState != "" {
-			ioutil.WriteFile(clusterState(dir), []byte(fullState), 0600)
+			wErr := ioutil.WriteFile(clusterState(dir), []byte(fullState), 0600)
+			if wErr != nil {
+				logrus.Errorf("RAJASHREE_LOGS_KE: Error when creating rancherPath for restore of %v: %v", info.Endpoint, err)
+			}
 		}
 	}
 

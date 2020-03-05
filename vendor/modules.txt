@@ -88,7 +88,7 @@ github.com/bep/debounce
 github.com/blang/semver
 # github.com/containerd/containerd v1.3.0
 github.com/containerd/containerd/errdefs
-# github.com/coreos/etcd v3.3.15+incompatible
+# github.com/coreos/etcd v3.3.17+incompatible
 github.com/coreos/etcd/client
 github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes
 github.com/coreos/etcd/pkg/pathutil
@@ -307,7 +307,7 @@ github.com/rancher/dynamiclistener/server
 github.com/rancher/dynamiclistener/storage/file
 github.com/rancher/dynamiclistener/storage/kubernetes
 github.com/rancher/dynamiclistener/storage/memory
-# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200212233641-64154ac214a7
+# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200212233641-64154ac214a7 => github.com/mrajashree/kontainer-engine v0.0.4-dev.0.20200306213650-c583110f1611
 github.com/rancher/kontainer-engine/cluster
 github.com/rancher/kontainer-engine/drivers/aks
 github.com/rancher/kontainer-engine/drivers/eks
