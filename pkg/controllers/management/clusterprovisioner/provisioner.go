@@ -966,10 +966,10 @@ func k3sClusterConfig(cluster *v3.Cluster) error {
 			Err:    fmt.Errorf("waiting for full cluster configuration"),
 			Reason: "Pending"}
 	}
-	// TODO Rancher may support upgrading the local cluster if its k3s in the future
-	if cluster.Name == v3.ClusterDriverLocal || cluster.Status.Driver == v3.ClusterDriverK3s {
-		return nil
+	if cluster.Status.Driver == v3.ClusterDriverK3s {
+		return nil //no-op
 	}
+
 	if strings.Contains(cluster.Status.Version.String(), "k3s") {
 		cluster.Status.Driver = v3.ClusterDriverK3s
 		// only set these values on init

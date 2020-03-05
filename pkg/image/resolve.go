@@ -129,7 +129,7 @@ func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[inte
 	}
 }
 
-func GetImages(systemChartPath string, imagesFromArgs []string, rkeSystemImages map[string]v3.RKESystemImages, osType OSType) ([]string, error) {
+func GetImages(systemChartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]v3.RKESystemImages, osType OSType) ([]string, error) {
 	var images []string
 
 	// fetch images from charts
@@ -158,6 +158,11 @@ func GetImages(systemChartPath string, imagesFromArgs []string, rkeSystemImages 
 	// append images from args
 	if len(imagesFromArgs) > 0 {
 		images = append(images, imagesFromArgs...)
+	}
+
+	// append images for k3s-upgrade
+	if len(k3sUpgradeImages) > 0 {
+		images = append(images, k3sUpgradeImages...)
 	}
 
 	return normalizeImages(images), nil

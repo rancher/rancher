@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/rancher/norman/api/access"
@@ -9,6 +10,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	"github.com/rancher/rancher/pkg/controllers/management/k3supgrade"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -39,6 +41,11 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	if err := v.validateLocalClusterAuthEndpoint(request, &spec); err != nil {
 		return err
 	}
+
+	if err := v.validateK3sVersionUpgrade(request, &spec); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -113,6 +120,58 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 			return httperror.NewAPIError(httperror.NotFound, "The clusterTemplateRevision is not found")
 		}
 		return err
+	}
+
+	return nil
+}
+
+// TODO: test validator
+// prevents downgrades, no-ops, and upgrading before versions have been set
+func (v *Validator) validateK3sVersionUpgrade(request *types.APIContext, spec *v3.ClusterSpec) error {
+	upgradeNotReadyErr := httperror.NewAPIError(httperror.Conflict, "k3s version upgrade is not ready, try again later")
+
+	if request.Method == http.MethodPost {
+		return nil
+	}
+
+	if spec.K3sConfig == nil {
+		// only applies to k3s clusters
+		return nil
+	}
+
+	// must wait for original spec version to be set
+	if spec.K3sConfig.Version == "" {
+		return upgradeNotReadyErr
+	}
+
+	cluster, err := v.ClusterLister.Get("", request.ID)
+	if err != nil {
+		return err
+	}
+
+	// must wait for original status version to be set
+	if cluster.Status.Version == nil {
+		return upgradeNotReadyErr
+	}
+
+	prevVersion := cluster.Status.Version.GitVersion
+	updateVersion := spec.K3sConfig.Version
+
+	if prevVersion == updateVersion {
+		// no op
+		return nil
+	}
+
+	isNewer, err := k3supgrade.IsNewerVersion(prevVersion, updateVersion)
+	if err != nil {
+		errMsg := fmt.Sprintf("unable to compare k3s version [%s]", spec.K3sConfig.Version)
+		return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
+	}
+
+	if !isNewer {
+		// update version must be higher than previous version, downgrades are not supported
+		errMsg := fmt.Sprintf("cannot upgrade k3s cluster version from [%s] to [%s]. New version must be higher.", prevVersion, updateVersion)
+		return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
 	}
 
 	return nil
