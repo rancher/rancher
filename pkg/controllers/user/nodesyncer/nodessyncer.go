@@ -193,10 +193,11 @@ func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan v3.
 	return m.updateNodeAndNode(node, obj)
 }
 
+// For any key that already exist in the plan, we should update or delete. For others, do not touch the plan.
 func computePlanDelta(planValues map[string]string, delta v3.MapDelta) (map[string]string, bool) {
 	update := false
 	for k, v := range delta.Add {
-		if planValues[k] != v {
+		if planValues[k] != "" {
 			update = true
 			planValues[k] = v
 		}
