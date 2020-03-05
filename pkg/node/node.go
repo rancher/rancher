@@ -164,3 +164,12 @@ func GetMachineForNode(node *corev1.Node, clusterNamespace string, machineLister
 	}
 	return nil, nil
 }
+
+func IsMachineReady(machine *v3.Node) bool {
+	for _, cond := range machine.Status.InternalNodeStatus.Conditions {
+		if cond.Type == corev1.NodeReady {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
