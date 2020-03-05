@@ -80,10 +80,8 @@ func UpgradeControlPlaneNodes(ctx context.Context, kubeClient *kubernetes.Client
 		upgradeStrategy, newHosts, inactiveHosts, maxUnavailable, drainHelper)
 	if err != nil {
 		logrus.Errorf("Failed to upgrade hosts: %v with error %v", strings.Join(hostsFailedToUpgrade, ","), err)
-		if len(hostsFailedToUpgrade) >= maxUnavailable {
-			return errMsgMaxUnavailableNotFailed, err
-		}
 		errMsgMaxUnavailableNotFailed = fmt.Sprintf("Failed to upgrade hosts: %v with error %v", strings.Join(hostsFailedToUpgrade, ","), err)
+		return errMsgMaxUnavailableNotFailed, err
 	}
 	log.Infof(ctx, "[%s] Successfully upgraded Controller Plane..", ControlRole)
 	return errMsgMaxUnavailableNotFailed, nil
