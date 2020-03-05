@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -122,16 +123,16 @@ func validateServicesOptions(c *Cluster) error {
 	// Validate external etcd information
 	if len(c.Services.Etcd.ExternalURLs) > 0 {
 		if len(c.Services.Etcd.CACert) == 0 {
-			return fmt.Errorf("External CA Certificate for etcd can't be empty")
+			return errors.New("External CA Certificate for etcd can't be empty")
 		}
 		if len(c.Services.Etcd.Cert) == 0 {
-			return fmt.Errorf("External Client Certificate for etcd can't be empty")
+			return errors.New("External Client Certificate for etcd can't be empty")
 		}
 		if len(c.Services.Etcd.Key) == 0 {
-			return fmt.Errorf("External Client Key for etcd can't be empty")
+			return errors.New("External Client Key for etcd can't be empty")
 		}
 		if len(c.Services.Etcd.Path) == 0 {
-			return fmt.Errorf("External etcd path can't be empty")
+			return errors.New("External etcd path can't be empty")
 		}
 	}
 
@@ -147,10 +148,10 @@ func validateEtcdBackupOptions(c *Cluster) error {
 	if c.Services.Etcd.BackupConfig != nil {
 		if c.Services.Etcd.BackupConfig.S3BackupConfig != nil {
 			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.Endpoint) == 0 {
-				return fmt.Errorf("etcd s3 backup backend endpoint can't be empty")
+				return errors.New("etcd s3 backup backend endpoint can't be empty")
 			}
 			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.BucketName) == 0 {
-				return fmt.Errorf("etcd s3 backup backend bucketName can't be empty")
+				return errors.New("etcd s3 backup backend bucketName can't be empty")
 			}
 			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.CustomCA) != 0 {
 				if isValid, err := pki.IsValidCertStr(c.Services.Etcd.BackupConfig.S3BackupConfig.CustomCA); !isValid {
@@ -188,10 +189,10 @@ func ValidateHostCount(c *Cluster) error {
 			}
 			return fmt.Errorf("Cluster must have at least one etcd plane host: failed to connect to the following etcd host(s) %v", failedEtcdHosts)
 		}
-		return fmt.Errorf("Cluster must have at least one etcd plane host: please specify one or more etcd in cluster config")
+		return errors.New("Cluster must have at least one etcd plane host: please specify one or more etcd in cluster config")
 	}
 	if len(c.EtcdHosts) > 0 && len(c.Services.Etcd.ExternalURLs) > 0 {
-		return fmt.Errorf("Cluster can't have both internal and external etcd")
+		return errors.New("Cluster can't have both internal and external etcd")
 	}
 	return nil
 }
@@ -255,25 +256,25 @@ func validateSystemImages(c *Cluster) error {
 
 func validateKubernetesImages(c *Cluster) error {
 	if len(c.SystemImages.Etcd) == 0 {
-		return fmt.Errorf("etcd image is not populated")
+		return errors.New("etcd image is not populated")
 	}
 	if len(c.SystemImages.Kubernetes) == 0 {
-		return fmt.Errorf("kubernetes image is not populated")
+		return errors.New("kubernetes image is not populated")
 	}
 	if len(c.SystemImages.PodInfraContainer) == 0 {
-		return fmt.Errorf("pod infrastructure container image is not populated")
+		return errors.New("pod infrastructure container image is not populated")
 	}
 	if len(c.SystemImages.Alpine) == 0 {
-		return fmt.Errorf("alpine image is not populated")
+		return errors.New("alpine image is not populated")
 	}
 	if len(c.SystemImages.NginxProxy) == 0 {
-		return fmt.Errorf("nginx proxy image is not populated")
+		return errors.New("nginx proxy image is not populated")
 	}
 	if len(c.SystemImages.CertDownloader) == 0 {
-		return fmt.Errorf("certificate downloader image is not populated")
+		return errors.New("certificate downloader image is not populated")
 	}
 	if len(c.SystemImages.KubernetesServicesSidecar) == 0 {
-		return fmt.Errorf("kubernetes sidecar image is not populated")
+		return errors.New("kubernetes sidecar image is not populated")
 	}
 	return nil
 }
@@ -282,40 +283,40 @@ func validateNetworkImages(c *Cluster) error {
 	// check network provider images
 	if c.Network.Plugin == FlannelNetworkPlugin {
 		if len(c.SystemImages.Flannel) == 0 {
-			return fmt.Errorf("flannel image is not populated")
+			return errors.New("flannel image is not populated")
 		}
 		if len(c.SystemImages.FlannelCNI) == 0 {
-			return fmt.Errorf("flannel cni image is not populated")
+			return errors.New("flannel cni image is not populated")
 		}
 	} else if c.Network.Plugin == CanalNetworkPlugin {
 		if len(c.SystemImages.CanalNode) == 0 {
-			return fmt.Errorf("canal image is not populated")
+			return errors.New("canal image is not populated")
 		}
 		if len(c.SystemImages.CanalCNI) == 0 {
-			return fmt.Errorf("canal cni image is not populated")
+			return errors.New("canal cni image is not populated")
 		}
 		if len(c.SystemImages.CanalFlannel) == 0 {
-			return fmt.Errorf("flannel image is not populated")
+			return errors.New("flannel image is not populated")
 		}
 	} else if c.Network.Plugin == CalicoNetworkPlugin {
 		if len(c.SystemImages.CalicoCNI) == 0 {
-			return fmt.Errorf("calico cni image is not populated")
+			return errors.New("calico cni image is not populated")
 		}
 		if len(c.SystemImages.CalicoCtl) == 0 {
-			return fmt.Errorf("calico ctl image is not populated")
+			return errors.New("calico ctl image is not populated")
 		}
 		if len(c.SystemImages.CalicoNode) == 0 {
-			return fmt.Errorf("calico image is not populated")
+			return errors.New("calico image is not populated")
 		}
 		if len(c.SystemImages.CalicoControllers) == 0 {
-			return fmt.Errorf("calico controllers image is not populated")
+			return errors.New("calico controllers image is not populated")
 		}
 	} else if c.Network.Plugin == WeaveNetworkPlugin {
 		if len(c.SystemImages.WeaveCNI) == 0 {
-			return fmt.Errorf("weave cni image is not populated")
+			return errors.New("weave cni image is not populated")
 		}
 		if len(c.SystemImages.WeaveNode) == 0 {
-			return fmt.Errorf("weave image is not populated")
+			return errors.New("weave image is not populated")
 		}
 	}
 	return nil
@@ -325,24 +326,27 @@ func validateDNSImages(c *Cluster) error {
 	// check dns provider images
 	if c.DNS.Provider == "kube-dns" {
 		if len(c.SystemImages.KubeDNS) == 0 {
-			return fmt.Errorf("kubedns image is not populated")
+			return errors.New("kubedns image is not populated")
 		}
 		if len(c.SystemImages.DNSmasq) == 0 {
-			return fmt.Errorf("dnsmasq image is not populated")
+			return errors.New("dnsmasq image is not populated")
 		}
 		if len(c.SystemImages.KubeDNSSidecar) == 0 {
-			return fmt.Errorf("kubedns sidecar image is not populated")
+			return errors.New("kubedns sidecar image is not populated")
 		}
 		if len(c.SystemImages.KubeDNSAutoscaler) == 0 {
-			return fmt.Errorf("kubedns autoscaler image is not populated")
+			return errors.New("kubedns autoscaler image is not populated")
 		}
 	} else if c.DNS.Provider == "coredns" {
 		if len(c.SystemImages.CoreDNS) == 0 {
-			return fmt.Errorf("coredns image is not populated")
+			return errors.New("coredns image is not populated")
 		}
 		if len(c.SystemImages.CoreDNSAutoscaler) == 0 {
-			return fmt.Errorf("coredns autoscaler image is not populated")
+			return errors.New("coredns autoscaler image is not populated")
 		}
+	}
+	if c.DNS.Nodelocal != nil && len(c.SystemImages.Nodelocal) == 0 {
+		return errors.New("nodelocal image is not populated")
 	}
 	return nil
 }
@@ -351,7 +355,7 @@ func validateMetricsImages(c *Cluster) error {
 	// checl metrics server image
 	if c.Monitoring.Provider != "none" {
 		if len(c.SystemImages.MetricsServer) == 0 {
-			return fmt.Errorf("metrics server images is not populated")
+			return errors.New("metrics server images is not populated")
 		}
 	}
 	return nil
@@ -361,10 +365,10 @@ func validateIngressImages(c *Cluster) error {
 	// check ingress images
 	if c.Ingress.Provider != "none" {
 		if len(c.SystemImages.Ingress) == 0 {
-			return fmt.Errorf("ingress image is not populated")
+			return errors.New("ingress image is not populated")
 		}
 		if len(c.SystemImages.IngressBackend) == 0 {
-			return fmt.Errorf("ingress backend image is not populated")
+			return errors.New("ingress backend image is not populated")
 		}
 	}
 	return nil

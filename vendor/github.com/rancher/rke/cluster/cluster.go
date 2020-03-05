@@ -108,6 +108,7 @@ const (
 	monitoringAddon = "monitoring"
 	dnsAddon        = "dns"
 	networkAddon    = "network"
+	nodelocalAddon  = "nodelocal"
 )
 
 func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptionData map[string]*v3.KubernetesServicesOptions, reconcileCluster bool) (string, error) {
@@ -420,9 +421,16 @@ func parseAddonConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngineC
 		networkAddon:    daemonsetType,
 		monitoringAddon: deploymentType,
 		dnsAddon:        deploymentType,
+		nodelocalAddon:  daemonsetType,
 	}
 	for addonName, addonType := range addonsResourceType {
-		updateStrategyField := values.GetValueN(r, addonName, "update_strategy")
+		var updateStrategyField interface{}
+		// nodelocal is a field under dns
+		if addonName == nodelocalAddon {
+			updateStrategyField = values.GetValueN(r, "dns", addonName, "update_strategy")
+		} else {
+			updateStrategyField = values.GetValueN(r, addonName, "update_strategy")
+		}
 		if updateStrategyField == nil {
 			continue
 		}
@@ -437,6 +445,8 @@ func parseAddonConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngineC
 				rkeConfig.Ingress.UpdateStrategy = updateStrategy
 			case networkAddon:
 				rkeConfig.Network.UpdateStrategy = updateStrategy
+			case nodelocalAddon:
+				rkeConfig.DNS.Nodelocal.UpdateStrategy = updateStrategy
 			}
 		case deploymentType:
 			updateStrategy, err := parseDeploymentUpdateStrategy(updateStrategyField)

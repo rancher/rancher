@@ -17,7 +17,8 @@ const (
 	HostnameLabel                = "kubernetes.io/hostname"
 	InternalAddressAnnotation    = "rke.cattle.io/internal-ip"
 	ExternalAddressAnnotation    = "rke.cattle.io/external-ip"
-	IgnoreHostDuringUpgradeLabel = "rke.cattle.io/ignore-during-upgrade"
+	IgnoreHostDuringUpgradeLabel = "user.cattle.io/upgrade-policy"
+	IgnoreLabelValue             = "prevent"
 	AWSCloudProvider             = "aws"
 	MaxRetries                   = 5
 	RetryInterval                = 5

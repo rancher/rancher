@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,7 +80,7 @@ func getNodeListForUpgrade(kubeClient *kubernetes.Clientset, hostsFailed *sync.M
 		if inactiveHosts[node.Labels[k8s.HostnameLabel]] {
 			continue
 		}
-		if val, ok := node.Labels[k8s.IgnoreHostDuringUpgradeLabel]; ok && val == "true" {
+		if val, ok := node.Labels[k8s.IgnoreHostDuringUpgradeLabel]; ok && val == k8s.IgnoreLabelValue {
 			continue
 		}
 		nodeList = append(nodeList, node)
@@ -87,10 +88,19 @@ func getNodeListForUpgrade(kubeClient *kubernetes.Clientset, hostsFailed *sync.M
 	return nodeList, nil
 }
 
-func CalculateMaxUnavailable(maxUnavailableVal string, numHosts int) (int, error) {
+func CalculateMaxUnavailable(maxUnavailableVal string, numHosts int, role string) (int, error) {
 	// if maxUnavailable is given in percent, round down
 	maxUnavailableParsed := k8sutil.Parse(maxUnavailableVal)
 	logrus.Debugf("Provided value for maxUnavailable: %v", maxUnavailableParsed)
+	if maxUnavailableParsed.Type == k8sutil.Int {
+		if maxUnavailableParsed.IntVal <= 0 {
+			return 0, fmt.Errorf("invalid input for max_unavailable_%s: %v, value must be > 0", role, maxUnavailableParsed.IntVal)
+		}
+	} else {
+		if strings.HasPrefix(maxUnavailableParsed.StrVal, "-") || maxUnavailableParsed.StrVal == "0%" {
+			return 0, fmt.Errorf("invalid input for max_unavailable_%s: %v, value must be > 0", role, maxUnavailableParsed.StrVal)
+		}
+	}
 	maxUnavailable, err := k8sutil.GetValueFromIntOrPercent(&maxUnavailableParsed, numHosts, false)
 	if err != nil {
 		logrus.Errorf("Unable to parse max_unavailable, should be a number or percentage of nodes, error: %v", err)
@@ -98,6 +108,7 @@ func CalculateMaxUnavailable(maxUnavailableVal string, numHosts int) (int, error
 	}
 	if maxUnavailable == 0 {
 		// In case there is only one node and rounding down maxUnvailable percentage led to 0
+		logrus.Infof("max_unavailable_%s got rounded down to 0, resetting to 1", role)
 		maxUnavailable = 1
 	}
 	logrus.Debugf("Parsed value of maxUnavailable: %v", maxUnavailable)
@@ -114,11 +125,11 @@ func resetMaxUnavailable(maxUnavailable, lenInactiveHosts int, component string)
 	}
 
 	if lenInactiveHosts > 0 {
-		if maxUnavailable == lenInactiveHosts {
-			return 0, fmt.Errorf("cannot proceed with upgrade of %s since %v host(s) are found to be inactive prior to upgrade", component, lenInactiveHosts)
+		if lenInactiveHosts >= maxUnavailable {
+			return 0, fmt.Errorf("cannot proceed with upgrade of %s since %v host(s) cannot be reached prior to upgrade", component, lenInactiveHosts)
 		}
 		maxUnavailable -= lenInactiveHosts
-		logrus.Infof("Resetting %s to %v since %v host(s) are found to be inactive prior to upgrade", "max_unavailable_"+component, maxUnavailable, lenInactiveHosts)
+		logrus.Infof("Resetting %s to %v since %v host(s) cannot be reached prior to upgrade", "max_unavailable_"+component, maxUnavailable, lenInactiveHosts)
 	}
 	return maxUnavailable, nil
 }
