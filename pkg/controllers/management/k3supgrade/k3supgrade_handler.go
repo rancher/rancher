@@ -12,8 +12,10 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v32 "github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
@@ -26,15 +28,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		return cluster, nil
 	}
 
-	// setup default k3sconfig
-	if cluster.Spec.K3sConfig == nil {
-		version := *cluster.Status.Version
-		cluster.Spec.K3sConfig = &v3.K3sConfig{
-			Version: version.String(),
-		}
-	}
-
-	if cluster.Spec.K3sConfig.Version == "" {
+	if cluster.Spec.K3sConfig == nil || cluster.Spec.K3sConfig.Version == "" {
 		return cluster, nil
 	}
 
@@ -42,12 +36,22 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	if err != nil {
 		return cluster, err
 	}
-
 	if !isNewer {
-		// cannot upgrade- version has not changed or proposed version is not newer than current version
-		return cluster, nil
-	}
+		needsUpgrade, err := h.nodesNeedUpgrade(cluster)
+		if err != nil {
+			return cluster, err
+		}
+		if !needsUpgrade {
+			// if upgrade was in progress, make sure to set the state back
+			if strings.Contains(v3.ClusterConditionUpgraded.GetMessage(cluster), "worker") {
+				v3.ClusterConditionUpgraded.True(cluster)
+				v3.ClusterConditionUpgraded.Message(cluster, "")
+				return h.clusterClient.Update(cluster)
+			}
+			return cluster, nil
+		}
 
+	}
 	// create or update k3supgradecontroller if necessary
 	if err = h.deployK3sUpgradeController(cluster.Name); err != nil {
 		return cluster, err
@@ -131,6 +135,16 @@ func (h *handler) deployK3sUpgradeController(clusterName string) error {
 			return err
 		}
 	} else {
+		if !checkDeployed(app) {
+			if !v32.AppConditionForceUpgrade.IsUnknown(app) {
+				v32.AppConditionForceUpgrade.Unknown(app)
+			}
+			logrus.Warnln("force redeploying system-ugrade-controller")
+			if _, err = appClient.Update(app); err != nil {
+				return err
+			}
+		}
+
 		if app.Spec.ExternalID == latestVersionID {
 			// app is up to date, no action needed
 			return nil
@@ -171,4 +185,31 @@ func IsNewerVersion(prevVersion, updatedVersion string) (bool, error) {
 		// two versions based on same k8s version
 		return updatedVer.Metadata > prevVer.Metadata, nil
 	}
+}
+
+//nodeNeedsUpgrade checks all nodes in cluster, returns true if they still need to be upgraded
+func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster) (bool, error) {
+	v3NodeList, err := h.nodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return false, err
+	}
+	for _, node := range v3NodeList {
+		isNewer, err := IsNewerVersion(node.Status.InternalNodeStatus.NodeInfo.KubeletVersion, cluster.Spec.K3sConfig.Version)
+		if err != nil {
+			return false, err
+		}
+		if isNewer {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func checkDeployed(app *v32.App) bool {
+
+	if v32.AppConditionDeployed.IsTrue(app) || v32.AppConditionInstalled.IsTrue(app) {
+		return true
+	}
+
+	return false
 }

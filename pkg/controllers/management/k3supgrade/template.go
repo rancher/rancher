@@ -24,11 +24,7 @@ var genericPlan = planv1.Plan{
 	Spec: planv1.PlanSpec{
 		Concurrency:        0,
 		ServiceAccountName: systemUpgradeServiceAccount,
-		Channel:            "",
-		Version:            "",
-		Secrets:            nil,
-		Prepare:            nil,
-		Cordon:             false,
+		Cordon:             true,
 		Upgrade: &planv1.ContainerSpec{
 			Image: upgradeImage,
 		},
