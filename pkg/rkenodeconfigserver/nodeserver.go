@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
@@ -19,13 +18,17 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
-	rkehosts "github.com/rancher/rke/hosts"
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+)
+
+const (
+	DefaultAgentCheckInterval       = 120
+	AgentCheckIntervalDuringUpgrade = 35
 )
 
 var (
@@ -40,6 +43,7 @@ type RKENodeConfigServer struct {
 	serviceOptions       v3.RKEK8sServiceOptionInterface
 	sysImagesLister      v3.RKEK8sSystemImageLister
 	sysImages            v3.RKEK8sSystemImageInterface
+	nodes                v3.NodeInterface
 }
 
 func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
@@ -51,6 +55,7 @@ func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext)
 		serviceOptions:       scaledContext.Management.RKEK8sServiceOptions(""),
 		sysImagesLister:      scaledContext.Management.RKEK8sSystemImages("").Controller().Lister(),
 		sysImages:            scaledContext.Management.RKEK8sSystemImages(""),
+		nodes:                scaledContext.Management.Nodes(""),
 	}
 }
 
@@ -91,13 +96,32 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	var nodeConfig *rkeworker.NodeConfig
-	if isNonWorkerOnly(client.Node.Status.NodeConfig.Role) {
+	if IsNonWorker(client.Node.Status.NodeConfig.Role) {
 		nodeConfig, err = n.nonWorkerConfig(req.Context(), client.Cluster, client.Node)
 	} else {
 		if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
 			rw.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
+		if client.NodeVersion != 0 {
+			logrus.Debugf("cluster [%s] worker-upgrade: received node-version [%v] for node [%s]", client.Cluster.Name,
+				client.NodeVersion, client.Node.Name)
+
+			if client.Node.Status.AppliedNodeVersion != client.NodeVersion {
+				nodeCopy := client.Node.DeepCopy()
+				logrus.Infof("cluster [%s] worker-upgrade: updating node [%s] with node-version %v", client.Cluster.Name,
+					client.Node.Name, client.NodeVersion)
+
+				nodeCopy.Status.AppliedNodeVersion = client.NodeVersion
+
+				_, err = n.nodes.Update(nodeCopy)
+				if err != nil {
+					logrus.Infof("cluster [%s] worker-upgrade: error updating node [%s] with node-version [%v]: %v", client.Cluster.Name,
+						client.Node.Name, client.NodeVersion, err)
+				}
+			}
+		}
+
 		nodeConfig, err = n.nodeConfig(req.Context(), client.Cluster, client.Node)
 	}
 
@@ -114,63 +138,47 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 }
 
-func isNonWorkerOnly(role []string) bool {
-	if slice.ContainsString(role, rkeservices.ETCDRole) ||
-		slice.ContainsString(role, rkeservices.ControlRole) {
-		return true
+func IsNonWorker(roles []string) bool {
+	for _, role := range roles {
+		if role == rkeservices.ETCDRole {
+			return true
+		}
+		if role == rkeservices.ControlRole {
+			return true
+		}
 	}
 	return false
 }
 
 func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
-	rkeConfig := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig
-	if rkeConfig == nil {
-		rkeConfig = &v3.RancherKubernetesEngineConfig{}
-	}
-
-	rkeConfig = rkeConfig.DeepCopy()
-	rkeConfig.Nodes = []v3.RKEConfigNode{
-		*node.Status.NodeConfig,
-	}
-	rkeConfig.Nodes[0].Role = []string{rkeservices.WorkerRole, rkeservices.ETCDRole, rkeservices.ControlRole}
-
-	infos, err := librke.GetDockerInfo(node)
-	if err != nil {
-		return nil, err
-	}
-	hostAddress := node.Status.NodeConfig.Address
-	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version, infos[hostAddress].OSType)
-	if err != nil {
-		return nil, err
-	}
-
-	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos, svcOptions)
-	if err != nil {
-		return nil, err
+	nodePlan := node.Status.NodePlan
+	if nodePlan == nil {
+		logrus.Infof("nodePlan is nil for node %s", node.Name)
+		return nil, fmt.Errorf("nodeplan is nil for non-worker node %s %s", node.Name, node.Status.NodeConfig.Address)
 	}
 
 	nc := &rkeworker.NodeConfig{
 		ClusterName: cluster.Name,
 	}
-	token, err := n.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create or get cluster token for share-mnt")
-	}
-	for _, tempNode := range plan.Nodes {
-		if tempNode.Address == node.Status.NodeConfig.Address {
-			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d,
-				node.Status.NodeConfig.HostnameOverride, cluster)
-			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
-			return nc, nil
-		}
-	}
+	nc.Processes = nodePlan.Plan.Processes
 
-	return nil, fmt.Errorf("failed to find plan for non-worker %s", node.Status.NodeConfig.Address)
+	return nc, nil
 }
 
 func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
-	spec := cluster.Status.AppliedSpec.DeepCopy()
+	status := cluster.Status.AppliedSpec.DeepCopy()
+	rkeConfig := status.RancherKubernetesEngineConfig
+
+	nodePlan := node.Status.NodePlan
+	hostAddress := node.Status.NodeConfig.Address
+	if nodePlan == nil {
+		logrus.Infof("nodePlan is nil for node %s", node.Name)
+		return nil, fmt.Errorf("nodeplan is nil for node %s %s", node.Name, hostAddress)
+	}
+
+	nc := &rkeworker.NodeConfig{
+		ClusterName: cluster.Name,
+	}
 
 	infos, err := librke.GetDockerInfo(node)
 	if err != nil {
@@ -182,78 +190,62 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		return nil, err
 	}
 
-	hostAddress := node.Status.NodeConfig.Address
 	hostDockerInfo := infos[hostAddress]
 	if hostDockerInfo.OSType == "windows" { // compatible with Windows
-		bundle = bundle.ForWindowsNode(spec.RancherKubernetesEngineConfig, hostAddress)
+		bundle = bundle.ForWindowsNode(rkeConfig, hostAddress)
 	} else {
-		bundle = bundle.ForNode(spec.RancherKubernetesEngineConfig, hostAddress)
+		bundle = bundle.ForNode(rkeConfig, hostAddress)
 	}
 
-	rkeConfig := spec.RancherKubernetesEngineConfig
-	filterHostForSpec(rkeConfig, node)
-	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
-	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version, hostDockerInfo.OSType)
-	if err != nil {
-		return nil, err
-	}
-	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos, svcOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	nc := &rkeworker.NodeConfig{
-		ClusterName: cluster.Name,
-	}
-	token, err := n.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create or get cluster token for share-mnt")
-	}
-	for _, tempNode := range plan.Nodes {
-		if tempNode.Address == hostAddress {
-			if hostDockerInfo.OSType == "windows" { // compatible with Windows
-				nc.Processes = enhanceWindowsProcesses(tempNode.Processes)
-			} else {
-				b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d,
-					node.Status.NodeConfig.HostnameOverride, cluster)
-			}
-			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
-			nc.Files = tempNode.Files
-			// Adding kubelet certificate
-			// Check if argument is set on kubelet for serving certificate
-			if rkepki.IsKubeletGenerateServingCertificateEnabledinConfig(rkeConfig) {
-				logrus.Debugf("nodeConfig: VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", tempNode.Address)
-				err := rkepki.GenerateKubeletCertificate(ctx, bundle.Certs(), *rkeConfig, "", "", false)
-				if err != nil {
-					return nil, errors.Wrapf(err, "failed to generate kubelet certificate")
-				}
-			}
-
-			certString, err := bundle.SafeMarshal()
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to marshal certificates bundle")
-			}
-			nc.Certs = certString
-
-			return nc, nil
+	if rkepki.IsKubeletGenerateServingCertificateEnabledinConfig(rkeConfig) {
+		logrus.Debugf("nodeConfig: VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", hostAddress)
+		err := rkepki.GenerateKubeletCertificate(ctx, bundle.Certs(), *rkeConfig, "", "", false)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to generate kubelet certificate")
 		}
 	}
+	certString, err := bundle.SafeMarshal()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal certificates bundle")
+	}
+	nc.Certs = certString
+	np := nodePlan.Plan
+	nc.Processes = np.Processes
+	nc.Files = np.Files
+	if nodePlan.AgentCheckInterval != 0 {
+		nc.AgentCheckInterval = nodePlan.AgentCheckInterval
+	}
 
-	return nil, fmt.Errorf("failed to find plan for %s", hostAddress)
+	if node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
+		if nodePlan.Version == cluster.Status.NodeVersion {
+			nc.NodeVersion = cluster.Status.NodeVersion
+			logrus.Infof("cluster [%s] worker-upgrade: sending node-version for node [%s] version %v", cluster.Name, node.Status.NodeName, nc.NodeVersion)
+		} else if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+			if nc.AgentCheckInterval != AgentCheckIntervalDuringUpgrade {
+				nodeCopy := node.DeepCopy()
+				nodeCopy.Status.NodePlan.AgentCheckInterval = AgentCheckIntervalDuringUpgrade
+
+				n.nodes.Update(nodeCopy)
+
+				logrus.Infof("cluster [%s] worker-upgrade: updating [%s] with agent-interval [%v]", cluster.Name, node.Status.NodeName, AgentCheckIntervalDuringUpgrade)
+				nc.AgentCheckInterval = AgentCheckIntervalDuringUpgrade
+			}
+		}
+	}
+	return nc, nil
 }
 
-func filterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
+func FilterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
 	nodeList := make([]v3.RKEConfigNode, 0)
 	for _, node := range spec.Nodes {
-		if isNonWorkerOnly(node.Role) || node.NodeName == n.Status.NodeConfig.NodeName {
+		if IsNonWorker(node.Role) || node.NodeName == n.Status.NodeConfig.NodeName {
 			nodeList = append(nodeList, node)
 		}
 	}
 	spec.Nodes = nodeList
 }
 
-func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool, nodeName string,
+func AugmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool, nodeName string,
 	cluster *v3.Cluster) map[string]v3.Process {
 	var shared []string
 
@@ -315,7 +307,7 @@ func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d
 	return processes
 }
 
-func enhanceWindowsProcesses(processes map[string]v3.Process) map[string]v3.Process {
+func EnhanceWindowsProcesses(processes map[string]v3.Process) map[string]v3.Process {
 	newProcesses := make(map[string]v3.Process, len(processes))
 	for k, p := range processes {
 		p.Binds = append(p.Binds,
@@ -327,7 +319,7 @@ func enhanceWindowsProcesses(processes map[string]v3.Process) map[string]v3.Proc
 	return newProcesses
 }
 
-func appendTaintsToKubeletArgs(processes map[string]v3.Process, nodeConfigTaints []v3.RKETaint) map[string]v3.Process {
+func AppendTaintsToKubeletArgs(processes map[string]v3.Process, nodeConfigTaints []v3.RKETaint) map[string]v3.Process {
 	if kubelet, ok := processes["kubelet"]; ok && len(nodeConfigTaints) != 0 {
 		initialTaints := taints.GetTaintsFromStrings(taints.GetStringsFromRKETaint(nodeConfigTaints))
 		var currentTaints []v1.Taint
