@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"context"
+	"net/http"
 	"sync"
 
 	"github.com/rancher/norman/types"
@@ -15,6 +16,10 @@ func NewAccessControl(ctx context.Context, clusterName string, rbacClient v1.Int
 	return NewAccessControlWithASL(clusterName, rbacClient, asl)
 }
 
+func isSubscribe(ctx *types.APIContext) bool {
+	return ctx.Request.Method == http.MethodGet && ctx.Type == "subscribe"
+}
+
 func NewAccessControlWithASL(clusterName string, rbacClient v1.Interface, asl accesscontrol.AccessSetLookup) types.AccessControl {
 	var cacheLock sync.RWMutex
 	return newContextBased(func(ctx *types.APIContext) (types.AccessControl, bool) {
@@ -23,19 +28,21 @@ func NewAccessControlWithASL(clusterName string, rbacClient v1.Interface, asl ac
 			return nil, false
 		}
 
-		cacheLock.RLock()
-		ac, ok := cache[clusterName]
-		if ok {
-			if u, ok := ac.(*userCachedAccess); !ok || !u.Expired() {
-				cacheLock.RUnlock()
-				return ac, true
+		if !isSubscribe(ctx) {
+			cacheLock.RLock()
+			ac, ok := cache[clusterName]
+			if ok {
+				if u, ok := ac.(*userCachedAccess); !ok || !u.Expired() {
+					cacheLock.RUnlock()
+					return ac, true
+				}
 			}
+			cacheLock.RUnlock()
 		}
-		cacheLock.RUnlock()
 
 		cacheLock.Lock()
 		defer cacheLock.Unlock()
-		ac = newUserLookupAccess(ctx, asl)
+		ac := newUserLookupAccess(ctx, asl)
 		cache[clusterName] = ac
 		return ac, true
 	})
