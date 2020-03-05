@@ -28,10 +28,12 @@ const (
 )
 
 type NodeConfig struct {
-	ClusterName string                `json:"clusterName"`
-	Certs       string                `json:"certs"`
-	Processes   map[string]v3.Process `json:"processes"`
-	Files       []v3.File             `json:"files"`
+	ClusterName        string                `json:"clusterName"`
+	Certs              string                `json:"certs"`
+	Processes          map[string]v3.Process `json:"processes"`
+	Files              []v3.File             `json:"files"`
+	NodeVersion        int                   `json:"nodeVersion"`
+	AgentCheckInterval int                   `json:"agentCheckInterval"`
 }
 
 func runProcess(ctx context.Context, name string, p v3.Process, start, forceRestart bool) error {
