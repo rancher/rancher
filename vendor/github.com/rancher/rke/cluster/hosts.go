@@ -89,8 +89,9 @@ func (c *Cluster) FindHostsLabeledToIgnoreUpgrade(ctx context.Context) {
 		return
 	}
 	for _, node := range nodes.Items {
-		if val, ok := node.Labels[k8s.IgnoreHostDuringUpgradeLabel]; ok && val == "true" {
+		if val, ok := node.Labels[k8s.IgnoreHostDuringUpgradeLabel]; ok && val == k8s.IgnoreLabelValue {
 			host := hosts.Host{RKEConfigNode: v3.RKEConfigNode{Address: node.Annotations[k8s.ExternalAddressAnnotation]}}
+			logrus.Infof("Host %v is labeled to ignore upgrade", host.Address)
 			c.HostsLabeledToIgnoreUpgrade[host.Address] = true
 		}
 	}
@@ -174,7 +175,7 @@ func (c *Cluster) CalculateMaxUnavailable() (int, int, error) {
 	}
 	// maxUnavailable should be calculated against all hosts provided in cluster.yml except the ones labelled to be ignored for upgrade
 	workerHosts += len(inactiveWorkerHosts)
-	maxUnavailableWorker, err := services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailableWorker, workerHosts)
+	maxUnavailableWorker, err := services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailableWorker, workerHosts, services.WorkerRole)
 	if err != nil {
 		return maxUnavailableWorker, maxUnavailableControl, err
 	}
@@ -185,7 +186,7 @@ func (c *Cluster) CalculateMaxUnavailable() (int, int, error) {
 		controlHosts++
 	}
 	controlHosts += len(inactiveControlPlaneHosts)
-	maxUnavailableControl, err = services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailableControlplane, controlHosts)
+	maxUnavailableControl, err = services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailableControlplane, controlHosts, services.ControlRole)
 	if err != nil {
 		return maxUnavailableWorker, maxUnavailableControl, err
 	}
