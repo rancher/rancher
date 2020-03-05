@@ -47,16 +47,21 @@ func (m *nodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object
 			return nil, err
 		}
 	}
-	nodeCopy := obj.DeepCopy()
-	if !desiredValue {
-		removeDrainCondition(nodeCopy)
+
+	logrus.Debugf("cordonNode: [%v] desired %v current %v", obj.Name, desiredValue, obj.Spec.InternalNodeSpec.Unschedulable)
+	// reset only after Unschedulable reflects correctly
+	if obj.Spec.InternalNodeSpec.Unschedulable == desiredValue {
+		nodeCopy := obj.DeepCopy()
+		nodeCopy.Spec.DesiredNodeUnschedulable = ""
+
+		if !obj.Spec.InternalNodeSpec.Unschedulable {
+			removeDrainCondition(nodeCopy)
+		}
+
+		obj, err = m.machines.Update(nodeCopy)
 	}
-	nodeCopy.Spec.DesiredNodeUnschedulable = ""
-	_, err = m.machines.Update(nodeCopy)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+
+	return obj, err
 }
 
 func (d *nodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) {
