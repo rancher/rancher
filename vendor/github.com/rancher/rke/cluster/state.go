@@ -86,7 +86,7 @@ func SaveFullStateToKubernetes(ctx context.Context, kubeCluster *Cluster, fullSt
 				time.Sleep(time.Second * 5)
 				continue
 			}
-			log.Infof(ctx, "[state] Successfully Saved full cluster state to Kubernetes ConfigMap: %s", StateConfigMapName)
+			log.Infof(ctx, "[state] Successfully Saved full cluster state to Kubernetes ConfigMap: %s", FullStateConfigMapName)
 			timeout <- true
 			break
 		}
