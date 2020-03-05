@@ -26,3 +26,5 @@ __pycache__
 .kube/
 .DS_Store
 tests/validation/.idea
+all.yaml
+kustomization.yaml

@@ -58,7 +58,7 @@ type AppStatus struct {
 	Notes                string            `json:"notes,omitempty"`
 	Conditions           []AppCondition    `json:"conditions,omitempty"`
 	LastAppliedTemplates string            `json:"lastAppliedTemplate,omitempty"`
-	HelmVersion          string            `json:"helmVersion,omitempty" norman:"nocreate,noupdate"`
+	HelmVersion          string            `json:"helmVersion,omitempty" norman:"noupdate,nocreate"`
 }
 
 type AppCondition struct {
