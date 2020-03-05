@@ -182,7 +182,7 @@ func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan v3.
 	}
 
 	node, obj = node.DeepCopy(), obj.DeepCopy()
-	planValues, changed := computePlanDelta(nodePlan.Labels, obj.Spec.MetadataUpdate.Labels, onlyKubeLabels)
+	planValues, changed := computePlanDelta(obj.Status.NodeConfig.Labels, obj.Spec.MetadataUpdate.Labels)
 	if changed {
 		obj.Status.NodeConfig.Labels = planValues
 	}
@@ -193,10 +193,10 @@ func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan v3.
 	return m.updateNodeAndNode(node, obj)
 }
 
-func computePlanDelta(planValues map[string]string, delta v3.MapDelta, canChangeValue canChangeValuePolicy) (map[string]string, bool) {
+func computePlanDelta(planValues map[string]string, delta v3.MapDelta) (map[string]string, bool) {
 	update := false
 	for k, v := range delta.Add {
-		if planValues[k] != v && canChangeValue(k) {
+		if planValues[k] != v {
 			update = true
 			planValues[k] = v
 		}
