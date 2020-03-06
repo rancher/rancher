@@ -11,6 +11,7 @@ def test_node_fields(admin_mc):
     cclient = admin_mc.client
     fields = {
         'annotations': 'cru',
+        'appliedNodeVersion': 'r',
         'labels': 'cru',
         'nodeTaints': 'r',
         'namespaceId': 'cr',
@@ -24,6 +25,7 @@ def test_node_fields(admin_mc):
         'limits': 'r',
         'publicEndpoints': 'r',
         'nodePoolId': 'r',
+        'nodePlan': 'r',
         'nodeName': 'r',
         'requested': 'r',
         'clusterId': 'cr',
