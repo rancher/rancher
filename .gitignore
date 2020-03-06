@@ -24,6 +24,7 @@ __pycache__
 /rancher
 *.pytest_cache
 .kube/
+.vscode/
 .DS_Store
 tests/validation/.idea
 all.yaml
