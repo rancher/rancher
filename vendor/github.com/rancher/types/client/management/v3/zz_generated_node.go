@@ -8,6 +8,7 @@ const (
 	NodeType                      = "node"
 	NodeFieldAllocatable          = "allocatable"
 	NodeFieldAnnotations          = "annotations"
+	NodeFieldAppliedNodeVersion   = "appliedNodeVersion"
 	NodeFieldCapacity             = "capacity"
 	NodeFieldClusterID            = "clusterId"
 	NodeFieldConditions           = "conditions"
@@ -28,6 +29,7 @@ const (
 	NodeFieldName                 = "name"
 	NodeFieldNamespaceId          = "namespaceId"
 	NodeFieldNodeName             = "nodeName"
+	NodeFieldNodePlan             = "nodePlan"
 	NodeFieldNodePoolID           = "nodePoolId"
 	NodeFieldNodeTaints           = "nodeTaints"
 	NodeFieldNodeTemplateID       = "nodeTemplateId"
@@ -55,6 +57,7 @@ type Node struct {
 	types.Resource
 	Allocatable          map[string]string         `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations          map[string]string         `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedNodeVersion   int64                     `json:"appliedNodeVersion,omitempty" yaml:"appliedNodeVersion,omitempty"`
 	Capacity             map[string]string         `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	ClusterID            string                    `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Conditions           []NodeCondition           `json:"conditions,omitempty" yaml:"conditions,omitempty"`
@@ -75,6 +78,7 @@ type Node struct {
 	Name                 string                    `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string                    `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeName             string                    `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
+	NodePlan             *NodePlan                 `json:"nodePlan,omitempty" yaml:"nodePlan,omitempty"`
 	NodePoolID           string                    `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
 	NodeTaints           []Taint                   `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
 	NodeTemplateID       string                    `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`

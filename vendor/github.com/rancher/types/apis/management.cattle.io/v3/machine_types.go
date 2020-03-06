@@ -91,6 +91,8 @@ type NodeStatus struct {
 	NodeLabels         map[string]string `json:"nodeLabels,omitempty"`
 	NodeTaints         []v1.Taint        `json:"nodeTaints,omitempty"`
 	DockerInfo         *DockerInfo       `json:"dockerInfo,omitempty"`
+	NodePlan           *NodePlan         `json:"nodePlan,omitempty"`
+	AppliedNodeVersion int               `json:"appliedNodeVersion,omitempty"`
 }
 
 type DockerInfo struct {
@@ -123,6 +125,7 @@ var (
 	NodeConditionConfigSaved condition.Cond = "Saved"
 	NodeConditionReady       condition.Cond = "Ready"
 	NodeConditionDrained     condition.Cond = "Drained"
+	NodeConditionUpgraded    condition.Cond = "Upgraded"
 )
 
 type NodeCondition struct {
@@ -223,6 +226,13 @@ type NodeSpec struct {
 	DesiredNodeUnschedulable string          `json:"desiredNodeUnschedulable,omitempty"`
 	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
 	MetadataUpdate           MetadataUpdate  `json:"metadataUpdate,omitempty"`
+}
+
+type NodePlan struct {
+	Plan    *RKEConfigNodePlan `json:"plan,omitempty"`
+	Version int                `json:"version,omitempty"`
+	// current default in rancher-agent is 2m (120s)
+	AgentCheckInterval int `json:"agentCheckInterval,omitempty" norman:"min=1,max=1800,default=120"`
 }
 
 type NodeCommonParams struct {
