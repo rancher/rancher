@@ -13,4 +13,8 @@ type K3sUpgradeStrategy struct {
 	ServerConcurrency int `yaml:"server_concurrency" json:"serverConcurrency,omitempty"`
 	// How many workers should be upgraded at a time
 	WorkerConcurrency int `yaml:"worker_concurrency" json:"workerConcurrency,omitempty"`
+	// Whether controlplane nodes should be drained
+	DrainServerNodes bool `yaml:"drain_server_nodes" json:"drainServerNodes,omitempty"`
+	// Whether worker nodes should be drained
+	DrainWorkerNodes bool `yaml:"drain_worker_nodes" json:"drainWorkerNodes,omitempty"`
 }
