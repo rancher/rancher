@@ -127,7 +127,7 @@ func (d *DummyIndexer) ListIndexFuncValues(indexName string) []string {
 func (d *DummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
 	return []interface{}{
 		&v3.Token{
-			Token: "$1:fc5d88fa6e60a091:15:8:1:dUzBSmpqILPEsA/DzulT0lf4T8xu6juX2NU0sMqLXYADzUiYIB3yFMN4EvLSD7PJ1N0g9Rd99sB3Nfe8YW5eDg", // "testkey"
+			Token: "$1:dGVzdHNhbHQ:THYNxKRchboM+OTTYgV2vjXO8T7GoIfkT+vkI7eWH60", // testsalt, testkey
 			ObjectMeta: v1.ObjectMeta{
 				Name: "testname",
 			},
