@@ -18,6 +18,5 @@ func CRDSetup(ctx context.Context, apiContext *config.UserOnlyContext) error {
 		client.ClusterAuthTokenType,
 		client.ClusterUserAttributeType,
 	)
-	factory.BatchWait()
-	return nil
+	return factory.BatchWait()
 }
