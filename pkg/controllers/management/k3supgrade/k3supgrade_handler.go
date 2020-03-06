@@ -35,7 +35,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	}
 
 	if cluster.Spec.K3sConfig.Version == "" {
-		cluster.Spec.K3sConfig.Version = cluster.Status.Version.String()
+		return cluster, nil
 	}
 
 	isNewer, err := IsNewerVersion(cluster.Status.Version.GitVersion, cluster.Spec.K3sConfig.Version)
