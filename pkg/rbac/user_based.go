@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rancher/norman/authorization"
@@ -17,9 +18,16 @@ import (
 	"k8s.io/client-go/transport"
 )
 
+type accessControlCache struct {
+	sync.RWMutex
+	cache map[string]types.AccessControl
+}
+
 func NewAccessControlHandler() auth.Middleware {
 	return func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
-		val := map[string]types.AccessControl{}
+		val := &accessControlCache{
+			cache: map[string]types.AccessControl{},
+		}
 		ctx := context.WithValue(req.Context(), contextKey{}, val)
 		req = req.WithContext(ctx)
 		next.ServeHTTP(rw, req)
