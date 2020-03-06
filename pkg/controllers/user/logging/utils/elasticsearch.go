@@ -44,10 +44,12 @@ func (w *elasticsearchTestWrap) TestReachable(ctx context.Context, dial dialer.D
 	}
 
 	index := getIndex(w.DateFormat, w.IndexPrefix)
+	url.Path = path.Join(url.Path, "/_bulk")
 
-	url.Path = path.Join(url.Path, index, "/container_log")
-
-	req, err := http.NewRequest(http.MethodPost, url.String(), bytes.NewReader(httpTestData))
+	bulkTestData := []byte(`{"index":{"_index":"` + index + `","_type":"container_log"}}` + "\n")
+	bulkTestData = append(bulkTestData, httpTestData...)
+	bulkTestData = append(bulkTestData, "\n"...)
+	req, err := http.NewRequest(http.MethodPost, url.String(), bytes.NewReader(bulkTestData))
 	if err != nil {
 		return errors.Wrap(err, "create request failed")
 	}
