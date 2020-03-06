@@ -9,8 +9,8 @@ import (
 type Manager interface {
 	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
 	GetUser(apiContext *types.APIContext) string
-	EnsureToken(tokenName, description, kind, userName string, ttl *int64) (string, error)
-	EnsureClusterToken(clusterName, tokenName, description, kind, userName string, ttl *int64) (string, error)
+	EnsureToken(tokenName, description, kind, userName string) (string, error)
+	EnsureClusterToken(clusterName, tokenName, description, kind, userName string) (string, error)
 	EnsureUser(principalName, displayName string) (*v3.User, error)
 	CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error)
 	SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error)

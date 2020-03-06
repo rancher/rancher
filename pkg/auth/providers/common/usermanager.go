@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -187,36 +188,26 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 	return false, errors.Errorf("Unsupported accessMode: %v", accessMode)
 }
 
-func (m *userManager) EnsureToken(tokenName, description, kind, userName string, ttl *int64) (string, error) {
-	return m.EnsureClusterToken("", tokenName, description, kind, userName, ttl)
+func (m *userManager) EnsureToken(tokenName, description, kind, userName string) (string, error) {
+	return m.EnsureClusterToken("", tokenName, description, kind, userName)
 }
 
-// Creates token obj with hashed token, returns token. Overwrites if pre-existing.
-func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string, ttl *int64) (string, error) {
+func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string) (string, error) {
 	if strings.HasPrefix(tokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
-	}
-	key, err := randomtoken.Generate()
-	if err != nil {
-		return "", errors.New("failed to generate token key")
 	}
 
 	token, err := m.tokenLister.Get("", tokenName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
-	if token != nil {
-		token.Token = key
-		err = tokens.ConvertTokenKeyToHash(token)
+
+	if token == nil {
+		key, err := randomtoken.Generate()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to generate token key")
 		}
-		logrus.Infof("Updating token for user %v", userName)
-		token, err = m.tokens.Update(token)
-		if err != nil {
-			return "", err
-		}
-	} else {
+
 		token = &v3.Token{
 			ObjectMeta: v1.ObjectMeta{
 				Name: tokenName,
@@ -233,21 +224,23 @@ func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, ki
 			Token:        key,
 			ClusterName:  clusterName,
 		}
-		if ttl != nil {
-			token.TTLMillis = *ttl
-		}
 
-		err = tokens.ConvertTokenKeyToHash(token)
-		if err != nil {
-			return "", err
-		}
 		logrus.Infof("Creating token for user %v", userName)
-		token, err = m.tokens.Create(token)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return "", err
+		createdToken, err := m.tokens.Create(token)
+		if err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return "", err
+			}
+			token, err = m.tokens.Get(tokenName, v1.GetOptions{})
+			if err != nil {
+				return "", err
+			}
+		} else {
+			token = createdToken
 		}
 	}
-	return token.Name + ":" + key, nil
+
+	return token.Name + ":" + token.Token, nil
 }
 
 func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, error) {
