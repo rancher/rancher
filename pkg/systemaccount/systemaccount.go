@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/config/systemtokens"
 	"github.com/rancher/types/user"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,39 +21,36 @@ const (
 
 func NewManager(management *config.ManagementContext) *Manager {
 	return &Manager{
-		userManager:  management.UserManager,
-		systemTokens: management.SystemTokens,
-		crtbs:        management.Management.ClusterRoleTemplateBindings(""),
-		crts:         management.Management.ClusterRegistrationTokens(""),
-		prtbs:        management.Management.ProjectRoleTemplateBindings(""),
-		prtbLister:   management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		tokens:       management.Management.Tokens(""),
-		users:        management.Management.Users(""),
+		userManager: management.UserManager,
+		crtbs:       management.Management.ClusterRoleTemplateBindings(""),
+		crts:        management.Management.ClusterRegistrationTokens(""),
+		prtbs:       management.Management.ProjectRoleTemplateBindings(""),
+		prtbLister:  management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		tokens:      management.Management.Tokens(""),
+		users:       management.Management.Users(""),
 	}
 }
 
 func NewManagerFromScale(management *config.ScaledContext) *Manager {
 	return &Manager{
-		userManager:  management.UserManager,
-		systemTokens: management.SystemTokens,
-		crtbs:        management.Management.ClusterRoleTemplateBindings(""),
-		crts:         management.Management.ClusterRegistrationTokens(""),
-		prtbs:        management.Management.ProjectRoleTemplateBindings(""),
-		prtbLister:   management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		tokens:       management.Management.Tokens(""),
-		users:        management.Management.Users(""),
+		userManager: management.UserManager,
+		crtbs:       management.Management.ClusterRoleTemplateBindings(""),
+		crts:        management.Management.ClusterRegistrationTokens(""),
+		prtbs:       management.Management.ProjectRoleTemplateBindings(""),
+		prtbLister:  management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		tokens:      management.Management.Tokens(""),
+		users:       management.Management.Users(""),
 	}
 }
 
 type Manager struct {
-	userManager  user.Manager
-	systemTokens systemtokens.Interface
-	crtbs        v3.ClusterRoleTemplateBindingInterface
-	crts         v3.ClusterRegistrationTokenInterface
-	prtbs        v3.ProjectRoleTemplateBindingInterface
-	prtbLister   v3.ProjectRoleTemplateBindingLister
-	tokens       v3.TokenInterface
-	users        v3.UserInterface
+	userManager user.Manager
+	crtbs       v3.ClusterRoleTemplateBindingInterface
+	crts        v3.ClusterRegistrationTokenInterface
+	prtbs       v3.ProjectRoleTemplateBindingInterface
+	prtbLister  v3.ProjectRoleTemplateBindingLister
+	tokens      v3.TokenInterface
+	users       v3.UserInterface
 }
 
 func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
@@ -160,7 +156,7 @@ func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, err
 	if err != nil {
 		return "", err
 	}
-	return s.systemTokens.EnsureSystemToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name, nil)
+	return s.userManager.EnsureToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name)
 }
 
 func (s *Manager) RemoveSystemAccount(userID string) error {

@@ -160,8 +160,13 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 	} else {
 		storedToken = objs[0].(*v3.Token)
 	}
-	if _, err := tokens.VerifyToken(storedToken, tokenName, tokenKey); err != nil {
-		return nil, err
+
+	if storedToken.Token != tokenKey || storedToken.ObjectMeta.Name != tokenName {
+		return nil, fmt.Errorf("must authenticate")
+	}
+
+	if tokens.IsExpired(*storedToken) {
+		return nil, fmt.Errorf("must authenticate")
 	}
 
 	return storedToken, nil

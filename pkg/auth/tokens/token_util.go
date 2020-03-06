@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken/common"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -99,37 +98,4 @@ func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]inte
 	mapper.FromInternal(tokenData)
 
 	return tokenData, nil
-}
-
-// Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
-func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error) {
-	if storedToken.ObjectMeta.Name != tokenName {
-		return 422, errors.New("Invalid auth token value")
-	}
-	if err := common.VerifyHash(storedToken.Token, tokenKey); err != nil {
-		logrus.Errorf("VerifyHash failed with error: %v", err)
-		return 422, errors.New("Invalid auth token value")
-	}
-	if IsExpired(*storedToken) {
-		return 410, errors.New("must authenticate")
-	}
-	return 200, nil
-}
-
-// ConvertTokenKeyToHash takes a token with an un-hashed key and converts it to a hashed key
-func ConvertTokenKeyToHash(token *v3.Token) error {
-	if token != nil && len(token.Token) > 0 {
-		var err error
-		hashedToken, err := common.CreateHash(token.Token)
-		if err != nil {
-			logrus.Errorf("Failed to generate hash from token: %v", err)
-			return errors.New("failed to generate hash from token")
-		}
-		token.Token = hashedToken
-		if token.Annotations == nil {
-			token.Annotations = map[string]string{}
-		}
-		token.Annotations[TokenHashed] = "true"
-	}
-	return nil
 }
