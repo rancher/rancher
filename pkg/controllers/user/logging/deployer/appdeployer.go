@@ -81,7 +81,8 @@ func (d *AppDeployer) deploy(app *projectv3.App, systemWriteKeys []string) error
 		if !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "failed to query app %s:%s", app.Namespace, app.Name)
 		}
-		if _, err := d.AppsGetter.Apps(app.Namespace).Create(app); err != nil && !apierrors.IsAlreadyExists(err) {
+		current, err = d.AppsGetter.Apps(app.Namespace).Create(app)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return errors.Wrapf(err, "failed to create app %s:%s", app.Namespace, app.Name)
 		}
 	}
