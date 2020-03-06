@@ -156,7 +156,9 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		projectclient.SourceCodeRepositoryType,
 	)
 
-	factory.BatchWait()
+	if err := factory.BatchWait(); err != nil {
+		return err
+	}
 
 	Clusters(schemas, apiContext, clusterManager, k8sProxy)
 	ClusterRoleTemplateBinding(schemas, apiContext)
