@@ -21,6 +21,7 @@ const (
 	ClusterStatusFieldIstioEnabled                         = "istioEnabled"
 	ClusterStatusFieldLimits                               = "limits"
 	ClusterStatusFieldMonitoringStatus                     = "monitoringStatus"
+	ClusterStatusFieldNodeVersion                          = "nodeVersion"
 	ClusterStatusFieldRequested                            = "requested"
 	ClusterStatusFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
 	ClusterStatusFieldVersion                              = "version"
@@ -46,6 +47,7 @@ type ClusterStatus struct {
 	IstioEnabled                         bool                        `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	Limits                               map[string]string           `json:"limits,omitempty" yaml:"limits,omitempty"`
 	MonitoringStatus                     *MonitoringStatus           `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
+	NodeVersion                          int64                       `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
 	Requested                            map[string]string           `json:"requested,omitempty" yaml:"requested,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
 	Version                              *Info                       `json:"version,omitempty" yaml:"version,omitempty"`
