@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,7 +20,7 @@ import (
 )
 
 type Factory struct {
-	wg           sync.WaitGroup
+	eg           errgroup.Group
 	ClientGetter proxy.ClientGetter
 }
 
@@ -41,30 +41,29 @@ func NewFactoryFromClient(config rest.Config) (*Factory, error) {
 	}, nil
 }
 
-func (f *Factory) BatchWait() {
-	f.wg.Wait()
+func (f *Factory) BatchWait() error {
+	return f.eg.Wait()
 }
 
 func (f *Factory) BatchCreateCRDs(ctx context.Context, storageContext types.StorageContext, schemas *types.Schemas, version *types.APIVersion, schemaIDs ...string) {
-	f.wg.Add(1)
-	go func() {
-		defer f.wg.Done()
-
+	f.eg.Go(func() error {
 		var schemasToCreate []*types.Schema
 
 		for _, schemaID := range schemaIDs {
 			s := schemas.Schema(version, schemaID)
 			if s == nil {
-				panic("can not find schema " + schemaID)
+				return fmt.Errorf("can not find schema %s", schemaID)
 			}
 			schemasToCreate = append(schemasToCreate, s)
 		}
 
 		err := f.AssignStores(ctx, storageContext, schemasToCreate...)
 		if err != nil {
-			panic("creating CRD store " + err.Error())
+			return fmt.Errorf("creating CRD store %v", err)
 		}
-	}()
+
+		return nil
+	})
 }
 
 func (f *Factory) AssignStores(ctx context.Context, storageContext types.StorageContext, schemas ...*types.Schema) error {
