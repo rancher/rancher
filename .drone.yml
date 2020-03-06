@@ -586,6 +586,23 @@ steps:
     ignore_missing: true
     password:
       from_secret: docker_password
+    spec: manifest-agent-head.tmpl
+    username:
+      from_secret: docker_username
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
+- name: push-build-number-agent-manifest
+  image: plugins/manifest:1.1.0
+  settings:
+    ignore_missing: true
+    password:
+      from_secret: docker_password
     spec: manifest-agent.tmpl
     username:
       from_secret: docker_username
