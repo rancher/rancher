@@ -93,8 +93,6 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 		cluster,
 		a.ClusterClient,
 		a.ClusterScanClient,
-		RetryIntervalInMilliseconds,
-		NumberOfRetriesForClusterUpdate,
 	)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, err.Error())

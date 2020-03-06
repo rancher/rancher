@@ -12,7 +12,14 @@ import (
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	errorState  = "error"
+	failedState = "fail"
+	passedState = "pass"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -33,11 +40,29 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 			}
 		}
 		if failed {
-			resource.Values["state"] = "error"
+			resource.Values["state"] = errorState
 			return
 		}
 		if completed {
 			resource.Links["report"] = apiContext.URLBuilder.Link("report", resource)
+			cisScanStatusInterface, ok := status["cisScanStatus"]
+			if !ok {
+				resource.Values["state"] = errorState
+				return
+			}
+			cisScanStatus := convert.ToMapInterface(cisScanStatusInterface)
+			failInterface := cisScanStatus["fail"]
+			fail, err := convert.ToNumber(failInterface)
+			if err != nil {
+				logrus.Errorf("error converting failInterface to int: %v", err)
+				resource.Values["state"] = errorState
+				return
+			}
+			if fail > 0 {
+				resource.Values["state"] = failedState
+			} else {
+				resource.Values["state"] = passedState
+			}
 		}
 	}
 }

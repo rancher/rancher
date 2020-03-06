@@ -134,7 +134,7 @@ func (ssh *scheduledScanHandler) sync(key string, _ *v3.ClusterScan) (runtime.Ob
 
 	currentCronSchedule := getCronSchedule(cluster)
 	if currentCronSchedule != pastCronSchedule {
-		logrus.Infof("scheduledScanHandler: sync: cron schedule has changed for cluster: %v, hence skipping",
+		logrus.Debugf("scheduledScanHandler: sync: cron schedule has changed for cluster: %v, hence skipping",
 			clusterID)
 		return nil, nil
 	}
@@ -180,8 +180,6 @@ func checkAndLaunchScan(cluster *v3.Cluster,
 		cluster,
 		clusterClient,
 		clusterScanClient,
-		cis.RetryIntervalInMilliseconds,
-		cis.NumberOfRetriesForClusterUpdate,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scheduledScanHandler: checkAndLaunchScan: error launching scan: %v", err)

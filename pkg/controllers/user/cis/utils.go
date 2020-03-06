@@ -32,22 +32,14 @@ func createConfigMapWithRetry(configMapsClient rcorev1.ConfigMapInterface, cm *v
 }
 
 func isRunnerPodRemoved(podLister rcorev1.PodLister) error {
-	removed := false
-	for retry := NumberOfRetriesForPodRemoval; retry > 0; retry-- {
-		pods, err := podLister.List(
-			v3.DefaultNamespaceForCis,
-			labels.Set(SonobuoyMasterLabel).AsSelector(),
-		)
-		if err != nil {
-			return fmt.Errorf("error listing pods: %v", err)
-		}
-		if len(pods) == 0 {
-			removed = true
-			break
-		}
-		time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
+	pods, err := podLister.List(
+		v3.DefaultNamespaceForCis,
+		labels.Set(SonobuoyMasterLabel).AsSelector(),
+	)
+	if err != nil {
+		return fmt.Errorf("error listing pods: %v", err)
 	}
-	if !removed {
+	if len(pods) != 0 {
 		return fmt.Errorf("runner pod not yet deleted")
 	}
 	return nil
