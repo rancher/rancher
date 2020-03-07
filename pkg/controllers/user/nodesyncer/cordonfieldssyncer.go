@@ -210,7 +210,7 @@ func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	token, err := d.systemTokens.EnsureSystemToken(drainTokenPrefix+user.Name, description, "drain-node", user.Name, nil)
+	token, err := d.userManager.EnsureToken(drainTokenPrefix+user.Name, description, "drain-node", user.Name)
 	if err != nil {
 		return nil, err
 	}

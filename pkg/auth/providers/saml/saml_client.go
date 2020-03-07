@@ -377,13 +377,13 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 func setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,
 	groupPrincipals []v3.Principal, isSecure bool) error {
-	rToken, unhashedTokenKey, err := tokenMGR.NewLoginToken(userID, userPrincipal, groupPrincipals, "", 0, "")
+	rToken, err := tokenMGR.NewLoginToken(userID, userPrincipal, groupPrincipals, "", 0, "")
 	if err != nil {
 		return err
 	}
 	tokenCookie := &http.Cookie{
 		Name:     "R_SESS",
-		Value:    rToken.ObjectMeta.Name + ":" + unhashedTokenKey,
+		Value:    rToken.ObjectMeta.Name + ":" + rToken.Token,
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,

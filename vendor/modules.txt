@@ -477,7 +477,7 @@ github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io
 github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/scheme
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1
-# github.com/rancher/types v0.0.0-20200306160654-37f04dbaa0a5
+# github.com/rancher/types v0.0.0-20200307012141-a9e1176ae180
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
@@ -509,7 +509,6 @@ github.com/rancher/types/compose
 github.com/rancher/types/condition
 github.com/rancher/types/config
 github.com/rancher/types/config/dialer
-github.com/rancher/types/config/systemtokens
 github.com/rancher/types/factory
 github.com/rancher/types/image
 github.com/rancher/types/kdm
