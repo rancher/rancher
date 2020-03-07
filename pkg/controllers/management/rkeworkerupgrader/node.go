@@ -71,36 +71,37 @@ func (uh *upgradeHandler) updateNodeActive(node *v3.Node) error {
 }
 
 func skipNode(node *v3.Node) bool {
+	clusterName := node.Namespace
 	if node.DeletionTimestamp != nil {
-		logrus.Debugf("node [%s] is getting deleted", node.Name)
+		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is getting deleted", clusterName, node.Name)
 		return true
 	}
 
 	if node.Status.NodeConfig == nil {
-		logrus.Debugf("node [%s] nodeConfig is empty", node.Name)
+		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] nodeConfig is empty", clusterName, node.Name)
 		return true
 	}
 
 	if !workerOnly(node.Status.NodeConfig.Role) {
-		logrus.Debugf("node [%s] is not a workerOnly node", node.Name)
+		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not a workerOnly node", clusterName, node.Name)
 		return true
 	}
 
 	// skip nodes marked for ignore by user
-	if node.Labels != nil && node.Labels[ignoreKey] == ignoreValue {
-		logrus.Debugf("node [%s] is marked with ignoreLabel %s: %v", node.Name, ignoreKey, ignoreValue)
+	if node.Status.NodeLabels != nil && node.Status.NodeLabels[ignoreKey] == ignoreValue {
+		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is marked with ignoreLabel %s: %v", clusterName, node.Name, ignoreKey, ignoreValue)
 		return true
 	}
 
 	// skip provisioning nodes
 	if !v3.NodeConditionProvisioned.IsTrue(node) {
-		logrus.Debugf("node [%s] is not provisioned", node.Name)
+		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not provisioned", clusterName, node.Name)
 		return true
 	}
 
 	// skip registering nodes
 	if !v3.NodeConditionRegistered.IsTrue(node) {
-		logrus.Debugf("node [%s] is not registered", node.Name)
+		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not registered", clusterName, node.Name)
 		return true
 	}
 
@@ -122,7 +123,7 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int) (ma
 		// check for nodeConditionReady
 		if !nodehelper.IsMachineReady(node) {
 			notReadyMap[node.Name] = node
-			logrus.Debugf("node [%s] is not ready", node.Name)
+			logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not ready", node.Namespace, node.Name)
 			continue
 		}
 
