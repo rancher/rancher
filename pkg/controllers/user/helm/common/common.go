@@ -334,3 +334,10 @@ func IsHelm3(helmName string) bool {
 	}
 	return false
 }
+
+func IsHelm2(helmName string) bool {
+	if helmName == HelmV2 || helmName == "" {
+		return true
+	}
+	return false
+}

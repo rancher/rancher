@@ -58,12 +58,14 @@ func helmInstall(tempDirs *common.HelmPath, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
-	go func() {
-		err := common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
-		if err != nil {
-			logrus.Errorf("got error while stopping tiller, error message: %s", err.Error())
-		}
-	}()
+	if common.IsHelm2(app.Status.HelmVersion) {
+		go func() {
+			err := common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
+			if err != nil {
+				logrus.Errorf("got error while stopping tiller, error message: %s", err.Error())
+			}
+		}()
+	}
 	return common.InstallCharts(tempDirs, addr, app)
 }
 
@@ -71,12 +73,14 @@ func helmDelete(tempDirs *common.HelmPath, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
-	go func() {
-		err := common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
-		if err != nil {
-			logrus.Errorf("got error while stopping tiller, error message: %s", err.Error())
-		}
-	}()
+	if common.IsHelm2(app.Status.HelmVersion) {
+		go func() {
+			err := common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
+			if err != nil {
+				logrus.Errorf("got error while stopping tiller, error message: %s", err.Error())
+			}
+		}()
+	}
 	return common.DeleteCharts(tempDirs, addr, app)
 }
 
