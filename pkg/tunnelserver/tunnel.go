@@ -44,8 +44,9 @@ type cluster struct {
 }
 
 type input struct {
-	Node    *client.Node `json:"node"`
-	Cluster *cluster     `json:"cluster"`
+	Node        *client.Node `json:"node"`
+	Cluster     *cluster     `json:"cluster"`
+	NodeVersion int          `json:"nodeVersion"`
 }
 
 func NewTunnelServer(authorizer *Authorizer) *remotedialer.Server {
@@ -82,10 +83,11 @@ type Authorizer struct {
 }
 
 type Client struct {
-	Cluster *v3.Cluster
-	Node    *v3.Node
-	Token   string
-	Server  string
+	Cluster     *v3.Cluster
+	Node        *v3.Node
+	Token       string
+	Server      string
+	NodeVersion int
 }
 
 func (t *Authorizer) authorizeTunnel(req *http.Request) (string, bool, error) {
@@ -130,10 +132,11 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 			node.Status.NodeConfig.Taints = taints.GetRKETaintsFromStrings(input.Node.CustomConfig.Taints)
 		}
 		return &Client{
-			Cluster: cluster,
-			Node:    node,
-			Token:   token,
-			Server:  req.Host,
+			Cluster:     cluster,
+			Node:        node,
+			Token:       token,
+			Server:      req.Host,
+			NodeVersion: input.NodeVersion,
 		}, ok, err
 	}
 

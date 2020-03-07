@@ -56,7 +56,7 @@ func TestAppendKubeletArgs(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		processes := getKubeletProcess(tc.currentCommand)
-		afterAppend := appendTaintsToKubeletArgs(processes, tc.taints)
+		afterAppend := AppendTaintsToKubeletArgs(processes, tc.taints)
 		appendedCommand := getCommandFromProcesses(afterAppend)
 		assert.Equal(t, tc.expectedTaintSet, appendedCommand, "", "")
 	}
@@ -91,7 +91,7 @@ func getAugmentedKubeletProcesses() map[string]v3.Process {
 		},
 	}
 
-	return augmentProcesses("token", processes, true, false, "dummynode", &cluster)
+	return AugmentProcesses("token", processes, true, false, "dummynode", &cluster)
 }
 
 func getCommandFromProcesses(processes map[string]v3.Process) map[string]struct{} {

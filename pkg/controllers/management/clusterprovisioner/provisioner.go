@@ -43,6 +43,7 @@ type Provisioner struct {
 	ClusterController     v3.ClusterController
 	Clusters              v3.ClusterInterface
 	NodeLister            v3.NodeLister
+	Nodes                 v3.NodeInterface
 	engineService         *service.EngineService
 	backoff               *flowcontrol.Backoff
 	KontainerDriverLister v3.KontainerDriverLister
@@ -58,6 +59,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		Clusters:              management.Management.Clusters(""),
 		ClusterController:     management.Management.Clusters("").Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
+		Nodes:                 management.Management.Nodes(""),
 		backoff:               flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		DynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
@@ -519,6 +521,10 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		cluster.Status.CACert = caCert
 		resetRkeConfigFlags(cluster, updateTriggered)
 
+		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+			cluster.Status.NodeVersion++
+		}
+
 		if cluster, err = p.Clusters.Update(cluster); err == nil {
 			saved = true
 			break
@@ -532,8 +538,17 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		return cluster, fmt.Errorf("failed to update cluster")
 	}
 
+	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+		logrus.Infof("Updated cluster [%s] with node version [%v]", cluster.Name, cluster.Status.NodeVersion)
+		p.reconcileForUpgrade(cluster.Name)
+	}
+
 	logrus.Infof("Provisioned cluster [%s]", cluster.Name)
 	return cluster, nil
+}
+
+func (p *Provisioner) reconcileForUpgrade(clusterName string) {
+	p.Nodes.Controller().Enqueue(clusterName, "upgrade_")
 }
 
 func (p *Provisioner) setGenericConfigs(cluster *v3.Cluster) {

@@ -253,7 +253,7 @@ func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterN
 		return "", err
 	}
 	for _, machine := range machines {
-		if machine.Spec.Worker && isMachineReady(machine) {
+		if machine.Spec.Worker && nodehelper.IsMachineReady(machine) {
 			nodePublicIP := getEndpointNodeAddress(machine)
 			if nodePublicIP != "" {
 				addresses = append(addresses, nodePublicIP)
