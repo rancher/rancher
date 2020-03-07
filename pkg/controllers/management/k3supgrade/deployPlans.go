@@ -36,7 +36,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 	masterPlan := &planv1.Plan{}
 	workerPlan := &planv1.Plan{}
 	// deactivate all existing plans that are not managed by Rancher
-	for _, plan := range planList.Items {
+	for i, plan := range planList.Items {
 		if _, ok := plan.Labels[rancherManagedPlan]; !ok {
 			// inverse selection is used here, we select a non-existent label
 			lsr := metav1.LabelSelectorRequirement{
@@ -55,11 +55,13 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 			switch name := plan.Name; name {
 			case k3sMasterPlanName:
 				if plan.Namespace == systemUpgradeNS {
-					masterPlan = &plan
+					// reference absolute memory location
+					masterPlan = &planList.Items[i]
 				}
 			case k3sWorkerPlanName:
 				if plan.Namespace == systemUpgradeNS {
-					workerPlan = &plan
+					// reference absolute memory location
+					workerPlan = &planList.Items[i]
 				}
 			}
 		}
