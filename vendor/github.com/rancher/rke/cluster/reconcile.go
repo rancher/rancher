@@ -28,7 +28,7 @@ const (
 )
 
 func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster, flags ExternalFlags, svcOptionData map[string]*v3.KubernetesServicesOptions) error {
-	logrus.Debugf("[reconcile] currentCluster: %+v\n", currentCluster)
+	logrus.Tracef("[reconcile] currentCluster: %+v\n", currentCluster)
 	log.Infof(ctx, "[reconcile] Reconciling cluster state")
 	kubeCluster.UpdateWorkersOnly = flags.UpdateOnly
 	if currentCluster == nil {

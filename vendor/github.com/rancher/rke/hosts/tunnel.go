@@ -67,7 +67,7 @@ func checkDockerVersion(ctx context.Context, h *Host, clusterVersion string) err
 	if err != nil {
 		return fmt.Errorf("Can't retrieve Docker Info: %v", err)
 	}
-	logrus.Debugf("Docker Info found: %#v", info)
+	logrus.Debugf("Docker Info found for host [%s]: %#v", h.Address, info)
 	h.DockerInfo = info
 	if h.IgnoreDockerVersion {
 		return nil
@@ -83,7 +83,7 @@ func checkDockerVersion(ctx context.Context, h *Host, clusterVersion string) err
 	}
 
 	if !isvalid {
-		return fmt.Errorf("Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, metadata.K8sVersionToDockerVersions[K8sVersion])
+		return fmt.Errorf("Unsupported Docker version found [%s] on host [%s], supported versions are %v", info.ServerVersion, h.Address, metadata.K8sVersionToDockerVersions[K8sVersion])
 	}
 	return nil
 }

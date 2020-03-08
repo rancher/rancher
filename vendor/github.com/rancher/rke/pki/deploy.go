@@ -156,7 +156,8 @@ func DeployAdminConfig(ctx context.Context, kubeConfig, localConfigPath string) 
 	if len(kubeConfig) == 0 {
 		return nil
 	}
-	logrus.Debugf("Deploying admin Kubeconfig locally: %s", kubeConfig)
+	logrus.Debugf("Deploying admin Kubeconfig locally at [%s]", localConfigPath)
+	logrus.Tracef("Deploying admin Kubeconfig locally: %s", kubeConfig)
 	err := ioutil.WriteFile(localConfigPath, []byte(kubeConfig), 0640)
 	if err != nil {
 		return fmt.Errorf("Failed to create local admin kubeconfig file: %v", err)

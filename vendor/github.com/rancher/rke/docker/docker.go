@@ -262,7 +262,7 @@ func pullImage(ctx context.Context, dClient *client.Client, hostname string, con
 			continue
 		}
 		defer out.Close()
-		if logrus.GetLevel() == logrus.DebugLevel {
+		if logrus.GetLevel() == logrus.TraceLevel {
 			io.Copy(os.Stdout, out)
 		} else {
 			io.Copy(ioutil.Discard, out)
