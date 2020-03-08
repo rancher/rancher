@@ -198,18 +198,17 @@ func ValidateHostCount(c *Cluster) error {
 }
 
 func validateDuplicateNodes(c *Cluster) error {
+	addresses := make(map[string]struct{}, len(c.Nodes))
+	hostnames := make(map[string]struct{}, len(c.Nodes))
 	for i := range c.Nodes {
-		for j := range c.Nodes {
-			if i == j {
-				continue
-			}
-			if c.Nodes[i].Address == c.Nodes[j].Address {
-				return fmt.Errorf("Cluster can't have duplicate node: %s", c.Nodes[i].Address)
-			}
-			if c.Nodes[i].HostnameOverride == c.Nodes[j].HostnameOverride {
-				return fmt.Errorf("Cluster can't have duplicate node: %s", c.Nodes[i].HostnameOverride)
-			}
+		if _, ok := addresses[c.Nodes[i].Address]; ok {
+			return fmt.Errorf("Cluster can't have duplicate node: %s", c.Nodes[i].Address)
 		}
+		addresses[c.Nodes[i].Address] = struct{}{}
+		if _, ok := hostnames[c.Nodes[i].HostnameOverride]; ok {
+			return fmt.Errorf("Cluster can't have duplicate node: %s", c.Nodes[i].HostnameOverride)
+		}
+		hostnames[c.Nodes[i].HostnameOverride] = struct{}{}
 	}
 	return nil
 }

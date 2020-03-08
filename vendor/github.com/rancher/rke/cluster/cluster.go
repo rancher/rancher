@@ -621,7 +621,7 @@ func parseNodeDrainInput(clusterFile string, rkeConfig *v3.RancherKubernetesEngi
 }
 
 func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) {
-	logrus.Debugf("Parsing cluster file [%v]", clusterFile)
+	logrus.Tracef("Parsing cluster file [%v]", clusterFile)
 	var rkeConfig v3.RancherKubernetesEngineConfig
 
 	// the customConfig is mapped to a k8s type, which doesn't unmarshal well because it has a

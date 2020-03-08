@@ -190,7 +190,7 @@ func (s *FullState) WriteStateFile(ctx context.Context, statePath string) error 
 	if err != nil {
 		return fmt.Errorf("Failed to Marshal state object: %v", err)
 	}
-	logrus.Debugf("Writing state file: %s", stateFile)
+	logrus.Tracef("Writing state file: %s", stateFile)
 	if err := ioutil.WriteFile(statePath, stateFile, 0640); err != nil {
 		return fmt.Errorf("Failed to write state file: %v", err)
 	}
