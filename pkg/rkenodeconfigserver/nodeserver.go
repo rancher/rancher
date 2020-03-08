@@ -161,6 +161,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 		ClusterName: cluster.Name,
 	}
 	nc.Processes = nodePlan.Plan.Processes
+	nc.AgentCheckInterval = nodePlan.AgentCheckInterval
 
 	return nc, nil
 }
