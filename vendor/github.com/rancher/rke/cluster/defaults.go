@@ -603,7 +603,7 @@ func GetExternalFlags(local, updateOnly, disablePortCheck bool, configDir, clust
 func (c *Cluster) setAddonsDefaults() {
 	c.Ingress.UpdateStrategy = setDaemonsetAddonDefaults(c.Ingress.UpdateStrategy)
 	c.Network.UpdateStrategy = setDaemonsetAddonDefaults(c.Network.UpdateStrategy)
-	c.DNS.UpdateStrategy = setDeploymentAddonDefaults(c.DNS.UpdateStrategy)
+	c.DNS.UpdateStrategy = setDNSDeploymentAddonDefaults(c.DNS.UpdateStrategy, c.DNS.Provider)
 	if c.DNS.LinearAutoscalerParams == nil {
 		c.DNS.LinearAutoscalerParams = &DefaultClusterProportionalAutoscalerLinearParams
 	}
@@ -636,5 +636,45 @@ func setDeploymentAddonDefaults(updateStrategy *appsv1.DeploymentStrategy) *apps
 	if updateStrategy.RollingUpdate.MaxSurge == nil {
 		updateStrategy.RollingUpdate.MaxSurge = &DefaultDeploymentUpdateStrategyParams
 	}
+	return updateStrategy
+}
+
+func setDNSDeploymentAddonDefaults(updateStrategy *appsv1.DeploymentStrategy, dnsProvider string) *appsv1.DeploymentStrategy {
+	var (
+		coreDNSMaxUnavailable, coreDNSMaxSurge = intstr.FromInt(1), intstr.FromInt(0)
+		kubeDNSMaxSurge, kubeDNSMaxUnavailable = intstr.FromString("10%"), intstr.FromInt(0)
+	)
+	if updateStrategy != nil && updateStrategy.Type != appsv1.RollingUpdateDeploymentStrategyType {
+		return updateStrategy
+	}
+	switch dnsProvider {
+	case CoreDNSProvider:
+		if updateStrategy == nil || updateStrategy.RollingUpdate == nil {
+			return &appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &coreDNSMaxUnavailable,
+					MaxSurge:       &coreDNSMaxSurge,
+				},
+			}
+		}
+		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
+			updateStrategy.RollingUpdate.MaxUnavailable = &coreDNSMaxUnavailable
+		}
+	case KubeDNSProvider:
+		if updateStrategy == nil || updateStrategy.RollingUpdate == nil {
+			return &appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &kubeDNSMaxUnavailable,
+					MaxSurge:       &kubeDNSMaxSurge,
+				},
+			}
+		}
+		if updateStrategy.RollingUpdate.MaxSurge == nil {
+			updateStrategy.RollingUpdate.MaxSurge = &kubeDNSMaxSurge
+		}
+	}
+
 	return updateStrategy
 }
