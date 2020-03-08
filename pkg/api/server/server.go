@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/controllers/catalog"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamicschema"
 	"github.com/rancher/rancher/pkg/api/controllers/feature"
+	"github.com/rancher/rancher/pkg/api/controllers/k3smetadata"
 	"github.com/rancher/rancher/pkg/api/controllers/samlconfig"
 	"github.com/rancher/rancher/pkg/api/controllers/settings"
 	"github.com/rancher/rancher/pkg/api/controllers/usercontrollers"
@@ -51,6 +52,7 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 	whitelistproxyNodeDriver.Register(ctx, scaledContext)
 	whitelistproxyKontainerDriver.Register(ctx, scaledContext)
 	samlconfig.Register(ctx, scaledContext)
+	k3smetadata.Register(ctx, scaledContext)
 	usercontrollers.Register(ctx, scaledContext, clusterManager)
 	err = settings.Register(scaledContext)
 
