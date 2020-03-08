@@ -115,7 +115,7 @@ func CalculateMaxUnavailable(maxUnavailableVal string, numHosts int, role string
 	return maxUnavailable, nil
 }
 
-func resetMaxUnavailable(maxUnavailable, lenInactiveHosts int, component string) (int, error) {
+func ResetMaxUnavailable(maxUnavailable, lenInactiveHosts int, component string) (int, error) {
 	if maxUnavailable > WorkerThreads {
 		/* upgrading a large number of nodes in parallel leads to a large number of goroutines, which has led to errors regarding too many open sockets
 		Because of this RKE switched to using workerpools. 50 workerthreads has been sufficient to optimize rke up, upgrading at most 50 nodes in parallel.

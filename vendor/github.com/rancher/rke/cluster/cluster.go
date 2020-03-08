@@ -166,12 +166,17 @@ func (c *Cluster) UpgradeControlPlane(ctx context.Context, kubeClient *kubernete
 	inactiveHosts := make(map[string]bool)
 	var controlPlaneHosts, notReadyHosts []*hosts.Host
 	var notReadyHostNames []string
+	var err error
 
 	for _, host := range c.InactiveHosts {
 		// include only hosts with controlplane role
 		if host.IsControl && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
 			inactiveHosts[host.HostnameOverride] = true
 		}
+	}
+	c.MaxUnavailableForControlNodes, err = services.ResetMaxUnavailable(c.MaxUnavailableForControlNodes, len(inactiveHosts), services.ControlRole)
+	if err != nil {
+		return "", err
 	}
 	for _, host := range c.ControlPlaneHosts {
 		if !c.HostsLabeledToIgnoreUpgrade[host.Address] {
@@ -265,12 +270,17 @@ func (c *Cluster) UpgradeWorkerPlane(ctx context.Context, kubeClient *kubernetes
 	inactiveHosts := make(map[string]bool)
 	var notReadyHosts []*hosts.Host
 	var notReadyHostNames []string
+	var err error
 
 	for _, host := range c.InactiveHosts {
 		// if host has controlplane role, it already has worker components upgraded
 		if !host.IsControl && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
 			inactiveHosts[host.HostnameOverride] = true
 		}
+	}
+	c.MaxUnavailableForWorkerNodes, err = services.ResetMaxUnavailable(c.MaxUnavailableForWorkerNodes, len(inactiveHosts), services.WorkerRole)
+	if err != nil {
+		return "", err
 	}
 	for _, host := range append(etcdAndWorkerHosts, workerOnlyHosts...) {
 		if c.NewHosts[host.HostnameOverride] {
