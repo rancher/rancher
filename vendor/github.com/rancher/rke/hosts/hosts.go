@@ -387,3 +387,11 @@ func GetHostListIntersect(a []*Host, b []*Host) []*Host {
 	}
 	return s
 }
+
+func GetInternalAddressForHosts(hostList []*Host) []string {
+	hostAddresses := []string{}
+	for _, host := range hostList {
+		hostAddresses = append(hostAddresses, host.InternalAddress)
+	}
+	return hostAddresses
+}
