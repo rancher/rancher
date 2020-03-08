@@ -88,7 +88,7 @@ func skipNode(node *v3.Node) bool {
 	}
 
 	// skip nodes marked for ignore by user
-	if node.Status.NodeLabels != nil && node.Status.NodeLabels[ignoreKey] == ignoreValue {
+	if ignoreNode(node) {
 		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is marked with ignoreLabel %s: %v", clusterName, node.Name, ignoreKey, ignoreValue)
 		return true
 	}
@@ -179,4 +179,8 @@ func workerOnly(roles []string) bool {
 		}
 	}
 	return worker
+}
+
+func ignoreNode(node *v3.Node) bool {
+	return node.Status.NodeLabels != nil && node.Status.NodeLabels[ignoreKey] == ignoreValue
 }

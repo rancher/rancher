@@ -99,20 +99,24 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 	}
 
 	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
-		// node is already updated to cordon/drain/uncordon, do nothing
-		if node.Spec.DesiredNodeUnschedulable != "" {
-			logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], unschedulable field [%v]", cluster.Name,
-				node.Name, node.Spec.DesiredNodeUnschedulable)
-			return node, nil
-		}
-		// node is upgrading and already updated with new node plan, do nothing
-		if v3.NodeConditionUpgraded.IsUnknown(node) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
-			if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
-				logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], plan's updated [%v]", cluster.Name,
-					node.Name, cluster.Status.NodeVersion)
+		// if sync is for a node that was just updated, do nothing
+		if !ignoreNode(node) {
+			// node is already updated to cordon/drain/uncordon, do nothing
+			if node.Spec.DesiredNodeUnschedulable != "" {
+				logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], unschedulable field [%v]", cluster.Name,
+					node.Name, node.Spec.DesiredNodeUnschedulable)
 				return node, nil
 			}
+			// node is upgrading and already updated with new node plan, do nothing
+			if v3.NodeConditionUpgraded.IsUnknown(node) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
+				if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
+					logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], plan's updated [%v]", cluster.Name,
+						node.Name, cluster.Status.NodeVersion)
+					return node, nil
+				}
+			}
 		}
+
 		logrus.Infof("cluster [%s] worker-upgrade: call upgrade to reconcile for node [%s]", cluster.Name, node.Name)
 		if err := uh.upgradeCluster(cluster, node.Name); err != nil {
 			return nil, err
