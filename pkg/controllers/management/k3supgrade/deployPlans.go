@@ -154,7 +154,7 @@ func cmp(a, b planv1.Plan) bool {
 func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, workerPlan planv1.Plan) (*v3.Cluster, error) {
 
 	// implement a simple state machine
-	// NotUpgraded => MasterPlanUpgrading => WorkerPlanUpgrading => NotUpgraded
+	// NotUpgraded => MasterPlanUpgrading || WorkerPlanUpgrading =>  NotUpgraded
 
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
 		v3.ClusterConditionUpgraded.Unknown(cluster)
@@ -172,6 +172,7 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 	}
 
 	// if we made it this far nothing is applying
+	// see k3supgrade_handler also
 	v3.ClusterConditionUpgraded.True(cluster)
 	return h.clusterClient.Update(cluster)
 

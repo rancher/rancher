@@ -43,7 +43,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		}
 		if !needsUpgrade {
 			// if upgrade was in progress, make sure to set the state back
-			if strings.Contains(v3.ClusterConditionUpgraded.GetMessage(cluster), "worker") {
+			if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
 				v3.ClusterConditionUpgraded.True(cluster)
 				v3.ClusterConditionUpgraded.Message(cluster, "")
 				return h.clusterClient.Update(cluster)
