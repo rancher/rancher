@@ -259,31 +259,31 @@ func GetCrtNameForHost(host *hosts.Host, prefix string) string {
 	} else {
 		newAddress = strings.Replace(host.Address, ".", "-", -1)
 	}
-	return fmt.Sprintf("%s-%s", prefix, newAddress)
+	return prefix + "-" + newAddress
 }
 
 func GetCertPath(name string) string {
-	return fmt.Sprintf("%s%s.pem", CertPathPrefix, name)
+	return CertPathPrefix + name + ".pem"
 }
 
 func GetKeyPath(name string) string {
-	return fmt.Sprintf("%s%s-key.pem", CertPathPrefix, name)
+	return CertPathPrefix + name + "-key.pem"
 }
 
 func GetConfigPath(name string) string {
-	return fmt.Sprintf("%skubecfg-%s.yaml", CertPathPrefix, name)
+	return CertPathPrefix + "kubecfg-" + name + ".yaml"
 }
 
 func GetCertTempPath(name string) string {
-	return fmt.Sprintf("%s%s.pem", TempCertPath, name)
+	return TempCertPath + name + ".pem"
 }
 
 func GetKeyTempPath(name string) string {
-	return fmt.Sprintf("%s%s-key.pem", TempCertPath, name)
+	return TempCertPath + name + ".pem"
 }
 
 func GetConfigTempPath(name string) string {
-	return fmt.Sprintf("%skubecfg-%s.yaml", TempCertPath, name)
+	return TempCertPath + "kubecfg-" + name + ".yaml"
 }
 
 func ToCertObject(componentName, commonName, ouName string, certificate *x509.Certificate, key *rsa.PrivateKey, csrASN1 []byte) CertificatePKI {

@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -54,25 +55,26 @@ func InitMetadata(ctx context.Context) error {
 	return nil
 }
 
-// this method loads metadata from three place, if RANCHER_METADATA_URL is provided then load data from specified location. Otherwise load data from bindata.
+// this method loads metadata, if RANCHER_METADATA_URL is provided then load data from specified location. Otherwise load data from bindata.
 func loadData() (kdm.Data, error) {
 	var b []byte
 	var err error
 	u := os.Getenv(RancherMetadataURLEnv)
 	if u != "" {
-		logrus.Debugf("Loading data.json from %s, timestamp: %s", u, time.Now().Format(time.RFC822))
+		logrus.Debugf("Loading data.json from %s", u)
 		b, err = readFile(u)
 		if err != nil {
 			return kdm.Data{}, err
 		}
 	} else {
-		logrus.Debugf("Logging data.json from local source, timestamp: %s", time.Now().Format(time.RFC822))
+		logrus.Debug("Loading data.json from local source")
 		b, err = data.Asset("data/data.json")
 		if err != nil {
 			return kdm.Data{}, err
 		}
 	}
-	logrus.Debugf("data.json content: %v", string(b))
+	logrus.Debugf("data.json SHA256 checksum: %x", sha256.Sum256(b))
+	logrus.Tracef("data.json content: %v", string(b))
 	return kdm.FromData(b)
 }
 
