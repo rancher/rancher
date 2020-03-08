@@ -186,7 +186,8 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 				bv = cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
 			}
 			appInfo.notApplicableSkipConfigMapName = getNotApplicableConfigMapName(bv)
-			if cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
+			if cs.Spec.ScanConfig.CisScanConfig.Profile == "" ||
+				cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
 				appInfo.defaultSkipConfigMapName = getDefaultSkipConfigMapName(bv)
 			}
 		}
