@@ -126,6 +126,11 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 
 	// proceed only if node and cluster's versions mismatch
 	if cluster.Status.NodeVersion == node.Status.AppliedNodeVersion {
+		if v3.NodeConditionUpgraded.IsUnknown(node) {
+			if err := uh.updateNodeActive(node); err != nil {
+				return nil, err
+			}
+		}
 		return node, nil
 	}
 

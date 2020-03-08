@@ -128,12 +128,15 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int) (ma
 		}
 
 		if node.Status.AppliedNodeVersion == expectedVersion {
-			if v3.NodeConditionUpgraded.IsTrue(node) && !node.Spec.InternalNodeSpec.Unschedulable {
+			if v3.NodeConditionUpgraded.IsUnknown(node) {
+				upgradedMap[node.Name] = node
+			}
+			if !node.Spec.InternalNodeSpec.Unschedulable {
+				logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is done", node.Namespace, node.Name)
 				done++
 			} else {
 				// node hasn't un-cordoned, so consider it upgrading in terms of maxUnavailable count
 				upgrading++
-				upgradedMap[node.Name] = node
 			}
 			continue
 		}
