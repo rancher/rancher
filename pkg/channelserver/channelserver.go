@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/catalog/utils"
@@ -16,10 +17,12 @@ import (
 )
 
 var (
-	prog = "channelserver"
+	prog             = "channelserver"
+	channelserverCmd *exec.Cmd
+	backoff          = flowcontrol.NewBackOff(5*time.Second, 15*time.Minute)
 )
 
-func getURLAndInterval() (string, string) {
+func GetURLAndInterval() (string, string) {
 	val := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(settings.RkeMetadataConfig.Get()), &val); err != nil {
 		logrus.Errorf("failed to parse %s value: %v", settings.RkeMetadataConfig.Name, err)
@@ -40,7 +43,7 @@ func run() chan error {
 	go func() {
 		defer close(done)
 
-		url, interval := getURLAndInterval()
+		url, interval := GetURLAndInterval()
 		cmd := exec.Command(
 			prog,
 			"--config-key=k3s",
@@ -50,6 +53,7 @@ func run() chan error {
 			"--listen-address=0.0.0.0:8115",
 			"--channel-server-version", getChannelServerArg(),
 			getChannelServerArg())
+		channelserverCmd = cmd
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		done <- cmd.Run()
@@ -63,10 +67,12 @@ func Start(ctx context.Context) error {
 		return nil
 	}
 
-	backoff := flowcontrol.NewBackOff(5*time.Second, 15*time.Minute)
 	for {
 		select {
 		case <-ctx.Done():
+			if err := Shutdown(); err != nil {
+				logrus.Errorf("error terminating channelserver: %v", err)
+			}
 			return ctx.Err()
 		case err := <-run():
 			logrus.Infof("failed to run channelserver: %v", err)
@@ -89,4 +95,19 @@ func getChannelServerArg() string {
 		return ""
 	}
 	return serverVersion
+}
+
+// Shutdown ends the channelserver process and resets backoff
+func Shutdown() error {
+	backoff.Reset("next")
+	if channelserverCmd == nil {
+		return nil
+	}
+	if err := channelserverCmd.Process.Kill(); err != nil {
+		if !strings.Contains(err.Error(), "process already finished") {
+			return err
+		}
+	}
+	channelserverCmd = nil
+	return nil
 }
