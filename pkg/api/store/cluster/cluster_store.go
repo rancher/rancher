@@ -22,6 +22,7 @@ import (
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/cis"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
@@ -196,6 +197,8 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := setNodeUpgradeStrategy(data, nil); err != nil {
 		return nil, err
 	}
+
+	handleScheduledScan(data)
 
 	data, err = r.transposeDynamicFieldToGenericConfig(data)
 	if err != nil {
@@ -490,6 +493,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := validateUpdatedS3Credentials(existingCluster, data); err != nil {
 		return nil, err
 	}
+	handleScheduledScan(data)
 
 	return r.Store.Update(apiContext, schema, data, id)
 }
@@ -737,6 +741,44 @@ func enableLocalBackup(data map[string]interface{}) {
 			// enable rancher etcd backup
 			values.PutValue(data, backupConfig, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig")
 		}
+	}
+}
+
+func handleScheduleScanScheduleConfig(data map[string]interface{}) {
+	scheduleConfigData, ok := values.GetValue(data, "scheduledClusterScan", "scheduleConfig")
+	if !ok || (ok && scheduleConfigData == nil) {
+		return
+	}
+	scheduleConfig := convert.ToMapInterface(scheduleConfigData)
+	if scheduleConfig["cronSchedule"] == "" {
+		values.PutValue(data, cis.DefaultCronSchedule, "scheduledClusterScan", "scheduleConfig", "cronSchedule")
+	}
+}
+
+func handleScheduleScanScanConfig(data map[string]interface{}) {
+	scanConfigData, ok := values.GetValue(data, "scheduledClusterScan", "scanConfig")
+	if !ok || (ok && scanConfigData == nil) {
+		return
+	}
+	cisScanConfigData, ok := values.GetValue(data, "scheduledClusterScan", "scanConfig", "cisScanConfig")
+	if !ok || (ok && cisScanConfigData == nil) {
+		return
+	}
+	cisScanConfig := convert.ToMapInterface(cisScanConfigData)
+	if cisScanConfig["profile"] == "" {
+		values.PutValue(data, v3.CisScanProfileTypePermissive, "scheduledClusterScan", "scanConfig", "cisScanConfig", "profile")
+	}
+}
+
+func handleScheduledScan(data map[string]interface{}) {
+	scheduledClusterScan, ok := values.GetValue(data, "scheduledClusterScan")
+	if ok && scheduledClusterScan != nil {
+		enabled := values.GetValueN(data, "scheduledClusterScan", "enabled")
+		if enabled == nil || (enabled != nil && !enabled.(bool)) {
+			return
+		}
+		handleScheduleScanScheduleConfig(data)
+		handleScheduleScanScanConfig(data)
 	}
 }
 
