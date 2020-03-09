@@ -924,8 +924,6 @@ github.com/rancher/remotedialer v0.2.5 h1:rNMMcJp5fU7FZ3wGFKSmDrXrSt8MYo5na4CzXd
 github.com/rancher/remotedialer v0.2.5/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
 github.com/rancher/rke v1.1.0-rc11 h1:xbFotmxoh9HXhhF6uoAX5DUp783lP71I+ofE4y5YsfI=
 github.com/rancher/rke v1.1.0-rc11/go.mod h1:QIPsQbZTpCWWBEqkIstqWyTZjb1Yoodaay58pFYDbCE=
-github.com/rancher/rke v1.1.0-rc9.0.20200308171230-47ba695d730f h1:wJMsG3epeFvooOXiSIvt69qHDJM1sVItWcWBVyxcgbg=
-github.com/rancher/rke v1.1.0-rc9.0.20200308171230-47ba695d730f/go.mod h1:QIPsQbZTpCWWBEqkIstqWyTZjb1Yoodaay58pFYDbCE=
 github.com/rancher/rke v1.1.0-rc9.0.20200308184752-4a0941bc8a7a h1:J6U+RhAawBtzOk6XTFlfYZmoyN/VaRJNkUQSxrw6l5s=
 github.com/rancher/rke v1.1.0-rc9.0.20200308184752-4a0941bc8a7a/go.mod h1:QIPsQbZTpCWWBEqkIstqWyTZjb1Yoodaay58pFYDbCE=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
@@ -939,8 +937,8 @@ github.com/rancher/system-upgrade-controller v0.3.1/go.mod h1:/2W/8WEqCSrz66hOYr
 github.com/rancher/types v0.0.0-20200303162837-300a04e6f743/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
 github.com/rancher/types v0.0.0-20200304001827-068a357fa053 h1:8IucmgkU1URdPq1FVGzg9Bg+N/TyC4SXpzW7kMcpVSU=
 github.com/rancher/types v0.0.0-20200304001827-068a357fa053/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
-github.com/rancher/types v0.0.0-20200307012141-a9e1176ae180 h1:wcD1dr69Yjw9ehE0E3JRDbyfmBbQmG7CMgYDwP/wODs=
-github.com/rancher/types v0.0.0-20200307012141-a9e1176ae180/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
+github.com/rancher/types v0.0.0-20200309191355-ad773344a3b6 h1:62rS1JIGA8Jq7YReXoe0wmnezOuLxYWyetEoJtQEUSY=
+github.com/rancher/types v0.0.0-20200309191355-ad773344a3b6/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.2.1-0.20191025041946-1fd360590735/go.mod h1:zmXTOSzU0vhumCyl0+Acq2FEP5WJOJRqnCQDegknyWA=
 github.com/rancher/wrangler v0.4.0/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
