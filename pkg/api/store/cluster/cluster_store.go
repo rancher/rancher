@@ -697,7 +697,7 @@ func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
 			nodeDrainInput = &v3.NodeDrainInput{
 				IgnoreDaemonSets: true,
 				GracePeriod:      -1,
-				Timeout:          60,
+				Timeout:          120,
 			}
 		}
 		values.PutValue(newData, nodeDrainInput, "rancherKubernetesEngineConfig", "upgradeStrategy", "nodeDrainInput")
