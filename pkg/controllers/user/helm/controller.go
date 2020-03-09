@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"os"
 	"reflect"
 	"sort"
@@ -14,6 +15,7 @@ import (
 	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hCommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
@@ -37,6 +40,7 @@ const (
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	MultiClusterAppIDSelector = "mcapp"
 	projectIDFieldLabel       = "field.cattle.io/projectId"
+	gatekeeperName            = "rancher-gatekeeper-operator"
 )
 
 func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
@@ -257,6 +261,16 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 	if err != nil {
 		return obj, err
 	}
+
+	if l.isGatekeeperApp(obj) {
+		logrus.Debugf("Removing GatekeeperApp: %v", obj.Name)
+		//remove the constrainttemplates.
+		err := l.handleConstraintTemplateCleanup(obj)
+		if err != nil {
+			return obj, err
+		}
+	}
+
 	for _, revision := range revisions.Items {
 		if err := appRevisionClient.Delete(revision.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			return obj, err
@@ -365,27 +379,42 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	return err
 }
 
-func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) error {
+func (l *Lifecycle) getKubeConfig(obj *v3.App, remove bool) (*clientcmdapi.Config, error) {
 	var token string
 
+	token, err := l.getToken(obj, remove)
+	if err != nil {
+		return nil, err
+	}
+	kubeConfig := l.KubeConfigGetter.KubeConfig(l.ClusterName, token)
+	for k := range kubeConfig.Clusters {
+		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
+	}
+	return kubeConfig, nil
+}
+
+func (l *Lifecycle) getToken(obj *v3.App, remove bool) (string, error) {
+	var token string
 	userID := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		return err
+		return "", err
 	} else if errors.IsNotFound(err) && remove {
 		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
 	} else if err == nil {
 		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, "helm", user.Name)
 	}
 	if err != nil {
+		return "", err
+	}
+	return token, err
+}
+
+func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) error {
+	kubeConfig, err := l.getKubeConfig(obj, remove)
+	if err != nil {
 		return err
 	}
-
-	kubeConfig := l.KubeConfigGetter.KubeConfig(l.ClusterName, token)
-	for k := range kubeConfig.Clusters {
-		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
-	}
-
 	return clientcmd.WriteToFile(*kubeConfig, kubePath)
 }
 
@@ -417,4 +446,35 @@ func (l *Lifecycle) getHelmVersion(obj *v3.App) (string, error) {
 		return "", err
 	}
 	return templateVersion.TemplateVersion.Status.HelmVersion, nil
+}
+
+func (l *Lifecycle) isGatekeeperApp(obj *v3.App) bool {
+	if obj.Name != gatekeeperName {
+		return false
+	}
+	values, err := url.Parse(obj.Spec.ExternalID)
+	if err != nil {
+		logrus.Errorf("IsGatekeeperApp: check catalog type failed: %s", err.Error())
+		return false
+	}
+	template := values.Query().Get("template")
+	if template == gatekeeperName {
+		return true
+	}
+	return false
+}
+
+func (l *Lifecycle) handleConstraintTemplateCleanup(obj *v3.App) error {
+
+	kubeConfig, err := l.getKubeConfig(obj, true)
+	if err != nil {
+		return fmt.Errorf("error %v getting kubeConfig for cluster %s", err, l.ClusterName)
+	}
+	resourceType := "constrainttemplates"
+	output, err := kubectl.DeleteAll(kubeConfig, resourceType, []string{"--wait=false"})
+	logrus.Debugf("kubectl output from deleting gatekeeper constraints %v ", string(output))
+	if err != nil {
+		return fmt.Errorf("error %v deleting gatekeeper %v for cluster %v", err, resourceType, l.ClusterName)
+	}
+	return nil
 }

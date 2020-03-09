@@ -64,6 +64,24 @@ func Delete(yaml []byte, kubeConfig *clientcmdapi.Config) ([]byte, error) {
 	return runWithHTTP2(cmd)
 }
 
+func DeleteAll(kubeConfig *clientcmdapi.Config, resourceType string, args []string) ([]byte, error) {
+	kubeConfigFile, err := writeKubeConfig(kubeConfig)
+	defer cleanup(kubeConfigFile)
+
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command("kubectl",
+		"--kubeconfig",
+		kubeConfigFile.Name(),
+		"delete",
+		resourceType,
+		"--all")
+
+	cmd.Args = append(cmd.Args, args...)
+	return runWithHTTP2(cmd)
+}
+
 func Drain(ctx context.Context, kubeConfig *clientcmdapi.Config, nodeName string, args []string) ([]byte, string, error) {
 	kubeConfigFile, err := writeKubeConfig(kubeConfig)
 	defer cleanup(kubeConfigFile)
