@@ -49,6 +49,9 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	podClient := userContext.Core.Pods(v3.DefaultNamespaceForCis)
 	podLister := podClient.Controller().Lister()
 
+	dsClient := userContext.Apps.DaemonSets(v3.DefaultNamespaceForCis)
+	dsLister := dsClient.Controller().Lister()
+
 	cisConfig := userContext.Management.Management.CisConfigs(namespace.GlobalNamespace)
 	cisConfigLister := cisConfig.Controller().Lister()
 
@@ -83,7 +86,10 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		cisConfigLister:              cisConfigLister,
 		cisBenchmarkVersionClient:    cisBenchmarkVersion,
 		cisBenchmarkVersionLister:    cisBenchmarkVersionLister,
+		podClient:                    podClient,
 		podLister:                    podLister,
+		dsClient:                     dsClient,
+		dsLister:                     dsLister,
 	}
 	clusterScanClient.AddClusterScopedLifecycle(ctx, "cisScanHandler", clusterName, clusterScanHandler)
 
