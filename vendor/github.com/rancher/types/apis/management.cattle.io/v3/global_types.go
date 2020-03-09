@@ -27,6 +27,7 @@ type FeatureSpec struct {
 }
 
 type FeatureStatus struct {
-	Dynamic bool `json:"dynamic"`
-	Default bool `json:"default"`
+	Dynamic     bool   `json:"dynamic"`
+	Default     bool   `json:"default"`
+	Description string `json:"description"`
 }
