@@ -15,18 +15,31 @@ import (
 var (
 	features = make(map[string]*Feature)
 
-	// Features, ex.: ClusterRandomName = newFeature("cluster-randomizer", false)
+	// Features, ex.: ClusterRandomName = newFeature("cluster-randomizer", "Randomizes clusters.", false, false)
 
-	UnsupportedStorageDrivers = newFeature("unsupported-storage-drivers", false, true)
-	IstioVirtualServiceUI     = newFeature("istio-virtual-service-ui", true, true)
-	Steve                     = newFeature("steve", true, false)
+	UnsupportedStorageDrivers = newFeature(
+		"unsupported-storage-drivers",
+		"Allows the use of types for storage providers and provisioners that are not enabled by default.",
+		false,
+		true)
+	IstioVirtualServiceUI = newFeature(
+		"istio-virtual-service-ui",
+		"Exposes a UI that enables users to create, read, update and delete virtual services and destination rules, which are traffic management features of Istio.",
+		true,
+		true)
+	Steve = newFeature(
+		"dashboard",
+		"Deploy experimental new UI for managing resources inside of clusters.",
+		true,
+		false)
 )
 
 type Feature struct {
 	name string
 	// val is the effective value- it is equal to default until explicitly changed
-	val bool
-	def bool
+	description string
+	val         bool
+	def         bool
 	// if a feature is not dynamic, then rancher must be restarted when the value is changed
 	dynamic bool
 }
@@ -68,23 +81,25 @@ func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
 				logrus.Errorf("unable to create feature %s in initialize features: %v", f.name, err)
 			}
 		} else {
-			errMsg := "unable to update feature %s in initialize features: %v"
+			newFeatureState := featureState.DeepCopy()
 			// checks if default value has changed
 			if featureState.Status.Default != f.def {
-				newFeatureState := featureState.DeepCopy()
 				newFeatureState.Status.Default = f.def
-				if featureState, err = ctx.Management.Features("").Update(newFeatureState); err != nil {
-					logrus.Errorf(errMsg, f.name, err)
-				}
 			}
 
 			// checks if developer has changed dynamic value from previous rancher version
 			if featureState.Status.Dynamic != f.dynamic {
-				newFeatureState := featureState.DeepCopy()
 				newFeatureState.Status.Dynamic = f.dynamic
-				if featureState, err = ctx.Management.Features("").Update(newFeatureState); err != nil {
-					logrus.Errorf(errMsg, f.name, err)
-				}
+			}
+
+			// checks if developer has changed description value from previous rancher version
+			if featureState.Status.Description != f.description {
+				newFeatureState.Status.Description = f.description
+			}
+
+			if newFeatureState, err = ctx.Management.Features("").Update(newFeatureState); err != nil {
+				logrus.Errorf("unable to update feature %s in initialize features: %v", f.name, err)
+				continue
 			}
 
 			if featureState.Spec.Value == nil {
@@ -164,12 +179,13 @@ func GetFeatureByName(name string) *Feature {
 }
 
 // newFeature adds feature to the global feature map
-func newFeature(name string, def bool, dynamic bool) *Feature {
+func newFeature(name, description string, def, dynamic bool) *Feature {
 	feature := &Feature{
-		name:    name,
-		def:     def,
-		val:     def,
-		dynamic: dynamic,
+		name:        name,
+		description: description,
+		def:         def,
+		val:         def,
+		dynamic:     dynamic,
 	}
 
 	// feature will be stored in feature map, features contained in feature

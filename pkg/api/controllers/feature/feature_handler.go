@@ -39,6 +39,11 @@ func sync(key string, obj *v3.Feature) (runtime.Object, error) {
 func ReconcileFeatures(obj *v3.Feature, newVal bool) error {
 	feature := features.GetFeatureByName(obj.Name)
 
+	// possible feature watch renamed, or no longer used by rancher
+	if feature == nil {
+		return nil
+	}
+
 	if newVal == feature.Enabled() {
 		return nil
 	}
