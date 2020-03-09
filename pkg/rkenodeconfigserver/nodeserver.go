@@ -29,6 +29,7 @@ import (
 const (
 	DefaultAgentCheckInterval       = 120
 	AgentCheckIntervalDuringUpgrade = 35
+	AgentCheckIntervalDuringCreate  = 15
 )
 
 var (
@@ -152,14 +153,16 @@ func IsNonWorker(roles []string) bool {
 
 func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
 	nodePlan := node.Status.NodePlan
-	if nodePlan == nil {
-		logrus.Infof("nodePlan is nil for node %s", node.Name)
-		return nil, fmt.Errorf("nodeplan is nil for non-worker node %s %s", node.Name, node.Status.NodeConfig.Address)
-	}
-
 	nc := &rkeworker.NodeConfig{
 		ClusterName: cluster.Name,
 	}
+
+	if nodePlan == nil {
+		logrus.Tracef("cluster [%s]: node [%s] doesn't have node plan yet", cluster.Name, node.Name)
+		nc.AgentCheckInterval = AgentCheckIntervalDuringCreate
+		return nc, nil
+	}
+
 	nc.Processes = nodePlan.Plan.Processes
 	nc.AgentCheckInterval = nodePlan.AgentCheckInterval
 
@@ -172,13 +175,15 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 
 	nodePlan := node.Status.NodePlan
 	hostAddress := node.Status.NodeConfig.Address
-	if nodePlan == nil {
-		logrus.Infof("nodePlan is nil for node %s", node.Name)
-		return nil, fmt.Errorf("nodeplan is nil for node %s %s", node.Name, hostAddress)
-	}
 
 	nc := &rkeworker.NodeConfig{
 		ClusterName: cluster.Name,
+	}
+
+	if nodePlan == nil {
+		logrus.Tracef("cluster [%s]: node [%s] %s doesn't have node plan yet", cluster.Name, node.Name, hostAddress)
+		nc.AgentCheckInterval = AgentCheckIntervalDuringCreate
+		return nc, nil
 	}
 
 	infos, err := librke.GetDockerInfo(node)
