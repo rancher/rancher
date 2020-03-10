@@ -182,10 +182,35 @@ func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan v3.
 	}
 
 	node, obj = node.DeepCopy(), obj.DeepCopy()
+	planValues, changed := computePlanDelta(obj.Status.NodeConfig.Labels, obj.Spec.MetadataUpdate.Labels)
+	if changed {
+		obj.Status.NodeConfig.Labels = planValues
+	}
 	node.Labels = finalMap
+
 	obj.Spec.MetadataUpdate.Labels = v3.MapDelta{}
 
 	return m.updateNodeAndNode(node, obj)
+}
+
+// For any key that already exist in the plan, we should update or delete. For others, do not touch the plan.
+func computePlanDelta(planValues map[string]string, delta v3.MapDelta) (map[string]string, bool) {
+	update := false
+	for k, v := range delta.Add {
+		if planValues[k] != "" {
+			update = true
+			planValues[k] = v
+		}
+	}
+
+	for k := range delta.Delete {
+		if planValues[k] != "" {
+			update = true
+			delete(planValues, k)
+		}
+	}
+	return planValues, update
+
 }
 
 func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePlan v3.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
