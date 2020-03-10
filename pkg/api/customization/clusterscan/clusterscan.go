@@ -31,6 +31,7 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 		status := convert.ToMapInterface(s)
 		failed := false
 		completed := false
+		runCompleted := false
 		for _, cond := range convert.ToMapSlice(status["conditions"]) {
 			if cond["type"] == string(mgmtv3.ClusterScanConditionCompleted) && cond["status"] == "True" {
 				completed = true
@@ -38,6 +39,13 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 			if cond["type"] == string(mgmtv3.ClusterScanConditionFailed) && cond["status"] == "True" {
 				failed = true
 			}
+			if cond["type"] == string(mgmtv3.ClusterScanConditionRunCompleted) && cond["status"] == "True" {
+				runCompleted = true
+			}
+		}
+		if runCompleted {
+			resource.Values["state"] = "reporting"
+			resource.Values["transitioning"] = "yes"
 		}
 		if failed {
 			resource.Values["state"] = errorState
