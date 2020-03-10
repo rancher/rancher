@@ -38,6 +38,10 @@ func NewProxyHandler(authorizer authorizer.Authorizer,
 
 func (h *Handler) MatchNonLegacy(prefix string) mux.MatcherFunc {
 	return func(req *http.Request, match *mux.RouteMatch) bool {
+		if !features.SteveProxy.Enabled() {
+			return false
+		}
+
 		clusterID := strings.TrimPrefix(req.URL.Path, prefix)
 		clusterID = strings.SplitN(clusterID, "/", 2)[0]
 		if match.Vars == nil {
