@@ -10,8 +10,8 @@ rb_resource = 'rolebinding'
 
 def test_create_cluster_template_with_revision(admin_mc, remove_resource):
 
-    cluster_template = create_cluster_template(admin_mc,
-                                               remove_resource, [], admin_mc)
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_resource(cluster_template)
     templateId = cluster_template.id
     _ = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -24,7 +24,8 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
 
 def test_create_template_revision_k8s_translation(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc,
-                                               remove_resource, [], admin_mc)
+                                               [], admin_mc)
+    remove_resource(cluster_template)
     tId = cluster_template.id
     client = admin_mc.client
 
@@ -60,9 +61,12 @@ def test_create_template_revision_k8s_translation(admin_mc, remove_resource):
     assert e.value.error.status == 422
 
 
-def test_default_pod_sec(admin_mc, remove_resource):
+def test_default_pod_sec(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc,
-                                               remove_resource, [], admin_mc)
+                                               [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+
     tId = cluster_template.id
     client = admin_mc.client
     cconfig = {
@@ -86,7 +90,7 @@ def test_default_pod_sec(admin_mc, remove_resource):
 
     cluster = wait_for_cluster_create(client, name=random_str(),
                                       clusterTemplateRevisionId=rev.id)
-    remove_resource(cluster)
+    remove_list.insert(0, cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
     assert cluster.defaultPodSecurityPolicyTemplateId == "restricted"
@@ -95,8 +99,9 @@ def test_default_pod_sec(admin_mc, remove_resource):
 
 
 def test_check_default_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
+    cluster_template = create_cluster_template(admin_mc,
                                                [], admin_mc)
+    remove_resource(cluster_template)
     templateId = cluster_template.id
     first_revision = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -108,9 +113,11 @@ def test_check_default_revision(admin_mc, remove_resource):
     assert e.value.error.status == 403
 
 
-def test_create_cluster_with_template(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
+def test_create_cluster_with_template(admin_mc, list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc,
                                                [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
     templateId = cluster_template.id
 
     template_revision = \
@@ -132,7 +139,7 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
                                       clusterTemplateRevisionId=revId,
                                       description="template from cluster",
                                       answers=answers)
-    remove_resource(cluster)
+    remove_list.insert(0, cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
     assert cluster.questions is not None
@@ -158,8 +165,9 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
 
 
 def test_create_cluster_validations(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
+    cluster_template = create_cluster_template(admin_mc,
                                                [], admin_mc)
+    remove_resource(cluster_template)
     templateId = cluster_template.id
     template_revision = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -187,8 +195,8 @@ def test_create_cluster_template_with_members(admin_mc, remove_resource,
     remove_resource(user_not_member)
     members = [{"userPrincipalId": "local://" + user_member.user.id,
                 "accessType": "read-only"}]
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               members, admin_mc)
+    cluster_template = create_cluster_template(admin_mc, members, admin_mc)
+    remove_resource(cluster_template)
     time.sleep(30)
     # check who has access to the cluster template
     # admin and user_member should be able to list it
@@ -245,8 +253,9 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
 @pytest.mark.nonparallel
 def test_check_enforcement(admin_mc, remove_resource,
                            list_remove_resource, user_factory):
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               [], admin_mc)
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
     templateId = cluster_template.id
     rev = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -261,10 +270,7 @@ def test_check_enforcement(admin_mc, remove_resource,
     cluster = client.create_cluster(
             name=random_str(), rancherKubernetesEngineConfig={
                 "accessKey": "asdfsd"})
-    remove_list = [cluster]
-    # This will be called before remove_resource,
-    # as clusters must be deleted before their cluster_template
-    list_remove_resource(remove_list)
+    remove_list.insert(0, cluster)
 
     # a user cannot create an rke cluster without template
     user = user_factory()
@@ -287,7 +293,7 @@ def test_check_enforcement(admin_mc, remove_resource,
     cluster2 = user_client.create_cluster(
             name=random_str(), amazonElasticContainerServiceConfig={
                 "accessKey": "asdfsd"})
-    remove_list.append(cluster2)
+    remove_list.insert(0, cluster2)
 
     # a user can create an rke cluster with a public template
     template_reloaded = client.by_id_cluster_template(templateId)
@@ -297,7 +303,7 @@ def test_check_enforcement(admin_mc, remove_resource,
     cluster3 = wait_for_cluster_create(user_client, name=random_str(),
                                        clusterTemplateRevisionId=rev.id,
                                        description="template from cluster")
-    remove_list.append(cluster3)
+    remove_list.insert(0, cluster3)
     client.update_by_id_setting(id='cluster-template-enforcement',
                                 value="false")
 
@@ -310,8 +316,8 @@ def test_revision_creation_permission(admin_mc, remove_resource,
                 "accessType": "read-only"},
                {"userPrincipalId": "local://" + user_owner.user.id,
                 "accessType": "owner"}]
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               members, admin_mc)
+    cluster_template = create_cluster_template(admin_mc, members, admin_mc)
+    remove_resource(cluster_template)
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
     split = cluster_template.id.split(":")
     name = split[1]
@@ -341,8 +347,8 @@ def test_revision_creation_permission(admin_mc, remove_resource,
 def test_updated_members_revision_access(admin_mc, remove_resource,
                                          user_factory):
     # create cluster template without members and a revision
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               [], admin_mc)
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_resource(cluster_template)
     templateId = cluster_template.id
     rev = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -382,8 +388,8 @@ def test_permissions_removed_on_downgrading_access(admin_mc, remove_resource,
     members = [{"userPrincipalId": "local://" + user_owner.user.id,
                 "accessType": "owner"}]
     # create cluster template with one member having "member" accessType
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               members, admin_mc)
+    cluster_template = create_cluster_template(admin_mc, members, admin_mc)
+    remove_resource(cluster_template)
 
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
     split = cluster_template.id.split(":")
@@ -427,8 +433,8 @@ def test_permissions_removed_on_downgrading_access(admin_mc, remove_resource,
 
 
 def test_required_template_question(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc,
-                                               remove_resource, [], admin_mc)
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_resource(cluster_template)
     tId = cluster_template.id
     client = admin_mc.client
 
@@ -483,9 +489,11 @@ def test_required_template_question(admin_mc, remove_resource):
         assert e.error.status == 422
 
 
-def test_secret_template_answers(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc,
-                                               remove_resource, [], admin_mc)
+def test_secret_template_answers(admin_mc, remove_resource,
+                                 list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
     tId = cluster_template.id
     client = admin_mc.client
 
@@ -547,7 +555,7 @@ azureCloudProvider.aadClientSecret"
                                       description="template from cluster",
                                       answers=answers)
 
-    remove_resource(cluster)
+    remove_list.insert(0, cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
     assert cluster.answers.values[azureClientId] is not None
@@ -566,8 +574,8 @@ def test_member_accesstype_check(admin_mc, user_factory, remove_resource):
                 "accessType": "member"}]
     # creation with a member with accessType "member" shouldn't be allowed
     try:
-        create_cluster_template(admin_mc, remove_resource,
-                                members, admin_mc)
+        cluster_template = create_cluster_template(admin_mc, members, admin_mc)
+        remove_resource(cluster_template)
     except ApiError as e:
         assert e.error.status == 422
 
@@ -575,8 +583,8 @@ def test_member_accesstype_check(admin_mc, user_factory, remove_resource):
                 "accessType": "read-only"},
                {"userPrincipalId": "local://" + user_owner.user.id,
                 "accessType": "owner"}]
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               members, admin_mc)
+    cluster_template = create_cluster_template(admin_mc, members, admin_mc)
+    remove_resource(cluster_template)
 
     updated_members = \
         [{"userPrincipalId": "local://" + user_readonly.user.id,
@@ -592,8 +600,8 @@ def test_member_accesstype_check(admin_mc, user_factory, remove_resource):
 
 
 def test_create_cluster_with_invalid_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc,
-                                               remove_resource, [], admin_mc)
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_resource(cluster_template)
     tId = cluster_template.id
     client = admin_mc.client
 
@@ -640,9 +648,11 @@ def test_create_cluster_with_invalid_revision(admin_mc, remove_resource):
         assert e.error.status == 422
 
 
-def test_disable_template_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc,
-                                               remove_resource, [], admin_mc)
+def test_disable_template_revision(admin_mc, list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+
     tId = cluster_template.id
     client = admin_mc.client
     rev = \
@@ -652,7 +662,7 @@ def test_disable_template_revision(admin_mc, remove_resource):
     cluster = wait_for_cluster_create(client, name=random_str(),
                                       clusterTemplateRevisionId=rev.id,
                                       description="template from cluster")
-    remove_resource(cluster)
+    remove_list.insert(0, cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
 
@@ -670,12 +680,14 @@ def test_disable_template_revision(admin_mc, remove_resource):
 
 
 def test_template_delete_by_members(admin_mc, remove_resource,
-                                    user_factory):
+                                    list_remove_resource, user_factory):
     user_owner = user_factory()
     members = [{"userPrincipalId": "local://" + user_owner.user.id,
                 "accessType": "owner"}]
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               members, admin_mc)
+    cluster_template = create_cluster_template(admin_mc, members, admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
     split = cluster_template.id.split(":")
     name = split[1]
@@ -690,7 +702,7 @@ def test_template_delete_by_members(admin_mc, remove_resource,
     cluster = wait_for_cluster_create(admin_mc.client, name=random_str(),
                                       clusterTemplateRevisionId=rev.id,
                                       description="template from cluster")
-    remove_resource(cluster)
+    remove_list.insert(0, cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
 
@@ -707,8 +719,8 @@ def test_template_delete_by_members(admin_mc, remove_resource,
 
 def test_template_access(admin_mc, remove_resource, user_factory):
     user = user_factory()
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               [], admin_mc)
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_resource(cluster_template)
     templateId = cluster_template.id
     rev = create_cluster_template_revision(admin_mc.client, templateId)
 
@@ -721,16 +733,18 @@ def test_template_access(admin_mc, remove_resource, user_factory):
     assert e.value.error.status == 404
 
 
-def test_save_as_template_action(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               [], admin_mc)
+def test_save_as_template_action(admin_mc, list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+
     templateId = cluster_template.id
     rev = create_cluster_template_revision(admin_mc.client, templateId)
 
     cluster = wait_for_cluster_create(admin_mc.client, name=random_str(),
                                       clusterTemplateRevisionId=rev.id,
                                       description="template from cluster")
-    remove_resource(cluster)
+    remove_list.insert(0, cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
 
@@ -756,7 +770,9 @@ def grb_cb(client, grb):
     return cb
 
 
-def create_cluster_template(creator, remove_resource, members, admin_mc):
+# When calling this function you _must_ remove the cluster_template manually
+# If a cluster is created also it must be removed after the template
+def create_cluster_template(creator, members, admin_mc):
     template_name = random_str()
 
     cluster_template = \
@@ -764,7 +780,6 @@ def create_cluster_template(creator, remove_resource, members, admin_mc):
                                          name=template_name,
                                          description="demo template",
                                          members=members)
-    remove_resource(cluster_template)
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
     rb_name = cluster_template.id.split(":")[1] + "-ct-a"
     wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
