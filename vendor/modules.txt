@@ -439,7 +439,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200302231302-020fd6252623
+# github.com/rancher/steve v0.0.0-20200310061740-02caeafb5d9e
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
