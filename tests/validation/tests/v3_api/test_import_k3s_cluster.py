@@ -1,19 +1,64 @@
 import os
-from lib.aws import AmazonWebServices
 from .common import *  # NOQA
+from lib.aws import AmazonWebServices
+from python_terraform import *
+
 
 DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            'resource')
-RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
+RANCHER_REGION = os.environ.get("AWS_REGION")
+RANCHER_VPC_ID = os.environ.get("AWS_VPC")
+RANCHER_SUBNETS = os.environ.get("AWS_SUBNET")
+RANCHER_AWS_AMI = os.environ.get("AWS_AMI", "")
+RANCHER_AWS_USER = os.environ.get("AWS_USER", "ubuntu")
+AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME", "")
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
+
+RANCHER_RESOURCE_NAME = os.environ.get("RANCHER_RESOURCE_NAME", "")
+RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
+RANCHER_K3S_NO_OF_SERVER_NODES = \
+    os.environ.get("RANCHER_K3S_NO_OF_SERVER_NODES", 3)
 RANCHER_K3S_NO_OF_WORKER_NODES = \
-    os.environ.get("RANCHER_AWS_NO_OF_WORKER_NODES", 3)
+    os.environ.get("RANCHER_K3S_NO_OF_WORKER_NODES", 3)
+RANCHER_K3S_SERVER_FLAGS = os.environ.get("RANCHER_K3S_SERVER_FLAGS", "server")
+RANCHER_K3S_WORKER_FLAGS = os.environ.get("RANCHER_K3S_WORKER_FLAGS", "agent")
+RANCHER_QA_SPACE = os.environ.get("RANCHER_QA_SPACE", "")
+
+RANCHER_EXTERNAL_DB = os.environ.get("RANCHER_EXTERNAL_DB", "mysql")
+RANCHER_EXTERNAL_DB_VERSION = os.environ.get("RANCHER_EXTERNAL_DB_VERSION", "5.7")
+RANCHER_INSTANCE_CLASS = os.environ.get("RANCHER_INSTANCE_CLASS", "db.t2.micro")
+RANCHER_DB_GROUP_NAME = os.environ.get("RANCHER_DB_GROUP_NAME", "default.mysql5.7")
+RANCHER_DB_USERNAME = os.environ.get("RANCHER_DB_USERNAME", "")
+RANCHER_DB_PASSWORD = os.environ.get("RANCHER_DB_PASSWORD", "")
+
+
+def test_create_k3s_single_control_cluster():
+    create_single_control_cluster()
+
+
+def test_create_k3s_multiple_control_cluster():
+    create_multiple_control_cluster()
+
 
 def test_import_k3s_cluster():
+    client, k3s_clusterfilepath = create_single_control_cluster()
+    cluster = create_rancher_cluster(client, k3s_clusterfilepath)
+    cluster_cleanup(client, cluster, aws_nodes)
 
+
+def test_import_k3s_cluster_multiple_control():
+    client = get_user_client()
+    create_multiple_control_cluster()
+    print("K3s Cluster Created")
+    k3s_clusterfilepath = "/tmp/multinode_kubeconfig1"
+    is_file = os.path.isfile(k3s_clusterfilepath)
+    assert is_file
+    cluster = create_rancher_cluster(client, k3s_clusterfilepath)
+
+
+def create_single_control_cluster():
     # Get URL and User_Token
     client = get_user_client()
-
     # Create nodes in AWS
     aws_nodes = create_nodes()
 
@@ -38,7 +83,68 @@ def test_import_k3s_cluster():
     k3s_clusterfilepath = DATA_SUBDIR + "/" + k3s_kubeconfig_file
     is_file = os.path.isfile(k3s_clusterfilepath)
     assert is_file
+    with open(k3s_clusterfilepath, 'r') as f:
+        print(f.read())
+    return client, k3s_clusterfilepath
 
+
+def create_multiple_control_cluster():
+    k3s_clusterfilepath = "/tmp/multinode_kubeconfig1"
+    tf_dir = DATA_SUBDIR + "/" + "terraform/master"
+    keyPath = os.path.abspath('.') + '/.ssh/' + AWS_SSH_KEY_NAME
+    os.chmod(keyPath, 0o400)
+    no_of_servers = int(RANCHER_K3S_NO_OF_SERVER_NODES)
+    no_of_servers = no_of_servers - 1
+
+    tf = Terraform(working_dir=tf_dir,
+                   variables={'region': RANCHER_REGION,
+                              'vpc_id': RANCHER_VPC_ID,
+                              'subnets': RANCHER_SUBNETS,
+                              'aws_ami': RANCHER_AWS_AMI,
+                              'aws_user': RANCHER_AWS_USER,
+                              'resource_name': RANCHER_RESOURCE_NAME,
+                              'access_key': keyPath,
+                              'external_db': RANCHER_EXTERNAL_DB,
+                              'external_db_version': RANCHER_EXTERNAL_DB_VERSION,
+                              'db_group_name': RANCHER_DB_GROUP_NAME,
+                              'instance_class': RANCHER_INSTANCE_CLASS,
+                              'username': RANCHER_DB_USERNAME,
+                              'password': RANCHER_DB_PASSWORD,
+                              'k3s_version': RANCHER_K3S_VERSION,
+                              'no_of_server_nodes': no_of_servers,
+                              'server_flags': RANCHER_K3S_SERVER_FLAGS,
+                              'qa_space': RANCHER_QA_SPACE})
+    print("Creating cluster")
+    tf.init()
+    approve = {"auto-approve": True}
+    print(tf.plan(out="plan_server.out"))
+    print("\n\n")
+    print(tf.apply("--auto-approve"))
+    print("\n\n")
+    tf_dir = DATA_SUBDIR + "/" + "terraform/worker"
+    tf = Terraform(working_dir=tf_dir,
+                   variables={'region': RANCHER_REGION,
+                              'vpc_id': RANCHER_VPC_ID,
+                              'subnets': RANCHER_SUBNETS,
+                              'aws_ami': RANCHER_AWS_AMI,
+                              'aws_user': RANCHER_AWS_USER,
+                              'resource_name': RANCHER_RESOURCE_NAME,
+                              'access_key': keyPath,
+                              'k3s_version': RANCHER_K3S_VERSION,
+                              'no_of_worker_nodes': int(RANCHER_K3S_NO_OF_WORKER_NODES),
+                              'worker_flags': RANCHER_K3S_WORKER_FLAGS})
+
+    print("Joining worker nodes")
+    tf.init()
+    print(tf.plan(out="plan_worker.out"))
+    print("\n\n")
+    print(tf.apply("--auto-approve"))
+    print("\n\n")
+    with open(k3s_clusterfilepath, 'r') as f:
+        print(f.read())
+
+
+def create_rancher_cluster(client, k3s_clusterfilepath):
     clustername = random_test_name("testcustom-k3s")
     cluster = client.create_cluster(name=clustername)
     cluster_token = create_custom_host_registration_token(client, cluster)
@@ -56,7 +162,8 @@ def test_import_k3s_cluster():
     # Validate the cluster
     cluster = validate_cluster(client, clusters[0],
                                check_intermediate_state=False)
-    cluster_cleanup(client, cluster, aws_nodes)
+
+    return cluster
 
 
 def create_nodes():

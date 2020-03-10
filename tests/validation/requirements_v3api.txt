@@ -15,6 +15,7 @@ pytest==3.8.1
 pytest-html==1.20.0
 pytest-ordering==0.6
 python-digitalocean==1.13.2
+python-terraform==0.10.1
 PyYAML==5.2
 requests==2.22.0
 rsa==4.0
