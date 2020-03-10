@@ -54,7 +54,7 @@ func Setup(server *steve.Server, config *wrangler.Context) error {
 type handler struct {
 	GitHub       http.Handler
 	Proxy        http.Handler
-	ProxyMatcher func(string) mux.MatcherFunc
+	ProxyMatcher func(string, bool) mux.MatcherFunc
 	NotFound     http.Handler
 }
 
@@ -62,8 +62,8 @@ func newRouter(h *handler) http.Handler {
 	mux := mux.NewRouter()
 	mux.UseEncodedPath()
 	mux.Handle("/v1/github{path:.*}", h.GitHub)
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").Handler(h.Proxy)
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(h.ProxyMatcher("/k8s/clusters/")).Handler(h.Proxy)
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(h.ProxyMatcher("/k8s/clusters/", true)).Handler(h.Proxy)
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(h.ProxyMatcher("/k8s/clusters/", false)).Handler(h.Proxy)
 	mux.NotFoundHandler = h.NotFound
 	return mux
 }

@@ -99,7 +99,7 @@ func (s *Server) Wrap(next http.Handler) http.Handler {
 	router.UseEncodedPath()
 	router.Path("/v1/management.cattle.io.v3.clusters/{namespace}/{type}").Handler(server)
 	router.Path("/v1/management.cattle.io.v3.clusters/{namespace}/{type}/{name}").Handler(server)
-	router.Path("/v1/management.cattle.io.v3.clusters/{namespace}/{type}/{namespace}/{name}").Handler(server)
+	router.Path("/v1/management.cattle.io.v3.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
 	router.NotFoundHandler = next
 
 	return router
@@ -108,7 +108,11 @@ func (s *Server) Wrap(next http.Handler) http.Handler {
 func prefix(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		vars := mux.Vars(req)
-		vars["prefix"] = "/v1/management.cattle.io.v3.clusters/" + vars["namespace"]
+		if vars["clusterID"] != "" {
+			vars["prefix"] = "/v1/management.cattle.io.v3.clusters/" + vars["clusterID"]
+		} else {
+			vars["prefix"] = "/v1/management.cattle.io.v3.clusters/" + vars["namespace"]
+		}
 		next.ServeHTTP(rw, req)
 	})
 }
