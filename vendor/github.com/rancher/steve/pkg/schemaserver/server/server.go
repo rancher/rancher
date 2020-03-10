@@ -41,19 +41,25 @@ func DefaultAPIServer() *Server {
 	s := &Server{
 		Schemas: types.EmptyAPISchemas().MustAddSchemas(builtin.Schemas),
 		ResponseWriters: map[string]types.ResponseWriter{
-			"json": &writer.EncodingResponseWriter{
-				ContentType: "application/json",
-				Encoder:     types.JSONEncoder,
-			},
-			"html": &writer.HTMLResponseWriter{
-				EncodingResponseWriter: writer.EncodingResponseWriter{
-					Encoder:     types.JSONEncoder,
+			"json": &writer.GzipWriter{
+				ResponseWriter: &writer.EncodingResponseWriter{
 					ContentType: "application/json",
+					Encoder:     types.JSONEncoder,
 				},
 			},
-			"yaml": &writer.EncodingResponseWriter{
-				ContentType: "application/yaml",
-				Encoder:     types.YAMLEncoder,
+			"html": &writer.GzipWriter{
+				ResponseWriter: &writer.HTMLResponseWriter{
+					EncodingResponseWriter: writer.EncodingResponseWriter{
+						Encoder:     types.JSONEncoder,
+						ContentType: "application/json",
+					},
+				},
+			},
+			"yaml": &writer.GzipWriter{
+				ResponseWriter: &writer.EncodingResponseWriter{
+					ContentType: "application/yaml",
+					Encoder:     types.YAMLEncoder,
+				},
 			},
 		},
 		AccessControl: &SchemaBasedAccess{},
