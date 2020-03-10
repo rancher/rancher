@@ -1,6 +1,8 @@
 package k3supgrade
 
 import (
+	"strings"
+
 	"github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,8 +73,7 @@ func generateWorkerPlan(version string, concurrency int, drain bool) planv1.Plan
 
 	// worker plans wait for master plans to complete
 	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
-		// TODO: the image version doesn't matter here, needs something recent
-		Image: upgradeImage + ":" + "v1.17.3-k3s1",
+		Image: upgradeImage + ":" + parseVersion(version),
 		Args:  []string{"prepare", k3sMasterPlanName},
 	}
 	// select all nodes that are not master
@@ -122,8 +123,7 @@ func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int
 
 	// worker plans wait for master plans to complete
 	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
-		// TODO need a recent valid image tag here...
-		Image: upgradeImage + ":" + "v1.17.3-k3s1",
+		Image: upgradeImage + ":" + parseVersion(version),
 		Args:  []string{"prepare", k3sMasterPlanName},
 	}
 
@@ -135,4 +135,9 @@ func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int
 	}
 
 	return workerPlan
+}
+
+// a valid k3s version needs to be converted to valid docker tag (v1.17.3+k3s1 => v1.17.3-k3s1)
+func parseVersion(v string) string {
+	return strings.Replace(v, "+", "-", -1)
 }
