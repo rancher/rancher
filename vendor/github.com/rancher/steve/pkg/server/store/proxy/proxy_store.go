@@ -387,6 +387,7 @@ func (s *Store) Create(apiOp *types.APIRequest, schema *types.APISchema, params 
 	}
 
 	resp, err = k8sClient.Create(&unstructured.Unstructured{Object: input}, opts)
+	rowToObject(resp)
 	return toAPI(schema, resp), err
 }
 
