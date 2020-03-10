@@ -72,8 +72,9 @@ func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
 					Value: nil,
 				},
 				Status: v3.FeatureStatus{
-					Default: f.def,
-					Dynamic: f.dynamic,
+					Default:     f.def,
+					Dynamic:     f.dynamic,
+					Description: f.description,
 				},
 			}
 
