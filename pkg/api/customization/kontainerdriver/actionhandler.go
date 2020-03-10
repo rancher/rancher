@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/api/handler"
@@ -22,8 +23,10 @@ import (
 )
 
 const (
-	linuxImages   = "rancher-images"
-	windowsImages = "rancher-windows-images"
+	linuxImages            = "rancher-images"
+	windowsImages          = "rancher-windows-images"
+	rkeMetadataConfig      = "rke-metadata-config"
+	forceRefreshAnnotation = "field.cattle.io/lastForceRefresh"
 )
 
 type ActionHandler struct {
@@ -74,6 +77,18 @@ func (a ActionHandler) refresh(apiContext *types.APIContext) error {
 		msg := fmt.Sprintf("failed to refresh %v", err)
 		return httperror.WrapAPIError(err, httperror.ServerError, msg)
 	}
+
+	setting, err := a.MetadataHandler.SettingLister.Get("", rkeMetadataConfig)
+	if err != nil {
+		return err
+	}
+
+	if setting.Annotations == nil {
+		setting.Annotations = make(map[string]string)
+	}
+
+	setting.Annotations[forceRefreshAnnotation] = strconv.FormatInt(time.Now().Unix(), 10)
+	_, err = a.MetadataHandler.Settings.Update(setting)
 	apiContext.WriteResponse(http.StatusOK, response)
 	return nil
 }
