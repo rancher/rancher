@@ -62,6 +62,7 @@ func newRouter(h *handler) http.Handler {
 	mux := mux.NewRouter()
 	mux.UseEncodedPath()
 	mux.Handle("/v1/github{path:.*}", h.GitHub)
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").Handler(h.Proxy)
 	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(h.ProxyMatcher("/k8s/clusters/")).Handler(h.Proxy)
 	mux.NotFoundHandler = h.NotFound
 	return mux

@@ -32,6 +32,11 @@ var (
 		"Deploy experimental new UI for managing resources inside of clusters.",
 		true,
 		false)
+	SteveProxy = newFeature(
+		"proxy",
+		"Use new experimental proxy for Kubernetes API requests.",
+		false,
+		true)
 )
 
 type Feature struct {
