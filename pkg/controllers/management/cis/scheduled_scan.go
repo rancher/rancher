@@ -81,9 +81,6 @@ func (ssh *scheduledScanHandler) clusterSync(key string, cluster *v3.Cluster) (r
 			}
 			logrus.Infof("scheduledScanHandler: clusterSync: Scheduled Scan enabled for cluster %v: %v",
 				cluster.Name, cronSchedule)
-			if err := scheduleScan(cluster, ssh.clusterScanClient, clusterInfo); err != nil {
-				return nil, fmt.Errorf("scheduledScanHandler: clusterSync: error scheduling scan: %v", err)
-			}
 			ssh.clustersMap[cluster.Name] = clusterInfo
 		} else {
 			if cluster.Spec.ScheduledClusterScan.ScheduleConfig != nil &&
@@ -93,6 +90,9 @@ func (ssh *scheduledScanHandler) clusterSync(key string, cluster *v3.Cluster) (r
 				logrus.Infof("scheduledScanHandler: clusterSync: cron schedule modified for cluster %v: %v",
 					cluster.Name, clusterInfo.cronSchedule)
 			}
+		}
+		if err := scheduleScan(cluster, ssh.clusterScanClient, clusterInfo); err != nil {
+			return nil, fmt.Errorf("scheduledScanHandler: clusterSync: error scheduling scan: %v", err)
 		}
 	} else {
 		if ok {
@@ -164,6 +164,8 @@ func checkAndLaunchScan(cluster *v3.Cluster,
 		cisScanConfig = &v3.CisScanConfig{
 			Profile: v3.CisScanProfileTypePermissive,
 		}
+	} else {
+		cisScanConfig = cluster.Spec.ScheduledClusterScan.ScanConfig.CisScanConfig
 	}
 
 	nextAt := clusterInfo.nextScanAt

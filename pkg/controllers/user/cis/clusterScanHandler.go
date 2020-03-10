@@ -3,8 +3,10 @@ package cis
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
@@ -12,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rke/util"
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	rcorev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -19,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -31,6 +35,7 @@ const (
 	varDebugMaster                = "debugMaster"
 	varDebugWorker                = "debugWorker"
 	varOverrideBenchmarkVersion   = "overrideBenchmarkVersion"
+	runnerPodPrefix               = "security-scan-runner-"
 )
 
 var (
@@ -53,7 +58,10 @@ type cisScanHandler struct {
 	cisConfigLister              v3.CisConfigLister
 	cisBenchmarkVersionClient    v3.CisBenchmarkVersionInterface
 	cisBenchmarkVersionLister    v3.CisBenchmarkVersionLister
+	podClient                    rcorev1.PodInterface
 	podLister                    rcorev1.PodLister
+	dsClient                     appsv1.DaemonSetInterface
+	dsLister                     appsv1.DaemonSetLister
 }
 
 type appInfo struct {
@@ -186,7 +194,8 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 				bv = cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
 			}
 			appInfo.notApplicableSkipConfigMapName = getNotApplicableConfigMapName(bv)
-			if cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
+			if cs.Spec.ScanConfig.CisScanConfig.Profile == "" ||
+				cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
 				appInfo.defaultSkipConfigMapName = getDefaultSkipConfigMapName(bv)
 			}
 		}
@@ -244,6 +253,9 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 	}
 
+	if err := csh.ensureCleanup(cs); err != nil {
+		return nil, err
+	}
 	return cs, nil
 }
 
@@ -286,27 +298,29 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 			return nil, fmt.Errorf("cisScanHandler: Updated: failed to update cluster about CIS scan completion")
 		}
 
-		cm, err := csh.cmClient.Get(cs.Name, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("cisScanHandler: Updated: error fetching configmap %v: %v", cs.Name, err)
-		}
-		r, err := report.Get([]byte(cm.Data[v3.DefaultScanOutputFileName]))
-		if err != nil {
-			return nil, fmt.Errorf("cisScanHandler: Updated: error getting report from configmap %v: %v", cs.Name, err)
-		}
-		if r == nil {
-			return nil, fmt.Errorf("cisScanHandler: Updated: error: got empty report from configmap %v", cs.Name)
-		}
+		if !v3.ClusterScanConditionFailed.IsTrue(cs) {
+			cm, err := csh.cmClient.Get(cs.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("cisScanHandler: Updated: error fetching configmap %v: %v", cs.Name, err)
+			}
+			r, err := report.Get([]byte(cm.Data[v3.DefaultScanOutputFileName]))
+			if err != nil {
+				return nil, fmt.Errorf("cisScanHandler: Updated: error getting report from configmap %v: %v", cs.Name, err)
+			}
+			if r == nil {
+				return nil, fmt.Errorf("cisScanHandler: Updated: error: got empty report from configmap %v", cs.Name)
+			}
 
-		cisScanStatus := &v3.CisScanStatus{
-			Total:         r.Total,
-			Pass:          r.Pass,
-			Fail:          r.Fail,
-			Skip:          r.Skip,
-			NotApplicable: r.NotApplicable,
-		}
+			cisScanStatus := &v3.CisScanStatus{
+				Total:         r.Total,
+				Pass:          r.Pass,
+				Fail:          r.Fail,
+				Skip:          r.Skip,
+				NotApplicable: r.NotApplicable,
+			}
 
-		cs.Status.CisScanStatus = cisScanStatus
+			cs.Status.CisScanStatus = cisScanStatus
+		}
 		v3.ClusterScanConditionCompleted.True(cs)
 		v3.ClusterScanConditionAlerted.Unknown(cs)
 	}
@@ -384,4 +398,43 @@ func (csh *cisScanHandler) deleteApp(appInfo *appInfo) error {
 	}
 
 	return nil
+}
+
+func (csh *cisScanHandler) ensureCleanup(cs *v3.ClusterScan) error {
+	var err error
+
+	// Delete the dameonset
+	dss, e := csh.dsLister.List(v3.DefaultNamespaceForCis, labels.Everything())
+	if e != nil {
+		err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error listing ds: %v", e))
+	} else {
+		for _, ds := range dss {
+			if e := csh.dsClient.Delete(ds.Name, &metav1.DeleteOptions{}); e != nil && !kerrors.IsNotFound(e) {
+				err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error deleting ds %v: %v", ds.Name, e))
+			}
+		}
+	}
+
+	// Delete the pod
+	podName := runnerPodPrefix + cs.Name
+	if e := csh.podClient.Delete(podName, &metav1.DeleteOptions{}); e != nil && !kerrors.IsNotFound(e) {
+		err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error deleting pod %v: %v", podName, e))
+	}
+
+	// Delete cms
+	cms, err := csh.cmLister.List(v3.DefaultNamespaceForCis, labels.Everything())
+	if err != nil {
+		err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error listing cm: %v", e))
+	} else {
+		for _, cm := range cms {
+			if !strings.Contains(cm.Name, cs.Name) {
+				continue
+			}
+			if e := csh.cmClient.Delete(cm.Name, &metav1.DeleteOptions{}); e != nil && !kerrors.IsNotFound(e) {
+				err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error deleting cm %v: %v", cm.Name, e))
+			}
+		}
+	}
+
+	return err
 }

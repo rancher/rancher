@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -16,6 +17,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	mgmtclient "github.com/rancher/types/client/management/v3"
+	"github.com/robfig/cron"
 )
 
 type Validator struct {
@@ -46,6 +48,48 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
+	if err := validateScheduledClusterScan(&spec); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateScheduledClusterScan(spec *v3.ClusterSpec) error {
+	if spec.ScheduledClusterScan == nil ||
+		(spec.ScheduledClusterScan != nil && !spec.ScheduledClusterScan.Enabled) {
+		return nil
+	}
+
+	if spec.ScheduledClusterScan.ScanConfig != nil &&
+		spec.ScheduledClusterScan.ScanConfig.CisScanConfig != nil {
+		profile := spec.ScheduledClusterScan.ScanConfig.CisScanConfig.Profile
+		if profile != v3.CisScanProfileTypePermissive &&
+			profile != v3.CisScanProfileTypeHardened {
+			return httperror.NewFieldAPIError(httperror.InvalidOption, "ScheduledClusterScan.ScanConfig.CisScanConfig.Profile", "profile can be either permissive or hardened")
+		}
+	}
+
+	if spec.ScheduledClusterScan.ScheduleConfig != nil {
+		if spec.ScheduledClusterScan.ScheduleConfig.Retention < 0 {
+			return httperror.NewFieldAPIError(httperror.MinLimitExceeded, "ScheduledClusterScan.ScheduleConfig.Retention", "Retention count cannot be negative")
+		}
+		schedule, err := cron.ParseStandard(spec.ScheduledClusterScan.ScheduleConfig.CronSchedule)
+		if err != nil {
+			return httperror.NewFieldAPIError(httperror.InvalidFormat, "ScheduledClusterScan.ScheduleConfig.CronSchedule", fmt.Sprintf("error parsing cron schedule: %v", err))
+		}
+		now := time.Now().Round(time.Second)
+		next1 := schedule.Next(now).Round(time.Second)
+		next2 := schedule.Next(next1).Round(time.Second)
+		timeAfter := next2.Sub(next1).Round(time.Second)
+
+		if timeAfter < (1 * time.Hour) {
+			if spec.ScheduledClusterScan.ScanConfig.CisScanConfig.DebugMaster ||
+				spec.ScheduledClusterScan.ScanConfig.CisScanConfig.DebugWorker {
+				return nil
+			}
+			return httperror.NewFieldAPIError(httperror.MinLimitExceeded, "ScheduledClusterScan.ScheduleConfig.CronSchedule", "minimum interval is one hour")
+		}
+	}
 	return nil
 }
 

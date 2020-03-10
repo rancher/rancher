@@ -58,7 +58,7 @@ func (csw *ClusterScanWatcher) Sync(_ string, cs *v3.ClusterScan) (runtime.Objec
 	}
 	var err error
 	if csw.alertManager.IsDeploy == false {
-		logrus.Infof("ClusterScanWatcher: Sync: alert manager not deployed")
+		logrus.Debugf("ClusterScanWatcher: Sync: alert manager not deployed")
 		v3.ClusterScanConditionAlerted.False(cs)
 		v3.ClusterScanConditionAlerted.Message(cs, MsgAlertManagerNotDeployed)
 		return cs, nil
