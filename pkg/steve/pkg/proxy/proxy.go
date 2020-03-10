@@ -36,9 +36,9 @@ func NewProxyHandler(authorizer authorizer.Authorizer,
 	}
 }
 
-func (h *Handler) MatchNonLegacy(prefix string) mux.MatcherFunc {
+func (h *Handler) MatchNonLegacy(prefix string, force bool) mux.MatcherFunc {
 	return func(req *http.Request, match *mux.RouteMatch) bool {
-		if !features.SteveProxy.Enabled() {
+		if !features.SteveProxy.Enabled() && !force {
 			return false
 		}
 
