@@ -903,7 +903,6 @@ github.com/rancher/apimachinery v0.17.2-rancher.1 h1:xKngbOlQnpzSYrm4UfTKBhTRJyR
 github.com/rancher/apimachinery v0.17.2-rancher.1/go.mod h1:b9qmWdKlLuU9EBh+06BtLcSf/Mu89rWL33naRxs1uZg=
 github.com/rancher/client-go v1.17.2-rancher.3 h1:zvwcY1iBSbS0jiOtZp+TkskVVGU03B4mv03jekwtAtU=
 github.com/rancher/client-go v1.17.2-rancher.3/go.mod h1:QAzRgsa0C2xl4/eVpeVAZMvikCn8Nm81yqVx3Kk9XYI=
-github.com/rancher/dynamiclistener v0.2.1-0.20200131054153-795bb90214d9/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932 h1:W+guy5I7I+BfWGm70jW/zOK+TEujYvV+GEGqug8waLQ=
 github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200305020630-f0f4d24bced5 h1:kGPjhMXrYxwlPh+OMHFeKWYb6nbc5rJFqmALrIfCpdE=
@@ -930,8 +929,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200310203046-d6c6de17bd32 h1:ZikVhUE3U+dA1qB81LySNcfpcj4RDSSzPZtZDi0e70M=
-github.com/rancher/steve v0.0.0-20200310203046-d6c6de17bd32/go.mod h1:/G0JfWp2NagVgmPZI61HinV4JwDngkYhG3DSnHpzuow=
+github.com/rancher/steve v0.0.0-20200311061204-0ad6c2aba128 h1:o9jJQP+QF0fhDy+WogNKCLSfrE6Ko/k3t+fYM/8F47E=
+github.com/rancher/steve v0.0.0-20200311061204-0ad6c2aba128/go.mod h1:CMv0hJaKyAzdKwxhxVZ/tQPLOFvlGaxqiUgkxXVBe6c=
 github.com/rancher/system-upgrade-controller v0.3.1 h1:SpDStISy1haw05OCTGVEDw+WAo23jnpXVOh/60YlD70=
 github.com/rancher/system-upgrade-controller v0.3.1/go.mod h1:/2W/8WEqCSrz66hOYr3vjMRsIsgyWdToqO1hEVRvvLg=
 github.com/rancher/types v0.0.0-20200303162837-300a04e6f743/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
@@ -943,12 +942,10 @@ github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xs
 github.com/rancher/wrangler v0.2.1-0.20191025041946-1fd360590735/go.mod h1:zmXTOSzU0vhumCyl0+Acq2FEP5WJOJRqnCQDegknyWA=
 github.com/rancher/wrangler v0.4.0/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
 github.com/rancher/wrangler v0.4.1/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
-github.com/rancher/wrangler v0.4.2-0.20200215064225-8abf292acf7b h1:sCzr61yWh72RhhwwEcXf6GleyTzbClVOlV8VU7iQRas=
-github.com/rancher/wrangler v0.4.2-0.20200215064225-8abf292acf7b/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
 github.com/rancher/wrangler v0.5.0 h1:zTchAfY9DzchLvXpRpQuNB0PbNfl/HSuvFL1wHN6mDU=
 github.com/rancher/wrangler v0.5.0/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
-github.com/rancher/wrangler v0.5.1-0.20200302190048-e60d4be8fc9b h1:UdQKBG/nO/H0HoOMaAKpK1jVCm+FeBxnoocXcWH3SJE=
-github.com/rancher/wrangler v0.5.1-0.20200302190048-e60d4be8fc9b/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
+github.com/rancher/wrangler v0.5.1-0.20200311053157-692040bfd728 h1:fvHxcpG4d9qdvauVDjXITEjRZmqdZk3WizegridxBPU=
+github.com/rancher/wrangler v0.5.1-0.20200311053157-692040bfd728/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
 github.com/rancher/wrangler-api v0.2.0/go.mod h1:zTPdNLZO07KvRaVOx6XQbKBSV55Fnn4s7nqmrMPJqd8=
 github.com/rancher/wrangler-api v0.2.1-0.20191025043713-b1ca9c21825a/go.mod h1:U4nfgObQ7EERMwljGhCfQIbh2ql/t8suINX8/VfWiko=
 github.com/rancher/wrangler-api v0.4.1 h1:bwy6BbdCEq+zQrWmy9L8XXcGEQ/mbeuQ2q1kfk8fo3M=

@@ -58,6 +58,7 @@ func (d *DynamicColumns) SetColumns(schema *types.APISchema) error {
 
 	obj, err := r.Do().Get()
 	if err != nil {
+		attributes.SetTable(schema, false)
 		return nil
 	}
 	t, ok := obj.(*metav1.Table)

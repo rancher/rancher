@@ -149,15 +149,26 @@ func (h *handler) refreshAll() error {
 	}
 
 	filteredSchemas := map[string]*types.APISchema{}
-	for id, schema := range schemas {
+	for _, schema := range schemas {
 		if isListWatchable(schema) {
+			if attributes.PreferredGroup(schema) != "" ||
+				attributes.PreferredVersion(schema) != "" {
+				continue
+			}
 			if ok, err := h.allowed(schema); err != nil {
 				return err
 			} else if !ok {
 				continue
 			}
 		}
-		filteredSchemas[id] = schema
+
+		gvk := attributes.GVK(schema)
+		if gvk.Kind != "" {
+			gvr := attributes.GVR(schema)
+			schema.ID = converter.GVKToSchemaID(gvk)
+			schema.PluralName = converter.GVRToPluralName(gvr)
+		}
+		filteredSchemas[schema.ID] = schema
 	}
 
 	if err := h.getColumns(h.ctx, filteredSchemas); err != nil {
