@@ -3,21 +3,26 @@ package apigroups
 import (
 	"net/http"
 
+	"github.com/rancher/steve/pkg/schema"
+
 	"github.com/rancher/steve/pkg/schemaserver/store/empty"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 )
 
-func Register(schemas *types.APISchemas, discovery discovery.DiscoveryInterface) {
-	schemas.MustImportAndCustomize(v1.APIGroup{}, func(schema *types.APISchema) {
-		schema.CollectionMethods = []string{http.MethodGet}
-		schema.ResourceMethods = []string{http.MethodGet}
-		schema.Store = NewStore(discovery)
-		schema.Formatter = func(request *types.APIRequest, resource *types.RawResource) {
+func Template(discovery discovery.DiscoveryInterface) schema.Template {
+	return schema.Template{
+		ID: "apigroup",
+		Customize: func(apiSchema *types.APISchema) {
+			apiSchema.CollectionMethods = []string{http.MethodGet}
+			apiSchema.ResourceMethods = []string{http.MethodGet}
+		},
+		Formatter: func(request *types.APIRequest, resource *types.RawResource) {
 			resource.ID = resource.APIObject.Data().String("name")
-		}
-	})
+		},
+		Store: NewStore(discovery),
+	}
 }
 
 type Store struct {

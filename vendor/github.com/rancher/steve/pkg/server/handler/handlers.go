@@ -5,7 +5,6 @@ import (
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schemaserver/types"
-	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func k8sAPI(sf schema.Factory, apiOp *types.APIRequest) {
@@ -16,11 +15,7 @@ func k8sAPI(sf schema.Factory, apiOp *types.APIRequest) {
 	}
 
 	apiOp.Name = vars["name"]
-	apiOp.Type = sf.ByGVR(runtimeschema.GroupVersionResource{
-		Version:  vars["version"],
-		Group:    group,
-		Resource: vars["resource"],
-	})
+	apiOp.Type = vars["type"]
 
 	nOrN := vars["nameorns"]
 	if nOrN != "" {

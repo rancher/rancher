@@ -22,6 +22,7 @@ type Factory interface {
 	Schemas(user user.Info) (*types.APISchemas, error)
 	ByGVR(gvr schema.GroupVersionResource) string
 	ByGVK(gvr schema.GroupVersionKind) string
+	OnChange(ctx context.Context, cb func())
 }
 
 type Collection struct {
@@ -29,6 +30,8 @@ type Collection struct {
 	baseSchema *types.APISchemas
 	schemas    map[string]*types.APISchema
 	templates  map[string]*Template
+	notifiers  map[int]func()
+	notifierID int
 	byGVR      map[schema.GroupVersionResource]string
 	byGVK      map[schema.GroupVersionKind]string
 	cache      *cache.LRUExpireCache
@@ -80,10 +83,26 @@ func NewCollection(ctx context.Context, baseSchema *types.APISchemas, access acc
 		byGVR:      map[schema.GroupVersionResource]string{},
 		byGVK:      map[schema.GroupVersionKind]string{},
 		cache:      cache.NewLRUExpireCache(1000),
+		notifiers:  map[int]func(){},
 		ctx:        ctx,
 		as:         access,
 		running:    map[string]func(){},
 	}
+}
+
+func (c *Collection) OnChange(ctx context.Context, cb func()) {
+	c.lock.Lock()
+	id := c.notifierID
+	c.notifierID++
+	c.notifiers[id] = cb
+	c.lock.Unlock()
+
+	go func() {
+		<-ctx.Done()
+		c.lock.Lock()
+		delete(c.notifiers, id)
+		c.lock.Unlock()
+	}()
 }
 
 func (c *Collection) Reset(schemas map[string]*types.APISchema) {
@@ -112,6 +131,11 @@ func (c *Collection) Reset(schemas map[string]*types.APISchema) {
 		c.cache.Remove(k)
 	}
 	c.lock.Unlock()
+	c.lock.RLock()
+	for _, f := range c.notifiers {
+		f()
+	}
+	c.lock.RUnlock()
 }
 
 func (c *Collection) startStopTemplate(schemas map[string]*types.APISchema) {

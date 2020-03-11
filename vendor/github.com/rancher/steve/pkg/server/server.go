@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/rancher/steve/pkg/server/resources/schemas"
+
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/client"
@@ -66,8 +68,8 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 
 	ccache := clustercache.NewClusterCache(ctx, cf.MetadataClient())
 
-	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, server.K8s.Discovery(), ccache)
-	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf, asl)...)
+	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, ccache)
+	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf, asl, server.K8s.Discovery())...)
 
 	cols, err := common.NewDynamicColumns(server.RestConfig)
 	if err != nil {
@@ -75,6 +77,9 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 	}
 
 	sf := schema.NewCollection(ctx, server.BaseSchemas, asl)
+
+	schemas.SetupWatcher(ctx, server.BaseSchemas, asl, sf)
+
 	sync := schemacontroller.Register(ctx,
 		cols,
 		server.K8s.Discovery(),
