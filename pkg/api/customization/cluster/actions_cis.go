@@ -19,11 +19,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	NumberOfRetriesForClusterUpdate = 3
-	RetryIntervalInMilliseconds     = 5
-)
-
 func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var err error
 
