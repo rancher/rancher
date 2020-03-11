@@ -1,6 +1,8 @@
 package attributes
 
 import (
+	"fmt"
+
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,6 +75,14 @@ func SetGVK(s *types.APISchema, gvk schema.GroupVersionKind) {
 	SetGroup(s, gvk.Group)
 	SetVersion(s, gvk.Version)
 	SetKind(s, gvk.Kind)
+}
+
+func Table(s *types.APISchema) bool {
+	return str(s, "table") != "false"
+}
+
+func SetTable(s *types.APISchema, value bool) {
+	setVal(s, "table", fmt.Sprint(value))
 }
 
 func GVR(s *types.APISchema) schema.GroupVersionResource {

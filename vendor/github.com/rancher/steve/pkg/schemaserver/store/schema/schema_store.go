@@ -34,7 +34,10 @@ func (s *Store) ByID(apiOp *types.APIRequest, schema *types.APISchema, id string
 }
 
 func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.APIObjectList, error) {
-	schemaMap := apiOp.Schemas.Schemas
+	return FilterSchemas(apiOp, apiOp.Schemas.Schemas), nil
+}
+
+func FilterSchemas(apiOp *types.APIRequest, schemaMap map[string]*types.APISchema) types.APIObjectList {
 	schemas := types.APIObjectList{}
 
 	included := map[string]bool{}
@@ -44,21 +47,21 @@ func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.AP
 		}
 
 		if apiOp.AccessControl.CanList(apiOp, schema) == nil || apiOp.AccessControl.CanGet(apiOp, schema) == nil {
-			schemas = s.addSchema(apiOp, schema, schemaMap, schemas, included)
+			schemas = addSchema(apiOp, schema, schemaMap, schemas, included)
 		}
 	}
 
-	return schemas, nil
+	return schemas
 }
 
-func (s *Store) addSchema(apiOp *types.APIRequest, schema *types.APISchema, schemaMap map[string]*types.APISchema, schemas types.APIObjectList, included map[string]bool) types.APIObjectList {
+func addSchema(apiOp *types.APIRequest, schema *types.APISchema, schemaMap map[string]*types.APISchema, schemas types.APIObjectList, included map[string]bool) types.APIObjectList {
 	included[schema.ID] = true
-	schemas = s.traverseAndAdd(apiOp, schema, schemaMap, schemas, included)
+	schemas = traverseAndAdd(apiOp, schema, schemaMap, schemas, included)
 	schemas.Objects = append(schemas.Objects, toAPIObject(schema))
 	return schemas
 }
 
-func (s *Store) traverseAndAdd(apiOp *types.APIRequest, schema *types.APISchema, schemaMap map[string]*types.APISchema, schemas types.APIObjectList, included map[string]bool) types.APIObjectList {
+func traverseAndAdd(apiOp *types.APIRequest, schema *types.APISchema, schemaMap map[string]*types.APISchema, schemas types.APIObjectList, included map[string]bool) types.APIObjectList {
 	for _, field := range schema.ResourceFields {
 		t := ""
 		subType := field.Type
@@ -68,7 +71,7 @@ func (s *Store) traverseAndAdd(apiOp *types.APIRequest, schema *types.APISchema,
 		}
 
 		if refSchema, ok := schemaMap[t]; ok && !included[t] {
-			schemas = s.addSchema(apiOp, refSchema, schemaMap, schemas, included)
+			schemas = addSchema(apiOp, refSchema, schemaMap, schemas, included)
 		}
 	}
 
@@ -79,7 +82,7 @@ func (s *Store) traverseAndAdd(apiOp *types.APIRequest, schema *types.APISchema,
 			}
 
 			if refSchema, ok := schemaMap[t]; ok && !included[t] {
-				schemas = s.addSchema(apiOp, refSchema, schemaMap, schemas, included)
+				schemas = addSchema(apiOp, refSchema, schemaMap, schemas, included)
 			}
 		}
 	}
@@ -91,7 +94,7 @@ func (s *Store) traverseAndAdd(apiOp *types.APIRequest, schema *types.APISchema,
 			}
 
 			if refSchema, ok := schemaMap[t]; ok && !included[t] {
-				schemas = s.addSchema(apiOp, refSchema, schemaMap, schemas, included)
+				schemas = addSchema(apiOp, refSchema, schemaMap, schemas, included)
 			}
 		}
 	}
