@@ -5,6 +5,7 @@ ENV WORKSPACE /src/rancher-validation
 WORKDIR $WORKSPACE
 ENV PYTHONPATH /src/rancher-validation
 ARG RKE_VERSION=v1.0.2
+ARG CLI_VERSION=v2.3.2
 
 COPY [".", "$WORKSPACE"]
 
@@ -14,6 +15,10 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     wget https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 && \
     mv rke_linux-amd64 /bin/rke && \
     chmod +x /bin/rke && \
+    wget https://github.com/rancher/cli/releases/download/$CLI_VERSION/rancher-linux-amd64-$CLI_VERSION.tar.gz && \
+    tar -x -f rancher-linux-amd64-$CLI_VERSION.tar.gz && \
+    mv rancher-$CLI_VERSION/rancher /bin/rancherctl && \
+    chmod +x /bin/rancherctl && \
     wget https://get.helm.sh/helm-v3.0.2-linux-amd64.tar.gz && \
     tar -x -f helm-v3.0.2-linux-amd64.tar.gz && \
     mv linux-amd64/helm /bin/helm_v3 && \
