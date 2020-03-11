@@ -80,9 +80,6 @@ func getNodeListForUpgrade(kubeClient *kubernetes.Clientset, hostsFailed *sync.M
 		if inactiveHosts[node.Labels[k8s.HostnameLabel]] {
 			continue
 		}
-		if val, ok := node.Labels[k8s.IgnoreHostDuringUpgradeLabel]; ok && val == k8s.IgnoreLabelValue {
-			continue
-		}
 		nodeList = append(nodeList, node)
 	}
 	return nodeList, nil
