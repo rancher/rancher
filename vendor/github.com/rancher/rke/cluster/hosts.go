@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/hosts"
-	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
@@ -16,8 +14,6 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"sigs.k8s.io/yaml"
 )
@@ -65,37 +61,6 @@ func (c *Cluster) TunnelHosts(ctx context.Context, flags ExternalFlags) error {
 		c.RancherKubernetesEngineConfig.Nodes = removeFromRKENodes(host.RKEConfigNode, c.RancherKubernetesEngineConfig.Nodes)
 	}
 	return ValidateHostCount(c)
-}
-
-func (c *Cluster) FindHostsLabeledToIgnoreUpgrade(ctx context.Context) {
-	kubeClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
-	if err != nil {
-		logrus.Errorf("Error generating kube client in FindHostsLabeledToIgnoreUpgrade: %v", err)
-		return
-	}
-	var nodes *v1.NodeList
-	for retries := 0; retries < k8s.MaxRetries; retries++ {
-		nodes, err = kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Second * k8s.RetryInterval)
-	}
-	if err != nil {
-		log.Infof(ctx, "Error listing nodes but continuing upgrade: %v", err)
-		return
-	}
-	if nodes == nil {
-		return
-	}
-	for _, node := range nodes.Items {
-		if val, ok := node.Labels[k8s.IgnoreHostDuringUpgradeLabel]; ok && val == k8s.IgnoreLabelValue {
-			host := hosts.Host{RKEConfigNode: v3.RKEConfigNode{Address: node.Annotations[k8s.ExternalAddressAnnotation]}}
-			logrus.Infof("Host %v is labeled to ignore upgrade", host.Address)
-			c.HostsLabeledToIgnoreUpgrade[host.Address] = true
-		}
-	}
-	return
 }
 
 func (c *Cluster) InvertIndexHosts() error {
@@ -158,34 +123,22 @@ func (c *Cluster) CalculateMaxUnavailable() (int, int, error) {
 	var workerHosts, controlHosts, maxUnavailableWorker, maxUnavailableControl int
 
 	for _, host := range c.InactiveHosts {
-		if host.IsControl && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
+		if host.IsControl {
 			inactiveControlPlaneHosts = append(inactiveControlPlaneHosts, host.HostnameOverride)
 		}
-		if !host.IsWorker && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
+		if !host.IsWorker {
 			inactiveWorkerHosts = append(inactiveWorkerHosts, host.HostnameOverride)
 		}
 		// not breaking out of the loop so we can log all of the inactive hosts
 	}
 
-	for _, host := range c.WorkerHosts {
-		if c.HostsLabeledToIgnoreUpgrade[host.Address] {
-			continue
-		}
-		workerHosts++
-	}
-	// maxUnavailable should be calculated against all hosts provided in cluster.yml except the ones labelled to be ignored for upgrade
-	workerHosts += len(inactiveWorkerHosts)
+	// maxUnavailable should be calculated against all hosts provided in cluster.yml
+	workerHosts = len(c.WorkerHosts) + len(inactiveWorkerHosts)
 	maxUnavailableWorker, err := services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailableWorker, workerHosts, services.WorkerRole)
 	if err != nil {
 		return maxUnavailableWorker, maxUnavailableControl, err
 	}
-	for _, host := range c.ControlPlaneHosts {
-		if c.HostsLabeledToIgnoreUpgrade[host.Address] {
-			continue
-		}
-		controlHosts++
-	}
-	controlHosts += len(inactiveControlPlaneHosts)
+	controlHosts = len(c.ControlPlaneHosts) + len(inactiveControlPlaneHosts)
 	maxUnavailableControl, err = services.CalculateMaxUnavailable(c.UpgradeStrategy.MaxUnavailableControlplane, controlHosts, services.ControlRole)
 	if err != nil {
 		return maxUnavailableWorker, maxUnavailableControl, err

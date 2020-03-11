@@ -70,7 +70,6 @@ type Cluster struct {
 	NewHosts                         map[string]bool
 	MaxUnavailableForWorkerNodes     int
 	MaxUnavailableForControlNodes    int
-	HostsLabeledToIgnoreUpgrade      map[string]bool
 }
 
 type encryptionConfig struct {
@@ -170,7 +169,7 @@ func (c *Cluster) UpgradeControlPlane(ctx context.Context, kubeClient *kubernete
 
 	for _, host := range c.InactiveHosts {
 		// include only hosts with controlplane role
-		if host.IsControl && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
+		if host.IsControl {
 			inactiveHosts[host.HostnameOverride] = true
 		}
 	}
@@ -179,9 +178,7 @@ func (c *Cluster) UpgradeControlPlane(ctx context.Context, kubeClient *kubernete
 		return "", err
 	}
 	for _, host := range c.ControlPlaneHosts {
-		if !c.HostsLabeledToIgnoreUpgrade[host.Address] {
-			controlPlaneHosts = append(controlPlaneHosts, host)
-		}
+		controlPlaneHosts = append(controlPlaneHosts, host)
 		if c.NewHosts[host.HostnameOverride] {
 			continue
 		}
@@ -237,7 +234,7 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 			return "", err
 		}
 		workerNodePlanMap[host.Address] = BuildRKEConfigNodePlan(ctx, c, host, host.DockerInfo, svcOptions)
-		if host.IsControl || c.HostsLabeledToIgnoreUpgrade[host.Address] {
+		if host.IsControl {
 			continue
 		}
 		if !host.IsEtcd {
@@ -274,7 +271,7 @@ func (c *Cluster) UpgradeWorkerPlane(ctx context.Context, kubeClient *kubernetes
 
 	for _, host := range c.InactiveHosts {
 		// if host has controlplane role, it already has worker components upgraded
-		if !host.IsControl && !c.HostsLabeledToIgnoreUpgrade[host.Address] {
+		if !host.IsControl {
 			inactiveHosts[host.HostnameOverride] = true
 		}
 	}
@@ -681,7 +678,6 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 		EncryptionConfig: encryptionConfig{
 			EncryptionProviderFile: encryptConfig,
 		},
-		HostsLabeledToIgnoreUpgrade: make(map[string]bool),
 	}
 	if metadata.K8sVersionToRKESystemImages == nil {
 		if err := metadata.InitMetadata(ctx); err != nil {

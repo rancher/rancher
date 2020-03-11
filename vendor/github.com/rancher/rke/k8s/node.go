@@ -14,14 +14,12 @@ import (
 )
 
 const (
-	HostnameLabel                = "kubernetes.io/hostname"
-	InternalAddressAnnotation    = "rke.cattle.io/internal-ip"
-	ExternalAddressAnnotation    = "rke.cattle.io/external-ip"
-	IgnoreHostDuringUpgradeLabel = "user.cattle.io/upgrade-policy"
-	IgnoreLabelValue             = "prevent"
-	AWSCloudProvider             = "aws"
-	MaxRetries                   = 5
-	RetryInterval                = 5
+	HostnameLabel             = "kubernetes.io/hostname"
+	InternalAddressAnnotation = "rke.cattle.io/internal-ip"
+	ExternalAddressAnnotation = "rke.cattle.io/external-ip"
+	AWSCloudProvider          = "aws"
+	MaxRetries                = 5
+	RetryInterval             = 5
 )
 
 func DeleteNode(k8sClient *kubernetes.Clientset, nodeName, cloudProvider string) error {
