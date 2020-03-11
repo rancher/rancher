@@ -16,6 +16,10 @@ AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
 engine_install_url = "https://releases.rancher.com/install-docker/18.09.sh"
+# validating Zero-downtime
+MAX_UNAVAILABLE_WORKER = os.environ.get('RANCHER_MAX_UNAVAILABLE_WORKER', "10%")
+MAX_UNAVAILABLE_CONTROL = os.environ.get('RANCHER_MAX_UNAVAILABLE_CONTROL', "1")
+DRAIN = os.environ.get('RANCHER_DRAIN', "False")
 
 rke_config = {
     "addonJobTimeout": 30,
@@ -184,10 +188,61 @@ rke_config_cis = {
             }
         }},
     "sshAgentAuth": False}
+rke_config_zerodowntime = {
+    "addonJobTimeout": 30,
+    "authentication":
+    {"strategy": "x509",
+     "type": "authnConfig"},
+    "ignoreDockerVersion": True,
+    "ingress":
+        {"provider": "nginx",
+         "type": "ingressConfig"},
+    "monitoring":
+        {"provider": "metrics-server",
+         "type": "monitoringConfig"},
+    "network":
+        {"plugin": "canal",
+         "type": "networkConfig",
+         "options": {"flannel_backend_type": "vxlan"}},
+    "services": {
+        "etcd": {
+            "extraArgs":
+                {"heartbeat-interval": 500,
+                 "election-timeout": 5000},
+            "snapshot": False,
+            "backupConfig":
+                {"intervalHours": 12, "retention": 6, "type": "backupConfig"},
+            "creation": "12h",
+            "retention": "72h",
+            "type": "etcdService"},
+        "kubeApi": {
+            "alwaysPullImages": False,
+            "podSecurityPolicy": False,
+            "serviceNodePortRange": "30000-32767",
+            "type": "kubeAPIService"}},
+    "sshAgentAuth": False,
+    "upgradeStrategy": {
+        "maxUnavailableControlplane": MAX_UNAVAILABLE_CONTROL,
+        "maxUnavailableWorker": MAX_UNAVAILABLE_WORKER,
+        "drain": DRAIN,
+        "nodeDrainInput": {
+            "deleteLocalData": False,
+            "force": False,
+            "gracePeriod": None,
+            "ignoreDaemonSets": True,
+            "timeout": 60,
+            "type": "/v3/schemas/nodeDrainInput",
+            "usePodGracePeriod": True,
+            "unlimitedTimeout": False
+        }
+    }
+}
+
 
 if K8S_VERSION != "":
     rke_config["kubernetesVersion"] = K8S_VERSION
     rke_config_cis["kubernetesVersion"] = K8S_VERSION
+    rke_config_zerodowntime["kubernetesVersion"] = K8S_VERSION
 
 
 rke_config_aws_provider = rke_config.copy()
