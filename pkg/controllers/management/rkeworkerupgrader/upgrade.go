@@ -16,11 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const (
-	ignoreKey   = "user.cattle.io/upgrade-policy"
-	ignoreValue = "prevent"
-)
-
 type upgradeHandler struct {
 	clusters             v3.ClusterInterface
 	nodes                v3.NodeInterface
@@ -100,20 +95,19 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 
 	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
 		// if sync is for a node that was just updated, do nothing
-		if !ignoreNode(node) {
-			// node is already updated to cordon/drain/uncordon, do nothing
-			if node.Spec.DesiredNodeUnschedulable != "" {
-				logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], unschedulable field [%v]", cluster.Name,
-					node.Name, node.Spec.DesiredNodeUnschedulable)
+
+		// node is already updated to cordon/drain/uncordon, do nothing
+		if node.Spec.DesiredNodeUnschedulable != "" {
+			logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], unschedulable field [%v]", cluster.Name,
+				node.Name, node.Spec.DesiredNodeUnschedulable)
+			return node, nil
+		}
+		// node is upgrading and already updated with new node plan, do nothing
+		if v3.NodeConditionUpgraded.IsUnknown(node) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
+			if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
+				logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], plan's updated [%v]", cluster.Name,
+					node.Name, cluster.Status.NodeVersion)
 				return node, nil
-			}
-			// node is upgrading and already updated with new node plan, do nothing
-			if v3.NodeConditionUpgraded.IsUnknown(node) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
-				if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
-					logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], plan's updated [%v]", cluster.Name,
-						node.Name, cluster.Status.NodeVersion)
-					return node, nil
-				}
 			}
 		}
 
@@ -255,17 +249,18 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 	}
 
 	if len(notReadyMap) > 0 {
-		// nodes are already unavailable, update plan to reconcile
+		// update plan for unavailable nodes
 		for name, node := range notReadyMap {
 			if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
 				continue
 			}
 
-			if err := uh.processNode(node, cluster, "reconciling"); err != nil {
+			if err := uh.processNode(node, cluster, false); err != nil {
 				return err
 			}
 
-			logrus.Infof("cluster [%s] worker-upgrade: updated unavailable node [%s] to attempt upgrade", clusterName, name)
+			logrus.Infof("cluster [%s] worker-upgrade: updated upgrading unavailable node [%s] with version %v", clusterName, name, cluster.Status.NodeVersion)
+
 		}
 	}
 
@@ -292,7 +287,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 			continue
 		}
 
-		if err := uh.processNode(node, cluster, "upgrading"); err != nil {
+		if err := uh.processNode(node, cluster, true); err != nil {
 			return err
 		}
 
