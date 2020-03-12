@@ -236,7 +236,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 
 	toPrepareMap, toProcessMap, upgradedMap, notReadyMap, filtered, upgrading, done := uh.filterNodes(nodes, cluster.Status.NodeVersion)
 
-	maxAllowed, err := calculateMaxUnavailable(cluster.Spec.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker, filtered)
+	maxAllowed, err := CalculateMaxUnavailable(cluster.Spec.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker, filtered)
 	if err != nil {
 		return err
 	}
@@ -369,7 +369,7 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, error) {
 	return false, nil
 }
 
-func calculateMaxUnavailable(maxUnavailable string, nodes int) (int, error) {
+func CalculateMaxUnavailable(maxUnavailable string, nodes int) (int, error) {
 	parsedMax := intstr.Parse(maxUnavailable)
 	maxAllowed, err := intstr.GetValueFromIntOrPercent(&parsedMax, nodes, false)
 	if err != nil {

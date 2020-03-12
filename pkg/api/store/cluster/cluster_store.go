@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
+	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/norman/types/values"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
@@ -26,9 +27,12 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
+	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/namespace"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
+	rkeservices "github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	managementv3 "github.com/rancher/types/client/management/v3"
@@ -51,6 +55,8 @@ type Store struct {
 	KontainerDriverLister         v3.KontainerDriverLister
 	ClusterTemplateLister         v3.ClusterTemplateLister
 	ClusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
+	NodeLister                    v3.NodeLister
+	ClusterLister                 v3.ClusterLister
 }
 
 type transformer struct {
@@ -120,6 +126,8 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 		ShellHandler:                  linkHandler.LinkHandler,
 		ClusterTemplateLister:         mgmt.Management.ClusterTemplates("").Controller().Lister(),
 		ClusterTemplateRevisionLister: mgmt.Management.ClusterTemplateRevisions("").Controller().Lister(),
+		ClusterLister:                 mgmt.Management.Clusters("").Controller().Lister(),
+		NodeLister:                    mgmt.Management.Nodes("").Controller().Lister(),
 	}
 	schema.Store = s
 	return s
@@ -494,7 +502,9 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 	handleScheduledScan(data)
-
+	if err := r.validateUnavailableNodes(data, existingCluster, id); err != nil {
+		return nil, err
+	}
 	return r.Store.Update(apiContext, schema, data, id)
 }
 
@@ -940,4 +950,94 @@ func replaceWithOldSecretIfNotExists(oldData, newData map[string]interface{}, cl
 	if oldSecret != "" {
 		values.PutValue(newData, oldSecret, keys...)
 	}
+}
+
+func (r *Store) validateUnavailableNodes(data, existingData map[string]interface{}, id string) error {
+	cluster, err := r.ClusterLister.Get("", id)
+	if err != nil {
+		return fmt.Errorf("error getting cluster, try again %v", err)
+	}
+	// no need to validate if cluster's already provisioning or upgrading
+	if v3.ClusterConditionProvisioned.IsUnknown(cluster) ||
+		v3.ClusterConditionUpgraded.IsUnknown(cluster) ||
+		v3.ClusterConditionUpdated.IsUnknown(cluster) {
+		return nil
+	}
+	spec, err := getRkeConfig(data)
+	if err != nil || spec == nil {
+		return err
+	}
+	status, err := getRkeConfig(existingData)
+	if err != nil || status == nil {
+		return err
+	}
+	if reflect.DeepEqual(status, spec) {
+		return nil
+	}
+	nodes, err := r.NodeLister.List(id, labels.Everything())
+	if err != nil {
+		return fmt.Errorf("error fetching nodes, try again %v", err)
+	}
+	return canUpgrade(nodes, spec.UpgradeStrategy)
+}
+
+func getRkeConfig(data map[string]interface{}) (*v3.RancherKubernetesEngineConfig, error) {
+	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
+	if rkeConfig == nil {
+		return nil, nil
+	}
+	config, err := json.Marshal(rkeConfig)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error marshaling rkeConfig")
+	}
+	var spec *v3.RancherKubernetesEngineConfig
+	if err := json.Unmarshal([]byte(config), &spec); err != nil {
+		return nil, errors.Wrapf(err, "error reading rkeConfig")
+	}
+	return spec, nil
+}
+
+func canUpgrade(nodes []*v3.Node, upgradeStrategy *v3.NodeUpgradeStrategy) error {
+	var (
+		controlReady, controlNotReady, workerOnlyReady, workerOnlyNotReady int
+	)
+	for _, node := range nodes {
+		if node.Status.NodeConfig == nil {
+			continue
+		}
+		if slice.ContainsString(node.Status.NodeConfig.Role, rkeservices.ControlRole) {
+			// any node having control role
+			if nodehelper.IsMachineReady(node) {
+				controlReady++
+			} else {
+				controlNotReady++
+			}
+			continue
+		}
+		if slice.ContainsString(node.Status.NodeConfig.Role, rkeservices.ETCDRole) {
+			continue
+		}
+		if nodehelper.IsMachineReady(node) {
+			workerOnlyReady++
+		} else {
+			workerOnlyNotReady++
+		}
+	}
+	maxUnavailableControl, err := rkeworkerupgrader.CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableControlplane, controlReady+controlNotReady)
+	if err != nil {
+		return err
+	}
+	if controlNotReady >= maxUnavailableControl {
+		return fmt.Errorf("not enough control plane nodes ready to upgrade, maxUnavailable: %v, notReady: %v, ready: %v",
+			maxUnavailableControl, controlNotReady, controlReady)
+	}
+	maxUnavailableWorker, err := rkeworkerupgrader.CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableWorker, workerOnlyReady+workerOnlyNotReady)
+	if err != nil {
+		return err
+	}
+	if workerOnlyNotReady >= maxUnavailableWorker {
+		return fmt.Errorf("not enough worker nodes ready to upgrade, maxUnavailable: %v, notReady: %v, ready: %v",
+			maxUnavailableWorker, workerOnlyNotReady, workerOnlyReady)
+	}
+	return nil
 }
