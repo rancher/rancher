@@ -33,7 +33,7 @@ func (uh *upgradeHandler) prepareNode(node *v3.Node, toDrain bool, nodeDrainInpu
 	return nil
 }
 
-func (uh *upgradeHandler) processNode(node *v3.Node, cluster *v3.Cluster, msg string) error {
+func (uh *upgradeHandler) processNode(node *v3.Node, cluster *v3.Cluster, upgrade bool) error {
 	nodePlan, err := uh.getNodePlan(node, cluster)
 	if err != nil {
 		return fmt.Errorf("setNodePlan: error getting node plan for [%s]: %v", node.Name, err)
@@ -42,10 +42,12 @@ func (uh *upgradeHandler) processNode(node *v3.Node, cluster *v3.Cluster, msg st
 	nodeCopy := node.DeepCopy()
 	nodeCopy.Status.NodePlan.Plan = nodePlan
 	nodeCopy.Status.NodePlan.Version = cluster.Status.NodeVersion
-	nodeCopy.Status.NodePlan.AgentCheckInterval = nodeserver.AgentCheckIntervalDuringUpgrade
 
-	v3.NodeConditionUpgraded.Unknown(nodeCopy)
-	v3.NodeConditionUpgraded.Message(nodeCopy, msg)
+	if upgrade {
+		nodeCopy.Status.NodePlan.AgentCheckInterval = nodeserver.AgentCheckIntervalDuringUpgrade
+		v3.NodeConditionUpgraded.Unknown(nodeCopy)
+		v3.NodeConditionUpgraded.Message(nodeCopy, "upgrading")
+	}
 
 	if _, err := uh.nodes.Update(nodeCopy); err != nil {
 		return err
@@ -87,12 +89,6 @@ func skipNode(node *v3.Node) bool {
 		return true
 	}
 
-	// skip nodes marked for ignore by user
-	if ignoreNode(node) {
-		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is marked with ignoreLabel %s: %v", clusterName, node.Name, ignoreKey, ignoreValue)
-		return true
-	}
-
 	// skip provisioning nodes
 	if !v3.NodeConditionProvisioned.IsTrue(node) {
 		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not provisioned", clusterName, node.Name)
@@ -122,7 +118,13 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int) (ma
 
 		// check for nodeConditionReady
 		if !nodehelper.IsMachineReady(node) {
-			notReadyMap[node.Name] = node
+			// update plan for nodes that were attempted for upgrade
+			if v3.NodeConditionUpgraded.IsUnknown(node) {
+				upgrading++
+				toProcessMap[node.Name] = node
+			} else {
+				notReadyMap[node.Name] = node
+			}
 			logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not ready", node.Namespace, node.Name)
 			continue
 		}
@@ -182,8 +184,4 @@ func workerOnly(roles []string) bool {
 		}
 	}
 	return worker
-}
-
-func ignoreNode(node *v3.Node) bool {
-	return node.Status.NodeLabels != nil && node.Status.NodeLabels[ignoreKey] == ignoreValue
 }
