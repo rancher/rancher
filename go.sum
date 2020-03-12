@@ -915,6 +915,8 @@ github.com/rancher/norman v0.0.0-20200211155126-fc45a55d4dfd/go.mod h1:b+483H276
 github.com/rancher/norman v0.0.0-20200302172514-1ee4db8c9219/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
 github.com/rancher/norman v0.0.0-20200306043103-a1411b4e62a1 h1:Sv+NnWlF4wgnQUKtfnxbEn/0anbnZ+R85CYg9sEgVwc=
 github.com/rancher/norman v0.0.0-20200306043103-a1411b4e62a1/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
+github.com/rancher/norman v0.0.0-20200312033725-5c74e1ee1e6d h1:XrZkPfanv6m1OcnqUzXqn4GmLA7vJ6eHJF7VGDl5ses=
+github.com/rancher/norman v0.0.0-20200312033725-5c74e1ee1e6d/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e h1:j6+HqCET/NLPBtew2m5apL7jWw/PStQ7iGwXjgAqdvo=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e/go.mod h1:XbYHTPaXuw8ZY9bylhYKQh/nJxDaTKk3YhAxPl4Qy/k=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAXBa/AuNAG0bhMusIXVh74dc1bbYOAe+HY=
@@ -923,6 +925,8 @@ github.com/rancher/remotedialer v0.2.5 h1:rNMMcJp5fU7FZ3wGFKSmDrXrSt8MYo5na4CzXd
 github.com/rancher/remotedialer v0.2.5/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
 github.com/rancher/rke v1.1.0-rc11 h1:xbFotmxoh9HXhhF6uoAX5DUp783lP71I+ofE4y5YsfI=
 github.com/rancher/rke v1.1.0-rc11/go.mod h1:QIPsQbZTpCWWBEqkIstqWyTZjb1Yoodaay58pFYDbCE=
+github.com/rancher/rke v1.1.0-rc14 h1:UZsMt0cFLdP4sL9OeDrsAW3dCU2Q50pO54zEo+Tazvc=
+github.com/rancher/rke v1.1.0-rc14/go.mod h1:RsWW6YIDE58gudSgJsJaJ8v0EhsQB/a4CZ2zuFZvYzQ=
 github.com/rancher/rke v1.1.0-rc9.0.20200311184416-a29be5b63f9d h1:XUCHe4r3LKc200V6h1hb9kgstlH698i8yuGxS9VDpGs=
 github.com/rancher/rke v1.1.0-rc9.0.20200311184416-a29be5b63f9d/go.mod h1:QIPsQbZTpCWWBEqkIstqWyTZjb1Yoodaay58pFYDbCE=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
