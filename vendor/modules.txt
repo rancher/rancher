@@ -365,7 +365,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200306043103-a1411b4e62a1
+# github.com/rancher/norman v0.0.0-20200312033725-5c74e1ee1e6d
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -413,7 +413,7 @@ github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.5
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
-# github.com/rancher/rke v1.1.0-rc9.0.20200311184416-a29be5b63f9d
+# github.com/rancher/rke v1.1.0-rc14
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider

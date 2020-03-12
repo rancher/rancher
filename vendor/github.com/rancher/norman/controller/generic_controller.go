@@ -224,14 +224,14 @@ func (g *genericController) sync(ctx context.Context) (retErr error) {
 		DeleteFunc: g.queueObject,
 	})
 
-	logrus.Debugf("Syncing %s Controller", g.name)
+	logrus.Tracef("Syncing %s Controller", g.name)
 
 	go g.informer.Run(ctx.Done())
 
 	if !cache.WaitForCacheSync(ctx.Done(), g.informer.HasSynced) {
 		return fmt.Errorf("failed to sync controller %s", g.name)
 	}
-	logrus.Debugf("Syncing %s Controller Done", g.name)
+	logrus.Tracef("Syncing %s Controller Done", g.name)
 
 	g.synced = true
 	return nil
@@ -300,7 +300,7 @@ func (g *genericController) processNextWorkItem() bool {
 	}
 	if _, ok := checkErr.(*ForgetError); err == nil || ok {
 		if ok {
-			logrus.Debugf("%v %v completed with dropped err: %v", g.name, key, err)
+			logrus.Tracef("%v %v completed with dropped err: %v", g.name, key, err)
 		}
 		g.queue.Forget(key)
 		return true
@@ -381,7 +381,7 @@ func (g *genericController) syncHandler(key interface{}) (err error) {
 			continue
 		}
 
-		logrus.Debugf("%s calling handler %s %s", g.name, handler.name, s)
+		logrus.Tracef("%s calling handler %s %s", g.name, handler.name, s)
 		metrics.IncTotalHandlerExecution(g.name, handler.name)
 		var newObj interface{}
 		if newObj, err = handler.handler(s, obj); err != nil {
