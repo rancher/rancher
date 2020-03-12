@@ -157,7 +157,7 @@ func streamStore(ctx context.Context, eg *errgroup.Group, apiContext *types.APIC
 			return err
 		}
 
-		logrus.Debugf("watching %s", schema.ID)
+		logrus.Tracef("watching %s", schema.ID)
 
 		for e := range events {
 			result <- e

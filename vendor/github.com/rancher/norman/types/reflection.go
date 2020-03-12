@@ -153,11 +153,11 @@ func (s *Schemas) importType(version *APIVersion, t reflect.Type, overrides ...r
 	}
 
 	if s, ok := s.processingTypes[t]; ok {
-		logrus.Debugf("Returning half built schema %s for %v", typeName, t)
+		logrus.Tracef("Returning half built schema %s for %v", typeName, t)
 		return s, nil
 	}
 
-	logrus.Debugf("Inspecting schema %s for %v", typeName, t)
+	logrus.Tracef("Inspecting schema %s for %v", typeName, t)
 
 	schema, err := s.newSchemaFromType(version, t, typeName)
 	if err != nil {
@@ -274,11 +274,11 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 		}
 
 		if blacklistNames[fieldName] {
-			logrus.Debugf("Ignoring blacklisted field %s.%s for %v", schema.ID, fieldName, field)
+			logrus.Tracef("Ignoring blacklisted field %s.%s for %v", schema.ID, fieldName, field)
 			continue
 		}
 
-		logrus.Debugf("Inspecting field %s.%s for %v", schema.ID, fieldName, field)
+		logrus.Tracef("Inspecting field %s.%s for %v", schema.ID, fieldName, field)
 
 		schemaField := Field{
 			Create:   true,
@@ -336,7 +336,7 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 			}
 		}
 
-		logrus.Debugf("Setting field %s.%s: %#v", schema.ID, fieldName, schemaField)
+		logrus.Tracef("Setting field %s.%s: %#v", schema.ID, fieldName, schemaField)
 		schema.ResourceFields[fieldName] = schemaField
 	}
 

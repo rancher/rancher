@@ -80,10 +80,10 @@ require (
 	github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200305020630-f0f4d24bced5
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200306043103-a1411b4e62a1
+	github.com/rancher/norman v0.0.0-20200312033725-5c74e1ee1e6d
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
-	github.com/rancher/rke v1.1.0-rc9.0.20200311184416-a29be5b63f9d
+	github.com/rancher/rke v1.1.0-rc14
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200311061204-0ad6c2aba128
 	github.com/rancher/system-upgrade-controller v0.3.1
