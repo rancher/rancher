@@ -33,7 +33,7 @@ func (s *Server) Setup(ctx context.Context, server *steveserver.Server) error {
 	s.cf = server.ClientFactory
 
 	server.SchemaTemplates = append(server.SchemaTemplates, schema.Template{
-		ID: "management.cattle.io.v3.cluster",
+		ID: "management.cattle.io.cluster",
 		Formatter: func(request *types.APIRequest, resource *types.RawResource) {
 			for _, link := range s.clusterLinks {
 				resource.Links[link] = request.URLBuilder.Link(resource.Schema, resource.ID, link)
@@ -97,9 +97,9 @@ func (s *Server) Wrap(next http.Handler) http.Handler {
 
 	router := mux.NewRouter()
 	router.UseEncodedPath()
-	router.Path("/v1/management.cattle.io.v3.clusters/{namespace}/{type}").Handler(server)
-	router.Path("/v1/management.cattle.io.v3.clusters/{namespace}/{type}/{name}").Handler(server)
-	router.Path("/v1/management.cattle.io.v3.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
+	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}").Handler(server)
+	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}").Handler(server)
+	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
 	router.NotFoundHandler = next
 
 	return router
@@ -109,9 +109,9 @@ func prefix(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		vars := mux.Vars(req)
 		if vars["clusterID"] != "" {
-			vars["prefix"] = "/v1/management.cattle.io.v3.clusters/" + vars["clusterID"]
+			vars["prefix"] = "/v1/management.cattle.io.clusters/" + vars["clusterID"]
 		} else {
-			vars["prefix"] = "/v1/management.cattle.io.v3.clusters/" + vars["namespace"]
+			vars["prefix"] = "/v1/management.cattle.io.clusters/" + vars["namespace"]
 		}
 		next.ServeHTTP(rw, req)
 	})
