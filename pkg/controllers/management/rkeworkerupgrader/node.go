@@ -104,7 +104,7 @@ func skipNode(node *v3.Node) bool {
 	return false
 }
 
-func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int) (map[string]*v3.Node, map[string]*v3.Node, map[string]*v3.Node, map[string]*v3.Node, int, int, int) {
+func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int, drain bool) (map[string]*v3.Node, map[string]*v3.Node, map[string]*v3.Node, map[string]*v3.Node, int, int, int) {
 	done, upgrading, filtered := 0, 0, 0
 	toPrepareMap, toProcessMap, upgradedMap, notReadyMap := map[string]*v3.Node{}, map[string]*v3.Node{}, map[string]*v3.Node{}, map[string]*v3.Node{}
 
@@ -143,13 +143,13 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int) (ma
 			continue
 		}
 
-		if preparingNode(node) {
+		if preparingNode(node, drain) {
 			// draining or cordoning
 			upgrading++
 			continue
 		}
 
-		if preparedNode(node) {
+		if preparedNode(node, drain) {
 			// node ready to upgrade
 			upgrading++
 			toProcessMap[node.Name] = node
@@ -162,12 +162,18 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int) (ma
 	return toPrepareMap, toProcessMap, upgradedMap, notReadyMap, filtered, upgrading, done
 }
 
-func preparingNode(node *v3.Node) bool {
-	return node.Spec.DesiredNodeUnschedulable == "drain" || node.Spec.DesiredNodeUnschedulable == "true"
+func preparingNode(node *v3.Node, drain bool) bool {
+	if drain {
+		return node.Spec.DesiredNodeUnschedulable == "drain"
+	}
+	return node.Spec.DesiredNodeUnschedulable == "true"
 }
 
-func preparedNode(node *v3.Node) bool {
-	return v3.NodeConditionDrained.IsTrue(node) || node.Spec.InternalNodeSpec.Unschedulable || v3.NodeConditionUpgraded.IsUnknown(node)
+func preparedNode(node *v3.Node, drain bool) bool {
+	if drain {
+		return v3.NodeConditionDrained.IsTrue(node)
+	}
+	return node.Spec.InternalNodeSpec.Unschedulable
 }
 
 func workerOnly(roles []string) bool {
