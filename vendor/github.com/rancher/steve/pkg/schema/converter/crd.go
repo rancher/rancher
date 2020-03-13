@@ -72,7 +72,7 @@ func forVersion(crd *beta1.CustomResourceDefinition, group, version, kind string
 		versionColumns = columns
 	}
 
-	id := gvkToSchemaID(schema.GroupVersionKind{
+	id := GVKToVersionedSchemaID(schema.GroupVersionKind{
 		Group:   group,
 		Version: version,
 		Kind:    kind,

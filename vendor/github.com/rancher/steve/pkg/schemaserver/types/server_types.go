@@ -50,7 +50,7 @@ func (r *RawResource) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	if len(data) < 2 || data[0] != '{' || data[len(data)-1] != '}' {
+	if len(data) < 3 || data[0] != '{' || data[len(data)-1] != '}' {
 		return outer, nil
 	}
 
@@ -287,4 +287,9 @@ func FormatterChain(formatter Formatter, next Formatter) Formatter {
 		formatter(request, resource)
 		next(request, resource)
 	}
+}
+
+func (r *APIRequest) Clone() *APIRequest {
+	clone := *r
+	return &clone
 }

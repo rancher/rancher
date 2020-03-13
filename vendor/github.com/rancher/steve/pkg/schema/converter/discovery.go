@@ -69,11 +69,11 @@ func refresh(gv schema.GroupVersion, groupToPreferredVersion map[string]string, 
 
 		logrus.Infof("APIVersion %s/%s Kind %s", gvk.Group, gvk.Version, gvk.Kind)
 
-		schema := schemasMap[gvkToSchemaID(gvk)]
+		schema := schemasMap[GVKToVersionedSchemaID(gvk)]
 		if schema == nil {
 			schema = &types.APISchema{
 				Schema: &schemas.Schema{
-					ID: gvkToSchemaID(gvk),
+					ID: GVKToVersionedSchemaID(gvk),
 				},
 			}
 			attributes.SetGVK(schema, gvk)

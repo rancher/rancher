@@ -24,7 +24,10 @@ import (
 )
 
 var (
-	listPool = semaphore.NewWeighted(10)
+	listPool        = semaphore.NewWeighted(10)
+	typeNameChanges = map[string]string{
+		"extensions.v1beta1.ingress": "networking.k8s.io.v1beta1.ingress",
+	}
 )
 
 type SchemasHandler interface {
@@ -151,8 +154,7 @@ func (h *handler) refreshAll() error {
 	filteredSchemas := map[string]*types.APISchema{}
 	for _, schema := range schemas {
 		if isListWatchable(schema) {
-			if attributes.PreferredGroup(schema) != "" ||
-				attributes.PreferredVersion(schema) != "" {
+			if preferredTypeExists(schema, schemas) {
 				continue
 			}
 			if ok, err := h.allowed(schema); err != nil {
@@ -181,6 +183,28 @@ func (h *handler) refreshAll() error {
 	}
 
 	return nil
+}
+
+func preferredTypeExists(schema *types.APISchema, schemas map[string]*types.APISchema) bool {
+	if replacement, ok := typeNameChanges[schema.ID]; ok && schemas[replacement] != nil {
+		return true
+	}
+	pg := attributes.PreferredGroup(schema)
+	pv := attributes.PreferredVersion(schema)
+	if pg == "" && pv == "" {
+		return false
+	}
+
+	gvk := attributes.GVK(schema)
+	if pg != "" {
+		gvk.Group = pg
+	}
+	if pv != "" {
+		gvk.Version = pv
+	}
+
+	_, ok := schemas[converter.GVKToVersionedSchemaID(gvk)]
+	return ok
 }
 
 func (h *handler) allowed(schema *types.APISchema) (bool, error) {
