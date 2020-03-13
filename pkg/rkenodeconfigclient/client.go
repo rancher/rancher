@@ -73,7 +73,9 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 
 		if nc != nil {
 			logrus.Debugf("Get agent config: %#v", nc)
-			interval = nc.AgentCheckInterval
+			if nc.AgentCheckInterval != 0 {
+				interval = nc.AgentCheckInterval
+			}
 			if nc.NodeVersion != 0 {
 				err := rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
 				if err != nil {
