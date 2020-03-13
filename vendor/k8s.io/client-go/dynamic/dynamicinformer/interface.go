@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metadatainformer
+package dynamicinformer
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,8 +22,8 @@ import (
 	"k8s.io/client-go/informers"
 )
 
-// SharedInformerFactory provides access to a shared informer and lister for dynamic client
-type SharedInformerFactory interface {
+// DynamicSharedInformerFactory provides access to a shared informer and lister for dynamic client
+type DynamicSharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
 	ForResource(gvr schema.GroupVersionResource) informers.GenericInformer
 	WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool

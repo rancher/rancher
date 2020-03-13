@@ -50,6 +50,7 @@ var (
 		"ScalingActive":               "pending",
 		"AbleToScale":                 "pending",
 		"RunCompleted":                "running",
+		"Processed":                   "processed",
 	}
 
 	// True == error

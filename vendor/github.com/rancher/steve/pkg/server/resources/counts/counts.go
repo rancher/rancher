@@ -10,7 +10,9 @@ import (
 	"github.com/rancher/steve/pkg/clustercache"
 	"github.com/rancher/steve/pkg/schemaserver/store/empty"
 	"github.com/rancher/steve/pkg/schemaserver/types"
+	"github.com/rancher/wrangler/pkg/summary"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -46,10 +48,17 @@ type Count struct {
 	Counts map[string]ItemCount `json:"counts"`
 }
 
+type Summary struct {
+	Count         int            `json:"count,omitempty"`
+	States        map[string]int `json:"states,omitempty"`
+	Error         int            `json:"errors,omitempty"`
+	Transitioning int            `json:"transitioning,omitempty"`
+}
+
 type ItemCount struct {
-	Count      int            `json:"count,omitempty"`
-	Namespaces map[string]int `json:"namespaces,omitempty"`
-	Revision   int            `json:"revision,omitempty"`
+	Summary    Summary            `json:"summary,omitempty"`
+	Namespaces map[string]Summary `json:"namespaces,omitempty"`
+	Revision   int                `json:"revision,omitempty"`
 }
 
 type Store struct {
@@ -105,7 +114,7 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 		countLock.Unlock()
 	}()
 
-	onChange := func(add bool, gvr schema2.GroupVersionResource, _ string, obj runtime.Object) error {
+	onChange := func(add bool, gvr schema2.GroupVersionResource, _ string, obj, oldObj runtime.Object) error {
 		countLock.Lock()
 		defer countLock.Unlock()
 
@@ -118,7 +127,7 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 			return nil
 		}
 
-		_, namespace, revision, ok := getInfo(obj)
+		_, namespace, revision, summary, ok := getInfo(obj)
 		if !ok {
 			return nil
 		}
@@ -128,27 +137,32 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 			return nil
 		}
 
-		if add {
-			itemCount.Count++
-			if namespace != "" {
-				itemCount.Namespaces[namespace]++
+		if oldObj != nil {
+			if _, _, _, oldSummary, ok := getInfo(oldObj); ok {
+				if oldSummary.Transitioning == summary.Transitioning &&
+					oldSummary.Error == summary.Error &&
+					oldSummary.State == summary.State {
+					return nil
+				}
+				itemCount = removeCounts(itemCount, namespace, oldSummary)
+			} else {
+				return nil
 			}
+		} else if add {
+			itemCount = addCounts(itemCount, namespace, summary)
 		} else {
-			itemCount.Count--
-			if namespace != "" {
-				itemCount.Namespaces[namespace]--
-			}
+			itemCount = removeCounts(itemCount, namespace, summary)
 		}
 
 		counts[schema.ID] = itemCount
 		countsCopy := map[string]ItemCount{}
 		for k, v := range counts {
-			ns := map[string]int{}
+			ns := map[string]Summary{}
 			for i, j := range v.Namespaces {
 				ns[i] = j
 			}
 			countsCopy[k] = ItemCount{
-				Count:      v.Count,
+				Summary:    v.Summary,
 				Revision:   v.Revision,
 				Namespaces: ns,
 			}
@@ -167,10 +181,13 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 	}
 
 	s.ccache.OnAdd(apiOp.Context(), func(gvr schema2.GroupVersionResource, key string, obj runtime.Object) error {
-		return onChange(true, gvr, key, obj)
+		return onChange(true, gvr, key, obj, nil)
+	})
+	s.ccache.OnChange(apiOp.Context(), func(gvr schema2.GroupVersionResource, key string, obj, oldObj runtime.Object) error {
+		return onChange(true, gvr, key, obj, oldObj)
 	})
 	s.ccache.OnRemove(apiOp.Context(), func(gvr schema2.GroupVersionResource, key string, obj runtime.Object) error {
-		return onChange(false, gvr, key, obj)
+		return onChange(false, gvr, key, obj, nil)
 	})
 
 	return result, nil
@@ -179,14 +196,6 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 func (s *Store) schemasToWatch(apiOp *types.APIRequest) (result []*types.APISchema) {
 	for _, schema := range apiOp.Schemas.Schemas {
 		if ignore[schema.ID] {
-			continue
-		}
-
-		if attributes.PreferredVersion(schema) != "" {
-			continue
-		}
-
-		if attributes.PreferredGroup(schema) != "" {
 			continue
 		}
 
@@ -208,23 +217,77 @@ func (s *Store) schemasToWatch(apiOp *types.APIRequest) (result []*types.APISche
 	return
 }
 
-func getInfo(obj interface{}) (name string, namespace string, revision int, ok bool) {
+func getInfo(obj interface{}) (name string, namespace string, revision int, summaryResult summary.Summary, ok bool) {
 	r, ok := obj.(runtime.Object)
 	if !ok {
-		return "", "", 0, false
+		return "", "", 0, summaryResult, false
 	}
 
 	meta, err := meta.Accessor(r)
 	if err != nil {
-		return "", "", 0, false
+		return "", "", 0, summaryResult, false
 	}
 
 	revision, err = strconv.Atoi(meta.GetResourceVersion())
 	if err != nil {
-		return "", "", 0, false
+		return "", "", 0, summaryResult, false
 	}
 
-	return meta.GetName(), meta.GetNamespace(), revision, true
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		summaryResult = summary.Summarize(unstr)
+	}
+
+	return meta.GetName(), meta.GetNamespace(), revision, summaryResult, true
+}
+
+func removeCounts(itemCount ItemCount, ns string, summary summary.Summary) ItemCount {
+	itemCount.Summary = removeSummary(itemCount.Summary, summary)
+	if ns == "" {
+		itemCount.Namespaces[ns] = removeSummary(itemCount.Namespaces[ns], summary)
+	}
+	return itemCount
+}
+
+func addCounts(itemCount ItemCount, ns string, summary summary.Summary) ItemCount {
+	itemCount.Summary = addSummary(itemCount.Summary, summary)
+	if ns == "" {
+		itemCount.Namespaces[ns] = addSummary(itemCount.Namespaces[ns], summary)
+	}
+	return itemCount
+}
+
+func removeSummary(counts Summary, summary summary.Summary) Summary {
+	counts.Count--
+	if summary.Transitioning {
+		counts.Transitioning--
+	}
+	if summary.Error {
+		counts.Error--
+	}
+	if summary.State != "" {
+		if counts.States == nil {
+			counts.States = map[string]int{}
+		}
+		counts.States[summary.State] -= 1
+	}
+	return counts
+}
+
+func addSummary(counts Summary, summary summary.Summary) Summary {
+	counts.Count++
+	if summary.Transitioning {
+		counts.Transitioning++
+	}
+	if summary.Error {
+		counts.Error++
+	}
+	if summary.State != "" {
+		if counts.States == nil {
+			counts.States = map[string]int{}
+		}
+		counts.States[summary.State] += 1
+	}
+	return counts
 }
 
 func (s *Store) getCount(apiOp *types.APIRequest) Count {
@@ -236,13 +299,13 @@ func (s *Store) getCount(apiOp *types.APIRequest) Count {
 
 		rev := 0
 		itemCount := ItemCount{
-			Namespaces: map[string]int{},
+			Namespaces: map[string]Summary{},
 		}
 
 		all := access.Grants("list", "*", "*")
 
 		for _, obj := range s.ccache.List(gvr) {
-			name, ns, revision, ok := getInfo(obj)
+			name, ns, revision, summary, ok := getInfo(obj)
 			if !ok {
 				continue
 			}
@@ -255,10 +318,7 @@ func (s *Store) getCount(apiOp *types.APIRequest) Count {
 				rev = revision
 			}
 
-			itemCount.Count++
-			if ns != "" {
-				itemCount.Namespaces[ns]++
-			}
+			itemCount = addCounts(itemCount, ns, summary)
 		}
 
 		itemCount.Revision = rev

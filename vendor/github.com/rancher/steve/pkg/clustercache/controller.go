@@ -2,7 +2,6 @@ package clustercache
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -15,26 +14,28 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/metadata"
-	"k8s.io/client-go/metadata/metadatainformer"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
 
 type Handler func(gvr schema2.GroupVersionResource, key string, obj runtime.Object) error
+type ChangeHandler func(gvr schema2.GroupVersionResource, key string, obj, oldObj runtime.Object) error
 
 type ClusterCache interface {
 	List(gvr schema2.GroupVersionResource) []interface{}
 	OnAdd(ctx context.Context, handler Handler)
 	OnRemove(ctx context.Context, handler Handler)
-	OnChange(ctx context.Context, handler Handler)
+	OnChange(ctx context.Context, handler ChangeHandler)
 	OnSchemas(schemas *schema.Collection) error
 }
 
 type event struct {
-	add bool
-	gvr schema2.GroupVersionResource
-	obj runtime.Object
+	add    bool
+	gvr    schema2.GroupVersionResource
+	obj    runtime.Object
+	oldObj runtime.Object
 }
 
 type watcher struct {
@@ -51,7 +52,7 @@ type clusterCache struct {
 
 	ctx               context.Context
 	typed             map[schema2.GroupVersionKind]cache.SharedIndexInformer
-	informerFactory   metadatainformer.SharedInformerFactory
+	informerFactory   dynamicinformer.DynamicSharedInformerFactory
 	controllerFactory generic.ControllerManager
 	watchers          map[schema2.GroupVersionResource]*watcher
 	workqueue         workqueue.DelayingInterface
@@ -61,11 +62,11 @@ type clusterCache struct {
 	changeHandlers cancelCollection
 }
 
-func NewClusterCache(ctx context.Context, client metadata.Interface) ClusterCache {
+func NewClusterCache(ctx context.Context, client dynamic.Interface) ClusterCache {
 	c := &clusterCache{
 		ctx:             ctx,
 		typed:           map[schema2.GroupVersionKind]cache.SharedIndexInformer{},
-		informerFactory: metadatainformer.NewSharedInformerFactory(client, 2*time.Hour),
+		informerFactory: dynamicinformer.NewDynamicSharedInformerFactory(client, 2*time.Hour),
 		watchers:        map[schema2.GroupVersionResource]*watcher{},
 		workqueue:       workqueue.NewNamedDelayingQueue("cluster-cache"),
 	}
@@ -89,14 +90,6 @@ func validSchema(schema *types.APISchema) bool {
 		return false
 	}
 
-	if attributes.PreferredVersion(schema) != "" {
-		return false
-	}
-
-	if attributes.PreferredGroup(schema) != "" {
-		return false
-	}
-
 	return true
 }
 
@@ -109,6 +102,17 @@ func (h *clusterCache) addResourceEventHandler(gvr schema2.GroupVersionResource,
 					obj: rObj,
 					gvr: gvr,
 				})
+			}
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			if rObj, ok := newObj.(runtime.Object); ok {
+				if rOldObj, ok := oldObj.(runtime.Object); ok {
+					h.workqueue.Add(event{
+						obj:    rObj,
+						oldObj: rOldObj,
+						gvr:    gvr,
+					})
+				}
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -163,10 +167,6 @@ func (h *clusterCache) OnSchemas(schemas *schema.Collection) error {
 
 		logrus.Infof("Watching metadata for %s", gvk.String())
 		h.addResourceEventHandler(gvr, w.informer)
-		name := fmt.Sprintf("meta %s", gvk)
-		h.controllerFactory.AddHandler(ctx, gvk, w.informer, name, func(key string, obj runtime.Object) (object runtime.Object, e error) {
-			return callAll(h.changeHandlers.List(), gvr, key, obj)
-		})
 	}
 
 	for gvr, w := range h.watchers {
@@ -227,13 +227,18 @@ func (h *clusterCache) start() {
 		}
 
 		key := toKey(event.obj)
-		if event.add {
-			_, err := callAll(h.addHandlers.List(), event.gvr, key, event.obj)
+		if event.oldObj != nil {
+			_, err := callAll(h.addHandlers.List(), event.gvr, key, event.obj, event.oldObj)
+			if err != nil {
+				logrus.Errorf("failed to handle add event: %v", err)
+			}
+		} else if event.add {
+			_, err := callAll(h.addHandlers.List(), event.gvr, key, event.obj, nil)
 			if err != nil {
 				logrus.Errorf("failed to handle add event: %v", err)
 			}
 		} else {
-			_, err := callAll(h.removeHandlers.List(), event.gvr, key, event.obj)
+			_, err := callAll(h.removeHandlers.List(), event.gvr, key, event.obj, nil)
 			if err != nil {
 				logrus.Errorf("failed to handle remove event: %v", err)
 			}
@@ -261,16 +266,22 @@ func (h *clusterCache) OnRemove(ctx context.Context, handler Handler) {
 	h.removeHandlers.Add(ctx, handler)
 }
 
-func (h *clusterCache) OnChange(ctx context.Context, handler Handler) {
+func (h *clusterCache) OnChange(ctx context.Context, handler ChangeHandler) {
 	h.changeHandlers.Add(ctx, handler)
 }
 
-func callAll(handlers []interface{}, gvr schema2.GroupVersionResource, key string, obj runtime.Object) (runtime.Object, error) {
+func callAll(handlers []interface{}, gvr schema2.GroupVersionResource, key string, obj, oldObj runtime.Object) (runtime.Object, error) {
 	var errs []error
 	for _, handler := range handlers {
-		f := handler.(Handler)
-		if err := f(gvr, key, obj); err != nil {
-			errs = append(errs, err)
+		if f, ok := handler.(Handler); ok {
+			if err := f(gvr, key, obj); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		if f, ok := handler.(ChangeHandler); ok {
+			if err := f(gvr, key, obj, oldObj); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 

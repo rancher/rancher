@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/discovery"
 )
 
-func gvkToSchemaID(gvk schema.GroupVersionKind) string {
+func GVKToVersionedSchemaID(gvk schema.GroupVersionKind) string {
 	if gvk.Group == "" {
 		return strings.ToLower(fmt.Sprintf("core.%s.%s", gvk.Version, gvk.Kind))
 	}
