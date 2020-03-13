@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -119,18 +118,10 @@ func (s *nodeTemplateStore) replaceCloudCredFields(apiContext *types.APIContext,
 	if len(toReplace) == 0 {
 		return nil
 	}
-	driverNameSplit := strings.SplitN(configName, "Config", 2)
-	if len(driverNameSplit) == 0 {
-		return httperror.WrapAPIError(err, httperror.MissingRequired, fmt.Sprintf("empty driverName for credID %s", configName))
-	}
-	ignoreFields, ignore := node.IgnoreCredFieldForTemplate[driverNameSplit[0]]
 	var fields []string
 	for key := range cred.Data {
 		splitKey := strings.SplitN(key, "-", 2)
 		if len(splitKey) == 2 && splitKey[0] == credConfigName {
-			if ignore && ignoreFields[splitKey[1]] {
-				continue
-			}
 			delete(toReplace, splitKey[1])
 			fields = append(fields, splitKey[1])
 		}
