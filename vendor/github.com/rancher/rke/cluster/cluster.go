@@ -184,6 +184,7 @@ func (c *Cluster) UpgradeControlPlane(ctx context.Context, kubeClient *kubernete
 		}
 		// find existing nodes that are in NotReady state
 		if err := services.CheckNodeReady(kubeClient, host, services.ControlRole); err != nil {
+			logrus.Debugf("Found node %v in NotReady state", host.HostnameOverride)
 			notReadyHosts = append(notReadyHosts, host)
 			notReadyHostNames = append(notReadyHostNames, host.HostnameOverride)
 		}
@@ -285,6 +286,7 @@ func (c *Cluster) UpgradeWorkerPlane(ctx context.Context, kubeClient *kubernetes
 		}
 		// find existing nodes that are in NotReady state
 		if err := services.CheckNodeReady(kubeClient, host, services.WorkerRole); err != nil {
+			logrus.Debugf("Found node %v in NotReady state", host.HostnameOverride)
 			notReadyHosts = append(notReadyHosts, host)
 			notReadyHostNames = append(notReadyHostNames, host.HostnameOverride)
 		}
