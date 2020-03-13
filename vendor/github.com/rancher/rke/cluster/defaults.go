@@ -489,7 +489,9 @@ func (c *Cluster) setClusterDNSDefaults() error {
 		logrus.Debugf("Cluster version [%s] is less than version [%s], using DNS provider [%s]", clusterSemVer, K8sVersionCoreDNSSemVer, DefaultDNSProvider)
 		ClusterDNSProvider = DefaultDNSProvider
 	}
-	c.DNS = &v3.DNSConfig{}
+	if c.DNS == nil {
+		c.DNS = &v3.DNSConfig{}
+	}
 	c.DNS.Provider = ClusterDNSProvider
 	logrus.Debugf("DNS provider set to [%s]", ClusterDNSProvider)
 	return nil
