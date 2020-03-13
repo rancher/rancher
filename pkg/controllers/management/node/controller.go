@@ -57,10 +57,6 @@ var aliases = map[string]map[string]string{
 	"vmwarevsphere": map[string]string{"cloudConfig": "cloud-config"},
 }
 
-var IgnoreCredFieldForTemplate = map[string]map[string]bool{
-	amazonec2: {"region": true},
-}
-
 func Register(ctx context.Context, management *config.ManagementContext) {
 	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
 	if err != nil {
@@ -684,7 +680,7 @@ func roles(node *v3.Node) []string {
 	return roles
 }
 
-func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v3.Field, toIgnore map[string]bool, credID string) error {
+func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v3.Field, credID string) error {
 	splitID := strings.Split(credID, ":")
 	if len(splitID) != 2 {
 		return fmt.Errorf("invalid credential id %s", credID)
@@ -697,9 +693,6 @@ func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v3.Field, 
 		for key, val := range cred.Data {
 			splitKey := strings.Split(key, "-")
 			if len(splitKey) == 2 && strings.HasSuffix(splitKey[0], "Config") {
-				if _, ok := toIgnore[splitKey[1]]; ok {
-					continue
-				}
 				if _, ok := fields[splitKey[1]]; ok {
 					ans[splitKey[1]] = string(val)
 				}
@@ -712,21 +705,12 @@ func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v3.Field, 
 func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, rawConfig interface{}, template *v3.NodeTemplate) error {
 	credID := convert.ToString(values.GetValueN(data, "spec", "cloudCredentialName"))
 	if credID != "" {
-		driverName := template.Spec.Driver
-		existingSchema, err := m.schemaLister.Get("", driverName+"config")
+		existingSchema, err := m.schemaLister.Get("", template.Spec.Driver+"config")
 		if err != nil {
 			return err
 		}
-		toIgnore := map[string]bool{}
-		for field := range existingSchema.Spec.ResourceFields {
-			if val, ok := IgnoreCredFieldForTemplate[driverName]; ok {
-				if _, ok := val[field]; ok {
-					toIgnore[field] = true
-				}
-			}
-		}
-		logrus.Debugf("setCredFields for credentialName %s ignoreFields %v", credID, toIgnore)
-		err = m.setCredFields(rawConfig, existingSchema.Spec.ResourceFields, toIgnore, credID)
+		logrus.Debugf("setCredFields for credentialName %s", credID)
+		err = m.setCredFields(rawConfig, existingSchema.Spec.ResourceFields, credID)
 		if err != nil {
 			return errors.Wrap(err, "failed to set credential fields")
 		}
