@@ -89,8 +89,7 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 	}
 
 	if node.Status.NodePlan == nil {
-		logrus.Infof("cluster [%s]: creating node plan for node [%s]", cluster.Name, node.Name)
-		return uh.updateNodePlan(node, cluster)
+		return uh.updateNodePlan(node, cluster, true)
 	}
 
 	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
@@ -136,7 +135,7 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 	if node.Status.AppliedNodeVersion == 0 {
 		// node never received appliedNodeVersion
 		if planChangedForUpgrade(nodePlan, node.Status.NodePlan.Plan) || planChangedForUpdate(nodePlan, node.Status.NodePlan.Plan) {
-			return uh.updateNodePlan(node, cluster)
+			return uh.updateNodePlan(node, cluster, false)
 		}
 	} else {
 		if planChangedForUpgrade(nodePlan, node.Status.NodePlan.Plan) {
@@ -148,14 +147,14 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 		}
 		if planChangedForUpdate(nodePlan, node.Status.NodePlan.Plan) {
 			logrus.Infof("cluster [%s] worker-upgrade: plan changed for update [%s]", cluster.Name, node.Name)
-			return uh.updateNodePlan(node, cluster)
+			return uh.updateNodePlan(node, cluster, false)
 		}
 	}
 
 	return node, nil
 }
 
-func (uh *upgradeHandler) updateNodePlan(node *v3.Node, cluster *v3.Cluster) (*v3.Node, error) {
+func (uh *upgradeHandler) updateNodePlan(node *v3.Node, cluster *v3.Cluster, create bool) (*v3.Node, error) {
 	nodePlan, err := uh.getNodePlan(node, cluster)
 	if err != nil {
 		return nil, fmt.Errorf("getNodePlan error for node [%s]: %v", node.Name, err)
@@ -174,11 +173,15 @@ func (uh *upgradeHandler) updateNodePlan(node *v3.Node, cluster *v3.Cluster) (*v
 	}
 	nodeCopy.Status.NodePlan = np
 
-	logrus.Infof("cluster [%s] worker-upgrade: updating node [%s] with plan [%v]", cluster.Name, node.Name, np.Version)
-
 	updated, err := uh.nodes.Update(nodeCopy)
 	if err != nil {
 		return nil, fmt.Errorf("error updating node [%s] with plan %v", node.Name, err)
+	}
+
+	if create {
+		logrus.Debugf("cluster [%s]: created node plan for node [%s]", cluster.Name, node.Name)
+	} else {
+		logrus.Debugf("cluster [%s] worker-upgrade: updated node [%s] with plan [%v]", cluster.Name, node.Name, np.Version)
 	}
 
 	return updated, err
@@ -234,15 +237,30 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 		return err
 	}
 
-	toPrepareMap, toProcessMap, upgradedMap, notReadyMap, filtered, upgrading, done := uh.filterNodes(nodes, cluster.Status.NodeVersion)
+	upgradeStrategy := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy
+	toDrain := upgradeStrategy.Drain
 
-	maxAllowed, err := CalculateMaxUnavailable(cluster.Spec.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker, filtered)
+	toPrepareMap, toProcessMap, upgradedMap, notReadyMap, filtered, upgrading, done := uh.filterNodes(nodes, cluster.Status.NodeVersion, toDrain)
+
+	maxAllowed, err := CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableWorker, filtered)
 	if err != nil {
 		return err
 	}
 
 	logrus.Debugf("cluster [%s] worker-upgrade: workerNodeInfo: nodes %v maxAllowed %v upgrading %v notReady %v "+
 		"toProcess %v toPrepare %v done %v", cluster.Name, filtered, maxAllowed, upgrading, len(notReadyMap), keys(toProcessMap), keys(toPrepareMap), keys(upgradedMap))
+
+	for name, node := range upgradedMap {
+		if v3.NodeConditionUpgraded.IsTrue(node) {
+			continue
+		}
+
+		if err := uh.updateNodeActive(node); err != nil {
+			return err
+		}
+
+		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to uncordon", clusterName, name)
+	}
 
 	if len(notReadyMap) > maxAllowed {
 		return fmt.Errorf("cluster [%s] worker-upgrade: not enough nodes to upgrade: nodes %v notReady %v maxUnavailable %v", clusterName, filtered, keys(notReadyMap), maxAllowed)
@@ -270,18 +288,6 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 		return fmt.Errorf("cluster [%s] worker-upgrade: more than allowed nodes upgrading for cluster: unavailable %v maxUnavailable %v", clusterName, unavailable, maxAllowed)
 	}
 
-	for name, node := range upgradedMap {
-		if v3.NodeConditionUpgraded.IsTrue(node) {
-			continue
-		}
-
-		if err := uh.updateNodeActive(node); err != nil {
-			return err
-		}
-
-		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to uncordon", clusterName, name)
-	}
-
 	for _, node := range toProcessMap {
 		if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
 			continue
@@ -294,11 +300,10 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to upgrade", clusterName, node.Name)
 	}
 
-	toDrain := cluster.Spec.RancherKubernetesEngineConfig.UpgradeStrategy.Drain
 	var nodeDrainInput *v3.NodeDrainInput
 	state := "cordon"
 	if toDrain {
-		nodeDrainInput = cluster.Spec.RancherKubernetesEngineConfig.UpgradeStrategy.DrainInput
+		nodeDrainInput = upgradeStrategy.DrainInput
 		state = "drain"
 	}
 
