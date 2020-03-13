@@ -64,7 +64,6 @@ func (i *scheduleInfo) String() string {
 
 func (ssh *scheduledScanHandler) clusterSync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil ||
-		cluster.DeletionTimestamp != nil ||
 		cluster.Spec.ScheduledClusterScan == nil {
 		return nil, nil
 	}
@@ -72,6 +71,13 @@ func (ssh *scheduledScanHandler) clusterSync(key string, cluster *v3.Cluster) (r
 	ssh.Lock()
 	defer ssh.Unlock()
 	clusterInfo, ok := ssh.clustersMap[cluster.Name]
+	if cluster.DeletionTimestamp != nil {
+		if ok {
+			logrus.Debugf("scheduledScanHandler: clusterSync: Scheduled Scan removed for deleted cluster: %v", cluster.Name)
+			delete(ssh.clustersMap, cluster.Name)
+		}
+		return nil, nil
+	}
 	if cluster.Spec.ScheduledClusterScan.Enabled {
 		if !ok {
 			// Do stuff to enable scheduling
