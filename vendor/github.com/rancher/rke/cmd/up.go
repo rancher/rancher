@@ -79,7 +79,7 @@ func UpCommand() cli.Command {
 
 func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags cluster.ExternalFlags, data map[string]interface{}) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	var APIURL, caCrt, clientCert, clientKey string
-	var reconcileCluster bool
+	var reconcileCluster, restore bool
 
 	clusterState, err := cluster.ReadStateFile(ctx, cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir))
 	if err != nil {
@@ -145,7 +145,15 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	if currentCluster != nil {
+	/* reconcileCluster flag decides whether zero downtime upgrade logic is used or not.
+	Zero-downtime upgrades should happen only when upgrading existing clusters. Not for new clusters or during etcd snapshot restore.
+	currentCluster != nil indicates this is an existing cluster. Restore flag on DesiredState.RancherKubernetesEngineConfig indicates if it's a snapshot restore or not.
+	reconcileCluster flag should be set to true only if currentCluster is not nil and restore is set to false
+	*/
+	if clusterState.DesiredState.RancherKubernetesEngineConfig != nil {
+		restore = clusterState.DesiredState.RancherKubernetesEngineConfig.Restore.Restore
+	}
+	if currentCluster != nil && !restore {
 		// reconcile this cluster, to check if upgrade is needed, or new nodes are getting added/removed
 		/*This is to separate newly added nodes, so we don't try to check their status/cordon them before upgrade.
 		This will also cover nodes that were considered inactive first time cluster was provisioned, but are now active during upgrade*/
