@@ -20,6 +20,7 @@ type Factory struct {
 	clientCfg           *rest.Config
 	watchClientCfg      *rest.Config
 	metadata            metadata.Interface
+	dynamic             dynamic.Interface
 	Config              *rest.Config
 }
 
@@ -66,7 +67,13 @@ func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 		return nil, err
 	}
 
+	d, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Factory{
+		dynamic:             d,
 		metadata:            md,
 		impersonate:         impersonate,
 		tableClientCfg:      tableClientCfg,
@@ -79,6 +86,10 @@ func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 
 func (p *Factory) MetadataClient() metadata.Interface {
 	return p.metadata
+}
+
+func (p *Factory) DynamicClient() dynamic.Interface {
+	return p.dynamic
 }
 
 func (p *Factory) Client(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {

@@ -14,31 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metadatainformer
+package dynamicinformer
 
 import (
 	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/metadata"
-	"k8s.io/client-go/metadata/metadatalister"
 	"k8s.io/client-go/tools/cache"
 )
 
-// NewSharedInformerFactory constructs a new instance of metadataSharedInformerFactory for all namespaces.
-func NewSharedInformerFactory(client metadata.Interface, defaultResync time.Duration) SharedInformerFactory {
-	return NewFilteredSharedInformerFactory(client, defaultResync, metav1.NamespaceAll, nil)
+// NewDynamicSharedInformerFactory constructs a new instance of dynamicSharedInformerFactory for all namespaces.
+func NewDynamicSharedInformerFactory(client dynamic.Interface, defaultResync time.Duration) DynamicSharedInformerFactory {
+	return NewFilteredDynamicSharedInformerFactory(client, defaultResync, metav1.NamespaceAll, nil)
 }
 
-// NewFilteredSharedInformerFactory constructs a new instance of metadataSharedInformerFactory.
+// NewFilteredDynamicSharedInformerFactory constructs a new instance of dynamicSharedInformerFactory.
 // Listers obtained via this factory will be subject to the same filters as specified here.
-func NewFilteredSharedInformerFactory(client metadata.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) SharedInformerFactory {
-	return &metadataSharedInformerFactory{
+func NewFilteredDynamicSharedInformerFactory(client dynamic.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) DynamicSharedInformerFactory {
+	return &dynamicSharedInformerFactory{
 		client:           client,
 		defaultResync:    defaultResync,
 		namespace:        namespace,
@@ -48,8 +49,8 @@ func NewFilteredSharedInformerFactory(client metadata.Interface, defaultResync t
 	}
 }
 
-type metadataSharedInformerFactory struct {
-	client        metadata.Interface
+type dynamicSharedInformerFactory struct {
+	client        dynamic.Interface
 	defaultResync time.Duration
 	namespace     string
 
@@ -61,9 +62,9 @@ type metadataSharedInformerFactory struct {
 	tweakListOptions TweakListOptionsFunc
 }
 
-var _ SharedInformerFactory = &metadataSharedInformerFactory{}
+var _ DynamicSharedInformerFactory = &dynamicSharedInformerFactory{}
 
-func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResource) informers.GenericInformer {
+func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResource) informers.GenericInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -73,14 +74,14 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 		return informer
 	}
 
-	informer = NewFilteredMetadataInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	f.informers[key] = informer
 
 	return informer
 }
 
 // Start initializes all requested informers.
-func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
+func (f *dynamicSharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -93,7 +94,7 @@ func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
 }
 
 // WaitForCacheSync waits for all started informers' cache were synced.
-func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool {
+func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool {
 	informers := func() map[schema.GroupVersionResource]cache.SharedIndexInformer {
 		f.lock.Lock()
 		defer f.lock.Unlock()
@@ -114,9 +115,9 @@ func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{})
 	return res
 }
 
-// NewFilteredMetadataInformer constructs a new informer for a metadata type.
-func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
-	return &metadataInformer{
+// NewFilteredDynamicInformer constructs a new informer for a dynamic type.
+func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
+	return &dynamicInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformer(
 			&cache.ListWatch{
@@ -133,24 +134,24 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 					return client.Resource(gvr).Namespace(namespace).Watch(options)
 				},
 			},
-			&metav1.PartialObjectMetadata{},
+			&unstructured.Unstructured{},
 			resyncPeriod,
 			indexers,
 		),
 	}
 }
 
-type metadataInformer struct {
+type dynamicInformer struct {
 	informer cache.SharedIndexInformer
 	gvr      schema.GroupVersionResource
 }
 
-var _ informers.GenericInformer = &metadataInformer{}
+var _ informers.GenericInformer = &dynamicInformer{}
 
-func (d *metadataInformer) Informer() cache.SharedIndexInformer {
+func (d *dynamicInformer) Informer() cache.SharedIndexInformer {
 	return d.informer
 }
 
-func (d *metadataInformer) Lister() cache.GenericLister {
-	return metadatalister.NewRuntimeObjectShim(metadatalister.New(d.informer.GetIndexer(), d.gvr))
+func (d *dynamicInformer) Lister() cache.GenericLister {
+	return dynamiclister.NewRuntimeObjectShim(dynamiclister.New(d.informer.GetIndexer(), d.gvr))
 }

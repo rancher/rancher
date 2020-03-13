@@ -66,9 +66,9 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 		asl = accesscontrol.NewAccessStore(ctx, true, server.RBAC)
 	}
 
-	ccache := clustercache.NewClusterCache(ctx, cf.MetadataClient())
+	ccache := clustercache.NewClusterCache(ctx, cf.DynamicClient())
 
-	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, ccache)
+	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, ccache, cf)
 	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf, asl, server.K8s.Discovery())...)
 
 	cols, err := common.NewDynamicColumns(server.RestConfig)

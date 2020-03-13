@@ -256,6 +256,8 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 
 		schemaField := Field{
 			CodeName: field.Name,
+			Create:   true,
+			Update:   true,
 		}
 
 		fieldType := field.Type
