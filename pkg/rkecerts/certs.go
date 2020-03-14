@@ -76,19 +76,14 @@ func Generate(config *v3.RancherKubernetesEngineConfig) (*Bundle, error) {
 	}, nil
 }
 
-func (b *Bundle) Marshal() (string, error) {
-	output := &bytes.Buffer{}
-	err := rkecerts.Save(b.certs, output)
-	return output.String(), err
-}
-
-// SafeMarshal removes the kube-ca cert key from the cert bundle before marshalling
+// SafeMarshal removes the kube-ca cert key and keyPEM from the cert bundle before marshalling
 func (b *Bundle) SafeMarshal() (string, error) {
 	output := &bytes.Buffer{}
 	certs := b.certs
-	if pkiCert, ok := certs[pki.CACertName]; ok {
-		pkiCert.Key = nil
-		certs[pki.CACertName] = pkiCert
+	if caCert, ok := certs[pki.CACertName]; ok {
+		caCert.Key = nil
+		caCert.KeyPEM = ""
+		certs[pki.CACertName] = caCert
 	}
 	err := rkecerts.Save(certs, output)
 	return output.String(), err
