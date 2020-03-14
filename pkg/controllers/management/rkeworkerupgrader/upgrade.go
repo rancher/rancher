@@ -4,16 +4,23 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/pkg/locker"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type upgradeHandler struct {
@@ -62,6 +69,12 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 		if cluster.DeletionTimestamp != nil || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
 			return nil, nil
 		}
+
+		if cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] == "true" {
+			// rke completed etcd snapshot restore, need to update plan for nodes so worker nodes reset to old rkeConfig
+			return node, uh.restore(cluster)
+		}
+
 		logrus.Infof("checking cluster [%s] for worker nodes upgrade", cluster.Name)
 
 		if ok, err := uh.toUpgradeCluster(cluster); err != nil {
@@ -90,6 +103,10 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 
 	if node.Status.NodePlan == nil {
 		return uh.updateNodePlan(node, cluster, true)
+	}
+
+	if v3.ClusterConditionUpdated.IsUnknown(cluster) || cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] == "true" {
+		return node, nil
 	}
 
 	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
@@ -273,7 +290,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 				continue
 			}
 
-			if err := uh.processNode(node, cluster, false); err != nil {
+			if err := uh.setNodePlan(node, cluster, false); err != nil {
 				return err
 			}
 
@@ -293,7 +310,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 			continue
 		}
 
-		if err := uh.processNode(node, cluster, true); err != nil {
+		if err := uh.setNodePlan(node, cluster, true); err != nil {
 			return err
 		}
 
@@ -372,6 +389,77 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (uh *upgradeHandler) restore(cluster *v3.Cluster) error {
+	nodes, err := uh.nodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return err
+	}
+
+	var errgrp errgroup.Group
+	nodesQueue := util.GetObjectQueue(nodes)
+	for w := 0; w < 5; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for node := range nodesQueue {
+				node := node.(*v3.Node)
+				if node.Status.NodeConfig != nil && workerOnly(node.Status.NodeConfig.Role) {
+					if node.Status.NodePlan.Version != cluster.Status.NodeVersion {
+						if err := uh.setNodePlan(node, cluster, false); err != nil {
+							errList = append(errList, err)
+						}
+						logrus.Infof("cluster [%s]: updated node [%s] for restore, plan version [%v]", cluster.Name,
+							node.Name, cluster.Status.NodeVersion)
+					}
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+
+	clusterCopy := cluster.DeepCopy()
+	clusterCopy.Annotations[clusterprovisioner.RkeRestoreAnnotation] = "false"
+	if _, err := uh.clusters.Update(clusterCopy); err != nil {
+		if !errors.IsConflict(err) {
+			return err
+		}
+		return uh.retryClusterUpdate(cluster.Name)
+	}
+	return nil
+}
+
+func (uh *upgradeHandler) retryClusterUpdate(name string) error {
+	backoff := wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    7,
+	}
+
+	return wait.ExponentialBackoff(backoff, func() (bool, error) {
+		cluster, err := uh.clusters.Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] != "false" {
+			cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] = "false"
+
+			_, err = uh.clusters.Update(cluster)
+			if err != nil {
+				logrus.Debugf("cluster [%s] restore: error resetting restore annotation %v", cluster.Name, err)
+				if errors.IsConflict(err) {
+					return false, nil
+				}
+				return false, err
+			}
+		}
+		return true, nil
+	})
+
 }
 
 func CalculateMaxUnavailable(maxUnavailable string, nodes int) (int, error) {
