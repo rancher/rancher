@@ -33,7 +33,7 @@ func (uh *upgradeHandler) prepareNode(node *v3.Node, toDrain bool, nodeDrainInpu
 	return nil
 }
 
-func (uh *upgradeHandler) processNode(node *v3.Node, cluster *v3.Cluster, upgrade bool) error {
+func (uh *upgradeHandler) setNodePlan(node *v3.Node, cluster *v3.Cluster, upgrade bool) error {
 	nodePlan, err := uh.getNodePlan(node, cluster)
 	if err != nil {
 		return fmt.Errorf("setNodePlan: error getting node plan for [%s]: %v", node.Name, err)
