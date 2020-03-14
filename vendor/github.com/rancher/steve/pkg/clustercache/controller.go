@@ -228,7 +228,7 @@ func (h *clusterCache) start() {
 
 		key := toKey(event.obj)
 		if event.oldObj != nil {
-			_, err := callAll(h.addHandlers.List(), event.gvr, key, event.obj, event.oldObj)
+			_, err := callAll(h.changeHandlers.List(), event.gvr, key, event.obj, event.oldObj)
 			if err != nil {
 				logrus.Errorf("failed to handle add event: %v", err)
 			}
