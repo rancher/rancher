@@ -41,12 +41,12 @@ func NewCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig, nameTmpl s
 }
 
 func NewManualCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig) *v3.ClusterScan {
-	nameTmpl := "cis-%v"
+	nameTmpl := ManualScanPrefix + "%v"
 	return NewCisScan(cluster, cisScanConfig, nameTmpl, v3.ClusterScanRunTypeManual)
 }
 
 func NewScheduledCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig) *v3.ClusterScan {
-	nameTmpl := "ss-cis-%v"
+	nameTmpl := ScheduledScanPrefix + "%v"
 	return NewCisScan(cluster, cisScanConfig, nameTmpl, v3.ClusterScanRunTypeScheduled)
 }
 
