@@ -255,17 +255,25 @@ func cleanOldScans(
 	clusterScanClient v3.ClusterScanInterface,
 	clusterScanLister v3.ClusterScanLister,
 ) error {
+	logrus.Debugf("scheduledScanHandler: cleanOldScans: clusterID: %v retention: %v", clusterID, retention)
 	clusterScans, err := clusterScanLister.List(clusterID, labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing cluster scans for cluster %v: %v", clusterID, err)
 	}
-	if len(clusterScans) <= retention {
+	var scheduledScans []*v3.ClusterScan
+	for _, cs := range clusterScans {
+		if !strings.HasPrefix(cs.Name, cis.ScheduledScanPrefix) {
+			continue
+		}
+		scheduledScans = append(scheduledScans, cs)
+	}
+	if len(scheduledScans) <= retention {
 		return nil
 	}
-	sort.Slice(clusterScans, func(i, j int) bool {
-		return !clusterScans[i].CreationTimestamp.Before(&clusterScans[j].CreationTimestamp)
+	sort.Slice(scheduledScans, func(i, j int) bool {
+		return !scheduledScans[i].CreationTimestamp.Before(&scheduledScans[j].CreationTimestamp)
 	})
-	for _, cs := range clusterScans[retention:] {
+	for _, cs := range scheduledScans[retention:] {
 		logrus.Debugf("scheduledScanHandler: cleanOldScans: deleting cs: %v %v", cs.Name, cs.CreationTimestamp.String())
 		if err := deleteClusterScanWithRetry(clusterScanClient, cs.Name); err != nil {
 			logrus.Errorf("scheduledScanHandler: cleanOldScans: error deleting cluster scan: %v: %v",
