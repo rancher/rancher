@@ -145,6 +145,7 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 					return nil
 				}
 				itemCount = removeCounts(itemCount, namespace, oldSummary)
+				itemCount = addCounts(itemCount, namespace, summary)
 			} else {
 				return nil
 			}
@@ -242,7 +243,7 @@ func getInfo(obj interface{}) (name string, namespace string, revision int, summ
 
 func removeCounts(itemCount ItemCount, ns string, summary summary.Summary) ItemCount {
 	itemCount.Summary = removeSummary(itemCount.Summary, summary)
-	if ns == "" {
+	if ns != "" {
 		itemCount.Namespaces[ns] = removeSummary(itemCount.Namespaces[ns], summary)
 	}
 	return itemCount
@@ -250,7 +251,7 @@ func removeCounts(itemCount ItemCount, ns string, summary summary.Summary) ItemC
 
 func addCounts(itemCount ItemCount, ns string, summary summary.Summary) ItemCount {
 	itemCount.Summary = addSummary(itemCount.Summary, summary)
-	if ns == "" {
+	if ns != "" {
 		itemCount.Namespaces[ns] = addSummary(itemCount.Namespaces[ns], summary)
 	}
 	return itemCount

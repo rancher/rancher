@@ -931,8 +931,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200313022237-d457428bfff9 h1:ZyN5hjKV3bK1WFY7vDp9qEXGBMn2xNkFyAEN3EsL3c4=
-github.com/rancher/steve v0.0.0-20200313022237-d457428bfff9/go.mod h1:+cCJ7EQa7G6w40XIrECQNRas7f8oAlaV9q/YysOBkAA=
+github.com/rancher/steve v0.0.0-20200314184620-eda3ecf98755 h1:Z+O6Gwtg6S38EocYKk5JQkbQv7Ujlo9MW+BnMjROk7k=
+github.com/rancher/steve v0.0.0-20200314184620-eda3ecf98755/go.mod h1:+cCJ7EQa7G6w40XIrECQNRas7f8oAlaV9q/YysOBkAA=
 github.com/rancher/system-upgrade-controller v0.3.1 h1:SpDStISy1haw05OCTGVEDw+WAo23jnpXVOh/60YlD70=
 github.com/rancher/system-upgrade-controller v0.3.1/go.mod h1:/2W/8WEqCSrz66hOYr3vjMRsIsgyWdToqO1hEVRvvLg=
 github.com/rancher/types v0.0.0-20200303162837-300a04e6f743/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
