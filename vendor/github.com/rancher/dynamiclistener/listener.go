@@ -337,6 +337,12 @@ func (l *listener) cacheHandler() http.Handler {
 
 		ip := net.ParseIP(h)
 		if len(ip) > 0 {
+			for _, v := range req.Header["User-Agent"] {
+				if strings.Contains(strings.ToLower(v), "mozilla") {
+					return
+				}
+			}
+
 			l.updateCert(h)
 		}
 	})
