@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -30,9 +31,6 @@ func setRefreshed(catalog *v3.Catalog) bool {
 		v3.CatalogConditionRefreshed.True(catalog)
 		v3.CatalogConditionRefreshed.Reason(catalog, "")
 		v3.CatalogConditionRefreshed.Message(catalog, "")
-		v3.CatalogConditionProcessed.True(catalog)
-		v3.CatalogConditionProcessed.Message(catalog, "")
-		v3.CatalogConditionProcessed.Reason(catalog, "")
 		return true
 	}
 	return false
@@ -165,4 +163,58 @@ func (m *Manager) updateCatalogInfo(cmt *CatalogInfo, catalogType string, templa
 	}
 
 	return cmt, nil
+}
+
+func setCatalogErrorState(cmt *CatalogInfo, catalog *v3.Catalog, projectCatalog *v3.ProjectCatalog, clusterCatalog *v3.ClusterCatalog) {
+	v3.CatalogConditionRefreshed.False(catalog)
+	v3.CatalogConditionRefreshed.Message(catalog, fmt.Sprintf("Error syncing catalog %v", catalog.Name))
+	v3.CatalogConditionProcessed.True(catalog)
+	cmt.catalog = catalog
+	cmt.projectCatalog = projectCatalog
+	cmt.clusterCatalog = clusterCatalog
+}
+
+func setCatalogIgnoreErrorState(commit string, cmt *CatalogInfo, catalog *v3.Catalog, projectCatalog *v3.ProjectCatalog, clusterCatalog *v3.ClusterCatalog, message string) {
+	v3.CatalogConditionProcessed.False(catalog)
+	v3.CatalogConditionProcessed.Message(catalog, message)
+	v3.CatalogConditionRefreshed.Message(catalog, "")
+	v3.CatalogConditionProcessed.ReasonAndMessageFromError(catalog, errors.New(message))
+	v3.CatalogConditionRefreshed.True(catalog)
+	catalog.Status.Commit = commit
+	if projectCatalog != nil {
+		projectCatalog.Catalog = *catalog
+	} else if clusterCatalog != nil {
+		clusterCatalog.Catalog = *catalog
+	}
+	cmt.catalog = catalog
+	cmt.projectCatalog = projectCatalog
+	cmt.clusterCatalog = clusterCatalog
+}
+
+func setTraverseCompleted(catalog *v3.Catalog) {
+	v3.CatalogConditionUpgraded.True(catalog)
+	v3.CatalogConditionDiskCached.True(catalog)
+	v3.CatalogConditionProcessed.True(catalog)
+	v3.CatalogConditionProcessed.Message(catalog, "")
+	v3.CatalogConditionProcessed.Reason(catalog, "")
+}
+
+// Using Helm standards to make a qualified name to be used for template name, see link below
+// General Helm Chart conventions should be followed as we will not correct all potential issues
+// https://github.com/helm/helm/blob/9b42702a4bced339ff424a78ad68dd6be6e1a80a/cmd/helm/testdata/testcharts/chart-with-template-lib-dep/charts/common/templates/_fullname.tpl
+func getValidTemplateName(catalogName, chartName string) string {
+	templateName := fmt.Sprintf("%s-%s", catalogName, chartName)
+	templateName = strings.ToLower(templateName)
+	templateName = strings.TrimSuffix(templateName, "-")
+	return templateName
+}
+
+// Using Helm standards to make a label to be used for the template version name, see link below
+// General Helm Chart conventions should be followed as we will not correct all potential issues
+// https://github.com/helm/helm/blob/3582b03a91bb994aa4d33a7bc50de5205f734c7a/pkg/chartutil/create.go
+func getValidTemplateNameWithVersion(templateName, version string) string {
+	label := fmt.Sprintf("%s-%s", templateName, version)
+	label = strings.ReplaceAll(label, "+", "_")
+	label = strings.TrimSuffix(label, "-")
+	return label
 }

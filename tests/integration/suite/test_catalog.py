@@ -288,8 +288,9 @@ def test_catalog_refresh(admin_mc):
 
 
 def test_invalid_catalog_chart_names(admin_mc, remove_resource):
-    """Test chart with too long name and chart with invalid
-     name in catalog error properly"""
+    """Test chart with invalid name in catalog error properly
+    and test that a chart names are truncated and processed without
+    error"""
     client = admin_mc.client
     name = random_str()
     url = "https://github.com/rancher/integration-test-charts"
@@ -309,16 +310,14 @@ def test_invalid_catalog_chart_names(admin_mc, remove_resource):
                        fail_handler=lambda:
                        "catalog was not found in error state")
     templates = client.list_template(catalogId=catalog.id).data
-
-    assert "areallylongnamelikereallyreallylongwestillneedmorez234dasdfasd"\
-        not in templates
-    assert "bad-chart_name" not in templates
+    templatesString = ','.join([str(i) for i in templates])
+    assert "areallylongname" not in templatesString
+    assert "bad-chart_name" not in templatesString
     assert catalog.state == "processed"
     assert catalog.transitioning == "error"
     assert "Error in chart(s):" in catalog.transitioningMessage
-    assert "areallylongnamelikereallyreallylongwestillneedmorez234dasdfasd" \
-        in catalog.transitioningMessage
     assert "bad-chart_name" in catalog.transitioningMessage
+    assert "areallylongname" in catalog.transitioningMessage
     # this will break if github repo changes
     assert len(templates) == 6
     # checking that the errored catalog can be deleted successfully
@@ -348,13 +347,13 @@ def test_invalid_catalog_chart_urls(admin_mc, remove_resource):
                        fail_handler=lambda:
                        "catalog was not found in error state")
     templates = client.list_template(catalogId=catalog.id).data
-
+    templatesString = ','.join([str(i) for i in templates])
     # url in index.yaml:
     # local://azure-samples.github.io/helm-charts/aks-helloworld-0.1.0.tgz
-    assert "aks-goodbyeworld" not in templates
+    assert "aks-goodbyeworld" not in templatesString
     # url in index.yaml:
     # file://azure-samples.github.io/helm-charts/aks-helloworld-0.1.0.tgz
-    assert "aks-helloworld" not in templates
+    assert "aks-helloworld" not in templatesString
     assert catalog.state == "processed"
     assert catalog.transitioning == "error"
     assert "Error in chart(s):" in catalog.transitioningMessage
