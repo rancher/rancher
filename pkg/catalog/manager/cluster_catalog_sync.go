@@ -31,13 +31,6 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 		return nil, err
 	}
 
-	// if the catalog was processed but some templates had errors due to local/file urls or chart names
-	// that cannot be used as labels - the catalog is up to date, but had errors so we don't refresh
-	// to give time for the user to make the necessary corrections.
-	if v3.CatalogConditionProcessed.IsFalse(clusterCatalog) && v3.CatalogConditionRefreshed.IsTrue(clusterCatalog) {
-		return nil, nil
-	}
-
 	commit, helm, err := helmlib.NewForceUpdate(&clusterCatalog.Catalog)
 	if err != nil {
 		return m.updateClusterCatalogError(clusterCatalog, err)
