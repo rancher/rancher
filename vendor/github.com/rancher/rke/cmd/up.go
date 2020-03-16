@@ -277,7 +277,6 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	}
 
 	rkeConfig, err := cluster.ParseConfig(clusterFile)
-	// logrus.Infof("melsayed---------clusterUpFromCli--------- %+v", rkeConfig.Services.KubeAPI.SecretsEncryptionConfig)
 	if err != nil {
 		return fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
