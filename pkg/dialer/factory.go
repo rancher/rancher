@@ -272,9 +272,32 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 	if f.TunnelServer.HasSession(sessionKey) {
 		d := f.TunnelServer.Dialer(sessionKey, 15*time.Second)
 		return dialer.Dialer(d), nil
+	} else {
+		// Try dialing to other controlplane nodes
+		logrus.Debugf("[nodeDialer] Using other active controlplane nodes for dialing to the cluster")
+		nodes, err := f.nodeLister.List(clusterName, labels.Everything())
+		if err != nil {
+			return nil, err
+		}
+		for _, node := range nodes {
+			if node.Status.NodeConfig == nil || !slice.ContainsString(node.Status.NodeConfig.Role, services.ControlRole) {
+				continue
+			}
+			fakeNode := &v1.Node{
+				Status: node.Status.InternalNodeStatus,
+			}
+			if node.DeletionTimestamp == nil && v3.NodeConditionProvisioned.IsTrue(node) && !v3.NodeConditionReady.IsUnknown(fakeNode) {
+				sessionKey := machineSessionKey(node)
+				if f.TunnelServer.HasSession(sessionKey) {
+					d := f.TunnelServer.Dialer(sessionKey, 15*time.Second)
+					return dialer.Dialer(d), nil
+				}
+				logrus.Errorf("[nodeDialer] can not build dialer to %s", node.Name)
+			}
+		}
 	}
 
-	return nil, fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)
+	return nil, fmt.Errorf("[nodeDialer] can not build dialer to [%s:%s]", clusterName, machineName)
 }
 
 func machineSessionKey(machine *v3.Node) string {
