@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/remotedialer"
@@ -21,7 +19,17 @@ import (
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
+
+type nodeNotFound struct {
+	error
+}
+
+func IsNodeNotFound(err error) bool {
+	_, ok := err.(nodeNotFound)
+	return ok
+}
 
 func NewFactory(apiContext *config.ScaledContext) (*Factory, error) {
 	authorizer := tunnelserver.NewAuthorizer(apiContext)
@@ -274,7 +282,7 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 		return dialer.Dialer(d), nil
 	}
 
-	return nil, fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)
+	return nil, nodeNotFound{error: fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)}
 }
 
 func machineSessionKey(machine *v3.Node) string {
