@@ -574,6 +574,136 @@
     "v": "2"
    }
   },
+  "v1.15.11-rancher1-1": {
+   "etcd": {
+    "client-cert-auth": "true",
+    "peer-client-cert-auth": "true"
+   },
+   "kubeapi": {
+    "allow-privileged": "true",
+    "anonymous-auth": "false",
+    "bind-address": "0.0.0.0",
+    "enable-admission-plugins": "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,NodeRestriction,Priority,TaintNodesByCondition,PersistentVolumeClaimResize",
+    "insecure-port": "0",
+    "kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+    "profiling": "false",
+    "requestheader-extra-headers-prefix": "X-Remote-Extra-",
+    "requestheader-group-headers": "X-Remote-Group",
+    "requestheader-username-headers": "X-Remote-User",
+    "runtime-config": "authorization.k8s.io/v1beta1=true",
+    "secure-port": "6443",
+    "service-account-lookup": "true",
+    "storage-backend": "etcd3",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+   },
+   "kubelet": {
+    "address": "0.0.0.0",
+    "anonymous-auth": "false",
+    "authentication-token-webhook": "true",
+    "authorization-mode": "Webhook",
+    "cgroups-per-qos": "True",
+    "cni-bin-dir": "/opt/cni/bin",
+    "cni-conf-dir": "/etc/cni/net.d",
+    "enforce-node-allocatable": "",
+    "event-qps": "0",
+    "make-iptables-util-chains": "true",
+    "network-plugin": "cni",
+    "read-only-port": "0",
+    "resolv-conf": "/etc/resolv.conf",
+    "streaming-connection-idle-timeout": "30m",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+    "v": "2",
+    "volume-plugin-dir": "/var/lib/kubelet/volumeplugins"
+   },
+   "kubeproxy": {
+    "healthz-bind-address": "127.0.0.1",
+    "v": "2"
+   },
+   "kubeController": {
+    "address": "0.0.0.0",
+    "allocate-node-cidrs": "true",
+    "allow-untagged-cloud": "true",
+    "configure-cloud-routes": "false",
+    "enable-hostpath-provisioner": "false",
+    "leader-elect": "true",
+    "node-monitor-grace-period": "40s",
+    "pod-eviction-timeout": "5m0s",
+    "profiling": "false",
+    "terminated-pod-gc-threshold": "1000",
+    "v": "2"
+   },
+   "scheduler": {
+    "address": "0.0.0.0",
+    "leader-elect": "true",
+    "profiling": "false",
+    "v": "2"
+   }
+  },
+  "v1.15.11-rancher1-2": {
+   "etcd": {
+    "client-cert-auth": "true",
+    "peer-client-cert-auth": "true"
+   },
+   "kubeapi": {
+    "allow-privileged": "true",
+    "anonymous-auth": "false",
+    "bind-address": "0.0.0.0",
+    "enable-admission-plugins": "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,NodeRestriction,Priority,TaintNodesByCondition,PersistentVolumeClaimResize",
+    "insecure-port": "0",
+    "kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+    "profiling": "false",
+    "requestheader-extra-headers-prefix": "X-Remote-Extra-",
+    "requestheader-group-headers": "X-Remote-Group",
+    "requestheader-username-headers": "X-Remote-User",
+    "runtime-config": "authorization.k8s.io/v1beta1=true",
+    "secure-port": "6443",
+    "service-account-lookup": "true",
+    "storage-backend": "etcd3",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+   },
+   "kubelet": {
+    "address": "0.0.0.0",
+    "anonymous-auth": "false",
+    "authentication-token-webhook": "true",
+    "authorization-mode": "Webhook",
+    "cgroups-per-qos": "True",
+    "cni-bin-dir": "/opt/cni/bin",
+    "cni-conf-dir": "/etc/cni/net.d",
+    "enforce-node-allocatable": "",
+    "event-qps": "0",
+    "make-iptables-util-chains": "true",
+    "network-plugin": "cni",
+    "read-only-port": "0",
+    "resolv-conf": "/etc/resolv.conf",
+    "streaming-connection-idle-timeout": "30m",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+    "v": "2",
+    "volume-plugin-dir": "/var/lib/kubelet/volumeplugins"
+   },
+   "kubeproxy": {
+    "healthz-bind-address": "127.0.0.1",
+    "v": "2"
+   },
+   "kubeController": {
+    "address": "0.0.0.0",
+    "allocate-node-cidrs": "true",
+    "allow-untagged-cloud": "true",
+    "configure-cloud-routes": "false",
+    "enable-hostpath-provisioner": "false",
+    "leader-elect": "true",
+    "node-monitor-grace-period": "40s",
+    "pod-eviction-timeout": "5m0s",
+    "profiling": "false",
+    "terminated-pod-gc-threshold": "1000",
+    "v": "2"
+   },
+   "scheduler": {
+    "address": "0.0.0.0",
+    "leader-elect": "true",
+    "profiling": "false",
+    "v": "2"
+   }
+  },
   "v1.15.6-rancher1-2": {
    "etcd": {
     "client-cert-auth": "true",
@@ -1092,6 +1222,136 @@
    }
   },
   "v1.16.7-rancher1-1": {
+   "etcd": {
+    "client-cert-auth": "true",
+    "peer-client-cert-auth": "true"
+   },
+   "kubeapi": {
+    "allow-privileged": "true",
+    "anonymous-auth": "false",
+    "bind-address": "0.0.0.0",
+    "enable-admission-plugins": "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,NodeRestriction,Priority,TaintNodesByCondition,PersistentVolumeClaimResize",
+    "insecure-port": "0",
+    "kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+    "profiling": "false",
+    "requestheader-extra-headers-prefix": "X-Remote-Extra-",
+    "requestheader-group-headers": "X-Remote-Group",
+    "requestheader-username-headers": "X-Remote-User",
+    "runtime-config": "authorization.k8s.io/v1beta1=true",
+    "secure-port": "6443",
+    "service-account-lookup": "true",
+    "storage-backend": "etcd3",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+   },
+   "kubelet": {
+    "address": "0.0.0.0",
+    "anonymous-auth": "false",
+    "authentication-token-webhook": "true",
+    "authorization-mode": "Webhook",
+    "cgroups-per-qos": "True",
+    "cni-bin-dir": "/opt/cni/bin",
+    "cni-conf-dir": "/etc/cni/net.d",
+    "enforce-node-allocatable": "",
+    "event-qps": "0",
+    "make-iptables-util-chains": "true",
+    "network-plugin": "cni",
+    "read-only-port": "0",
+    "resolv-conf": "/etc/resolv.conf",
+    "streaming-connection-idle-timeout": "30m",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+    "v": "2",
+    "volume-plugin-dir": "/var/lib/kubelet/volumeplugins"
+   },
+   "kubeproxy": {
+    "healthz-bind-address": "127.0.0.1",
+    "v": "2"
+   },
+   "kubeController": {
+    "address": "0.0.0.0",
+    "allocate-node-cidrs": "true",
+    "allow-untagged-cloud": "true",
+    "configure-cloud-routes": "false",
+    "enable-hostpath-provisioner": "false",
+    "leader-elect": "true",
+    "node-monitor-grace-period": "40s",
+    "pod-eviction-timeout": "5m0s",
+    "profiling": "false",
+    "terminated-pod-gc-threshold": "1000",
+    "v": "2"
+   },
+   "scheduler": {
+    "address": "0.0.0.0",
+    "leader-elect": "true",
+    "profiling": "false",
+    "v": "2"
+   }
+  },
+  "v1.16.8-rancher1-1": {
+   "etcd": {
+    "client-cert-auth": "true",
+    "peer-client-cert-auth": "true"
+   },
+   "kubeapi": {
+    "allow-privileged": "true",
+    "anonymous-auth": "false",
+    "bind-address": "0.0.0.0",
+    "enable-admission-plugins": "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,NodeRestriction,Priority,TaintNodesByCondition,PersistentVolumeClaimResize",
+    "insecure-port": "0",
+    "kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+    "profiling": "false",
+    "requestheader-extra-headers-prefix": "X-Remote-Extra-",
+    "requestheader-group-headers": "X-Remote-Group",
+    "requestheader-username-headers": "X-Remote-User",
+    "runtime-config": "authorization.k8s.io/v1beta1=true",
+    "secure-port": "6443",
+    "service-account-lookup": "true",
+    "storage-backend": "etcd3",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+   },
+   "kubelet": {
+    "address": "0.0.0.0",
+    "anonymous-auth": "false",
+    "authentication-token-webhook": "true",
+    "authorization-mode": "Webhook",
+    "cgroups-per-qos": "True",
+    "cni-bin-dir": "/opt/cni/bin",
+    "cni-conf-dir": "/etc/cni/net.d",
+    "enforce-node-allocatable": "",
+    "event-qps": "0",
+    "make-iptables-util-chains": "true",
+    "network-plugin": "cni",
+    "read-only-port": "0",
+    "resolv-conf": "/etc/resolv.conf",
+    "streaming-connection-idle-timeout": "30m",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+    "v": "2",
+    "volume-plugin-dir": "/var/lib/kubelet/volumeplugins"
+   },
+   "kubeproxy": {
+    "healthz-bind-address": "127.0.0.1",
+    "v": "2"
+   },
+   "kubeController": {
+    "address": "0.0.0.0",
+    "allocate-node-cidrs": "true",
+    "allow-untagged-cloud": "true",
+    "configure-cloud-routes": "false",
+    "enable-hostpath-provisioner": "false",
+    "leader-elect": "true",
+    "node-monitor-grace-period": "40s",
+    "pod-eviction-timeout": "5m0s",
+    "profiling": "false",
+    "terminated-pod-gc-threshold": "1000",
+    "v": "2"
+   },
+   "scheduler": {
+    "address": "0.0.0.0",
+    "leader-elect": "true",
+    "profiling": "false",
+    "v": "2"
+   }
+  },
+  "v1.16.8-rancher1-2": {
    "etcd": {
     "client-cert-auth": "true",
     "peer-client-cert-auth": "true"
@@ -4306,38 +4566,40 @@
    "skippedChecks": {
     "1.1.11": "Enabling AlwaysPullImages can use significant bandwidth.",
     "1.1.21": "When generating serving certificates, functionality could break in conjunction with hostname overrides which are required for certain cloud providers.",
-    "1.1.24": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
+    "1.1.24": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
+    "1.1.34": "Enabling encryption changes how data can be recovered as data is encrypted.",
+    "1.1.35": "Enabling encryption changes how data can be recovered as data is encrypted.",
     "1.1.36": "EventRateLimit needs to be tuned depending on the cluster.",
     "1.2.2": "Adding this argument prevents Rancher's monitoring tool to collect metrics on the scheduler.",
     "1.3.7": "Adding this argument prevents Rancher's monitoring tool to collect metrics on the controller manager.",
     "1.4.12": "A system service account is required for etcd data directory ownership. Refer to Rancher's hardening guide for more details on how to configure this ownership.",
-    "1.7.2": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
-    "1.7.3": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
-    "1.7.4": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
-    "1.7.5": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
+    "1.7.2": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
+    "1.7.3": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
+    "1.7.4": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
+    "1.7.5": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
     "2.1.10": "When generating serving certificates, functionality could break in conjunction with hostname overrides which are required for certain cloud providers.",
-    "2.1.6": "System level configurations are required prior to provisioning the cluster in order for this argument to be set to true. "
+    "2.1.6": "System level configurations are required prior to provisioning the cluster in order for this argument to be set to true."
    },
    "notApplicableChecks": {
-    "1.1.9": "The argument --repair-malformed-updates has been removed as of Kubernetes version 1.14",
-    "1.3.6": "Cluster provisioned by RKE handles certificate rotation directly through RKE.",
-    "1.4.1": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.4.13": "Cluster provisioned by RKE does not store the kubernetes default kubeconfig credentials file on the nodes.",
-    "1.4.14": "Cluster provisioned by RKE does not store the kubernetes default kubeconfig credentials file on the nodes.",
-    "1.4.2": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.4.3": "Cluster provisioned by RKE doesn't require or maintain a configuration file for controller-manager.\nAll configuration is passed in as arguments at container run time.",
-    "1.4.4": "Cluster provisioned by RKE doesn't require or maintain a configuration file for controller-manager.\nAll configuration is passed in as arguments at container run time.",
-    "1.4.5": "Cluster provisioned by RKE doesn't require or maintain a configuration file for scheduler.\nAll configuration is passed in as arguments at container run time.",
-    "1.4.6": "Cluster provisioned by RKE doesn't require or maintain a configuration file for scheduler.\nAll configuration is passed in as arguments at container run time.",
-    "1.4.7": "Cluster provisioned by RKE doesn't require or maintain a configuration file for etcd.\nAll configuration is passed in as arguments at container run time.",
-    "1.4.8": "Cluster provisioned by RKE doesn't require or maintain a configuration file for etcd.\nAll configuration is passed in as arguments at container run time.",
-    "2.1.12": "Cluster provisioned by RKE handles certificate rotation directly through RKE.",
-    "2.1.13": "Cluster provisioned by RKE handles certificate rotation directly through RKE.",
+    "1.1.9": "The argument --repair-malformed-updates has been removed as of Kubernetes version 1.14.",
+    "1.3.6": "Clusters provisioned by RKE handles certificate rotation directly through RKE.",
+    "1.4.1": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.4.13": "Clusters provisioned by RKE does not store the kubernetes default kubeconfig credentials file on the nodes.",
+    "1.4.14": "Clusters provisioned by RKE does not store the kubernetes default kubeconfig credentials file on the nodes.",
+    "1.4.2": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.4.3": "Clusters provisioned by RKE doesn't require or maintain a configuration file for controller-manager.\nAll configuration is passed in as arguments at container run time.",
+    "1.4.4": "Clusters provisioned by RKE doesn't require or maintain a configuration file for controller-manager.\nAll configuration is passed in as arguments at container run time.",
+    "1.4.5": "Clusters provisioned by RKE doesn't require or maintain a configuration file for scheduler.\nAll configuration is passed in as arguments at container run time.",
+    "1.4.6": "Clusters provisioned by RKE doesn't require or maintain a configuration file for scheduler.\nAll configuration is passed in as arguments at container run time.",
+    "1.4.7": "Clusters provisioned by RKE doesn't require or maintain a configuration file for etcd.\nAll configuration is passed in as arguments at container run time.",
+    "1.4.8": "Clusters provisioned by RKE doesn't require or maintain a configuration file for etcd.\nAll configuration is passed in as arguments at container run time.",
+    "2.1.12": "Clusters provisioned by RKE handles certificate rotation directly through RKE.",
+    "2.1.13": "Clusters provisioned by RKE handles certificate rotation directly through RKE.",
     "2.1.8": "Clusters provisioned by RKE clusters and most cloud providers require hostnames.",
-    "2.2.10": "RKE doesn’t require or maintain a configuration file for the kubelet.\nAll configuration is passed in as arguments at container run time.",
-    "2.2.3": "Cluster provisioned by RKE doesn’t require or maintain a configuration file for the kubelet service.\nAll configuration is passed in as arguments at container run time.",
-    "2.2.4": "Cluster provisioned by RKE doesn’t require or maintain a configuration file for the kubelet service.\nAll configuration is passed in as arguments at container run time.",
-    "2.2.9": "RKE doesn’t require or maintain a configuration file for the kubelet.\nAll configuration is passed in as arguments at container run time."
+    "2.2.10": "Clusters provisioned by RKE doesn’t require or maintain a configuration file for the kubelet.\nAll configuration is passed in as arguments at container run time.",
+    "2.2.3": "Clusters provisioned by RKE doesn’t require or maintain a configuration file for the kubelet service.\nAll configuration is passed in as arguments at container run time.",
+    "2.2.4": "Clusters provisioned by RKE doesn’t require or maintain a configuration file for the kubelet service.\nAll configuration is passed in as arguments at container run time.",
+    "2.2.9": "Clusters provisioned by RKE doesn’t require or maintain a configuration file for the kubelet.\nAll configuration is passed in as arguments at container run time."
    }
   },
   "rke-cis-1.5": {
@@ -4345,39 +4607,39 @@
    "minKubernetesVersion": "1.15",
    "skippedChecks": {
     "1.1.12": "A system service account is required for etcd data directory ownership. Refer to Rancher's hardening guide for more details on how to configure this ownership.",
-    "1.2.16": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
+    "1.2.16": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
     "1.2.6": "When generating serving certificates, functionality could break in conjunction with hostname overrides which are required for certain cloud providers.",
     "4.2.10": "When generating serving certificates, functionality could break in conjunction with hostname overrides which are required for certain cloud providers.",
-    "4.2.6": "System level configurations are required prior to provisioning the cluster in order for this argument to be set to true. ",
+    "4.2.6": "System level configurations are required prior to provisioning the cluster in order for this argument to be set to true.",
     "5.1.5": "TODO",
-    "5.2.2": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
-    "5.2.3": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
-    "5.2.4": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
-    "5.2.5": "Enabling Pod Security Policy can cause applications to unexpectedly fail. ",
+    "5.2.2": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
+    "5.2.3": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
+    "5.2.4": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
+    "5.2.5": "Enabling Pod Security Policy can cause applications to unexpectedly fail.",
     "5.3.2": "Enabling Network Policies can cause lot of unintended network traffic disruptions",
     "5.6.4": "A default namespace provides a flexible workspace to try out various deployments"
    },
    "notApplicableChecks": {
-    "1.1.1": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.13": "Cluster provisioned by RKE does not store the kubernetes default kubeconfig credentials file on the nodes.",
-    "1.1.14": "Cluster provisioned by RKE does not store the kubernetes default kubeconfig credentials file on the nodes.",
-    "1.1.15": "Cluster provisioned by RKE doesn't require or maintain a configuration file for scheduler.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.16": "Cluster provisioned by RKE doesn't require or maintain a configuration file for scheduler.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.17": "Cluster provisioned by RKE doesn't require or maintain a configuration file for controller-manager.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.18": "Cluster provisioned by RKE doesn't require or maintain a configuration file for controller-manager.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.2": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.3": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.4": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.5": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.6": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.7": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.1.8": "Cluster provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
-    "1.3.6": "Cluster provisioned by RKE handles certificate rotation directly through RKE.",
-    "4.1.1": "Cluster provisioned by RKE doesn’t require or maintain a configuration file for the kubelet service.\nAll configuration is passed in as arguments at container run time.",
-    "4.1.10": "RKE doesn’t require or maintain a configuration file for the kubelet.\nAll configuration is passed in as arguments at container run time.",
-    "4.1.2": "Cluster provisioned by RKE doesn’t require or maintain a configuration file for the kubelet service.\nAll configuration is passed in as arguments at container run time.",
-    "4.1.9": "RKE doesn’t require or maintain a configuration file for the kubelet.\nAll configuration is passed in as arguments at container run time.",
-    "4.2.12": "Cluster provisioned by RKE handles certificate rotation directly through RKE."
+    "1.1.1": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.13": "Clusters provisioned by RKE does not store the kubernetes default kubeconfig credentials file on the nodes.",
+    "1.1.14": "Clusters provisioned by RKE does not store the kubernetes default kubeconfig credentials file on the nodes.",
+    "1.1.15": "Clusters provisioned by RKE doesn't require or maintain a configuration file for scheduler.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.16": "Clusters provisioned by RKE doesn't require or maintain a configuration file for scheduler.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.17": "Clusters provisioned by RKE doesn't require or maintain a configuration file for controller-manager.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.18": "Clusters provisioned by RKE doesn't require or maintain a configuration file for controller-manager.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.2": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.3": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.4": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.5": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.6": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.7": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.1.8": "Clusters provisioned by RKE doesn't require or maintain a configuration file for kube-apiserver.\nAll configuration is passed in as arguments at container run time.",
+    "1.3.6": "Clusters provisioned by RKE handles certificate rotation directly through RKE.",
+    "4.1.1": "Clusters provisioned by RKE doesn’t require or maintain a configuration file for the kubelet service.\nAll configuration is passed in as arguments at container run time.",
+    "4.1.10": "Clusters provisioned by RKE doesn’t require or maintain a configuration file for the kubelet.\nAll configuration is passed in as arguments at container run time.",
+    "4.1.2": "Clusters provisioned by RKE doesn’t require or maintain a configuration file for the kubelet service.\nAll configuration is passed in as arguments at container run time.",
+    "4.1.9": "Clusters provisioned by RKE doesn’t require or maintain a configuration file for the kubelet.\nAll configuration is passed in as arguments at container run time.",
+    "4.2.12": "Clusters provisioned by RKE handles certificate rotation directly through RKE."
    }
   }
  },
