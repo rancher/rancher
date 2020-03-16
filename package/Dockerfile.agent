@@ -1,4 +1,7 @@
-FROM ubuntu:18.04
+FROM ubuntu:bionic-20200219 AS base
+RUN apt-get update && \
+    apt-get upgrade -y
+
 ARG ARCH=amd64
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
     DOCKER_URL_arm64=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm64 \
