@@ -156,6 +156,12 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 	// implement a simple state machine
 	// NotUpgraded => MasterPlanUpgrading || WorkerPlanUpgrading =>  NotUpgraded
 
+	if masterPlan.Name == "" && workerPlan.Name == "" {
+		v3.ClusterConditionUpgraded.Unknown(cluster)
+		v3.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
+		return h.clusterClient.Update(cluster)
+	}
+
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
 		v3.ClusterConditionUpgraded.Unknown(cluster)
 		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded", masterPlan.Status.Applying[0])
