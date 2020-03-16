@@ -21,7 +21,6 @@ import (
 	"github.com/sirupsen/logrus"
 	ldapv2 "gopkg.in/ldap.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -46,6 +45,10 @@ var (
 	}
 )
 
+type configMapGetter interface {
+	GetConfigMap(name string, opts metav1.GetOptions) (map[string]interface{}, error)
+}
+
 type ldapProvider struct {
 	ctx                   context.Context
 	authConfigs           v3.AuthConfigInterface
@@ -58,9 +61,10 @@ type ldapProvider struct {
 	testAndApplyInputType string
 	userScope             string
 	groupScope            string
+	configMapGetter       configMapGetter
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, providerName string) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, providerName string, cfgMapGetter configMapGetter) common.AuthProvider {
 	return &ldapProvider{
 		ctx:                   ctx,
 		authConfigs:           mgmtCtx.Management.AuthConfigs(""),
@@ -71,6 +75,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		testAndApplyInputType: testAndApplyInputTypes[providerName],
 		userScope:             providerName + "_user",
 		groupScope:            providerName + "_group",
+		configMapGetter:       cfgMapGetter,
 	}
 }
 
@@ -207,18 +212,10 @@ func (p *ldapProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) b
 }
 
 func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
-	// TODO See if this can be simplified. also, this makes an api call everytime. find a better way
-	authConfigObj, err := p.authConfigs.ObjectClient().UnstructuredClient().Get(p.providerName, metav1.GetOptions{})
+	storedLdapConfigMap, err := p.configMapGetter.GetConfigMap(p.providerName, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve %s, error: %v", p.providerName, err)
+		return nil, nil, err
 	}
-
-	u, ok := authConfigObj.(runtime.Unstructured)
-	if !ok {
-		return nil, nil, fmt.Errorf("failed to retrieve %s, cannot read k8s Unstructured data", p.providerName)
-	}
-
-	storedLdapConfigMap := u.UnstructuredContent()
 	storedLdapConfig := &v3.LdapConfig{}
 
 	if p.samlSearchProvider() && ldapConfigKey[p.providerName] != "" {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
@@ -76,13 +77,17 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providersByType[client.ActiveDirectoryConfigType] = p
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
 
-	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.OpenLdapName)
+	remoteConfig := ldap.NewRemoteConfig(mgmt.Management.AuthConfigs(""))
+	// TODO Is there a config source where it would be sensible to put expireAfter?
+	expireAfter := time.Minute * 5
+	cachedConfig := NewCachedConfig(remoteConfig, expireAfter)
+	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.OpenLdapName, cachedConfig)
 	ProviderNames[ldap.OpenLdapName] = true
 	providers[ldap.OpenLdapName] = p
 	providersByType[client.OpenLdapConfigType] = p
 	providersByType[publicclient.OpenLdapProviderType] = p
 
-	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.FreeIpaName)
+	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.FreeIpaName, cachedConfig)
 	ProviderNames[ldap.FreeIpaName] = true
 	providers[ldap.FreeIpaName] = p
 	providersByType[client.FreeIpaConfigType] = p
