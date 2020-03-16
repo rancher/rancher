@@ -154,7 +154,7 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 
 func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.Node, error) {
 	machineName := machineName(inNode)
-	logrus.Debugf("getMachine: looking up machine [%s] in cluster [%s]", machineName, cluster.Name)
+	//logrus.Debugf("getMachine: looking up machine [%s] in cluster [%s]", machineName, cluster.Name)
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
 		if objs, err := t.nodeIndexer.ByIndex(nodeKeyIndex, fmt.Sprintf("%s/%s", cluster.Name, inNode.RequestedHostname)); err == nil {
@@ -349,7 +349,7 @@ func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, 
 func machineName(machine *client.Node) string {
 	digest := md5.Sum([]byte(machine.RequestedHostname))
 	machineNameMD5 := fmt.Sprintf("m-%s", hex.EncodeToString(digest[:])[:12])
-	logrus.Debugf("machineName: returning [%s] for node with RequestedHostname [%s]", machineNameMD5, machine.RequestedHostname)
+	//logrus.Debugf("machineName: returning [%s] for node with RequestedHostname [%s]", machineNameMD5, machine.RequestedHostname)
 	return machineNameMD5
 }
 

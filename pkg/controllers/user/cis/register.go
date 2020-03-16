@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -98,4 +99,16 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		clusterScanClient: clusterScanClient,
 	}
 	podClient.AddHandler(ctx, "podHandler", podHandler.Sync)
+
+	roles := userContext.Management.RBAC.Roles(namespace.GlobalNamespace)
+	roleLister := roles.Controller().Lister()
+	roleBindings := userContext.Management.RBAC.RoleBindings(namespace.GlobalNamespace)
+	roleBindingLister := roleBindings.Controller().Lister()
+	cisScanRBACHandler := cisScanRBACHandler{
+		roles:             roles,
+		roleLister:        roleLister,
+		roleBindings:      roleBindings,
+		roleBindingLister: roleBindingLister,
+	}
+	userContext.Management.Management.ClusterRoleTemplateBindings(v1.NamespaceAll).AddHandler(ctx, "cisScanRBACHandler", cisScanRBACHandler.Sync)
 }
