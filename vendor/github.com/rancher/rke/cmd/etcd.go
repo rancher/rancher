@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
@@ -129,6 +131,11 @@ func RestoreEtcdSnapshot(
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
+
+	if err := validateCerts(rkeFullState.DesiredState); err != nil {
+		return APIURL, caCrt, clientCert, clientKey, nil, err
+	}
+
 	if err := checkLegacyCluster(ctx, kubeCluster, rkeFullState, flags); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -178,6 +185,42 @@ func RestoreEtcdSnapshot(
 	}
 	log.Infof(ctx, "Finished restoring snapshot [%s] on all etcd hosts", snapshotName)
 	return APIURL, caCrt, clientCert, clientKey, certs, err
+}
+
+func validateCerts(state cluster.State) error {
+	var failedErrs error
+
+	if state.RancherKubernetesEngineConfig == nil {
+		// possibly already started a restore
+		return nil
+	}
+	for name, certPKI := range state.CertificatesBundle {
+		if name == pki.ServiceAccountTokenKeyName || name == pki.RequestHeaderCACertName || name == pki.KubeAdminCertName {
+			continue
+		}
+
+		cert := certPKI.Certificate
+		if cert == nil {
+			if failedErrs == nil {
+				failedErrs = fmt.Errorf("Certificate [%s] is nil", certPKI.Name)
+			} else {
+				failedErrs = errors.Wrap(failedErrs, fmt.Sprintf("Certificate [%s] is nil", certPKI.Name))
+			}
+		}
+
+		certPool := x509.NewCertPool()
+		certPool.AddCert(cert)
+		if _, err := cert.Verify(x509.VerifyOptions{Roots: certPool, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
+			if failedErrs == nil {
+				failedErrs = fmt.Errorf("Certificate [%s] failed verification: %v", certPKI.Name, err)
+			}
+			failedErrs = errors.Wrap(failedErrs, fmt.Sprintf("Certificate [%s] failed verification: %v", certPKI.Name, err))
+		}
+	}
+	if failedErrs != nil {
+		return errors.Wrap(failedErrs, "[etcd] Failed to restore etcd snapshot: invalid certs")
+	}
+	return nil
 }
 
 func SnapshotSaveEtcdHostsFromCli(ctx *cli.Context) error {
