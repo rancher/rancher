@@ -11,6 +11,9 @@ import (
 var NodeNotFound = "can not build dialer to"
 
 func IsNodeNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
 	return strings.Contains(err.Error(), NodeNotFound)
 }
 
