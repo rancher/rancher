@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types/slice"
-	dialer2 "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/hosts"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -69,7 +68,7 @@ func (t *RKEDialerFactory) WrapTransport(config *v3.RancherKubernetesEngineConfi
 						address = strings.Replace(address, ip, privateIP, 1)
 					}
 					conn, err := dialer(network, address)
-					if dialer2.IsNodeNotFound(err) {
+					if ref.IsNodeNotFound(err) {
 						clusterDialer, dialerErr := t.Factory.ClusterDialer(ns)
 						if dialerErr == nil {
 							return clusterDialer(network, address)

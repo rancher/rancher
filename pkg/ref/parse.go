@@ -8,6 +8,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+var NodeNotFound = "can not build dialer to"
+
+func IsNodeNotFound(err error) bool {
+	return strings.Contains(err.Error(), NodeNotFound)
+}
+
 func FromStrings(namespace, name string) string {
 	return fmt.Sprintf("%s:%s", namespace, name)
 }
