@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
@@ -66,7 +67,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 
 	if samlp.hasLdapGroupSearch() {
-		samlp.ldapProvider = ldap.Configure(ctx, mgmtCtx, userMGR, tokenMGR, name)
+		remoteConfig := ldap.NewRemoteConfig(mgmtCtx.Management.AuthConfigs(""))
+		// TODO Is there a config source where it would be sensible to put expireAfter?
+		expireAfter := time.Minute * 5
+		cachedConfig := ldap.NewCachedConfig(remoteConfig, expireAfter)
+		samlp.ldapProvider = ldap.Configure(ctx, mgmtCtx, userMGR, tokenMGR, name, cachedConfig)
 	}
 
 	SamlProviders[name] = samlp

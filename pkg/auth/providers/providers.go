@@ -80,7 +80,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	remoteConfig := ldap.NewRemoteConfig(mgmt.Management.AuthConfigs(""))
 	// TODO Is there a config source where it would be sensible to put expireAfter?
 	expireAfter := time.Minute * 5
-	cachedConfig := NewCachedConfig(remoteConfig, expireAfter)
+	cachedConfig := ldap.NewCachedConfig(remoteConfig, expireAfter)
 	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.OpenLdapName, cachedConfig)
 	ProviderNames[ldap.OpenLdapName] = true
 	providers[ldap.OpenLdapName] = p
