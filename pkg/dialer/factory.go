@@ -22,15 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-type nodeNotFound struct {
-	error
-}
-
-func IsNodeNotFound(err error) bool {
-	_, ok := err.(nodeNotFound)
-	return ok
-}
-
 func NewFactory(apiContext *config.ScaledContext) (*Factory, error) {
 	authorizer := tunnelserver.NewAuthorizer(apiContext)
 	tunneler := tunnelserver.NewTunnelServer(authorizer)
@@ -282,7 +273,7 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 		return dialer.Dialer(d), nil
 	}
 
-	return nil, nodeNotFound{error: fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)}
+	return nil, fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)
 }
 
 func machineSessionKey(machine *v3.Node) string {
