@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/management/k3supgrade"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/types/image"
@@ -77,7 +78,7 @@ func run(systemChartPath string, imagesFromArgs []string) error {
 		data.K8sVersionInfo,
 	)
 
-	k3sUpgradeImages := getK3sUpgradeImages(data.K3S)
+	k3sUpgradeImages := getK3sUpgradeImages(rancherVersion, data.K3S)
 
 	targetImages, err := img.GetImages(systemChartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
 	if err != nil {
@@ -220,16 +221,53 @@ func getWindowsAgentImage() string {
 	return fmt.Sprintf("%s/rancher-agent:%s", repo, tag)
 }
 
-func getK3sUpgradeImages(k3sData map[string]interface{}) []string {
+// getK3sUpgradeImages returns k3s-upgrade images for every k3s release that supports
+// current rancher version
+func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) []string {
 	k3sImages := make([]string, 0)
 	imageFormat := "rancher/k3s-upgrade:%s"
-	channels, _ := k3sData["channels"].([]interface{})
-	for _, channel := range channels {
-		channelMap, _ := channel.(map[string]interface{})
-		if version, _ := channelMap["latest"].(string); version != "" {
-			version = strings.Replace(version, "+", "-", -1)
-			k3sImages = append(k3sImages, fmt.Sprintf(imageFormat, version))
+	releases, _ := k3sData["releases"].([]interface{})
+	for _, channel := range releases {
+		releaseMap, _ := channel.(map[string]interface{})
+		version, _ := releaseMap["version"].(string)
+		if version == "" {
+			continue
 		}
+
+		if rancherVersion != "dev" {
+			maxVersion, _ := releaseMap["maxChannelServerVersion"].(string)
+			maxVersion = strings.TrimPrefix(maxVersion, "v")
+			if maxVersion == "" {
+				continue
+			}
+			minVersion, _ := releaseMap["minChannelServerVersion"].(string)
+			minVersion = strings.Trim(minVersion, "v")
+			if minVersion == "" {
+				continue
+			}
+
+			versionGTMin, err := k3supgrade.IsNewerVersion(minVersion, rancherVersion)
+			if err != nil {
+				continue
+			}
+			if rancherVersion != minVersion && !versionGTMin {
+				// rancher version not equal to or greater than minimum supported rancher version
+				continue
+			}
+
+			versionLTMax, err := k3supgrade.IsNewerVersion(rancherVersion, maxVersion)
+			if err != nil {
+				continue
+			}
+			if rancherVersion != maxVersion && !versionLTMax {
+				// rancher version not equal to or greater than maximum supported rancher version
+				continue
+			}
+		}
+
+		version = strings.Replace(version, "+", "-", -1)
+		k3sImages = append(k3sImages, fmt.Sprintf(imageFormat, version))
+
 	}
 	return k3sImages
 }
