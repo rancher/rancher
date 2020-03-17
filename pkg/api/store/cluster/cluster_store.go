@@ -32,6 +32,7 @@ import (
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
+	rkedefaults "github.com/rancher/rke/cluster"
 	rkeservices "github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -679,8 +680,8 @@ func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
 			upgradeStrategy = oldUpgradeStrategy
 		} else {
 			upgradeStrategy = &v3.NodeUpgradeStrategy{
-				MaxUnavailableWorker:       "10%",
-				MaxUnavailableControlplane: "1",
+				MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
+				MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
 				Drain:                      false,
 			}
 		}
@@ -688,16 +689,21 @@ func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
 		return nil
 	}
 	upgradeStrategyMap := convert.ToMapInterface(upgradeStrategy)
-	if control, ok := upgradeStrategyMap["maxUnavailableControlplane"]; ok {
+	if control, ok := upgradeStrategyMap["maxUnavailableControlplane"]; ok && control != "" {
 		if err := validateUnavailable(convert.ToString(control)); err != nil {
 			return fmt.Errorf("maxUnavailableControlplane is invalid: %v", err)
 		}
+	} else {
+		values.PutValue(newData, rkedefaults.DefaultMaxUnavailableControlplane, "rancherKubernetesEngineConfig", "upgradeStrategy", "maxUnavailableControlplane")
 	}
-	if worker, ok := upgradeStrategyMap["maxUnavailableWorker"]; ok {
+	if worker, ok := upgradeStrategyMap["maxUnavailableWorker"]; ok && worker != "" {
 		if err := validateUnavailable(convert.ToString(worker)); err != nil {
 			return fmt.Errorf("maxUnavailableWorker is invalid: %v", err)
 		}
+	} else {
+		values.PutValue(newData, rkedefaults.DefaultMaxUnavailableWorker, "rancherKubernetesEngineConfig", "upgradeStrategy", "maxUnavailableWorker")
 	}
+
 	nodeDrainInput := upgradeStrategyMap["nodeDrainInput"]
 	if nodeDrainInput == nil {
 		oldDrainInput := convert.ToMapInterface(oldUpgradeStrategy)["nodeDrainInput"]
