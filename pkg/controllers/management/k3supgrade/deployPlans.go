@@ -154,12 +154,19 @@ func cmp(a, b planv1.Plan) bool {
 func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, workerPlan planv1.Plan) (*v3.Cluster, error) {
 
 	// implement a simple state machine
-	// NotUpgraded => MasterPlanUpgrading || WorkerPlanUpgrading =>  NotUpgraded
+	// UpgradedTrue => GenericUpgrading =>  MasterPlanUpgrading || WorkerPlanUpgrading =>  UpgradedTrue
 
 	if masterPlan.Name == "" && workerPlan.Name == "" {
-		v3.ClusterConditionUpgraded.Unknown(cluster)
-		v3.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
-		return h.clusterClient.Update(cluster)
+		// enter upgrading state
+		if v3.ClusterConditionUpgraded.IsTrue(cluster) {
+			v3.ClusterConditionUpgraded.Unknown(cluster)
+			v3.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
+			return h.clusterClient.Update(cluster)
+		}
+		if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+			// remain in upgrading state if we are passed empty plans
+			return cluster, nil
+		}
 	}
 
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
