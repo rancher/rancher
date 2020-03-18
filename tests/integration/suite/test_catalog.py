@@ -320,3 +320,16 @@ def test_invalid_catalog_charts(admin_mc, remove_resource):
     client.delete(catalog)
     wait_for_template_to_be_deleted(client, name)
     assert not client.list_catalog(name=name).data
+
+
+def test_refresh_catalog_access(admin_mc, user_mc):
+    """Tests that a user with standard access is not
+    able to refresh a catalog.
+    """
+    catalog = admin_mc.client.by_id_catalog("library")
+    out = admin_mc.client.action(obj=catalog, action_name="refresh")
+    assert out['catalogs'][0] == "library"
+
+    with pytest.raises(ApiError) as e:
+        user_mc.client.action(obj=catalog, action_name="refresh")
+    assert e.value.error.status == 404

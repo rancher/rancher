@@ -70,6 +70,10 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 
 	switch apiContext.Type {
 	case mgmtv3client.ClusterLoggingType:
+		if !canPerformAction(apiContext, mgmtv3.ClusterLoggingGroupVersionKind.Group, mgmtv3.ClusterLoggingResource.Name) {
+			return httperror.NewAPIError(httperror.NotFound, "not found")
+		}
+
 		var input mgmtv3.ClusterTestInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
@@ -87,6 +91,10 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 		outputTags = input.OutputTags
 
 	case mgmtv3client.ProjectLoggingType:
+		if !canPerformAction(apiContext, mgmtv3.ProjectLoggingGroupVersionKind.Group, mgmtv3.ProjectLoggingResource.Name) {
+			return httperror.NewAPIError(httperror.NotFound, "not found")
+		}
+
 		var input mgmtv3.ProjectTestInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
@@ -303,4 +311,11 @@ type streamHandler struct {
 
 func addCertPrefixPath(certDir, file string) string {
 	return path.Join(certDir, file)
+}
+
+func canPerformAction(apiContext *types.APIContext, groupName, resourceName string) bool {
+	alertObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	return apiContext.AccessControl.CanDo(groupName, resourceName, "create", apiContext, alertObj, apiContext.Schema) == nil
 }
