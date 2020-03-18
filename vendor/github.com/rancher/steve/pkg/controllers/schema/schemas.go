@@ -97,6 +97,19 @@ func (h *handler) queueRefresh() {
 	}()
 }
 
+func isListOrGetable(schema *types.APISchema) bool {
+	for _, verb := range attributes.Verbs(schema) {
+		switch verb {
+		case "list":
+			return true
+		case "get":
+			return true
+		}
+	}
+
+	return false
+}
+
 func isListWatchable(schema *types.APISchema) bool {
 	var (
 		canList  bool
@@ -119,7 +132,7 @@ func (h *handler) getColumns(ctx context.Context, schemas map[string]*types.APIS
 	eg := errgroup.Group{}
 
 	for _, schema := range schemas {
-		if !isListWatchable(schema) {
+		if !isListOrGetable(schema) {
 			continue
 		}
 
