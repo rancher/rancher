@@ -421,15 +421,26 @@ func (uh *upgradeHandler) restore(cluster *v3.Cluster) error {
 		return err
 	}
 
-	clusterCopy := cluster.DeepCopy()
-	clusterCopy.Annotations[clusterprovisioner.RkeRestoreAnnotation] = "false"
-	if _, err := uh.clusters.Update(clusterCopy); err != nil {
+	toUpdate := getRestoredCluster(cluster.DeepCopy())
+	if _, err := uh.clusters.Update(toUpdate); err != nil {
 		if !errors.IsConflict(err) {
 			return err
 		}
 		return uh.retryClusterUpdate(cluster.Name)
 	}
 	return nil
+}
+
+func getRestoredCluster(cluster *v3.Cluster) *v3.Cluster {
+	cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] = "false"
+
+	// if restore's for a cluster stuck in upgrading, update it as upgraded
+	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+		v3.ClusterConditionUpgraded.True(cluster)
+		v3.ClusterConditionUpgraded.Message(cluster, "restored worker nodes")
+	}
+
+	return cluster
 }
 
 func (uh *upgradeHandler) retryClusterUpdate(name string) error {
@@ -446,9 +457,7 @@ func (uh *upgradeHandler) retryClusterUpdate(name string) error {
 			return false, err
 		}
 		if cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] != "false" {
-			cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] = "false"
-
-			_, err = uh.clusters.Update(cluster)
+			_, err = uh.clusters.Update(getRestoredCluster(cluster))
 			if err != nil {
 				logrus.Debugf("cluster [%s] restore: error resetting restore annotation %v", cluster.Name, err)
 				if errors.IsConflict(err) {
