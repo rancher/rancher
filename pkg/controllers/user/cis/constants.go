@@ -7,6 +7,8 @@ const (
 	RetryIntervalInMilliseconds       = 100
 	ConfigFileName                    = "config.json"
 	CurrentBenchmarkKey               = "current"
+	ManualScanPrefix                  = "cis-"
+	ScheduledScanPrefix               = "ss-cis-"
 
 	creatorIDAnno = "field.cattle.io/creatorId"
 )
