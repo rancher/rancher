@@ -52,6 +52,9 @@ func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
+	if !canUpdateCatalog(apiContext, v3.CatalogGroupVersionKind.Group, v3.CatalogResource.Name) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 
 	catalogs := []v3.Catalog{}
 	if apiContext.ID != "" {
@@ -129,6 +132,9 @@ func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
+	if !canUpdateCatalog(apiContext, v3.ProjectCatalogGroupVersionKind.Group, v3.ProjectCatalogResource.Name) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 
 	prjCatalogs := []v3.ProjectCatalog{}
 	if apiContext.ID != "" {
@@ -167,6 +173,9 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
+	if !canUpdateCatalog(apiContext, v3.ClusterCatalogGroupVersionKind.Group, v3.ClusterCatalogResource.Name) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 
 	clCatalogs := []v3.ClusterCatalog{}
 	if apiContext.ID != "" {
@@ -199,4 +208,11 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	}
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
+}
+
+func canUpdateCatalog(apiContext *types.APIContext, groupName, resourceName string) bool {
+	catObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	return apiContext.AccessControl.CanDo(groupName, resourceName, "update", apiContext, catObj, apiContext.Schema) == nil
 }

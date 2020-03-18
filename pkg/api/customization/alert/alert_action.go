@@ -36,6 +36,10 @@ func GroupFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 func (h *Handler) ClusterAlertRuleActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+	if !canUpdateAlert(request, v3.ClusterAlertRuleGroupVersionKind.Group, v3.ClusterAlertRuleResource.Name) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
+
 	parts := strings.Split(request.ID, ":")
 	ns := parts[0]
 	id := parts[1]
@@ -91,6 +95,10 @@ func (h *Handler) ClusterAlertRuleActionHandler(actionName string, action *types
 }
 
 func (h *Handler) ProjectAlertRuleActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+	if !canUpdateAlert(request, v3.ProjectAlertRuleGroupVersionKind.Group, v3.ProjectAlertRuleResource.Name) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
+
 	parts := strings.Split(request.ID, ":")
 	ns := parts[0]
 	id := parts[1]
@@ -143,4 +151,11 @@ func (h *Handler) ProjectAlertRuleActionHandler(actionName string, action *types
 	}
 	request.WriteResponse(http.StatusOK, data)
 	return nil
+}
+
+func canUpdateAlert(apiContext *types.APIContext, groupName, resourceName string) bool {
+	alertObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	return apiContext.AccessControl.CanDo(groupName, resourceName, "update", apiContext, alertObj, apiContext.Schema) == nil
 }
