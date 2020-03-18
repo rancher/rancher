@@ -172,6 +172,9 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 }
 
 func (uh *upgradeHandler) updateNodePlan(node *v3.Node, cluster *v3.Cluster, create bool) (*v3.Node, error) {
+	if node.Status.NodeConfig == nil {
+		return node, nil
+	}
 	nodePlan, err := uh.getNodePlan(node, cluster)
 	if err != nil {
 		return nil, fmt.Errorf("getNodePlan error for node [%s]: %v", node.Name, err)
