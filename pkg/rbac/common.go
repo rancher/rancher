@@ -4,8 +4,16 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
+)
+
+const (
+	NamespaceID = "namespaceId"
+	ProjectID   = "projectId"
+	ClusterID   = "clusterId"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -66,4 +74,25 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 		Kind:      kind,
 		Name:      name,
 	}, nil
+}
+
+// Returns object with available information to check against users permissions, used in combination with CanDo
+func ObjFromContext(apiContext *types.APIContext, resource *types.RawResource) map[string]interface{} {
+	var obj map[string]interface{}
+	if resource != nil && resource.Values["id"] != nil {
+		obj = resource.Values
+	}
+	if obj == nil {
+		obj = map[string]interface{}{
+			"id": apiContext.ID,
+		}
+		// collection endpoint without id needs to know which cluster-namespace for rbac check
+		if apiContext.Query.Get(ClusterID) != "" {
+			obj[NamespaceID] = apiContext.Query.Get(ClusterID)
+		}
+		if apiContext.Query.Get(ProjectID) != "" {
+			_, obj[NamespaceID] = ref.Parse(apiContext.Query.Get(ProjectID))
+		}
+	}
+	return obj
 }

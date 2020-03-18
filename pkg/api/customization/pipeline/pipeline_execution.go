@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	client "github.com/rancher/types/client/project/v3"
@@ -31,11 +32,13 @@ type ExecutionHandler struct {
 }
 
 func (h *ExecutionHandler) ExecutionFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	if e := convert.ToString(resource.Values[executionStateField]); utils.IsFinishState(e) {
-		resource.AddAction(apiContext, actionRerun)
-	}
-	if e := convert.ToString(resource.Values[executionStateField]); !utils.IsFinishState(e) {
-		resource.AddAction(apiContext, actionStop)
+	if canUpdatePipelineExecution(apiContext, resource) {
+		if e := convert.ToString(resource.Values[executionStateField]); utils.IsFinishState(e) {
+			resource.AddAction(apiContext, actionRerun)
+		}
+		if e := convert.ToString(resource.Values[executionStateField]); !utils.IsFinishState(e) {
+			resource.AddAction(apiContext, actionStop)
+		}
 	}
 	resource.Links[linkLog] = apiContext.URLBuilder.Link(linkLog, resource)
 }
@@ -50,6 +53,9 @@ func (h *ExecutionHandler) LinkHandler(apiContext *types.APIContext, next types.
 }
 
 func (h *ExecutionHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	if !canUpdatePipelineExecution(apiContext, nil) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 	switch actionName {
 	case actionRerun:
 		return h.rerun(apiContext)
@@ -126,4 +132,11 @@ func (h *ExecutionHandler) stop(apiContext *types.APIContext) error {
 		return err
 	}
 	return nil
+}
+
+func canUpdatePipelineExecution(apiContext *types.APIContext, resource *types.RawResource) bool {
+	obj := rbac.ObjFromContext(apiContext, resource)
+	return apiContext.AccessControl.CanDo(
+		v3.PipelineExecutionGroupVersionKind.Group, v3.PipelineExecutionResource.Name, "update", apiContext, obj, apiContext.Schema,
+	) == nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/cluster/v3"
@@ -64,6 +65,11 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	if err != nil {
 		return err
 	}
+
+	if !canUpdateNS(apiContext, nil) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
+
 	switch actionName {
 	case "move":
 		clusterID := w.ClusterManager.ClusterName(apiContext)
@@ -115,8 +121,15 @@ func NewFormatter(next types.Formatter) types.Formatter {
 			next(request, resource)
 		}
 		annotations := convert.ToMapInterface(resource.Values["annotations"])
-		if convert.ToString(annotations[helm.AppIDsLabel]) == "" {
+		canUpdate := canUpdateNS(request, resource)
+		if canUpdate && convert.ToString(annotations[helm.AppIDsLabel]) == "" {
 			resource.AddAction(request, "move")
 		}
 	}
+}
+
+func canUpdateNS(apiContext *types.APIContext, resource *types.RawResource) bool {
+	obj := rbac.ObjFromContext(apiContext, resource)
+	// the user must have * permissions on namespace, the create-ns role alone won't return true here
+	return apiContext.AccessControl.CanDo("", "namespaces", "update", apiContext, obj, apiContext.Schema) == nil
 }

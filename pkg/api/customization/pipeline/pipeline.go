@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	client "github.com/rancher/types/client/project/v3"
@@ -40,8 +41,12 @@ type Handler struct {
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, actionRun)
-	resource.AddAction(apiContext, actionPushConfig)
+	if canCreatePipelineExecutionFromPipeline(apiContext, resource) {
+		resource.AddAction(apiContext, actionRun)
+	}
+	if canUpdatePipeline(apiContext, resource) {
+		resource.AddAction(apiContext, actionPushConfig)
+	}
 	resource.Links[linkConfigs] = apiContext.URLBuilder.Link(linkConfigs, resource)
 	resource.Links[linkYaml] = apiContext.URLBuilder.Link(linkYaml, resource)
 	resource.Links[linkBranches] = apiContext.URLBuilder.Link(linkBranches, resource)
@@ -65,8 +70,14 @@ func (h *Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHa
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	switch actionName {
 	case actionRun:
+		if !canCreatePipelineExecutionFromPipeline(apiContext, nil) {
+			return httperror.NewAPIError(httperror.NotFound, "not found")
+		}
 		return h.run(apiContext)
 	case actionPushConfig:
+		if !canUpdatePipeline(apiContext, nil) {
+			return httperror.NewAPIError(httperror.NotFound, "not found")
+		}
 		return h.pushConfig(apiContext)
 	}
 	return httperror.NewAPIError(httperror.InvalidAction, "unsupported action")
@@ -523,4 +534,28 @@ func (h *Handler) getPipelineConfigs(pipeline *v3.Pipeline, branch string) (map[
 	}
 
 	return m, nil
+}
+
+func canUpdatePipeline(apiContext *types.APIContext, resource *types.RawResource) bool {
+	obj := rbac.ObjFromContext(apiContext, resource)
+	return apiContext.AccessControl.CanDo(
+		v3.PipelineGroupVersionKind.Group, v3.PipelineResource.Name, "update", apiContext, obj, apiContext.Schema,
+	) == nil
+}
+
+// This checks ability to execute pipeline from pipeline obj, not pipelineExecution obj
+// Uses the project ID from the pipeline obj to check create permissions on executions in that NS
+func canCreatePipelineExecutionFromPipeline(apiContext *types.APIContext, resource *types.RawResource) bool {
+	obj := make(map[string]interface{})
+	if resource != nil {
+		obj[rbac.NamespaceID], _ = ref.Parse(resource.ID)
+	} else {
+		obj[rbac.NamespaceID], _ = ref.Parse(apiContext.ID)
+	}
+	if val, ok := obj[rbac.NamespaceID]; !ok || val == "" {
+		return false
+	}
+	return apiContext.AccessControl.CanDo(
+		v3.PipelineExecutionGroupVersionKind.Group, v3.PipelineExecutionResource.Name, "create", apiContext, obj, apiContext.Schema,
+	) == nil
 }

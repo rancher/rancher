@@ -178,14 +178,14 @@ def test_statefulset_workload_volumemount_subpath(admin_pc):
     # 1. validate volumeMounts.subPath when workload creating
     # invalid volumeMounts.subPath: absolute path
     with pytest.raises(ApiError) as e:
-            client.create_workload(name=name,
-                                   namespaceId='default',
-                                   scale=1,
-                                   containers=containers_one,
-                                   statefulSetConfig=statefulSetConfig,
-                                   volumes=volumes)
+        client.create_workload(name=name,
+                               namespaceId='default',
+                               scale=1,
+                               containers=containers_one,
+                               statefulSetConfig=statefulSetConfig,
+                               volumes=volumes)
 
-            assert e.value.error.status == 422
+        assert e.value.error.status == 422
 
     # invalid volumeMounts.subPath: contains '..'
     with pytest.raises(ApiError) as e:
