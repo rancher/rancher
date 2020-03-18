@@ -1,7 +1,11 @@
 import pytest
 import time
+from rancher import ApiError
 from .pipeline_common import MockGithub
-from .conftest import ProjectContext, rancher
+from .conftest import ProjectContext, rancher, \
+    wait_until_available, user_project_client
+from .common import random_str
+
 
 MOCK_GITHUB_PORT = 4016
 MOCK_GITHUB_HOST = "localhost:4016"
@@ -133,6 +137,33 @@ def test_pipeline_github_log_in_out(admin_pc, mock_github):
     gh_provider.login(code='test_code')
     creds = client.list_source_code_credential()
     assert len(creds) == 1
+
+
+def test_pipeline_run_access(admin_mc, admin_pc, user_mc, remove_resource):
+    """Tests that a user with read-only access is not
+    able to run a pipeline.
+    """
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_mc.user.id,
+        projectId=admin_pc.project.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb)
+
+    pipeline = admin_pc.client.create_pipeline(
+        projectId=admin_pc.project.id,
+        repositoryUrl="https://github.com/rancher/pipeline-example-go.git",
+        name=random_str(),
+    )
+    remove_resource(pipeline)
+    wait_until_available(admin_pc.client, pipeline)
+
+    # ensure user can get pipeline, then run should fail
+    proj_user_client = user_project_client(user_mc, admin_pc.project)
+    wait_until_available(proj_user_client, pipeline)
+    with pytest.raises(ApiError) as e:
+        user_mc.client.action(obj=pipeline, action_name="run", branch="master")
+    assert e.value.error.status == 404
 
 
 def set_up_pipeline_github(user_pc):
