@@ -64,6 +64,16 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	if err != nil {
 		return err
 	}
+
+	nsObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	// note that the user must have * permissions on namespace, the create-ns role alone won't return true here
+	canUpdateNS := apiContext.AccessControl.CanDo("", "namespaces", "update", apiContext, nsObj, apiContext.Schema) == nil
+	if !canUpdateNS {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
+
 	switch actionName {
 	case "move":
 		clusterID := w.ClusterManager.ClusterName(apiContext)

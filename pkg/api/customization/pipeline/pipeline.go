@@ -62,6 +62,16 @@ func (h *Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHa
 }
 
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	plObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	canExecutePipeline := apiContext.AccessControl.CanDo(
+		v3.PipelineExecutionGroupVersionKind.Group, v3.PipelineExecutionResource.Name, "create", apiContext, plObj, apiContext.Schema,
+	) == nil
+	if !canExecutePipeline {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
+
 	switch actionName {
 	case actionRun:
 		return h.run(apiContext)
