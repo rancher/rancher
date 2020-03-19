@@ -91,7 +91,7 @@ func (c *client) Login(code string) (*v3.SourceCodeCredential, error) {
 	token, err := gitlabOauthConfig.Exchange(oauth2.NoContext, code)
 	if err != nil {
 		return nil, err
-	} else if token.TokenType != "bearer" || token.AccessToken == "" {
+	} else if strings.ToLower(token.TokenType) != "bearer" || token.AccessToken == "" {
 		return nil, fmt.Errorf("Fail to get accesstoken with oauth config")
 	}
 	return c.GetAccount(token.AccessToken)
