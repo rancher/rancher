@@ -964,9 +964,9 @@ func (r *Store) validateUnavailableNodes(data, existingData map[string]interface
 		return fmt.Errorf("error getting cluster, try again %v", err)
 	}
 	// no need to validate if cluster's already provisioning or upgrading
-	if v3.ClusterConditionProvisioned.IsUnknown(cluster) ||
-		v3.ClusterConditionUpgraded.IsUnknown(cluster) ||
-		v3.ClusterConditionUpdated.IsUnknown(cluster) {
+	if !v3.ClusterConditionProvisioned.IsTrue(cluster) ||
+		!v3.ClusterConditionUpdated.IsTrue(cluster) ||
+		v3.ClusterConditionUpgraded.IsUnknown(cluster) {
 		return nil
 	}
 	spec, err := getRkeConfig(data)
