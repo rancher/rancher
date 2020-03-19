@@ -260,17 +260,19 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 	upgradeStrategy := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy
 	toDrain := upgradeStrategy.Drain
 
-	toPrepareMap, toProcessMap, upgradedMap, notReadyMap, filtered, upgrading, done := uh.filterNodes(nodes, cluster.Status.NodeVersion, toDrain)
+	// get current upgrade status of nodes
+	status := uh.filterNodes(nodes, cluster.Status.NodeVersion, toDrain)
 
-	maxAllowed, err := CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableWorker, filtered)
+	maxAllowed, err := CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableWorker, status.filtered)
 	if err != nil {
 		return err
 	}
 
 	logrus.Debugf("cluster [%s] worker-upgrade: workerNodeInfo: nodes %v maxAllowed %v upgrading %v notReady %v "+
-		"toProcess %v toPrepare %v done %v", cluster.Name, filtered, maxAllowed, upgrading, len(notReadyMap), keys(toProcessMap), keys(toPrepareMap), keys(upgradedMap))
+		"toProcess %v toPrepare %v done %v", cluster.Name, status.filtered, maxAllowed, status.upgrading,
+		keys(status.notReady), keys(status.toProcess), keys(status.toPrepare), keys(status.upgraded))
 
-	for name, node := range upgradedMap {
+	for _, node := range status.upgraded {
 		if v3.NodeConditionUpgraded.IsTrue(node) {
 			continue
 		}
@@ -279,16 +281,18 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 			return err
 		}
 
-		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to uncordon", clusterName, name)
+		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to uncordon", clusterName, node.Name)
 	}
 
-	if len(notReadyMap) > maxAllowed {
-		return fmt.Errorf("cluster [%s] worker-upgrade: not enough nodes to upgrade: nodes %v notReady %v maxUnavailable %v", clusterName, filtered, keys(notReadyMap), maxAllowed)
+	notReady := len(status.notReady)
+	if notReady > maxAllowed {
+		return fmt.Errorf("cluster [%s] worker-upgrade: not enough nodes to upgrade: nodes %v notReady %v maxUnavailable %v",
+			clusterName, status.filtered, keys(status.notReady), maxAllowed)
 	}
 
-	if len(notReadyMap) > 0 {
+	if notReady > 0 {
 		// update plan for unavailable nodes
-		for name, node := range notReadyMap {
+		for _, node := range status.notReady {
 			if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
 				continue
 			}
@@ -297,18 +301,20 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 				return err
 			}
 
-			logrus.Infof("cluster [%s] worker-upgrade: updated upgrading unavailable node [%s] with version %v", clusterName, name, cluster.Status.NodeVersion)
+			logrus.Infof("cluster [%s] worker-upgrade: updated upgrading unavailable node [%s] with version %v",
+				clusterName, node.Name, cluster.Status.NodeVersion)
 
 		}
 	}
 
-	unavailable := upgrading + len(notReadyMap)
+	unavailable := status.upgrading + notReady
 
 	if unavailable > maxAllowed {
-		return fmt.Errorf("cluster [%s] worker-upgrade: more than allowed nodes upgrading for cluster: unavailable %v maxUnavailable %v", clusterName, unavailable, maxAllowed)
+		return fmt.Errorf("cluster [%s] worker-upgrade: more than allowed nodes upgrading for cluster: unavailable %v maxUnavailable %v",
+			clusterName, unavailable, maxAllowed)
 	}
 
-	for _, node := range toProcessMap {
+	for _, node := range status.toProcess {
 		if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
 			continue
 		}
@@ -327,7 +333,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 		state = "drain"
 	}
 
-	for _, node := range toPrepareMap {
+	for _, node := range status.toPrepare {
 		if unavailable == maxAllowed {
 			break
 		}
@@ -340,8 +346,8 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to %s", clusterName, node.Name, state)
 	}
 
-	if done == filtered {
-		logrus.Debugf("cluster [%s] worker-upgrade: cluster is done upgrading, done %v len(nodes) %v", clusterName, done, filtered)
+	if status.done == status.filtered {
+		logrus.Debugf("cluster [%s] worker-upgrade: cluster is done upgrading, done %v len(nodes) %v", clusterName, status.done, status.filtered)
 		if !v3.ClusterConditionUpgraded.IsTrue(cluster) {
 			clusterCopy := cluster.DeepCopy()
 			v3.ClusterConditionUpgraded.True(clusterCopy)
@@ -474,6 +480,14 @@ func (uh *upgradeHandler) retryClusterUpdate(name string) error {
 
 }
 
+func keys(nodes []*v3.Node) []string {
+	keys := make([]string, len(nodes))
+	for _, node := range nodes {
+		keys = append(keys, node.Name)
+	}
+	return keys
+}
+
 func CalculateMaxUnavailable(maxUnavailable string, nodes int) (int, error) {
 	parsedMax := intstr.Parse(maxUnavailable)
 	maxAllowed, err := intstr.GetValueFromIntOrPercent(&parsedMax, nodes, false)
@@ -484,12 +498,4 @@ func CalculateMaxUnavailable(maxUnavailable string, nodes int) (int, error) {
 		return maxAllowed, nil
 	}
 	return 1, nil
-}
-
-func keys(m map[string]*v3.Node) []string {
-	k := []string{}
-	for key := range m {
-		k = append(k, key)
-	}
-	return k
 }
