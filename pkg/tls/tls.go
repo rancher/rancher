@@ -16,10 +16,13 @@ import (
 	"github.com/rancher/dynamiclistener/cert"
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/core"
 	corev1controllers "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
-	"k8s.io/apimachinery/pkg/util/net"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -43,6 +46,8 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		return err
 	}
 
+	migrateConfig(restConfig, opts)
+
 	if err := server.ListenAndServe(ctx, httpsPort, httpPort, handler, opts); err != nil {
 		return err
 	}
@@ -54,6 +59,47 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	<-ctx.Done()
 	return ctx.Err()
 
+}
+
+func migrateConfig(restConfig *rest.Config, opts *server.ListenOpts) {
+	defer func() {
+		opts.TLSListenerConfig.MaxSANs += len(opts.TLSListenerConfig.SANs)
+	}()
+
+	c, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return
+	}
+
+	config, err := c.Resource(schema.GroupVersionResource{
+		Group:    "management.cattle.io",
+		Version:  "v3",
+		Resource: "listenconfigs",
+	}).Get("cli-config", metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+
+	known := convert.ToStringSlice(config.Object["knownIps"])
+	for k := range convert.ToMapInterface(config.Object["generatedCerts"]) {
+		if strings.HasPrefix(k, "local/") {
+			continue
+		}
+		known = append(known, k)
+	}
+
+	for _, k := range known {
+		found := false
+		for _, san := range opts.TLSListenerConfig.SANs {
+			if san == k {
+				found = true
+				break
+			}
+		}
+		if !found {
+			opts.TLSListenerConfig.SANs = append(opts.TLSListenerConfig.SANs, k)
+		}
+	}
 }
 
 func SetupListener(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
@@ -100,12 +146,6 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		return "", noCACerts, nil, errors.Wrapf(err, "parsing %s", settings.RotateCertsIfExpiringInDays.Get())
 	}
 
-	sans := []string{"localhost", "127.0.0.1"}
-	ip, err := net.ChooseHostInterface()
-	if err == nil {
-		sans = append(sans, ip.String())
-	}
-
 	opts := &server.ListenOpts{
 		Secrets:       secrets,
 		CAName:        "tls-rancher",
@@ -115,7 +155,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		TLSListenerConfig: dynamiclistener.Config{
 			TLSConfig:             tlsConfig,
 			ExpirationDaysCheck:   expiration,
-			SANs:                  sans,
+			MaxSANs:               6,
 			CloseConnOnCertChange: true,
 		},
 	}
