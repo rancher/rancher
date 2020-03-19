@@ -156,6 +156,7 @@ type ClusterStatus struct {
 	IstioEnabled                         bool                        `json:"istioEnabled,omitempty" norman:"nocreate,noupdate,default=false"`
 	CertificatesExpiration               map[string]CertExpiration   `json:"certificatesExpiration,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty"`
+	CurrentCisRunName                    string                      `json:"currentCisRunName,omitempty"`
 }
 
 type ClusterComponentStatus struct {
