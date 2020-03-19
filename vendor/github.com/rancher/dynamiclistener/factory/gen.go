@@ -81,7 +81,7 @@ func (t *TLS) AddCN(secret *v1.Secret, cn ...string) (*v1.Secret, bool, error) {
 		err error
 	)
 
-	if !NeedsUpdate(secret, cn...) {
+	if !NeedsUpdate(0, secret, cn...) {
 		return secret, false, nil
 	}
 
@@ -137,7 +137,7 @@ func populateCN(secret *v1.Secret, cn ...string) *v1.Secret {
 	return secret
 }
 
-func NeedsUpdate(secret *v1.Secret, cn ...string) bool {
+func NeedsUpdate(maxSANs int, secret *v1.Secret, cn ...string) bool {
 	if secret == nil {
 		return true
 	}
@@ -148,6 +148,9 @@ func NeedsUpdate(secret *v1.Secret, cn ...string) bool {
 
 	for _, cn := range cn {
 		if secret.Annotations[cnPrefix+cn] == "" {
+			if maxSANs > 0 && len(cns(secret)) >= maxSANs {
+				return false
+			}
 			return true
 		}
 	}
