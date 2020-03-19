@@ -71,7 +71,7 @@ func LaunchScan(
 	}
 
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Annotations[v3.RunCisScanAnnotation] = cisScan.Name
+	updatedCluster.Status.CurrentCisRunName = cisScan.Name
 
 	// Can't add either too many retries or longer interval as this an API handler
 	for i := 0; i < NumberOfRetriesForClusterUpdate; i++ {
@@ -89,7 +89,7 @@ func LaunchScan(
 			continue
 		}
 		updatedCluster = cluster.DeepCopy()
-		updatedCluster.Annotations[v3.RunCisScanAnnotation] = cisScan.Name
+		updatedCluster.Status.CurrentCisRunName = cisScan.Name
 	}
 	if err != nil {
 		logrus.Errorf("LaunchScan: error updating cluster annotation for cluster %v: %v", cluster.Name, err)

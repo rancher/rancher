@@ -102,7 +102,7 @@ func ValidateClusterBeforeLaunchingScan(cluster *v3.Cluster) error {
 	if !v3.ClusterConditionReady.IsTrue(cluster) {
 		return fmt.Errorf("cluster not ready")
 	}
-	if _, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok {
+	if cluster.Status.CurrentCisRunName != "" {
 		return fmt.Errorf("CIS scan already running on cluster")
 	}
 	return nil
