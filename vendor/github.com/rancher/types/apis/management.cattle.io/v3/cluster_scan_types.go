@@ -24,7 +24,6 @@ const (
 	DefaultSonobuoyPodName     = "security-scan-runner"
 	ConfigMapNameForUserConfig = "security-scan-cfg"
 
-	RunCisScanAnnotation         = "field.cattle.io/runCisScan"
 	SonobuoyCompletionAnnotation = "field.cattle.io/sonobuoyDone"
 	CisHelmChartOwner            = "field.cattle.io/clusterScanOwner"
 

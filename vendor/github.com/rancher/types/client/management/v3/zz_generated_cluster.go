@@ -28,6 +28,7 @@ const (
 	ClusterFieldConditions                           = "conditions"
 	ClusterFieldCreated                              = "created"
 	ClusterFieldCreatorID                            = "creatorId"
+	ClusterFieldCurrentCisRunName                    = "currentCisRunName"
 	ClusterFieldDefaultClusterRoleForProjectMembers  = "defaultClusterRoleForProjectMembers"
 	ClusterFieldDefaultPodSecurityPolicyTemplateID   = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                          = "description"
@@ -87,6 +88,7 @@ type Cluster struct {
 	Conditions                           []ClusterCondition             `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created                              string                         `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                            string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	CurrentCisRunName                    string                         `json:"currentCisRunName,omitempty" yaml:"currentCisRunName,omitempty"`
 	DefaultClusterRoleForProjectMembers  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityPolicyTemplateID   string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                          string                         `json:"description,omitempty" yaml:"description,omitempty"`
