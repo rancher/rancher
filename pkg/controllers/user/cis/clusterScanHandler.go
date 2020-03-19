@@ -9,10 +9,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
-	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	"github.com/rancher/rke/util"
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	appsv1 "github.com/rancher/types/apis/apps/v1"
 	rcorev1 "github.com/rancher/types/apis/core/v1"
@@ -111,40 +109,24 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
 		currentK8sVersion := cluster.Spec.RancherKubernetesEngineConfig.Version
-		shortK8sVersion := util.GetTagMajorVersion(currentK8sVersion)
-		cisConfigParams, err := kontainerdrivermetadata.GetCisConfigParams(
-			shortK8sVersion,
-			csh.cisConfigLister,
-			csh.cisConfigClient,
-		)
-		if err != nil {
-			logrus.Debugf("cisScanHandler: Create: benchmark version not found for k8s version: %v(%v), using default",
-				currentK8sVersion, shortK8sVersion)
-			cisConfigParams, err = kontainerdrivermetadata.GetCisConfigParams(
-				"default",
-				csh.cisConfigLister,
-				csh.cisConfigClient,
-			)
-			if err != nil {
-				return cs, fmt.Errorf("error fetching default cis config: %v", err)
-			}
+		overrideBenchmarkVersion := ""
+		if cs.Spec.ScanConfig.CisScanConfig != nil {
+			overrideBenchmarkVersion = cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
 		}
-		benchmarkInfo, err := kontainerdrivermetadata.GetCisBenchmarkVersionInfo(
-			cisConfigParams.BenchmarkVersion,
-			csh.cisBenchmarkVersionLister,
-			csh.cisBenchmarkVersionClient,
+		bv, bvManaged, err := GetBenchmarkVersionToUse(overrideBenchmarkVersion, currentK8sVersion,
+			csh.cisConfigLister, csh.cisConfigClient,
+			csh.cisBenchmarkVersionLister, csh.cisBenchmarkVersionClient,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("cisScanHandler: Create: error fetching benchmark version info %v: %v",
-				cisConfigParams.BenchmarkVersion, err)
+			return cs, err
 		}
 		logrus.Debugf("cisScanHandler: Create: k8sVersion: %v, benchmarkVersion: %v",
-			currentK8sVersion, cisConfigParams.BenchmarkVersion)
+			currentK8sVersion, bv)
 		skipOverride := false
 		appInfo := &appInfo{
 			appName:                  cs.Name,
 			clusterName:              cs.Spec.ClusterID,
-			overrideBenchmarkVersion: cisConfigParams.BenchmarkVersion,
+			overrideBenchmarkVersion: bv,
 		}
 		if cs.Spec.ScanConfig.CisScanConfig != nil {
 			if cs.Spec.ScanConfig.CisScanConfig.DebugMaster {
@@ -156,10 +138,12 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 			if cs.Spec.ScanConfig.CisScanConfig.OverrideSkip != nil {
 				skipOverride = true
 			}
-			if cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion != "" {
-				logrus.Debugf("cisScanHandler: Create: user requested overrideBenchmarkVersion: %v",
-					cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion)
-				appInfo.overrideBenchmarkVersion = cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
+		}
+		if bvManaged {
+			appInfo.notApplicableSkipConfigMapName = getNotApplicableConfigMapName(bv)
+			if cs.Spec.ScanConfig.CisScanConfig.Profile == "" ||
+				cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
+				appInfo.defaultSkipConfigMapName = getDefaultSkipConfigMapName(bv)
 			}
 		}
 
@@ -186,18 +170,6 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 		if cm != nil {
 			appInfo.userSkipConfigMapName = cm.Name
-		}
-
-		if benchmarkInfo.Managed {
-			bv := cisConfigParams.BenchmarkVersion
-			if cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion != "" {
-				bv = cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
-			}
-			appInfo.notApplicableSkipConfigMapName = getNotApplicableConfigMapName(bv)
-			if cs.Spec.ScanConfig.CisScanConfig.Profile == "" ||
-				cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
-				appInfo.defaultSkipConfigMapName = getDefaultSkipConfigMapName(bv)
-			}
 		}
 
 		// Deploy the system helm chart
