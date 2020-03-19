@@ -214,7 +214,7 @@ func getValidTemplateName(catalogName, chartName string) string {
 // https://github.com/helm/helm/blob/3582b03a91bb994aa4d33a7bc50de5205f734c7a/pkg/chartutil/create.go
 func getValidTemplateNameWithVersion(templateName, version string) string {
 	label := fmt.Sprintf("%s-%s", templateName, version)
-	label = strings.ReplaceAll(label, "+", "_")
+	label = strings.ReplaceAll(label, "+", "-")
 	label = strings.TrimSuffix(label, "-")
 	return label
 }
