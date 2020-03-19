@@ -206,6 +206,7 @@ func validateCerts(state cluster.State) error {
 			} else {
 				failedErrs = errors.Wrap(failedErrs, fmt.Sprintf("Certificate [%s] is nil", certPKI.Name))
 			}
+			continue
 		}
 
 		certPool := x509.NewCertPool()
@@ -213,8 +214,9 @@ func validateCerts(state cluster.State) error {
 		if _, err := cert.Verify(x509.VerifyOptions{Roots: certPool, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
 			if failedErrs == nil {
 				failedErrs = fmt.Errorf("Certificate [%s] failed verification: %v", certPKI.Name, err)
+			} else {
+				failedErrs = errors.Wrap(failedErrs, fmt.Sprintf("Certificate [%s] failed verification: %v", certPKI.Name, err))
 			}
-			failedErrs = errors.Wrap(failedErrs, fmt.Sprintf("Certificate [%s] failed verification: %v", certPKI.Name, err))
 		}
 	}
 	if failedErrs != nil {
