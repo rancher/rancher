@@ -71,8 +71,15 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", string(obj.UID)); err != nil {
 		return nil, err
 	}
-	err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj)
-	return nil, err
+
+	if err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj); err != nil {
+		return nil, err
+	}
+
+	if err := c.mgr.cisScanRbacHandler.removeCISScanBinding(obj); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
@@ -160,6 +167,11 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 			return err
 		}
 	}
+	//handle cisconfig binding
+	if err := c.mgr.cisScanRbacHandler.ensureCISScanBinding(binding, isOwnerRole); err != nil {
+		return err
+	}
+
 	return nil
 }
 
