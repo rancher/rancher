@@ -63,7 +63,7 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 		return httperror.WrapAPIError(err, httperror.ClusterUnavailable,
 			fmt.Sprintf("cluster not ready"))
 	}
-	if _, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok {
+	if cluster.Status.CurrentCisRunName != "" {
 		return httperror.WrapAPIError(err, httperror.Conflict,
 			fmt.Sprintf("CIS scan already running on cluster"))
 	}

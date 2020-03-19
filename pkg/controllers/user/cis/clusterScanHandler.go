@@ -245,9 +245,9 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 		return nil, fmt.Errorf("cisScanHandler: Remove: error getting cluster %v", err)
 	}
 
-	if owner, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok && owner == cs.Name {
+	if cluster.Status.CurrentCisRunName == cs.Name {
 		updatedCluster := cluster.DeepCopy()
-		delete(updatedCluster.Annotations, v3.RunCisScanAnnotation)
+		updatedCluster.Status.CurrentCisRunName = ""
 		if _, err := csh.clusterClient.Update(updatedCluster); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Remove: failed to update cluster about CIS scan completion")
 		}
@@ -293,7 +293,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 
 		updatedCluster := cluster.DeepCopy()
-		delete(updatedCluster.Annotations, v3.RunCisScanAnnotation)
+		updatedCluster.Status.CurrentCisRunName = ""
 		if _, err := csh.clusterClient.Update(updatedCluster); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Updated: failed to update cluster about CIS scan completion")
 		}
