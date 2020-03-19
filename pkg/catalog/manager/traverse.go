@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -50,7 +51,9 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			return err
 		}
 	}
-	for chart, metadata := range index.IndexFile.Entries {
+
+	entriesWithErrors, entriesToProcess := m.preprocessCatalog(catalog, index.IndexFile.Entries)
+	for chart, metadata := range entriesToProcess {
 		newHelmVersionCommits[chart] = v3.VersionCommits{
 			Value: map[string]string{},
 		}
@@ -158,7 +161,6 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			} else {
 				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s/%s&type=%s&template=%s&version=%s", templateNamespace, catalog.Name, catalogType, template.Spec.FolderName, v.Version)
 			}
-
 			versions = append(versions, v)
 		}
 		var categories []string
@@ -169,7 +171,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		template.Labels = label
 		template.Spec.Categories = categories
 		template.Spec.Versions = versions
-		template.Name = fmt.Sprintf("%s-%s", catalog.Name, template.Spec.FolderName)
+		template.Name = getValidTemplateName(catalog.Name, template.Spec.FolderName)
 		switch catalogType {
 		case client.CatalogType:
 			template.Spec.CatalogID = catalog.Name
@@ -240,7 +242,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	toDeleteChart := []string{}
 	for chart := range catalog.Status.HelmVersionCommits {
 		if _, ok := index.IndexFile.Entries[chart]; !ok {
-			toDeleteChart = append(toDeleteChart, fmt.Sprintf("%s-%s", catalog.Name, chart))
+			toDeleteChart = append(toDeleteChart, getValidTemplateName(catalog.Name, chart))
 		}
 	}
 	// delete non-existing templates
@@ -251,6 +253,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		}
 		deletedTemplates++
 	}
+	failedTemplates = failedTemplates + len(entriesWithErrors)
 	logrus.Infof("Catalog sync done. %v templates created, %v templates updated, %v templates deleted, %v templates failed", createdTemplates, updatedTemplates, deletedTemplates, failedTemplates)
 
 	catalog.Status.HelmVersionCommits = newHelmVersionCommits
@@ -263,8 +266,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	/*conditions need to be set here to stop templates from updating
 	each time when they have no changes
 	*/
-	v3.CatalogConditionUpgraded.True(catalog)
-	v3.CatalogConditionDiskCached.True(catalog)
+	setTraverseCompleted(catalog)
 	var errstrings []string
 	if len(createErrors) > 0 {
 		errstrings = append(errstrings, fmt.Sprintf("failed to create templates. Multiple error(s) occurred: %v", createErrors))
@@ -272,7 +274,18 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	if len(updateErrors) > 0 {
 		errstrings = append(errstrings, fmt.Sprintf("failed to update templates. Multiple error(s) occurred: %v", updateErrors))
 	}
+	if len(entriesWithErrors) > 0 && len(errstrings) == 0 {
+		invalidChartErrors := processInvalidChartErrors(entriesWithErrors)
+		setCatalogIgnoreErrorState(commit, cmt, catalog, projectCatalog, clusterCatalog, fmt.Sprintf("Error in chart(s): %s", invalidChartErrors))
+		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
+			return err
+		}
+		logrus.Error(fmt.Sprintf("failed to sync templates. Multiple error(s) occured: %v", invalidChartErrors))
+		return &controller.ForgetError{Err: errors.Errorf("failed to sync templates. Multiple error(s) occurred: %v", invalidChartErrors)}
+	}
 	if len(errstrings) > 0 {
+		invalidChartErrors := processInvalidChartErrors(entriesWithErrors)
+		errstrings = append(errstrings, invalidChartErrors)
 		setCatalogErrorState(cmt, catalog, projectCatalog, clusterCatalog)
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
@@ -311,10 +324,10 @@ type catalogYml struct {
 	Labels     map[string]string `yaml:"labels,omitempty"`
 }
 
-func setCatalogErrorState(cmt *CatalogInfo, catalog *v3.Catalog, projectCatalog *v3.ProjectCatalog, clusterCatalog *v3.ClusterCatalog) {
-	v3.CatalogConditionRefreshed.False(catalog)
-	v3.CatalogConditionRefreshed.Message(catalog, fmt.Sprintf("Error syncing catalog %v", catalog.Name))
-	cmt.catalog = catalog
-	cmt.projectCatalog = projectCatalog
-	cmt.clusterCatalog = clusterCatalog
+func processInvalidChartErrors(entriesWithErrors []ChartsWithErrors) string {
+	var invalidChartErrors strings.Builder
+	for _, errorInfo := range entriesWithErrors {
+		fmt.Fprintf(&invalidChartErrors, "%s;", errorInfo.error.Error())
+	}
+	return invalidChartErrors.String()
 }
