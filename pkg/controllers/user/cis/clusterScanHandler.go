@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	appsv1 "github.com/rancher/types/apis/apps/v1"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	rcorev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -45,6 +46,7 @@ type cisScanHandler struct {
 	clusterClient                v3.ClusterInterface
 	clusterLister                v3.ClusterLister
 	projectLister                v3.ProjectLister
+	nodeLister                   corev1.NodeLister
 	appClient                    projv3.AppInterface
 	catalogTemplateVersionLister v3.CatalogTemplateVersionLister
 	clusterScanClient            v3.ClusterScanInterface
@@ -328,6 +330,13 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 		varDebugWorker:                appInfo.debugWorker,
 		varOverrideBenchmarkVersion:   appInfo.overrideBenchmarkVersion,
 	}
+
+	taints, err := csh.collectTaints()
+	if err != nil {
+		return err
+	}
+	appAnswers = labels.Merge(appAnswers, taints)
+
 	logrus.Debugf("cisScanHandler: deployApp: appAnswers: %+v", appAnswers)
 	app := &projv3.App{
 		ObjectMeta: metav1.ObjectMeta{
@@ -350,6 +359,29 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 	}
 
 	return nil
+}
+
+// collectTaints collect all taints on kubernetes nodes except node.kubernetes.io/*
+func (csh *cisScanHandler) collectTaints() (map[string]string, error) {
+	r := map[string]string{}
+	selector := labels.NewSelector()
+	nodes, err := csh.nodeLister.List("", selector)
+	if err != nil {
+		return nil, err
+	}
+
+	index := 0
+	for _, node := range nodes {
+		for _, taint := range node.Spec.Taints {
+			if !strings.HasPrefix(taint.Key, "node.kubernetes.io") {
+				r[fmt.Sprintf("sonobuoy.tolerations[%v].key", index)] = taint.Key
+				r[fmt.Sprintf("sonobuoy.tolerations[%v].operator", index)] = "Exists"
+				r[fmt.Sprintf("sonobuoy.tolerations[%v].effect", index)] = string(taint.Effect)
+				index++
+			}
+		}
+	}
+	return r, nil
 }
 
 func (csh *cisScanHandler) deleteApp(appInfo *appInfo) error {

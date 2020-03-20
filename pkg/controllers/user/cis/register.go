@@ -78,6 +78,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		systemAccountManager:         systemAccountManager,
 		clusterNamespace:             userContext.ClusterName,
 		nsClient:                     nsClient,
+		nodeLister:                   userContext.Core.Nodes("").Controller().Lister(),
 		cmLister:                     cmLister,
 		clusterLister:                clusterLister,
 		projectLister:                projectLister,
