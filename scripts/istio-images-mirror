@@ -32,3 +32,4 @@ quay.io/calico/pod2daemon-flexvol rancher/calico-pod2daemon-flexvol v3.13.0
 us.gcr.io/k8s-artifacts-prod/external-dns/external-dns rancher/kubernetes-external-dns v0.6.0
 quay.io/open-policy-agent/gatekeeper rancher/opa-gatekeeper v3.1.0-beta.7
 k8s.gcr.io/k8s-dns-node-cache rancher/k8s-dns-node-cache 1.15.7
+sonobuoy/sonobuoy rancher/sonobuoy-sonobuoy v0.16.3
