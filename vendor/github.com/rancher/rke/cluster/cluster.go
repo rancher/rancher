@@ -193,16 +193,32 @@ func (c *Cluster) UpgradeControlPlane(ctx context.Context, kubeClient *kubernete
 	if len(notReadyHostNames) > 0 {
 		// attempt upgrade on NotReady hosts without respecting max_unavailable_controlplane
 		logrus.Infof("Attempting upgrade of controlplane components on following hosts in NotReady status: %v", strings.Join(notReadyHostNames, ","))
-		services.RunControlPlane(ctx, notReadyHosts,
+		err = services.RunControlPlane(ctx, notReadyHosts,
 			c.LocalConnDialerFactory,
 			c.PrivateRegistriesMap,
 			cpNodePlanMap,
 			c.UpdateWorkersOnly,
 			c.SystemImages.Alpine,
 			c.Certificates)
+		if err != nil {
+			logrus.Errorf("Failed to upgrade controlplane components on NotReady hosts, error: %v", err)
+		}
+		err = services.RunWorkerPlane(ctx, notReadyHosts,
+			c.LocalConnDialerFactory,
+			c.PrivateRegistriesMap,
+			cpNodePlanMap,
+			c.Certificates,
+			c.UpdateWorkersOnly,
+			c.SystemImages.Alpine)
+		if err != nil {
+			logrus.Errorf("Failed to upgrade worker components on NotReady hosts, error: %v", err)
+		}
 		// Calling CheckNodeReady wil give some time for nodes to get in Ready state
 		for _, host := range notReadyHosts {
-			services.CheckNodeReady(kubeClient, host, services.ControlRole)
+			err = services.CheckNodeReady(kubeClient, host, services.ControlRole)
+			if err != nil {
+				logrus.Errorf("Host %v failed to report Ready status with error: %v", host.HostnameOverride, err)
+			}
 		}
 	}
 	// rolling upgrade respecting maxUnavailable
@@ -294,16 +310,22 @@ func (c *Cluster) UpgradeWorkerPlane(ctx context.Context, kubeClient *kubernetes
 	if len(notReadyHostNames) > 0 {
 		// attempt upgrade on NotReady hosts without respecting max_unavailable_worker
 		logrus.Infof("Attempting upgrade of worker components on following hosts in NotReady status: %v", strings.Join(notReadyHostNames, ","))
-		services.RunWorkerPlane(ctx, notReadyHosts,
+		err = services.RunWorkerPlane(ctx, notReadyHosts,
 			c.LocalConnDialerFactory,
 			c.PrivateRegistriesMap,
 			workerNodePlanMap,
 			c.Certificates,
 			c.UpdateWorkersOnly,
 			c.SystemImages.Alpine)
+		if err != nil {
+			logrus.Errorf("Failed to upgrade worker components on NotReady hosts, error: %v", err)
+		}
 		// Calling CheckNodeReady wil give some time for nodes to get in Ready state
 		for _, host := range notReadyHosts {
-			services.CheckNodeReady(kubeClient, host, services.WorkerRole)
+			err = services.CheckNodeReady(kubeClient, host, services.WorkerRole)
+			if err != nil {
+				logrus.Errorf("Host %v failed to report Ready status with error: %v", host.HostnameOverride, err)
+			}
 		}
 	}
 
