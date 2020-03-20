@@ -163,6 +163,10 @@ func processWorkerPlaneForUpgrade(ctx context.Context, kubeClient *kubernetes.Cl
 				}
 				if !upgradable {
 					logrus.Infof("[workerplane] Upgrade not required for worker components of host %v", runHost.HostnameOverride)
+					if err := k8s.CordonUncordon(kubeClient, runHost.HostnameOverride, false); err != nil {
+						// This node didn't undergo an upgrade, so RKE will only log any error after uncordoning it and won't count this in maxUnavailable
+						logrus.Errorf("[workerplane] Failed to uncordon node %v, error: %v", runHost.HostnameOverride, err)
+					}
 					continue
 				}
 				if err := upgradeWorkerHost(ctx, kubeClient, runHost, upgradeStrategy.Drain, drainHelper, localConnDialerFactory, prsMap, workerNodePlanMap, certMap, updateWorkersOnly, alpineImage); err != nil {
