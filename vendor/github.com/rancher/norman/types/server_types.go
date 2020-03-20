@@ -174,6 +174,16 @@ func (r *APIContext) Filter(opts *QueryOptions, schema *Schema, obj interface{})
 	return nil
 }
 
+type Expire interface {
+	Expire(apiContext *APIContext, schema *Schema)
+}
+
+func (r *APIContext) ExpireAccessControl(schema *Schema) {
+	if e, ok := r.AccessControl.(Expire); ok {
+		e.Expire(r, schema)
+	}
+}
+
 var (
 	ASC  = SortOrder("asc")
 	DESC = SortOrder("desc")
