@@ -20,6 +20,16 @@ func newContextBased(lookup contextLookup) types.AccessControl {
 	}
 }
 
+func (c *contextBased) Expire(apiContext *types.APIContext, schema *types.Schema) {
+	ac, ok := c.lookup(apiContext)
+	if !ok {
+		return
+	}
+	if e, ok := ac.(types.Expire); ok {
+		e.Expire(apiContext, schema)
+	}
+}
+
 func (c *contextBased) CanCreate(apiContext *types.APIContext, schema *types.Schema) error {
 	ac, ok := c.lookup(apiContext)
 	if ok {
