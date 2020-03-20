@@ -32,7 +32,9 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
-		addRule().apiGroups("*").resources("secrets").verbs("create")
+		addRule().apiGroups("*").resources("secrets").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch")
 
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
@@ -83,7 +85,9 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
