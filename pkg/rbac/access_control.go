@@ -2,7 +2,6 @@ package rbac
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/features"
@@ -15,10 +14,6 @@ func NewAccessControl(ctx context.Context, clusterName string, rbacClient v1.Int
 	return NewAccessControlWithASL(clusterName, rbacClient, asl)
 }
 
-func isSubscribe(ctx *types.APIContext) bool {
-	return ctx.Request.Method == http.MethodGet && ctx.Type == "subscribe"
-}
-
 func NewAccessControlWithASL(clusterName string, rbacClient v1.Interface, asl accesscontrol.AccessSetLookup) types.AccessControl {
 	return newContextBased(func(ctx *types.APIContext) (types.AccessControl, bool) {
 		cache, ok := ctx.Request.Context().Value(contextKey{}).(*accessControlCache)
@@ -26,21 +21,19 @@ func NewAccessControlWithASL(clusterName string, rbacClient v1.Interface, asl ac
 			return nil, false
 		}
 
-		if !isSubscribe(ctx) {
-			cache.RLock()
-			ac, ok := cache.cache[clusterName]
-			if ok {
-				if u, ok := ac.(*userCachedAccess); !ok || !u.Expired() {
-					cache.RUnlock()
-					return ac, true
-				}
+		cache.RLock()
+		ac, ok := cache.cache[clusterName]
+		if ok {
+			if u, ok := ac.(*userCachedAccess); !ok || !u.Expired() {
+				cache.RUnlock()
+				return ac, true
 			}
-			cache.RUnlock()
 		}
+		cache.RUnlock()
 
 		cache.Lock()
 		defer cache.Unlock()
-		ac := newUserLookupAccess(ctx, asl)
+		ac = newUserLookupAccess(ctx, asl)
 		cache.cache[clusterName] = ac
 		return ac, true
 	})
