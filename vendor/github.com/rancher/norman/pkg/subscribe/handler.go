@@ -113,7 +113,6 @@ func handler(apiContext *types.APIContext) error {
 			if schema != nil {
 				buffer := &bytes.Buffer{}
 
-				apiContext.ExpireAccessControl(schema)
 				if err := jsonWriter.VersionBody(apiContext, &schema.Version, buffer, item); err != nil {
 					cancel()
 					continue
