@@ -3,6 +3,7 @@ package k3supgrade
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	planClientset "github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
@@ -10,6 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const MaxDisplayNodes = 10
 
 // deployPlans creates a master and worker plan in the downstream cluster to instrument
 // the system-upgrade-controller in the downstream cluster
@@ -171,7 +174,9 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
 		v3.ClusterConditionUpgraded.Unknown(cluster)
-		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded", masterPlan.Status.Applying[0])
+		c := cluster.Spec.K3sConfig.ServerConcurrency
+		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded",
+			upgradingMessage(c, masterPlan.Status.Applying))
 		v3.ClusterConditionUpgraded.Message(cluster, masterPlanMessage)
 		return h.clusterClient.Update(cluster)
 
@@ -179,7 +184,9 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 
 	if workerPlan.Name != "" && len(workerPlan.Status.Applying) > 0 {
 		v3.ClusterConditionUpgraded.Unknown(cluster)
-		workerPlanMessage := fmt.Sprintf("worker node [%s] is being upgraded", workerPlan.Status.Applying[0])
+		c := cluster.Spec.K3sConfig.WorkerConcurrency
+		workerPlanMessage := fmt.Sprintf("worker node [%s] being upgraded",
+			upgradingMessage(c, workerPlan.Status.Applying))
 		v3.ClusterConditionUpgraded.Message(cluster, workerPlanMessage)
 		return h.clusterClient.Update(cluster)
 	}
@@ -189,4 +196,16 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 	v3.ClusterConditionUpgraded.True(cluster)
 	return h.clusterClient.Update(cluster)
 
+}
+
+func upgradingMessage(concurrency int, nodes []string) string {
+	// concurrency max can be very large
+	if concurrency > len(nodes) {
+		concurrency = len(nodes)
+	}
+	if concurrency > MaxDisplayNodes {
+		concurrency = MaxDisplayNodes
+	}
+
+	return strings.Join(nodes[:concurrency], ", ")
 }
