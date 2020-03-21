@@ -48,6 +48,23 @@ type ActionHandler struct {
 	ClusterCatalogClient v3.ClusterCatalogInterface
 }
 
+func (a ActionHandler) refreshCatalog(catalog *v3.Catalog) (err error) {
+	for i := 0; i < 3; i++ {
+		catalog, err = a.CatalogClient.Get(catalog.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
+		v3.CatalogConditionRefreshed.Unknown(catalog)
+		_, err = a.CatalogClient.Update(catalog)
+		if err == nil {
+			break
+		}
+	}
+	return err
+}
+
 func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
@@ -71,9 +88,7 @@ func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Act
 	}
 	var catalogNames []string
 	for _, catalog := range catalogs {
-		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
-		v3.CatalogConditionRefreshed.Unknown(&catalog)
-		if _, err := a.CatalogClient.Update(&catalog); err != nil {
+		if err := a.refreshCatalog(&catalog); err != nil {
 			return err
 		}
 		catalogNames = append(catalogNames, catalog.Name)

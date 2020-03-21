@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,6 +28,8 @@ import (
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
+
+	_ "net/http/pprof"
 )
 
 var (
@@ -335,6 +338,10 @@ func run() error {
 		}()
 
 		return nil
+	}
+
+	if isCluster() {
+		go log.Println(http.ListenAndServe("localhost:6060", nil))
 	}
 
 	for {

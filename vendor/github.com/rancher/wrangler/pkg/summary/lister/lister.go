@@ -14,40 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dynamiclister
+package lister
 
 import (
+	"github.com/rancher/wrangler/pkg/summary"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
-var _ Lister = &dynamicLister{}
-var _ NamespaceLister = &dynamicNamespaceLister{}
+var _ Lister = &summaryLister{}
+var _ NamespaceLister = &summaryNamespaceLister{}
 
-// dynamicLister implements the Lister interface.
-type dynamicLister struct {
+// summaryLister implements the Lister interface.
+type summaryLister struct {
 	indexer cache.Indexer
 	gvr     schema.GroupVersionResource
 }
 
 // New returns a new Lister.
 func New(indexer cache.Indexer, gvr schema.GroupVersionResource) Lister {
-	return &dynamicLister{indexer: indexer, gvr: gvr}
+	return &summaryLister{indexer: indexer, gvr: gvr}
 }
 
 // List lists all resources in the indexer.
-func (l *dynamicLister) List(selector labels.Selector) (ret []*unstructured.Unstructured, err error) {
+func (l *summaryLister) List(selector labels.Selector) (ret []*summary.SummarizedObject, err error) {
 	err = cache.ListAll(l.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*unstructured.Unstructured))
+		ret = append(ret, m.(*summary.SummarizedObject))
 	})
 	return ret, err
 }
 
 // Get retrieves a resource from the indexer with the given name
-func (l *dynamicLister) Get(name string) (*unstructured.Unstructured, error) {
+func (l *summaryLister) Get(name string) (*summary.SummarizedObject, error) {
 	obj, exists, err := l.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -55,31 +55,31 @@ func (l *dynamicLister) Get(name string) (*unstructured.Unstructured, error) {
 	if !exists {
 		return nil, errors.NewNotFound(l.gvr.GroupResource(), name)
 	}
-	return obj.(*unstructured.Unstructured), nil
+	return obj.(*summary.SummarizedObject), nil
 }
 
 // Namespace returns an object that can list and get resources from a given namespace.
-func (l *dynamicLister) Namespace(namespace string) NamespaceLister {
-	return &dynamicNamespaceLister{indexer: l.indexer, namespace: namespace, gvr: l.gvr}
+func (l *summaryLister) Namespace(namespace string) NamespaceLister {
+	return &summaryNamespaceLister{indexer: l.indexer, namespace: namespace, gvr: l.gvr}
 }
 
-// dynamicNamespaceLister implements the NamespaceLister interface.
-type dynamicNamespaceLister struct {
+// summaryNamespaceLister implements the NamespaceLister interface.
+type summaryNamespaceLister struct {
 	indexer   cache.Indexer
 	namespace string
 	gvr       schema.GroupVersionResource
 }
 
 // List lists all resources in the indexer for a given namespace.
-func (l *dynamicNamespaceLister) List(selector labels.Selector) (ret []*unstructured.Unstructured, err error) {
+func (l *summaryNamespaceLister) List(selector labels.Selector) (ret []*summary.SummarizedObject, err error) {
 	err = cache.ListAllByNamespace(l.indexer, l.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*unstructured.Unstructured))
+		ret = append(ret, m.(*summary.SummarizedObject))
 	})
 	return ret, err
 }
 
 // Get retrieves a resource from the indexer for a given namespace and name.
-func (l *dynamicNamespaceLister) Get(name string) (*unstructured.Unstructured, error) {
+func (l *summaryNamespaceLister) Get(name string) (*summary.SummarizedObject, error) {
 	obj, exists, err := l.indexer.GetByKey(l.namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -87,5 +87,5 @@ func (l *dynamicNamespaceLister) Get(name string) (*unstructured.Unstructured, e
 	if !exists {
 		return nil, errors.NewNotFound(l.gvr.GroupResource(), name)
 	}
-	return obj.(*unstructured.Unstructured), nil
+	return obj.(*summary.SummarizedObject), nil
 }
