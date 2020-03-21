@@ -341,7 +341,9 @@ func run() error {
 	}
 
 	if isCluster() {
-		go log.Println(http.ListenAndServe("localhost:6060", nil))
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
+		}()
 	}
 
 	for {
