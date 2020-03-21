@@ -893,6 +893,7 @@ github.com/rancher/kontainer-engine v0.0.4-dev.0.20200305020630-f0f4d24bced5 h1:
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200305020630-f0f4d24bced5/go.mod h1:8Qyam1g5ybxj/c+BU9vFymqAGDdk9pMbDRa5lWfgj+M=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
+github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/norman v0.0.0-20200211155126-fc45a55d4dfd/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
 github.com/rancher/norman v0.0.0-20200302172514-1ee4db8c9219/go.mod h1:b+483H276jRBXYosdWrNKFpxH+JYMs3UIdlV60dhdg0=
@@ -919,8 +920,8 @@ github.com/rancher/system-upgrade-controller v0.3.1 h1:SpDStISy1haw05OCTGVEDw+WA
 github.com/rancher/system-upgrade-controller v0.3.1/go.mod h1:/2W/8WEqCSrz66hOYr3vjMRsIsgyWdToqO1hEVRvvLg=
 github.com/rancher/types v0.0.0-20200303162837-300a04e6f743/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
 github.com/rancher/types v0.0.0-20200304001827-068a357fa053/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
-github.com/rancher/types v0.0.0-20200319154846-36d43b593726 h1:DG+4mWIBypkhxrcT6110OP8h+GtNhklaI4Wu36JzehU=
-github.com/rancher/types v0.0.0-20200319154846-36d43b593726/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
+github.com/rancher/types v0.0.0-20200321010655-131b470971dc h1:fUcsE1mo+iRWQiWWBI1xiMM6F9tqcgWdWRP2ccLxPwk=
+github.com/rancher/types v0.0.0-20200321010655-131b470971dc/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.2.1-0.20191025041946-1fd360590735/go.mod h1:zmXTOSzU0vhumCyl0+Acq2FEP5WJOJRqnCQDegknyWA=
 github.com/rancher/wrangler v0.4.1/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
