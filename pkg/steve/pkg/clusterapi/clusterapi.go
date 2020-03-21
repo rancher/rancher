@@ -50,6 +50,7 @@ func (s *Server) newSchemas() *types.APISchemas {
 
 	schemas.MustImportAndCustomize(v3.Project{}, func(schema *types.APISchema) {
 		schema.Store = store
+		attributes.SetNamespaced(schema, true)
 		attributes.SetGroup(schema, v3.GroupName)
 		attributes.SetVersion(schema, "v3")
 		attributes.SetKind(schema, "Project")
@@ -63,6 +64,7 @@ func (s *Server) newSchemas() *types.APISchemas {
 			Store:   store,
 			clients: s.cf,
 		}
+		attributes.SetNamespaced(schema, true)
 		attributes.SetGroup(schema, projectv3.GroupName)
 		attributes.SetVersion(schema, "v3")
 		attributes.SetKind(schema, "App")
