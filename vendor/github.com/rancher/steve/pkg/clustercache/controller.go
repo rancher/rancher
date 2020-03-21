@@ -10,12 +10,13 @@ import (
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/merr"
+	"github.com/rancher/wrangler/pkg/summary/client"
+	"github.com/rancher/wrangler/pkg/summary/informer"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -52,7 +53,7 @@ type clusterCache struct {
 
 	ctx               context.Context
 	typed             map[schema2.GroupVersionKind]cache.SharedIndexInformer
-	informerFactory   dynamicinformer.DynamicSharedInformerFactory
+	informerFactory   informer.SummarySharedInformerFactory
 	controllerFactory generic.ControllerManager
 	watchers          map[schema2.GroupVersionResource]*watcher
 	workqueue         workqueue.DelayingInterface
@@ -62,11 +63,11 @@ type clusterCache struct {
 	changeHandlers cancelCollection
 }
 
-func NewClusterCache(ctx context.Context, client dynamic.Interface) ClusterCache {
+func NewClusterCache(ctx context.Context, dynamicClient dynamic.Interface) ClusterCache {
 	c := &clusterCache{
 		ctx:             ctx,
 		typed:           map[schema2.GroupVersionKind]cache.SharedIndexInformer{},
-		informerFactory: dynamicinformer.NewDynamicSharedInformerFactory(client, 2*time.Hour),
+		informerFactory: informer.NewSummarySharedInformerFactory(client.NewForDynamicClient(dynamicClient), 2*time.Hour),
 		watchers:        map[schema2.GroupVersionResource]*watcher{},
 		workqueue:       workqueue.NewNamedDelayingQueue("cluster-cache"),
 	}

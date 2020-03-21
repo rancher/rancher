@@ -14,32 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dynamicinformer
+package informer
 
 import (
 	"sync"
 	"time"
 
+	"github.com/rancher/wrangler/pkg/summary"
+	"github.com/rancher/wrangler/pkg/summary/client"
+	"github.com/rancher/wrangler/pkg/summary/lister"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 )
 
-// NewDynamicSharedInformerFactory constructs a new instance of dynamicSharedInformerFactory for all namespaces.
-func NewDynamicSharedInformerFactory(client dynamic.Interface, defaultResync time.Duration) DynamicSharedInformerFactory {
-	return NewFilteredDynamicSharedInformerFactory(client, defaultResync, metav1.NamespaceAll, nil)
+// NewSummarySharedInformerFactory constructs a new instance of summarySharedInformerFactory for all namespaces.
+func NewSummarySharedInformerFactory(client client.Interface, defaultResync time.Duration) SummarySharedInformerFactory {
+	return NewFilteredSummarySharedInformerFactory(client, defaultResync, metav1.NamespaceAll, nil)
 }
 
-// NewFilteredDynamicSharedInformerFactory constructs a new instance of dynamicSharedInformerFactory.
+// NewFilteredSummarySharedInformerFactory constructs a new instance of summarySharedInformerFactory.
 // Listers obtained via this factory will be subject to the same filters as specified here.
-func NewFilteredDynamicSharedInformerFactory(client dynamic.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) DynamicSharedInformerFactory {
-	return &dynamicSharedInformerFactory{
+func NewFilteredSummarySharedInformerFactory(client client.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) SummarySharedInformerFactory {
+	return &summarySharedInformerFactory{
 		client:           client,
 		defaultResync:    defaultResync,
 		namespace:        namespace,
@@ -49,8 +49,8 @@ func NewFilteredDynamicSharedInformerFactory(client dynamic.Interface, defaultRe
 	}
 }
 
-type dynamicSharedInformerFactory struct {
-	client        dynamic.Interface
+type summarySharedInformerFactory struct {
+	client        client.Interface
 	defaultResync time.Duration
 	namespace     string
 
@@ -62,9 +62,9 @@ type dynamicSharedInformerFactory struct {
 	tweakListOptions TweakListOptionsFunc
 }
 
-var _ DynamicSharedInformerFactory = &dynamicSharedInformerFactory{}
+var _ SummarySharedInformerFactory = &summarySharedInformerFactory{}
 
-func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResource) informers.GenericInformer {
+func (f *summarySharedInformerFactory) ForResource(gvr schema.GroupVersionResource) informers.GenericInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -74,14 +74,14 @@ func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 		return informer
 	}
 
-	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informer = NewFilteredSummaryInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	f.informers[key] = informer
 
 	return informer
 }
 
 // Start initializes all requested informers.
-func (f *dynamicSharedInformerFactory) Start(stopCh <-chan struct{}) {
+func (f *summarySharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -94,7 +94,7 @@ func (f *dynamicSharedInformerFactory) Start(stopCh <-chan struct{}) {
 }
 
 // WaitForCacheSync waits for all started informers' cache were synced.
-func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool {
+func (f *summarySharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool {
 	informers := func() map[schema.GroupVersionResource]cache.SharedIndexInformer {
 		f.lock.Lock()
 		defer f.lock.Unlock()
@@ -115,9 +115,9 @@ func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 	return res
 }
 
-// NewFilteredDynamicInformer constructs a new informer for a dynamic type.
-func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
-	return &dynamicInformer{
+// NewFilteredSummaryInformer constructs a new informer for a summary type.
+func NewFilteredSummaryInformer(client client.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
+	return &summaryInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformer(
 			&cache.ListWatch{
@@ -134,24 +134,24 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 					return client.Resource(gvr).Namespace(namespace).Watch(options)
 				},
 			},
-			&unstructured.Unstructured{},
+			&summary.SummarizedObject{},
 			resyncPeriod,
 			indexers,
 		),
 	}
 }
 
-type dynamicInformer struct {
+type summaryInformer struct {
 	informer cache.SharedIndexInformer
 	gvr      schema.GroupVersionResource
 }
 
-var _ informers.GenericInformer = &dynamicInformer{}
+var _ informers.GenericInformer = &summaryInformer{}
 
-func (d *dynamicInformer) Informer() cache.SharedIndexInformer {
+func (d *summaryInformer) Informer() cache.SharedIndexInformer {
 	return d.informer
 }
 
-func (d *dynamicInformer) Lister() cache.GenericLister {
-	return dynamiclister.NewRuntimeObjectShim(dynamiclister.New(d.informer.GetIndexer(), d.gvr))
+func (d *summaryInformer) Lister() cache.GenericLister {
+	return lister.NewRuntimeObjectShim(lister.New(d.informer.GetIndexer(), d.gvr))
 }
