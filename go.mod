@@ -80,7 +80,7 @@ require (
 	github.com/rancher/dynamiclistener v0.2.1-0.20200319061731-763229ddcd6e
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200305020630-f0f4d24bced5
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200320232552-586aa558bed7
+	github.com/rancher/norman v0.0.0-20200321231028-b5f2e33b54fa
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
 	github.com/rancher/rke v1.1.0-rc9.0.20200320205153-03880c96e45a
@@ -88,7 +88,7 @@ require (
 	github.com/rancher/steve v0.0.0-20200321145211-7395e5b8c467
 	github.com/rancher/system-upgrade-controller v0.3.1
 	github.com/rancher/types v0.0.0-20200321010655-131b470971dc
-	github.com/rancher/wrangler v0.5.1-0.20200312201919-371ff2551072
+	github.com/rancher/wrangler v0.5.1
 	github.com/rancher/wrangler-api v0.5.0
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
