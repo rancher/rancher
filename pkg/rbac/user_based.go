@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/rancher/norman/authorization"
 	"github.com/rancher/norman/httperror"
@@ -43,19 +42,22 @@ func newUserLookupAccess(ctx *types.APIContext, accessStore accesscontrol.Access
 	}
 	accessSet := accessStore.AccessFor(user)
 	return &userCachedAccess{
-		expires: time.Now().Add(3 * time.Second),
-		access:  accessSet,
+		access: accessSet,
 	}
 }
 
 type userCachedAccess struct {
 	authorization.AllAccess
-	expires time.Time
+	expired bool
 	access  *accesscontrol.AccessSet
 }
 
+func (a *userCachedAccess) Expire(apiContext *types.APIContext, schema *types.Schema) {
+	a.expired = true
+}
+
 func (a *userCachedAccess) Expired() bool {
-	return time.Now().After(a.expires)
+	return a.expired
 }
 
 func (a *userCachedAccess) CanDo(apiGroup, resource, verb string, apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {

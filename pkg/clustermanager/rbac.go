@@ -5,6 +5,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func (m *Manager) Expire(apiContext *types.APIContext, schema *types.Schema) {
+	ac, err := m.getAccessControl(apiContext, schema)
+	if err != nil {
+		return
+	}
+	if e, ok := ac.(types.Expire); ok {
+		e.Expire(apiContext, schema)
+	}
+}
+
 func (m *Manager) CanCreate(apiContext *types.APIContext, schema *types.Schema) error {
 	ac, err := m.getAccessControl(apiContext, schema)
 	if err != nil {
