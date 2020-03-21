@@ -85,10 +85,10 @@ require (
 	github.com/rancher/remotedialer v0.2.5
 	github.com/rancher/rke v1.1.0-rc9.0.20200320205153-03880c96e45a
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200318191740-b78a8b03ddf9
+	github.com/rancher/steve v0.0.0-20200321145211-7395e5b8c467
 	github.com/rancher/system-upgrade-controller v0.3.1
 	github.com/rancher/types v0.0.0-20200319154846-36d43b593726
-	github.com/rancher/wrangler v0.5.1-0.20200312201919-371ff2551072
+	github.com/rancher/wrangler v0.5.1
 	github.com/rancher/wrangler-api v0.5.0
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect

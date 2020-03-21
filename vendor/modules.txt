@@ -439,7 +439,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200318191740-b78a8b03ddf9
+# github.com/rancher/steve v0.0.0-20200321145211-7395e5b8c467
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
@@ -518,7 +518,7 @@ github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
-# github.com/rancher/wrangler v0.5.1-0.20200312201919-371ff2551072
+# github.com/rancher/wrangler v0.5.1
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/broadcast
@@ -550,6 +550,9 @@ github.com/rancher/wrangler/pkg/signals
 github.com/rancher/wrangler/pkg/slice
 github.com/rancher/wrangler/pkg/start
 github.com/rancher/wrangler/pkg/summary
+github.com/rancher/wrangler/pkg/summary/client
+github.com/rancher/wrangler/pkg/summary/informer
+github.com/rancher/wrangler/pkg/summary/lister
 # github.com/rancher/wrangler-api v0.5.0
 github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io
 github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1
@@ -954,8 +957,6 @@ k8s.io/client-go/discovery
 k8s.io/client-go/discovery/cached/disk
 k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
-k8s.io/client-go/dynamic/dynamicinformer
-k8s.io/client-go/dynamic/dynamiclister
 k8s.io/client-go/informers
 k8s.io/client-go/informers/admissionregistration
 k8s.io/client-go/informers/admissionregistration/v1

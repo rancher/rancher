@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/wrangler/pkg/summary"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -234,10 +233,7 @@ func getInfo(obj interface{}) (name string, namespace string, revision int, summ
 		return "", "", 0, summaryResult, false
 	}
 
-	if unstr, ok := obj.(*unstructured.Unstructured); ok {
-		summaryResult = summary.Summarize(unstr)
-	}
-
+	summaryResult = summary.Summarize(r)
 	return meta.GetName(), meta.GetNamespace(), revision, summaryResult, true
 }
 
