@@ -18,10 +18,12 @@ func NewSchemaStore() types.Store {
 }
 
 func toAPIObject(schema *types.APISchema) types.APIObject {
+	s := schema.DeepCopy()
+	delete(s.Schema.Attributes, "access")
 	return types.APIObject{
 		Type:   "schema",
 		ID:     schema.ID,
-		Object: schema,
+		Object: s,
 	}
 }
 

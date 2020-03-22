@@ -289,7 +289,7 @@ func (s *Store) listAndWatch(apiOp *types.APIRequest, k8sClient dynamic.Resource
 }
 
 func (s *Store) WatchNames(apiOp *types.APIRequest, schema *types.APISchema, w types.WatchRequest, names sets.String) (chan types.APIEvent, error) {
-	adminClient, err := s.clientGetter.TableClientForWatch(apiOp, schema, apiOp.Namespace)
+	adminClient, err := s.clientGetter.TableAdminClientForWatch(apiOp, schema, apiOp.Namespace)
 	if err != nil {
 		return nil, err
 	}

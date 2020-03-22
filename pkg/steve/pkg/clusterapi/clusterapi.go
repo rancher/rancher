@@ -55,7 +55,7 @@ func (s *Server) newSchemas() *types.APISchemas {
 		attributes.SetVersion(schema, "v3")
 		attributes.SetKind(schema, "Project")
 		attributes.SetResource(schema, "projects")
-		attributes.SetVerbs(schema, []string{"list", "get", "delete", "update", "watch", "patch"})
+		attributes.SetVerbs(schema, []string{"create", "list", "get", "delete", "update", "watch", "patch"})
 		s.clusterLinks = append(s.clusterLinks, "projects")
 	})
 
@@ -69,7 +69,7 @@ func (s *Server) newSchemas() *types.APISchemas {
 		attributes.SetVersion(schema, "v3")
 		attributes.SetKind(schema, "App")
 		attributes.SetResource(schema, "apps")
-		attributes.SetVerbs(schema, []string{"list", "get", "delete", "update", "watch", "patch"})
+		attributes.SetVerbs(schema, []string{"create", "list", "get", "delete", "update", "watch", "patch"})
 		s.clusterLinks = append(s.clusterLinks, "apps")
 	})
 
@@ -100,6 +100,7 @@ func (s *Server) Wrap(next http.Handler) http.Handler {
 	router := mux.NewRouter()
 	router.UseEncodedPath()
 	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}").Handler(server)
+	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type:apps?}/{namespace}").Handler(server)
 	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}").Handler(server)
 	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
 	router.NotFoundHandler = next
