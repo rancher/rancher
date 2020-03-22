@@ -130,7 +130,7 @@ func ToMiddleware(auth Authenticator) Middleware {
 	return func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
 		info, ok, err := auth.Authenticate(req)
 		if err != nil {
-			rw.WriteHeader(http.StatusServiceUnavailable)
+			rw.WriteHeader(http.StatusUnauthorized)
 			rw.Write([]byte(err.Error()))
 			return
 		}

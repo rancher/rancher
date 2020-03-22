@@ -3,9 +3,11 @@ package cluster
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/blang/semver"
 	"github.com/rancher/rke/cloudprovider"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/k8s"
@@ -309,6 +311,18 @@ func (c *Cluster) setClusterServicesDefaults() {
 		}
 	}
 
+	enableKubeAPIAuditLog, err := checkVersionNeedsKubeAPIAuditLog(c.Version)
+	if err != nil {
+		logrus.Warnf("Can not determine if cluster version [%s] needs to have kube-api audit log enabled: %v", c.Version, err)
+	}
+	if enableKubeAPIAuditLog {
+		logrus.Debugf("Enabling kube-api audit log for cluster version [%s]", c.Version)
+
+		if c.Services.KubeAPI.AuditLog == nil {
+			c.Services.KubeAPI.AuditLog = &v3.AuditLog{Enabled: true}
+		}
+
+	}
 	if c.Services.KubeAPI.AuditLog != nil &&
 		c.Services.KubeAPI.AuditLog.Enabled {
 		if c.Services.KubeAPI.AuditLog.Configuration == nil {
@@ -679,4 +693,23 @@ func setDNSDeploymentAddonDefaults(updateStrategy *appsv1.DeploymentStrategy, dn
 	}
 
 	return updateStrategy
+}
+
+func checkVersionNeedsKubeAPIAuditLog(k8sVersion string) (bool, error) {
+	toMatch, err := semver.Make(k8sVersion[1:])
+	if err != nil {
+		return false, fmt.Errorf("Cluster version [%s] can not be parsed as semver", k8sVersion[1:])
+	}
+	logrus.Debugf("Checking if cluster version [%s] needs to have kube-api audit log enabled", k8sVersion[1:])
+	// kube-api audit log needs to be enabled for k8s 1.15.11 and up, k8s 1.16.8 and up, k8s 1.17.4 and up
+	clusterKubeAPIAuditLogRange, err := semver.ParseRange(">=1.15.11-rancher0 <=1.15.99 || >=1.16.8-rancher0 <=1.16.99 || >=1.17.4-rancher0")
+	if err != nil {
+		return false, errors.New("Failed to parse semver range for checking to enable kube-api audit log")
+	}
+	if clusterKubeAPIAuditLogRange(toMatch) {
+		logrus.Debugf("Cluster version [%s] needs to have kube-api audit log enabled", k8sVersion[1:])
+		return true, nil
+	}
+	logrus.Debugf("Cluster version [%s] does not need to have kube-api audit log enabled", k8sVersion[1:])
+	return false, nil
 }

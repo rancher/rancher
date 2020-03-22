@@ -265,6 +265,9 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		ClusterTemplateClient:         managementContext.Management.ClusterTemplates(""),
 		ClusterTemplateRevisionClient: managementContext.Management.ClusterTemplateRevisions(""),
 		SubjectAccessReviewClient:     managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
+		CisConfigClient:               managementContext.Management.CisConfigs(""),
+		CisConfigLister:               managementContext.Management.CisConfigs("").Controller().Lister(),
+		CisBenchmarkVersionClient:     managementContext.Management.CisBenchmarkVersions(""),
 		CisBenchmarkVersionLister:     managementContext.Management.CisBenchmarkVersions("").Controller().Lister(),
 	}
 

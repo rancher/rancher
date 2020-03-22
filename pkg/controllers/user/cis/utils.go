@@ -5,9 +5,12 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/app/utils"
+	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rke/util"
 	rcorev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,8 +105,81 @@ func ValidateClusterBeforeLaunchingScan(cluster *v3.Cluster) error {
 	if !v3.ClusterConditionReady.IsTrue(cluster) {
 		return fmt.Errorf("cluster not ready")
 	}
-	if _, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok {
+	if cluster.Status.CurrentCisRunName != "" {
 		return fmt.Errorf("CIS scan already running on cluster")
 	}
 	return nil
+}
+
+// If overrideBenchmarkVersion is not specified, we use the cluster k8s version to
+// figure out which benchmark version to use. If there is no matching k8s version in
+// cis configs, we use "default" entry. Each of these benchmark versions have a min
+// k8s version to use.
+func GetBenchmarkVersionToUse(overrideBenchmarkVersion string, currentK8sVersion string,
+	cisConfigLister v3.CisConfigLister, cisConfigClient v3.CisConfigInterface,
+	cisBenchmarkVersionLister v3.CisBenchmarkVersionLister, cisBenchmarkVersionClient v3.CisBenchmarkVersionInterface,
+) (string, bool, error) {
+	bv := overrideBenchmarkVersion
+	shortK8sVersion := util.GetTagMajorVersion(currentK8sVersion)
+	if bv == "" {
+		cisConfigParams, err := kontainerdrivermetadata.GetCisConfigParams(
+			shortK8sVersion,
+			cisConfigLister,
+			cisConfigClient,
+		)
+		if err != nil {
+			logrus.Debugf("cisScanHandler: benchmark version not found for k8s version: %v, using default",
+				shortK8sVersion)
+			cisConfigParams, err = kontainerdrivermetadata.GetCisConfigParams(
+				"default",
+				cisConfigLister,
+				cisConfigClient,
+			)
+			if err != nil {
+				return "", false, fmt.Errorf("cisScanHandler: error fetching default cis config: %v", err)
+			}
+		}
+		bv = cisConfigParams.BenchmarkVersion
+	}
+	benchmarkInfo, err := kontainerdrivermetadata.GetCisBenchmarkVersionInfo(
+		bv,
+		cisBenchmarkVersionLister,
+		cisBenchmarkVersionClient,
+	)
+	if err != nil {
+		return "", false, fmt.Errorf("cisScanHandler: error fetching benchmark version info %v: %v",
+			bv, err)
+	}
+	sufficient, err := isClusterVersionSufficient(shortK8sVersion, benchmarkInfo.MinKubernetesVersion)
+	if err != nil {
+		return "", false, err
+	}
+	if !sufficient {
+		return "", false, fmt.Errorf("minimum k8s version %v needed for running cis scan", benchmarkInfo.MinKubernetesVersion)
+	}
+	return bv, benchmarkInfo.Managed, nil
+}
+
+func isClusterVersionSufficient(shortClusterK8SVersion, benchmarkMinK8SVersion string) (bool, error) {
+	benchmarkK8sVersionSemVer, err := util.StrToSemVer(ConvertToSemVerStr(benchmarkMinK8SVersion))
+	if err != nil {
+		return false, fmt.Errorf("cisScanHandler: error getting sem version for benchmark k8s version %v: %v",
+			benchmarkMinK8SVersion, err)
+	}
+	clusterK8sSemVerStr := ConvertToSemVerStr(shortClusterK8SVersion)
+	clusterK8sSemVer, err := util.StrToSemVer(clusterK8sSemVerStr)
+	if err != nil {
+		return false, fmt.Errorf("cisScanHandler: error getting sem version for cluster k8s version %v: %v",
+			clusterK8sSemVer, err)
+	}
+	logrus.Debugf("cisScanHandler: checking if cluster version %v is less than min version: %v",
+		clusterK8sSemVerStr, benchmarkMinK8SVersion)
+	if clusterK8sSemVer.LessThan(*benchmarkK8sVersionSemVer) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func ConvertToSemVerStr(tag string) string {
+	return tag + ".0"
 }

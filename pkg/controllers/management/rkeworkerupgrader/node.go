@@ -2,6 +2,7 @@ package rkeworkerupgrader
 
 import (
 	"fmt"
+	"sort"
 
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
@@ -9,6 +10,27 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
+
+type upgradeStatus struct {
+	/*
+		prepare: pre-process for upgrade: cordon/drain
+		process: update node plan, state: upgrading
+	*/
+	// active => cordon/drain
+	toPrepare []*v3.Node
+	// cordon/drain => upgrading
+	toProcess []*v3.Node
+	// upgrading => upgraded => uncordon
+	upgraded []*v3.Node
+	// unavailable nodes
+	notReady []*v3.Node
+	// upgraded active nodes
+	done int
+	// nodes qualified to upgrade
+	filtered int
+	// nodes in upgrading state
+	upgrading int
+}
 
 func (uh *upgradeHandler) prepareNode(node *v3.Node, toDrain bool, nodeDrainInput *v3.NodeDrainInput) error {
 	var nodeCopy *v3.Node
@@ -33,7 +55,7 @@ func (uh *upgradeHandler) prepareNode(node *v3.Node, toDrain bool, nodeDrainInpu
 	return nil
 }
 
-func (uh *upgradeHandler) processNode(node *v3.Node, cluster *v3.Cluster, upgrade bool) error {
+func (uh *upgradeHandler) setNodePlan(node *v3.Node, cluster *v3.Cluster, upgrade bool) error {
 	nodePlan, err := uh.getNodePlan(node, cluster)
 	if err != nil {
 		return fmt.Errorf("setNodePlan: error getting node plan for [%s]: %v", node.Name, err)
@@ -104,26 +126,24 @@ func skipNode(node *v3.Node) bool {
 	return false
 }
 
-func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int) (map[string]*v3.Node, map[string]*v3.Node, map[string]*v3.Node, map[string]*v3.Node, int, int, int) {
-	done, upgrading, filtered := 0, 0, 0
-	toPrepareMap, toProcessMap, upgradedMap, notReadyMap := map[string]*v3.Node{}, map[string]*v3.Node{}, map[string]*v3.Node{}, map[string]*v3.Node{}
-
+func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int, drain bool) *upgradeStatus {
+	status := &upgradeStatus{}
 	for _, node := range nodes {
 
 		if skipNode(node) {
 			continue
 		}
 
-		filtered++
+		status.filtered++
 
 		// check for nodeConditionReady
 		if !nodehelper.IsMachineReady(node) {
 			// update plan for nodes that were attempted for upgrade
 			if v3.NodeConditionUpgraded.IsUnknown(node) {
-				upgrading++
-				toProcessMap[node.Name] = node
+				status.upgrading++
+				status.toProcess = append(status.toProcess, node)
 			} else {
-				notReadyMap[node.Name] = node
+				status.notReady = append(status.notReady, node)
 			}
 			logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not ready", node.Namespace, node.Name)
 			continue
@@ -131,43 +151,59 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int) (ma
 
 		if node.Status.AppliedNodeVersion == expectedVersion {
 			if v3.NodeConditionUpgraded.IsUnknown(node) {
-				upgradedMap[node.Name] = node
+				status.upgraded = append(status.upgraded, node)
 			}
 			if !node.Spec.InternalNodeSpec.Unschedulable {
 				logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is done", node.Namespace, node.Name)
-				done++
+				status.done++
 			} else {
 				// node hasn't un-cordoned, so consider it upgrading in terms of maxUnavailable count
-				upgrading++
+				status.upgrading++
 			}
 			continue
 		}
 
-		if preparingNode(node) {
+		if preparingNode(node, drain) {
 			// draining or cordoning
-			upgrading++
+			status.upgrading++
 			continue
 		}
 
-		if preparedNode(node) {
+		if preparedNode(node, drain) {
 			// node ready to upgrade
-			upgrading++
-			toProcessMap[node.Name] = node
+			status.upgrading++
+			status.toProcess = append(status.toProcess, node)
 			continue
 		}
 
-		toPrepareMap[node.Name] = node
+		status.toPrepare = append(status.toPrepare, node)
 	}
 
-	return toPrepareMap, toProcessMap, upgradedMap, notReadyMap, filtered, upgrading, done
+	sortByNodeName(status.toPrepare)
+	sortByNodeName(status.toProcess)
+	sortByNodeName(status.upgraded)
+	sortByNodeName(status.notReady)
+
+	return status
 }
 
-func preparingNode(node *v3.Node) bool {
-	return node.Spec.DesiredNodeUnschedulable == "drain" || node.Spec.DesiredNodeUnschedulable == "true"
+func sortByNodeName(arr []*v3.Node) {
+	// v3.Node.Name is auto generated, format: `m-xxxx`
+	sort.Slice(arr, func(i, j int) bool { return arr[i].Name < arr[j].Name })
 }
 
-func preparedNode(node *v3.Node) bool {
-	return v3.NodeConditionDrained.IsTrue(node) || node.Spec.InternalNodeSpec.Unschedulable || v3.NodeConditionUpgraded.IsUnknown(node)
+func preparingNode(node *v3.Node, drain bool) bool {
+	if drain {
+		return node.Spec.DesiredNodeUnschedulable == "drain"
+	}
+	return node.Spec.DesiredNodeUnschedulable == "true"
+}
+
+func preparedNode(node *v3.Node, drain bool) bool {
+	if drain {
+		return v3.NodeConditionDrained.IsTrue(node)
+	}
+	return node.Spec.InternalNodeSpec.Unschedulable
 }
 
 func workerOnly(roles []string) bool {

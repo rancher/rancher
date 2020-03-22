@@ -48,7 +48,9 @@ PRIVATE_IMAGES = {
     "rhel-7.7-docker-native-113-selinux-on": {
         'image': 'ami-069569219156fdf07', 'ssh_user': 'ec2-user'},
     "rhel-7.7-docker-19.03-selinux-off": {
-        'image': 'ami-07a7a8ebadc4c9522', 'ssh_user': 'ec2-user'},
+        'image': 'ami-01ed32daf0a8275e9', 'ssh_user': 'ec2-user'},
+    "rhel-7.7-docker-19.03-selinux-on": {
+        'image': 'ami-0dc67f9cc295ff9da', 'ssh_user': 'ec2-user'},
     "oracleLinux-7.7-kernel-UEKr5-docker-19.03": {
         'image': 'ami-06dd5f94499093e3d', 'ssh_user': 'ec2-user'},
     "suse-sles12-sp2-docker-18061ce": {

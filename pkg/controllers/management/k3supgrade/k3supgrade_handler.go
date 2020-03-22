@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
+	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v32 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -52,6 +53,12 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		}
 
 	}
+	// set cluster upgrading status
+	cluster, err = h.modifyClusterCondition(cluster, planv1.Plan{}, planv1.Plan{})
+	if err != nil {
+		return cluster, err
+	}
+
 	// create or update k3supgradecontroller if necessary
 	if err = h.deployK3sUpgradeController(cluster.Name); err != nil {
 		return cluster, err

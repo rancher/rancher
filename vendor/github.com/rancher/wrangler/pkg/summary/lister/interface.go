@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dynamiclister
+package lister
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"github.com/rancher/wrangler/pkg/summary"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 // Lister helps list resources.
 type Lister interface {
 	// List lists all resources in the indexer.
-	List(selector labels.Selector) (ret []*unstructured.Unstructured, err error)
+	List(selector labels.Selector) (ret []*summary.SummarizedObject, err error)
 	// Get retrieves a resource from the indexer with the given name
-	Get(name string) (*unstructured.Unstructured, error)
+	Get(name string) (*summary.SummarizedObject, error)
 	// Namespace returns an object that can list and get resources in a given namespace.
 	Namespace(namespace string) NamespaceLister
 }
@@ -34,7 +34,7 @@ type Lister interface {
 // NamespaceLister helps list and get resources.
 type NamespaceLister interface {
 	// List lists all resources in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*unstructured.Unstructured, err error)
+	List(selector labels.Selector) (ret []*summary.SummarizedObject, err error)
 	// Get retrieves a resource from the indexer for a given namespace and name.
-	Get(name string) (*unstructured.Unstructured, error)
+	Get(name string) (*summary.SummarizedObject, error)
 }

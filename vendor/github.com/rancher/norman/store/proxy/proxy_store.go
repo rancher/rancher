@@ -271,6 +271,7 @@ func (s *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 	}
 
 	return convert.Chan(c, func(data map[string]interface{}) map[string]interface{} {
+		apiContext.ExpireAccessControl(schema)
 		return apiContext.AccessControl.Filter(apiContext, schema, data, s.authContext)
 	}), nil
 }

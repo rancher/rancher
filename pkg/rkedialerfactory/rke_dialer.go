@@ -3,17 +3,15 @@ package rkedialerfactory
 import (
 	"fmt"
 	"net"
-	"strings"
-
-	"k8s.io/client-go/transport"
-
 	"net/http"
+	"strings"
 
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/hosts"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
+	"k8s.io/client-go/transport"
 )
 
 type RKEDialerFactory struct {
@@ -69,7 +67,14 @@ func (t *RKEDialerFactory) WrapTransport(config *v3.RancherKubernetesEngineConfi
 					if privateIP, ok := translateAddress[ip]; ok {
 						address = strings.Replace(address, ip, privateIP, 1)
 					}
-					return dialer(network, address)
+					conn, err := dialer(network, address)
+					if ref.IsNodeNotFound(err) {
+						clusterDialer, dialerErr := t.Factory.ClusterDialer(ns)
+						if dialerErr == nil {
+							return clusterDialer(network, address)
+						}
+					}
+					return conn, err
 				}
 			}
 			return rt

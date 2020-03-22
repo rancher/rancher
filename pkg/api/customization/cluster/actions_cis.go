@@ -63,7 +63,7 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 		return httperror.WrapAPIError(err, httperror.ClusterUnavailable,
 			fmt.Sprintf("cluster not ready"))
 	}
-	if _, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok {
+	if cluster.Status.CurrentCisRunName != "" {
 		return httperror.WrapAPIError(err, httperror.Conflict,
 			fmt.Sprintf("CIS scan already running on cluster"))
 	}
@@ -79,6 +79,14 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 			return httperror.WrapAPIError(err, httperror.ServerError,
 				fmt.Sprintf("error fetching cis benchmark version %v", cisScanConfig.OverrideBenchmarkVersion))
 		}
+	}
+	_, _, err = cis.GetBenchmarkVersionToUse(cisScanConfig.OverrideBenchmarkVersion,
+		cluster.Spec.RancherKubernetesEngineConfig.Version,
+		a.CisConfigLister, a.CisConfigClient,
+		a.CisBenchmarkVersionLister, a.CisBenchmarkVersionClient,
+	)
+	if err != nil {
+		return httperror.NewAPIError(httperror.MethodNotAllowed, err.Error())
 	}
 
 	isManual := true

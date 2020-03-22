@@ -3,7 +3,6 @@ package accesscontrol
 import (
 	"hash"
 	"sort"
-	"strings"
 
 	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -166,12 +165,7 @@ func (p *policyRuleIndex) getRoleBindings(subjectName string) []*rbacv1.RoleBind
 		return nil
 	}
 	sort.Slice(result, func(i, j int) bool {
-		if i := strings.Compare(result[i].Namespace, result[j].Namespace); i < 0 {
-			return true
-		} else if i > 0 {
-			return false
-		}
-		return result[i].Name < result[j].Name
+		return string(result[i].UID) < string(result[j].UID)
 	})
 	return result
 }

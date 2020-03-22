@@ -26,7 +26,7 @@ ENV CATTLE_CHANNELSERVER_VERSION v0.3.0
 ENV LOGLEVEL_VERSION v0.1.3
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.12
-ENV KUBECTL_VERSION v1.16.1
+ENV KUBECTL_VERSION v1.16.8
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
 ENV RANCHER_METADATA_BRANCH ${RANCHER_METADATA_BRANCH}
@@ -102,7 +102,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${RANCHER_METADATA_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.4.3
+ENV CATTLE_UI_VERSION 2.4.7
 ENV CATTLE_CLI_VERSION v2.4.0-rc4
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.

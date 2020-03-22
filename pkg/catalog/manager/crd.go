@@ -31,10 +31,6 @@ func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalo
 		template.Spec.Versions[i].AppReadme = ""
 	}
 	logrus.Debugf("Creating template %s", template.Name)
-	//check label length to ensure template doesn't get created without template versions
-	if len(template.Name) > 63 {
-		return errors.Errorf("failed %v must be no more than 63 characters", template.Name)
-	}
 	createdTemplate, err := m.templateClient.Create(&template)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create template %s", template.Name)
@@ -172,7 +168,7 @@ func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.T
 		templateVersion := &v3.CatalogTemplateVersion{}
 		templateVersion.Spec = spec
 		templateVersion.Status = v3.TemplateVersionStatus{HelmVersion: template.Status.HelmVersion}
-		templateVersion.Name = fmt.Sprintf("%s-%v", template.Name, spec.Version)
+		templateVersion.Name = getValidTemplateNameWithVersion(template.Name, spec.Version)
 		templateVersion.Namespace = template.Namespace
 		templateVersion.Labels = map[string]string{
 			TemplateNameLabel: template.Name,

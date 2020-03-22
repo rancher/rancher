@@ -334,7 +334,7 @@ type NodeDrainInput struct {
 	// If negative, the default value specified in the pod will be used
 	GracePeriod int `yaml:"grace_period" json:"gracePeriod,omitempty" norman:"default=-1"`
 	// Time to wait (in seconds) before giving up for one try
-	Timeout int `yaml:"timeout" json:"timeout" norman:"min=1,max=10800,default=60"`
+	Timeout int `yaml:"timeout" json:"timeout" norman:"min=1,max=10800,default=120"`
 }
 
 type CloudCredential struct {

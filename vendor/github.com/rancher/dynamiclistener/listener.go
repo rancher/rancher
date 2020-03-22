@@ -52,6 +52,7 @@ func NewListener(l net.Listener, storage TLSStorage, caCert *x509.Certificate, c
 		Listener:  l,
 		storage:   &nonNil{storage: storage},
 		sans:      config.SANs,
+		maxSANs:   config.MaxSANs,
 		tlsConfig: config.TLSConfig,
 	}
 	if dynamicListener.tlsConfig == nil {
@@ -60,6 +61,9 @@ func NewListener(l net.Listener, storage TLSStorage, caCert *x509.Certificate, c
 	dynamicListener.tlsConfig.GetCertificate = dynamicListener.getCertificate
 
 	if config.CloseConnOnCertChange {
+		if len(dynamicListener.tlsConfig.Certificates) == 0 {
+			dynamicListener.tlsConfig.NextProtos = []string{"http/1.1"}
+		}
 		dynamicListener.conns = map[int]*closeWrapper{}
 	}
 
@@ -90,6 +94,7 @@ type Config struct {
 	Organization          []string
 	TLSConfig             *tls.Config
 	SANs                  []string
+	MaxSANs               int
 	ExpirationDaysCheck   int
 	CloseConnOnCertChange bool
 }
@@ -108,6 +113,7 @@ type listener struct {
 	tlsConfig *tls.Config
 	cert      *tls.Certificate
 	sans      []string
+	maxSANs   int
 	init      sync.Once
 }
 
@@ -261,7 +267,7 @@ func (l *listener) updateCert(cn ...string) error {
 		return err
 	}
 
-	if !factory.NeedsUpdate(secret, cn...) {
+	if !factory.NeedsUpdate(l.maxSANs, secret, cn...) {
 		return nil
 	}
 
@@ -281,14 +287,13 @@ func (l *listener) updateCert(cn ...string) error {
 		}
 		// clear version to force cert reload
 		l.version = ""
-	}
-
-	if l.conns != nil {
-		l.connLock.Lock()
-		for _, conn := range l.conns {
-			_ = conn.close()
+		if l.conns != nil {
+			l.connLock.Lock()
+			for _, conn := range l.conns {
+				_ = conn.close()
+			}
+			l.connLock.Unlock()
 		}
-		l.connLock.Unlock()
 	}
 
 	return nil

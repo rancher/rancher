@@ -37,6 +37,7 @@ import (
 const (
 	RKEDriverKey          = "rancherKubernetesEngineConfig"
 	KontainerEngineUpdate = "provisioner.cattle.io/ke-driver-update"
+	RkeRestoreAnnotation  = "rke.cattle.io/restore"
 )
 
 type Provisioner struct {
@@ -583,6 +584,9 @@ func (p *Provisioner) setGenericConfigs(cluster *v3.Cluster) {
 func resetRkeConfigFlags(cluster *v3.Cluster, updateTriggered bool) {
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = nil
+		if cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore {
+			cluster.Annotations[RkeRestoreAnnotation] = "true"
+		}
 		cluster.Spec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
 			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.RotateCertificates = nil

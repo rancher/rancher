@@ -49,6 +49,10 @@ func getMatchingSchemas(apiContext *types.APIContext) []*types.Schema {
 	return schemas
 }
 
+type Expire interface {
+	Expire(apiContext *types.APIContext)
+}
+
 func handler(apiContext *types.APIContext) error {
 	schemas := getMatchingSchemas(apiContext)
 	if len(schemas) == 0 {
@@ -108,6 +112,7 @@ func handler(apiContext *types.APIContext) error {
 			schema := apiContext.Schemas.Schema(apiContext.Version, convert.ToString(item["type"]))
 			if schema != nil {
 				buffer := &bytes.Buffer{}
+
 				if err := jsonWriter.VersionBody(apiContext, &schema.Version, buffer, item); err != nil {
 					cancel()
 					continue

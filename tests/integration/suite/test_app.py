@@ -3,7 +3,7 @@ import pytest
 from rancher import ApiError
 from .test_catalog import wait_for_template_to_be_created
 from .common import random_str
-from .conftest import set_server_version, wait_for
+from .conftest import set_server_version, wait_for, DEFAULT_CATALOG
 
 
 def test_app_mysql(admin_pc, admin_mc):
@@ -589,6 +589,61 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
     msg = e.value.error
     assert e.value.error.message == 'rancher min version not met', msg
     assert e.value.error.status == 422
+
+
+def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):
+    """Test that app is using specified helm version"""
+    app_client = admin_pc.client
+    catalog_client = admin_mc.client
+    catalog_name1 = random_str()
+    catalog_name2 = random_str()
+    app_name1 = random_str()
+    app_name2 = random_str()
+    catalog1 = catalog_client.create_catalog(name=catalog_name1,
+                                             branch="master",
+                                             url=DEFAULT_CATALOG,
+                                             )
+    remove_resource(catalog1)
+    catalog2 = catalog_client.create_catalog(name=catalog_name2,
+                                             branch="master",
+                                             url=DEFAULT_CATALOG,
+                                             helmVersion="helm_v3"
+                                             )
+    remove_resource(catalog2)
+    wait_for_template_to_be_created(catalog_client, catalog_name1)
+    wait_for_template_to_be_created(catalog_client, catalog_name2)
+
+    ns1 = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                   projectId=admin_pc.
+                                                   project.id)
+    remove_resource(ns1)
+    ns2 = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                   projectId=admin_pc.
+                                                   project.id)
+    remove_resource(ns2)
+    app1 = app_client.create_app(
+        name=app_name1,
+        externalId="catalog://?catalog="+catalog_name1+"&template=chartmuseum&"
+        "version=2.7.0&namespace=cattle-global-data",
+        targetNamespace=ns1.name,
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(app1)
+    app2 = app_client.create_app(
+        name=app_name2,
+        externalId="catalog://?catalog="+catalog_name2+"&template=chartmuseum&"
+        "version=2.7.0&namespace=cattle-global-data",
+        targetNamespace=ns2.name,
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(app2)
+    wait_for_workload(admin_pc.client, ns1.name, count=1)
+    wait_for_workload(admin_pc.client, ns2.name, count=1)
+    app1 = admin_pc.client.reload(app1)
+    app2 = admin_pc.client.reload(app2)
+    assert "helmVersion" not in app1
+    assert "helmVersion" in app2
+    assert app2.helmVersion == "helm_v3"
 
 
 def wait_for_workload(client, ns, timeout=240, count=0):
