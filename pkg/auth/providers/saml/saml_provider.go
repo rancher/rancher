@@ -67,7 +67,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 
 	if samlp.hasLdapGroupSearch() {
-		remoteConfig := ldap.NewRemoteConfig(mgmtCtx.Management.AuthConfigs(""))
+		remoteConfig := ldap.NewRemoteConfig(mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient())
 		// TODO Is there a config source where it would be sensible to put expireAfter?
 		expireAfter := time.Minute * 5
 		cachedConfig := ldap.NewCachedConfig(remoteConfig, expireAfter)

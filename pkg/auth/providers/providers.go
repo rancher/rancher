@@ -77,7 +77,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providersByType[client.ActiveDirectoryConfigType] = p
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
 
-	remoteConfig := ldap.NewRemoteConfig(mgmt.Management.AuthConfigs(""))
+	remoteConfig := ldap.NewRemoteConfig(mgmt.Management.AuthConfigs("").ObjectClient().UnstructuredClient())
 	// TODO Is there a config source where it would be sensible to put expireAfter?
 	expireAfter := time.Minute * 5
 	cachedConfig := ldap.NewCachedConfig(remoteConfig, expireAfter)
