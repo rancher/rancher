@@ -143,7 +143,8 @@ spec:
         - mountPath: /var/log/auditlog
           name: audit-log
 {{- end }}
-{{- if gt (int .Values.auditLog.level) 0 }}
+{{- if eq .Values.auditLog.destination "sidecar" }}
+  {{- if gt (int .Values.auditLog.level) 0 }}
       # Make audit logs available for Rancher log collector tools.
       - image: {{ .Values.busyboxImage }}
         name: {{ template "rancher.name" . }}-audit-log
@@ -152,6 +153,7 @@ spec:
         volumeMounts:
         - mountPath: /var/log/auditlog
           name: audit-log
+  {{- end }}
 {{- end }}
       volumes:
 {{- if .Values.additionalTrustedCAs }}
@@ -167,7 +169,7 @@ spec:
           secretName: tls-ca
 {{- end }}
 {{- if gt (int .Values.auditLog.level) 0 }}
-  {{- if eq .Values.auditLog.destination "hostPath" }}
+  {{- if .Values.auditLog.hostPath }}
       - name: audit-log
         hostPath:
           path: {{ .Values.auditLog.hostPath }}
