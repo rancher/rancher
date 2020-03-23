@@ -154,7 +154,7 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 
 func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.Node, error) {
 	machineName := machineName(inNode)
-	logrus.Debugf("getMachine: looking up machine [%s] in cluster [%s]", machineName, cluster.Name)
+	logrus.Tracef("getMachine: looking up machine [%s] in cluster [%s]", machineName, cluster.Name)
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
 		if objs, err := t.nodeIndexer.ByIndex(nodeKeyIndex, fmt.Sprintf("%s/%s", cluster.Name, inNode.RequestedHostname)); err == nil {
@@ -163,16 +163,17 @@ func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.N
 			}
 		}
 
-		logrus.Debugf("getMachine: looking up [%s] as node name in cluster [%s]", inNode.RequestedHostname, cluster.Name)
+		logrus.Tracef("getMachine: looking up [%s] as node name in cluster [%s]", inNode.RequestedHostname, cluster.Name)
 		machine, err := t.machineLister.Get(cluster.Name, inNode.RequestedHostname)
 		if err == nil {
+			logrus.Debugf("Error looking up [%s] as node name in cluster [%s], error: %v", inNode.RequestedHostname, cluster.Name, err)
 			return machine, nil
 		}
 
-		logrus.Debugf("getMachine: looking up [%s] as RequestedHostname in cluster [%s]", inNode.RequestedHostname, cluster.Name)
+		logrus.Tracef("getMachine: looking up [%s] as RequestedHostname in cluster [%s]", inNode.RequestedHostname, cluster.Name)
 		machines, _ := t.machineLister.List(cluster.Name, labels.NewSelector())
 		for _, machine := range machines {
-			logrus.Debugf("getMachine: comparing machine.Spec.RequestedHostname [%s] to inNode.RequestedHostname [%s]", machine.Spec.RequestedHostname, inNode.RequestedHostname)
+			logrus.Tracef("getMachine: comparing machine.Spec.RequestedHostname [%s] to inNode.RequestedHostname [%s]", machine.Spec.RequestedHostname, inNode.RequestedHostname)
 			if machine.Spec.RequestedHostname == inNode.RequestedHostname {
 				return machine, nil
 			}
@@ -283,7 +284,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		return cluster, true, err
 	}
 	if driver == "" {
-		logrus.Debugf("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
+		logrus.Tracef("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
 		cluster.Status.Driver = v3.ClusterDriverImported
 		changed = true
 	}
@@ -349,7 +350,7 @@ func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, 
 func machineName(machine *client.Node) string {
 	digest := md5.Sum([]byte(machine.RequestedHostname))
 	machineNameMD5 := fmt.Sprintf("m-%s", hex.EncodeToString(digest[:])[:12])
-	logrus.Debugf("machineName: returning [%s] for node with RequestedHostname [%s]", machineNameMD5, machine.RequestedHostname)
+	logrus.Tracef("machineName: returning [%s] for node with RequestedHostname [%s]", machineNameMD5, machine.RequestedHostname)
 	return machineNameMD5
 }
 
