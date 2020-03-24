@@ -280,6 +280,10 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		Users:                         managementContext.Management.Users(""),
 		GrbLister:                     managementContext.Management.GlobalRoleBindings("").Controller().Lister(),
 		GrLister:                      managementContext.Management.GlobalRoles("").Controller().Lister(),
+		CisConfigClient:               managementContext.Management.CisConfigs(namespace.GlobalNamespace),
+		CisConfigLister:               managementContext.Management.CisConfigs(namespace.GlobalNamespace).Controller().Lister(),
+		CisBenchmarkVersionClient:     managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace),
+		CisBenchmarkVersionLister:     managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace).Controller().Lister(),
 	}
 	schema.Validator = clusterValidator.Validator
 
