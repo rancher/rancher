@@ -102,7 +102,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${RANCHER_METADATA_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.4.8
+ENV CATTLE_UI_VERSION 2.4.9
 ENV CATTLE_CLI_VERSION v2.4.0-rc4
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
