@@ -522,7 +522,8 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		cluster.Status.CACert = caCert
 		resetRkeConfigFlags(cluster, updateTriggered)
 
-		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+		// initialize on first rke up
+		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && cluster.Status.NodeVersion == 0 {
 			cluster.Status.NodeVersion++
 		}
 
