@@ -164,10 +164,8 @@ func (h *clusterCache) OnSchemas(schemas *schema.Collection) error {
 		if w.informer == nil {
 			w.informer = h.informerFactory.ForResource(gvr).Informer()
 			w.start = true
+			h.addResourceEventHandler(gvr, w.informer)
 		}
-
-		logrus.Infof("Watching metadata for %s", gvk.String())
-		h.addResourceEventHandler(gvr, w.informer)
 	}
 
 	for gvr, w := range h.watchers {
@@ -178,14 +176,19 @@ func (h *clusterCache) OnSchemas(schemas *schema.Collection) error {
 		}
 	}
 
+	var toWait []*watcher
+
 	for _, w := range toStart {
 		if !w.start {
 			continue
 		}
+		w.start = false
+		logrus.Infof("Watching metadata for %s", w.gvk)
 		go w.informer.Run(w.ctx.Done())
+		toWait = append(toWait, w)
 	}
 
-	for _, w := range toStart {
+	for _, w := range toWait {
 		cache.WaitForCacheSync(w.ctx.Done(), w.informer.HasSynced)
 	}
 
