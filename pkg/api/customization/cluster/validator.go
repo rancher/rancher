@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/controllers/management/k3supgrade"
+	"github.com/rancher/rancher/pkg/controllers/user/cis"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -27,6 +28,10 @@ type Validator struct {
 	Users                         v3.UserInterface
 	GrbLister                     v3.GlobalRoleBindingLister
 	GrLister                      v3.GlobalRoleLister
+	CisConfigClient               v3.CisConfigInterface
+	CisConfigLister               v3.CisConfigLister
+	CisBenchmarkVersionClient     v3.CisBenchmarkVersionInterface
+	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -48,18 +53,33 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
-	if err := validateScheduledClusterScan(&spec); err != nil {
+	if err := v.validateScheduledClusterScan(&spec); err != nil {
 		return err
 	}
 	return nil
 }
 
-func validateScheduledClusterScan(spec *v3.ClusterSpec) error {
+func (v *Validator) validateScheduledClusterScan(spec *v3.ClusterSpec) error {
 	if spec.ScheduledClusterScan == nil ||
 		(spec.ScheduledClusterScan != nil && !spec.ScheduledClusterScan.Enabled) {
 		return nil
 	}
+	currentK8sVersion := spec.RancherKubernetesEngineConfig.Version
+	overrideBenchmarkVersion := ""
+	if spec.ScheduledClusterScan.ScanConfig.CisScanConfig != nil {
+		overrideBenchmarkVersion = spec.ScheduledClusterScan.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
+	}
+	_, _, err := cis.GetBenchmarkVersionToUse(overrideBenchmarkVersion, currentK8sVersion,
+		v.CisConfigLister, v.CisConfigClient,
+		v.CisBenchmarkVersionLister, v.CisBenchmarkVersionClient,
+	)
+	if err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+	return validateScheduledClusterScan(spec)
+}
 
+func validateScheduledClusterScan(spec *v3.ClusterSpec) error {
 	if spec.ScheduledClusterScan.ScanConfig != nil &&
 		spec.ScheduledClusterScan.ScanConfig.CisScanConfig != nil {
 		profile := spec.ScheduledClusterScan.ScanConfig.CisScanConfig.Profile
