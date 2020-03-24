@@ -329,7 +329,7 @@ def test_refresh_catalog_access(admin_mc, user_mc):
     catalog = admin_mc.client.by_id_catalog("library")
     out = admin_mc.client.action(obj=catalog, action_name="refresh")
     assert out['catalogs'][0] == "library"
-
+    # use catalog obj from admin client to get action not available to user
     with pytest.raises(ApiError) as e:
         user_mc.client.action(obj=catalog, action_name="refresh")
     assert e.value.error.status == 404

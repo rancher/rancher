@@ -173,9 +173,10 @@ def test_pipeline_run_access(admin_mc, admin_pc, user_mc, remove_resource):
     remove_resource(pipeline)
     wait_until_available(admin_pc.client, pipeline)
 
-    # ensure user can get pipeline, then run should fail
+    # ensure user can get pipeline
     proj_user_client = user_project_client(user_mc, admin_pc.project)
     wait_until_available(proj_user_client, pipeline)
     with pytest.raises(ApiError) as e:
+        # Doing run action with pipeline obj from admin_client should fail
         user_mc.client.action(obj=pipeline, action_name="run", branch="master")
     assert e.value.error.status == 404

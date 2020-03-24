@@ -17,8 +17,10 @@ def test_alert_access(admin_mc, admin_pc, admin_cc, user_mc, remove_resource):
 
     # we get some project defaults, wait for them to come up
     wait_until(projectAlertRules(user_mc.client), timeout=20)
-    alerts = user_mc.client.list_projectAlertRule()
-
+    # list with admin_mc to get action not available to user
+    alerts = admin_mc.client.list_projectAlertRule(
+        projectId=admin_pc.project.id
+    )
     with pytest.raises(ApiError) as e:
         user_mc.client.action(obj=alerts.data[0], action_name="deactivate")
     assert e.value.error.status == 404
