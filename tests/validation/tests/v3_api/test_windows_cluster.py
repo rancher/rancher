@@ -27,23 +27,17 @@ def test_windows_provisioning():
     nodes = aws_nodes + win_nodes
     node_roles = node_roles_linux + node_roles_windows
 
-    cluster, aws_nodes = create_custom_host_from_nodes(nodes, 
+    cluster, nodes = create_custom_host_from_nodes(nodes, 
                                                        node_roles, 
                                                        random_cluster_name=True, 
                                                        windows=True)
                                                        
-    node_threads = []
     for node in win_nodes:
-        thread = Thread(target=pull_images, args=[node])
-        node_threads.append(thread)
-        thread.start()
-
-    for thread in node_threads:
-        thread.join()
+        pull_images(node)
         
     cluster_cleanup(get_user_client(), cluster, nodes)
 
 def pull_images(node):
     print("Pulling images on node: " + node.host_name)
-    pull_result = node.execute_command("docker pull " + TEST_IMAGE + " && " + "docker pull " + TEST_IMAGE_NGINX + " && " + "docker pull " + TEST_IMAGE)
+    pull_result = node.execute_command("docker pull " + TEST_IMAGE + " && " + "docker pull " + TEST_IMAGE_NGINX + " && " + "docker pull " + TEST_IMAGE_OS_BASE)
     print(pull_result)
