@@ -21,7 +21,7 @@ if [ -n "$DRONE_TAG" ]; then
     TAG=$DRONE_TAG
 fi
 
-cp ../bin/rancher ../bin/agent .
+cp ../bin/rancher ../bin/agent ../bin/data.json .
 
 IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${TAG}

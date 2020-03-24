@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -64,7 +65,7 @@ func run(systemChartPath string, imagesFromArgs []string) error {
 	}
 
 	// already downloaded in dapper
-	b, err := ioutil.ReadFile("/root/data.json")
+	b, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
 	if err != nil {
 		return err
 	}
