@@ -27,7 +27,9 @@ const (
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "refresh")
+	if canUpdateCatalog(apiContext) {
+		resource.AddAction(apiContext, "refresh")
+	}
 	resource.Links["exportYaml"] = apiContext.URLBuilder.Link("exportYaml", resource)
 	if resource.Values["url"] == SystemLibraryURL && resource.Values["name"] == SystemCatalogName {
 		delete(resource.Links, "remove")
@@ -38,8 +40,10 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	}
 }
 
-func CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
-	collection.AddAction(request, "refresh")
+func CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
+	if canUpdateCatalog(apiContext) {
+		collection.AddAction(apiContext, "refresh")
+	}
 }
 
 type ActionHandler struct {
@@ -69,7 +73,7 @@ func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
-	if !canUpdateCatalog(apiContext, v3.CatalogGroupVersionKind.Group, v3.CatalogResource.Name) {
+	if !canUpdateCatalog(apiContext) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -147,7 +151,7 @@ func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
-	if !canUpdateCatalog(apiContext, v3.ProjectCatalogGroupVersionKind.Group, v3.ProjectCatalogResource.Name) {
+	if !canUpdateCatalog(apiContext) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -188,7 +192,7 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
-	if !canUpdateCatalog(apiContext, v3.ClusterCatalogGroupVersionKind.Group, v3.ClusterCatalogResource.Name) {
+	if !canUpdateCatalog(apiContext) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -225,7 +229,18 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	return nil
 }
 
-func canUpdateCatalog(apiContext *types.APIContext, groupName, resourceName string) bool {
+func canUpdateCatalog(apiContext *types.APIContext) bool {
+	var groupName, resourceName string
+	switch apiContext.Type {
+	case client.CatalogType:
+		groupName, resourceName = v3.CatalogGroupVersionKind.Group, v3.CatalogResource.Name
+	case client.ClusterCatalogType:
+		groupName, resourceName = v3.ClusterCatalogGroupVersionKind.Group, v3.ClusterCatalogResource.Name
+	case client.ProjectCatalogType:
+		groupName, resourceName = v3.ProjectCatalogGroupVersionKind.Group, v3.ProjectCatalogResource.Name
+	default:
+		return false
+	}
 	catObj := map[string]interface{}{
 		"id": apiContext.ID,
 	}
