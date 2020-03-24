@@ -47,18 +47,18 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"baiducloudcontainerengine",
-		"https://github.com/cnrancher/kontainer-engine-driver-baidu/releases/download/v0.2.0/kontainer-engine-driver-baidu-linux",
+		"https://drivers.rancher.cn/kontainer-engine-driver-baidu/0.2.0/kontainer-engine-driver-baidu-linux",
 		"4613e3be3ae5487b0e21dfa761b95de2144f80f98bf76847411e5fcada343d5e",
-		"https://cluster-driver.oss-cn-shenzhen.aliyuncs.com/baidu/ui/component.js",
+		"https://drivers.rancher.cn/kontainer-engine-driver-baidu/0.2.0/component.js",
 		false,
-		"*.aliyuncs.com", "*.baidubce.com",
+		"drivers.rancher.cn", "*.baidubce.com",
 	); err != nil {
 		return err
 	}
 
 	if err := creator.addCustomDriver(
 		"aliyunkubernetescontainerservice",
-		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.5/kontainer-engine-driver-aliyun-linux",
+		"https://drivers.rancher.cn/kontainer-engine-driver-aliyun/0.2.5/kontainer-engine-driver-aliyun-linux",
 		"31aa0a44450c5a5eb128dd0956292dfd91aab726d1a548f6d527a9212a27db9b",
 		"",
 		false,
@@ -69,7 +69,7 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"tencentkubernetesengine",
-		"https://github.com/rancher/kontainer-engine-driver-tencent/releases/download/v0.2.3/kontainer-engine-driver-tencent-linux",
+		"https://drivers.rancher.cn/kontainer-engine-driver-tencent/0.2.3/kontainer-engine-driver-tencent-linux",
 		"144f785473290ee2f63cf35da0c6bde12bc307878078500a47a0a8d04422ae53",
 		"",
 		false,
@@ -80,7 +80,7 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"huaweicontainercloudengine",
-		"https://github.com/rancher/kontainer-engine-driver-huawei/releases/download/v0.1.2/kontainer-engine-driver-huawei-linux",
+		"https://drivers.rancher.cn/kontainer-engine-driver-huawei/0.1.2/kontainer-engine-driver-huawei-linux",
 		"0b6c1dfaa477a60a3bd9f8a60a55fcafd883866c2c5c387aec75b95d6ba81d45",
 		"",
 		false,
