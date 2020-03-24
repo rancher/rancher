@@ -77,10 +77,10 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 
 		logrus.Infof("checking cluster [%s] for worker nodes upgrade", cluster.Name)
 
-		if ok, err := uh.toUpgradeCluster(cluster); err != nil {
+		if toUpgrade, planChanged, err := uh.toUpgradeCluster(cluster); err != nil {
 			return nil, err
-		} else if ok {
-			if err := uh.upgradeCluster(cluster, key); err != nil {
+		} else if toUpgrade {
+			if err := uh.upgradeCluster(cluster, key, planChanged); err != nil {
 				return nil, err
 			}
 		}
@@ -128,7 +128,7 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 		}
 
 		logrus.Infof("cluster [%s] worker-upgrade: call upgrade to reconcile for node [%s]", cluster.Name, node.Name)
-		if err := uh.upgradeCluster(cluster, node.Name); err != nil {
+		if err := uh.upgradeCluster(cluster, node.Name, false); err != nil {
 			return nil, err
 		}
 		return node, nil
@@ -157,7 +157,7 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 	} else {
 		if planChangedForUpgrade(nodePlan, node.Status.NodePlan.Plan) {
 			logrus.Infof("cluster [%s] worker-upgrade: plan changed for node [%s], call upgrade to reconcile cluster", cluster.Name, node.Name)
-			if err := uh.upgradeCluster(cluster, node.Name); err != nil {
+			if err := uh.upgradeCluster(cluster, node.Name, false); err != nil {
 				return nil, err
 			}
 			return node, nil
@@ -234,24 +234,27 @@ func (uh *upgradeHandler) getNodePlan(node *v3.Node, cluster *v3.Cluster) (*v3.R
 	return nodePlan, err
 }
 
-func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) error {
+func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, planChanged bool) error {
 	clusterName := cluster.Name
 
 	uh.clusterLock.Lock(clusterName)
 	defer uh.clusterLock.Unlock(clusterName)
 
-	if !v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+	logrus.Debugf("cluster [%s] upgrading condition: [%v] plan changed: [%v]", clusterName, v3.ClusterConditionUpgraded.IsUnknown(cluster), planChanged)
+	if !v3.ClusterConditionUpgraded.IsUnknown(cluster) || planChanged {
 		clusterCopy := cluster.DeepCopy()
 		v3.ClusterConditionUpgraded.Unknown(clusterCopy)
 		v3.ClusterConditionUpgraded.Message(clusterCopy, "updating worker nodes")
+		clusterCopy.Status.NodeVersion++
 		var err error
 		cluster, err = uh.clusters.Update(clusterCopy)
 		if err != nil {
 			return err
 		}
-		logrus.Infof("cluster [%s] worker-upgrade: updated cluster for upgrading", clusterName)
+		logrus.Infof("cluster [%s] worker-upgrade: updated cluster for upgrading: [%v] ", clusterName, clusterCopy.Status.NodeVersion)
 	}
 
+	logrus.Debugf("cluster [%s] worker-upgrade cluster status node version [%v]", clusterName, cluster.Status.NodeVersion)
 	nodes, err := uh.nodeLister.List(clusterName, labels.Everything())
 	if err != nil {
 		return err
@@ -364,14 +367,10 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string) e
 	return nil
 }
 
-func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, error) {
-	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
-		return true, nil
-	}
-
+func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, error) {
 	nodes, err := uh.nodeLister.List(cluster.Name, labels.Everything())
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	for _, node := range nodes {
@@ -389,15 +388,15 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, error) {
 
 		nodePlan, err := uh.getNodePlan(node, cluster)
 		if err != nil {
-			return false, err
+			return false, false, err
 		}
 
 		if planChangedForUpgrade(nodePlan, node.Status.NodePlan.Plan) {
-			return true, nil
+			return true, true, nil
 		}
 	}
 
-	return false, nil
+	return false, false, nil
 }
 
 func (uh *upgradeHandler) restore(cluster *v3.Cluster) error {
