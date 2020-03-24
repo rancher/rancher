@@ -372,6 +372,10 @@ func (s *Store) Create(apiOp *types.APIRequest, schema *types.APISchema, params 
 	if name == "" && input.String("metadata", "generateName") == "" {
 		input.SetNested(schema.ID[0:1]+"-", "metadata", "generatedName")
 	}
+	if ns == "" && apiOp.Namespace != "" {
+		ns = apiOp.Namespace
+		input.SetNested(ns, "metadata", "namespace")
+	}
 
 	gvk := attributes.GVK(schema)
 	input["apiVersion"], input["kind"] = gvk.ToAPIVersionAndKind()
