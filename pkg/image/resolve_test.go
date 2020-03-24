@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -259,7 +261,7 @@ func TestGetImages(t *testing.T) {
 }
 
 func getTestK8sVersionInfo() (*kd.VersionInfo, *kd.VersionInfo, error) {
-	b, err := ioutil.ReadFile("/root/data.json")
+	b, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
 	if err != nil {
 		return nil, nil, err
 	}
