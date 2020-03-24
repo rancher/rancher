@@ -60,8 +60,10 @@ func NewHandler(management *config.ScaledContext, clusterManager *clustermanager
 }
 
 func CollectionFormatter(apiContext *types.APIContext, resource *types.GenericCollection) {
-	resource.AddAction(apiContext, "test")
-	resource.AddAction(apiContext, "dryRun")
+	if canPerformAction(apiContext) {
+		resource.AddAction(apiContext, "test")
+		resource.AddAction(apiContext, "dryRun")
+	}
 }
 
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -71,7 +73,7 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 
 	switch apiContext.Type {
 	case mgmtv3client.ClusterLoggingType:
-		if !canPerformAction(apiContext, mgmtv3.ClusterLoggingGroupVersionKind.Group, mgmtv3.ClusterLoggingResource.Name) {
+		if !canPerformAction(apiContext) {
 			return httperror.NewAPIError(httperror.NotFound, "not found")
 		}
 
@@ -92,7 +94,7 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 		outputTags = input.OutputTags
 
 	case mgmtv3client.ProjectLoggingType:
-		if !canPerformAction(apiContext, mgmtv3.ProjectLoggingGroupVersionKind.Group, mgmtv3.ProjectLoggingResource.Name) {
+		if !canPerformAction(apiContext) {
 			return httperror.NewAPIError(httperror.NotFound, "not found")
 		}
 
@@ -314,9 +316,18 @@ func addCertPrefixPath(certDir, file string) string {
 	return path.Join(certDir, file)
 }
 
-func canPerformAction(apiContext *types.APIContext, groupName, resourceName string) bool {
-	alertObj := map[string]interface{}{
+func canPerformAction(apiContext *types.APIContext) bool {
+	var groupName, resourceName string
+	switch apiContext.Type {
+	case mgmtv3client.ClusterLoggingType:
+		groupName, resourceName = mgmtv3.ClusterLoggingGroupVersionKind.Group, mgmtv3.ClusterLoggingResource.Name
+	case mgmtv3client.ProjectLoggingType:
+		groupName, resourceName = mgmtv3.ProjectLoggingGroupVersionKind.Group, mgmtv3.ProjectLoggingResource.Name
+	default:
+		return false
+	}
+	logObj := map[string]interface{}{
 		"id": apiContext.ID,
 	}
-	return apiContext.AccessControl.CanDo(groupName, resourceName, "create", apiContext, alertObj, apiContext.Schema) == nil
+	return apiContext.AccessControl.CanDo(groupName, resourceName, "create", apiContext, logObj, apiContext.Schema) == nil
 }

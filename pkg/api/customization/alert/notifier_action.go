@@ -18,14 +18,21 @@ import (
 const testSMTPTitle = "Alert From Rancher: SMTP configuration validated"
 
 func NotifierCollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
-	collection.AddAction(apiContext, "send")
+	if canCreateNotifier(apiContext) {
+		collection.AddAction(apiContext, "send")
+	}
 }
 
 func NotifierFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "send")
+	if canCreateNotifier(apiContext) {
+		resource.AddAction(apiContext, "send")
+	}
 }
 
 func (h *Handler) NotifierActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	if !canCreateNotifier(apiContext) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 	switch actionName {
 	case "send":
 		return h.testNotifier(actionName, action, apiContext)
@@ -78,4 +85,11 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 		return errors.Wrap(err, "error getting dialer")
 	}
 	return notifiers.SendMessage(notifier, "", notifierMessage, dialer)
+}
+
+func canCreateNotifier(apiContext *types.APIContext) bool {
+	alertObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	return apiContext.AccessControl.CanDo(v3.NotifierGroupVersionKind.Group, v3.NotifierResource.Name, "create", apiContext, alertObj, apiContext.Schema) == nil
 }

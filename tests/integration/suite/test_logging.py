@@ -14,7 +14,8 @@ def test_logging_test_action(admin_mc, admin_pc, user_mc, remove_resource):
         roleTemplateId="read-only")
     remove_resource(prtb)
 
-    logEndpoint = user_mc.client.list_clusterLogging()
+    # use logEndpoint from admin client to get action not available to user
+    logEndpoint = admin_mc.client.list_clusterLogging()
     with pytest.raises(ApiError) as e:
         user_mc.client.action(
             obj=logEndpoint,
