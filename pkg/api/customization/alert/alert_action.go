@@ -8,9 +8,9 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,21 +22,25 @@ type Handler struct {
 }
 
 func RuleFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "unmute")
-	resource.AddAction(apiContext, "activate")
-	resource.AddAction(apiContext, "mute")
-	resource.AddAction(apiContext, "deactivate")
+	if canUpdateAlert(apiContext) {
+		resource.AddAction(apiContext, "unmute")
+		resource.AddAction(apiContext, "activate")
+		resource.AddAction(apiContext, "mute")
+		resource.AddAction(apiContext, "deactivate")
+	}
 }
 
 func GroupFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "unmute")
-	resource.AddAction(apiContext, "activate")
-	resource.AddAction(apiContext, "mute")
-	resource.AddAction(apiContext, "deactivate")
+	if canUpdateAlert(apiContext) {
+		resource.AddAction(apiContext, "unmute")
+		resource.AddAction(apiContext, "activate")
+		resource.AddAction(apiContext, "mute")
+		resource.AddAction(apiContext, "deactivate")
+	}
 }
 
 func (h *Handler) ClusterAlertRuleActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	if !canUpdateAlert(request, v3.ClusterAlertRuleGroupVersionKind.Group, v3.ClusterAlertRuleResource.Name) {
+	if !canUpdateAlert(request) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -95,7 +99,7 @@ func (h *Handler) ClusterAlertRuleActionHandler(actionName string, action *types
 }
 
 func (h *Handler) ProjectAlertRuleActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	if !canUpdateAlert(request, v3.ProjectAlertRuleGroupVersionKind.Group, v3.ProjectAlertRuleResource.Name) {
+	if !canUpdateAlert(request) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -153,7 +157,16 @@ func (h *Handler) ProjectAlertRuleActionHandler(actionName string, action *types
 	return nil
 }
 
-func canUpdateAlert(apiContext *types.APIContext, groupName, resourceName string) bool {
+func canUpdateAlert(apiContext *types.APIContext) bool {
+	var groupName, resourceName string
+	switch apiContext.Type {
+	case client.ClusterAlertRuleType:
+		groupName, resourceName = v3.ClusterAlertRuleGroupVersionKind.Group, v3.ClusterAlertRuleResource.Name
+	case client.ProjectAlertRuleType:
+		groupName, resourceName = v3.ProjectAlertRuleGroupVersionKind.Group, v3.ProjectAlertRuleResource.Name
+	default:
+		return false
+	}
 	alertObj := map[string]interface{}{
 		"id": apiContext.ID,
 	}

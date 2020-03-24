@@ -31,11 +31,13 @@ type ExecutionHandler struct {
 }
 
 func (h *ExecutionHandler) ExecutionFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	if e := convert.ToString(resource.Values[executionStateField]); utils.IsFinishState(e) {
-		resource.AddAction(apiContext, actionRerun)
-	}
-	if e := convert.ToString(resource.Values[executionStateField]); !utils.IsFinishState(e) {
-		resource.AddAction(apiContext, actionStop)
+	if canExecutePipeline(apiContext) {
+		if e := convert.ToString(resource.Values[executionStateField]); utils.IsFinishState(e) {
+			resource.AddAction(apiContext, actionRerun)
+		}
+		if e := convert.ToString(resource.Values[executionStateField]); !utils.IsFinishState(e) {
+			resource.AddAction(apiContext, actionStop)
+		}
 	}
 	resource.Links[linkLog] = apiContext.URLBuilder.Link(linkLog, resource)
 }
@@ -50,6 +52,9 @@ func (h *ExecutionHandler) LinkHandler(apiContext *types.APIContext, next types.
 }
 
 func (h *ExecutionHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	if !canExecutePipeline(apiContext) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 	switch actionName {
 	case actionRerun:
 		return h.rerun(apiContext)
@@ -126,4 +131,13 @@ func (h *ExecutionHandler) stop(apiContext *types.APIContext) error {
 		return err
 	}
 	return nil
+}
+
+func canExecutePipeline(apiContext *types.APIContext) bool {
+	plObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	return apiContext.AccessControl.CanDo(
+		v3.PipelineExecutionGroupVersionKind.Group, v3.PipelineExecutionResource.Name, "create", apiContext, plObj, apiContext.Schema,
+	) == nil
 }

@@ -65,12 +65,7 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		return err
 	}
 
-	nsObj := map[string]interface{}{
-		"id": apiContext.ID,
-	}
-	// note that the user must have * permissions on namespace, the create-ns role alone won't return true here
-	canUpdateNS := apiContext.AccessControl.CanDo("", "namespaces", "update", apiContext, nsObj, apiContext.Schema) == nil
-	if !canUpdateNS {
+	if !canUpdateNS(apiContext) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -125,8 +120,17 @@ func NewFormatter(next types.Formatter) types.Formatter {
 			next(request, resource)
 		}
 		annotations := convert.ToMapInterface(resource.Values["annotations"])
-		if convert.ToString(annotations[helm.AppIDsLabel]) == "" {
+
+		if canUpdate := canUpdateNS(request); canUpdate && convert.ToString(annotations[helm.AppIDsLabel]) == "" {
 			resource.AddAction(request, "move")
 		}
 	}
+}
+
+func canUpdateNS(apiContext *types.APIContext) bool {
+	nsObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	// note that the user must have * permissions on namespace, the create-ns role alone won't return true here
+	return apiContext.AccessControl.CanDo("", "namespaces", "update", apiContext, nsObj, apiContext.Schema) == nil
 }

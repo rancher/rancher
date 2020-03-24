@@ -39,8 +39,12 @@ type Handler struct {
 }
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, actionRun)
-	resource.AddAction(apiContext, actionPushConfig)
+	if canExecutePipeline(apiContext) {
+		resource.AddAction(apiContext, actionRun)
+	}
+	if canUpdatePipeline(apiContext) {
+		resource.AddAction(apiContext, actionPushConfig)
+	}
 	resource.Links[linkConfigs] = apiContext.URLBuilder.Link(linkConfigs, resource)
 	resource.Links[linkYaml] = apiContext.URLBuilder.Link(linkYaml, resource)
 	resource.Links[linkBranches] = apiContext.URLBuilder.Link(linkBranches, resource)
@@ -62,20 +66,16 @@ func (h *Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHa
 }
 
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	plObj := map[string]interface{}{
-		"id": apiContext.ID,
-	}
-	canExecutePipeline := apiContext.AccessControl.CanDo(
-		v3.PipelineExecutionGroupVersionKind.Group, v3.PipelineExecutionResource.Name, "create", apiContext, plObj, apiContext.Schema,
-	) == nil
-	if !canExecutePipeline {
-		return httperror.NewAPIError(httperror.NotFound, "not found")
-	}
-
 	switch actionName {
 	case actionRun:
+		if !canExecutePipeline(apiContext) {
+			return httperror.NewAPIError(httperror.NotFound, "not found")
+		}
 		return h.run(apiContext)
 	case actionPushConfig:
+		if !canUpdatePipeline(apiContext) {
+			return httperror.NewAPIError(httperror.NotFound, "not found")
+		}
 		return h.pushConfig(apiContext)
 	}
 	return httperror.NewAPIError(httperror.InvalidAction, "unsupported action")
@@ -501,4 +501,13 @@ func (h *Handler) getPipelineConfigs(pipeline *v3.Pipeline, branch string) (map[
 	}
 
 	return m, nil
+}
+
+func canUpdatePipeline(apiContext *types.APIContext) bool {
+	plObj := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	return apiContext.AccessControl.CanDo(
+		v3.PipelineGroupVersionKind.Group, v3.PipelineResource.Name, "update", apiContext, plObj, apiContext.Schema,
+	) == nil
 }
