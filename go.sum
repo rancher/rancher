@@ -928,6 +928,8 @@ github.com/rancher/wrangler v0.4.1/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU
 github.com/rancher/wrangler v0.5.0/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
 github.com/rancher/wrangler v0.5.2 h1:8y8aSQLM+xzXgOMMIc8m6TcRedGPqpH9PpvCqR0pZAU=
 github.com/rancher/wrangler v0.5.2/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
+github.com/rancher/wrangler v0.5.3 h1:wbacrpVWJAAB9aSyHC4IELx5bLZFy/7G4bGZKPFfGIA=
+github.com/rancher/wrangler v0.5.3/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
 github.com/rancher/wrangler-api v0.2.0/go.mod h1:zTPdNLZO07KvRaVOx6XQbKBSV55Fnn4s7nqmrMPJqd8=
 github.com/rancher/wrangler-api v0.2.1-0.20191025043713-b1ca9c21825a/go.mod h1:U4nfgObQ7EERMwljGhCfQIbh2ql/t8suINX8/VfWiko=
 github.com/rancher/wrangler-api v0.5.0 h1:ScVozf5SjRLW0UzOka9xzdlTJ99vLR/Gbk4/kIY49GY=

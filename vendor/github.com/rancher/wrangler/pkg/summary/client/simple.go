@@ -89,15 +89,7 @@ func (c *summaryResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 	go func() {
 		defer close(eventChan)
 		for event := range resp.ResultChan() {
-			switch event.Type {
-			case watch.Added:
-				fallthrough
-			case watch.Modified:
-				fallthrough
-			case watch.Deleted:
-				event.Object = summary.Summarized(event.Object)
-			default:
-			}
+			event.Object = summary.Summarized(event.Object)
 			eventChan <- event
 		}
 	}()
