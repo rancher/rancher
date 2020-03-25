@@ -14,7 +14,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 )
 
-func Setup(server *steve.Server, config *wrangler.Context) error {
+func Setup(server *steve.Server, config *wrangler.Context, localSupport bool, rancherHandler http.Handler) error {
 	githubHandler, err := github.NewProxy(config.Core.Secret().Cache(),
 		settings.GithubProxyAPIURL.Get(),
 		"cattle-system",
@@ -42,8 +42,9 @@ func Setup(server *steve.Server, config *wrangler.Context) error {
 		GitHub:       server.AuthMiddleware.Wrap(githubHandler),
 		Proxy:        server.AuthMiddleware.Wrap(proxy),
 		ProxyMatcher: proxy.MatchNonLegacy,
-		NotFound:     server.Next,
-	})
+		Rancher:      rancherHandler,
+		Steve:        server.Next,
+	}, localSupport)
 
 	// wrap with UI
 	server.Next = dashboard.Route(server.Next, settings.DashboardIndex.Get)
@@ -52,18 +53,26 @@ func Setup(server *steve.Server, config *wrangler.Context) error {
 }
 
 type handler struct {
+	Rancher      http.Handler
 	GitHub       http.Handler
 	Proxy        http.Handler
 	ProxyMatcher func(string, bool) mux.MatcherFunc
-	NotFound     http.Handler
+	Steve        http.Handler
 }
 
-func newRouter(h *handler) http.Handler {
+func newRouter(h *handler, localSupport bool) http.Handler {
 	mux := mux.NewRouter()
 	mux.UseEncodedPath()
 	mux.Handle("/v1/github{path:.*}", h.GitHub)
 	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(h.ProxyMatcher("/k8s/clusters/", true)).Handler(h.Proxy)
 	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(h.ProxyMatcher("/k8s/clusters/", false)).Handler(h.Proxy)
-	mux.NotFoundHandler = h.NotFound
+	if localSupport {
+		mux.NotFoundHandler = h.Steve
+	} else {
+		mux.PathPrefix("/v1/schemas").Handler(h.Steve)
+		mux.PathPrefix("/v1/userpreference").Handler(h.Steve)
+		mux.PathPrefix("/v1/management.cattle.io").Methods(http.MethodGet).Handler(h.Steve)
+		mux.NotFoundHandler = h.Rancher
+	}
 	return mux
 }
