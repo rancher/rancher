@@ -82,7 +82,7 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 			}
 		}
 	}
-	logrus.Debugf("create cmd %v", cmd)
+	logrus.Tracef("create cmd %v", cmd)
 	cmd = append(cmd, node.Spec.RequestedHostname)
 	return cmd
 }
