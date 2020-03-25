@@ -956,7 +956,7 @@ func setNodeAnnotationsLabelsTaints(k8sClient *kubernetes.Clientset, host *hosts
 	for retries := 0; retries <= 5; retries++ {
 		node, err = k8s.GetNode(k8sClient, host.HostnameOverride)
 		if err != nil {
-			logrus.Debugf("[hosts] Can't find node by name [%s], retrying..", host.HostnameOverride)
+			logrus.Debugf("[hosts] Can't find node by name [%s], error: %v", host.HostnameOverride, err)
 			time.Sleep(2 * time.Second)
 			continue
 		}

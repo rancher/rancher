@@ -19,7 +19,7 @@ import (
 
 func CheckNodeReady(kubeClient *kubernetes.Clientset, runHost *hosts.Host, component string) error {
 	for retries := 0; retries < k8s.MaxRetries; retries++ {
-		logrus.Infof("[%s] Now checking status of node %v", component, runHost.HostnameOverride)
+		logrus.Infof("[%s] Now checking status of node %v, try #%v", component, runHost.HostnameOverride, retries+1)
 		k8sNode, err := k8s.GetNode(kubeClient, runHost.HostnameOverride)
 		if err != nil {
 			return fmt.Errorf("[%s] Error getting node %v: %v", component, runHost.HostnameOverride, err)

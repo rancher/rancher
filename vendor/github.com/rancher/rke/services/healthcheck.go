@@ -47,7 +47,7 @@ func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, l
 	}
 	for retries := 0; retries < 10; retries++ {
 		if err = getHealthz(client, serviceName, host.Address, url); err != nil {
-			logrus.Debugf("[healthcheck] %v", err)
+			logrus.Debugf("[healthcheck] %v, try #%v", err, retries+1)
 			time.Sleep(5 * time.Second)
 			continue
 		}
