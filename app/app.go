@@ -330,7 +330,7 @@ func newSteve(ctx context.Context, rancher *Rancher) (http.Handler, error) {
 		Next:            rancher.Handler,
 		StartHooks: []steveserver.StartHook{
 			func(ctx context.Context, server *steveserver.Server) error {
-				return steve.Setup(server, rancher.WranglerContext)
+				return steve.Setup(server, rancher.WranglerContext, localClusterEnabled(rancher.Config), rancher.Handler)
 			},
 			clusterapiServer.Setup,
 		},
