@@ -386,6 +386,11 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, err
 			continue
 		}
 
+		// if cluster's already upgrading, skip nodes that are yet to upgrade, planChangedForUpgrade will always be true
+		if v3.ClusterConditionUpgraded.IsUnknown(cluster) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
+			continue
+		}
+
 		nodePlan, err := uh.getNodePlan(node, cluster)
 		if err != nil {
 			return false, false, err
@@ -394,6 +399,10 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, err
 		if planChangedForUpgrade(nodePlan, node.Status.NodePlan.Plan) {
 			return true, true, nil
 		}
+	}
+
+	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+		return true, false, nil
 	}
 
 	return false, false, nil
