@@ -289,7 +289,10 @@ func (c *Cluster) deployKubeDNS(ctx context.Context, data map[string]interface{}
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
 		StubDomains:            c.DNS.StubDomains,
 		NodeSelector:           c.DNS.NodeSelector,
-		UpdateStrategy:         c.DNS.UpdateStrategy,
+		UpdateStrategy: &appsv1.DeploymentStrategy{
+			Type:          c.DNS.UpdateStrategy.Strategy,
+			RollingUpdate: c.DNS.UpdateStrategy.RollingUpdate,
+		},
 	}
 	linearModeBytes, err := json.Marshal(c.DNS.LinearAutoscalerParams)
 	if err != nil {
@@ -322,7 +325,10 @@ func (c *Cluster) deployCoreDNS(ctx context.Context, data map[string]interface{}
 		UpstreamNameservers:    c.DNS.UpstreamNameservers,
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
 		NodeSelector:           c.DNS.NodeSelector,
-		UpdateStrategy:         c.DNS.UpdateStrategy,
+		UpdateStrategy: &appsv1.DeploymentStrategy{
+			Type:          c.DNS.UpdateStrategy.Strategy,
+			RollingUpdate: c.DNS.UpdateStrategy.RollingUpdate,
+		},
 	}
 	linearModeBytes, err := json.Marshal(c.DNS.LinearAutoscalerParams)
 	if err != nil {
@@ -372,8 +378,11 @@ func (c *Cluster) deployMetricServer(ctx context.Context, data map[string]interf
 		Options:            c.Monitoring.Options,
 		NodeSelector:       c.Monitoring.NodeSelector,
 		Version:            util.GetTagMajorVersion(versionTag),
-		UpdateStrategy:     c.Monitoring.UpdateStrategy,
-		Replicas:           c.Monitoring.Replicas,
+		UpdateStrategy: &appsv1.DeploymentStrategy{
+			Type:          c.Monitoring.UpdateStrategy.Strategy,
+			RollingUpdate: c.Monitoring.UpdateStrategy.RollingUpdate,
+		},
+		Replicas: c.Monitoring.Replicas,
 	}
 	tmplt, err := templates.GetVersionedTemplates(kdm.MetricsServer, data, c.Version)
 	if err != nil {
@@ -531,7 +540,10 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 		ExtraEnvs:         c.Ingress.ExtraEnvs,
 		ExtraVolumes:      c.Ingress.ExtraVolumes,
 		ExtraVolumeMounts: c.Ingress.ExtraVolumeMounts,
-		UpdateStrategy:    c.Ingress.UpdateStrategy,
+		UpdateStrategy: &appsv1.DaemonSetUpdateStrategy{
+			Type:          c.Ingress.UpdateStrategy.Strategy,
+			RollingUpdate: c.Ingress.UpdateStrategy.RollingUpdate,
+		},
 	}
 	// since nginx ingress controller 0.16.0, it can be run as non-root and doesn't require privileged anymore.
 	// So we can use securityContext instead of setting privileges via initContainer.
@@ -649,7 +661,12 @@ func (c *Cluster) deployNodelocal(ctx context.Context, data map[string]interface
 		ClusterDNSServer: c.ClusterDNSServer,
 		IPAddress:        c.DNS.Nodelocal.IPAddress,
 		NodeSelector:     c.DNS.Nodelocal.NodeSelector,
-		UpdateStrategy:   c.DNS.Nodelocal.UpdateStrategy,
+	}
+	if c.DNS.Nodelocal.UpdateStrategy != nil {
+		NodelocalConfig.UpdateStrategy = &appsv1.DaemonSetUpdateStrategy{
+			Type:          c.DNS.Nodelocal.UpdateStrategy.Strategy,
+			RollingUpdate: c.DNS.Nodelocal.UpdateStrategy.RollingUpdate,
+		}
 	}
 	tmplt, err := templates.GetVersionedTemplates(kdm.Nodelocal, data, c.Version)
 	if err != nil {

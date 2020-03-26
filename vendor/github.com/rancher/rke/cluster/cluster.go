@@ -27,7 +27,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -517,25 +516,26 @@ func parseIngressConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngin
 	return nil
 }
 
-func parseDaemonSetUpdateStrategy(updateStrategyField interface{}) (*appsv1.DaemonSetUpdateStrategy, error) {
+func parseDaemonSetUpdateStrategy(updateStrategyField interface{}) (*v3.DaemonSetUpdateStrategy, error) {
 	updateStrategyBytes, err := json.Marshal(updateStrategyField)
 	if err != nil {
 		return nil, fmt.Errorf("[parseDaemonSetUpdateStrategy] error marshalling updateStrategy: %v", err)
 	}
-	var updateStrategy *appsv1.DaemonSetUpdateStrategy
+	var updateStrategy *v3.DaemonSetUpdateStrategy
 	err = json.Unmarshal(updateStrategyBytes, &updateStrategy)
 	if err != nil {
 		return nil, fmt.Errorf("[parseIngressUpdateStrategy] error unmarshaling updateStrategy: %v", err)
 	}
+
 	return updateStrategy, nil
 }
 
-func parseDeploymentUpdateStrategy(updateStrategyField interface{}) (*appsv1.DeploymentStrategy, error) {
+func parseDeploymentUpdateStrategy(updateStrategyField interface{}) (*v3.DeploymentStrategy, error) {
 	updateStrategyBytes, err := json.Marshal(updateStrategyField)
 	if err != nil {
 		return nil, fmt.Errorf("[parseDeploymentUpdateStrategy] error marshalling updateStrategy: %v", err)
 	}
-	var updateStrategy *appsv1.DeploymentStrategy
+	var updateStrategy *v3.DeploymentStrategy
 	err = json.Unmarshal(updateStrategyBytes, &updateStrategy)
 	if err != nil {
 		return nil, fmt.Errorf("[parseDeploymentUpdateStrategy] error unmarshaling updateStrategy: %v", err)

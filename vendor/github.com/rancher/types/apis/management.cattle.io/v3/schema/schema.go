@@ -72,7 +72,9 @@ func rkeTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ExtraEnv{}).
 		MustImport(&Version, v3.ExtraVolume{}).
 		MustImport(&Version, v3.ExtraVolumeMount{}).
-		MustImport(&Version, v3.LinearAutoscalerParams{})
+		MustImport(&Version, v3.LinearAutoscalerParams{}).
+		MustImport(&Version, v3.DeploymentStrategy{}).
+		MustImport(&Version, v3.DaemonSetUpdateStrategy{})
 }
 
 func schemaTypes(schemas *types.Schemas) *types.Schemas {

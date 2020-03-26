@@ -2,7 +2,6 @@ package v3
 
 import (
 	"github.com/rancher/norman/types"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
@@ -384,7 +383,7 @@ type NetworkConfig struct {
 	// NodeSelector key pair
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 	// Network plugin daemonset upgrade strategy
-	UpdateStrategy *appsv1.DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
+	UpdateStrategy *DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
 }
 
 type AuthWebhookConfig struct {
@@ -428,7 +427,7 @@ type IngressConfig struct {
 	// Extra volume mounts
 	ExtraVolumeMounts []ExtraVolumeMount `yaml:"extra_volume_mounts" json:"extraVolumeMounts,omitempty" norman:"type=array[json]"`
 	// nginx daemonset upgrade strategy
-	UpdateStrategy *appsv1.DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
+	UpdateStrategy *DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
 }
 
 type ExtraEnv struct {
@@ -816,7 +815,7 @@ type MonitoringConfig struct {
 	// NodeSelector key pair
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 	// Update strategy
-	UpdateStrategy *appsv1.DeploymentStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
+	UpdateStrategy *DeploymentStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
 	// Number of monitoring addon pods
 	Replicas *int32 `yaml:"replicas" json:"replicas,omitempty" norman:"default=1"`
 }
@@ -846,7 +845,7 @@ type DNSConfig struct {
 	// Nodelocal DNS
 	Nodelocal *Nodelocal `yaml:"nodelocal" json:"nodelocal,omitempy"`
 	// Update strategy
-	UpdateStrategy *appsv1.DeploymentStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
+	UpdateStrategy *DeploymentStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
 	// Autoscaler fields to determine number of dns replicas
 	LinearAutoscalerParams *LinearAutoscalerParams `yaml:"linear_autoscaler_params" json:"linearAutoscalerParams,omitempty"`
 }
@@ -855,7 +854,7 @@ type Nodelocal struct {
 	// link-local IP for nodelocal DNS
 	IPAddress string `yaml:"ip_address" json:"ipAddress,omitempy"`
 	// Nodelocal DNS daemonset upgrade strategy
-	UpdateStrategy *appsv1.DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
+	UpdateStrategy *DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
 	// NodeSelector key pair
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 }

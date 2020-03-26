@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 const (
@@ -177,7 +178,10 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context, data map[string]interface
 		RBACConfig:     c.Authorization.Mode,
 		ClusterVersion: util.GetTagMajorVersion(c.Version),
 		NodeSelector:   c.Network.NodeSelector,
-		UpdateStrategy: c.Network.UpdateStrategy,
+		UpdateStrategy: &appsv1.DaemonSetUpdateStrategy{
+			Type:          c.Network.UpdateStrategy.Strategy,
+			RollingUpdate: c.Network.UpdateStrategy.RollingUpdate,
+		},
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(flannelConfig, data)
 	if err != nil {
@@ -201,7 +205,10 @@ func (c *Cluster) doCalicoDeploy(ctx context.Context, data map[string]interface{
 		RBACConfig:       c.Authorization.Mode,
 		NodeSelector:     c.Network.NodeSelector,
 		MTU:              c.Network.MTU,
-		UpdateStrategy:   c.Network.UpdateStrategy,
+		UpdateStrategy: &appsv1.DaemonSetUpdateStrategy{
+			Type:          c.Network.UpdateStrategy.Strategy,
+			RollingUpdate: c.Network.UpdateStrategy.RollingUpdate,
+		},
 		FlexVolPluginDir: c.Network.Options[CalicoFlexVolPluginDirectory],
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(calicoConfig, data)
@@ -240,9 +247,12 @@ func (c *Cluster) doCanalDeploy(ctx context.Context, data map[string]interface{}
 			"VNI":  flannelVni,
 			"Port": flannelPort,
 		},
-		NodeSelector:     c.Network.NodeSelector,
-		MTU:              c.Network.MTU,
-		UpdateStrategy:   c.Network.UpdateStrategy,
+		NodeSelector: c.Network.NodeSelector,
+		MTU:          c.Network.MTU,
+		UpdateStrategy: &appsv1.DaemonSetUpdateStrategy{
+			Type:          c.Network.UpdateStrategy.Strategy,
+			RollingUpdate: c.Network.UpdateStrategy.RollingUpdate,
+		},
 		FlexVolPluginDir: c.Network.Options[CanalFlexVolPluginDirectory],
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(canalConfig, data)
@@ -262,7 +272,10 @@ func (c *Cluster) doWeaveDeploy(ctx context.Context, data map[string]interface{}
 		RBACConfig:         c.Authorization.Mode,
 		NodeSelector:       c.Network.NodeSelector,
 		MTU:                c.Network.MTU,
-		UpdateStrategy:     c.Network.UpdateStrategy,
+		UpdateStrategy: &appsv1.DaemonSetUpdateStrategy{
+			Type:          c.Network.UpdateStrategy.Strategy,
+			RollingUpdate: c.Network.UpdateStrategy.RollingUpdate,
+		},
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(weaveConfig, data)
 	if err != nil {
