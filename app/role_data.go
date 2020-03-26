@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -389,7 +391,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 		adminName = admins.Items[0].Name
 	}
 
-	if _, err := management.K8sClient.CoreV1().ConfigMaps(cattleNamespace).Get(bootstrapAdminConfig, v1.GetOptions{}); err != nil {
+	if _, err := management.K8sClient.CoreV1().ConfigMaps(cattleNamespace).Get(context.TODO(), bootstrapAdminConfig, v1.GetOptions{}); err != nil {
 		if !apierrors.IsNotFound(err) {
 			logrus.Warnf("Unable to determine if admin user already created: %v", err)
 			return "", nil
@@ -451,7 +453,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 		},
 	}
 
-	_, err = management.K8sClient.CoreV1().ConfigMaps(cattleNamespace).Create(&adminConfigMap)
+	_, err = management.K8sClient.CoreV1().ConfigMaps(cattleNamespace).Create(context.TODO(), &adminConfigMap, v1.CreateOptions{})
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			logrus.Warnf("Error creating admin config map: %v", err)

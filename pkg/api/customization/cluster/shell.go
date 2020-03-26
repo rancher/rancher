@@ -35,7 +35,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 	}
 	cacerts := base64.StdEncoding.EncodeToString([]byte(settings.CACerts.Get()))
 
-	pods, err := context.K8sClient.CoreV1().Pods("cattle-system").List(v1.ListOptions{
+	pods, err := context.K8sClient.CoreV1().Pods("cattle-system").List(apiContext.Request.Context(), v1.ListOptions{
 		LabelSelector: "app=cattle-agent",
 	})
 	if err != nil {

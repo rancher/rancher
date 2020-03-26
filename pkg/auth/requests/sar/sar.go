@@ -1,6 +1,7 @@
 package sar
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -8,6 +9,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	authV1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // SubjectAccessReview checks if a user can impersonate as another user or group
@@ -61,7 +63,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateUser(userContext *config.U
 		},
 	}
 
-	result, err := userContext.K8sClient.AuthorizationV1().SubjectAccessReviews().Create(&review)
+	result, err := userContext.K8sClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), &review, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -82,7 +84,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateGroup(userContext *config.
 			},
 		}
 
-		result, err := userContext.K8sClient.AuthorizationV1().SubjectAccessReviews().Create(&review)
+		result, err := userContext.K8sClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), &review, metav1.CreateOptions{})
 		if err != nil {
 			return false, err
 		}
