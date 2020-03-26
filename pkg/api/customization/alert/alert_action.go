@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/rbac"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config/dialer"
@@ -22,7 +23,7 @@ type Handler struct {
 }
 
 func RuleFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	if canUpdateAlert(apiContext) {
+	if canUpdateAlert(apiContext, resource) {
 		resource.AddAction(apiContext, "unmute")
 		resource.AddAction(apiContext, "activate")
 		resource.AddAction(apiContext, "mute")
@@ -31,7 +32,7 @@ func RuleFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 func GroupFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	if canUpdateAlert(apiContext) {
+	if canUpdateAlert(apiContext, nil) {
 		resource.AddAction(apiContext, "unmute")
 		resource.AddAction(apiContext, "activate")
 		resource.AddAction(apiContext, "mute")
@@ -40,7 +41,7 @@ func GroupFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 func (h *Handler) ClusterAlertRuleActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	if !canUpdateAlert(request) {
+	if !canUpdateAlert(request, nil) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -99,7 +100,7 @@ func (h *Handler) ClusterAlertRuleActionHandler(actionName string, action *types
 }
 
 func (h *Handler) ProjectAlertRuleActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	if !canUpdateAlert(request) {
+	if !canUpdateAlert(request, nil) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -157,7 +158,7 @@ func (h *Handler) ProjectAlertRuleActionHandler(actionName string, action *types
 	return nil
 }
 
-func canUpdateAlert(apiContext *types.APIContext) bool {
+func canUpdateAlert(apiContext *types.APIContext, resource *types.RawResource) bool {
 	var groupName, resourceName string
 	switch apiContext.Type {
 	case client.ClusterAlertRuleType:
@@ -167,8 +168,6 @@ func canUpdateAlert(apiContext *types.APIContext) bool {
 	default:
 		return false
 	}
-	alertObj := map[string]interface{}{
-		"id": apiContext.ID,
-	}
-	return apiContext.AccessControl.CanDo(groupName, resourceName, "update", apiContext, alertObj, apiContext.Schema) == nil
+	obj := rbac.ObjFromContext(apiContext, resource)
+	return apiContext.AccessControl.CanDo(groupName, resourceName, "update", apiContext, obj, apiContext.Schema) == nil
 }

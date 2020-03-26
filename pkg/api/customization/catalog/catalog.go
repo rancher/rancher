@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -27,7 +28,7 @@ const (
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	if canUpdateCatalog(apiContext) {
+	if canUpdateCatalog(apiContext, resource) {
 		resource.AddAction(apiContext, "refresh")
 	}
 	resource.Links["exportYaml"] = apiContext.URLBuilder.Link("exportYaml", resource)
@@ -41,7 +42,7 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 func CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
-	if canUpdateCatalog(apiContext) {
+	if canUpdateCatalog(apiContext, nil) {
 		collection.AddAction(apiContext, "refresh")
 	}
 }
@@ -56,7 +57,7 @@ func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
-	if !canUpdateCatalog(apiContext) {
+	if !canUpdateCatalog(apiContext, nil) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -136,7 +137,7 @@ func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
-	if !canUpdateCatalog(apiContext) {
+	if !canUpdateCatalog(apiContext, nil) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -177,7 +178,7 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
-	if !canUpdateCatalog(apiContext) {
+	if !canUpdateCatalog(apiContext, nil) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -214,7 +215,7 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	return nil
 }
 
-func canUpdateCatalog(apiContext *types.APIContext) bool {
+func canUpdateCatalog(apiContext *types.APIContext, resource *types.RawResource) bool {
 	var groupName, resourceName string
 	switch apiContext.Type {
 	case client.CatalogType:
@@ -226,8 +227,6 @@ func canUpdateCatalog(apiContext *types.APIContext) bool {
 	default:
 		return false
 	}
-	catObj := map[string]interface{}{
-		"id": apiContext.ID,
-	}
-	return apiContext.AccessControl.CanDo(groupName, resourceName, "update", apiContext, catObj, apiContext.Schema) == nil
+	obj := rbac.ObjFromContext(apiContext, resource)
+	return apiContext.AccessControl.CanDo(groupName, resourceName, "update", apiContext, obj, apiContext.Schema) == nil
 }
