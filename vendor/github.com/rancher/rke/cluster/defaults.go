@@ -95,12 +95,12 @@ const (
 var (
 	DefaultDaemonSetMaxUnavailable        = intstr.FromInt(1)
 	DefaultDeploymentUpdateStrategyParams = intstr.FromString("25%")
-	DefaultDaemonSetUpdateStrategy        = appsv1.DaemonSetUpdateStrategy{
-		Type:          appsv1.RollingUpdateDaemonSetStrategyType,
+	DefaultDaemonSetUpdateStrategy        = v3.DaemonSetUpdateStrategy{
+		Strategy:      appsv1.RollingUpdateDaemonSetStrategyType,
 		RollingUpdate: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &DefaultDaemonSetMaxUnavailable},
 	}
-	DefaultDeploymentUpdateStrategy = appsv1.DeploymentStrategy{
-		Type: appsv1.RollingUpdateDeploymentStrategyType,
+	DefaultDeploymentUpdateStrategy = v3.DeploymentStrategy{
+		Strategy: appsv1.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &appsv1.RollingUpdateDeployment{
 			MaxUnavailable: &DefaultDeploymentUpdateStrategyParams,
 			MaxSurge:       &DefaultDeploymentUpdateStrategyParams,
@@ -629,8 +629,8 @@ func (c *Cluster) setAddonsDefaults() {
 	}
 }
 
-func setDaemonsetAddonDefaults(updateStrategy *appsv1.DaemonSetUpdateStrategy) *appsv1.DaemonSetUpdateStrategy {
-	if updateStrategy != nil && updateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
+func setDaemonsetAddonDefaults(updateStrategy *v3.DaemonSetUpdateStrategy) *v3.DaemonSetUpdateStrategy {
+	if updateStrategy != nil && updateStrategy.Strategy != appsv1.RollingUpdateDaemonSetStrategyType {
 		return updateStrategy
 	}
 	if updateStrategy == nil || updateStrategy.RollingUpdate == nil || updateStrategy.RollingUpdate.MaxUnavailable == nil {
@@ -639,8 +639,8 @@ func setDaemonsetAddonDefaults(updateStrategy *appsv1.DaemonSetUpdateStrategy) *
 	return updateStrategy
 }
 
-func setDeploymentAddonDefaults(updateStrategy *appsv1.DeploymentStrategy) *appsv1.DeploymentStrategy {
-	if updateStrategy != nil && updateStrategy.Type != appsv1.RollingUpdateDeploymentStrategyType {
+func setDeploymentAddonDefaults(updateStrategy *v3.DeploymentStrategy) *v3.DeploymentStrategy {
+	if updateStrategy != nil && updateStrategy.Strategy != appsv1.RollingUpdateDeploymentStrategyType {
 		return updateStrategy
 	}
 	if updateStrategy == nil || updateStrategy.RollingUpdate == nil {
@@ -655,19 +655,19 @@ func setDeploymentAddonDefaults(updateStrategy *appsv1.DeploymentStrategy) *apps
 	return updateStrategy
 }
 
-func setDNSDeploymentAddonDefaults(updateStrategy *appsv1.DeploymentStrategy, dnsProvider string) *appsv1.DeploymentStrategy {
+func setDNSDeploymentAddonDefaults(updateStrategy *v3.DeploymentStrategy, dnsProvider string) *v3.DeploymentStrategy {
 	var (
 		coreDNSMaxUnavailable, coreDNSMaxSurge = intstr.FromInt(1), intstr.FromInt(0)
 		kubeDNSMaxSurge, kubeDNSMaxUnavailable = intstr.FromString("10%"), intstr.FromInt(0)
 	)
-	if updateStrategy != nil && updateStrategy.Type != appsv1.RollingUpdateDeploymentStrategyType {
+	if updateStrategy != nil && updateStrategy.Strategy != appsv1.RollingUpdateDeploymentStrategyType {
 		return updateStrategy
 	}
 	switch dnsProvider {
 	case CoreDNSProvider:
 		if updateStrategy == nil || updateStrategy.RollingUpdate == nil {
-			return &appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
+			return &v3.DeploymentStrategy{
+				Strategy: appsv1.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDeployment{
 					MaxUnavailable: &coreDNSMaxUnavailable,
 					MaxSurge:       &coreDNSMaxSurge,
@@ -679,8 +679,8 @@ func setDNSDeploymentAddonDefaults(updateStrategy *appsv1.DeploymentStrategy, dn
 		}
 	case KubeDNSProvider:
 		if updateStrategy == nil || updateStrategy.RollingUpdate == nil {
-			return &appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
+			return &v3.DeploymentStrategy{
+				Strategy: appsv1.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDeployment{
 					MaxUnavailable: &kubeDNSMaxUnavailable,
 					MaxSurge:       &kubeDNSMaxSurge,
