@@ -99,7 +99,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 	if err := addMachineDriver(PacketDriver, "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.2.2/docker-machine-driver-packet_linux-amd64.zip",
-		"https://tinkerbell.org/ui-driver-packet/1.0.1/component.js", "e03c6bc9406c811e03e9bc2c39f43e6cc8c02d1615bd0e0b8ee1b38be6fe201c", []string{"api.packet.net", "tinkerbell.org"}, false, false, management); err != nil {
+		"https://tinkerbell.org/ui-driver-packet/1.0.2/component.js", "e03c6bc9406c811e03e9bc2c39f43e6cc8c02d1615bd0e0b8ee1b38be6fe201c", []string{"api.packet.net", "tinkerbell.org"}, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(RackspaceDriver, "local://", "", "", nil, false, true, management); err != nil {
