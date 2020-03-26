@@ -152,7 +152,6 @@ func GetUserSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) [
 
 func GetGroupSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) []string {
 	groupSeachAttributes := []string{config.GroupMemberUserAttribute,
-		config.GroupMemberMappingAttribute,
 		ObjectClass,
 		config.GroupObjectClass,
 		config.UserLoginAttribute,
