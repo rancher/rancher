@@ -98,25 +98,6 @@ var amiForRegionAndVersion = map[string]map[string]string{
 		"me-south-1":     "ami-02ec1b153ae90c2c3",
 		"sa-east-1":      "ami-035e63ad35c591df8",
 	},
-	"1.12": map[string]string{
-		"us-east-2":      "ami-0243b86bf17bdf282",
-		"us-east-1":      "ami-0ad6567ae0a817577",
-		"us-west-2":      "ami-0ec0eebfe09f8a641",
-		"ap-east-1":      "ami-0d8112a829ab1dbe3",
-		"ap-south-1":     "ami-0229b20de901562bb",
-		"ap-northeast-2": "ami-02c654f7a3055a0b5",
-		"ap-southeast-1": "ami-03a8ac8740d6ddcd1",
-		"ap-southeast-2": "ami-0bf3d8667e090925b",
-		"ap-northeast-1": "ami-02355b50897aa3aa1",
-		"ca-central-1":   "ami-072d30b45d3515f6a",
-		"eu-central-1":   "ami-033d1d6ff9131d9f1",
-		"eu-west-1":      "ami-04b0486b375074f76",
-		"eu-west-2":      "ami-0aed33d48fb4e1f41",
-		"eu-west-3":      "ami-048395c260672dd76",
-		"eu-north-1":     "ami-04e160b95d368ebc9",
-		"me-south-1":     "ami-05c110c75b8ae1fe3",
-		"sa-east-1":      "ami-02fcd63b41f21e854",
-	},
 }
 
 type Driver struct {
