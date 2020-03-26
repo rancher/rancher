@@ -587,6 +587,7 @@ func resetRkeConfigFlags(cluster *v3.Cluster, updateTriggered bool) {
 		cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = nil
 		if cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore {
 			cluster.Annotations[RkeRestoreAnnotation] = "true"
+			cluster.Status.NodeVersion++
 		}
 		cluster.Spec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
