@@ -19,6 +19,7 @@ limitations under the License.
 package v3
 
 import (
+	"context"
 	time "time"
 
 	versioned "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned"
@@ -60,13 +61,13 @@ func NewFilteredUserInformer(client versioned.Interface, resyncPeriod time.Durat
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ManagementV3().Users().List(options)
+				return client.ManagementV3().Users().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ManagementV3().Users().Watch(options)
+				return client.ManagementV3().Users().Watch(context.TODO(), options)
 			},
 		},
 		&managementcattleiov3.User{},

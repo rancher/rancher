@@ -99,7 +99,7 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 }
 
 func (n *GDController) getIngressForGlobalDNS(globaldns *v3.GlobalDNS) (*v1beta1.Ingress, error) {
-	ingress, err := n.ingresses.Get(strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"), metav1.GetOptions{}) //n.Get("", strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"))
+	ingress, err := n.ingresses.Get(context.TODO(), strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"), metav1.GetOptions{}) //n.Get("", strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"))
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDNS) (*v1be
 	if globaldns.Spec.TTL != 0 {
 		ingressSpec.ObjectMeta.Annotations[annotationDNSTTL] = strconv.FormatInt(globaldns.Spec.TTL, 10)
 	}
-	ingressObj, err := n.ingresses.Create(ingressSpec)
+	ingressObj, err := n.ingresses.Create(context.TODO(), ingressSpec, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.Glo
 
 	if n.ifEndpointsDiffer(ingress.Status.LoadBalancer.Ingress, obj.Status.Endpoints) {
 		ingress.Status.LoadBalancer.Ingress = n.sliceToStatus(obj.Status.Endpoints)
-		ingress, err = n.ingresses.UpdateStatus(ingress)
+		ingress, err = n.ingresses.UpdateStatus(context.TODO(), ingress, metav1.UpdateOptions{})
 
 		if err != nil {
 			return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
@@ -203,7 +203,7 @@ func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.Glo
 	}
 
 	if updateIngress {
-		_, err = n.ingresses.Update(ingress)
+		_, err = n.ingresses.Update(context.TODO(), ingress, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
 		}

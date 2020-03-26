@@ -68,7 +68,7 @@ func (p *projectStore) getProjects(apiOp *types.APIRequest, schema *types.APISch
 		return nil, err
 	}
 
-	objs, err := client.List(metav1.ListOptions{})
+	objs, err := client.List(apiOp.Context(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

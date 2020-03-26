@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -19,16 +20,16 @@ import (
 )
 
 func setupNS(name, projectName string, nsClient v1.NamespaceInterface, c *check.C) *corev1.Namespace {
-	if _, err := nsClient.Get(name, metav1.GetOptions{}); err == nil {
-		nsList, err := nsClient.List(metav1.ListOptions{})
+	if _, err := nsClient.Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+		nsList, err := nsClient.List(context.TODO(), metav1.ListOptions{})
 		c.Assert(err, check.IsNil)
 		nsListMeta, err := meta.ListAccessor(nsList)
 		c.Assert(err, check.IsNil)
-		nsWatch, err := nsClient.Watch(metav1.ListOptions{ResourceVersion: nsListMeta.GetResourceVersion()})
+		nsWatch, err := nsClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: nsListMeta.GetResourceVersion()})
 		c.Assert(err, check.IsNil)
 		defer nsWatch.Stop()
 
-		if err := nsClient.Delete(name, &metav1.DeleteOptions{}); err != nil {
+		if err := nsClient.Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 			c.Fatal(err)
 		}
 
@@ -39,7 +40,7 @@ func setupNS(name, projectName string, nsClient v1.NamespaceInterface, c *check.
 				if watch.Deleted == watchEvent.Type || watch.Modified == watchEvent.Type {
 					if ns, ok := watchEvent.Object.(*corev1.Namespace); ok && ns.Name == name {
 						for i := 0; i < 10; i++ {
-							if ns, err := nsClient.Get(name, metav1.GetOptions{}); err == nil {
+							if ns, err := nsClient.Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
 								if ns.Status.Phase == corev1.NamespaceTerminating && len(ns.Spec.Finalizers) == 0 {
 									break Loop
 								}
@@ -64,7 +65,7 @@ func setupNS(name, projectName string, nsClient v1.NamespaceInterface, c *check.
 			},
 		},
 	}
-	ns, err := nsClient.Create(ns)
+	ns, err := nsClient.Create(context.TODO(), ns, metav1.CreateOptions{})
 	c.Assert(err, check.IsNil)
 
 	return ns
@@ -74,12 +75,12 @@ func setupCRD(name, plural, group, kind, version string, scope apiextensionsv1be
 	crdWatch watch.Interface, c *check.C) {
 	fullName := plural + "." + group
 
-	if err := crdClient.Delete(fullName, &metav1.DeleteOptions{}); err == nil {
+	if err := crdClient.Delete(context.TODO(), fullName, metav1.DeleteOptions{}); err == nil {
 		waitForCRDDeleted(fullName, crdWatch, crdClient, c)
 	}
 
 	crd := newCRD(fullName, name, plural, group, kind, version, scope)
-	_, err := crdClient.Create(crd)
+	_, err := crdClient.Create(context.TODO(), crd, metav1.CreateOptions{})
 	c.Assert(err, check.IsNil)
 	waitForCRDEstablished(fullName, crdWatch, crdClient, c)
 }
@@ -90,7 +91,7 @@ func waitForCRDEstablished(name string, crdWatch watch.Interface, crdClient crdc
 		case watchEvent := <-crdWatch.ResultChan():
 			if watch.Modified == watchEvent.Type || watch.Added == watchEvent.Type {
 				if crd, ok := watchEvent.Object.(*apiextensionsv1beta1.CustomResourceDefinition); ok && crd.Name == name {
-					got, err := crdClient.Get(name, metav1.GetOptions{})
+					got, err := crdClient.Get(context.TODO(), name, metav1.GetOptions{})
 					c.Assert(err, check.IsNil)
 
 					for _, c := range got.Status.Conditions {
@@ -179,7 +180,7 @@ func watchChecker(watcher watch.Interface, c *check.C, checker func(watchEvent w
 
 func deleteNSOnPass(name string, nsClient v1.NamespaceInterface, c *check.C) {
 	if !c.Failed() {
-		if err := nsClient.Delete(name, &metav1.DeleteOptions{}); err != nil {
+		if err := nsClient.Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 			c.Logf("Error deleting ns %v: %v", name, err)
 		}
 	}
