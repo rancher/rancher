@@ -233,6 +233,9 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := validateS3Credentials(data); err != nil {
 		return nil, err
 	}
+	if err := removeSchemaTypeFromAddonUpgradeStrategy(data); err != nil {
+		return nil, err
+	}
 
 	return r.Store.Create(apiContext, schema, data)
 }
@@ -506,6 +509,9 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := r.validateUnavailableNodes(data, existingCluster, id); err != nil {
 		return nil, err
 	}
+	if err := removeSchemaTypeFromAddonUpgradeStrategy(data); err != nil {
+		return nil, err
+	}
 	return r.Store.Update(apiContext, schema, data, id)
 }
 
@@ -664,6 +670,41 @@ func validateNetworkFlag(data map[string]interface{}, create bool) error {
 		}
 	}
 
+	return nil
+}
+
+func removeSchemaTypeFromAddonUpgradeStrategy(newData map[string]interface{}) error {
+	rkeConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig")
+	if rkeConfig == nil {
+		return nil
+	}
+	rkeConfigMap := convert.ToMapInterface(rkeConfig)
+	for _, addon := range []string{"dns", "ingress", "network", "monitoring"} {
+		if addon == "dns" {
+			// check nodeLocal type too
+			nodeLocalUpgradeStrategy := values.GetValueN(rkeConfigMap, addon, "nodelocal", "updateStrategy")
+			if nodeLocalUpgradeStrategy != nil {
+				nodeLocalUpgradeStrategyMap := convert.ToMapInterface(nodeLocalUpgradeStrategy)
+				if updateType, ok := nodeLocalUpgradeStrategyMap["type"].(string); ok {
+					if strings.Contains(updateType, "/v3/schemas") {
+						delete(nodeLocalUpgradeStrategyMap, "type")
+						values.PutValue(newData, nodeLocalUpgradeStrategyMap, "rancherKubernetesEngineConfig", addon, "nodelocal", "updateStrategy")
+					}
+				}
+			}
+		}
+		updateStrategy := values.GetValueN(rkeConfigMap, addon, "updateStrategy")
+		if updateStrategy == nil {
+			continue
+		}
+		updateStrategyMap := convert.ToMapInterface(updateStrategy)
+		if updateType, ok := updateStrategyMap["type"].(string); ok {
+			if strings.Contains(updateType, "/v3/schemas") {
+				delete(updateStrategyMap, "type")
+				values.PutValue(newData, updateStrategyMap, "rancherKubernetesEngineConfig", addon, "updateStrategy")
+			}
+		}
+	}
 	return nil
 }
 
