@@ -176,35 +176,38 @@ func (c *clusterController) Cache() ClusterCache {
 }
 
 func (c *clusterController) Create(obj *v3.Cluster) (*v3.Cluster, error) {
-	return c.clientGetter.Clusters().Create(obj)
+	return c.clientGetter.Clusters().Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *clusterController) Update(obj *v3.Cluster) (*v3.Cluster, error) {
-	return c.clientGetter.Clusters().Update(obj)
+	return c.clientGetter.Clusters().Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *clusterController) UpdateStatus(obj *v3.Cluster) (*v3.Cluster, error) {
-	return c.clientGetter.Clusters().UpdateStatus(obj)
+	return c.clientGetter.Clusters().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *clusterController) Delete(name string, options *metav1.DeleteOptions) error {
-	return c.clientGetter.Clusters().Delete(name, options)
+	if options == nil {
+		options = &metav1.DeleteOptions{}
+	}
+	return c.clientGetter.Clusters().Delete(context.TODO(), name, *options)
 }
 
 func (c *clusterController) Get(name string, options metav1.GetOptions) (*v3.Cluster, error) {
-	return c.clientGetter.Clusters().Get(name, options)
+	return c.clientGetter.Clusters().Get(context.TODO(), name, options)
 }
 
 func (c *clusterController) List(opts metav1.ListOptions) (*v3.ClusterList, error) {
-	return c.clientGetter.Clusters().List(opts)
+	return c.clientGetter.Clusters().List(context.TODO(), opts)
 }
 
 func (c *clusterController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.Clusters().Watch(opts)
+	return c.clientGetter.Clusters().Watch(context.TODO(), opts)
 }
 
 func (c *clusterController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Cluster, err error) {
-	return c.clientGetter.Clusters().Patch(name, pt, data, subresources...)
+	return c.clientGetter.Clusters().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type clusterCache struct {
@@ -233,6 +236,7 @@ func (c *clusterCache) GetByIndex(indexName, key string) (result []*v3.Cluster, 
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v3.Cluster, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v3.Cluster))
 	}

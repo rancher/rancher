@@ -211,7 +211,7 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRole(userContext *config.U
 		ObjectMeta: meta,
 		Rules:      rules,
 	}
-	return userContext.K8sClient.RbacV1().ClusterRoles().Create(&clusterRole)
+	return userContext.K8sClient.RbacV1().ClusterRoles().Create(context.TODO(), &clusterRole, metav1.CreateOptions{})
 }
 
 func (c *ClusterLifecycleCleanup) createCleanupServiceAccount(userContext *config.UserContext) (*coreV1.ServiceAccount, error) {
@@ -222,7 +222,7 @@ func (c *ClusterLifecycleCleanup) createCleanupServiceAccount(userContext *confi
 	serviceAccount := coreV1.ServiceAccount{
 		ObjectMeta: meta,
 	}
-	return userContext.K8sClient.CoreV1().ServiceAccounts("default").Create(&serviceAccount)
+	return userContext.K8sClient.CoreV1().ServiceAccounts("default").Create(context.TODO(), &serviceAccount, metav1.CreateOptions{})
 }
 
 func (c *ClusterLifecycleCleanup) createCleanupClusterRoleBinding(
@@ -248,7 +248,7 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRoleBinding(
 			Name:     role,
 		},
 	}
-	return userContext.K8sClient.RbacV1().ClusterRoleBindings().Create(&clusterRoleBinding)
+	return userContext.K8sClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), &clusterRoleBinding, metav1.CreateOptions{})
 }
 
 func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserContext, sa string) (*batchV1.Job, error) {
@@ -286,7 +286,7 @@ func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserConte
 			},
 		},
 	}
-	return userContext.K8sClient.BatchV1().Jobs("default").Create(&job)
+	return userContext.K8sClient.BatchV1().Jobs("default").Create(context.TODO(), &job, metav1.CreateOptions{})
 }
 
 func (c *ClusterLifecycleCleanup) updateClusterRoleOwner(
@@ -295,13 +295,13 @@ func (c *ClusterLifecycleCleanup) updateClusterRoleOwner(
 	or []metav1.OwnerReference,
 ) error {
 	return tryUpdate(func() error {
-		role, err := userContext.K8sClient.RbacV1().ClusterRoles().Get(role.Name, metav1.GetOptions{})
+		role, err := userContext.K8sClient.RbacV1().ClusterRoles().Get(context.TODO(), role.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		role.OwnerReferences = or
 
-		_, err = userContext.K8sClient.RbacV1().ClusterRoles().Update(role)
+		_, err = userContext.K8sClient.RbacV1().ClusterRoles().Update(context.TODO(), role, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -315,13 +315,13 @@ func (c *ClusterLifecycleCleanup) updateServiceAccountOwner(
 	or []metav1.OwnerReference,
 ) error {
 	return tryUpdate(func() error {
-		sa, err := userContext.K8sClient.CoreV1().ServiceAccounts("default").Get(sa.Name, metav1.GetOptions{})
+		sa, err := userContext.K8sClient.CoreV1().ServiceAccounts("default").Get(context.TODO(), sa.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		sa.OwnerReferences = or
 
-		_, err = userContext.K8sClient.CoreV1().ServiceAccounts("default").Update(sa)
+		_, err = userContext.K8sClient.CoreV1().ServiceAccounts("default").Update(context.TODO(), sa, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -335,13 +335,13 @@ func (c *ClusterLifecycleCleanup) updateClusterRoleBindingOwner(
 	or []metav1.OwnerReference,
 ) error {
 	return tryUpdate(func() error {
-		crb, err := userContext.K8sClient.RbacV1().ClusterRoleBindings().Get(crb.Name, metav1.GetOptions{})
+		crb, err := userContext.K8sClient.RbacV1().ClusterRoleBindings().Get(context.TODO(), crb.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		crb.OwnerReferences = or
 
-		_, err = userContext.K8sClient.RbacV1().ClusterRoleBindings().Update(crb)
+		_, err = userContext.K8sClient.RbacV1().ClusterRoleBindings().Update(context.TODO(), crb, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -351,14 +351,14 @@ func (c *ClusterLifecycleCleanup) updateClusterRoleBindingOwner(
 
 func cleanupNamespaces(client kubernetes.Interface) error {
 	logrus.Debug("Starting cleanup of local cluster namespaces")
-	namespaces, err := client.CoreV1().Namespaces().List(metav1.ListOptions{})
+	namespaces, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	for _, ns := range namespaces.Items {
 		err = tryUpdate(func() error {
-			nameSpace, err := client.CoreV1().Namespaces().Get(ns.Name, metav1.GetOptions{})
+			nameSpace, err := client.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
 			if err != nil {
 				if apierror.IsNotFound(err) {
 					return nil
@@ -400,7 +400,7 @@ func cleanupNamespaces(client kubernetes.Interface) error {
 
 			if updated {
 				logrus.Debugf("Updating local namespace: %v", nameSpace.Name)
-				_, err = client.CoreV1().Namespaces().Update(nameSpace)
+				_, err = client.CoreV1().Namespaces().Update(context.TODO(), nameSpace, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}

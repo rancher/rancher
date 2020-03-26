@@ -1,6 +1,7 @@
 package clustergc
 
 import (
+	"context"
 	"testing"
 
 	"github.com/rancher/norman/lifecycle"
@@ -101,38 +102,38 @@ func setObjectMeta(u *unstructured.Unstructured, objectMeta *metav1.ObjectMeta) 
 
 type mockDynamicResourceInterface struct{}
 
-func (mockDynamicResourceInterface) Update(obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (mockDynamicResourceInterface) Update(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	return obj, nil
 }
 
-func (mockDynamicResourceInterface) Create(obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (mockDynamicResourceInterface) Create(ctx context.Context, obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (mockDynamicResourceInterface) UpdateStatus(obj *unstructured.Unstructured, options metav1.UpdateOptions) (*unstructured.Unstructured, error) {
+func (mockDynamicResourceInterface) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (mockDynamicResourceInterface) Delete(name string, options *metav1.DeleteOptions, subresources ...string) error {
+func (mockDynamicResourceInterface) Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error {
 	panic("implement me")
 }
 
-func (mockDynamicResourceInterface) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (mockDynamicResourceInterface) DeleteCollection(ctx context.Context, options metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	panic("implement me")
 }
 
-func (mockDynamicResourceInterface) Get(name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (mockDynamicResourceInterface) Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (mockDynamicResourceInterface) List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+func (mockDynamicResourceInterface) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	panic("implement me")
 }
 
-func (mockDynamicResourceInterface) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (mockDynamicResourceInterface) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	panic("implement me")
 }
 
-func (mockDynamicResourceInterface) Patch(name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (mockDynamicResourceInterface) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
