@@ -135,12 +135,7 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 	}
 
 	// proceed only if node and cluster's versions mismatch
-	if cluster.Status.NodeVersion == node.Status.AppliedNodeVersion {
-		if v3.NodeConditionUpgraded.IsUnknown(node) {
-			if err := uh.updateNodeActive(node); err != nil {
-				return nil, err
-			}
-		}
+	if cluster.Status.NodeVersion == node.Status.NodePlan.Version {
 		return node, nil
 	}
 
@@ -155,13 +150,6 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 			return uh.updateNodePlan(node, cluster, false)
 		}
 	} else {
-		if planChangedForUpgrade(nodePlan, node.Status.NodePlan.Plan) {
-			logrus.Infof("cluster [%s] worker-upgrade: plan changed for node [%s], call upgrade to reconcile cluster", cluster.Name, node.Name)
-			if err := uh.upgradeCluster(cluster, node.Name, false); err != nil {
-				return nil, err
-			}
-			return node, nil
-		}
 		if planChangedForUpdate(nodePlan, node.Status.NodePlan.Plan) {
 			logrus.Infof("cluster [%s] worker-upgrade: plan changed for update [%s]", cluster.Name, node.Name)
 			return uh.updateNodePlan(node, cluster, false)
