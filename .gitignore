@@ -8,6 +8,7 @@
 /.idea
 /package/rancher
 /package/agent
+/tests/integration/.idea/workspace.xml
 /tests/MANIFEST
 /tests/integration/MANIFEST
 tests/integration/MANIFEST
