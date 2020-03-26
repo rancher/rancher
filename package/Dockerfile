@@ -14,6 +14,7 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=dev
+ARG DASHBOARD_BRANCH=latest
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ARG RANCHER_METADATA_BRANCH=dev-v2.4
 
@@ -30,6 +31,7 @@ ENV KUBECTL_VERSION v1.16.8
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
 ENV RANCHER_METADATA_BRANCH ${RANCHER_METADATA_BRANCH}
+ENV CATTLE_DASHBOARD_INDEX https://releases.rancher.com/dashboard/${DASHBOARD_BRANCH}/index.html
 ENV HELM_VERSION v3.1.0
 ENV KUSTOMIZE_VERSION v3.5.4
 
