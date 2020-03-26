@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -60,7 +61,7 @@ func NewHandler(management *config.ScaledContext, clusterManager *clustermanager
 }
 
 func CollectionFormatter(apiContext *types.APIContext, resource *types.GenericCollection) {
-	if canPerformAction(apiContext) {
+	if canPerformLoggingAction(apiContext, nil, "") {
 		resource.AddAction(apiContext, "test")
 		resource.AddAction(apiContext, "dryRun")
 	}
@@ -68,14 +69,11 @@ func CollectionFormatter(apiContext *types.APIContext, resource *types.GenericCo
 
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var target mgmtv3.LoggingTargets
-	var clusterName, projectID, level, containerLogSourceTag string
+	var clusterName, projectID, projectName, level, containerLogSourceTag string
 	var outputTags map[string]string
 
 	switch apiContext.Type {
 	case mgmtv3client.ClusterLoggingType:
-		if !canPerformAction(apiContext) {
-			return httperror.NewAPIError(httperror.NotFound, "not found")
-		}
 
 		var input mgmtv3.ClusterTestInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
@@ -86,6 +84,9 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 		if err = convert.ToObj(actionInput, &input); err != nil {
 			return err
 		}
+		if !canPerformLoggingAction(apiContext, nil, input.ClusterName) {
+			return httperror.NewAPIError(httperror.NotFound, "not found")
+		}
 
 		target = input.LoggingTargets
 		clusterName = input.ClusterName
@@ -94,9 +95,6 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 		outputTags = input.OutputTags
 
 	case mgmtv3client.ProjectLoggingType:
-		if !canPerformAction(apiContext) {
-			return httperror.NewAPIError(httperror.NotFound, "not found")
-		}
 
 		var input mgmtv3.ProjectTestInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
@@ -110,10 +108,14 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 
 		target = input.LoggingTargets
 		projectID = input.ProjectName
-		clusterName, _ = ref.Parse(input.ProjectName)
+		clusterName, projectName = ref.Parse(input.ProjectName)
 		level = loggingconfig.ProjectLevel
 		containerLogSourceTag = projectID
 		outputTags = input.OutputTags
+
+		if !canPerformLoggingAction(apiContext, nil, projectName) {
+			return httperror.NewAPIError(httperror.NotFound, "not found")
+		}
 	}
 
 	if err := validate(level, containerLogSourceTag, target, outputTags); err != nil {
@@ -316,7 +318,7 @@ func addCertPrefixPath(certDir, file string) string {
 	return path.Join(certDir, file)
 }
 
-func canPerformAction(apiContext *types.APIContext) bool {
+func canPerformLoggingAction(apiContext *types.APIContext, resource *types.RawResource, ns string) bool {
 	var groupName, resourceName string
 	switch apiContext.Type {
 	case mgmtv3client.ClusterLoggingType:
@@ -326,8 +328,9 @@ func canPerformAction(apiContext *types.APIContext) bool {
 	default:
 		return false
 	}
-	logObj := map[string]interface{}{
-		"id": apiContext.ID,
+	obj := rbac.ObjFromContext(apiContext, resource)
+	if ns != "" {
+		obj[rbac.NamespaceID] = ns
 	}
-	return apiContext.AccessControl.CanDo(groupName, resourceName, "create", apiContext, logObj, apiContext.Schema) == nil
+	return apiContext.AccessControl.CanDo(groupName, resourceName, "create", apiContext, obj, apiContext.Schema) == nil
 }
