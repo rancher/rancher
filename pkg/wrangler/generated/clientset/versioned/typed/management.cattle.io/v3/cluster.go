@@ -19,6 +19,7 @@ limitations under the License.
 package v3
 
 import (
+	"context"
 	"time"
 
 	scheme "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/scheme"
@@ -37,15 +38,15 @@ type ClustersGetter interface {
 
 // ClusterInterface has methods to work with Cluster resources.
 type ClusterInterface interface {
-	Create(*v3.Cluster) (*v3.Cluster, error)
-	Update(*v3.Cluster) (*v3.Cluster, error)
-	UpdateStatus(*v3.Cluster) (*v3.Cluster, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v3.Cluster, error)
-	List(opts v1.ListOptions) (*v3.ClusterList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Cluster, err error)
+	Create(ctx context.Context, cluster *v3.Cluster, opts v1.CreateOptions) (*v3.Cluster, error)
+	Update(ctx context.Context, cluster *v3.Cluster, opts v1.UpdateOptions) (*v3.Cluster, error)
+	UpdateStatus(ctx context.Context, cluster *v3.Cluster, opts v1.UpdateOptions) (*v3.Cluster, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v3.Cluster, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v3.ClusterList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v3.Cluster, err error)
 	ClusterExpansion
 }
 
@@ -62,19 +63,19 @@ func newClusters(c *ManagementV3Client) *clusters {
 }
 
 // Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
-func (c *clusters) Get(name string, options v1.GetOptions) (result *v3.Cluster, err error) {
+func (c *clusters) Get(ctx context.Context, name string, options v1.GetOptions) (result *v3.Cluster, err error) {
 	result = &v3.Cluster{}
 	err = c.client.Get().
 		Resource("clusters").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Clusters that match those selectors.
-func (c *clusters) List(opts v1.ListOptions) (result *v3.ClusterList, err error) {
+func (c *clusters) List(ctx context.Context, opts v1.ListOptions) (result *v3.ClusterList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -84,13 +85,13 @@ func (c *clusters) List(opts v1.ListOptions) (result *v3.ClusterList, err error)
 		Resource("clusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested clusters.
-func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *clusters) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -100,81 +101,84 @@ func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("clusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a cluster and creates it.  Returns the server's representation of the cluster, and an error, if there is any.
-func (c *clusters) Create(cluster *v3.Cluster) (result *v3.Cluster, err error) {
+func (c *clusters) Create(ctx context.Context, cluster *v3.Cluster, opts v1.CreateOptions) (result *v3.Cluster, err error) {
 	result = &v3.Cluster{}
 	err = c.client.Post().
 		Resource("clusters").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cluster).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a cluster and updates it. Returns the server's representation of the cluster, and an error, if there is any.
-func (c *clusters) Update(cluster *v3.Cluster) (result *v3.Cluster, err error) {
+func (c *clusters) Update(ctx context.Context, cluster *v3.Cluster, opts v1.UpdateOptions) (result *v3.Cluster, err error) {
 	result = &v3.Cluster{}
 	err = c.client.Put().
 		Resource("clusters").
 		Name(cluster.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cluster).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *clusters) UpdateStatus(cluster *v3.Cluster) (result *v3.Cluster, err error) {
+func (c *clusters) UpdateStatus(ctx context.Context, cluster *v3.Cluster, opts v1.UpdateOptions) (result *v3.Cluster, err error) {
 	result = &v3.Cluster{}
 	err = c.client.Put().
 		Resource("clusters").
 		Name(cluster.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cluster).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the cluster and deletes it. Returns an error if one occurs.
-func (c *clusters) Delete(name string, options *v1.DeleteOptions) error {
+func (c *clusters) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusters").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *clusters) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("clusters").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched cluster.
-func (c *clusters) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Cluster, err error) {
+func (c *clusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v3.Cluster, err error) {
 	result = &v3.Cluster{}
 	err = c.client.Patch(pt).
 		Resource("clusters").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

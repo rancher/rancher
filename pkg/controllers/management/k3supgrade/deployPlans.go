@@ -1,6 +1,7 @@
 package k3supgrade
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -33,7 +34,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 	}
 	planClient := planConfig.Plans(metav1.NamespaceAll)
 
-	planList, err := planClient.List(metav1.ListOptions{})
+	planList, err := planClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -49,7 +50,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 			}
 			plan.Spec.NodeSelector.MatchExpressions = append(plan.Spec.NodeSelector.MatchExpressions, lsr)
 
-			_, err = planClient.Update(&plan)
+			_, err = planClient.Update(context.TODO(), &plan, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -79,7 +80,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 
 			if !cmp(*masterPlan, newMaster) {
 				planClient = planConfig.Plans(systemUpgradeNS)
-				masterPlan, err = planClient.Update(&newMaster)
+				masterPlan, err = planClient.Update(context.TODO(), &newMaster, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
@@ -93,7 +94,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 
 			if !cmp(*workerPlan, newWorker) {
 				planClient = planConfig.Plans(systemUpgradeNS)
-				workerPlan, err = planClient.Update(&newWorker)
+				workerPlan, err = planClient.Update(context.TODO(), &newWorker, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
@@ -106,7 +107,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 			cluster.Spec.K3sConfig.ServerConcurrency,
 			cluster.Spec.K3sConfig.DrainServerNodes)
 
-		masterPlan, err = planClient.Create(&genMasterPlan)
+		masterPlan, err = planClient.Create(context.TODO(), &genMasterPlan, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -114,7 +115,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 			cluster.Spec.K3sConfig.WorkerConcurrency,
 			cluster.Spec.K3sConfig.DrainWorkerNodes)
 
-		workerPlan, err = planClient.Create(&genWorkerPlan)
+		workerPlan, err = planClient.Create(context.TODO(), &genWorkerPlan, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}

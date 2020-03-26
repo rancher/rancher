@@ -176,35 +176,38 @@ func (c *userController) Cache() UserCache {
 }
 
 func (c *userController) Create(obj *v3.User) (*v3.User, error) {
-	return c.clientGetter.Users().Create(obj)
+	return c.clientGetter.Users().Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *userController) Update(obj *v3.User) (*v3.User, error) {
-	return c.clientGetter.Users().Update(obj)
+	return c.clientGetter.Users().Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *userController) UpdateStatus(obj *v3.User) (*v3.User, error) {
-	return c.clientGetter.Users().UpdateStatus(obj)
+	return c.clientGetter.Users().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *userController) Delete(name string, options *metav1.DeleteOptions) error {
-	return c.clientGetter.Users().Delete(name, options)
+	if options == nil {
+		options = &metav1.DeleteOptions{}
+	}
+	return c.clientGetter.Users().Delete(context.TODO(), name, *options)
 }
 
 func (c *userController) Get(name string, options metav1.GetOptions) (*v3.User, error) {
-	return c.clientGetter.Users().Get(name, options)
+	return c.clientGetter.Users().Get(context.TODO(), name, options)
 }
 
 func (c *userController) List(opts metav1.ListOptions) (*v3.UserList, error) {
-	return c.clientGetter.Users().List(opts)
+	return c.clientGetter.Users().List(context.TODO(), opts)
 }
 
 func (c *userController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.Users().Watch(opts)
+	return c.clientGetter.Users().Watch(context.TODO(), opts)
 }
 
 func (c *userController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.User, err error) {
-	return c.clientGetter.Users().Patch(name, pt, data, subresources...)
+	return c.clientGetter.Users().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type userCache struct {
@@ -233,6 +236,7 @@ func (c *userCache) GetByIndex(indexName, key string) (result []*v3.User, err er
 	if err != nil {
 		return nil, err
 	}
+	result = make([]*v3.User, 0, len(objs))
 	for _, obj := range objs {
 		result = append(result, obj.(*v3.User))
 	}

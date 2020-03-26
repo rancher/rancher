@@ -214,7 +214,7 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 		return err
 	}
 
-	testerPods, err := context.K8sClient.CoreV1().Pods(loggingconfig.LoggingNamespace).List(metav1.ListOptions{
+	testerPods, err := context.K8sClient.CoreV1().Pods(loggingconfig.LoggingNamespace).List(apiContext.Request.Context(), metav1.ListOptions{
 		LabelSelector: labels.Set(loggingconfig.FluentdTesterSelector).String(),
 	})
 	if err != nil {

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -468,13 +469,13 @@ func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 	}
 
 	nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
-	ns, err := nsClient.Get(o.GetName(), v1.GetOptions{})
+	ns, err := nsClient.Get(context.TODO(), o.GetName(), v1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if ns.Status.Phase != v12.NamespaceTerminating {
 		logrus.Infof("[%v] Deleting namespace %v", controller, o.GetName())
-		err = nsClient.Delete(o.GetName(), nil)
+		err = nsClient.Delete(context.TODO(), o.GetName(), v1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -497,14 +498,14 @@ func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string
 		if ns == nil {
 			nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
 			logrus.Infof("[%v] Creating namespace %v", controller, o.GetName())
-			_, err := nsClient.Create(&v12.Namespace{
+			_, err := nsClient.Create(context.TODO(), &v12.Namespace{
 				ObjectMeta: v1.ObjectMeta{
 					Name: o.GetName(),
 					Annotations: map[string]string{
 						"management.cattle.io/system-namespace": "true",
 					},
 				},
-			})
+			}, v1.CreateOptions{})
 			if err != nil {
 				return obj, condition.Error("NamespaceCreationFailure", errors.Wrapf(err, "failed to create namespace for %v %v", t.GetKind(), o.GetName()))
 			}
