@@ -76,7 +76,7 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 	}, nil
 }
 
-// Returns object with available information to check against users permissions, used in combination with CanDo
+// ObjFromContext returns object with available information to check against users permissions, used in combination with CanDo
 func ObjFromContext(apiContext *types.APIContext, resource *types.RawResource) map[string]interface{} {
 	var obj map[string]interface{}
 	if resource != nil && resource.Values["id"] != nil {

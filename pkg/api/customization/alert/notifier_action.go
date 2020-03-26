@@ -50,7 +50,13 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 	if err = json.Unmarshal(data, input); err != nil {
 		return errors.Wrap(err, "unmarshaling input error")
 	}
-	if !canCreateNotifier(apiContext, nil, input.ClusterName) {
+
+	cluster := map[string]interface{}{}
+	if err = json.Unmarshal(data, &cluster); err != nil {
+		return errors.Wrap(err, "unmarshaling clusterID error")
+	}
+	clusterID, ok := cluster[rbac.ClusterID].(string)
+	if !ok || !canCreateNotifier(apiContext, nil, clusterID) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
