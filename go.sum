@@ -914,8 +914,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200324221701-ed6d3f2b3afa h1:pyjPvx4PbTIV+yLtec2MECzdpGXrxGhHrMh1UDBG9as=
-github.com/rancher/steve v0.0.0-20200324221701-ed6d3f2b3afa/go.mod h1:zU/PtZTxrQ+Ecko10jTJ1ER93/Db1AB0J8lUAxxbu5Q=
+github.com/rancher/steve v0.0.0-20200326011521-7b434b133887 h1:Ui9+Aw34DlaZ9MaYpJno/R/EDP8FoSWimqhRf42qrqc=
+github.com/rancher/steve v0.0.0-20200326011521-7b434b133887/go.mod h1:jXe4ExvrdAAKwdfk3ROJ9HAYo2aqeuUD6nvSqowlqJ8=
 github.com/rancher/system-upgrade-controller v0.3.1 h1:SpDStISy1haw05OCTGVEDw+WAo23jnpXVOh/60YlD70=
 github.com/rancher/system-upgrade-controller v0.3.1/go.mod h1:/2W/8WEqCSrz66hOYr3vjMRsIsgyWdToqO1hEVRvvLg=
 github.com/rancher/types v0.0.0-20200303162837-300a04e6f743/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
@@ -926,8 +926,6 @@ github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xs
 github.com/rancher/wrangler v0.2.1-0.20191025041946-1fd360590735/go.mod h1:zmXTOSzU0vhumCyl0+Acq2FEP5WJOJRqnCQDegknyWA=
 github.com/rancher/wrangler v0.4.1/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
 github.com/rancher/wrangler v0.5.0/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
-github.com/rancher/wrangler v0.5.2 h1:8y8aSQLM+xzXgOMMIc8m6TcRedGPqpH9PpvCqR0pZAU=
-github.com/rancher/wrangler v0.5.2/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
 github.com/rancher/wrangler v0.5.3 h1:wbacrpVWJAAB9aSyHC4IELx5bLZFy/7G4bGZKPFfGIA=
 github.com/rancher/wrangler v0.5.3/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
 github.com/rancher/wrangler-api v0.2.0/go.mod h1:zTPdNLZO07KvRaVOx6XQbKBSV55Fnn4s7nqmrMPJqd8=

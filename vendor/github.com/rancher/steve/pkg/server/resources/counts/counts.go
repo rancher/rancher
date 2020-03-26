@@ -54,10 +54,33 @@ type Summary struct {
 	Transitioning int            `json:"transitioning,omitempty"`
 }
 
+func (s *Summary) DeepCopy() *Summary {
+	r := *s
+	if r.States != nil {
+		r.States = map[string]int{}
+		for k := range s.States {
+			r.States[k] = s.States[k]
+		}
+	}
+	return &r
+}
+
 type ItemCount struct {
 	Summary    Summary            `json:"summary,omitempty"`
 	Namespaces map[string]Summary `json:"namespaces,omitempty"`
 	Revision   int                `json:"revision,omitempty"`
+}
+
+func (i *ItemCount) DeepCopy() *ItemCount {
+	r := *i
+	r.Summary = *r.Summary.DeepCopy()
+	if r.Namespaces != nil {
+		r.Namespaces = map[string]Summary{}
+		for k, v := range i.Namespaces {
+			r.Namespaces[k] = *v.DeepCopy()
+		}
+	}
+	return &r
 }
 
 type Store struct {
@@ -157,15 +180,7 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 		counts[schema.ID] = itemCount
 		countsCopy := map[string]ItemCount{}
 		for k, v := range counts {
-			ns := map[string]Summary{}
-			for i, j := range v.Namespaces {
-				ns[i] = j
-			}
-			countsCopy[k] = ItemCount{
-				Summary:    v.Summary,
-				Revision:   v.Revision,
-				Namespaces: ns,
-			}
+			countsCopy[k] = *v.DeepCopy()
 		}
 
 		result <- types.APIEvent{
