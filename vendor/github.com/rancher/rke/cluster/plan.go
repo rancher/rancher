@@ -1102,7 +1102,8 @@ func (c *Cluster) getDefaultKubernetesServicesOptions(osType string) (v3.Kuberne
 	// Example c.Version: v1.16.3-rancher1-1
 	logrus.Debugf("getDefaultKubernetesServicesOptions: getting serviceOptions for cluster version [%s]", c.Version)
 	if serviceOptions, ok := serviceOptionsTemplate[c.Version]; ok {
-		logrus.Debugf("getDefaultKubernetesServicesOptions: serviceOptions [%v] found for cluster version [%s]", serviceOptions, c.Version)
+		logrus.Debugf("getDefaultKubernetesServicesOptions: serviceOptions found for cluster version [%s]", c.Version)
+		logrus.Tracef("getDefaultKubernetesServicesOptions: [%s] serviceOptions [%v]", c.Version, serviceOptions)
 		return serviceOptions, nil
 	}
 
@@ -1126,7 +1127,8 @@ func (c *Cluster) getDefaultKubernetesServicesOptions(osType string) (v3.Kuberne
 	}
 
 	if serviceOptions, ok := serviceOptionsTemplate[clusterMajorVersion]; ok {
-		logrus.Debugf("getDefaultKubernetesServicesOptions: serviceOptions [%v] found for cluster major version [%s]", serviceOptions, clusterMajorVersion)
+		logrus.Debugf("getDefaultKubernetesServicesOptions: serviceOptions found for cluster major version [%s]", clusterMajorVersion)
+		logrus.Tracef("getDefaultKubernetesServicesOptions: [%s] serviceOptions [%v]", clusterMajorVersion, serviceOptions)
 		return serviceOptions, nil
 	}
 
