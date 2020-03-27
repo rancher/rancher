@@ -33,6 +33,7 @@ ENV HELM_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HE
     TILLER_URL_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/tiller-arm64 \
     TILLER_URL=TILLER_URL_${ARCH}
 
+ENV CATTLE_HELM_UNITTEST_VERSION v0.1.6-rancher1
 RUN curl -sLf ${!HELM_URL} > /usr/bin/helm && \
     curl -sLf ${!TILLER_URL} > /usr/bin/tiller && \
     chmod +x /usr/bin/helm /usr/bin/tiller && \
