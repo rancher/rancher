@@ -7,6 +7,7 @@ def test_ingress_fields(admin_pc_client):
         'projectId': 'cr',
         'rules': 'cru',
         'tls': 'cru',
+        'ingressClassName': 'cru',
         'defaultBackend': 'cru',
         'publicEndpoints': 'r',
         'status': 'r',
@@ -15,6 +16,7 @@ def test_ingress_fields(admin_pc_client):
     auth_check(admin_pc_client.schema, 'ingressBackend', '', {
         'serviceId': 'cru',
         'targetPort': 'cru',
+        'resource': 'cru',
         'workloadIds': 'cru',
     })
 
@@ -24,6 +26,8 @@ def test_ingress_fields(admin_pc_client):
     })
 
     auth_check(admin_pc_client.schema, 'httpIngressPath', '', {
+        'resource': 'cru',
+        'pathType': 'cru',
         'path': 'cru',
         'serviceId': 'cru',
         'targetPort': 'cru',
