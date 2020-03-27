@@ -377,7 +377,7 @@ func (d *Driver) GetClusterSize(ctx context.Context, info *types.ClusterInfo) (*
 		return nil, fmt.Errorf("failed to create clientset: %v", err)
 	}
 
-	nodeList, err := clientset.CoreV1().Nodes().List(v1.ListOptions{})
+	nodeList, err := clientset.CoreV1().Nodes().List(ctx, v1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get server version: %v", err)
 	}

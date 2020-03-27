@@ -2,6 +2,10 @@
 
 package eks
 
+import (
+	"github.com/aws/aws-sdk-go/private/protocol"
+)
+
 const (
 
 	// ErrCodeBadRequestException for service response error code
@@ -81,3 +85,17 @@ const (
 	// your cluster.
 	ErrCodeUnsupportedAvailabilityZoneException = "UnsupportedAvailabilityZoneException"
 )
+
+var exceptionFromCode = map[string]func(protocol.ResponseMetadata) error{
+	"BadRequestException":                  newErrorBadRequestException,
+	"ClientException":                      newErrorClientException,
+	"InvalidParameterException":            newErrorInvalidParameterException,
+	"InvalidRequestException":              newErrorInvalidRequestException,
+	"NotFoundException":                    newErrorNotFoundException,
+	"ResourceInUseException":               newErrorResourceInUseException,
+	"ResourceLimitExceededException":       newErrorResourceLimitExceededException,
+	"ResourceNotFoundException":            newErrorResourceNotFoundException,
+	"ServerException":                      newErrorServerException,
+	"ServiceUnavailableException":          newErrorServiceUnavailableException,
+	"UnsupportedAvailabilityZoneException": newErrorUnsupportedAvailabilityZoneException,
+}

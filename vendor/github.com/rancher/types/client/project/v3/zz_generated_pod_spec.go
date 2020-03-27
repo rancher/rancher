@@ -9,6 +9,7 @@ const (
 	PodSpecFieldDNSPolicy                     = "dnsPolicy"
 	PodSpecFieldEnableServiceLinks            = "enableServiceLinks"
 	PodSpecFieldEphemeralContainers           = "ephemeralContainers"
+	PodSpecFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	PodSpecFieldFsgid                         = "fsgid"
 	PodSpecFieldGids                          = "gids"
 	PodSpecFieldHostAliases                   = "hostAliases"
@@ -45,6 +46,7 @@ type PodSpec struct {
 	DNSPolicy                     string                         `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`
 	HostAliases                   []HostAlias                    `json:"hostAliases,omitempty" yaml:"hostAliases,omitempty"`

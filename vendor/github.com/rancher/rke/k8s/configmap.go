@@ -1,9 +1,10 @@
 package k8s
 
 import (
+	"context"
 	"reflect"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -27,13 +28,13 @@ func UpdateConfigMap(k8sClient *kubernetes.Clientset, configYaml []byte, configM
 			return updated, err
 		}
 		// the config map is not in k8s, I will create it and return updated=false
-		if _, err := k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(cfgMap); err != nil {
+		if _, err := k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), cfgMap, metav1.CreateOptions{}); err != nil {
 			return updated, err
 		}
 		return updated, nil
 	}
 	if !reflect.DeepEqual(existingConfigMap.Data, cfgMap.Data) {
-		if _, err := k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(cfgMap); err != nil {
+		if _, err := k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(context.TODO(), cfgMap, metav1.UpdateOptions{}); err != nil {
 			return updated, err
 		}
 		updated = true
@@ -42,9 +43,9 @@ func UpdateConfigMap(k8sClient *kubernetes.Clientset, configYaml []byte, configM
 }
 
 func GetConfigMap(k8sClient *kubernetes.Clientset, configMapName string) (*v1.ConfigMap, error) {
-	return k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	return k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
 }
 
 func DeleteConfigMap(k8sClient *kubernetes.Clientset, configMapName string) error {
-	return k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(configMapName, &metav1.DeleteOptions{})
+	return k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), configMapName, metav1.DeleteOptions{})
 }

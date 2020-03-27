@@ -15505,7 +15505,7 @@ type AccessKey struct {
 	// calls, while Inactive means it is not.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The name of the IAM user that the access key is associated with.
 	//
@@ -15647,7 +15647,7 @@ type AccessKeyMetadata struct {
 
 	// The status of the access key. Active means that the key is valid for API
 	// calls; Inactive means it is not.
-	Status *string `type:"string" enum:"statusType"`
+	Status *string `type:"string" enum:"StatusType"`
 
 	// The name of the IAM user that the key is associated with.
 	UserName *string `min:"1" type:"string"`
@@ -19987,7 +19987,7 @@ type EntityInfo struct {
 	// The type of entity (user or role).
 	//
 	// Type is a required field
-	Type *string `type:"string" required:"true" enum:"policyOwnerEntityType"`
+	Type *string `type:"string" required:"true" enum:"PolicyOwnerEntityType"`
 }
 
 // String returns the string representation
@@ -21428,7 +21428,7 @@ type GetOrganizationsAccessReportInput struct {
 	// The key that is used to sort the results. If you choose the namespace key,
 	// the results are returned in alphabetical order. If you choose the time key,
 	// the results are sorted numerically by the date and time.
-	SortKey *string `type:"string" enum:"sortKeyType"`
+	SortKey *string `type:"string" enum:"SortKeyType"`
 }
 
 // String returns the string representation
@@ -21525,7 +21525,7 @@ type GetOrganizationsAccessReportOutput struct {
 	// The status of the job.
 	//
 	// JobStatus is a required field
-	JobStatus *string `type:"string" required:"true" enum:"jobStatusType"`
+	JobStatus *string `type:"string" required:"true" enum:"JobStatusType"`
 
 	// When IsTruncated is true, this element is present and contains the value
 	// to use for the Marker parameter in a subsequent pagination request.
@@ -22048,7 +22048,7 @@ type GetSSHPublicKeyInput struct {
 	// PEM format, use PEM.
 	//
 	// Encoding is a required field
-	Encoding *string `type:"string" required:"true" enum:"encodingType"`
+	Encoding *string `type:"string" required:"true" enum:"EncodingType"`
 
 	// The unique identifier for the SSH public key.
 	//
@@ -22326,7 +22326,7 @@ type GetServiceLastAccessedDetailsOutput struct {
 	// The status of the job.
 	//
 	// JobStatus is a required field
-	JobStatus *string `type:"string" required:"true" enum:"jobStatusType"`
+	JobStatus *string `type:"string" required:"true" enum:"JobStatusType"`
 
 	// When IsTruncated is true, this element is present and contains the value
 	// to use for the Marker parameter in a subsequent pagination request.
@@ -22533,7 +22533,7 @@ type GetServiceLastAccessedDetailsWithEntitiesOutput struct {
 	// The status of the job.
 	//
 	// JobStatus is a required field
-	JobStatus *string `type:"string" required:"true" enum:"jobStatusType"`
+	JobStatus *string `type:"string" required:"true" enum:"JobStatusType"`
 
 	// When IsTruncated is true, this element is present and contains the value
 	// to use for the Marker parameter in a subsequent pagination request.
@@ -25065,7 +25065,7 @@ type ListPoliciesInput struct {
 	//
 	// This parameter is optional. If it is not included, or if it is set to All,
 	// all policies are returned.
-	Scope *string `type:"string" enum:"policyScopeType"`
+	Scope *string `type:"string" enum:"PolicyScopeType"`
 }
 
 // String returns the string representation
@@ -26596,7 +26596,7 @@ type ListVirtualMFADevicesInput struct {
 	// The status (Unassigned or Assigned) of the devices to list. If you do not
 	// specify an AssignmentStatus, the operation defaults to Any, which lists both
 	// assigned and unassigned virtual MFA devices.,
-	AssignmentStatus *string `type:"string" enum:"assignmentStatusType"`
+	AssignmentStatus *string `type:"string" enum:"AssignmentStatusType"`
 
 	// Use this parameter only when paginating results and only after you receive
 	// a response indicating that the results are truncated. Set it to the value
@@ -27342,7 +27342,7 @@ type PolicyGrantingServiceAccess struct {
 	// This field is null for managed policies. For more information about these
 	// policy types, see Managed Policies and Inline Policies (https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_managed-vs-inline.html)
 	// in the IAM User Guide.
-	EntityType *string `type:"string" enum:"policyOwnerEntityType"`
+	EntityType *string `type:"string" enum:"PolicyOwnerEntityType"`
 
 	// The Amazon Resource Name (ARN). ARNs are unique identifiers for AWS resources.
 	//
@@ -27361,7 +27361,7 @@ type PolicyGrantingServiceAccess struct {
 	// in the IAM User Guide.
 	//
 	// PolicyType is a required field
-	PolicyType *string `type:"string" required:"true" enum:"policyType"`
+	PolicyType *string `type:"string" required:"true" enum:"PolicyType"`
 }
 
 // String returns the string representation
@@ -29109,7 +29109,7 @@ type SSHPublicKey struct {
 	// key cannot be used.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The date and time, in ISO 8601 date-time format (http://www.iso.org/iso/iso8601),
 	// when the SSH public key was uploaded.
@@ -29183,7 +29183,7 @@ type SSHPublicKeyMetadata struct {
 	// key cannot be used.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The date and time, in ISO 8601 date-time format (http://www.iso.org/iso/iso8601),
 	// when the SSH public key was uploaded.
@@ -29494,7 +29494,7 @@ type ServiceSpecificCredential struct {
 	// is valid for API calls, while Inactive means it is not.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The name of the IAM user associated with the service-specific credential.
 	//
@@ -29583,7 +29583,7 @@ type ServiceSpecificCredentialMetadata struct {
 	// is valid for API calls, while Inactive means it is not.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The name of the IAM user associated with the service-specific credential.
 	//
@@ -29728,7 +29728,7 @@ type SetSecurityTokenServicePreferencesInput struct {
 	// in the IAM User Guide.
 	//
 	// GlobalEndpointTokenVersion is a required field
-	GlobalEndpointTokenVersion *string `type:"string" required:"true" enum:"globalEndpointTokenVersion"`
+	GlobalEndpointTokenVersion *string `type:"string" required:"true" enum:"GlobalEndpointTokenVersion"`
 }
 
 // String returns the string representation
@@ -29795,7 +29795,7 @@ type SigningCertificate struct {
 	// for API calls, while Inactive means it is not.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The date when the signing certificate was uploaded.
 	UploadDate *time.Time `type:"timestamp"`
@@ -30894,7 +30894,7 @@ type UpdateAccessKeyInput struct {
 	// cannot be used.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The name of the user whose key you want to update.
 	//
@@ -31776,7 +31776,7 @@ type UpdateSSHPublicKeyInput struct {
 	// that the key cannot be used.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The name of the IAM user associated with the SSH public key.
 	//
@@ -31967,7 +31967,7 @@ type UpdateServiceSpecificCredentialInput struct {
 	// The status to be assigned to the service-specific credential.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The name of the IAM user associated with the service-specific credential.
 	// If you do not specify this value, then the operation assumes the user whose
@@ -32060,7 +32060,7 @@ type UpdateSigningCertificateInput struct {
 	// be used.
 	//
 	// Status is a required field
-	Status *string `type:"string" required:"true" enum:"statusType"`
+	Status *string `type:"string" required:"true" enum:"StatusType"`
 
 	// The name of the IAM user the signing certificate belongs to.
 	//
@@ -32939,6 +32939,17 @@ func (s *VirtualMFADevice) SetUser(v *User) *VirtualMFADevice {
 }
 
 const (
+	// AssignmentStatusTypeAssigned is a AssignmentStatusType enum value
+	AssignmentStatusTypeAssigned = "Assigned"
+
+	// AssignmentStatusTypeUnassigned is a AssignmentStatusType enum value
+	AssignmentStatusTypeUnassigned = "Unassigned"
+
+	// AssignmentStatusTypeAny is a AssignmentStatusType enum value
+	AssignmentStatusTypeAny = "Any"
+)
+
+const (
 	// ContextKeyTypeEnumString is a ContextKeyTypeEnum enum value
 	ContextKeyTypeEnumString = "string"
 
@@ -32991,6 +33002,14 @@ const (
 )
 
 const (
+	// EncodingTypeSsh is a EncodingType enum value
+	EncodingTypeSsh = "SSH"
+
+	// EncodingTypePem is a EncodingType enum value
+	EncodingTypePem = "PEM"
+)
+
+const (
 	// EntityTypeUser is a EntityType enum value
 	EntityTypeUser = "User"
 
@@ -33008,6 +33027,25 @@ const (
 )
 
 const (
+	// GlobalEndpointTokenVersionV1token is a GlobalEndpointTokenVersion enum value
+	GlobalEndpointTokenVersionV1token = "v1Token"
+
+	// GlobalEndpointTokenVersionV2token is a GlobalEndpointTokenVersion enum value
+	GlobalEndpointTokenVersionV2token = "v2Token"
+)
+
+const (
+	// JobStatusTypeInProgress is a JobStatusType enum value
+	JobStatusTypeInProgress = "IN_PROGRESS"
+
+	// JobStatusTypeCompleted is a JobStatusType enum value
+	JobStatusTypeCompleted = "COMPLETED"
+
+	// JobStatusTypeFailed is a JobStatusType enum value
+	JobStatusTypeFailed = "FAILED"
+)
+
+const (
 	// PermissionsBoundaryAttachmentTypePermissionsBoundaryPolicy is a PermissionsBoundaryAttachmentType enum value
 	PermissionsBoundaryAttachmentTypePermissionsBoundaryPolicy = "PermissionsBoundaryPolicy"
 )
@@ -33021,6 +33059,28 @@ const (
 
 	// PolicyEvaluationDecisionTypeImplicitDeny is a PolicyEvaluationDecisionType enum value
 	PolicyEvaluationDecisionTypeImplicitDeny = "implicitDeny"
+)
+
+const (
+	// PolicyOwnerEntityTypeUser is a PolicyOwnerEntityType enum value
+	PolicyOwnerEntityTypeUser = "USER"
+
+	// PolicyOwnerEntityTypeRole is a PolicyOwnerEntityType enum value
+	PolicyOwnerEntityTypeRole = "ROLE"
+
+	// PolicyOwnerEntityTypeGroup is a PolicyOwnerEntityType enum value
+	PolicyOwnerEntityTypeGroup = "GROUP"
+)
+
+const (
+	// PolicyScopeTypeAll is a PolicyScopeType enum value
+	PolicyScopeTypeAll = "All"
+
+	// PolicyScopeTypeAws is a PolicyScopeType enum value
+	PolicyScopeTypeAws = "AWS"
+
+	// PolicyScopeTypeLocal is a PolicyScopeType enum value
+	PolicyScopeTypeLocal = "Local"
 )
 
 const (
@@ -33044,6 +33104,14 @@ const (
 
 	// PolicySourceTypeNone is a PolicySourceType enum value
 	PolicySourceTypeNone = "none"
+)
+
+const (
+	// PolicyTypeInline is a PolicyType enum value
+	PolicyTypeInline = "INLINE"
+
+	// PolicyTypeManaged is a PolicyType enum value
+	PolicyTypeManaged = "MANAGED"
 )
 
 // The policy usage type that indicates whether the policy is used as a permissions
@@ -33077,171 +33145,103 @@ const (
 )
 
 const (
-	// AssignmentStatusTypeAssigned is a assignmentStatusType enum value
-	AssignmentStatusTypeAssigned = "Assigned"
-
-	// AssignmentStatusTypeUnassigned is a assignmentStatusType enum value
-	AssignmentStatusTypeUnassigned = "Unassigned"
-
-	// AssignmentStatusTypeAny is a assignmentStatusType enum value
-	AssignmentStatusTypeAny = "Any"
-)
-
-const (
-	// EncodingTypeSsh is a encodingType enum value
-	EncodingTypeSsh = "SSH"
-
-	// EncodingTypePem is a encodingType enum value
-	EncodingTypePem = "PEM"
-)
-
-const (
-	// GlobalEndpointTokenVersionV1token is a globalEndpointTokenVersion enum value
-	GlobalEndpointTokenVersionV1token = "v1Token"
-
-	// GlobalEndpointTokenVersionV2token is a globalEndpointTokenVersion enum value
-	GlobalEndpointTokenVersionV2token = "v2Token"
-)
-
-const (
-	// JobStatusTypeInProgress is a jobStatusType enum value
-	JobStatusTypeInProgress = "IN_PROGRESS"
-
-	// JobStatusTypeCompleted is a jobStatusType enum value
-	JobStatusTypeCompleted = "COMPLETED"
-
-	// JobStatusTypeFailed is a jobStatusType enum value
-	JobStatusTypeFailed = "FAILED"
-)
-
-const (
-	// PolicyOwnerEntityTypeUser is a policyOwnerEntityType enum value
-	PolicyOwnerEntityTypeUser = "USER"
-
-	// PolicyOwnerEntityTypeRole is a policyOwnerEntityType enum value
-	PolicyOwnerEntityTypeRole = "ROLE"
-
-	// PolicyOwnerEntityTypeGroup is a policyOwnerEntityType enum value
-	PolicyOwnerEntityTypeGroup = "GROUP"
-)
-
-const (
-	// PolicyScopeTypeAll is a policyScopeType enum value
-	PolicyScopeTypeAll = "All"
-
-	// PolicyScopeTypeAws is a policyScopeType enum value
-	PolicyScopeTypeAws = "AWS"
-
-	// PolicyScopeTypeLocal is a policyScopeType enum value
-	PolicyScopeTypeLocal = "Local"
-)
-
-const (
-	// PolicyTypeInline is a policyType enum value
-	PolicyTypeInline = "INLINE"
-
-	// PolicyTypeManaged is a policyType enum value
-	PolicyTypeManaged = "MANAGED"
-)
-
-const (
-	// SortKeyTypeServiceNamespaceAscending is a sortKeyType enum value
+	// SortKeyTypeServiceNamespaceAscending is a SortKeyType enum value
 	SortKeyTypeServiceNamespaceAscending = "SERVICE_NAMESPACE_ASCENDING"
 
-	// SortKeyTypeServiceNamespaceDescending is a sortKeyType enum value
+	// SortKeyTypeServiceNamespaceDescending is a SortKeyType enum value
 	SortKeyTypeServiceNamespaceDescending = "SERVICE_NAMESPACE_DESCENDING"
 
-	// SortKeyTypeLastAuthenticatedTimeAscending is a sortKeyType enum value
+	// SortKeyTypeLastAuthenticatedTimeAscending is a SortKeyType enum value
 	SortKeyTypeLastAuthenticatedTimeAscending = "LAST_AUTHENTICATED_TIME_ASCENDING"
 
-	// SortKeyTypeLastAuthenticatedTimeDescending is a sortKeyType enum value
+	// SortKeyTypeLastAuthenticatedTimeDescending is a SortKeyType enum value
 	SortKeyTypeLastAuthenticatedTimeDescending = "LAST_AUTHENTICATED_TIME_DESCENDING"
 )
 
 const (
-	// StatusTypeActive is a statusType enum value
+	// StatusTypeActive is a StatusType enum value
 	StatusTypeActive = "Active"
 
-	// StatusTypeInactive is a statusType enum value
+	// StatusTypeInactive is a StatusType enum value
 	StatusTypeInactive = "Inactive"
 )
 
 const (
-	// SummaryKeyTypeUsers is a summaryKeyType enum value
+	// SummaryKeyTypeUsers is a SummaryKeyType enum value
 	SummaryKeyTypeUsers = "Users"
 
-	// SummaryKeyTypeUsersQuota is a summaryKeyType enum value
+	// SummaryKeyTypeUsersQuota is a SummaryKeyType enum value
 	SummaryKeyTypeUsersQuota = "UsersQuota"
 
-	// SummaryKeyTypeGroups is a summaryKeyType enum value
+	// SummaryKeyTypeGroups is a SummaryKeyType enum value
 	SummaryKeyTypeGroups = "Groups"
 
-	// SummaryKeyTypeGroupsQuota is a summaryKeyType enum value
+	// SummaryKeyTypeGroupsQuota is a SummaryKeyType enum value
 	SummaryKeyTypeGroupsQuota = "GroupsQuota"
 
-	// SummaryKeyTypeServerCertificates is a summaryKeyType enum value
+	// SummaryKeyTypeServerCertificates is a SummaryKeyType enum value
 	SummaryKeyTypeServerCertificates = "ServerCertificates"
 
-	// SummaryKeyTypeServerCertificatesQuota is a summaryKeyType enum value
+	// SummaryKeyTypeServerCertificatesQuota is a SummaryKeyType enum value
 	SummaryKeyTypeServerCertificatesQuota = "ServerCertificatesQuota"
 
-	// SummaryKeyTypeUserPolicySizeQuota is a summaryKeyType enum value
+	// SummaryKeyTypeUserPolicySizeQuota is a SummaryKeyType enum value
 	SummaryKeyTypeUserPolicySizeQuota = "UserPolicySizeQuota"
 
-	// SummaryKeyTypeGroupPolicySizeQuota is a summaryKeyType enum value
+	// SummaryKeyTypeGroupPolicySizeQuota is a SummaryKeyType enum value
 	SummaryKeyTypeGroupPolicySizeQuota = "GroupPolicySizeQuota"
 
-	// SummaryKeyTypeGroupsPerUserQuota is a summaryKeyType enum value
+	// SummaryKeyTypeGroupsPerUserQuota is a SummaryKeyType enum value
 	SummaryKeyTypeGroupsPerUserQuota = "GroupsPerUserQuota"
 
-	// SummaryKeyTypeSigningCertificatesPerUserQuota is a summaryKeyType enum value
+	// SummaryKeyTypeSigningCertificatesPerUserQuota is a SummaryKeyType enum value
 	SummaryKeyTypeSigningCertificatesPerUserQuota = "SigningCertificatesPerUserQuota"
 
-	// SummaryKeyTypeAccessKeysPerUserQuota is a summaryKeyType enum value
+	// SummaryKeyTypeAccessKeysPerUserQuota is a SummaryKeyType enum value
 	SummaryKeyTypeAccessKeysPerUserQuota = "AccessKeysPerUserQuota"
 
-	// SummaryKeyTypeMfadevices is a summaryKeyType enum value
+	// SummaryKeyTypeMfadevices is a SummaryKeyType enum value
 	SummaryKeyTypeMfadevices = "MFADevices"
 
-	// SummaryKeyTypeMfadevicesInUse is a summaryKeyType enum value
+	// SummaryKeyTypeMfadevicesInUse is a SummaryKeyType enum value
 	SummaryKeyTypeMfadevicesInUse = "MFADevicesInUse"
 
-	// SummaryKeyTypeAccountMfaenabled is a summaryKeyType enum value
+	// SummaryKeyTypeAccountMfaenabled is a SummaryKeyType enum value
 	SummaryKeyTypeAccountMfaenabled = "AccountMFAEnabled"
 
-	// SummaryKeyTypeAccountAccessKeysPresent is a summaryKeyType enum value
+	// SummaryKeyTypeAccountAccessKeysPresent is a SummaryKeyType enum value
 	SummaryKeyTypeAccountAccessKeysPresent = "AccountAccessKeysPresent"
 
-	// SummaryKeyTypeAccountSigningCertificatesPresent is a summaryKeyType enum value
+	// SummaryKeyTypeAccountSigningCertificatesPresent is a SummaryKeyType enum value
 	SummaryKeyTypeAccountSigningCertificatesPresent = "AccountSigningCertificatesPresent"
 
-	// SummaryKeyTypeAttachedPoliciesPerGroupQuota is a summaryKeyType enum value
+	// SummaryKeyTypeAttachedPoliciesPerGroupQuota is a SummaryKeyType enum value
 	SummaryKeyTypeAttachedPoliciesPerGroupQuota = "AttachedPoliciesPerGroupQuota"
 
-	// SummaryKeyTypeAttachedPoliciesPerRoleQuota is a summaryKeyType enum value
+	// SummaryKeyTypeAttachedPoliciesPerRoleQuota is a SummaryKeyType enum value
 	SummaryKeyTypeAttachedPoliciesPerRoleQuota = "AttachedPoliciesPerRoleQuota"
 
-	// SummaryKeyTypeAttachedPoliciesPerUserQuota is a summaryKeyType enum value
+	// SummaryKeyTypeAttachedPoliciesPerUserQuota is a SummaryKeyType enum value
 	SummaryKeyTypeAttachedPoliciesPerUserQuota = "AttachedPoliciesPerUserQuota"
 
-	// SummaryKeyTypePolicies is a summaryKeyType enum value
+	// SummaryKeyTypePolicies is a SummaryKeyType enum value
 	SummaryKeyTypePolicies = "Policies"
 
-	// SummaryKeyTypePoliciesQuota is a summaryKeyType enum value
+	// SummaryKeyTypePoliciesQuota is a SummaryKeyType enum value
 	SummaryKeyTypePoliciesQuota = "PoliciesQuota"
 
-	// SummaryKeyTypePolicySizeQuota is a summaryKeyType enum value
+	// SummaryKeyTypePolicySizeQuota is a SummaryKeyType enum value
 	SummaryKeyTypePolicySizeQuota = "PolicySizeQuota"
 
-	// SummaryKeyTypePolicyVersionsInUse is a summaryKeyType enum value
+	// SummaryKeyTypePolicyVersionsInUse is a SummaryKeyType enum value
 	SummaryKeyTypePolicyVersionsInUse = "PolicyVersionsInUse"
 
-	// SummaryKeyTypePolicyVersionsInUseQuota is a summaryKeyType enum value
+	// SummaryKeyTypePolicyVersionsInUseQuota is a SummaryKeyType enum value
 	SummaryKeyTypePolicyVersionsInUseQuota = "PolicyVersionsInUseQuota"
 
-	// SummaryKeyTypeVersionsPerPolicyQuota is a summaryKeyType enum value
+	// SummaryKeyTypeVersionsPerPolicyQuota is a SummaryKeyType enum value
 	SummaryKeyTypeVersionsPerPolicyQuota = "VersionsPerPolicyQuota"
 
-	// SummaryKeyTypeGlobalEndpointTokenVersion is a summaryKeyType enum value
+	// SummaryKeyTypeGlobalEndpointTokenVersion is a SummaryKeyType enum value
 	SummaryKeyTypeGlobalEndpointTokenVersion = "GlobalEndpointTokenVersion"
 )

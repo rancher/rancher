@@ -176,35 +176,38 @@ func (c *aPIServiceController) Cache() APIServiceCache {
 }
 
 func (c *aPIServiceController) Create(obj *v1.APIService) (*v1.APIService, error) {
-	return c.clientGetter.APIServices().Create(obj)
+	return c.clientGetter.APIServices().Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *aPIServiceController) Update(obj *v1.APIService) (*v1.APIService, error) {
-	return c.clientGetter.APIServices().Update(obj)
+	return c.clientGetter.APIServices().Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *aPIServiceController) UpdateStatus(obj *v1.APIService) (*v1.APIService, error) {
-	return c.clientGetter.APIServices().UpdateStatus(obj)
+	return c.clientGetter.APIServices().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *aPIServiceController) Delete(name string, options *metav1.DeleteOptions) error {
-	return c.clientGetter.APIServices().Delete(name, options)
+	if options == nil {
+		options = &metav1.DeleteOptions{}
+	}
+	return c.clientGetter.APIServices().Delete(context.TODO(), name, *options)
 }
 
 func (c *aPIServiceController) Get(name string, options metav1.GetOptions) (*v1.APIService, error) {
-	return c.clientGetter.APIServices().Get(name, options)
+	return c.clientGetter.APIServices().Get(context.TODO(), name, options)
 }
 
 func (c *aPIServiceController) List(opts metav1.ListOptions) (*v1.APIServiceList, error) {
-	return c.clientGetter.APIServices().List(opts)
+	return c.clientGetter.APIServices().List(context.TODO(), opts)
 }
 
 func (c *aPIServiceController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.APIServices().Watch(opts)
+	return c.clientGetter.APIServices().Watch(context.TODO(), opts)
 }
 
 func (c *aPIServiceController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.APIService, err error) {
-	return c.clientGetter.APIServices().Patch(name, pt, data, subresources...)
+	return c.clientGetter.APIServices().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type aPIServiceCache struct {

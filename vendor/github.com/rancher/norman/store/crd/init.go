@@ -98,20 +98,20 @@ func (f *Factory) CreateCRDs(ctx context.Context, storageContext types.StorageCo
 		return nil, err
 	}
 
-	ready, err := f.getReadyCRDs(apiClient)
+	ready, err := f.getReadyCRDs(ctx, apiClient)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, schema := range schemas {
-		crd, err := f.createCRD(apiClient, schema, ready)
+		crd, err := f.createCRD(ctx, apiClient, schema, ready)
 		if err != nil {
 			return nil, err
 		}
 		schemaStatus[schema] = crd
 	}
 
-	ready, err = f.getReadyCRDs(apiClient)
+	ready, err = f.getReadyCRDs(ctx, apiClient)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (f *Factory) waitCRD(ctx context.Context, apiClient clientset.Interface, cr
 		}
 		first = false
 
-		crd, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crdName, metav1.GetOptions{})
+		crd, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(ctx, crdName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -163,7 +163,7 @@ func (f *Factory) waitCRD(ctx context.Context, apiClient clientset.Interface, cr
 	})
 }
 
-func (f *Factory) createCRD(apiClient clientset.Interface, schema *types.Schema, ready map[string]*apiext.CustomResourceDefinition) (*apiext.CustomResourceDefinition, error) {
+func (f *Factory) createCRD(ctx context.Context, apiClient clientset.Interface, schema *types.Schema, ready map[string]*apiext.CustomResourceDefinition) (*apiext.CustomResourceDefinition, error) {
 	plural := strings.ToLower(schema.PluralName)
 	name := strings.ToLower(plural + "." + schema.Version.Group)
 
@@ -193,15 +193,15 @@ func (f *Factory) createCRD(apiClient clientset.Interface, schema *types.Schema,
 	}
 
 	logrus.Infof("Creating CRD %s", name)
-	crd2, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	crd2, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
 	if errors.IsAlreadyExists(err) {
 		return crd, nil
 	}
 	return crd2, err
 }
 
-func (f *Factory) getReadyCRDs(apiClient clientset.Interface) (map[string]*apiext.CustomResourceDefinition, error) {
-	list, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+func (f *Factory) getReadyCRDs(ctx context.Context, apiClient clientset.Interface) (map[string]*apiext.CustomResourceDefinition, error) {
+	list, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
