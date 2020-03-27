@@ -11,6 +11,7 @@ const (
 	NamespacedSecretFieldCreatorID       = "creatorId"
 	NamespacedSecretFieldData            = "data"
 	NamespacedSecretFieldDescription     = "description"
+	NamespacedSecretFieldImmutable       = "immutable"
 	NamespacedSecretFieldKind            = "kind"
 	NamespacedSecretFieldLabels          = "labels"
 	NamespacedSecretFieldName            = "name"
@@ -29,6 +30,7 @@ type NamespacedSecret struct {
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Data            map[string]string `json:"data,omitempty" yaml:"data,omitempty"`
 	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Immutable       *bool             `json:"immutable,omitempty" yaml:"immutable,omitempty"`
 	Kind            string            `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`

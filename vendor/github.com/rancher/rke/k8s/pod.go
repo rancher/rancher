@@ -1,6 +1,8 @@
 package k8s
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -9,7 +11,7 @@ import (
 
 func DeletePods(k8sClient *kubernetes.Clientset, podList *v1.PodList) error {
 	for _, pod := range podList.Items {
-		if err := k8sClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if err := k8sClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -17,7 +19,7 @@ func DeletePods(k8sClient *kubernetes.Clientset, podList *v1.PodList) error {
 }
 
 func ListPodsByLabel(k8sClient *kubernetes.Clientset, label string) (*v1.PodList, error) {
-	pods, err := k8sClient.CoreV1().Pods("").List(metav1.ListOptions{LabelSelector: label})
+	pods, err := k8sClient.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return nil, err
 	}

@@ -134,7 +134,7 @@ func (s *Store) doAuthed(apiContext *types.APIContext, request *rest.Request) re
 	for _, header := range authHeaders {
 		request.SetHeader(header, apiContext.Request.Header[http.CanonicalHeaderKey(header)]...)
 	}
-	return request.Do()
+	return request.Do(apiContext.Request.Context())
 }
 
 func (s *Store) k8sClient(apiContext *types.APIContext) (rest.Interface, error) {
@@ -250,7 +250,7 @@ func (s *Store) retryList(namespace string, apiContext *types.APIContext) (*unst
 		req := s.common(namespace, k8sClient.Get())
 		start := time.Now()
 		resultList = &unstructured.UnstructuredList{}
-		err = req.Do().Into(resultList)
+		err = req.Do(apiContext.Request.Context()).Into(resultList)
 		logrus.Tracef("LIST: %v, %v", time.Now().Sub(start), s.resourcePlural)
 		if err != nil {
 			if i < 2 && strings.Contains(err.Error(), "Client.Timeout exceeded") {
@@ -296,7 +296,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 		ResourceVersion: "0",
 	}, metav1.ParameterCodec)
 
-	body, err := req.Stream()
+	body, err := req.Stream(apiContext.Request.Context())
 	if err != nil {
 		return nil, err
 	}

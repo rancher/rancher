@@ -70,7 +70,7 @@ func WebhookConfigForURL(url string) (string, error) {
 }
 
 func NewWebhookAuthenticator(cacheTTL time.Duration, kubeConfigFile string) (Authenticator, error) {
-	wh, err := webhook.New(kubeConfigFile, "v1", nil)
+	wh, err := webhook.New(kubeConfigFile, "v1", nil, nil)
 	if err != nil {
 		return nil, err
 	}
