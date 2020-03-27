@@ -77,7 +77,7 @@ func (s *yamlLinkHandler) LinkHandler(apiContext *types.APIContext, next types.R
 		}
 		req.SetHeader("Accept", "*/*")
 
-		r, err := req.Do().Get()
+		r, err := req.Do(apiContext.Request.Context()).Get()
 		if err != nil {
 			if e, ok := err.(*apierrors.StatusError); ok && e.Status().Code == 403 {
 				continue

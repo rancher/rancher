@@ -48,7 +48,7 @@ func (e *rancherPrefStore) ByID(apiOp *types.APIRequest, schema *types.APISchema
 		Object: pref,
 	}
 
-	objs, err := client.List(metav1.ListOptions{})
+	objs, err := client.List(apiOp.Context(), metav1.ListOptions{})
 	if err != nil {
 		return result, err
 	}
@@ -77,11 +77,11 @@ func (e *rancherPrefStore) createNamespace(apiOp *types.APIRequest, ns string) e
 	if err != nil {
 		return err
 	}
-	_, err = client.Get(ns, metav1.GetOptions{})
+	_, err = client.Get(apiOp.Context(), ns, metav1.GetOptions{})
 	if !apierrors.IsNotFound(err) {
 		return err
 	}
-	_, err = client.Create(&unstructured.Unstructured{
+	_, err = client.Create(apiOp.Context(), &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
 				"name": ns,
@@ -104,7 +104,7 @@ func (e *rancherPrefStore) Update(apiOp *types.APIRequest, schema *types.APISche
 		newValues[k] = convert.ToString(v)
 	}
 
-	prefs, err := client.List(metav1.ListOptions{})
+	prefs, err := client.List(apiOp.Context(), metav1.ListOptions{})
 	if err != nil {
 		return types.APIObject{}, err
 	}
@@ -115,12 +115,12 @@ func (e *rancherPrefStore) Update(apiOp *types.APIRequest, schema *types.APISche
 		delete(newValues, key)
 		if ok && newValue != pref.Object["value"] {
 			pref.Object["value"] = newValue
-			_, err := client.Update(&pref, metav1.UpdateOptions{})
+			_, err := client.Update(apiOp.Context(), &pref, metav1.UpdateOptions{})
 			if err != nil {
 				return types.APIObject{}, err
 			}
 		} else if !ok {
-			err := client.Delete(key, nil)
+			err := client.Delete(apiOp.Context(), key, metav1.DeleteOptions{})
 			if err != nil {
 				return types.APIObject{}, err
 			}
@@ -136,7 +136,7 @@ func (e *rancherPrefStore) Update(apiOp *types.APIRequest, schema *types.APISche
 			nsExists = true
 		}
 
-		_, err = client.Create(&unstructured.Unstructured{
+		_, err = client.Create(apiOp.Context(), &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"apiVersion": gvk.GroupVersion().String(),
 				"kind":       gvk.Kind,
@@ -160,5 +160,5 @@ func (e *rancherPrefStore) Delete(apiOp *types.APIRequest, schema *types.APISche
 		return types.APIObject{}, err
 	}
 
-	return types.APIObject{}, client.DeleteCollection(nil, metav1.ListOptions{})
+	return types.APIObject{}, client.DeleteCollection(apiOp.Context(), metav1.DeleteOptions{}, metav1.ListOptions{})
 }

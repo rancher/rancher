@@ -47,7 +47,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		return err
 	}
 
-	migrateConfig(restConfig, opts)
+	migrateConfig(ctx, restConfig, opts)
 
 	if err := server.ListenAndServe(ctx, httpsPort, httpPort, handler, opts); err != nil {
 		return err
@@ -62,7 +62,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 
 }
 
-func migrateConfig(restConfig *rest.Config, opts *server.ListenOpts) {
+func migrateConfig(ctx context.Context, restConfig *rest.Config, opts *server.ListenOpts) {
 	defer func() {
 		opts.TLSListenerConfig.MaxSANs += len(opts.TLSListenerConfig.SANs)
 	}()
@@ -76,7 +76,7 @@ func migrateConfig(restConfig *rest.Config, opts *server.ListenOpts) {
 		Group:    "management.cattle.io",
 		Version:  "v3",
 		Resource: "listenconfigs",
-	}).Get("cli-config", metav1.GetOptions{})
+	}).Get(ctx, "cli-config", metav1.GetOptions{})
 	if err != nil {
 		return
 	}

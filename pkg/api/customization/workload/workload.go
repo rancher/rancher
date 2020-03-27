@@ -204,7 +204,7 @@ func (a ActionWrapper) rollbackDeployment(apiContext *types.APIContext, clusterC
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting DeploymentRollback for %s %s", rollbackInput.ReplicaSetID, err.Error()))
 	}
 	err = clusterContext.UnversionedClient.Post().Prefix("apis/extensions/v1beta1/").Namespace(namespace).
-		Resource("deployments").Name(name).SubResource("rollback").Body(deploymentRollback).Do().Error()
+		Resource("deployments").Name(name).SubResource("rollback").Body(deploymentRollback).Do(apiContext.Request.Context()).Error()
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating workload %s by %s : %s", deployment.ID, actionName, err.Error()))
 	}

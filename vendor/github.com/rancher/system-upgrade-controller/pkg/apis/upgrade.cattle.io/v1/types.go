@@ -6,7 +6,7 @@ package v1
 import (
 	"time"
 
-	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/system-upgrade-controller/pkg/condition"
 	"github.com/rancher/wrangler/pkg/genericcondition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

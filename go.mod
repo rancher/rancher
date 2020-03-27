@@ -10,28 +10,28 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
 
-	k8s.io/api => k8s.io/api v0.17.2
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.17.2
-	k8s.io/apimachinery => github.com/rancher/apimachinery v0.17.2-rancher.1
-	k8s.io/apiserver => k8s.io/apiserver v0.17.2
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.17.2
-	k8s.io/client-go => github.com/rancher/client-go v1.17.2-rancher.3
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.17.2
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.17.2
-	k8s.io/code-generator => k8s.io/code-generator v0.17.2
-	k8s.io/component-base => k8s.io/component-base v0.17.2
-	k8s.io/cri-api => k8s.io/cri-api v0.17.2
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.17.2
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.17.2
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.17.2
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.17.2
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.17.2
-	k8s.io/kubectl => k8s.io/kubectl v0.17.2
-	k8s.io/kubelet => k8s.io/kubelet v0.17.2
-	k8s.io/kubernetes => k8s.io/kubernetes v1.17.2
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.17.2
-	k8s.io/metrics => k8s.io/metrics v0.17.2
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.17.2
+	k8s.io/api => k8s.io/api v0.18.0
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.0
+	k8s.io/apimachinery => k8s.io/apimachinery v0.18.0
+	k8s.io/apiserver => k8s.io/apiserver v0.18.0
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.18.0
+	k8s.io/client-go => github.com/rancher/client-go v1.18.0-rancher.1
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.18.0
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.18.0
+	k8s.io/code-generator => k8s.io/code-generator v0.18.0
+	k8s.io/component-base => k8s.io/component-base v0.18.0
+	k8s.io/cri-api => k8s.io/cri-api v0.18.0
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.18.0
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.18.0
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.18.0
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.18.0
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.18.0
+	k8s.io/kubectl => k8s.io/kubectl v0.18.0
+	k8s.io/kubelet => k8s.io/kubelet v0.18.0
+	k8s.io/kubernetes => k8s.io/kubernetes v1.18.0
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.18.0
+	k8s.io/metrics => k8s.io/metrics v0.18.0
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.18.0
 )
 
 require (
@@ -39,10 +39,11 @@ require (
 	github.com/Azure/go-autorest/autorest v0.9.3-0.20191028180845-3492b2aff503
 	github.com/Azure/go-autorest/autorest/adal v0.8.1-0.20191028180845-3492b2aff503
 	github.com/DataDog/zstd v1.4.1 // indirect
-	github.com/aws/aws-sdk-go v1.25.48
+	github.com/aws/aws-sdk-go v1.28.2
 	github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1 // indirect
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/containerd/containerd v1.3.0 // indirect
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/coreos/go-semver v0.3.0
@@ -78,18 +79,18 @@ require (
 	github.com/prometheus/common v0.9.1
 	github.com/prometheus/tsdb v0.8.0 // indirect
 	github.com/rancher/dynamiclistener v0.2.1-0.20200319061731-763229ddcd6e
-	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200326174839-3c435bf7b688
+	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200327180925-6d88ca2af46f
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200321231028-b5f2e33b54fa
+	github.com/rancher/norman v0.0.0-20200326201949-eb806263e8ad
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
-	github.com/rancher/rke v1.1.0-rc18
+	github.com/rancher/rke v1.1.0-rc9.0.20200327175519-ecc629f2c3d5
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200326011521-7b434b133887
-	github.com/rancher/system-upgrade-controller v0.3.1
-	github.com/rancher/types v0.0.0-20200326224903-b4612bd96d9b
-	github.com/rancher/wrangler v0.5.3
-	github.com/rancher/wrangler-api v0.5.0
+	github.com/rancher/steve v0.0.0-20200326205851-420f62f642eb
+	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
+	github.com/rancher/types v0.0.0-20200327203838-a36e8d24795f
+	github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736
+	github.com/rancher/wrangler-api v0.5.1-0.20200326194427-c13310506d04
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
 	github.com/satori/go.uuid v1.2.0
@@ -104,23 +105,23 @@ require (
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
-	golang.org/x/crypto v0.0.0-20200207205829-a95e85b341fd
+	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/api v0.14.0
-	google.golang.org/grpc v1.25.1
+	google.golang.org/grpc v1.26.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.8
-	k8s.io/api v0.17.2
-	k8s.io/apiextensions-apiserver v0.17.2
-	k8s.io/apimachinery v0.17.2
-	k8s.io/apiserver v0.17.2
-	k8s.io/cli-runtime v0.17.2
+	k8s.io/api v0.18.0
+	k8s.io/apiextensions-apiserver v0.18.0
+	k8s.io/apimachinery v0.18.0
+	k8s.io/apiserver v0.18.0
+	k8s.io/cli-runtime v0.18.0
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/kubectl v0.17.2
-	k8s.io/kubernetes v1.17.2
-	k8s.io/utils v0.0.0-20191114200735-6ca3b61696b6
+	k8s.io/kubectl v0.18.0
+	k8s.io/kubernetes v1.18.0
+	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 )

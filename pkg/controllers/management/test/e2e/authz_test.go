@@ -34,7 +34,7 @@ func (s *AuthzSuite) TestClusterRoleTemplateBindingCreate(c *check.C) {
 
 	// create RoleTemplate (this one will be referenced by the next one)
 	podRORoleTemplateName := "testsubcrt1"
-	s.clusterClient.RbacV1().ClusterRoles().Delete(podRORoleTemplateName, &metav1.DeleteOptions{})
+	s.clusterClient.RbacV1().ClusterRoles().Delete(context.TODO(), podRORoleTemplateName, metav1.DeleteOptions{})
 	subRT, err := s.createRoleTemplate(podRORoleTemplateName,
 		[]rbacv1.PolicyRule{
 			{
@@ -49,7 +49,7 @@ func (s *AuthzSuite) TestClusterRoleTemplateBindingCreate(c *check.C) {
 
 	// create RoleTemplate that will reference the first one
 	rtName := "testcrt1"
-	s.clusterClient.RbacV1().ClusterRoles().Delete(rtName, &metav1.DeleteOptions{})
+	s.clusterClient.RbacV1().ClusterRoles().Delete(context.TODO(), rtName, metav1.DeleteOptions{})
 	rt, err := s.createRoleTemplate(rtName,
 		[]rbacv1.PolicyRule{
 			{
@@ -96,7 +96,7 @@ func (s *AuthzSuite) TestClusterRoleTemplateBindingCreate(c *check.C) {
 	}
 
 	rolesActual := map[string]rbacv1.ClusterRole{}
-	rs, err := s.clusterClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
+	rs, err := s.clusterClient.RbacV1().ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 	for _, r := range rs.Items {
 		if _, ok := rolesExpected[r.Name]; ok {
@@ -132,7 +132,7 @@ func (s *AuthzSuite) TestRoleTemplateBindingCreate(c *check.C) {
 
 	// create RoleTemplate (this one will be referenced by the next one)
 	podRORoleTemplateName := "testsubrt1"
-	s.clusterClient.RbacV1().ClusterRoles().Delete(podRORoleTemplateName, &metav1.DeleteOptions{})
+	s.clusterClient.RbacV1().ClusterRoles().Delete(context.TODO(), podRORoleTemplateName, metav1.DeleteOptions{})
 	subRT, err := s.createRoleTemplate(podRORoleTemplateName,
 		[]rbacv1.PolicyRule{
 			{
@@ -147,7 +147,7 @@ func (s *AuthzSuite) TestRoleTemplateBindingCreate(c *check.C) {
 
 	// create RoleTemplate that will reference the first one
 	rtName := "testrt1"
-	s.clusterClient.RbacV1().ClusterRoles().Delete(rtName, &metav1.DeleteOptions{})
+	s.clusterClient.RbacV1().ClusterRoles().Delete(context.TODO(), rtName, metav1.DeleteOptions{})
 	rt, err := s.createRoleTemplate(rtName,
 		[]rbacv1.PolicyRule{
 			{
@@ -196,7 +196,7 @@ func (s *AuthzSuite) TestRoleTemplateBindingCreate(c *check.C) {
 	}
 
 	rolesActual := map[string]rbacv1.ClusterRole{}
-	rs, err := s.clusterClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
+	rs, err := s.clusterClient.RbacV1().ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 	for _, r := range rs.Items {
 		if _, ok := rolesExpected[r.Name]; ok {
@@ -242,7 +242,7 @@ func (s *AuthzSuite) TestBuiltinRoleTemplateBindingCreate(c *check.C) {
 	bindingWatcher := s.bindingWatcher(ns.Name, c)
 	defer bindingWatcher.Stop()
 
-	roles, err := s.clusterClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
+	roles, err := s.clusterClient.RbacV1().ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 	rolesPreCount := len(roles.Items)
 
@@ -268,7 +268,7 @@ func (s *AuthzSuite) TestBuiltinRoleTemplateBindingCreate(c *check.C) {
 	})
 
 	// ensure no new roles were created in the namespace
-	roles, err = s.clusterClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
+	roles, err = s.clusterClient.RbacV1().ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 	rolesPostCount := len(roles.Items)
 	c.Assert(rolesPostCount, check.Equals, rolesPreCount)
@@ -342,44 +342,44 @@ func (s *AuthzSuite) createRoleTemplate(name string, rules []rbacv1.PolicyRule, 
 
 func (s *AuthzSuite) pspWatcher(c *check.C) watch.Interface {
 	pspClient := s.clusterClient.ExtensionsV1beta1().PodSecurityPolicies()
-	pList, err := pspClient.List(metav1.ListOptions{})
+	pList, err := pspClient.List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 	pListMeta, err := meta.ListAccessor(pList)
 	c.Assert(err, check.IsNil)
-	pspWatch, err := pspClient.Watch(metav1.ListOptions{ResourceVersion: pListMeta.GetResourceVersion()})
+	pspWatch, err := pspClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: pListMeta.GetResourceVersion()})
 	c.Assert(err, check.IsNil)
 	return pspWatch
 }
 
 func (s *AuthzSuite) clusterBindingWatcher(c *check.C) watch.Interface {
 	bindingClient := s.clusterClient.RbacV1().ClusterRoleBindings()
-	bList, err := bindingClient.List(metav1.ListOptions{})
+	bList, err := bindingClient.List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 	bListMeta, err := meta.ListAccessor(bList)
 	c.Assert(err, check.IsNil)
-	bindingWatch, err := bindingClient.Watch(metav1.ListOptions{ResourceVersion: bListMeta.GetResourceVersion()})
+	bindingWatch, err := bindingClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: bListMeta.GetResourceVersion()})
 	c.Assert(err, check.IsNil)
 	return bindingWatch
 }
 
 func (s *AuthzSuite) bindingWatcher(namespace string, c *check.C) watch.Interface {
 	bindingClient := s.clusterClient.RbacV1().RoleBindings(namespace)
-	bList, err := bindingClient.List(metav1.ListOptions{})
+	bList, err := bindingClient.List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 	bListMeta, err := meta.ListAccessor(bList)
 	c.Assert(err, check.IsNil)
-	bindingWatch, err := bindingClient.Watch(metav1.ListOptions{ResourceVersion: bListMeta.GetResourceVersion()})
+	bindingWatch, err := bindingClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: bListMeta.GetResourceVersion()})
 	c.Assert(err, check.IsNil)
 	return bindingWatch
 }
 
 func (s *AuthzSuite) roleWatcher(c *check.C) watch.Interface {
 	roleClient := s.clusterClient.RbacV1().ClusterRoles()
-	initialList, err := roleClient.List(metav1.ListOptions{})
+	initialList, err := roleClient.List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 	initialListListMeta, err := meta.ListAccessor(initialList)
 	c.Assert(err, check.IsNil)
-	roleWatch, err := roleClient.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
+	roleWatch, err := roleClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
 	c.Assert(err, check.IsNil)
 	return roleWatch
 }
@@ -407,13 +407,13 @@ func (s *AuthzSuite) SetUpSuite(c *check.C) {
 func (s *AuthzSuite) setupCRDs(c *check.C) {
 	crdClient := s.extClient.ApiextensionsV1beta1().CustomResourceDefinitions()
 
-	initialList, err := crdClient.List(metav1.ListOptions{})
+	initialList, err := crdClient.List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
 
 	initialListListMeta, err := meta.ListAccessor(initialList)
 	c.Assert(err, check.IsNil)
 
-	crdWatch, err := crdClient.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
+	crdWatch, err := crdClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
 	c.Assert(err, check.IsNil)
 	defer crdWatch.Stop()
 

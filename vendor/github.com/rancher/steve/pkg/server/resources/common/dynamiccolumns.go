@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rancher/steve/pkg/attributes"
@@ -34,7 +35,7 @@ func NewDynamicColumns(config *rest.Config) (*DynamicColumns, error) {
 	}, nil
 }
 
-func (d *DynamicColumns) SetColumns(schema *types.APISchema) error {
+func (d *DynamicColumns) SetColumns(ctx context.Context, schema *types.APISchema) error {
 	if attributes.Columns(schema) != nil {
 		return nil
 	}
@@ -56,7 +57,7 @@ func (d *DynamicColumns) SetColumns(schema *types.APISchema) error {
 		Limit: 1,
 	}, metav1.ParameterCodec)
 
-	obj, err := r.Do().Get()
+	obj, err := r.Do(ctx).Get()
 	if err != nil {
 		attributes.SetTable(schema, false)
 		return nil

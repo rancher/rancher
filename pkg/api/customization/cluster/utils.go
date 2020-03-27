@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -143,7 +144,7 @@ func CanCreateRKETemplate(callerID string, subjectAccessReviewClient clientauthv
 		},
 	}
 
-	result, err := subjectAccessReviewClient.Create(&review)
+	result, err := subjectAccessReviewClient.Create(context.TODO(), &review, v12.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
