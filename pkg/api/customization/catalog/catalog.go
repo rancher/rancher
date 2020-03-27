@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
@@ -19,12 +20,16 @@ import (
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "refresh")
+	if canUpdateCatalog(apiContext, resource) {
+		resource.AddAction(apiContext, "refresh")
+	}
 	resource.Links["exportYaml"] = apiContext.URLBuilder.Link("exportYaml", resource)
 }
 
-func CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
-	collection.AddAction(request, "refresh")
+func CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
+	if canUpdateCatalog(apiContext, nil) {
+		collection.AddAction(apiContext, "refresh")
+	}
 }
 
 type ActionHandler struct {
@@ -35,6 +40,9 @@ type ActionHandler struct {
 
 func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	if actionName != "refresh" {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
+	if !canUpdateCatalog(apiContext, nil) {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 
@@ -111,6 +119,9 @@ func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
+	if !canUpdateCatalog(apiContext, nil) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 
 	prjCatalogs := []v3.ProjectCatalog{}
 	if apiContext.ID != "" {
@@ -147,6 +158,9 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	if actionName != "refresh" {
 		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
+	if !canUpdateCatalog(apiContext, nil) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 
 	clCatalogs := []v3.ClusterCatalog{}
 	if apiContext.ID != "" {
@@ -177,4 +191,20 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	}
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
+}
+
+func canUpdateCatalog(apiContext *types.APIContext, resource *types.RawResource) bool {
+	var groupName, resourceName string
+	switch apiContext.Type {
+	case client.CatalogType:
+		groupName, resourceName = v3.CatalogGroupVersionKind.Group, v3.CatalogResource.Name
+	case client.ClusterCatalogType:
+		groupName, resourceName = v3.ClusterCatalogGroupVersionKind.Group, v3.ClusterCatalogResource.Name
+	case client.ProjectCatalogType:
+		groupName, resourceName = v3.ProjectCatalogGroupVersionKind.Group, v3.ProjectCatalogResource.Name
+	default:
+		return false
+	}
+	obj := rbac.ObjFromContext(apiContext, resource)
+	return apiContext.AccessControl.CanDo(groupName, resourceName, "update", apiContext, obj, apiContext.Schema) == nil
 }

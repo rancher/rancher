@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/notifiers"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,11 +17,15 @@ import (
 const testSMTPTitle = "Alert From Rancher: SMTP configuration validated"
 
 func NotifierCollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
-	collection.AddAction(apiContext, "send")
+	if canCreateNotifier(apiContext, nil, "") {
+		collection.AddAction(apiContext, "send")
+	}
 }
 
 func NotifierFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "send")
+	if canCreateNotifier(apiContext, resource, "") {
+		resource.AddAction(apiContext, "send")
+	}
 }
 
 func (h *Handler) NotifierActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -45,6 +50,16 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 	if err = json.Unmarshal(data, input); err != nil {
 		return errors.Wrap(err, "unmarshaling input error")
 	}
+
+	cluster := map[string]interface{}{}
+	if err = json.Unmarshal(data, &cluster); err != nil {
+		return errors.Wrap(err, "unmarshaling clusterID error")
+	}
+	clusterID, ok := cluster[rbac.ClusterID].(string)
+	if !ok || !canCreateNotifier(apiContext, nil, clusterID) {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
+
 	notifier := &v3.Notifier{
 		Spec: input.NotifierSpec,
 	}
@@ -63,4 +78,12 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 		notifierMessage.Title = testSMTPTitle
 	}
 	return notifiers.SendMessage(notifier, "", notifierMessage)
+}
+
+func canCreateNotifier(apiContext *types.APIContext, resource *types.RawResource, clusterID string) bool {
+	obj := rbac.ObjFromContext(apiContext, resource)
+	if clusterID != "" {
+		obj[rbac.NamespaceID] = clusterID
+	}
+	return apiContext.AccessControl.CanDo(v3.NotifierGroupVersionKind.Group, v3.NotifierResource.Name, "create", apiContext, obj, apiContext.Schema) == nil
 }

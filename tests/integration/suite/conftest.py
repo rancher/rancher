@@ -127,8 +127,14 @@ def cluster_and_client(cluster_id, mgmt_client):
 
 
 def user_project_client(user, project):
-    """Returns a project level  client for the user"""
+    """Returns a project level client for the user"""
     return rancher.Client(url=project.links.self+'/schemas', verify=False,
+                          token=user.client.token)
+
+
+def user_cluster_client(user, cluster):
+    """Returns a cluster level client for the user"""
+    return rancher.Client(url=cluster.links.self+'/schemas', verify=False,
                           token=user.client.token)
 
 

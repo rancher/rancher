@@ -123,3 +123,24 @@ def test_user_can_list_global_catalog(user_factory, remove_resource):
     user_client = user1.client
     c = user_client.list_catalog(name="library")
     assert len(c) == 1
+
+
+def test_catalog_refresh(admin_mc):
+    """Test that on refresh the response includes the names of the catalogs
+    that are being refreshed"""
+    catalog = admin_mc.client.by_id_catalog("library")
+    try:
+        admin_mc.client.action(obj=catalog, action_name="refresh")
+    except ApiError as e:
+        assert e is None
+
+
+def test_refresh_catalog_access(admin_mc, user_mc):
+    """Tests that a user with standard access is not
+    able to refresh a catalog.
+    """
+    catalog = admin_mc.client.by_id_catalog("library")
+    with pytest.raises(ApiError) as e:
+        # use catalog obj from admin client to get action not available to user
+        user_mc.client.action(obj=catalog, action_name="refresh")
+    assert e.value.error.status == 404

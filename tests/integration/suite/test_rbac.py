@@ -4,10 +4,10 @@ from rancher import ApiError
 import time
 
 from .common import random_str
-from .conftest import wait_until_available, \
+from .conftest import wait_until_available, wait_until, \
     cluster_and_client, user_project_client, \
     kubernetes_api_client, wait_for, ClusterContext, \
-    admin_pc
+    user_cluster_client, admin_pc
 
 
 def test_multi_user(admin_mc, user_mc):
@@ -646,6 +646,63 @@ def test_member_can_edit_secret(admin_mc, admin_pc, remove_resource,
     )
 
 
+def test_readonly_cannot_move_namespace(
+        admin_cc, admin_mc, user_mc, remove_resource):
+    """Tests that a user with readonly access is not able to
+    move namespace across projects. Makes 2 projects and one
+    namespace and then moves NS across.
+    """
+    p1 = admin_mc.client.create_project(
+        name='test-' + random_str(),
+        clusterId=admin_cc.cluster.id
+    )
+    remove_resource(p1)
+    p1 = admin_cc.management.client.wait_success(p1)
+
+    p2 = admin_mc.client.create_project(
+        name='test-' + random_str(),
+        clusterId=admin_cc.cluster.id
+    )
+    remove_resource(p2)
+    p2 = admin_mc.client.wait_success(p2)
+
+    # Use k8s client to see if project namespace exists
+    k8s_client = kubernetes.client.CoreV1Api(admin_mc.k8s_client)
+    wait_until(cluster_has_namespace(k8s_client, p1.id.split(":")[1]))
+    wait_until(cluster_has_namespace(k8s_client, p2.id.split(":")[1]))
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_mc.user.id,
+        projectId=p1.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb)
+
+    prtb2 = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_mc.user.id,
+        projectId=p2.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb2)
+
+    wait_until_available(user_mc.client, p1)
+    wait_until_available(user_mc.client, p2)
+
+    ns = admin_cc.client.create_namespace(
+        name=random_str(),
+        projectId=p1.id
+    )
+    wait_until_available(admin_cc.client, ns)
+    remove_resource(ns)
+
+    cluster_user_client = user_cluster_client(user_mc, admin_cc.cluster)
+    wait_until_available(cluster_user_client, ns)
+
+    with pytest.raises(ApiError) as e:
+        user_mc.client.action(obj=ns, action_name="move", projectId=p2.id)
+    assert e.value.error.status == 404
+
+
 def wait_for_workload(client, ns, timeout=60, count=0):
     start = time.time()
     interval = 0.5
@@ -658,3 +715,11 @@ def wait_for_workload(client, ns, timeout=60, count=0):
         interval *= 2
         workloads = client.list_workload(namespaceId=ns)
     return workloads
+
+
+def cluster_has_namespace(client, ns_name):
+    """Wait for the give namespace to exist, useful for project namespaces"""
+    def cb():
+        return ns_name in \
+               [ns.metadata.name for ns in client.list_namespace().items]
+    return cb
