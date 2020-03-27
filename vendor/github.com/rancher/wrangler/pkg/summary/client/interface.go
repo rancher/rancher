@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"github.com/rancher/wrangler/pkg/summary"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -12,8 +13,8 @@ type Interface interface {
 }
 
 type ResourceInterface interface {
-	List(opts metav1.ListOptions) (*summary.SummarizedObjectList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*summary.SummarizedObjectList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 }
 
 type NamespaceableResourceInterface interface {

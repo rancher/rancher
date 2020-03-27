@@ -31,7 +31,7 @@ import (
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -788,19 +788,19 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 
 	logrus.Infof("[amazonelasticcontainerservice] Applying ConfigMap")
 
-	_, err = clientset.CoreV1().ConfigMaps("kube-system").Create(&v1.ConfigMap{
-		TypeMeta: v12.TypeMeta{
+	_, err = clientset.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "aws-auth",
 			Namespace: "kube-system",
 		},
 		Data: map[string]string{
 			"mapRoles": string(mapRoles),
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil && !errors.IsConflict(err) {
 		return fmt.Errorf("error creating config map: %v", err)
 	}

@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	apiv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -71,7 +72,7 @@ func Register(ctx context.Context,
 
 	return func() error {
 		h.queueRefresh()
-		return h.refreshAll()
+		return h.refreshAll(ctx)
 	}
 }
 
@@ -90,7 +91,7 @@ func (h *handler) queueRefresh() {
 
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		if err := h.refreshAll(); err != nil {
+		if err := h.refreshAll(h.ctx); err != nil {
 			logrus.Errorf("failed to sync schemas: %v", err)
 			atomic.StoreInt32(&h.toSync, 1)
 		}
@@ -143,14 +144,14 @@ func (h *handler) getColumns(ctx context.Context, schemas map[string]*types.APIS
 		s := schema
 		eg.Go(func() error {
 			defer listPool.Release(1)
-			return h.cols.SetColumns(s)
+			return h.cols.SetColumns(ctx, s)
 		})
 	}
 
 	return eg.Wait()
 }
 
-func (h *handler) refreshAll() error {
+func (h *handler) refreshAll(ctx context.Context) error {
 	h.Lock()
 	defer h.Unlock()
 
@@ -170,7 +171,7 @@ func (h *handler) refreshAll() error {
 			if preferredTypeExists(schema, schemas) {
 				continue
 			}
-			if ok, err := h.allowed(schema); err != nil {
+			if ok, err := h.allowed(ctx, schema); err != nil {
 				return err
 			} else if !ok {
 				continue
@@ -220,9 +221,9 @@ func preferredTypeExists(schema *types.APISchema, schemas map[string]*types.APIS
 	return ok
 }
 
-func (h *handler) allowed(schema *types.APISchema) (bool, error) {
+func (h *handler) allowed(ctx context.Context, schema *types.APISchema) (bool, error) {
 	gvr := attributes.GVR(schema)
-	ssar, err := h.ssar.Create(&authorizationv1.SelfSubjectAccessReview{
+	ssar, err := h.ssar.Create(ctx, &authorizationv1.SelfSubjectAccessReview{
 		Spec: authorizationv1.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
 				Verb:     "list",
@@ -231,7 +232,7 @@ func (h *handler) allowed(schema *types.APISchema) (bool, error) {
 				Resource: gvr.Resource,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}

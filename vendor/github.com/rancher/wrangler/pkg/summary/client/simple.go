@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"github.com/rancher/wrangler/pkg/summary"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -35,16 +36,16 @@ func (c *summaryResourceClient) Namespace(ns string) ResourceInterface {
 	return &ret
 }
 
-func (c *summaryResourceClient) List(opts metav1.ListOptions) (*summary.SummarizedObjectList, error) {
+func (c *summaryResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*summary.SummarizedObjectList, error) {
 	var (
 		u   *unstructured.UnstructuredList
 		err error
 	)
 
 	if c.namespace == "" {
-		u, err = c.client.Resource(c.resource).List(opts)
+		u, err = c.client.Resource(c.resource).List(ctx, opts)
 	} else {
-		u, err = c.client.Resource(c.resource).Namespace(c.namespace).List(opts)
+		u, err = c.client.Resource(c.resource).Namespace(c.namespace).List(ctx, opts)
 	}
 	if err != nil {
 		return nil, err
@@ -69,7 +70,7 @@ func (c *summaryResourceClient) List(opts metav1.ListOptions) (*summary.Summariz
 	return list, nil
 }
 
-func (c *summaryResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *summaryResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var (
 		resp watch.Interface
 		err  error
@@ -78,9 +79,9 @@ func (c *summaryResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 	eventChan := make(chan watch.Event)
 
 	if c.namespace == "" {
-		resp, err = c.client.Resource(c.resource).Watch(opts)
+		resp, err = c.client.Resource(c.resource).Watch(ctx, opts)
 	} else {
-		resp, err = c.client.Resource(c.resource).Namespace(c.namespace).Watch(opts)
+		resp, err = c.client.Resource(c.resource).Namespace(c.namespace).Watch(ctx, opts)
 	}
 	if err != nil {
 		return nil, err

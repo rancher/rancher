@@ -1,9 +1,11 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
+
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/batch/v1"
+	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +42,7 @@ func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport transpor
 			return err
 		}
 	}
-	if _, err = k8sClient.BatchV1().Jobs(job.Namespace).Create(&job); err != nil {
+	if _, err = k8sClient.BatchV1().Jobs(job.Namespace).Create(context.TODO(), &job, metav1.CreateOptions{}); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			logrus.Debugf("[k8s] Job %s already exists..", job.Name)
 			return nil
@@ -85,7 +87,7 @@ func ensureJobCompleted(k8sClient *kubernetes.Clientset, j interface{}) error {
 
 func ensureJobDeleted(k8sClient *kubernetes.Clientset, j interface{}) error {
 	job := j.(v1.Job)
-	_, err := k8sClient.BatchV1().Jobs(job.Namespace).Get(job.Name, metav1.GetOptions{})
+	_, err := k8sClient.BatchV1().Jobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// this is the "true" return of the function
@@ -99,14 +101,15 @@ func ensureJobDeleted(k8sClient *kubernetes.Clientset, j interface{}) error {
 func deleteK8sJob(k8sClient *kubernetes.Clientset, name, namespace string) error {
 	deletePolicy := metav1.DeletePropagationForeground
 	return k8sClient.BatchV1().Jobs(namespace).Delete(
+		context.TODO(),
 		name,
-		&metav1.DeleteOptions{
+		metav1.DeleteOptions{
 			PropagationPolicy: &deletePolicy,
 		})
 }
 
 func getK8sJob(k8sClient *kubernetes.Clientset, name, namespace string) (*v1.Job, error) {
-	return k8sClient.BatchV1().Jobs(namespace).Get(name, metav1.GetOptions{})
+	return k8sClient.BatchV1().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func GetK8sJobStatus(k8sClient *kubernetes.Clientset, name, namespace string) (JobStatus, error) {

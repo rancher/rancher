@@ -10,6 +10,7 @@ const (
 	ManagementSecretFieldCreated         = "created"
 	ManagementSecretFieldCreatorID       = "creatorId"
 	ManagementSecretFieldData            = "data"
+	ManagementSecretFieldImmutable       = "immutable"
 	ManagementSecretFieldLabels          = "labels"
 	ManagementSecretFieldName            = "name"
 	ManagementSecretFieldOwnerReferences = "ownerReferences"
@@ -25,6 +26,7 @@ type ManagementSecret struct {
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Data            map[string]string `json:"data,omitempty" yaml:"data,omitempty"`
+	Immutable       *bool             `json:"immutable,omitempty" yaml:"immutable,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`

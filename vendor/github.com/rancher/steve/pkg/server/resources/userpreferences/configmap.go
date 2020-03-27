@@ -43,7 +43,7 @@ func (e *configMapStore) ByID(apiOp *types.APIRequest, schema *types.APISchema, 
 		Object: pref,
 	}
 
-	obj, err := client.Get(prefName(u), metav1.GetOptions{})
+	obj, err := client.Get(apiOp.Context(), prefName(u), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return result, nil
 	}
@@ -71,9 +71,9 @@ func (e *configMapStore) Update(apiOp *types.APIRequest, schema *types.APISchema
 		return types.APIObject{}, err
 	}
 
-	obj, err := client.Get(prefName(u), metav1.GetOptions{})
+	obj, err := client.Get(apiOp.Context(), prefName(u), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		_, err = client.Create(&unstructured.Unstructured{
+		_, err = client.Create(apiOp.Context(), &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"metadata": map[string]interface{}{
 					"name": prefName(u),
@@ -83,7 +83,7 @@ func (e *configMapStore) Update(apiOp *types.APIRequest, schema *types.APISchema
 		}, metav1.CreateOptions{})
 	} else if err == nil {
 		obj.Object["data"] = data.Data().Map("data")
-		_, err = client.Update(obj, metav1.UpdateOptions{})
+		_, err = client.Update(apiOp.Context(), obj, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		return types.APIObject{}, err
@@ -99,5 +99,5 @@ func (e *configMapStore) Delete(apiOp *types.APIRequest, schema *types.APISchema
 		return types.APIObject{}, err
 	}
 
-	return types.APIObject{}, client.Delete(prefName(u), nil)
+	return types.APIObject{}, client.Delete(apiOp.Context(), prefName(u), metav1.DeleteOptions{})
 }

@@ -11,6 +11,7 @@ const (
 	IngressFieldCreatorID            = "creatorId"
 	IngressFieldDefaultBackend       = "defaultBackend"
 	IngressFieldDescription          = "description"
+	IngressFieldIngressClassName     = "ingressClassName"
 	IngressFieldLabels               = "labels"
 	IngressFieldName                 = "name"
 	IngressFieldNamespaceId          = "namespaceId"
@@ -34,6 +35,7 @@ type Ingress struct {
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DefaultBackend       *IngressBackend   `json:"defaultBackend,omitempty" yaml:"defaultBackend,omitempty"`
 	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
+	IngressClassName     string            `json:"ingressClassName,omitempty" yaml:"ingressClassName,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
