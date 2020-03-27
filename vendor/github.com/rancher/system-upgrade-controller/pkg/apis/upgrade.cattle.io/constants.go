@@ -3,6 +3,9 @@ package upgrade
 import "path"
 
 const (
+	// AnnotationTTLSecondsAfterFinished is used to store a fallback value for job.spec.ttlSecondsAfterFinished
+	AnnotationTTLSecondsAfterFinished = GroupName + `/ttl-seconds-after-finished`
+
 	// LabelController is the name of the upgrade controller.
 	LabelController = GroupName + `/controller`
 
@@ -12,7 +15,7 @@ const (
 	// LabelPlan is the plan being applied.
 	LabelPlan = GroupName + `/plan`
 
-	// LabelPlan is the version being applied.
+	// LabelVersion is the version of the plan being applied.
 	LabelVersion = GroupName + `/version`
 
 	// LabelPlanSuffix is used for composing labels specific to a plan.

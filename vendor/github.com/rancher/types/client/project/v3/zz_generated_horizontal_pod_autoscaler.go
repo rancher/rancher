@@ -7,6 +7,7 @@ import (
 const (
 	HorizontalPodAutoscalerType                      = "horizontalPodAutoscaler"
 	HorizontalPodAutoscalerFieldAnnotations          = "annotations"
+	HorizontalPodAutoscalerFieldBehavior             = "behavior"
 	HorizontalPodAutoscalerFieldConditions           = "conditions"
 	HorizontalPodAutoscalerFieldCreated              = "created"
 	HorizontalPodAutoscalerFieldCreatorID            = "creatorId"
@@ -34,6 +35,7 @@ const (
 type HorizontalPodAutoscaler struct {
 	types.Resource
 	Annotations          map[string]string                  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Behavior             *HorizontalPodAutoscalerBehavior   `json:"behavior,omitempty" yaml:"behavior,omitempty"`
 	Conditions           []HorizontalPodAutoscalerCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string                             `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`

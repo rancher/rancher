@@ -176,35 +176,38 @@ func (c *customResourceDefinitionController) Cache() CustomResourceDefinitionCac
 }
 
 func (c *customResourceDefinitionController) Create(obj *v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error) {
-	return c.clientGetter.CustomResourceDefinitions().Create(obj)
+	return c.clientGetter.CustomResourceDefinitions().Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *customResourceDefinitionController) Update(obj *v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error) {
-	return c.clientGetter.CustomResourceDefinitions().Update(obj)
+	return c.clientGetter.CustomResourceDefinitions().Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *customResourceDefinitionController) UpdateStatus(obj *v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error) {
-	return c.clientGetter.CustomResourceDefinitions().UpdateStatus(obj)
+	return c.clientGetter.CustomResourceDefinitions().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *customResourceDefinitionController) Delete(name string, options *metav1.DeleteOptions) error {
-	return c.clientGetter.CustomResourceDefinitions().Delete(name, options)
+	if options == nil {
+		options = &metav1.DeleteOptions{}
+	}
+	return c.clientGetter.CustomResourceDefinitions().Delete(context.TODO(), name, *options)
 }
 
 func (c *customResourceDefinitionController) Get(name string, options metav1.GetOptions) (*v1beta1.CustomResourceDefinition, error) {
-	return c.clientGetter.CustomResourceDefinitions().Get(name, options)
+	return c.clientGetter.CustomResourceDefinitions().Get(context.TODO(), name, options)
 }
 
 func (c *customResourceDefinitionController) List(opts metav1.ListOptions) (*v1beta1.CustomResourceDefinitionList, error) {
-	return c.clientGetter.CustomResourceDefinitions().List(opts)
+	return c.clientGetter.CustomResourceDefinitions().List(context.TODO(), opts)
 }
 
 func (c *customResourceDefinitionController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.CustomResourceDefinitions().Watch(opts)
+	return c.clientGetter.CustomResourceDefinitions().Watch(context.TODO(), opts)
 }
 
 func (c *customResourceDefinitionController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CustomResourceDefinition, err error) {
-	return c.clientGetter.CustomResourceDefinitions().Patch(name, pt, data, subresources...)
+	return c.clientGetter.CustomResourceDefinitions().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type customResourceDefinitionCache struct {

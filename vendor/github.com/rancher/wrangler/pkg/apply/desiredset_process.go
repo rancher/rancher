@@ -162,9 +162,9 @@ func (o *desiredSet) clearNamespace(objs map[objectset.ObjectKey]runtime.Object)
 func (o *desiredSet) createPatcher(client dynamic.NamespaceableResourceInterface) Patcher {
 	return func(namespace, name string, pt types2.PatchType, data []byte) (object runtime.Object, e error) {
 		if namespace != "" {
-			return client.Namespace(namespace).Patch(name, pt, data, v1.PatchOptions{})
+			return client.Namespace(namespace).Patch(o.ctx, name, pt, data, v1.PatchOptions{})
 		}
-		return client.Patch(name, pt, data, v1.PatchOptions{})
+		return client.Patch(o.ctx, name, pt, data, v1.PatchOptions{})
 	}
 }
 
@@ -284,7 +284,7 @@ func (o *desiredSet) list(informer cache.SharedIndexInformer, client dynamic.Nam
 			c = client
 		}
 
-		list, err := c.List(v1.ListOptions{
+		list, err := c.List(o.ctx, v1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if err != nil {

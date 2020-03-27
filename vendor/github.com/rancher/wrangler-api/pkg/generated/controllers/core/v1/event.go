@@ -173,31 +173,34 @@ func (c *eventController) Cache() EventCache {
 }
 
 func (c *eventController) Create(obj *v1.Event) (*v1.Event, error) {
-	return c.clientGetter.Events(obj.Namespace).Create(obj)
+	return c.clientGetter.Events(obj.Namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *eventController) Update(obj *v1.Event) (*v1.Event, error) {
-	return c.clientGetter.Events(obj.Namespace).Update(obj)
+	return c.clientGetter.Events(obj.Namespace).Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *eventController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return c.clientGetter.Events(namespace).Delete(name, options)
+	if options == nil {
+		options = &metav1.DeleteOptions{}
+	}
+	return c.clientGetter.Events(namespace).Delete(context.TODO(), name, *options)
 }
 
 func (c *eventController) Get(namespace, name string, options metav1.GetOptions) (*v1.Event, error) {
-	return c.clientGetter.Events(namespace).Get(name, options)
+	return c.clientGetter.Events(namespace).Get(context.TODO(), name, options)
 }
 
 func (c *eventController) List(namespace string, opts metav1.ListOptions) (*v1.EventList, error) {
-	return c.clientGetter.Events(namespace).List(opts)
+	return c.clientGetter.Events(namespace).List(context.TODO(), opts)
 }
 
 func (c *eventController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.Events(namespace).Watch(opts)
+	return c.clientGetter.Events(namespace).Watch(context.TODO(), opts)
 }
 
 func (c *eventController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
-	return c.clientGetter.Events(namespace).Patch(name, pt, data, subresources...)
+	return c.clientGetter.Events(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type eventCache struct {
