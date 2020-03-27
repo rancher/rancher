@@ -642,6 +642,8 @@ github.com/rancher/kontainer-driver-metadata v0.0.0-20200325193009-ba905565142c 
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200325193009-ba905565142c/go.mod h1:VBeI/67gB2g/zn1R3Tu7VvCCKTiYCX0HfsFVvnm7v2I=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200327172209-44d59a43e621 h1:HqVaJoT2l7YotNpr93JDlAwvOrd9hj65fvKUPFPQBh8=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200327172209-44d59a43e621/go.mod h1:VBeI/67gB2g/zn1R3Tu7VvCCKTiYCX0HfsFVvnm7v2I=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20200327203707-3ac337455dcc h1:WJBHBO46aFv4mG33qJHujCiGabp9h0zii4wLex8szPY=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20200327203707-3ac337455dcc/go.mod h1:VBeI/67gB2g/zn1R3Tu7VvCCKTiYCX0HfsFVvnm7v2I=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200326175710-485fea53750a h1:a9NRVA29QxXFpwXe7ifurgHVQvBJ5vspw7ZAEd/dmh0=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200326175710-485fea53750a/go.mod h1:Eccd5R2X1vvjYg0O1gZ0jWAl+bDq6Egv/H2YzKz5tP0=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
@@ -666,6 +668,8 @@ github.com/rancher/rke v1.0.6-rc2 h1:KibYyTSe0/XqzdxyqNOfoa16kHV9WhyIarc1ZfT6ox4
 github.com/rancher/rke v1.0.6-rc2/go.mod h1:kTkTxQxLMelaSvbfegidyqI9e5fpgo9k1bsLoLz33v0=
 github.com/rancher/rke v1.0.6-rc3 h1:PwHX+S2TQl0j1slEaJpm12IOoD6C0RSgR/rQDKsQO14=
 github.com/rancher/rke v1.0.6-rc3/go.mod h1:ezCZwNOJDusezn5d3xG3sIgyM1gz6apQmzrC/4IJZ5s=
+github.com/rancher/rke v1.0.6-rc4 h1:Oa8kBVM84utuE7VO5rC8iy/2x2lLu9guxaHr8vrPUZI=
+github.com/rancher/rke v1.0.6-rc4/go.mod h1:UGzO9fZeVBY08CXAfBDOG9qAOoUPNVhJqvlVYKwkg1Q=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=

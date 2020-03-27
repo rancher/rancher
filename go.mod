@@ -70,13 +70,13 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.4.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20200327172209-44d59a43e621
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20200327203707-3ac337455dcc
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200326175710-485fea53750a
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20200227003532-35fa47cccad7
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
-	github.com/rancher/rke v1.0.6-rc3
+	github.com/rancher/rke v1.0.6-rc4
 	github.com/rancher/types v0.0.0-20191226170233-4d49bbf42146
 	github.com/rancher/wrangler v0.4.1
 	github.com/robfig/cron v1.1.0
