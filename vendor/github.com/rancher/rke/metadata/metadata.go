@@ -30,7 +30,7 @@ func InitMetadata(ctx context.Context) error {
 	return nil
 }
 
-const RKEVersionDev = "v0.2.3"
+const RKEVersionDev = "v1.0.6"
 
 func initAddonTemplates() {
 	K8sVersionToTemplates = rke.DriverData.K8sVersionedTemplates
