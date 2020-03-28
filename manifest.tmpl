@@ -8,7 +8,3 @@ manifests:
   platform:
     architecture: arm64
     os: linux
-- image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}-linux-arm
-  platform:
-    architecture: arm
-    os: linux
