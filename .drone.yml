@@ -566,7 +566,6 @@ steps:
 - name: push-head-manifest
   image: plugins/manifest:1.1.0
   settings:
-    ignore_missing: true
     password:
       from_secret: docker_password
     spec: manifest.tmpl
@@ -583,7 +582,6 @@ steps:
 - name: push-head-agent-manifest
   image: plugins/manifest:1.1.0
   settings:
-    ignore_missing: true
     password:
       from_secret: docker_password
     spec: manifest-agent.tmpl
@@ -605,7 +603,6 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest.tmpl
-    ignore_missing: true
   when:
     event:
     - tag
@@ -618,7 +615,6 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-agent.tmpl
-    ignore_missing: true
   when:
     event:
     - tag
