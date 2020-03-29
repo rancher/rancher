@@ -563,24 +563,8 @@ kind: pipeline
 name: manifest
 
 steps:
-- name: push-head-manifest
-  image: plugins/manifest:1.1.0
-  settings:
-    password:
-      from_secret: docker_password
-    spec: manifest.tmpl
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
-
 - name: push-head-agent-manifest
-  image: plugins/manifest:1.1.0
+  image: plugins/manifest:1.2.3
   settings:
     password:
       from_secret: docker_password
@@ -595,8 +579,24 @@ steps:
     event:
     - push
 
+- name: push-head-manifest
+  image: plugins/manifest:1.2.3
+  settings:
+    password:
+      from_secret: docker_password
+    spec: manifest.tmpl
+    username:
+      from_secret: docker_username
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
 - name: push-build-number-agent-manifest
-  image: plugins/manifest:1.1.0
+  image: plugins/manifest:1.2.3
   settings:
     password:
       from_secret: docker_password
@@ -611,26 +611,26 @@ steps:
     event:
     - push
 
-- name: push-manifest
-  image: plugins/manifest:1.1.0
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest.tmpl
-  when:
-    event:
-    - tag
-
 - name: push-agent-manifest
-  image: plugins/manifest:1.1.0
+  image: plugins/manifest:1.2.3
   settings:
     username:
       from_secret: docker_username
     password:
       from_secret: docker_password
     spec: manifest-agent.tmpl
+  when:
+    event:
+    - tag
+
+- name: push-manifest
+  image: plugins/manifest:1.2.3
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    spec: manifest.tmpl
   when:
     event:
     - tag
