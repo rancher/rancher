@@ -4415,20 +4415,20 @@
    "maxRancherVersion": "2.3.3"
   },
   "v1.15.11-rancher1-2": {
-   "minRKEVersion": "1.0.6",
-   "minRancherVersion": "2.3.6"
+   "minRKEVersion": "1.0.4",
+   "minRancherVersion": "2.3.5"
   },
   "v1.15.5-rancher1-1": {
    "maxRKEVersion": "0.2.8",
    "maxRancherVersion": "2.2.9"
   },
   "v1.16.8-rancher1-2": {
-   "minRKEVersion": "1.0.6",
-   "minRancherVersion": "2.3.6"
+   "minRKEVersion": "1.0.4",
+   "minRancherVersion": "2.3.5"
   },
   "v1.17.4-rancher1-2": {
-   "minRKEVersion": "1.0.6",
-   "minRancherVersion": "2.3.6"
+   "minRKEVersion": "1.0.4",
+   "minRancherVersion": "2.3.5"
   },
   "v1.8": {
    "maxRKEVersion": "0.2.2",
