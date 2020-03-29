@@ -72,6 +72,12 @@ get_address()
             packetpublic)
                 echo $(curl -s https://metadata.packet.net/2009-04-04/meta-data/public-ipv4)
                 ;;
+            scwprivate)
+                echo $(curl -s http://169.254.42.42/conf | grep "^PRIVATE_IP=" | sed "s/^PRIVATE_IP=//")
+                ;;
+            scwpublic)
+                echo $(curl -s http://169.254.42.42/conf | grep "^PUBLIC_IP_ADDRESS=" | sed "s/^PUBLIC_IP_ADDRESS=//")
+                ;;
             ipify)
                 echo $(curl -s https://api.ipify.org)
                 ;;
