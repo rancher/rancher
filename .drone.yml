@@ -330,7 +330,7 @@ platform:
 
 steps:
 - name: push-head-agent-manifest
-  image: plugins/manifest:1.2.3
+  image: ibuildthecloud/manifest:v1.2.3-patch1
   settings:
     password:
       from_secret: docker_password
@@ -346,7 +346,7 @@ steps:
     - push
 
 - name: push-head-manifest
-  image: plugins/manifest:1.2.3
+  image: ibuildthecloud/manifest:v1.2.3-patch1
   settings:
     password:
       from_secret: docker_password
@@ -362,7 +362,7 @@ steps:
     - push
 
 - name: push-agent-manifest
-  image: plugins/manifest:1.2.3
+  image: ibuildthecloud/manifest:v1.2.3-patch1
   settings:
     password:
       from_secret: docker_password
@@ -374,7 +374,7 @@ steps:
     - tag
 
 - name: push-manifest
-  image: plugins/manifest:1.2.3
+  image: ibuildthecloud/manifest:v1.2.3-patch1
   settings:
     password:
       from_secret: docker_password
