@@ -174,7 +174,7 @@ func GetEnvKey(key string) string {
 func getMetadataConfig() string {
 	branch := os.Getenv("RANCHER_METADATA_BRANCH")
 	if branch == "" {
-		branch = "dev-v2.4"
+		branch = "dev-v2.5"
 	}
 	data := map[string]interface{}{
 		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
