@@ -2325,6 +2325,10 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ComponentStatusesLastSync != nil {
+		in, out := &in.ComponentStatusesLastSync, &out.ComponentStatusesLastSync
+		*out = (*in).DeepCopy()
+	}
 	if in.Capacity != nil {
 		in, out := &in.Capacity, &out.Capacity
 		*out = make(corev1.ResourceList, len(*in))

@@ -81,6 +81,8 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	sort.Slice(cluster.Status.ComponentStatuses, func(i, j int) bool {
 		return cluster.Status.ComponentStatuses[i].Name < cluster.Status.ComponentStatuses[j].Name
 	})
+	updateTime := metav1.Now()
+	cluster.Status.ComponentStatusesLastSync = &updateTime
 	return nil
 }
 

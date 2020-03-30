@@ -138,6 +138,7 @@ type ClusterStatus struct {
 	AgentFeatures                        map[string]bool             `json:"agentFeatures,omitempty"`
 	AuthImage                            string                      `json:"authImage"`
 	ComponentStatuses                    []ClusterComponentStatus    `json:"componentStatuses,omitempty"`
+	ComponentStatusesLastSync            *metav1.Time                `json:"componentStatusesLastSync,omitempty"`
 	APIEndpoint                          string                      `json:"apiEndpoint,omitempty"`
 	ServiceAccountToken                  string                      `json:"serviceAccountToken,omitempty"`
 	CACert                               string                      `json:"caCert,omitempty"`
