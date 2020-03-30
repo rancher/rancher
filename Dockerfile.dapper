@@ -16,7 +16,7 @@ ENV HELM_VERSION v3.1.0
 ENV KUSTOMIZE_VERSION v3.5.4
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV RANCHER_METADATA_BRANCH=dev-v2.4
+ENV RANCHER_METADATA_BRANCH=dev-v2.5
 
 RUN apt-get update && \
     apt-get install -y gcc ca-certificates git wget curl vim less file xz-utils unzip && \
