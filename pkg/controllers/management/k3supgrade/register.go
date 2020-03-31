@@ -2,6 +2,7 @@ package k3supgrade
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -23,6 +24,7 @@ type handler struct {
 	nodeLister             v3.NodeLister
 	systemAccountManager   *systemaccount.Manager
 	manager                *clustermanager.Manager
+	clusterEnqueueAfter    func(name string, duration time.Duration)
 }
 
 const (
@@ -37,6 +39,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		systemUpgradeNamespace: systemUpgradeNS,
 		clusterCache:           wContext.Mgmt.Cluster().Cache(),
 		clusterClient:          wContext.Mgmt.Cluster(),
+		clusterEnqueueAfter:    wContext.Mgmt.Cluster().EnqueueAfter,
 		apps:                   mgmtCtx.Project.Apps(metav1.NamespaceAll),
 		appLister:              mgmtCtx.Project.Apps("").Controller().Lister(),
 		templateLister:         mgmtCtx.Management.CatalogTemplates("").Controller().Lister(),
