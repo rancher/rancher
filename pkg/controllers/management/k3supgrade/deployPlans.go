@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	planClientset "github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
@@ -177,8 +178,7 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 		c := cluster.Spec.K3sConfig.ServerConcurrency
 		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded",
 			upgradingMessage(c, masterPlan.Status.Applying))
-		v3.ClusterConditionUpgraded.Message(cluster, masterPlanMessage)
-		return h.clusterClient.Update(cluster)
+		return h.enqueueOrUpdate(cluster, masterPlanMessage)
 
 	}
 
@@ -187,8 +187,7 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 		c := cluster.Spec.K3sConfig.WorkerConcurrency
 		workerPlanMessage := fmt.Sprintf("worker node [%s] being upgraded",
 			upgradingMessage(c, workerPlan.Status.Applying))
-		v3.ClusterConditionUpgraded.Message(cluster, workerPlanMessage)
-		return h.clusterClient.Update(cluster)
+		return h.enqueueOrUpdate(cluster, workerPlanMessage)
 	}
 
 	// if we made it this far nothing is applying
@@ -208,4 +207,16 @@ func upgradingMessage(concurrency int, nodes []string) string {
 	}
 
 	return strings.Join(nodes[:concurrency], ", ")
+}
+
+func (h *handler) enqueueOrUpdate(cluster *v3.Cluster, upgradeMessage string) (*v3.Cluster, error) {
+	if v3.ClusterConditionUpgraded.GetMessage(cluster) == upgradeMessage {
+		// update would be no op
+		h.clusterEnqueueAfter(cluster.Name, time.Second*5) // prevent controller from remaining in this state
+		return cluster, nil
+	}
+
+	v3.ClusterConditionUpgraded.Message(cluster, upgradeMessage)
+	return h.clusterClient.Update(cluster)
+
 }
