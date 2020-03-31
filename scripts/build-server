@@ -11,7 +11,7 @@ mkdir -p bin
 if echo "$VERSION" | grep -q -e '^v.*' ; then 
     UI_INDEX="local"
 fi
-UI_INDEX=${UI_INDEX:-"https://releases.rancher.com/ui/latest2/index.html"}
+UI_INDEX=${UI_INDEX:-"https://releases.rancher.com/ui/latest-2.4/index.html"}
 RKE_VERSION="$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')"
 
 # Inject Setting values
