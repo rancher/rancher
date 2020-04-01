@@ -5,11 +5,28 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/rancher/remotedialer/metrics"
 )
+
+var (
+	backupTimeout = 15 * time.Second
+)
+
+func init() {
+	t := os.Getenv("REMOTEDIALER_BACKUP_TIMEOUT_SECONDS")
+	if t != "" {
+		i, err := strconv.Atoi(t)
+		if err != nil {
+			panic("invalid number " + t + " for REMOTEDIALER_BACKUP_TIMEOUT_SECONDS")
+		}
+		backupTimeout = time.Duration(i) * time.Second
+	}
+}
 
 type connection struct {
 	sync.Mutex
@@ -191,7 +208,7 @@ func (c chanWriter) Write(buf []byte) (int, error) {
 		select {
 		case c.C <- buf:
 			return len(buf), nil
-		case <-time.After(15 * time.Second):
+		case <-time.After(backupTimeout):
 			return 0, errors.New("backed up reader")
 		}
 	}
