@@ -1,4 +1,6 @@
+import base64
 import os
+import pytest
 import rancher
 import time
 
@@ -23,21 +25,41 @@ RANCHER_HA_HOSTNAME = RANCHER_HOSTNAME_PREFIX + ".qa.rancher.space"
 RANCHER_IMAGE_TAG = os.environ.get("RANCHER_IMAGE_TAG")
 RANCHER_SERVER_URL = "https://" + RANCHER_HA_HOSTNAME
 RANCHER_HELM_REPO = os.environ.get("RANCHER_HELM_REPO", "latest")
+RANCHER_LETSENCRYPT_EMAIL = os.environ.get("RANCHER_LETSENCRYPT_EMAIL")
+# cert type for HA install [rancher-self-signed, byo-valid, byo-self-signed, letsencrypt]
+RANCHER_HA_CERT_OPTION = os.environ.get("RANCHER_HA_CERT_OPTION", "rancher-self-signed")
+RANCHER_VALID_TLS_CERT = os.environ.get("RANCHER_VALID_TLS_CERT")
+RANCHER_VALID_TLS_KEY = os.environ.get("RANCHER_VALID_TLS_KEY")
+RANCHER_BYO_TLS_CERT = os.environ.get("RANCHER_BYO_TLS_CERT")
+RANCHER_BYO_TLS_KEY = os.environ.get("RANCHER_BYO_TLS_KEY")
+RANCHER_PRIVATE_CA_CERT = os.environ.get("RANCHER_PRIVATE_CA_CERT")
 AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME")
 kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
 export_cmd = "export KUBECONFIG=" + kubeconfig_path
 
 
 def test_create_ha():
+    cm_install = True
+    
+    if "byo-" in RANCHER_HA_CERT_OPTION:
+        cm_install = False
+
+    ha_setup(install_cm=cm_install)
+    install_rancher()
+    ha_finalize()
+
+def ha_setup(install_cm=True):
     print(RANCHER_HA_HOSTNAME)
     nodes = create_resources()
     rke_config = create_rke_cluster_config(nodes)
     create_rke_cluster(rke_config)
-    install_cert_manager()
+    if install_cm == True:
+        install_cert_manager()
     add_repo_create_namespace()
-    install_rancher_self_signed()
-    set_url_and_password()
 
+def ha_finalize():
+    set_url_and_password()
+    print_kubeconfig()
 
 def create_resources():
     # Create nlb and grab ARN & dns name
@@ -97,9 +119,7 @@ def install_cert_manager():
         "helm_v3 install cert-manager jetstack/cert-manager " + \
         "--namespace cert-manager --version v0.12.0"
 
-    print(helm_certmanager_cmd)
-    out = run_command_with_stderr(helm_certmanager_cmd)
-    print(out)
+    run_command_with_stderr(helm_certmanager_cmd)
     time.sleep(120)
 
 
@@ -109,36 +129,75 @@ def add_repo_create_namespace(repo=RANCHER_HELM_REPO):
         " https://releases.rancher.com/server-charts/" + repo + " && " + \
         "helm_v3 repo update"
 
-    print(helm_repo_cmd)
-    out = run_command_with_stderr(helm_repo_cmd)
-    print(out)
+    run_command_with_stderr(helm_repo_cmd)
 
     helm_init_cmd = \
         export_cmd + \
         " && kubectl create namespace cattle-system"
-    print(helm_init_cmd)
-    out = run_command_with_stderr(helm_init_cmd)
-    print(out)
+
+    run_command_with_stderr(helm_init_cmd)
 
 
-def install_rancher_self_signed(repo=RANCHER_HELM_REPO):
+def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO):
     helm_rancher_cmd = \
         export_cmd + " && helm_v3 install rancher " + \
         "rancher-" + repo + "/rancher " + \
         "--version " + RANCHER_CHART_VERSION + " " \
         "--namespace cattle-system " + \
         "--set hostname=" + RANCHER_HA_HOSTNAME
-
-    if RANCHER_IMAGE_TAG != "":
+        
+    if type == 'letsencrypt':
         helm_rancher_cmd = helm_rancher_cmd + \
-            " --set rancherImageTag=${RANCHER_IMAGE_TAG}"
+            " --set ingress.tls.source=letsEncrypt " + \
+            "--set letsEncrypt.email=" + RANCHER_LETSENCRYPT_EMAIL
+    elif type == 'byo-self-signed':
+        helm_rancher_cmd = helm_rancher_cmd + \
+            " --set ingress.tls.source=secret " + \
+            "--set privateCA=true"
+    elif type == 'byo-valid':
+        helm_rancher_cmd = helm_rancher_cmd + \
+            " --set ingress.tls.source=secret"
+    
+    if RANCHER_IMAGE_TAG != "" and RANCHER_IMAGE_TAG is not None:
+        helm_rancher_cmd = helm_rancher_cmd + \
+            " --set rancherImageTag=" + RANCHER_IMAGE_TAG
 
-    print(helm_rancher_cmd)
-    out = run_command_with_stderr(helm_rancher_cmd)
-    print(out)
+    if type == "byo-self-signed":
+        create_tls_secrets(valid_cert=False)
+    elif type == "byo-valid":
+        create_tls_secrets(valid_cert=True)
 
+    run_command_with_stderr(helm_rancher_cmd)
     time.sleep(120)
 
+
+def create_tls_secrets(valid_cert):
+    cert_path = DATA_SUBDIR + "/tls.crt"
+    key_path = DATA_SUBDIR + "/tls.key"
+    ca_path = DATA_SUBDIR + "/cacerts.pem"
+
+    if valid_cert == True:
+        # write files from env var
+        write_encoded_certs(cert_path, RANCHER_VALID_TLS_CERT)
+        write_encoded_certs(key_path, RANCHER_VALID_TLS_KEY)
+    else:
+        write_encoded_certs(cert_path, RANCHER_BYO_TLS_CERT)
+        write_encoded_certs(key_path, RANCHER_BYO_TLS_KEY)
+        write_encoded_certs(ca_path, RANCHER_PRIVATE_CA_CERT)
+
+    tls_command = export_cmd + " && kubectl -n cattle-system create secret tls tls-rancher-ingress --cert=" + cert_path + " --key=" + key_path
+    ca_command = export_cmd + " && kubectl -n cattle-system create secret generic tls-ca --from-file=" + ca_path
+
+    run_command_with_stderr(tls_command)
+
+    if valid_cert == False:
+        run_command_with_stderr(ca_command)
+
+
+def write_encoded_certs(path, contents):
+    file = open(path, "w")
+    file.write(base64.b64decode(contents).decode("utf-8"))
+    file.close()
 
 def set_url_and_password():
     admin_token = set_url_password_token(RANCHER_SERVER_URL)
@@ -155,8 +214,14 @@ def set_url_and_password():
 
 def create_rke_cluster(config_path):
     rke_cmd = "rke --version && rke up --config " + config_path
-    result = run_command_with_stderr(rke_cmd)
-    print(result)
+    run_command_with_stderr(rke_cmd)
+
+
+def print_kubeconfig():
+    kubeconfig_file = open(kubeconfig_path, "r")
+    kubeconfig_contents = kubeconfig_file.read()
+    kubeconfig_file.close()
+    print("\n\n" + kubeconfig_contents + "\n\n")
 
 
 def create_rke_cluster_config(aws_nodes):
@@ -182,3 +247,17 @@ def create_rke_cluster_config(aws_nodes):
     f.write(rkeconfig)
     f.close()
     return clusterfilepath
+
+@pytest.fixture(scope='module', autouse=True)
+def precheck_certificate_options():
+    if RANCHER_HA_CERT_OPTION == 'byo-valid':
+        if RANCHER_VALID_TLS_CERT == '' or RANCHER_VALID_TLS_KEY == '' or \
+            RANCHER_VALID_TLS_CERT is None or RANCHER_VALID_TLS_KEY is None:
+                raise pytest.skip('Valid certificates not found in environment variables')
+    elif RANCHER_HA_CERT_OPTION == 'byo-self-signed':
+        if RANCHER_BYO_TLS_CERT == '' or RANCHER_BYO_TLS_KEY == '' or RANCHER_PRIVATE_CA_CERT == '' or \
+            RANCHER_BYO_TLS_CERT is None or RANCHER_BYO_TLS_KEY is None or RANCHER_PRIVATE_CA_CERT is None:
+            raise pytest.skip('Self signed certificates not found in environment variables')
+    elif RANCHER_HA_CERT_OPTION == 'letsencrypt':
+        if RANCHER_LETSENCRYPT_EMAIL == '' or RANCHER_LETSENCRYPT_EMAIL is None:
+            raise pytest.skip('LetsEncrypt email is not found in environment variables')
