@@ -58,6 +58,8 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	cisBenchmarkVersion := userContext.Management.Management.CisBenchmarkVersions(namespace.GlobalNamespace)
 	cisBenchmarkVersionLister := cisBenchmarkVersion.Controller().Lister()
 
+	templateLister := userContext.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
+
 	// Responsible for syncing the benchmark version info from mgmt ctx
 	// to config maps in user cluster
 	cisBenchmarkVersionHandler := &cisBenchmarkVersionHandler{
@@ -91,6 +93,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		podLister:                    podLister,
 		dsClient:                     dsClient,
 		dsLister:                     dsLister,
+		templateLister:               templateLister,
 	}
 	clusterScanClient.AddClusterScopedLifecycle(ctx, "cisScanHandler", clusterName, clusterScanHandler)
 
