@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/norman/types/convert"
+	passwordutil "github.com/rancher/rancher/pkg/api/store/password"
+	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
@@ -15,9 +19,6 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
-
-	"github.com/rancher/norman/types/convert"
-	passwordutil "github.com/rancher/rancher/pkg/api/store/password"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,6 +30,7 @@ const (
 	GlobaldnsProviderCatalogLauncher = "mgmt-global-dns-provider-catalog-launcher"
 	cattleCreatorIDAnnotationKey     = "field.cattle.io/creatorId"
 	localClusterName                 = "local"
+	templateName                     = "rancher-external-dns"
 )
 
 type ProviderCatalogLauncher struct {
@@ -38,6 +40,7 @@ type ProviderCatalogLauncher struct {
 	appLister         pv3.AppLister
 	userManager       user.Manager
 	secrets           v1.SecretInterface
+	templateLister    v3.CatalogTemplateLister
 }
 
 func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderCatalogLauncher {
@@ -48,6 +51,7 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 		appLister:         mgmt.Project.Apps("").Controller().Lister(),
 		userManager:       mgmt.UserManager,
 		secrets:           mgmt.Core.Secrets(""),
+		templateLister:    mgmt.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
 	}
 	return n
 }
@@ -207,7 +211,10 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 		}
 	} else {
 		//create new app
-		appCatalogID := settings.SystemExternalDNSCatalogID.Get()
+		appCatalogID, err := n.getExternalDNSCatalogID()
+		if err != nil {
+			return nil, err
+		}
 		sysProject, err := n.getSystemProjectID()
 		if err != nil {
 			return nil, err
@@ -274,6 +281,15 @@ func (n *ProviderCatalogLauncher) getSystemProjectID() (string, error) {
 	}
 
 	return systemProject.Name, nil
+}
+
+func (n *ProviderCatalogLauncher) getExternalDNSCatalogID() (string, error) {
+	templateVersionID := n.getRancherExternalDNSTemplateID()
+	return versionutil.GetSystemAppCatalogID(templateVersionID, n.templateLister)
+}
+
+func (n *ProviderCatalogLauncher) getRancherExternalDNSTemplateID() string {
+	return fmt.Sprintf("%s-%s", cutils.SystemLibraryName, templateName)
 }
 
 func CopyCreatorID(toAnnotations, fromAnnotations map[string]string) map[string]string {
