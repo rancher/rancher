@@ -173,7 +173,8 @@ rke_config_cis = {
         },
         "kubelet": {
             "extraArgs": {
-                "protect-kernel-defaults": True
+                "protect-kernel-defaults": True,
+                "feature-gates": "RotateKubeletServerCertificate=true"
             },
             "generateServingCertificate": True
         },
