@@ -68,7 +68,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 	}
 
 	searchOpRequest := ldapv2.NewSearchRequest(userDN,
-		ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
+		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
 		operationalAttrList, nil)
 	opResult, err := lConn.Search(searchOpRequest)
