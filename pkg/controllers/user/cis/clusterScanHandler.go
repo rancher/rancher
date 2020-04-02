@@ -9,7 +9,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
-	"github.com/rancher/rancher/pkg/settings"
+	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	appsv1 "github.com/rancher/types/apis/apps/v1"
@@ -35,6 +36,7 @@ const (
 	varDebugWorker                = "debugWorker"
 	varOverrideBenchmarkVersion   = "overrideBenchmarkVersion"
 	runnerPodPrefix               = "security-scan-runner-"
+	templateName                  = "rancher-cis-benchmark"
 )
 
 var (
@@ -62,6 +64,7 @@ type cisScanHandler struct {
 	podLister                    rcorev1.PodLister
 	dsClient                     appsv1.DaemonSetInterface
 	dsLister                     appsv1.DaemonSetLister
+	templateLister               v3.CatalogTemplateLister
 }
 
 type appInfo struct {
@@ -302,8 +305,11 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 }
 
 func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
-	appCatalogID := settings.SystemCISBenchmarkCatalogID.Get()
-	err := utils.DetectAppCatalogExistence(appCatalogID, csh.catalogTemplateVersionLister)
+	appCatalogID, err := csh.getCISBenchmarkCatalogID()
+	if err != nil {
+		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
+	}
+	err = utils.DetectAppCatalogExistence(appCatalogID, csh.catalogTemplateVersionLister)
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}
@@ -441,4 +447,13 @@ func (csh *cisScanHandler) ensureCleanup(cs *v3.ClusterScan) error {
 	}
 
 	return err
+}
+
+func (csh *cisScanHandler) getCISBenchmarkCatalogID() (string, error) {
+	templateVersionID := csh.getRancherCISBenchmarkTemplateID()
+	return versionutil.GetSystemAppCatalogID(templateVersionID, csh.templateLister)
+}
+
+func (csh *cisScanHandler) getRancherCISBenchmarkTemplateID() string {
+	return fmt.Sprintf("%s-%s", cutils.SystemLibraryName, templateName)
 }
