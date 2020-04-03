@@ -114,13 +114,13 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 			return 400, errWrongMessageType
 		}
 
-		if err := s.serveMessage(reader); err != nil {
+		if err := s.serveMessage(ctx, reader); err != nil {
 			return 500, err
 		}
 	}
 }
 
-func (s *Session) serveMessage(reader io.Reader) error {
+func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 	message, err := newServerMessage(reader)
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func (s *Session) serveMessage(reader io.Reader) error {
 		if s.auth == nil || !s.auth(message.proto, message.address) {
 			return errors.New("connect not allowed")
 		}
-		s.clientConnect(message)
+		s.clientConnect(ctx, message)
 		return nil
 	}
 
@@ -154,14 +154,14 @@ func (s *Session) serveMessage(reader io.Reader) error {
 	if conn == nil {
 		if message.messageType == Data {
 			err := fmt.Errorf("connection not found %s/%d/%d", s.clientKey, s.sessionKey, message.connID)
-			newErrorMessage(message.connID, err).WriteTo(s.conn)
+			newErrorMessage(message.connID, err).WriteTo(defaultDeadline(), s.conn)
 		}
 		return nil
 	}
 
 	switch message.messageType {
 	case Data:
-		if _, err := io.Copy(conn.tunnelWriter(), message); err != nil {
+		if err := conn.OnData(message); err != nil {
 			s.closeConnection(message.connID, err)
 		}
 	case Error:
@@ -169,6 +169,10 @@ func (s *Session) serveMessage(reader io.Reader) error {
 	}
 
 	return nil
+}
+
+func defaultDeadline() time.Time {
+	return time.Now().Add(time.Minute)
 }
 
 func parseAddress(address string) (string, int, error) {
@@ -191,7 +195,7 @@ func (s *Session) addRemoteClient(address string) error {
 		keys = map[int]bool{}
 		s.remoteClientKeys[clientKey] = keys
 	}
-	keys[int(sessionKey)] = true
+	keys[sessionKey] = true
 
 	if PrintTunnelData {
 		logrus.Debugf("ADD REMOTE CLIENT %s, SESSION %d", address, s.sessionKey)
@@ -233,7 +237,7 @@ func (s *Session) closeConnection(connID int64, err error) {
 	}
 }
 
-func (s *Session) clientConnect(message *message) {
+func (s *Session) clientConnect(ctx context.Context, message *message) {
 	conn := newConnection(message.connID, s, message.proto, message.address)
 
 	s.Lock()
@@ -243,10 +247,35 @@ func (s *Session) clientConnect(message *message) {
 	}
 	s.Unlock()
 
-	go clientDial(s.dialer, conn, message)
+	go clientDial(ctx, s.dialer, conn, message)
 }
 
-func (s *Session) serverConnect(deadline time.Duration, proto, address string) (net.Conn, error) {
+type connResult struct {
+	conn net.Conn
+	err  error
+}
+
+func (s *Session) serverConnectContext(ctx context.Context, proto, address string) (net.Conn, error) {
+	deadline, ok := ctx.Deadline()
+	if ok {
+		return s.serverConnect(deadline, proto, address)
+	}
+
+	result := make(chan connResult, 1)
+	go func() {
+		c, err := s.serverConnect(defaultDeadline(), proto, address)
+		result <- connResult{conn: c, err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case r := <-result:
+		return r.conn, r.err
+	}
+}
+
+func (s *Session) serverConnect(deadline time.Time, proto, address string) (net.Conn, error) {
 	connID := atomic.AddInt64(&s.nextConnID, 1)
 	conn := newConnection(connID, s, proto, address)
 
@@ -257,7 +286,7 @@ func (s *Session) serverConnect(deadline time.Duration, proto, address string) (
 	}
 	s.Unlock()
 
-	_, err := s.writeMessage(newConnect(connID, deadline, proto, address))
+	_, err := s.writeMessage(deadline, newConnect(connID, proto, address))
 	if err != nil {
 		s.closeConnection(connID, err)
 		return nil, err
@@ -266,11 +295,11 @@ func (s *Session) serverConnect(deadline time.Duration, proto, address string) (
 	return conn, err
 }
 
-func (s *Session) writeMessage(message *message) (int, error) {
+func (s *Session) writeMessage(deadline time.Time, message *message) (int, error) {
 	if PrintTunnelData {
 		logrus.Debug("WRITE ", message)
 	}
-	return message.WriteTo(s.conn)
+	return message.WriteTo(deadline, s.conn)
 }
 
 func (s *Session) Close() {
@@ -288,7 +317,7 @@ func (s *Session) Close() {
 
 func (s *Session) sessionAdded(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
-	_, err := s.writeMessage(newAddClient(client))
+	_, err := s.writeMessage(time.Time{}, newAddClient(client))
 	if err != nil {
 		s.conn.conn.Close()
 	}
@@ -296,7 +325,7 @@ func (s *Session) sessionAdded(clientKey string, sessionKey int64) {
 
 func (s *Session) sessionRemoved(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
-	_, err := s.writeMessage(newRemoveClient(client))
+	_, err := s.writeMessage(time.Time{}, newRemoveClient(client))
 	if err != nil {
 		s.conn.conn.Close()
 	}

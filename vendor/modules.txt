@@ -419,7 +419,7 @@ github.com/rancher/norman/types/values
 github.com/rancher/norman/urlbuilder
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
-# github.com/rancher/remotedialer v0.2.5
+# github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
 # github.com/rancher/rke v1.1.0-rc9.0.20200329162208-b513e200abc2
@@ -489,7 +489,7 @@ github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1
 github.com/rancher/system-upgrade-controller/pkg/condition
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/scheme
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1
-# github.com/rancher/types v0.0.0-20200327203838-a36e8d24795f
+# github.com/rancher/types v0.0.0-20200403175648-784a390255fa
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2

@@ -1,13 +1,14 @@
 package remotedialer
 
 import (
+	"context"
 	"io"
 	"net"
 	"sync"
 	"time"
 )
 
-func clientDial(dialer Dialer, conn *connection, message *message) {
+func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *message) {
 	defer conn.Close()
 
 	var (
@@ -15,11 +16,14 @@ func clientDial(dialer Dialer, conn *connection, message *message) {
 		err     error
 	)
 
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Minute))
 	if dialer == nil {
-		netConn, err = net.DialTimeout(message.proto, message.address, time.Duration(message.deadline)*time.Millisecond)
+		d := net.Dialer{}
+		netConn, err = d.DialContext(ctx, message.proto, message.address)
 	} else {
-		netConn, err = dialer(message.proto, message.address)
+		netConn, err = dialer(ctx, message.proto, message.address)
 	}
+	cancel()
 
 	if err != nil {
 		conn.tunnelClose(err)
