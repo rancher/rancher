@@ -24,4 +24,6 @@ CGO_ENABLED=0 go build -i -tags k8s \
    -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS" \
   -o bin/rancher
 
-curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${RANCHER_METADATA_BRANCH}/data.json > bin/data.json
+if  [ -n "$RANCHER_METADATA_BRANCH" ]; then
+    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${RANCHER_METADATA_BRANCH}/data.json > bin/data.json
+fi
