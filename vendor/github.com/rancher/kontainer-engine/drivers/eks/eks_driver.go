@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -958,16 +957,28 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *t
 		return nil, err
 	}
 
-	if newState.KubernetesVersion != "" &&
-		newState.KubernetesVersion != state.KubernetesVersion {
+	var sendUpdate bool
+	if newState.KubernetesVersion != "" && newState.KubernetesVersion != state.KubernetesVersion {
+		sendUpdate = true
 		state.KubernetesVersion = newState.KubernetesVersion
 	}
 
-	if !reflect.DeepEqual(state, *oldstate) {
-		if err := d.updateClusterAndWait(ctx, state); err != nil {
-			logrus.Errorf("error updating cluster: %v", err)
-			return info, err
-		}
+	if newState.ClientID != "" && newState.ClientID != state.ClientID {
+		state.ClientID = newState.ClientID
+	}
+
+	if newState.ClientSecret != "" && newState.ClientSecret != state.ClientSecret {
+		state.ClientSecret = newState.ClientSecret
+	}
+
+	if !sendUpdate {
+		logrus.Infof("Update complete")
+		return info, storeState(info, state)
+	}
+
+	if err := d.updateClusterAndWait(ctx, state); err != nil {
+		logrus.Errorf("error updating cluster: %v", err)
+		return info, err
 	}
 
 	logrus.Infof("Update complete")
@@ -1159,6 +1170,14 @@ func notFound(err error) bool {
 	return false
 }
 
+func invalidParam(err error) bool {
+	if awsErr, ok := err.(awserr.Error); ok {
+		return awsErr.Code() == eks.ErrCodeInvalidParameterException
+	}
+
+	return false
+}
+
 func doesNotExist(err error) bool {
 	// There is no better way of doing this because AWS API does not distinguish between a attempt to delete a stack
 	// (or key pair) that does not exist, and, for example, a malformed delete request, so we have to parse the error
@@ -1279,7 +1298,23 @@ func (d *Driver) updateClusterAndWait(ctx context.Context, state state) error {
 			input.Name = aws.String(state.ClusterName)
 			output, err = svc.UpdateClusterVersionWithContext(ctx, input)
 		}
-
+		if invalidParam(err) {
+			describeInput := &eks.DescribeClusterInput{
+				Name: input.Name,
+			}
+			eksState, describeErr := svc.DescribeCluster(describeInput)
+			if describeErr != nil {
+				// show original error encountered during update
+				return err
+			}
+			if eksState == nil || eksState.Cluster == nil {
+				return err
+			}
+			if eksState.Cluster.Version != nil && *eksState.Cluster.Version == state.KubernetesVersion {
+				// versions match, no update needed
+				return nil
+			}
+		}
 		if err != nil {
 			return err
 		}

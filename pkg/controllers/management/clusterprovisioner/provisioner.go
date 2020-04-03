@@ -813,14 +813,6 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 		return nil, err
 	}
 
-	// Version is the only parameter that can be updated for EKS, if they is equal we do not need to update
-	// TODO: Replace with logic that is more adaptable
-	if cluster.Spec.GenericEngineConfig != nil && (*cluster.Spec.GenericEngineConfig)["driverName"] == "amazonelasticcontainerservice" &&
-		cluster.Status.AppliedSpec.GenericEngineConfig != nil && (*cluster.Spec.GenericEngineConfig)["kubernetesVersion"] ==
-		(*cluster.Status.AppliedSpec.GenericEngineConfig)["kubernetesVersion"] {
-		return nil, nil
-	}
-
 	if reflect.DeepEqual(oldConfig, newConfig) {
 		return nil, nil
 	}
