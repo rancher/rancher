@@ -46,6 +46,10 @@ PRIVATE_IMAGES = {
         'image': 'ami-0af048cee838aa482', 'ssh_user': 'ec2-user'},
     "suse-sles12-sp2-docker-18061ce": {
         'image': 'ami-0cc154aeb82bd8fa0', 'ssh_user': 'ec2-user'},
+    "suse-12-sp5-docker-19.03.1-kernel-4.12.14-122.17.1": {
+        'image': 'ami-0003839096dc438c0', 'ssh_user': 'ec2-user'},
+    "sles15-sp1-docker-19.03.1": {
+        'image': 'ami-0636bb98601d8917e', 'ssh_user': 'ec2-user'},
     "ubuntu-16.04-docker-18.09": {
         'image': 'ami-07e968eb9151b2599', 'ssh_user': 'ubuntu'},
     "ubuntu-18.04-docker-18.09": {
