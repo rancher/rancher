@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/features"
@@ -89,8 +88,8 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 	if err != nil {
 		return nil, err
 	}
-	dialer := h.tunnelServer.Dialer(host, 15*time.Second)
-	return dialer(network, "127.0.0.1:6443")
+	dialer := h.tunnelServer.Dialer(host)
+	return dialer(ctx, network, "127.0.0.1:6443")
 }
 
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {

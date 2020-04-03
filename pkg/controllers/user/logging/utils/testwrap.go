@@ -37,7 +37,7 @@ var (
 )
 
 type LoggingTargetTestWrap interface {
-	TestReachable(dial dialer.Dialer, includeSendTestLog bool) error
+	TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error
 }
 
 func NewLoggingTargetTestWrap(loggingTargets v3.LoggingTargets) LoggingTargetTestWrap {
@@ -60,7 +60,7 @@ func NewLoggingTargetTestWrap(loggingTargets v3.LoggingTargets) LoggingTargetTes
 
 func testReachableHTTP(dial dialer.Dialer, req *http.Request, tlsConfig *tls.Config) error {
 	transport := &http.Transport{
-		Dial:            dial,
+		DialContext:     dial,
 		TLSClientConfig: tlsConfig,
 	}
 
@@ -99,8 +99,8 @@ func writeToUDPConn(data []byte, smartHost string) error {
 	return nil
 }
 
-func newTCPConn(dialer dialer.Dialer, smartHost string, tlsConfig *tls.Config, handshake bool) (net.Conn, error) {
-	conn, err := dialer("tcp", smartHost)
+func newTCPConn(ctx context.Context, dialer dialer.Dialer, smartHost string, tlsConfig *tls.Config, handshake bool) (net.Conn, error) {
+	conn, err := dialer(ctx, "tcp", smartHost)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create raw connection %s", smartHost)
 	}

@@ -61,7 +61,7 @@ func (j *Engine) getMinioClient(ns string) (*minio.Client, error) {
 
 		j.HTTPClient = &http.Client{
 			Transport: &http.Transport{
-				Dial: dial,
+				DialContext: dial,
 			},
 			Timeout: 15 * time.Second,
 		}

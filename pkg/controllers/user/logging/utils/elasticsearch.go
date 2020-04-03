@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -18,7 +19,7 @@ type elasticsearchTestWrap struct {
 	*v3.ElasticsearchConfig
 }
 
-func (w *elasticsearchTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bool) error {
+func (w *elasticsearchTestWrap) TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error {
 	url, err := url.Parse(w.Endpoint)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't parse url %s", w.Endpoint)
@@ -34,7 +35,7 @@ func (w *elasticsearchTestWrap) TestReachable(dial dialer.Dialer, includeSendTes
 	}
 
 	if !includeSendTestLog {
-		conn, err := newTCPConn(dial, url.Host, tlsConfig, true)
+		conn, err := newTCPConn(ctx, dial, url.Host, tlsConfig, true)
 		if err != nil {
 			return err
 		}

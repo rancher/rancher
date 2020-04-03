@@ -172,7 +172,7 @@ func (auth authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func newHTTPTransport(dial dialer.Dialer) *http.Transport {
 	return &http.Transport{
-		Dial:                  dial,
+		DialContext:           dial,
 		ExpectContinueTimeout: 1 * time.Second,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,

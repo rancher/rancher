@@ -75,10 +75,12 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 
 	local := &rkedialerfactory.RKEDialerFactory{
 		Factory: management.Dialer,
+		Ctx:     ctx,
 	}
 	docker := &rkedialerfactory.RKEDialerFactory{
 		Factory: management.Dialer,
 		Docker:  true,
+		Ctx:     ctx,
 	}
 
 	driver := service.Drivers[service.RancherKubernetesEngineDriverName]
