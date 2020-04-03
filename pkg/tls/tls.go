@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/core"
 	corev1controllers "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/net"
@@ -90,6 +92,7 @@ func migrateConfig(ctx context.Context, restConfig *rest.Config, opts *server.Li
 	}
 
 	for _, k := range known {
+		k = strings.SplitN(k, ":", 2)[0]
 		found := false
 		for _, san := range opts.TLSListenerConfig.SANs {
 			if san == k {
@@ -163,7 +166,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 			TLSConfig:             tlsConfig,
 			ExpirationDaysCheck:   expiration,
 			SANs:                  sans,
-			MaxSANs:               20,
+			FilterCN:              filterCN,
 			CloseConnOnCertChange: true,
 		},
 	}
@@ -224,6 +227,25 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 
 	// No certificates mounted or only --no-cacerts used
 	return ca, noCACerts, opts, nil
+}
+
+func filterCN(cns ...string) []string {
+	serverURL := settings.ServerURL.Get()
+	if serverURL == "" {
+		return cns
+	}
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		logrus.Errorf("invalid server-url, can not parse %s: %v", serverURL, err)
+		return cns
+	}
+	host := u.Hostname()
+	for _, cn := range cns {
+		if cn == host {
+			return []string{host}
+		}
+	}
+	return nil
 }
 
 func fileExists(path string) bool {
