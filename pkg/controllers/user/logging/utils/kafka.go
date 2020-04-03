@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -27,7 +28,7 @@ func getKafkaTestData() kafka.Message {
 		Time:  time.Now(),
 	}
 }
-func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bool) error {
+func (w *kafkaTestWrap) TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error {
 	if w.SaslUsername != "" && w.SaslPassword != "" {
 		//TODO: Now we don't have a out of the box Kafka go client fit our request which both support sasl and could pass conn to it.
 		//kafka-go has a PR to support sasl, but not merge yet due to the mantainer want support Negotiation and Kerberos as well, we will add test func to sasl after the sasl in kafka-go is stable
@@ -48,7 +49,7 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 			}
 		}
 
-		conn, err := newTCPConn(dial, url.Host, tlsConfig, true)
+		conn, err := newTCPConn(ctx, dial, url.Host, tlsConfig, true)
 		if err != nil {
 			return err
 		}
@@ -73,7 +74,7 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 	}
 
 	broker0Host := broker0URL.Host
-	broker0Conn, err := w.kafkaConn(dial, broker0TLSConfig, broker0Host)
+	broker0Conn, err := w.kafkaConn(ctx, dial, broker0TLSConfig, broker0Host)
 	if err != nil {
 		return err
 	}
@@ -102,7 +103,7 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 		}
 
 		if includeSendTestLog {
-			if err = w.sendData2Kafka(broker0Conn, dial); err != nil {
+			if err = w.sendData2Kafka(ctx, broker0Conn, dial); err != nil {
 				return err
 			}
 		}
@@ -119,7 +120,7 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 			}
 		}
 
-		brokerControllerConn, err := w.kafkaConn(dial, brokerControllerTLSConfig, brokerControllerHost)
+		brokerControllerConn, err := w.kafkaConn(ctx, dial, brokerControllerTLSConfig, brokerControllerHost)
 		if err != nil {
 			return err
 		}
@@ -130,7 +131,7 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 		}
 
 		if includeSendTestLog {
-			if err = w.sendData2Kafka(brokerControllerConn, dial); err != nil {
+			if err = w.sendData2Kafka(ctx, brokerControllerConn, dial); err != nil {
 				return err
 			}
 		}
@@ -155,14 +156,14 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 			return errors.New(v + " isn't included in broker list")
 		}
 
-		if err = w.checkEndpointReachable(endpointURL, dial); err != nil {
+		if err = w.checkEndpointReachable(ctx, endpointURL, dial); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (w *kafkaTestWrap) checkEndpointReachable(endpointURL *url.URL, dial dialer.Dialer) error {
+func (w *kafkaTestWrap) checkEndpointReachable(ctx context.Context, endpointURL *url.URL, dial dialer.Dialer) error {
 	var tlsConfig *tls.Config
 	var err error
 	if endpointURL.Scheme == "https" {
@@ -177,7 +178,7 @@ func (w *kafkaTestWrap) checkEndpointReachable(endpointURL *url.URL, dial dialer
 		}
 	}
 
-	conn, err := w.kafkaConn(dial, tlsConfig, endpointURL.Host)
+	conn, err := w.kafkaConn(ctx, dial, tlsConfig, endpointURL.Host)
 	if err != nil {
 		return err
 	}
@@ -209,7 +210,7 @@ func (w *kafkaTestWrap) getKafkaPartitionLeader(kafkaConn *kafka.Conn) (*kafka.B
 	return &patitionLeader, nil
 }
 
-func (w *kafkaTestWrap) sendData2Kafka(kafkaConn *kafka.Conn, dial dialer.Dialer) error {
+func (w *kafkaTestWrap) sendData2Kafka(ctx context.Context, kafkaConn *kafka.Conn, dial dialer.Dialer) error {
 	patitionLeader, err := w.getKafkaPartitionLeader(kafkaConn)
 	if err != nil {
 		return err
@@ -228,7 +229,7 @@ func (w *kafkaTestWrap) sendData2Kafka(kafkaConn *kafka.Conn, dial dialer.Dialer
 		return err
 	}
 
-	patitionLeaderConn, err := w.kafkaConn(dial, tlsConfig, patitionLeaderHost)
+	patitionLeaderConn, err := w.kafkaConn(ctx, dial, tlsConfig, patitionLeaderHost)
 	if err != nil {
 		return err
 	}
@@ -240,8 +241,8 @@ func (w *kafkaTestWrap) sendData2Kafka(kafkaConn *kafka.Conn, dial dialer.Dialer
 	return nil
 }
 
-func (w *kafkaTestWrap) kafkaConn(dial dialer.Dialer, config *tls.Config, smartHost string) (*kafka.Conn, error) {
-	conn, err := newTCPConn(dial, smartHost, config, false)
+func (w *kafkaTestWrap) kafkaConn(ctx context.Context, dial dialer.Dialer, config *tls.Config, smartHost string) (*kafka.Conn, error) {
+	conn, err := newTCPConn(ctx, dial, smartHost, config, false)
 	if err != nil {
 		return nil, err
 	}

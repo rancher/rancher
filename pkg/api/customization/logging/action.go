@@ -2,6 +2,7 @@ package logging
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"path"
@@ -124,7 +125,7 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 
 	switch actionName {
 	case "test":
-		if err := h.testLoggingTarget(clusterName, target); err != nil {
+		if err := h.testLoggingTarget(apiContext.Request.Context(), clusterName, target); err != nil {
 			return httperror.NewAPIError(httperror.ServerError, err.Error())
 		}
 
@@ -146,7 +147,7 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 
 }
 
-func (h *Handler) testLoggingTarget(clusterName string, target mgmtv3.LoggingTargets) error {
+func (h *Handler) testLoggingTarget(ctx context.Context, clusterName string, target mgmtv3.LoggingTargets) error {
 	clusterDialer, err := h.dialerFactory.ClusterDialer(clusterName)
 	if err != nil {
 		return errors.Wrap(err, "get cluster dialer failed")
@@ -157,7 +158,7 @@ func (h *Handler) testLoggingTarget(clusterName string, target mgmtv3.LoggingTar
 		return nil
 	}
 
-	return wp.TestReachable(clusterDialer, true)
+	return wp.TestReachable(ctx, clusterDialer, true)
 }
 
 func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clusterName, projectID string, target mgmtv3.LoggingTargets) error {

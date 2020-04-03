@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/sha512"
 	"crypto/tls"
 	"encoding/base64"
@@ -33,7 +34,7 @@ type heloOption struct {
 	Keepalive bool   `json:"keepalive"`
 }
 
-func (w *fluentForwarderTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bool) error {
+func (w *fluentForwarderTestWrap) TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error {
 	for _, s := range w.FluentServers {
 		host, _, err := net.SplitHostPort(s.Endpoint)
 		if err != nil {
@@ -52,7 +53,7 @@ func (w *fluentForwarderTestWrap) TestReachable(dial dialer.Dialer, includeSendT
 			}
 		}
 
-		conn, err := newTCPConn(dial, s.Endpoint, tlsConfig, true)
+		conn, err := newTCPConn(ctx, dial, s.Endpoint, tlsConfig, true)
 		if err != nil {
 			return err
 		}

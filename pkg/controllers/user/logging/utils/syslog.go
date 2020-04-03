@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -16,7 +17,7 @@ type syslogTestWrap struct {
 	*v3.SyslogConfig
 }
 
-func (w *syslogTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bool) error {
+func (w *syslogTestWrap) TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error {
 	//TODO: for udp we can't use cluster dialer now, how to handle in cluster deploy syslog
 	syslogTestData := newRFC5424Message(w.Severity, w.Program, w.Token, testMessage)
 	if w.Protocol == "udp" {
@@ -45,7 +46,7 @@ func (w *syslogTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bo
 		}
 	}
 
-	conn, err := newTCPConn(dial, w.Endpoint, tlsConfig, true)
+	conn, err := newTCPConn(ctx, dial, w.Endpoint, tlsConfig, true)
 	if err != nil {
 		return err
 	}

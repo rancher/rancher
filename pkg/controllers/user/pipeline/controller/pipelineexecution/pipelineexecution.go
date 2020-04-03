@@ -66,6 +66,7 @@ type executionSummary struct {
 }
 
 type Lifecycle struct {
+	ctx                  context.Context
 	systemAccountManager *systemaccount.Manager
 	namespaceLister      v1.NamespaceLister
 	namespaces           v1.NamespaceInterface
@@ -129,6 +130,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 	pipelineEngine := engine.New(cluster, true)
 	pipelineExecutionLifecycle := &Lifecycle{
+		ctx:                        ctx,
 		systemAccountManager:       systemaccount.NewManager(cluster.Management),
 		namespaces:                 namespaces,
 		namespaceLister:            namespaceLister,
@@ -498,7 +500,7 @@ func (l *Lifecycle) doNotify(obj *v3.PipelineExecution) (runtime.Object, error) 
 			notifierMessage.Content = strings.Replace(message, "\n", "<br>\n", -1)
 		}
 		g.Go(func() error {
-			return notifiers.SendMessage(toSendRecipient.Notifier, toSendRecipient.Recipient, notifierMessage, clusterDialer)
+			return notifiers.SendMessage(l.ctx, toSendRecipient.Notifier, toSendRecipient.Recipient, notifierMessage, clusterDialer)
 		})
 	}
 	return obj, g.Wait()
