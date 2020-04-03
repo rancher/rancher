@@ -880,8 +880,8 @@ github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4b
 github.com/rancher/client-go v1.18.0-rancher.1 h1:YmROLJNSiBc+BU0MBsJU4QuNXV31ZqpGc+phrLk6jY0=
 github.com/rancher/client-go v1.18.0-rancher.1/go.mod h1:uQSYDYs4WhVZ9i6AIoEZuwUggLVEF64HOD37boKAtF8=
 github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
-github.com/rancher/dynamiclistener v0.2.1-0.20200319061731-763229ddcd6e h1:idy8TXAiZjZKa2J3A3DKXSfSz1sY+zMjk3rJNqoMREQ=
-github.com/rancher/dynamiclistener v0.2.1-0.20200319061731-763229ddcd6e/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
+github.com/rancher/dynamiclistener v0.2.1-0.20200403051005-4436fc6b4890 h1:cuE3NbOo0x7J52KwPXv9A0jh7tMJI4d2eAISW04xrwg=
+github.com/rancher/dynamiclistener v0.2.1-0.20200403051005-4436fc6b4890/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200403004702-f9faabcc049b h1:ANlxi+hf1tOTflxWFVXJ7XQ5ddTfjwjUMkM/9i42V/M=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200403004702-f9faabcc049b/go.mod h1:mQnNiMtNrIcliLZDPQqmdfd4ucSr84h0DQDWo9C9KqE=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
