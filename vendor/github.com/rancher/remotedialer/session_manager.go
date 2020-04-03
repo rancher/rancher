@@ -1,11 +1,11 @@
 package remotedialer
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/rancher/remotedialer/metrics"
@@ -31,12 +31,12 @@ func newSessionManager() *sessionManager {
 	}
 }
 
-func toDialer(s *Session, prefix string, deadline time.Duration) Dialer {
-	return func(proto, address string) (net.Conn, error) {
+func toDialer(s *Session, prefix string) Dialer {
+	return func(ctx context.Context, proto, address string) (net.Conn, error) {
 		if prefix == "" {
-			return s.serverConnect(deadline, proto, address)
+			return s.serverConnectContext(ctx, proto, address)
 		}
-		return s.serverConnect(deadline, prefix+"::"+proto, address)
+		return s.serverConnectContext(ctx, prefix+"::"+proto, address)
 	}
 }
 
@@ -66,13 +66,13 @@ func (sm *sessionManager) addListener(listener sessionListener) {
 	}
 }
 
-func (sm *sessionManager) getDialer(clientKey string, deadline time.Duration) (Dialer, error) {
+func (sm *sessionManager) getDialer(clientKey string) (Dialer, error) {
 	sm.Lock()
 	defer sm.Unlock()
 
 	sessions := sm.clients[clientKey]
 	if len(sessions) > 0 {
-		return toDialer(sessions[0], "", deadline), nil
+		return toDialer(sessions[0], ""), nil
 	}
 
 	for _, sessions := range sm.peers {
@@ -81,7 +81,7 @@ func (sm *sessionManager) getDialer(clientKey string, deadline time.Duration) (D
 			keys := session.remoteClientKeys[clientKey]
 			session.Unlock()
 			if len(keys) > 0 {
-				return toDialer(session, clientKey, deadline), nil
+				return toDialer(session, clientKey), nil
 			}
 		}
 	}

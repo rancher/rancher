@@ -24,7 +24,8 @@ const (
 )
 
 var (
-	idCounter int64
+	idCounter      int64
+	legacyDeadline = (15 * time.Second).Milliseconds()
 )
 
 func init() {
@@ -38,7 +39,6 @@ type message struct {
 	id          int64
 	err         error
 	connID      int64
-	deadline    int64
 	messageType messageType
 	bytes       []byte
 	body        io.Reader
@@ -50,21 +50,19 @@ func nextid() int64 {
 	return atomic.AddInt64(&idCounter, 1)
 }
 
-func newMessage(connID int64, deadline int64, bytes []byte) *message {
+func newMessage(connID int64, bytes []byte) *message {
 	return &message{
 		id:          nextid(),
 		connID:      connID,
-		deadline:    deadline,
 		messageType: Data,
 		bytes:       bytes,
 	}
 }
 
-func newConnect(connID int64, deadline time.Duration, proto, address string) *message {
+func newConnect(connID int64, proto, address string) *message {
 	return &message{
 		id:          nextid(),
 		connID:      connID,
-		deadline:    deadline.Nanoseconds() / 1000000,
 		messageType: Connect,
 		bytes:       []byte(fmt.Sprintf("%s/%s", proto, address)),
 		proto:       proto,
@@ -126,11 +124,11 @@ func newServerMessage(reader io.Reader) (*message, error) {
 	}
 
 	if m.messageType == Data || m.messageType == Connect {
-		deadline, err := binary.ReadVarint(buf)
+		// no longer used, this is the deadline field
+		_, err := binary.ReadVarint(buf)
 		if err != nil {
 			return nil, err
 		}
-		m.deadline = deadline
 	}
 
 	if m.messageType == Connect {
@@ -176,17 +174,17 @@ func (m *message) Err() error {
 }
 
 func (m *message) Bytes() []byte {
-	return append(m.header(), m.bytes...)
+	return append(m.header(len(m.bytes)), m.bytes...)
 }
 
-func (m *message) header() []byte {
-	buf := make([]byte, 24)
+func (m *message) header(space int) []byte {
+	buf := make([]byte, 24+space)
 	offset := 0
 	offset += binary.PutVarint(buf[offset:], m.id)
 	offset += binary.PutVarint(buf[offset:], m.connID)
 	offset += binary.PutVarint(buf[offset:], int64(m.messageType))
 	if m.messageType == Data || m.messageType == Connect {
-		offset += binary.PutVarint(buf[offset:], m.deadline)
+		offset += binary.PutVarint(buf[offset:], legacyDeadline)
 	}
 	return buf[:offset]
 }
@@ -195,8 +193,8 @@ func (m *message) Read(p []byte) (int, error) {
 	return m.body.Read(p)
 }
 
-func (m *message) WriteTo(wsConn *wsConn) (int, error) {
-	err := wsConn.WriteMessage(websocket.BinaryMessage, m.Bytes())
+func (m *message) WriteTo(deadline time.Time, wsConn *wsConn) (int, error) {
+	err := wsConn.WriteMessage(websocket.BinaryMessage, deadline, m.Bytes())
 	return len(m.bytes), err
 }
 
@@ -210,7 +208,7 @@ func (m *message) String() string {
 	case Error:
 		return fmt.Sprintf("%d ERROR        [%d]: %s", m.id, m.connID, m.Err())
 	case Connect:
-		return fmt.Sprintf("%d CONNECT      [%d]: %s/%s deadline %d", m.id, m.connID, m.proto, m.address, m.deadline)
+		return fmt.Sprintf("%d CONNECT      [%d]: %s/%s", m.id, m.connID, m.proto, m.address)
 	case AddClient:
 		return fmt.Sprintf("%d ADDCLIENT    [%s]", m.id, m.address)
 	case RemoveClient:
