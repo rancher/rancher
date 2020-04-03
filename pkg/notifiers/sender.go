@@ -516,7 +516,7 @@ func NewClientFromConfig(cfg *v3.HTTPClientConfig, dialer dialer.Dialer) (*http.
 		Timeout: time.Second * 10,
 	}
 
-	if cfg != nil {
+	if IsHTTPClientConfigSet(cfg) {
 		proxyURL, err := url.Parse(cfg.ProxyURL)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to parse notifier proxy url %s", cfg.ProxyURL)
@@ -537,4 +537,11 @@ func post(client *http.Client, url string, bodyType string, body io.Reader) (*ht
 	}
 	req.Header.Set("Content-Type", bodyType)
 	return client.Do(req)
+}
+
+func IsHTTPClientConfigSet(cfg *v3.HTTPClientConfig) bool {
+	if cfg != nil && cfg.ProxyURL != "" {
+		return true
+	}
+	return false
 }
