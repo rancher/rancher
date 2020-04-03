@@ -1,8 +1,6 @@
-import base64
 import boto3
 import logging
 import os
-import rsa
 import time
 
 from boto3.exceptions import Boto3Error
@@ -17,8 +15,6 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 AWS_REGION_AZ = os.environ.get("AWS_REGION_AZ", "us-east-2a")
 AWS_SECURITY_GROUP = os.environ.get("AWS_SECURITY_GROUPS",
                                     'sg-0e753fd5550206e55')
-AWS_SUBNET = os.environ.get("AWS_SUBNET", "subnet-ee8cac86")
-AWS_VPC_ID = os.environ.get("AWS_VPC_ID", "vpc-bfccf4d7")
 AWS_SECURITY_GROUPS = [AWS_SECURITY_GROUP]
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
@@ -30,9 +26,6 @@ AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
 
 AWS_AMI = os.environ.get("AWS_AMI", "")
 AWS_USER = os.environ.get("AWS_USER", "ubuntu")
-AWS_HOSTED_ZONE_ID = os.environ.get("AWS_HOSTED_ZONE_ID", "")
-AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "50")
-AWS_WINDOWS_VOLUME_SIZE = os.environ.get("AWS_WINDOWS_VOLUME_SIZE", "100")
 
 PRIVATE_IMAGES = {
     "rancheros-v1.5.1-docker-native": {
@@ -48,15 +41,15 @@ PRIVATE_IMAGES = {
     "rhel-7.7-docker-native-113-selinux-on": {
         'image': 'ami-069569219156fdf07', 'ssh_user': 'ec2-user'},
     "rhel-7.7-docker-19.03-selinux-off": {
-        'image': 'ami-01ed32daf0a8275e9', 'ssh_user': 'ec2-user'},
-    "rhel-7.7-docker-19.03-selinux-on": {
-        'image': 'ami-0dc67f9cc295ff9da', 'ssh_user': 'ec2-user'},
-    "oracleLinux-7.7-kernel-UEKr5-docker-19.03": {
-        'image': 'ami-06dd5f94499093e3d', 'ssh_user': 'ec2-user'},
+        'image': 'ami-068182ee3b273d6ec', 'ssh_user': 'ec2-user'},
+    "oracleLinux-7.7-docker-19.03": {
+        'image': 'ami-0af048cee838aa482', 'ssh_user': 'ec2-user'},
     "suse-sles12-sp2-docker-18061ce": {
         'image': 'ami-0cc154aeb82bd8fa0', 'ssh_user': 'ec2-user'},
-    "suse-sles12-sp5-docker-19.03.5": {
-        'image': 'ami-0591b00f223575dc5', 'ssh_user': 'ec2-user'},
+    "suse-12-sp5-docker-19.03.1-kernel-4.12.14-122.17.1": {
+        'image': 'ami-0003839096dc438c0', 'ssh_user': 'ec2-user'},
+    "sles15-sp1-docker-19.03.1": {
+        'image': 'ami-0636bb98601d8917e', 'ssh_user': 'ec2-user'},
     "ubuntu-16.04-docker-18.09": {
         'image': 'ami-07e968eb9151b2599', 'ssh_user': 'ubuntu'},
     "ubuntu-18.04-docker-18.09": {
@@ -66,9 +59,7 @@ PRIVATE_IMAGES = {
     "ubuntu-18.04-docker-19.03": {
         'image': 'ami-066f14e43aebc7472', 'ssh_user': 'ubuntu'},
     "rhel-7.6-docker-18.09": {
-        'image': 'ami-094574ffb6efb3a9b', 'ssh_user': 'ec2-user'},
-    "windows-1903-docker-19.03": {
-        'image': 'ami-0f5bea682d4bdd318', 'ssh_user': 'Administrator'}}
+        'image': 'ami-094574ffb6efb3a9b', 'ssh_user': 'ec2-user'}}
 
 PUBLIC_AMI = {
     'us-east-2': {
@@ -96,17 +87,6 @@ class AmazonWebServices(CloudProviderBase):
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION)
-
-        self._elbv2_client = boto3.client(
-            'elbv2',
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION)
-
-        self._route53_client = boto3.client(
-            'route53',
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
 
         self.master_ssh_key = None
         self.master_ssh_key_path = None
@@ -144,8 +124,7 @@ class AmazonWebServices(CloudProviderBase):
             if self.DOCKER_INSTALLED.lower() == 'false':
                 image, ssh_user = self._select_ami(os_version)
             else:
-                image, ssh_user = \
-                    self._select_private_ami(os_version, docker_version)
+                image, ssh_user = self._select_private_ami(os_version, docker_version)
 
         if key_name:
             # if cert private key
@@ -165,16 +144,8 @@ class AmazonWebServices(CloudProviderBase):
             ssh_private_key = self.master_ssh_key
             ssh_private_key_path = self.master_ssh_key_path
 
-        if os_version is not None:
-            if 'windows' in os_version:
-                volume_size = AWS_WINDOWS_VOLUME_SIZE
-                instance_type = 't3.xlarge'
-            else:
-                volume_size = AWS_VOLUME_SIZE
-                instance_type = AWS_INSTANCE_TYPE
-
         args = {"ImageId": image,
-                "InstanceType": instance_type,
+                "InstanceType": AWS_INSTANCE_TYPE,
                 "MinCount": 1,
                 "MaxCount": 1,
                 "TagSpecifications": [{'ResourceType': 'instance', 'Tags': [
@@ -187,9 +158,9 @@ class AmazonWebServices(CloudProviderBase):
                     'Groups': AWS_SECURITY_GROUPS}],
                 "Placement": {'AvailabilityZone': AWS_REGION_AZ},
                 "BlockDeviceMappings":
-                    [{"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": int(volume_size)}}]
+                    [{"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": 50}}]
                 }
-        if len(AWS_IAM_PROFILE) > 0:
+        if (len(AWS_IAM_PROFILE) > 0):
             args["IamInstanceProfile"] = {'Name': AWS_IAM_PROFILE}
 
         instance = self._client.run_instances(**args)
@@ -230,16 +201,7 @@ class AmazonWebServices(CloudProviderBase):
                 self.reboot_nodes(nodes)
                 time.sleep(10)
                 nodes = self.wait_for_nodes_state(nodes)
-
-            # wait for window nodes to come up so we can decrypt the password
-            if os_version is not None:
-                if 'windows' in os_version:
-                    time.sleep(60 * 6)
-
             for node in nodes:
-                if os_version is not None:
-                    if 'windows' in os_version:
-                        node.ssh_password = self.decrypt_windows_password(node.provider_node_id)
                 node.ready_node()
         return nodes
 
@@ -395,10 +357,8 @@ class AmazonWebServices(CloudProviderBase):
 
     def _s3_list_files(self, client):
         """List files in specific S3 URL"""
-        response = client.list_objects(Bucket=os.environ.get(
-                                           "AWS_S3_BUCKET_NAME", ""),
-                                       Prefix=os.environ.get(
-                                           "AWS_S3_BUCKET_FOLDER_NAME", ""))
+        response = client.list_objects(Bucket=os.environ.get("AWS_S3_BUCKET_NAME", ""),
+                                       Prefix=os.environ.get("AWS_S3_BUCKET_FOLDER_NAME", ""))
         for content in response.get('Contents', []):
             yield content.get('Key')
 
@@ -419,127 +379,3 @@ class AmazonWebServices(CloudProviderBase):
                 break
         return found
 
-    def register_targets(self, targets, target_group_arn):
-        self._elbv2_client.register_targets(
-            TargetGroupArn=target_group_arn,
-            Targets=targets)
-
-    def describe_target_health(self, target_group_arn):
-        return self._elbv2_client.describe_target_health(
-            TargetGroupArn=target_group_arn)
-
-    def deregister_all_targets(self, target_group_arn):
-        target_health_descriptions = \
-            self.describe_target_health(target_group_arn)
-
-        if len(target_health_descriptions["TargetHealthDescriptions"]) > 0:
-            targets = []
-
-            for target in \
-                    target_health_descriptions["TargetHealthDescriptions"]:
-                target_obj = target["Target"]
-                targets.append(target_obj)
-
-            self._elbv2_client.deregister_targets(
-                TargetGroupArn=target_group_arn,
-                Targets=targets)
-
-    def create_network_lb(self, name):
-        return self._elbv2_client.create_load_balancer(
-            Name=name, Subnets=[AWS_SUBNET], Type='network'
-        )
-
-    def delete_lb(self, loadBalancerARN):
-        self._elbv2_client.delete_load_balancer(
-            LoadBalancerArn=loadBalancerARN
-        )
-
-    def create_ha_target_group(self, port, name):
-        return self._elbv2_client.create_target_group(
-            Name=name,
-            Protocol='TCP',
-            Port=port,
-            VpcId=AWS_VPC_ID,
-            HealthCheckProtocol='HTTP',
-            HealthCheckPort='80',
-            HealthCheckEnabled=True,
-            HealthCheckPath='/healthz',
-            HealthCheckIntervalSeconds=10,
-            HealthCheckTimeoutSeconds=6,
-            HealthyThresholdCount=3,
-            UnhealthyThresholdCount=3,
-            Matcher={
-                'HttpCode': '200-399'
-            },
-            TargetType='instance'
-        )
-
-    def delete_target_group(self, targetGroupARN):
-        self._elbv2_client.delete_target_group(
-            TargetGroupArn=targetGroupARN
-        )
-
-    def create_ha_nlb_listener(self, loadBalancerARN, port, targetGroupARN):
-        return self._elbv2_client.create_listener(
-            LoadBalancerArn=loadBalancerARN,
-            Protocol='TCP',
-            Port=port,
-            DefaultActions=[{'Type': 'forward',
-                             'TargetGroupArn': targetGroupARN}]
-        )
-
-    def upsert_route_53_record_cname(self, recordName, recordValue):
-        return self._route53_client.change_resource_record_sets(
-            HostedZoneId=AWS_HOSTED_ZONE_ID,
-            ChangeBatch={
-                'Comment': 'update',
-                'Changes': [{
-                    'Action': 'UPSERT',
-                    'ResourceRecordSet': {
-                        'Name': recordName,
-                        'Type': 'CNAME',
-                        'TTL': 300,
-                        'ResourceRecords': [{
-                            'Value': recordValue
-                        }]
-                    }
-                }]
-            }
-        )
-
-    def decrypt_windows_password(self, instance_id):
-        password = ""
-        password_data = self._client.\
-            get_password_data(InstanceId=instance_id)['PasswordData']
-        if password_data:
-            password = base64.b64decode(password_data)
-            with open (self.get_ssh_key_path(AWS_SSH_KEY_NAME),'r') as privkeyfile:
-                priv = rsa.PrivateKey.load_pkcs1(privkeyfile.read())
-                password = rsa.decrypt(password,priv).decode('utf-8')
-
-        return password
-
-    def get_ebs_volumes(self, provider_node_id):
-        node_filter = [{
-            'Name': 'attachment.instance-id', 'Values': [provider_node_id]}]
-        try:
-            response = self._client.describe_volumes(Filters=node_filter)
-            volumes = response.get('Volumes', [])
-            return volumes
-        except (Boto3Error, RuntimeError) as e:
-            msg = "Failed while querying instance '{}' volumes!: {}".format(
-                provider_node_id, str(e))
-            raise RuntimeError(msg)
-
-    def get_security_group_name(self, security_group_id):
-        security_group_filter = [{
-            'Name': 'group-id', 'Values': [security_group_id]}]
-        try:
-            response = self._client.describe_security_groups(Filters=security_group_filter)
-            security_groups = response.get('SecurityGroups', [])
-            if len(security_groups) > 0:
-                return security_groups[0]['GroupName']
-        except Boto3Error as e:
-            msg = "Failed while querying security group name for '{}' in region {}: {}".format(
-                security_group_id, AWS_REGION, str(e))
-            raise RuntimeError(msg)
