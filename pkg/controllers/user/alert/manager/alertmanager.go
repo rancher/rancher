@@ -95,7 +95,7 @@ func NewAlertManager(cluster *config.UserContext) *AlertManager {
 	}
 	client := &http.Client{
 		Transport: &http.Transport{
-			Dial: dial,
+			DialContext: dial,
 		},
 		Timeout: 15 * time.Second,
 	}

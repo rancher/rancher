@@ -274,7 +274,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		return nil, err
 	}
 
-	var tlsDialer dialer.Dialer
+	var tlsDialer func(string, string) (net.Conn, error)
 	if cluster.Status.Driver == v3.ClusterDriverRKE {
 		tlsDialer, err = nameIgnoringTLSDialer(clusterDialer, caBytes)
 		if err != nil {
@@ -295,7 +295,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 			if ht, ok := rt.(*http.Transport); ok {
 				ht.DialContext = nil
 				ht.DialTLS = tlsDialer
-				ht.Dial = clusterDialer
+				ht.DialContext = clusterDialer
 			}
 			return rt
 		},
@@ -304,7 +304,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 	return rc, nil
 }
 
-func nameIgnoringTLSDialer(dialer dialer.Dialer, caBytes []byte) (dialer.Dialer, error) {
+func nameIgnoringTLSDialer(dialer dialer.Dialer, caBytes []byte) (func(string, string) (net.Conn, error), error) {
 	rkeVerify, err := VerifyIgnoreDNSName(caBytes)
 	if err != nil {
 		return nil, err
@@ -318,7 +318,9 @@ func nameIgnoringTLSDialer(dialer dialer.Dialer, caBytes []byte) (dialer.Dialer,
 	}
 
 	return func(network, address string) (net.Conn, error) {
-		rawConn, err := dialer(network, address)
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
+		defer cancel()
+		rawConn, err := dialer(ctx, network, address)
 		if err != nil {
 			return nil, err
 		}

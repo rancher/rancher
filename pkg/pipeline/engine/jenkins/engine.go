@@ -113,7 +113,7 @@ func (j *Engine) getJenkinsClient(execution *v3.PipelineExecution) (*Client, err
 		}
 		j.HTTPClient = &http.Client{
 			Transport: &http.Transport{
-				Dial: dial,
+				DialContext: dial,
 			},
 			Timeout: 15 * time.Second,
 		}

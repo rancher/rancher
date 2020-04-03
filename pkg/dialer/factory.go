@@ -1,6 +1,7 @@
 package dialer
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -42,12 +43,12 @@ type Factory struct {
 }
 
 func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
-	return func(network, address string) (net.Conn, error) {
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		d, err := f.clusterDialer(clusterName, address)
 		if err != nil {
 			return nil, err
 		}
-		return d(network, address)
+		return d(ctx, network, address)
 	}, nil
 }
 
@@ -150,13 +151,13 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 
 	if f.TunnelServer.HasSession(cluster.Name) {
 		logrus.Tracef("dialerFactory: tunnel session found for cluster [%s]", cluster.Name)
-		cd := f.TunnelServer.Dialer(cluster.Name, 15*time.Second)
-		return func(network, address string) (net.Conn, error) {
+		cd := f.TunnelServer.Dialer(cluster.Name)
+		return func(ctx context.Context, network, address string) (net.Conn, error) {
 			if cluster.Status.Driver == v3.ClusterDriverRKE {
 				address = f.translateClusterAddress(cluster, hostPort, address)
 			}
 			logrus.Tracef("dialerFactory: returning network [%s] and address [%s] as clusterDialer", network, address)
-			return cd(network, address)
+			return cd(ctx, network, address)
 		}, nil
 	}
 	logrus.Tracef("dialerFactory: no tunnel session found for cluster [%s], falling back to nodeDialer", cluster.Name)
@@ -177,7 +178,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 			logrus.Tracef("dialerFactory: using node [%s]/[%s] for nodeDialer",
 				node.Labels["management.cattle.io/nodename"], node.Name)
 			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
-				return func(network, address string) (net.Conn, error) {
+				return func(ctx context.Context, network, address string) (net.Conn, error) {
 					if address == hostPort && localAPIEndpoint {
 						logrus.Trace("dialerFactory: rewriting address/port to 127.0.0.1:6443 as node may not" +
 							" have direct kube-api access")
@@ -185,7 +186,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 						address = "127.0.0.1:6443"
 					}
 					logrus.Tracef("dialerFactory: Returning network [%s] and address [%s] as nodeDialer", network, address)
-					return nodeDialer(network, address)
+					return nodeDialer(ctx, network, address)
 				}, nil
 			}
 		}
@@ -195,13 +196,13 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 	for i := 0; i < 4; i++ {
 		if f.TunnelServer.HasSession(cluster.Name) {
 			logrus.Debugf("Cluster [%s] has reconnected, resuming", cluster.Name)
-			cd := f.TunnelServer.Dialer(cluster.Name, 15*time.Second)
-			return func(network, address string) (net.Conn, error) {
+			cd := f.TunnelServer.Dialer(cluster.Name)
+			return func(ctx context.Context, network, address string) (net.Conn, error) {
 				if cluster.Status.Driver == v3.ClusterDriverRKE {
 					address = f.translateClusterAddress(cluster, hostPort, address)
 				}
 				logrus.Tracef("dialerFactory: returning network [%s] and address [%s] as clusterDialer", network, address)
-				return cd(network, address)
+				return cd(ctx, network, address)
 			}, nil
 		}
 		time.Sleep(wait.Jitter(5*time.Second, 1))
@@ -227,7 +228,7 @@ func native() (dialer.Dialer, error) {
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}
-	return netDialer.Dial, nil
+	return netDialer.DialContext, nil
 }
 
 func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, error) {
@@ -242,9 +243,9 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 		if machine.Status.InternalNodeStatus.NodeInfo.OperatingSystem == "windows" {
 			network, address = "npipe", "//./pipe/docker_engine"
 		}
-		d := f.TunnelServer.Dialer(sessionKey, 15*time.Second)
-		return func(string, string) (net.Conn, error) {
-			return d(network, address)
+		d := f.TunnelServer.Dialer(sessionKey)
+		return func(ctx context.Context, _ string, _ string) (net.Conn, error) {
+			return d(ctx, network, address)
 		}, nil
 	}
 
@@ -252,12 +253,12 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 }
 
 func (f *Factory) NodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
-	return func(network, address string) (net.Conn, error) {
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		d, err := f.nodeDialer(clusterName, machineName)
 		if err != nil {
 			return nil, err
 		}
-		return d(network, address)
+		return d(ctx, network, address)
 	}, nil
 }
 
@@ -269,7 +270,7 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 
 	sessionKey := machineSessionKey(machine)
 	if f.TunnelServer.HasSession(sessionKey) {
-		d := f.TunnelServer.Dialer(sessionKey, 15*time.Second)
+		d := f.TunnelServer.Dialer(sessionKey)
 		return dialer.Dialer(d), nil
 	}
 

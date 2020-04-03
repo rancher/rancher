@@ -1,6 +1,7 @@
 package alert
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 
@@ -32,14 +33,14 @@ func NotifierFormatter(apiContext *types.APIContext, resource *types.RawResource
 func (h *Handler) NotifierActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	switch actionName {
 	case "send":
-		return h.testNotifier(actionName, action, apiContext)
+		return h.testNotifier(apiContext.Request.Context(), actionName, action, apiContext)
 	}
 
 	return httperror.NewAPIError(httperror.InvalidAction, "invalid action: "+actionName)
 
 }
 
-func (h *Handler) testNotifier(actionName string, action *types.Action, apiContext *types.APIContext) error {
+func (h *Handler) testNotifier(ctx context.Context, actionName string, action *types.Action, apiContext *types.APIContext) error {
 	data, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return errors.Wrap(err, "reading request body error")
@@ -84,7 +85,7 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 	if err != nil {
 		return errors.Wrap(err, "error getting dialer")
 	}
-	return notifiers.SendMessage(notifier, "", notifierMessage, dialer)
+	return notifiers.SendMessage(ctx, notifier, "", notifierMessage, dialer)
 }
 
 func canCreateNotifier(apiContext *types.APIContext, resource *types.RawResource, clusterID string) bool {

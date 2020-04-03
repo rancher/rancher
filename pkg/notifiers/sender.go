@@ -2,6 +2,7 @@ package notifiers
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
@@ -40,7 +41,7 @@ type wechatResponse struct {
 	Error string `json:"error"`
 }
 
-func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer dialer.Dialer) error {
+func SendMessage(ctx context.Context, notifier *v3.Notifier, recipient string, msg *Message, dialer dialer.Dialer) error {
 	if notifier.Spec.SlackConfig != nil {
 		if recipient == "" {
 			recipient = notifier.Spec.SlackConfig.DefaultRecipient
@@ -53,7 +54,7 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer d
 		if recipient == "" {
 			recipient = s.DefaultRecipient
 		}
-		return TestEmail(s.Host, s.Password, s.Username, int(s.Port), s.TLS, msg.Title, msg.Content, recipient, s.Sender, dialer)
+		return TestEmail(ctx, s.Host, s.Password, s.Username, int(s.Port), s.TLS, msg.Title, msg.Content, recipient, s.Sender, dialer)
 	}
 
 	if notifier.Spec.PagerdutyConfig != nil {
@@ -285,11 +286,11 @@ func TestSlack(url, channel, msg string, cfg *v3.HTTPClientConfig, dialer dialer
 	return nil
 }
 
-func TestEmail(host, password, username string, port int, requireTLS bool, title, content, receiver, sender string, dialer dialer.Dialer) error {
+func TestEmail(ctx context.Context, host, password, username string, port int, requireTLS bool, title, content, receiver, sender string, dialer dialer.Dialer) error {
 	if content == "" {
 		content = "Alert Name: Test SMTP setting"
 	}
-	c, err := smtpInit(host, port, dialer)
+	c, err := smtpInit(ctx, host, port, dialer)
 	if err != nil {
 		return err
 	}
@@ -301,7 +302,7 @@ func TestEmail(host, password, username string, port int, requireTLS bool, title
 	return smtpSend(c, title, content, receiver, sender)
 }
 
-func smtpInit(host string, port int, dialer dialer.Dialer) (*smtp.Client, error) {
+func smtpInit(ctx context.Context, host string, port int, dialer dialer.Dialer) (*smtp.Client, error) {
 	smartHost := host + ":" + strconv.Itoa(port)
 	timeout := 15 * time.Second
 	var (
@@ -315,7 +316,7 @@ func smtpInit(host string, port int, dialer dialer.Dialer) (*smtp.Client, error)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to build dialer %v", err)
 			}
-			conn, err = dialer("tcp", smartHost)
+			conn, err = dialer(ctx, "tcp", smartHost)
 		} else {
 			conn, err = tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", smartHost, &tls.Config{ServerName: host})
 		}
@@ -328,7 +329,7 @@ func smtpInit(host string, port int, dialer dialer.Dialer) (*smtp.Client, error)
 		}
 	} else {
 		if dialer != nil {
-			conn, err = dialer("tcp", smartHost)
+			conn, err = dialer(ctx, "tcp", smartHost)
 		} else {
 			conn, err = net.DialTimeout("tcp", smartHost, timeout)
 		}
@@ -349,8 +350,8 @@ func dialerWithTLSConfig(dialer dialer.Dialer, host, smartHost string) dialer.Di
 		ServerName:         host,
 	}
 
-	return func(network, address string) (net.Conn, error) {
-		rawConn, err := dialer("tcp", smartHost)
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		rawConn, err := dialer(ctx, "tcp", smartHost)
 		if err != nil {
 			return nil, err
 		}
@@ -522,8 +523,8 @@ func NewClientFromConfig(cfg *v3.HTTPClientConfig, dialer dialer.Dialer) (*http.
 			return nil, errors.Wrapf(err, "Failed to parse notifier proxy url %s", cfg.ProxyURL)
 		}
 		client.Transport = &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
-			Dial:  dialer,
+			Proxy:       http.ProxyURL(proxyURL),
+			DialContext: dialer,
 		}
 	}
 

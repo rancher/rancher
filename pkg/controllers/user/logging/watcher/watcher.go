@@ -36,17 +36,17 @@ func StartEndpointWatcher(ctx context.Context, cluster *config.UserContext) {
 
 func (e *endpointWatcher) watch(ctx context.Context, interval time.Duration) {
 	for range ticker.Context(ctx, interval) {
-		if err := e.checkClusterTarget(); err != nil {
+		if err := e.checkClusterTarget(ctx); err != nil {
 			logrus.Error(err)
 		}
 
-		if err := e.checkProjectTarget(); err != nil {
+		if err := e.checkProjectTarget(ctx); err != nil {
 			logrus.Error(err)
 		}
 	}
 }
 
-func (e *endpointWatcher) checkClusterTarget() error {
+func (e *endpointWatcher) checkClusterTarget(ctx context.Context) error {
 	cls, err := e.clusterLoggings.Controller().Lister().List(e.clusterName, labels.NewSelector())
 	if err != nil {
 		return errors.Wrapf(err, "list clusterlogging fail in endpoint watcher")
@@ -65,7 +65,7 @@ func (e *endpointWatcher) checkClusterTarget() error {
 	if wl == nil {
 		err = nil
 	} else {
-		err = wl.TestReachable(clusterDialer, false)
+		err = wl.TestReachable(ctx, clusterDialer, false)
 	}
 
 	updatedObj := setClusterLoggingErrMsg(obj, err)
@@ -80,7 +80,7 @@ func (e *endpointWatcher) checkClusterTarget() error {
 	return nil
 }
 
-func (e *endpointWatcher) checkProjectTarget() error {
+func (e *endpointWatcher) checkProjectTarget(ctx context.Context) error {
 	clusterDialer, err := e.dialerFactory.ClusterDialer(e.clusterName)
 	if err != nil {
 		return errors.Wrapf(err, "get cluster dailer %s failed", e.clusterName)
@@ -96,7 +96,7 @@ func (e *endpointWatcher) checkProjectTarget() error {
 		if wp == nil {
 			err = nil
 		} else {
-			err = wp.TestReachable(clusterDialer, false)
+			err = wp.TestReachable(ctx, clusterDialer, false)
 		}
 
 		updatedObj := setProjectLoggingErrMsg(v, err)
