@@ -47,7 +47,7 @@ type User struct {
 	Password           string     `json:"password,omitempty" norman:"writeOnly,noupdate"`
 	MustChangePassword bool       `json:"mustChangePassword,omitempty"`
 	PrincipalIDs       []string   `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
-	Me                 bool       `json:"me,omitempty"`
+	Me                 bool       `json:"me,omitempty" norman:"nocreate,noupdate"`
 	Enabled            *bool      `json:"enabled,omitempty" norman:"default=true"`
 	Spec               UserSpec   `json:"spec,omitempty"`
 	Status             UserStatus `json:"status"`
