@@ -12,11 +12,13 @@ import (
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/labels"
 	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 type Formatter struct {
 	KontainerDriverLister     v3.KontainerDriverLister
+	nodeLister                v3.NodeLister
 	clusterSpecPwdFields      map[string]interface{}
 	SubjectAccessReviewClient v1.SubjectAccessReviewInterface
 }
@@ -24,6 +26,7 @@ type Formatter struct {
 func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContext) *Formatter {
 	clusterFormatter := Formatter{
 		KontainerDriverLister:     managementContext.Management.KontainerDrivers("").Controller().Lister(),
+		nodeLister:                managementContext.Management.Nodes("").Controller().Lister(),
 		clusterSpecPwdFields:      gatherClusterSpecPwdFields(schemas, schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType)),
 		SubjectAccessReviewClient: managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
 	}
@@ -145,6 +148,12 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		}
 	}
 
+	nodes, err := f.nodeLister.List(resource.ID, labels.Everything())
+	if err != nil {
+		logrus.Warnf("error getting node list for cluster %s: %s", resource.ID, err)
+	} else {
+		resource.Values["nodeCount"] = len(nodes)
+	}
 }
 
 func setTrueIfNil(configMap map[string]interface{}, fieldName string) {
