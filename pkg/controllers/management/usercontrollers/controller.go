@@ -69,7 +69,9 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 	var err error
 	if obj.Name == "local" && obj.Spec.Internal {
 		err = c.cleanupLocalCluster(obj)
-	} else if obj.Status.Driver == v3.ClusterDriverImported || obj.Status.Driver == v3.ClusterDriverK3s {
+	} else if obj.Status.Driver == v3.ClusterDriverImported ||
+		obj.Status.Driver == v3.ClusterDriverK3s ||
+		obj.Status.Driver == v3.ClusterDriverK3os {
 		err = c.cleanupImportedCluster(obj)
 	}
 	if err != nil {
