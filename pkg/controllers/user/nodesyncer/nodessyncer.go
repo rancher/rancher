@@ -182,10 +182,13 @@ func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan v3.
 	}
 
 	node, obj = node.DeepCopy(), obj.DeepCopy()
-	planValues, changed := computePlanDelta(obj.Status.NodeConfig.Labels, obj.Spec.MetadataUpdate.Labels)
-	if changed {
-		obj.Status.NodeConfig.Labels = planValues
+	if obj.Status.NodeConfig != nil {
+		planValues, changed := computePlanDelta(obj.Status.NodeConfig.Labels, obj.Spec.MetadataUpdate.Labels)
+		if changed {
+			obj.Status.NodeConfig.Labels = planValues
+		}
 	}
+
 	node.Labels = finalMap
 
 	obj.Spec.MetadataUpdate.Labels = v3.MapDelta{}
