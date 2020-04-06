@@ -71,6 +71,7 @@ const (
 	ClusterDriverLocal    = "local"
 	ClusterDriverRKE      = "rancherKubernetesEngine"
 	ClusterDriverK3s      = "k3s"
+	ClusterDriverK3os     = "k3os"
 )
 
 // +genclient
