@@ -65,10 +65,6 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 }
 
 func migrateConfig(restConfig *rest.Config, opts *server.ListenOpts) {
-	defer func() {
-		opts.TLSListenerConfig.MaxSANs += len(opts.TLSListenerConfig.SANs)
-	}()
-
 	c, err := dynamic.NewForConfig(restConfig)
 	if err != nil {
 		return
