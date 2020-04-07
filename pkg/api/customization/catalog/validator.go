@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 )
 
 var (
@@ -24,11 +25,16 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 			u.Scheme = strings.ToLower(u.Scheme) // git commands are case-sensitive
 			data["url"] = u.String()
 		}
-		return nil
 	} else if request.Method == http.MethodPost {
 		return httperror.NewAPIError(httperror.MissingRequired, "Catalog URL not specified")
 	}
 
+	if helmVersion, ok := data["helmVersion"]; ok {
+		toLowerHelmVersion := strings.ToLower(helmVersion.(string))
+		if strings.Contains(toLowerHelmVersion, "v3") && !common.IsHelm3(toLowerHelmVersion) {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "Invalid helm 3 version")
+		}
+	}
 	return nil
 }
 
