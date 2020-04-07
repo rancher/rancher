@@ -293,9 +293,12 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		Timeout: 30 * time.Second,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
-				ht.DialContext = nil
-				ht.DialTLS = tlsDialer
-				ht.DialContext = clusterDialer
+				if tlsDialer == nil {
+					ht.DialContext = clusterDialer
+				} else {
+					ht.DialContext = nil
+					ht.DialTLS = tlsDialer
+				}
 			}
 			return rt
 		},
