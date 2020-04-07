@@ -1,10 +1,12 @@
 from copy import deepcopy
 import os
 import requests
+from .common import json
 from .common import CATTLE_API_URL
 from .common import create_config_file
 from .common import CATTLE_TEST_URL
 from .common import ADMIN_TOKEN
+from .common import get_setting_value_by_name
 from .common import get_user_client
 from .common import USER_TOKEN
 from .common import validate_cluster
@@ -36,18 +38,16 @@ def test_clusters_for_kdm():
     Helper function - validate_custom_cluster_kdm() to create the AWS nodes
     and add to the cluster
     """
-    k8s_version_url = CATTLE_API_URL + K8S_VERSION_URL
-    plugin = PLUGIN
-    head = {'Authorization': 'Bearer ' + USER_TOKEN}
-    response = requests.get(k8s_version_url, verify=False, headers=head)
-    data = response.json()
-    print(data)
-    k8s_v = data["value"]
-    default_k8s_versions = k8s_v.split(",")
+    rancher_version = get_setting_value_by_name('server-version')
+    if str(rancher_version).startswith('v2.2'):
+        k8s_v = get_setting_value_by_name('k8s-version-to-images')
+        default_k8s_versions = json.loads(k8s_v).keys()
+    else:
+        k8s_v = get_setting_value_by_name('k8s-versions-current')
+        default_k8s_versions = k8s_v.split(",")
     # default_k8s_versions = ["v1.17.2-rancher1-1"]
     list_process = []
-    print("response: ", response)
-    print("k8s_v: ", k8s_v)
+    plugin = PLUGIN
     print("default_k8s_versions: ", default_k8s_versions)
     for k8s_version in default_k8s_versions:
         rke_config_new = deepcopy(rke_config)
@@ -64,7 +64,7 @@ def test_clusters_for_kdm():
             rke_config_new["network"] = {"type": "networkConfig",
                                          "plugin": plug}
             client = get_user_client()
-            cluster_name = random_name()
+            cluster_name = random_test_name(plug)
             cluster = client.create_cluster(name=cluster_name,
                                             driver="rancherKubernetesEngine",
                                             rancherKubernetesEngineConfig=
@@ -100,8 +100,8 @@ def test_clusters_for_kdm():
                 cluster["rancherKubernetesEngineConfig"]["kubernetesVersion"]
             passed_cluster[cluster.name]["network"] = \
                 cluster["rancherKubernetesEngineConfig"]["network"]["plugin"]
-        except:
-            print("Issue in ", cluster.name)
+        except Exception as e:
+            print("Issue in {}:\n{}".format(cluster.name, e))
             failed_cluster[cluster.name] = {}
             failed_cluster[cluster.name]["k8s"] = \
                 cluster["rancherKubernetesEngineConfig"]["kubernetesVersion"]
