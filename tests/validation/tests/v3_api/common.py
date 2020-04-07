@@ -272,6 +272,13 @@ def random_name():
     return "test" + "-" + str(random_int(10000, 99999))
 
 
+def get_setting_value_by_name(name):
+    settings_url = CATTLE_API_URL + "/settings/" + name
+    head = {'Authorization': 'Bearer ' + ADMIN_TOKEN}
+    response = requests.get(settings_url, verify=False, headers=head)
+    return response.json()["value"]
+
+
 # Return value is negative if v1 < v2, zero if v1 == v2 and positive if v1 > v2
 def compare_versions(v1, v2):
     if tuple(map(int, (v1.split(".")))) > tuple(map(int, (v2.split(".")))):
