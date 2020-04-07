@@ -270,6 +270,7 @@ def test_embedded_system_catalog_missing_edit_link(admin_mc):
     assert "update" not in system_catalog.links
 
 
+@pytest.mark.nonparallel
 def test_catalog_refresh(admin_mc):
     """Test that on refresh the response includes the names of the catalogs
     that are being refreshed"""
