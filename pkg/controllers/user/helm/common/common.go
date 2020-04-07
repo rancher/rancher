@@ -329,7 +329,7 @@ func createKustomizeFiles(tempDirs *HelmPath, labelValue string) error {
 }
 
 func IsHelm3(helmName string) bool {
-	if helmName == HelmV3 {
+	if helmName == HelmV3 || strings.ToLower(helmName) == "v3" {
 		return true
 	}
 	return false
