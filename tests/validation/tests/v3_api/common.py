@@ -161,6 +161,7 @@ NESTED_GROUP_ENABLED = ast.literal_eval(
     os.environ.get('RANCHER_NESTED_GROUP_ENABLED', "False"))
 # the shared password for all auth users
 AUTH_USER_PASSWORD = os.environ.get('RANCHER_AUTH_USER_PASSWORD', "")
+
 # the link to log in as an auth user
 LOGIN_AS_AUTH_USER_URL = \
     CATTLE_TEST_URL + "/v3-public/" \
@@ -638,8 +639,13 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
     nodes = client.list_node(clusterId=cluster.id).data
     schedulable_nodes = []
     for node in nodes:
-        if node.worker and (not node.unschedulable) and (node.labels['kubernetes.io/os'] == os_type or node.labels['beta.kubernetes.io/os'] == os_type):
-            schedulable_nodes.append(node)
+        if node.worker and (not node.unschedulable):
+            for key, val in node.labels.items():
+                # Either one of the labels should be present on the node
+                if key == 'kubernetes.io/os' or key == 'beta.kubernetes.io/os':
+                    if val == os_type:
+                        schedulable_nodes.append(node)
+                        break
         # Including master in list of nodes as master is also schedulable
         if 'k3s' in cluster.version["gitVersion"] and node.controlPlane:
             schedulable_nodes.append(node)
