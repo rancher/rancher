@@ -28,9 +28,10 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 	} else if request.Method == http.MethodPost {
 		return httperror.NewAPIError(httperror.MissingRequired, "Catalog URL not specified")
 	}
-
+	//
 	if helmVersion, ok := data["helmVersion"]; ok {
 		toLowerHelmVersion := strings.ToLower(helmVersion.(string))
+		// determine if user is setting helmVersion to helm 3 and validate to help user set value correctly
 		if strings.Contains(toLowerHelmVersion, "v3") && !common.IsHelm3(toLowerHelmVersion) {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, "Invalid helm 3 version")
 		}
