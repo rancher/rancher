@@ -261,10 +261,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "Pass user-data to the nodes to perform automated configuration tasks",
 		Default: &types.Default{
 			DefaultString: "#!/bin/bash\nset -o xtrace\n" +
-				"/etc/eks/bootstrap.sh ${ClusterName} ${BootstrapArguments}" +
+				"/etc/eks/bootstrap.sh ${ClusterName} ${BootstrapArguments}\n" +
 				"/opt/aws/bin/cfn-signal --exit-code $? " +
 				"--stack  ${AWS::StackName} " +
-				"--resource NodeGroup --region ${AWS::Region}\n",
+				"--resource NodeGroup --region ${AWS::Region}",
 		},
 	}
 	driverFlag.Options["keyPairName"] = &types.Flag{
