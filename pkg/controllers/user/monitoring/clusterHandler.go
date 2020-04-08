@@ -19,6 +19,7 @@ import (
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -419,7 +420,17 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	_, err = utils.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app, false)
+	// redeploy cluster-monitoring App forcibly if its workload doesn't exist
+	var forceRedeploy bool
+	appWorkload, err := ch.app.agentStatefulSetLister.Get(appTargetNamespace, fmt.Sprintf("prometheus-%s", appName))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, errors.Wrapf(err, "failed to get statefulset %s/prometheus-%s", appTargetNamespace, appName)
+	}
+	if appWorkload == nil || appWorkload.Name == "" || appWorkload.DeletionTimestamp != nil {
+		forceRedeploy = true
+	}
+
+	_, err = utils.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app, forceRedeploy)
 	if err != nil {
 		return nil, err
 	}
