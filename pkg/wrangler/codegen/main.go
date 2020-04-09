@@ -6,6 +6,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	controllergen "github.com/rancher/wrangler/pkg/controller-gen"
 	"github.com/rancher/wrangler/pkg/controller-gen/args"
+	"sigs.k8s.io/cluster-api/api/v1alpha3"
 )
 
 func main() {
@@ -20,6 +21,13 @@ func main() {
 				Types: []interface{}{
 					v3.Cluster{},
 					v3.User{},
+				},
+				GenerateClients: true,
+			},
+			"cluster.x-k8s.io": {
+				PackageName: "cluster.x-k8s.io",
+				Types: []interface{}{
+					v1alpha3.Cluster{},
 				},
 				GenerateClients: true,
 			},
