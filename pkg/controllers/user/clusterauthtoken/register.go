@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken/common"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -18,10 +17,8 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	tokenIndexers := map[string]cache.IndexFunc{
 		tokenByUserAndClusterIndex: tokenByUserAndCluster,
 	}
-	if err := tokenInformer.AddIndexers(tokenIndexers); err != nil {
-		logrus.Error(err)
-		return
-	}
+
+	tokenInformer.AddIndexers(tokenIndexers)
 
 	namespace := common.DefaultNamespace
 	clusterName := cluster.ClusterName
@@ -43,6 +40,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		clusterConfigMapLister,
 		settingInterface,
 	}).Sync)
+
 	cluster.Management.Management.Tokens("").AddClusterScopedLifecycle(ctx,
 		"cat-token-controller",
 		clusterName,
@@ -62,11 +60,13 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		clusterUserAttribute,
 		clusterUserAttributeLister,
 	}).Sync)
+
 	cluster.Management.Management.UserAttributes("").AddHandler(ctx, "cat-user-attribute-controller", (&userAttributeHandler{
 		namespace,
 		clusterUserAttribute,
 		clusterUserAttributeLister,
 	}).Sync)
+
 	cluster.Cluster.ClusterUserAttributes(namespace).AddHandler(ctx, "cat-cluster-user-attribute-controller", (&clusterUserAttributeHandler{
 		userAttribute,
 		userAttributeLister,
