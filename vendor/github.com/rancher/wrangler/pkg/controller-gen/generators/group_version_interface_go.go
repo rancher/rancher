@@ -31,15 +31,16 @@ type groupInterfaceGo struct {
 	customArgs *args2.CustomArgs
 }
 
-func (f *groupInterfaceGo) Imports(*generator.Context) []string {
+func (f *groupInterfaceGo) Imports(context *generator.Context) []string {
 	firstType := f.customArgs.TypesByGroup[f.gv][0]
 	group := f.customArgs.Options.Groups[f.gv.Group]
+	p := context.Universe.Package(firstType.Package)
 
 	packages := []string{
 		GenericPackage,
 		fmt.Sprintf("%s \"%s\"", f.gv.Version, firstType.Package),
 		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
-		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
+		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, listerInformerGroupPackageName(f.gv.Group, p), f.gv.Version),
 	}
 
 	return packages

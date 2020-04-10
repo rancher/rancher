@@ -35,8 +35,9 @@ type typeGo struct {
 	customArgs *args2.CustomArgs
 }
 
-func (f *typeGo) Imports(*generator.Context) []string {
+func (f *typeGo) Imports(context *generator.Context) []string {
 	group := f.customArgs.Options.Groups[f.gv.Group]
+	p := context.Universe.Package(f.name.Package)
 
 	packages := []string{
 		"metav1 \"k8s.io/apimachinery/pkg/apis/meta/v1\"",
@@ -54,8 +55,8 @@ func (f *typeGo) Imports(*generator.Context) []string {
 		fmt.Sprintf("%s \"%s\"", f.gv.Version, f.name.Package),
 		GenericPackage,
 		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
-		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
-		fmt.Sprintf("listers \"%s/%s/%s\"", group.ListersPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
+		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, listerInformerGroupPackageName(f.gv.Group, p), f.gv.Version),
+		fmt.Sprintf("listers \"%s/%s/%s\"", group.ListersPackage, listerInformerGroupPackageName(f.gv.Group, p), f.gv.Version),
 	}
 
 	return packages
@@ -333,6 +334,7 @@ func Register{{.type}}GeneratingHandler(ctx context.Context, controller {{.type}
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
+	controller.OnChange(ctx, name, statusHandler.Remove)
 	Register{{.type}}StatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
@@ -347,7 +349,7 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 		return obj, nil
 	}
 
-	origStatus := obj.Status
+	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
 	newStatus, err := a.handler(obj, obj.Status)
 	if err != nil {
@@ -355,16 +357,16 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 		newStatus = *origStatus.DeepCopy()
 	}
 
-	obj.Status = newStatus
 	if a.condition != "" {
 		if errors.IsConflict(err) {
-			a.condition.SetError(obj, "", nil)
+			a.condition.SetError(&newStatus, "", nil)
 		} else {
-			a.condition.SetError(obj, "", err)
+			a.condition.SetError(&newStatus, "", err)
 		}
 	}
-	if !equality.Semantic.DeepEqual(origStatus, obj.Status) {
+	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
 		var newErr error
+		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
@@ -381,29 +383,28 @@ type {{.lowerName}}GeneratingHandler struct {
 	name  string
 }
 
+func (a *{{.lowerName}}GeneratingHandler) Remove(key string, obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
+	if obj != nil {
+		return obj, nil
+	}
+
+	obj = &{{.version}}.{{.type}}{}
+	obj.Namespace, obj.Name = kv.RSplit(key, "/")
+	obj.SetGroupVersionKind(a.gvk)
+
+	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects()
+}
+
 func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error) {
 	objs, newStatus, err := a.{{.type}}GeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
 
-	apply := a.apply
-
-	if !a.opts.DynamicLookup {
-		apply = apply.WithStrictCaching()
-	}
-
-	if !a.opts.AllowCrossNamespace && !a.opts.AllowClusterScoped {
-		apply = apply.WithSetOwnerReference(true, false).
-			WithDefaultNamespace(obj.GetNamespace()).
-			WithListerNamespace(obj.GetNamespace())
-	}
-
-	if !a.opts.AllowClusterScoped {
-		apply = apply.WithRestrictClusterScoped()
-	}
-
-	return newStatus, apply.
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)

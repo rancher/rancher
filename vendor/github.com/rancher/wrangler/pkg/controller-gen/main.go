@@ -1,12 +1,15 @@
 package controllergen
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"k8s.io/gengo/generator"
 
 	cgargs "github.com/rancher/wrangler/pkg/controller-gen/args"
 	"github.com/rancher/wrangler/pkg/controller-gen/generators"
@@ -237,7 +240,62 @@ func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 
 	return args.Execute(cs.NameSystems(nil),
 		cs.DefaultNameSystem(),
-		cs.Packages)
+		setGenClient(groups, customArgs.TypesByGroup, cs.Packages))
+}
+
+func setGenClient(groups map[string]bool, typesByGroup map[schema.GroupVersion][]*types.Name, f func(*generator.Context, *args.GeneratorArgs) generator.Packages) func(*generator.Context, *args.GeneratorArgs) generator.Packages {
+	return func(context *generator.Context, generatorArgs *args.GeneratorArgs) generator.Packages {
+		for gv, names := range typesByGroup {
+			if !groups[gv.Group] {
+				continue
+			}
+			for _, name := range names {
+				var (
+					p           = context.Universe.Package(name.Package)
+					t           = p.Type(name.Name)
+					status      bool
+					nsed        bool
+					kubebuilder bool
+				)
+
+				for _, line := range append(t.SecondClosestCommentLines, t.CommentLines...) {
+					switch {
+					case strings.Contains(line, "+kubebuilder:object:root=true"):
+						kubebuilder = true
+						t.SecondClosestCommentLines = append(t.SecondClosestCommentLines, "+genclient")
+					case strings.Contains(line, "+kubebuilder:subresource:status"):
+						status = true
+					case strings.Contains(line, "+kubebuilder:resource:") && strings.Contains(line, "scope=Namespaced"):
+						nsed = true
+					}
+				}
+
+				if kubebuilder {
+					if !nsed {
+						t.SecondClosestCommentLines = append(t.SecondClosestCommentLines, "+genclient:nonNamespaced")
+					}
+					if !status {
+						t.SecondClosestCommentLines = append(t.SecondClosestCommentLines, "+genclient:noStatus")
+					}
+
+					foundGroup := false
+					for _, comment := range p.DocComments {
+						if strings.Contains(comment, "+groupName=") {
+							foundGroup = true
+							break
+						}
+					}
+
+					if !foundGroup {
+						p.DocComments = append(p.DocComments, "+groupName="+gv.Group)
+						p.Comments = append(p.Comments, "+groupName="+gv.Group)
+						fmt.Println(gv.Group, p.DocComments, p.Comments, p.Path)
+					}
+				}
+			}
+		}
+		return f(context, generatorArgs)
+	}
 }
 
 func generateInformers(groups map[string]bool, customArgs *cgargs.CustomArgs) error {
@@ -257,7 +315,7 @@ func generateInformers(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 
 	return args.Execute(inf.NameSystems(nil),
 		inf.DefaultNameSystem(),
-		inf.Packages)
+		setGenClient(groups, customArgs.TypesByGroup, inf.Packages))
 }
 
 func generateListers(groups map[string]bool, customArgs *cgargs.CustomArgs) error {
@@ -275,7 +333,7 @@ func generateListers(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 
 	return args.Execute(ls.NameSystems(nil),
 		ls.DefaultNameSystem(),
-		ls.Packages)
+		setGenClient(groups, customArgs.TypesByGroup, ls.Packages))
 }
 
 func parseTypes(customArgs *cgargs.CustomArgs) []string {

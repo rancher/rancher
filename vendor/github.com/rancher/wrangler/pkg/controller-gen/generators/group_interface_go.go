@@ -30,13 +30,21 @@ type interfaceGo struct {
 	customArgs *args2.CustomArgs
 }
 
-func (f *interfaceGo) Imports(*generator.Context) []string {
+func (f *interfaceGo) Imports(context *generator.Context) []string {
 	group := f.customArgs.Options.Groups[f.group]
+	packageName := f.group
+	for gv, types := range f.customArgs.TypesByGroup {
+		if gv.Group == f.group && len(types) > 0 {
+			packageName = types[0].Package
+		}
+	}
+	p := context.Universe.Package(packageName)
+	fmt.Println("IMPORT", packageName, p.Path, listerInformerGroupPackageName(f.group, p))
 
 	packages := []string{
 		GenericPackage,
 		fmt.Sprintf("clientset \"%s\"", group.ClientSetPackage),
-		fmt.Sprintf("informers \"%s/%s\"", group.InformersPackage, groupPackageName(f.group, group.PackageName)),
+		fmt.Sprintf("informers \"%s/%s\"", group.InformersPackage, listerInformerGroupPackageName(f.group, p)),
 	}
 
 	for gv := range f.customArgs.TypesByGroup {
