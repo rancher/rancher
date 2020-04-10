@@ -45,5 +45,5 @@ type version struct {
 }
 
 func (c *version) Cluster() ClusterController {
-	return NewClusterController(v1alpha3.GroupVersion.WithKind("Cluster"), c.controllerManager, c.client, c.informers.Clusters())
+	return NewClusterController(v1alpha3.SchemeGroupVersion.WithKind("Cluster"), c.controllerManager, c.client, c.informers.Clusters())
 }
