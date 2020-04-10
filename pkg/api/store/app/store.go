@@ -30,7 +30,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	if err := s.verifyAppExternalIDMatchesProject(apiContext, data); err != nil {
+	if err := s.verifyAppExternalIDMatchesProject(data, ""); err != nil {
 		return nil, err
 	}
 
@@ -53,7 +53,7 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	if err := s.verifyAppExternalIDMatchesProject(apiContext, data); err != nil {
+	if err := s.verifyAppExternalIDMatchesProject(data, id); err != nil {
 		return nil, err
 	}
 
@@ -128,23 +128,35 @@ func (s *Store) checkAccessToTemplateVersion(apiContext *types.APIContext, data 
 	return nil
 }
 
-func (s *Store) verifyAppExternalIDMatchesProject(apiContext *types.APIContext, data map[string]interface{}) error {
-	_, ns, err := s.parseAppExternalID(data)
+func (s *Store) verifyAppExternalIDMatchesProject(data map[string]interface{}, id string) error {
+	_, catalogNs, err := s.parseAppExternalID(data)
 	if err != nil {
 		return err
 	}
-	if ns == namespace.GlobalNamespace {
+	if catalogNs == namespace.GlobalNamespace {
 		// apps from global catalog can be launched in any clusters
 		return nil
 	}
 
-	// check if target project is either same as the ns (project scoped catalog), or belongs in the ns (cluster scoped catalog)
+	// check if target project is either same as the catalogNs (project scoped catalog), or belongs in the ns (cluster scoped catalog)
 	projectID := convert.ToString(data["projectId"])
+	if projectID == "" {
+		// this can happen only during app edit, get projectID from app
+		ns, name := ref.Parse(id)
+		if ns == "" || name == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("app id [%s] passed during edit is invalid", id))
+		}
+		app, err := s.Apps.Get(ns, name)
+		if err != nil {
+			return fmt.Errorf("error getting app %s: %v", id, err)
+		}
+		projectID = app.Spec.ProjectName
+	}
 	clusterName, projectName := ref.Parse(projectID)
-	if ns == clusterName || ns == projectName {
+	if catalogNs == clusterName || catalogNs == projectName {
 		return nil
 	}
-	return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Cannot use catalog from %v to launch app in %v", ns, projectID))
+	return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Cannot use catalog from %v to launch app in %v", catalogNs, projectID))
 }
 
 func (s *Store) parseAppExternalID(data map[string]interface{}) (string, string, error) {

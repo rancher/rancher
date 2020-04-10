@@ -3,8 +3,8 @@ import pytest
 from rancher import ApiError
 from .test_catalog import wait_for_template_to_be_created
 from .common import random_str
-from .conftest import set_server_version, wait_for, DEFAULT_CATALOG \
-wait_for_condition, wait_until
+from .conftest import set_server_version, wait_for, wait_for_condition, \
+    wait_until, user_project_client, DEFAULT_CATALOG
 
 
 def test_app_mysql(admin_pc, admin_mc):
@@ -649,6 +649,7 @@ def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):
 
 def test_app_externalid_target_project_verification(admin_mc,
                                                     admin_pc,
+                                                    user_factory,
                                                     remove_resource):
     client = admin_mc.client
 
@@ -671,7 +672,7 @@ def test_app_externalid_target_project_verification(admin_mc,
 
     external_id = "catalog://?catalog=" + project_name + "/" + name + \
                   "&type=projectCatalog&template=chartmuseum" \
-                  "&version=1.6.0"
+                  "&version=2.7.0"
 
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=admin_pc.
@@ -690,6 +691,73 @@ def test_app_externalid_target_project_verification(admin_mc,
     except ApiError as e:
         assert e.error.status == 422
         assert "Cannot use catalog from" in e.error.message
+
+    # create app in the p1 project, this should work
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=p1.id)
+    remove_resource(ns)
+    app_name = random_str()
+    app_data = {
+        'name': app_name,
+        'externalId': external_id,
+        'targetNamespace': ns.name,
+        'projectId': p1.id,
+        "answers": [{
+            "values": {
+                "defaultImage": "true",
+                "image.repository": "chartmuseum/chartmuseum",
+                "image.tag": "v0.7.1",
+                "env.open.STORAGE": "local",
+                "gcp.secret.enabled": "false",
+                "gcp.secret.key": "credentials.json",
+                "persistence.enabled": "true",
+                "persistence.size": "10Gi",
+                "ingress.enabled": "true",
+                "ingress.hosts[0]": "xip.io",
+                "service.type": "NodePort",
+                "env.open.SHOW_ADVANCED": "false",
+                "env.open.DEPTH": "0",
+                "env.open.ALLOW_OVERWRITE": "false",
+                "env.open.AUTH_ANONYMOUS_GET": "false",
+                "env.open.DISABLE_METRICS": "true"
+            }
+        }]
+    }
+
+    p1_client = user_project_client(admin_pc, p1)
+    app1 = p1_client.create_app(app_data)
+    remove_resource(app1)
+    wait_for_workload(p1_client, ns.name, count=1)
+
+    app = p1_client.reload(app1)
+    # updating app without passing projectId should not throw any error
+    update_data = {
+        'name': app_name,
+        'externalId': external_id,
+        'targetNamespace': ns.name,
+        'type': app,
+        "answers": [{
+            "values": {
+                "defaultImage": "true",
+                "image.repository": "chartmuseum/chartmuseum",
+                "image.tag": "v0.7.1",
+                "env.open.STORAGE": "local",
+                "gcp.secret.enabled": "false",
+                "gcp.secret.key": "credentials.json",
+                "persistence.enabled": "true",
+                "persistence.size": "10Gi",
+                "ingress.enabled": "true",
+                "ingress.hosts[0]": "xip.io",
+                "service.type": "NodePort",
+                "env.open.SHOW_ADVANCED": "false",
+                "env.open.DEPTH": "1",
+                "env.open.ALLOW_OVERWRITE": "false",
+                "env.open.AUTH_ANONYMOUS_GET": "false",
+                "env.open.DISABLE_METRICS": "true"
+            }
+        }]
+    }
+    p1_client.update(app, update_data)
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):
