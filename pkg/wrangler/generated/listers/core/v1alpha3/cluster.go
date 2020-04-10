@@ -21,6 +21,7 @@ package v1alpha3
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	v1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
 )
@@ -88,7 +89,7 @@ func (s clusterNamespaceLister) Get(name string) (*v1alpha3.Cluster, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha3.Resource("cluster"), name)
+		return nil, errors.NewNotFound(schema.GroupResource{}, name)
 	}
 	return obj.(*v1alpha3.Cluster), nil
 }

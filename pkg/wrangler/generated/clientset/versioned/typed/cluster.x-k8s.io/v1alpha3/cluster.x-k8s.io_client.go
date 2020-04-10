@@ -20,8 +20,8 @@ package v1alpha3
 
 import (
 	"github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/scheme"
-	rest "k8s.io/client-go/rest"
-	v1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest"
 )
 
 type ClusterV1alpha3Interface interface {
@@ -67,7 +67,7 @@ func New(c rest.Interface) *ClusterV1alpha3Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha3.SchemeGroupVersion
+	gv := schema.GroupVersion{Group: "cluster.x-k8s.io", Version: "v1alpha3"}
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
