@@ -26,11 +26,16 @@ import (
 
 type ClusterV1alpha3Interface interface {
 	RESTClient() rest.Interface
+	ClustersGetter
 }
 
 // ClusterV1alpha3Client is used to interact with features provided by the cluster.x-k8s.io group.
 type ClusterV1alpha3Client struct {
 	restClient rest.Interface
+}
+
+func (c *ClusterV1alpha3Client) Clusters(namespace string) ClusterInterface {
+	return newClusters(c, namespace)
 }
 
 // NewForConfig creates a new ClusterV1alpha3Client for the given config.
@@ -62,7 +67,7 @@ func New(c rest.Interface) *ClusterV1alpha3Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha3.SchemeGroupVersion
+	gv := v1alpha3.GroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()

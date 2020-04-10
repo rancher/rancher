@@ -23,11 +23,12 @@ import (
 	"time"
 
 	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/cluster.x-k8s.io/v1alpha3"
-	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/cluster.x-k8s.io/v1alpha3"
-	listers "github.com/rancher/rancher/pkg/wrangler/generated/listers/cluster.x-k8s.io/v1alpha3"
+	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/core/v1alpha3"
+	listers "github.com/rancher/rancher/pkg/wrangler/generated/listers/core/v1alpha3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -267,6 +268,7 @@ func RegisterClusterGeneratingHandler(ctx context.Context, controller ClusterCon
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
+	controller.OnChange(ctx, name, statusHandler.Remove)
 	RegisterClusterStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
@@ -281,7 +283,7 @@ func (a *clusterStatusHandler) sync(key string, obj *v1alpha3.Cluster) (*v1alpha
 		return obj, nil
 	}
 
-	origStatus := obj.Status
+	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
 	newStatus, err := a.handler(obj, obj.Status)
 	if err != nil {
@@ -289,16 +291,16 @@ func (a *clusterStatusHandler) sync(key string, obj *v1alpha3.Cluster) (*v1alpha
 		newStatus = *origStatus.DeepCopy()
 	}
 
-	obj.Status = newStatus
 	if a.condition != "" {
 		if errors.IsConflict(err) {
-			a.condition.SetError(obj, "", nil)
+			a.condition.SetError(&newStatus, "", nil)
 		} else {
-			a.condition.SetError(obj, "", err)
+			a.condition.SetError(&newStatus, "", err)
 		}
 	}
-	if !equality.Semantic.DeepEqual(origStatus, obj.Status) {
+	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
 		var newErr error
+		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
@@ -315,29 +317,28 @@ type clusterGeneratingHandler struct {
 	name  string
 }
 
+func (a *clusterGeneratingHandler) Remove(key string, obj *v1alpha3.Cluster) (*v1alpha3.Cluster, error) {
+	if obj != nil {
+		return obj, nil
+	}
+
+	obj = &v1alpha3.Cluster{}
+	obj.Namespace, obj.Name = kv.RSplit(key, "/")
+	obj.SetGroupVersionKind(a.gvk)
+
+	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects()
+}
+
 func (a *clusterGeneratingHandler) Handle(obj *v1alpha3.Cluster, status v1alpha3.ClusterStatus) (v1alpha3.ClusterStatus, error) {
 	objs, newStatus, err := a.ClusterGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
 
-	apply := a.apply
-
-	if !a.opts.DynamicLookup {
-		apply = apply.WithStrictCaching()
-	}
-
-	if !a.opts.AllowCrossNamespace && !a.opts.AllowClusterScoped {
-		apply = apply.WithSetOwnerReference(true, false).
-			WithDefaultNamespace(obj.GetNamespace()).
-			WithListerNamespace(obj.GetNamespace())
-	}
-
-	if !a.opts.AllowClusterScoped {
-		apply = apply.WithRestrictClusterScoped()
-	}
-
-	return newStatus, apply.
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)

@@ -24,6 +24,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
+	v1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -52,7 +53,11 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=management.cattle.io, Version=v3
+	// Group=cluster.x-k8s.io, Version=v1alpha3
+	case v1alpha3.GroupVersion.WithResource("clusters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha3().Clusters().Informer()}, nil
+
+		// Group=management.cattle.io, Version=v3
 	case v3.SchemeGroupVersion.WithResource("clusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Management().V3().Clusters().Informer()}, nil
 	case v3.SchemeGroupVersion.WithResource("users"):

@@ -21,7 +21,7 @@ package cluster
 import (
 	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned"
 	v1alpha3 "github.com/rancher/rancher/pkg/wrangler/generated/controllers/cluster.x-k8s.io/v1alpha3"
-	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/cluster.x-k8s.io"
+	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/core"
 	"github.com/rancher/wrangler/pkg/generic"
 )
 

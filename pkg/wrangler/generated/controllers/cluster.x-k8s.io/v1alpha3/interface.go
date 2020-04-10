@@ -20,7 +20,7 @@ package v1alpha3
 
 import (
 	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/cluster.x-k8s.io/v1alpha3"
-	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/cluster.x-k8s.io/v1alpha3"
+	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/core/v1alpha3"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
 )
@@ -45,5 +45,5 @@ type version struct {
 }
 
 func (c *version) Cluster() ClusterController {
-	return NewClusterController(v1alpha3.SchemeGroupVersion.WithKind("Cluster"), c.controllerManager, c.client, c.informers.Clusters())
+	return NewClusterController(v1alpha3.GroupVersion.WithKind("Cluster"), c.controllerManager, c.client, c.informers.Clusters())
 }

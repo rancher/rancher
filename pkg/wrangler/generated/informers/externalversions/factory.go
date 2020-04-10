@@ -24,6 +24,7 @@ import (
 	time "time"
 
 	versioned "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned"
+	core "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/core"
 	internalinterfaces "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/internalinterfaces"
 	managementcattleio "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/management.cattle.io"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -172,7 +173,12 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
+	Cluster() core.Interface
 	Management() managementcattleio.Interface
+}
+
+func (f *sharedInformerFactory) Cluster() core.Interface {
+	return core.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Management() managementcattleio.Interface {

@@ -19,12 +19,17 @@ limitations under the License.
 package fake
 
 import (
+	v1alpha3 "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/cluster.x-k8s.io/v1alpha3"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
 type FakeClusterV1alpha3 struct {
 	*testing.Fake
+}
+
+func (c *FakeClusterV1alpha3) Clusters(namespace string) v1alpha3.ClusterInterface {
+	return &FakeClusters{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
