@@ -2,6 +2,7 @@ package wrangler
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/wrangler/generated/controllers/cluster.x-k8s.io/v1alpha3"
 
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/steve/pkg/accesscontrol"
@@ -20,6 +21,7 @@ type Context struct {
 
 	Apply        apply.Apply
 	Mgmt         managementv3.Interface
+	V1alpha3    v1alpha3.Interface
 	TunnelServer *remotedialer.Server
 
 	ASL      accesscontrol.AccessSetLookup
