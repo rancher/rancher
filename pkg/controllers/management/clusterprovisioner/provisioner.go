@@ -98,6 +98,10 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
+	if skipClusterAPI(&cluster.Spec) {
+		return cluster, nil
+	}
+
 	logrus.Infof("Deleting cluster [%s]", cluster.Name)
 	if skipLocalK3sImported(cluster) ||
 		cluster.Status.Driver == "" {
@@ -122,6 +126,10 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
+	if skipClusterAPI(&cluster.Spec) {
+		return cluster, nil
+	}
+
 	obj, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
 		anno, _ := cluster.Annotations[KontainerEngineUpdate]
 		if anno == "updated" {
@@ -303,7 +311,7 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	v3.ClusterConditionProvisioned.Reason(cluster, "")
 	v3.ClusterConditionPending.True(cluster)
 
-	if cluster.Spec.RancherKubernetesEngineConfig != nil || cluster.Spec.GenericEngineConfig != nil {
+	if cluster.Spec.RancherKubernetesEngineConfig != nil || cluster.Spec.GenericEngineConfig != nil || cluster.Spec.ClusterAPIConfig != "" {
 		return cluster, nil
 	}
 	nodes, err := p.NodeLister.List(cluster.Name, labels.Everything())
@@ -327,6 +335,10 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) (runtime.Obje
 }
 
 func (p *Provisioner) Create(cluster *v3.Cluster) (runtime.Object, error) {
+	if skipClusterAPI(&cluster.Spec) {
+		return cluster, nil
+	}
+
 	var err error
 
 	// Initialize conditions, be careful to not continually update them
@@ -670,6 +682,10 @@ func skipLocalK3sImported(cluster *v3.Cluster) bool {
 		cluster.Status.Driver == v3.ClusterDriverK3os
 }
 
+func skipClusterAPI(spec *v3.ClusterSpec) bool {
+	return true // return cluster.Spec.ClusterAPIConfig != ""
+}
+
 func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverName, clusterName string) (*v3.ClusterSpec, interface{}, error) {
 	var v interface{}
 	if spec.GenericEngineConfig == nil {
@@ -723,6 +739,10 @@ func GetDriver(cluster *v3.Cluster, driverLister v3.KontainerDriverLister) (stri
 
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		return v3.ClusterDriverRKE, nil
+	}
+
+	if cluster.Spec.ClusterAPIConfig != "" {
+		return "clusterAPI", nil
 	}
 
 	if driver == nil {

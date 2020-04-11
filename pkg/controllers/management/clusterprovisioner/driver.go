@@ -46,6 +46,11 @@ func (p *Provisioner) getKontainerDriver(spec v3.ClusterSpec) (*v3.KontainerDriv
 		return p.KontainerDriverLister.Get("", "import")
 	}
 
+	/*
+	if spec.clusterAPIConfig != Nil {
+
+	 */
+
 	return nil, fmt.Errorf("no kontainer driver for cluster %v", spec.DisplayName)
 }
 
