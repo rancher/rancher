@@ -555,7 +555,11 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 	}
 
 	// Save the required role templates to the annotation on the obj
-	meta.GetAnnotations()[roleTemplatesRequired] = string(d)
+	if annos := meta.GetAnnotations(); annos == nil {
+		meta.SetAnnotations(map[string]string{roleTemplatesRequired: string(d)})
+	} else {
+		annos[roleTemplatesRequired] = string(d)
+	}
 
 	return obj, nil
 }
