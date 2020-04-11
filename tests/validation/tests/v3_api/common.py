@@ -1086,8 +1086,11 @@ def get_custom_host_registration_cmd(client, cluster, roles, node):
     else:
         cluster_token = create_custom_host_registration_token(client, cluster)
 
+    node_name = "" if node.node_name is None \
+        else " --node-name " + node.node_name
     additional_options = " --address " + node.public_ip_address + \
-                         " --internal-address " + node.private_ip_address
+                         " --internal-address " + node.private_ip_address + \
+                         node_name
 
     if 'Administrator' == node.ssh_user:
         cmd = cluster_token.windowsNodeCommand

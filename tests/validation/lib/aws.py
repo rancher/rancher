@@ -123,6 +123,7 @@ class AmazonWebServices(CloudProviderBase):
 
         instance = self._client.run_instances(**args)
         node = Node(
+            node_name=node_name,
             provider_node_id=instance['Instances'][0]['InstanceId'],
             state=instance['Instances'][0]['State']['Name'],
             ssh_user=ssh_user,
