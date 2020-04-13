@@ -55,7 +55,7 @@ def test_node_label_add():
     wait_for_condition(client, node, check_label_added(test_label), None, 10)
     validate_label_set_on_node(client, node, test_label, label_value)
 
-     # delete label
+    # delete label
     del node_labels[test_label]
     client.update(node, labels=node_labels)
 
@@ -90,7 +90,7 @@ def test_node_label_edit():
     wait_for_condition(client, node, check_label_added(test_label), None, 10)
     validate_label_set_on_node(client, node, test_label, new_value)
 
-     # delete label
+    # delete label
     del node_labels[test_label]
     client.update(node, labels=node_labels)
 
@@ -401,8 +401,7 @@ def test_node_label_custom_add_edit_addnode():
     """ Create a custom cluster, Add node labels via register command
     Edit via API and change the existing label value ONLY
     Add a control plane node with label same as the ORIGINAL one
-    And check the labels on all the nodes. This will fail due to issue:
-    https://github.com/rancher/rancher/issues/25144"""
+    And check the labels on all the nodes."""
     test_label = random_name()
     label_value = random_name()
     cluster_custom["test_label"] = test_label
@@ -428,11 +427,13 @@ def test_node_label_custom_add_edit_addnode():
     new_value_2 = random_name()
     node_labels[test_label] = new_value_2
     client.update(node, labels=node_labels)
-    node = client.reload(node)
-    time.sleep(2)
+    # cluster will go into updating state
+    cluster = validate_cluster_state(client, cluster, True,
+                                     intermediate_state="updating",
+                                     nodes_not_in_active_state=[])
 
+    node = client.reload(node)
     # Label should be added
-    wait_for_condition(client, node, check_label_added(test_label), None, 10)
     validate_label_set_on_node(client, node, test_label, new_value_2)
 
     # add a control plane node with original label
@@ -447,8 +448,8 @@ def test_node_label_custom_add_edit_addnode():
     docker_run_cmd = get_custom_host_registration_cmd(client, cluster,
                                                       ["controlplane"],
                                                       aws_node)
-    docker_run_cmd = docker_run_cmd + " --label " + \
-                    test_label + "=" + label_value
+    docker_run_cmd = \
+        docker_run_cmd + " --label " + test_label + "=" + label_value
     aws_node.execute_command(docker_run_cmd)
     wait_for_cluster_node_count(client, cluster, 2)
     cluster = validate_cluster_state(client, cluster,
@@ -457,7 +458,7 @@ def test_node_label_custom_add_edit_addnode():
     # cluster cleanup
     custom_cluster_add_edit["cluster"] = cluster
     custom_cluster_add_edit["aws_node"] = aws_nodes_list
-    
+
     for node in nodes:
         if node.nodeName != node_name_1:
             validate_label_set_on_node(client, node, test_label, label_value)
@@ -652,8 +653,8 @@ def test_node_label_node_template_delete_api():
     This test validates delete of label via API
     which is added through node template
     :return: None
-
-    This test will fail. Because of a known issue currently existing
+    Expected failure because of issue -
+    https://github.com/rancher/rancher/issues/26604
     """
     test_label = random_name()
     label_value = random_name()
@@ -667,17 +668,19 @@ def test_node_label_node_template_delete_api():
     node = client.list_node(clusterId=cluster.id).data
     node_id = node[0].id
     node = client.by_id_node(node_id)
-    # Edit label on node via API
     node_labels = node.labels.data_dict()
     assert node_labels[test_label] == label_value
 
     # delete label
     del node_labels[test_label]
     client.update(node, labels=node_labels)
-    time.sleep(2)
+    # cluster will go into updating state
+    cluster = validate_cluster_state(client, cluster, True,
+                                     intermediate_state="updating",
+                                     nodes_not_in_active_state=[])
 
+    node = client.reload(node)
     # label should be deleted
-    wait_for_condition(client, node, check_label_removed(test_label), None, 10)
     validate_label_deleted_on_node(client, node, test_label)
 
 
@@ -730,9 +733,11 @@ def test_node_label_custom_edit():
     new_value = random_name()
     node_labels[test_label] = new_value
     client.update(node, labels=node_labels)
+    # cluster will go into updating state
+    cluster = validate_cluster_state(client, cluster, True,
+                                     intermediate_state="updating",
+                                     nodes_not_in_active_state=[])
     node = client.reload(node)
-    # becasue of an issue, waiting long
-    time.sleep(20)
 
     validate_label_set_on_node(client, node, test_label, new_value)
     cluster_custom["label_value"] = new_value
@@ -778,9 +783,9 @@ def test_node_label_custom_add_additional():
 def test_node_label_custom_delete():
     """
     This test deletes the label on the node via API
-    Known failure because of
-    issue: https://github.com/rancher/rancher/issues/15825
     :return: None
+    Expected failure because of issue -
+    https://github.com/rancher/rancher/issues/26604
     """
     create_kubeconfig(cluster_custom["cluster"])
     client = cluster_detail["client"]
@@ -797,10 +802,13 @@ def test_node_label_custom_delete():
     node_labels = node.labels.data_dict()
     del node_labels[test_label]
     client.update(node, labels=node_labels)
-    time.sleep(2)
+    # cluster will go into updating state
+    cluster = validate_cluster_state(client, cluster, True,
+                                     intermediate_state="updating",
+                                     nodes_not_in_active_state=[])
 
+    node = client.reload(node)
     # label should be deleted
-    wait_for_condition(client, node, check_label_removed(test_label), None, 10)
     validate_label_deleted_on_node(client, node, test_label)
 
 
@@ -886,9 +894,9 @@ def create_project_client(request):
     Create a cluster for node template related test cases
     """
     cluster_node_template["cluster"], \
-        node_pools, \
-        cluster_node_template["node_template"], \
-        cluster_node_template["do_cloud_credential"] = \
+    node_pools, \
+    cluster_node_template["node_template"], \
+    cluster_node_template["do_cloud_credential"] = \
         create_cluster_node_template_label(test_label, label_value)
     cluster_node_template["node_pools"] = node_pools[0]
     cluster_node_template["test_label"] = test_label
@@ -1136,7 +1144,7 @@ def create_custom_node_label(node_roles, test_label,
         for nr in node_roles[i]:
             aws_node.roles.append(nr)
         docker_run_cmd = docker_run_cmd + " --label " + \
-            test_label + "=" + label_value
+                         test_label + "=" + label_value
         aws_node.execute_command(docker_run_cmd)
         i += 1
     cluster = validate_cluster_state(client, cluster)
