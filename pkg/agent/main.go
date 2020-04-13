@@ -20,7 +20,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
@@ -318,27 +317,6 @@ func run() error {
 			}
 		}()
 
-		// launching reconcileKubelet in a goroutine to make sure kubelet will be restarted
-		// every three minutes until managed agent comes up and take over
-		go func() {
-		loop:
-			for {
-				select {
-				case <-time.After(3 * time.Minute):
-					done, err := reconcileKubelet(ctx)
-					if err != nil {
-						logrus.Errorf("failed to reconcile kubelet: %v", err)
-					}
-					if done {
-						break loop
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-
-		}()
-
 		return nil
 	}
 
@@ -395,20 +373,16 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
+	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
+	if writeCertsOnly {
+		return true, nil
+	}
+
 	c, err := client.NewEnvClient()
 	if err != nil {
 		return false, err
 	}
 	defer c.Close()
-
-	exist, err := checkManagedAgents(ctx, c)
-	if err != nil {
-		return false, err
-	}
-	if exist {
-		logrus.Infof("managed agent exists, stop reconciling kubelet")
-		return true, nil
-	}
 
 	args := filters.NewArgs()
 	args.Add("label", "io.rancher.rke.container.name=kubelet")
@@ -431,34 +405,5 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 			break
 		}
 	}
-	return false, nil
-}
-
-func checkManagedAgents(ctx context.Context, c *client.Client) (bool, error) {
-	args := filters.NewArgs()
-	args.Add("label", "io.cattle.agent=true")
-
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
-		All:     true,
-		Filters: args,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	for _, container := range containers {
-		con, err := c.ContainerInspect(ctx, container.ID)
-		if err != nil {
-			return false, err
-		}
-		// this check if container is a managed node-agent
-		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok &&
-			con.Config != nil &&
-			slice.ContainsString(con.Config.Env, "CATTLE_K8S_MANAGED=true") &&
-			slice.ContainsString(con.Config.Env, "CATTLE_CLUSTER=false") {
-			return true, nil
-		}
-	}
-
 	return false, nil
 }
