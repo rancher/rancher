@@ -1,3 +1,4 @@
+from .test_auth import enable_ad, load_setup_data
 from .common import *  # NOQA
 from rancher import ApiError
 import pytest
@@ -16,6 +17,8 @@ BRANCH = "dev"
 URL = "https://git.rancher.io/system-charts"
 # the link to search principals in the auth provider
 
+AUTH_ADMIN_USER = load_setup_data()["admin_user"]
+
 
 @if_test_group_rbac
 def test_ggrb_1(remove_resource):
@@ -32,7 +35,9 @@ def test_ggrb_1(remove_resource):
     # check that users can not create catalogs
     for user in users:
         validate_permission_create_catalog(user, False)
-    g_id = get_group_principal_id(target_group_name)
+    auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+                                    AUTH_USER_PASSWORD)
+    g_id = get_group_principal_id(target_group_name, token=auth_admin['token'])
     ggrb = get_admin_client().create_global_role_binding(
         globalRoleId="catalogs-manage", groupPrincipalId=g_id)
     # check that users can create catalogs now
@@ -73,7 +78,9 @@ def test_ggrb_2(remove_resource):
                                              template=TEMPLATE_MANAGE_CATALOG)
     gr = admin_c.create_global_role(template)
     remove_resource(gr)
-    g_id = get_group_principal_id(target_group_name)
+    auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+                                    AUTH_USER_PASSWORD)
+    g_id = get_group_principal_id(target_group_name, token=auth_admin['token'])
     ggrb = get_admin_client().create_global_role_binding(
         globalRoleId=gr["id"], groupPrincipalId=g_id)
     # check that users can create catalogs now, but not list clusters
@@ -135,7 +142,9 @@ def test_ggrb_3(remove_resource):
     # check that user not in the group can not list clusters
     validate_permission_list_cluster(user1, 0)
 
-    g_id = get_group_principal_id(target_g)
+    auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+                                    AUTH_USER_PASSWORD)
+    g_id = get_group_principal_id(target_g, token=auth_admin['token'])
     # create a custom global role that permits listing clusters
     admin_c = get_admin_client()
     template = generate_template_global_role(name=random_name(),
@@ -237,7 +246,9 @@ def validate_permission_create_ggrb(token, permission=False):
     create group global role bindings
     """
     target_group_name = get_group()
-    g_id = get_group_principal_id(target_group_name)
+    auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+                                    AUTH_USER_PASSWORD)
+    g_id = get_group_principal_id(target_group_name, token=auth_admin['token'])
     role = generate_a_global_role()
     client = get_client_for_token(token)
     if not permission:
@@ -293,5 +304,12 @@ def generate_a_global_role():
 def create_project_client(request):
     client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
+
+    admin_client = get_admin_client()
+    ad_enabled = admin_client.by_id_auth_config("activedirectory").enabled
+    if AUTH_PROVIDER == "activeDirectory" and not ad_enabled:
+        enable_ad(AUTH_ADMIN_USER, ADMIN_TOKEN,
+                  password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
+
     if NESTED_GROUP_ENABLED:
         assert is_nested(), "no nested group is found"
