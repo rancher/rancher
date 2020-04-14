@@ -858,3 +858,132 @@ def setup_project_by_role(role, remove_resource):
 
     else:
         return None, None, None, None
+
+# --------------------- rbac tests by workload type -----------------------
+@if_test_rbac
+@pytest.mark.parametrize("role", [CLUSTER_MEMBER,
+                                  PROJECT_MEMBER, PROJECT_OWNER,
+                                  PROJECT_READ_ONLY, CLUSTER_OWNER])
+def test_rbac_wl_daemonset():
+    project = rbac_get_project()
+    user_token = rbac_get_user_token_by_role(role)
+    p_client = get_project_client_for_token(project, user_token)
+    ns = rbac_get_namespace()
+    cluster = namespace["cluster"]
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    if role != PROJECT_READ_ONLY:
+        workload = p_client.create_workload(name=name,
+                                                containers=con,
+                                                namespaceId=ns.id,
+                                                daemonSetConfig={})
+        schedulable_node_count = len(get_schedulable_nodes(cluster))
+        validate_workload(p_client, workload, "daemonSet",
+                        ns.name, schedulable_node_count)
+        p_client.delete(workload)
+        return None
+    else:
+         with pytest.raises(ApiError) as e:
+             workload = p_client.create_workload(name=name,
+                                                containers=con,
+                                                namespaceId=ns.id,
+                                                daemonSetConfig={})
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'Forbidden'
+
+@if_test_rbac
+@pytest.mark.parametrize("role", [CLUSTER_MEMBER,
+                                  PROJECT_MEMBER, PROJECT_OWNER,
+                                  PROJECT_READ_ONLY, CLUSTER_OWNER])
+def test_rbac_wl_daemonset_list():
+    project = rbac_get_project()
+    #Deploy daemonset as cluster owner
+    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    p_client = get_project_client_for_token(project, user_token)
+    ns = rbac_get_namespace()
+    cluster = namespace["cluster"]
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name,
+                                            containers=con,
+                                            namespaceId=ns.id,
+                                            daemonSetConfig={})
+    wait_for_wl_to_active(cluster_owner_p_client, workload)
+    #Switch to rbac role
+    user_token = rbac_get_user_token_by_role(role)
+    p_client = get_project_client_for_token(project, user_token)
+    assert len(p_client.list_workload().data) == 1
+
+@if_test_rbac
+@pytest.mark.parametrize("role", [CLUSTER_MEMBER,
+                                  PROJECT_MEMBER, PROJECT_OWNER,
+                                  PROJECT_READ_ONLY, CLUSTER_OWNER])
+def test_rbac_wl_daemonset_update():
+    project = rbac_get_project()
+    user_token = rbac_get_user_token_by_role(role)
+    p_client = get_project_client_for_token(project, user_token)
+    ns = rbac_get_namespace()
+    cluster = namespace["cluster"]
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    if role != PROJECT_READ_ONLY:
+        workload = p_client.create_workload(name=name,
+                                                containers=con,
+                                                namespaceId=ns.id,
+                                                daemonSetConfig={})
+        wait_for_wl_to_active(cluster_owner_p_client, workload)
+        con = [{"name": "test1", "image": "nginx"}]
+        p_client.update(workload, containers=con)
+        validate_workload_image(p_client, workload, "nginx", ns)
+    else:
+        user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+        p_client = get_project_client_for_token(project, user_token)
+        ns = rbac_get_namespace()
+        workload = p_client.create_workload(name=name,
+                                                containers=con,
+                                                namespaceId=ns.id,
+                                                daemonSetConfig={})
+        wait_for_wl_to_active(cluster_owner_p_client, workload)
+        with pytest.raises(ApiError) as e:
+            con = [{"name": "test1", "image": "nginx"}]
+            p_client.update(workload, containers=con)
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'Forbidden'
+
+@if_test_rbac
+@pytest.mark.parametrize("role", [CLUSTER_MEMBER,
+                                  PROJECT_MEMBER, PROJECT_OWNER,
+                                  PROJECT_READ_ONLY, CLUSTER_OWNER])
+def test_rbac_wl_daemonset_delete():
+    project = rbac_get_project()
+    user_token = rbac_get_user_token_by_role(role)
+    p_client = get_project_client_for_token(project, user_token)
+    ns = rbac_get_namespace()
+    cluster = namespace["cluster"]
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    if role != PROJECT_READ_ONLY:
+        workload = p_client.create_workload(name=name,
+                                                containers=con,
+                                                namespaceId=ns.id,
+                                                daemonSetConfig={})
+        wait_for_wl_to_active(cluster_owner_p_client, workload)
+        p_client.delete(workload)
+        assert len(p_client.list_workload(uuid=workload.uuid).data) == 0
+    else:
+        user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+        p_client = get_project_client_for_token(project, user_token)
+        ns = rbac_get_namespace()
+        workload = p_client.create_workload(name=name,
+                                                containers=con,
+                                                namespaceId=ns.id,
+                                                daemonSetConfig={})
+        wait_for_wl_to_active(cluster_owner_p_client, workload)
+        with pytest.raises(ApiError) as e:
+            p_client.delete(workload)
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'Forbidden'
