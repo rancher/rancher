@@ -2464,3 +2464,19 @@ def create_connection(url, subprotocols):
     )
     assert ws.connected, "failed to build the websocket"
     return ws
+
+
+def wait_for_hpa_to_active(client, hpa, timeout=DEFAULT_TIMEOUT):
+    start = time.time()
+    hpalist = client.list_horizontalPodAutoscaler(uuid=hpa.uuid).data
+    assert len(hpalist) == 1
+    hpa = hpalist[0]
+    while hpa.state != "active":
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to active")
+        time.sleep(.5)
+        hpas = client.list_horizontalPodAutoscaler(uuid=hpa.uuid).data
+        assert len(hpas) == 1
+        hpa = hpas[0]
+    return hpa
