@@ -1,5 +1,5 @@
 import urllib3
-from .common import * # NOQA
+from .common import *  # NOQA
 
 # This stops ssl warnings for insecure certs
 urllib3.disable_warnings()
@@ -41,5 +41,7 @@ def remove_resource(request):
                     pass
                 elif code != 404:
                     raise e
+
         request.addfinalizer(clean)
+
     return _cleanup

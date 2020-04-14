@@ -26,8 +26,7 @@ def test_import_rke_cluster():
     # Create AWS nodes for the cluster
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
-            AWS_NODE_COUNT, random_test_name(HOST_NAME),
-            wait_for_ready=True)
+            AWS_NODE_COUNT, random_test_name(HOST_NAME))
     assert len(aws_nodes) == AWS_NODE_COUNT
     # Create RKE config
     clusterfilepath = create_rke_cluster_config(aws_nodes)
@@ -74,8 +73,7 @@ def test_generate_rke_config():
 
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
-            AWS_NODE_COUNT, random_test_name(HOST_NAME),
-            wait_for_ready=True)
+            AWS_NODE_COUNT, random_test_name(HOST_NAME))
     assert len(aws_nodes) == AWS_NODE_COUNT
     # Create RKE config
     rkeconfigpath = create_rke_cluster_config(aws_nodes)
@@ -109,7 +107,7 @@ def create_rke_cluster_config(aws_nodes):
     f.write(rkeconfig)
     if(AWS_NODE_COUNT > 3):
         for i in range(3, AWS_NODE_COUNT):
-            for j in range(i, i+1):
+            for j in range(i, i + 1):
                 f.write("  - address: {}\n".format(
                     aws_nodes[j].public_ip_address))
                 f.write("    internaladdress: {}\n".format(
