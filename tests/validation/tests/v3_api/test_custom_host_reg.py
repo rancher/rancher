@@ -1,3 +1,4 @@
+from .test_auth import enable_ad, load_setup_data
 from .common import *  # NOQA
 import ast
 
@@ -57,9 +58,24 @@ def test_deploy_rancher_server():
     token = set_url_password_token(RANCHER_SERVER_URL)
     admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                   token=token, verify=False)
-    AUTH_URL = \
-        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
-    user, user_token = create_user(admin_client, AUTH_URL)
+
+    if AUTH_PROVIDER == "activeDirectory":
+        enable_url = RANCHER_SERVER_URL + "/v3/" + AUTH_PROVIDER + \
+            "Configs/" + AUTH_PROVIDER.lower() + "?action=testAndApply"
+        auth_admin_user = load_setup_data()["admin_user"]
+        enable_ad(auth_admin_user, token, enable_url=enable_url,
+                  password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
+
+        auth_user_login_url = RANCHER_SERVER_URL + "/v3-public/" \
+            + AUTH_PROVIDER + "Providers/" \
+            + AUTH_PROVIDER.lower() + "?action=login"
+        user_token = login_as_auth_user(load_setup_data()["standard_user"],
+                                        AUTH_USER_PASSWORD,
+                                        login_url=auth_user_login_url)["token"]
+    else:
+        AUTH_URL = \
+            RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
+        user, user_token = create_user(admin_client, AUTH_URL)
 
     env_details = "env.CATTLE_TEST_URL='" + RANCHER_SERVER_URL + "'\n"
     env_details += "env.ADMIN_TOKEN='" + token + "'\n"

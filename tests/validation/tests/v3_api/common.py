@@ -153,20 +153,21 @@ TEMPLATE_LIST_CLUSTER = {
 }
 
 # this is used when testing users from a auth provider
-AUTH_PROVIDER_NAME = os.environ.get('RANCHER_AUTH_PROVIDER', "")
-if AUTH_PROVIDER_NAME not in ["activeDirectory", "freeIpa", "openLdap", ""]:
+AUTH_PROVIDER = os.environ.get('RANCHER_AUTH_PROVIDER', "")
+if AUTH_PROVIDER not in ["activeDirectory", "freeIpa", "openLdap", ""]:
     pytest.fail("Invalid RANCHER_AUTH_PROVIDER. Please provide one of: "
                 "activeDirectory, freeIpa, or openLdap (case sensitive).")
 NESTED_GROUP_ENABLED = ast.literal_eval(
     os.environ.get('RANCHER_NESTED_GROUP_ENABLED', "False"))
-# the shared password for all auth users
+# Admin Auth username and the shared password for all auth users
 AUTH_USER_PASSWORD = os.environ.get('RANCHER_AUTH_USER_PASSWORD', "")
+
 
 # the link to log in as an auth user
 LOGIN_AS_AUTH_USER_URL = \
     CATTLE_TEST_URL + "/v3-public/" \
-    + AUTH_PROVIDER_NAME + "Providers/" \
-    + AUTH_PROVIDER_NAME.lower() + "?action=login"
+    + AUTH_PROVIDER + "Providers/" \
+    + AUTH_PROVIDER.lower() + "?action=login"
 CATTLE_AUTH_PRINCIPAL_URL = CATTLE_TEST_URL + "/v3/principals?action=search"
 
 # This is used for nested group when a third part Auth is enabled
@@ -176,7 +177,7 @@ nested_group = {
     "group_dic": None,
     "groups": None
 }
-if_test_group_rbac = pytest.mark.skipif(not AUTH_PROVIDER_NAME
+if_test_group_rbac = pytest.mark.skipif(not AUTH_PROVIDER
                                         or not AUTH_USER_PASSWORD,
                                         reason='Group RBAC tests are skipped.'
                                                'Required AUTH env variables '
@@ -2210,7 +2211,7 @@ def delete_crd(ns, file, kubectl_context):
 def prepare_auth_data():
     name = \
         os.path.join(os.path.dirname(os.path.realpath(__file__)) + "/resource",
-                     AUTH_PROVIDER_NAME.lower() + ".json")
+                     AUTH_PROVIDER.lower() + ".json")
     with open(name) as reader:
         auth_data = reader.read()
     raw = json.loads(auth_data).get("nested_group_info")
@@ -2309,10 +2310,10 @@ def get_group_principal_id(group_name, token=ADMIN_TOKEN, expected_status=200):
     return r.json()['data'][0]["id"]
 
 
-def login_as_auth_user(username, password):
+def login_as_auth_user(username, password, login_url=LOGIN_AS_AUTH_USER_URL):
     """ login with the user account from the auth provider,
     and return the user token"""
-    r = requests.post(LOGIN_AS_AUTH_USER_URL, json={
+    r = requests.post(login_url, json={
         'username': username,
         'password': password,
         'responseType': 'json',

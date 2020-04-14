@@ -42,7 +42,13 @@ node {
                       string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                       string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
                       string(credentialsId: 'RANCHER_PRIVATE_CA_CERT', variable: 'RANCHER_PRIVATE_CA_CERT'),
-                      string(credentialsId: 'RANCHER_AUTH_USER_PASSWORD', variable: 'RANCHER_AUTH_USER_PASSWORD')]) {
+                      string(credentialsId: 'RANCHER_AUTH_USER_PASSWORD', variable: 'RANCHER_AUTH_USER_PASSWORD'),
+                      string(credentialsId: 'RANCHER_HOSTNAME_OR_IP_ADDRESS', variable: 'RANCHER_HOSTNAME_OR_IP_ADDRESS'),
+                      string(credentialsId: 'RANCHER_CA_CERTIFICATE', variable: 'RANCHER_CA_CERTIFICATE'),
+                      string(credentialsId: 'RANCHER_SERVICE_ACCOUNT_NAME', variable: 'RANCHER_SERVICE_ACCOUNT_NAME'),
+                      string(credentialsId: 'RANCHER_SERVICE_ACCOUNT_PASSWORD', variable: 'RANCHER_SERVICE_ACCOUNT_PASSWORD'),
+                      string(credentialsId: 'RANCHER_USER_SEARCH_BASE', variable: 'RANCHER_USER_SEARCH_BASE'),
+                      string(credentialsId: 'RANCHER_DEFAULT_LOGIN_DOMAIN', variable: 'RANCHER_DEFAULT_LOGIN_DOMAIN')]) {
                         
       stage('Checkout') {
         deleteDir()

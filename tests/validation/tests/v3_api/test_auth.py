@@ -4,8 +4,6 @@ import os
 
 from .common import *  # NOQA
 
-AUTH_PROVIDER = os.environ.get('RANCHER_AUTH_PROVIDER', "")
-
 '''
 Prerequisite:
 1. Set up auth, make testautoadmin as your admin user
@@ -14,15 +12,15 @@ Prerequisite:
 
 # Config Fields
 HOSTNAME_OR_IP_ADDRESS = os.environ.get("RANCHER_HOSTNAME_OR_IP_ADDRESS")
-PORT = os.environ.get("RANCHER_PORT")
+PORT = os.environ.get("RANCHER_PORT", 636)
 CA_CERTIFICATE = os.environ.get("RANCHER_CA_CERTIFICATE", "")
-CONNECTION_TIMEOUT = os.environ.get("RANCHER_CONNECTION_TIMEOUT")
+CONNECTION_TIMEOUT = os.environ.get("RANCHER_CONNECTION_TIMEOUT", 5000)
 SERVICE_ACCOUNT_NAME = os.environ.get("RANCHER_SERVICE_ACCOUNT_NAME")
 SERVICE_ACCOUNT_PASSWORD = os.environ.get("RANCHER_SERVICE_ACCOUNT_PASSWORD")
 DEFAULT_LOGIN_DOMAIN = os.environ.get("RANCHER_DEFAULT_LOGIN_DOMAIN")
 USER_SEARCH_BASE = os.environ.get("RANCHER_USER_SEARCH_BASE")
 GROUP_SEARCH_BASE = os.environ.get("RANCHER_GROUP_SEARCH_BASE")
-PASSWORD = os.environ.get('RANCHER_USER_PASSWORD', "")
+PASSWORD = os.environ.get('RANCHER_USER_PASSWORD', AUTH_USER_PASSWORD)
 AD_SPECIAL_CHAR_PASSWORD = os.environ.get("RANCHER_AD_SPECIAL_CHAR_PASSWORD")
 OPENLDAP_SPECIAL_CHAR_PASSWORD = \
     os.environ.get("RANCHER_OPENLDAP_SPECIAL_CHAR_PASSWORD")
@@ -592,7 +590,8 @@ def enable_openldap_nestedgroup(username, token, expected_status=200):
           username + " " + str(expected_status))
 
 
-def enable_ad(username, token, expected_status=200):
+def enable_ad(username, token, enable_url=CATTLE_AUTH_ENABLE_URL,
+              password=PASSWORD, nested=False, expected_status=200):
     headers = {'Authorization': 'Bearer ' + token}
     activeDirectoryConfig = {
         "accessMode": "unrestricted",
@@ -605,7 +604,7 @@ def enable_ad(username, token, expected_status=200):
         "groupNameAttribute": "name",
         "groupObjectClass": "group",
         "groupSearchAttribute": "sAMAccountName",
-        "nestedGroupMembershipEnabled": False,
+        "nestedGroupMembershipEnabled": nested,
         "port": PORT,
         "servers": [HOSTNAME_OR_IP_ADDRESS],
         "serviceAccountUsername": SERVICE_ACCOUNT_NAME,
@@ -623,11 +622,11 @@ def enable_ad(username, token, expected_status=200):
     ca_cert = activeDirectoryConfig["certificate"]
     activeDirectoryConfig["certificate"] = ca_cert.replace('\\n', '\n')
 
-    r = requests.post(CATTLE_AUTH_ENABLE_URL,
+    r = requests.post(enable_url,
                       json={"activeDirectoryConfig": activeDirectoryConfig,
                             "enabled": True,
                             "username": username,
-                            "password": PASSWORD},
+                            "password": password},
                       verify=False, headers=headers)
     assert r.status_code == expected_status
     print("Enable ActiveDirectory request for " +
