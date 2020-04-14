@@ -834,7 +834,8 @@ def validate_http_response(cmd, target_name_list, client_pod=None):
             result = run_command(curl_cmd)
         else:
             if is_windows():
-                wget_cmd = 'powershell -NoLogo -NonInteractive -Command "& {{ (Invoke-WebRequest -UseBasicParsing -Uri ' \
+                wget_cmd = 'powershell -NoLogo -NonInteractive -Command ' \
+                           '"& {{ (Invoke-WebRequest -UseBasicParsing -Uri ' \
                            '{0}).Content }}"'.format(cmd)
             else:
                 wget_cmd = "wget -qO- " + cmd
@@ -968,10 +969,12 @@ def validate_dns_entry_windows(pod, host, expected):
                 ping_validation_pass = True
                 break
         return ping_validation_pass and (" (0% loss)" in str(ping_output))
-    wait_for(callback=ping_check, timeout_message="Failed to ping {0}".format(host))
+    wait_for(callback=ping_check,
+             timeout_message="Failed to ping {0}".format(host))
 
     def dig_check():
-        dig_cmd = 'powershell -NoLogo -NonInteractive -Command "& {{ (Resolve-DnsName {0}).IPAddress }}"'.format(host)
+        dig_cmd = 'powershell -NoLogo -NonInteractive -Command ' \
+                  '"& {{ (Resolve-DnsName {0}).IPAddress }}"'.format(host)
         dig_output = kubectl_pod_exec(pod, dig_cmd)
         dig_validation_pass = True
         for expected_value in expected:
@@ -979,7 +982,8 @@ def validate_dns_entry_windows(pod, host, expected):
                 dig_validation_pass = False
                 break
         return dig_validation_pass
-    wait_for(callback=dig_check, timeout_message="Failed to resolve {0}".format(host))
+    wait_for(callback=dig_check,
+             timeout_message="Failed to resolve {0}".format(host))
 
 
 def validate_dns_record_deleted(client, dns_record, timeout=DEFAULT_TIMEOUT):
@@ -1082,11 +1086,11 @@ def get_custom_host_registration_cmd(client, cluster, roles, node):
         cluster_token = cluster_tokens[0]
     else:
         cluster_token = create_custom_host_registration_token(client, cluster)
-    
-    additional_options = " --address " + node.public_ip_address + \
-                            " --internal-address " + node.private_ip_address
 
-    if 'windows' in node.os_version:
+    additional_options = " --address " + node.public_ip_address + \
+                         " --internal-address " + node.private_ip_address
+
+    if 'Administrator' == node.ssh_user:
         cmd = cluster_token.windowsNodeCommand
         cmd = cmd.replace('| iex', '--worker' + additional_options + ' | iex ')
     else:
@@ -1094,7 +1098,7 @@ def get_custom_host_registration_cmd(client, cluster, roles, node):
         for role in roles:
             assert role in allowed_roles
             cmd += " --" + role
-        
+
         cmd += additional_options
     return cmd
 
@@ -1372,7 +1376,7 @@ def create_config_file(env_details):
 
 
 def validate_hostPort(p_client, workload, source_port, cluster):
-    url = get_endpoint_url_for_workload(p_client, workload)
+    get_endpoint_url_for_workload(p_client, workload)
     wl = p_client.list_workload(uuid=workload.uuid).data[0]
     source_port_wk = wl.publicEndpoints[0]["port"]
     assert source_port == source_port_wk, "Source ports do not match"
@@ -1501,7 +1505,9 @@ def create_wl_with_nfs(p_client, ns_id, pvc_name, wl_name,
 def write_content_to_file(pod, content, filename):
     cmd_write = "/bin/bash -c 'echo {1} > {0}'".format(filename, content)
     if is_windows():
-        cmd_write = 'powershell -NoLogo -NonInteractive -Command "& { echo {1} > {0} }"'.format(filename, content)
+        cmd_write = \
+            'powershell -NoLogo -NonInteractive -Command ' \
+            '"& { echo {1} > {0} }"'.format(filename, content)
     output = kubectl_pod_exec(pod, cmd_write)
     assert output.strip().decode('utf-8') == ""
 
@@ -1509,7 +1515,8 @@ def write_content_to_file(pod, content, filename):
 def validate_file_content(pod, content, filename):
     cmd_get_content = "/bin/bash -c 'cat {0}' ".format(filename)
     if is_windows():
-        cmd_get_content = 'powershell -NoLogo -NonInteractive -Command "& { cat {0} }"'.format(filename)
+        cmd_get_content = 'powershell -NoLogo -NonInteractive -Command ' \
+                          '"& { cat {0} }"'.format(filename)
     output = kubectl_pod_exec(pod, cmd_get_content)
     assert output.strip().decode('utf-8') == content
 
@@ -1723,9 +1730,9 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
     parameters = external_id.split('&')
     assert len(parameters) > 1, \
         "Incorrect list of parameters from catalog external ID"
-    chart = parameters[len(parameters)-2].split("=")[1] + "-" + \
-            parameters[len(parameters)-1].split("=")[1]
-    app_name = parameters[len(parameters)-2].split("=")[1]
+    chart = parameters[len(parameters) - 2].split("=")[1] + "-" + \
+        parameters[len(parameters) - 1].split("=")[1]
+    app_name = parameters[len(parameters) - 2].split("=")[1]
     workloads = proj_client.list_workload(namespaceId=ns).data
     for wl in workloads:
         print("Workload {} , state - {}".format(wl.id, wl.state))
@@ -1928,7 +1935,7 @@ def create_catalog_external_id(catalog_name, template, version,
                                project_cluster_id=None, catalog_type=None):
     if catalog_type is None:
         return "catalog://?catalog=" + catalog_name + \
-           "&template=" + template + "&version=" + version
+               "&template=" + template + "&version=" + version
     elif catalog_type == "project" or catalog_type == "cluster":
         return "catalog://?catalog=" + project_cluster_id + "/" \
                + catalog_name + "&type=" + catalog_type \
@@ -2171,8 +2178,8 @@ def validate_backup_delete(namespace, backup_info, backup_mode=None):
         cluster.etcdBackups(name=backup_info["backupname"])['data'][0]
     )
     wait_for_backup_to_delete(cluster, backup_info["backupname"])
-    assert len(cluster.etcdBackups(name=backup_info["backupname"])) == 0, \
-            "backup shouldn't be listed in the Cluster backups"
+    assert len(cluster.etcdBackups(name=backup_info["backupname"])) == 0,\
+        "backup shouldn't be listed in the Cluster backups"
     if backup_mode == "s3":
         # Check the backup reference is deleted in Rancher and S3
         backup_found = AmazonWebServices().s3_backup_check(

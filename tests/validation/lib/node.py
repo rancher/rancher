@@ -1,23 +1,20 @@
 import json
 import logging
-import os
 import paramiko
 import time
 
 
 logging.getLogger("paramiko").setLevel(logging.CRITICAL)
-DOCKER_INSTALLED = os.environ.get("DOCKER_INSTALLED", "true")
 DOCKER_INSTALL_CMD = (
     "curl https://releases.rancher.com/install-docker/{0}.sh | sh")
 
 
 class Node(object):
-    def __init__(
-        self, provider_node_id=None, host_name=None, node_name=None,
-        public_ip_address=None, private_ip_address=None, state=None,
-        labels=None, host_name_override=None, ssh_key=None,
-        ssh_key_name=None, ssh_key_path=None, ssh_user=None,
-            os_version=None, docker_version=None):
+    def __init__(self, provider_node_id=None, host_name=None, node_name=None,
+                 public_ip_address=None, private_ip_address=None, state=None,
+                 labels=None, host_name_override=None, ssh_key=None,
+                 ssh_key_name=None, ssh_key_path=None, ssh_user=None,
+                 docker_version=None, docker_installed="false"):
 
         self.provider_node_id = provider_node_id
         # node name giving to k8s node, hostname override
@@ -33,8 +30,8 @@ class Node(object):
         self.ssh_key = ssh_key
         self.ssh_key_name = ssh_key_name
         self.ssh_key_path = ssh_key_path
-        self.os_version = os_version
         self.docker_version = docker_version
+        self.docker_installed = docker_installed
         self._roles = []
         self.labels = labels or {}
         self.state = state
@@ -46,7 +43,7 @@ class Node(object):
     @property
     def ssh_password(self):
         return self._ssh_password
-    
+
     @ssh_password.setter
     def ssh_password(self, password):
         self._ssh_password = password
@@ -67,7 +64,7 @@ class Node(object):
             try:
                 self._ssh_client.connect(
                     self.public_ip_address, username=self.ssh_user,
-                    key_filename=self.ssh_key_path, port=self.ssh_port)
+                    key_filename=self.ssh_key_path, port=int(self.ssh_port))
                 result = self._ssh_client.exec_command(command)
                 if result and len(result) == 3 and result[1].readable():
                     result = [result[1].read(), result[2].read()]
@@ -87,13 +84,13 @@ class Node(object):
         try:
             if self.ssh_password is not None:
                 self._ssh_client.connect(
-                self.public_ip_address, username=self.ssh_user,
-                password=self.ssh_password, port=self.ssh_port)
+                    self.public_ip_address, username=self.ssh_user,
+                    password=self.ssh_password, port=int(self.ssh_port))
             else:
                 self._ssh_client.connect(
                     self.public_ip_address, username=self.ssh_user,
-                    key_filename=self.ssh_key_path, port=self.ssh_port)
-            
+                    key_filename=self.ssh_key_path, port=int(self.ssh_port))
+
             result = self._ssh_client.exec_command(command)
             if result and len(result) == 3 and result[1].readable():
                 result = [str(result[1].read(), 'utf-8'),
@@ -112,9 +109,12 @@ class Node(object):
         return self.execute_command(command)
 
     def ready_node(self):
-        if "windows" not in self.os_version:
-            self.wait_for_ssh_ready()
-        if DOCKER_INSTALLED.lower() == 'false':
+        # ignore Windows node
+        if self.ssh_user == "Administrator":
+            return
+
+        self.wait_for_ssh_ready()
+        if self.docker_installed.lower() == 'false':
             self.install_docker()
 
     def docker_ps(self, all=False, includeall=False):

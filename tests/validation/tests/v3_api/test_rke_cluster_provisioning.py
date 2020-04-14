@@ -64,14 +64,14 @@ rke_config_windows = {
         {"provider": "metrics-server",
          "type": "monitoringConfig"},
     "network": {
-      "mtu": 0,
-      "plugin": "flannel",
-      "type": "networkConfig",
-      "options": {
-        "flannel_backend_type": "vxlan",
-        "flannel_backend_port": "4789",
-        "flannel_backend_vni": "4096"
-      }
+        "mtu": 0,
+        "plugin": "flannel",
+        "type": "networkConfig",
+        "options": {
+            "flannel_backend_type": "vxlan",
+            "flannel_backend_port": "4789",
+            "flannel_backend_vni": "4096"
+        }
     },
     "services": {
         "etcd": {
@@ -1019,16 +1019,19 @@ def create_and_validate_custom_host(node_roles, random_cluster_name=False):
         AmazonWebServices().create_multiple_nodes(
             len(node_roles), random_test_name(HOST_NAME))
 
-    cluster, nodes = create_custom_host_from_nodes(aws_nodes, node_roles, random_cluster_name)
-    cluster = validate_cluster(client, cluster, check_intermediate_state=False, k8s_version=K8S_VERSION)
+    cluster, nodes = create_custom_host_from_nodes(aws_nodes, node_roles,
+                                                   random_cluster_name)
+    cluster = validate_cluster(client, cluster, check_intermediate_state=False,
+                               k8s_version=K8S_VERSION)
     return cluster, nodes
 
 
-def create_custom_host_from_nodes(nodes, node_roles, random_cluster_name=False, windows=False):
+def create_custom_host_from_nodes(nodes, node_roles,
+                                  random_cluster_name=False, windows=False):
     client = get_user_client()
     cluster_name = random_name() if random_cluster_name \
         else evaluate_clustername()
-    
+
     if windows:
         config = rke_config_windows
     else:
@@ -1039,7 +1042,7 @@ def create_custom_host_from_nodes(nodes, node_roles, random_cluster_name=False, 
                                     rancherKubernetesEngineConfig=config,
                                     windowsPreferedCluster=windows)
     assert cluster.state == "provisioning"
-    
+
     i = 0
     for aws_node in nodes:
         docker_run_cmd = \
@@ -1049,11 +1052,12 @@ def create_custom_host_from_nodes(nodes, node_roles, random_cluster_name=False, 
 
         for nr in node_roles[i]:
             aws_node.roles.append(nr)
-        
+
         result = aws_node.execute_command(docker_run_cmd)
         print(result)
         i += 1
 
-    cluster = validate_cluster_state(client, cluster, check_intermediate_state=False)
-    
+    cluster = validate_cluster_state(client, cluster,
+                                     check_intermediate_state=False)
+
     return cluster, nodes
