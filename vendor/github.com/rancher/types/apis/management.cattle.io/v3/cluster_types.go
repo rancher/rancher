@@ -71,6 +71,7 @@ const (
 	ClusterDriverLocal    = "local"
 	ClusterDriverRKE      = "rancherKubernetesEngine"
 	ClusterDriverK3s      = "k3s"
+	ClusterDriverK3os     = "k3os"
 )
 
 // +genclient
@@ -117,6 +118,7 @@ type ClusterSpec struct {
 	AzureKubernetesServiceConfig        *MapStringInterface `json:"azureKubernetesServiceConfig,omitempty"`
 	AmazonElasticContainerServiceConfig *MapStringInterface `json:"amazonElasticContainerServiceConfig,omitempty"`
 	GenericEngineConfig                 *MapStringInterface `json:"genericEngineConfig,omitempty"`
+	ClusterAPIConfig                    string              `json:"clusterAPIConfig,omitempty"`
 	ClusterTemplateName                 string              `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate],nocreate,noupdate"`
 	ClusterTemplateRevisionName         string              `json:"clusterTemplateRevisionName,omitempty" norman:"type=reference[clusterTemplateRevision]"`
 	ClusterTemplateAnswers              Answer              `json:"answers,omitempty"`
