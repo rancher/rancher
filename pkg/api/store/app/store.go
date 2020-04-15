@@ -30,6 +30,10 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
+	if err := s.verifyAppExternalIDMatchesProject(data, ""); err != nil {
+		return nil, err
+	}
+
 	if err := s.validateRancherVersion(data); err != nil {
 		return nil, err
 	}
@@ -46,6 +50,10 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
 	if err := s.checkAccessToTemplateVersion(apiContext, data); err != nil {
+		return nil, err
+	}
+
+	if err := s.verifyAppExternalIDMatchesProject(data, id); err != nil {
 		return nil, err
 	}
 
@@ -98,16 +106,10 @@ func (s *Store) validateRancherVersion(data map[string]interface{}) error {
 }
 
 func (s *Store) checkAccessToTemplateVersion(apiContext *types.APIContext, data map[string]interface{}) error {
-	externalID := convert.ToString(data["externalId"])
-	if externalID == "" {
-		return nil
-	}
-
-	templateVersionID, ns, err := hcommon.ParseExternalID(externalID)
+	templateVersionID, ns, err := s.parseAppExternalID(data)
 	if err != nil {
 		return err
 	}
-
 	if ns == namespace.GlobalNamespace {
 		// all users have read access to global catalogs, and can use their template versions to create apps
 		return nil
@@ -124,4 +126,48 @@ func (s *Store) checkAccessToTemplateVersion(apiContext *types.APIContext, data 
 		return err
 	}
 	return nil
+}
+
+func (s *Store) verifyAppExternalIDMatchesProject(data map[string]interface{}, id string) error {
+	_, catalogNs, err := s.parseAppExternalID(data)
+	if err != nil {
+		return err
+	}
+	if catalogNs == namespace.GlobalNamespace {
+		// apps from global catalog can be launched in any clusters
+		return nil
+	}
+
+	// check if target project is either same as the catalogNs (project scoped catalog), or belongs in the ns (cluster scoped catalog)
+	projectID := convert.ToString(data["projectId"])
+	if projectID == "" {
+		// this can happen only during app edit, get projectID from app
+		ns, name := ref.Parse(id)
+		if ns == "" || name == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("app id [%s] passed during edit is invalid", id))
+		}
+		app, err := s.Apps.Get(ns, name)
+		if err != nil {
+			return fmt.Errorf("error getting app %s: %v", id, err)
+		}
+		projectID = app.Spec.ProjectName
+	}
+	clusterName, projectName := ref.Parse(projectID)
+	if catalogNs == clusterName || catalogNs == projectName {
+		return nil
+	}
+	return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Cannot use catalog from %v to launch app in %v", catalogNs, projectID))
+}
+
+func (s *Store) parseAppExternalID(data map[string]interface{}) (string, string, error) {
+	externalID := convert.ToString(data["externalId"])
+	if externalID == "" {
+		return "", "", nil
+	}
+
+	templateVersionID, ns, err := hcommon.ParseExternalID(externalID)
+	if err != nil {
+		return "", "", err
+	}
+	return templateVersionID, ns, nil
 }
