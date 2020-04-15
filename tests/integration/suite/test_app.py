@@ -3,7 +3,8 @@ import pytest
 from rancher import ApiError
 from .test_catalog import wait_for_template_to_be_created
 from .common import random_str
-from .conftest import set_server_version, wait_for, DEFAULT_CATALOG
+from .conftest import set_server_version, wait_for, wait_for_condition, \
+    wait_until, user_project_client, DEFAULT_CATALOG
 
 
 def test_app_mysql(admin_pc, admin_mc):
@@ -646,7 +647,120 @@ def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):
     assert app2.helmVersion == "helm_v3"
 
 
-def wait_for_workload(client, ns, timeout=240, count=0):
+def test_app_externalid_target_project_verification(admin_mc,
+                                                    admin_pc,
+                                                    user_factory,
+                                                    remove_resource):
+    client = admin_mc.client
+
+    p1 = client.create_project(name=random_str(), clusterId='local')
+    remove_resource(p1)
+    wait_for_condition('InitialRolesPopulated', 'True', client, p1)
+    p1 = client.reload(p1)
+
+    # create a project scoped catalog in p1
+    project_name = str.lstrip(p1.id, "local:")
+    name = random_str()
+    url = "https://github.com/rancher/integration-test-charts.git"
+
+    client.create_project_catalog(name=name,
+                                  branch="master",
+                                  url=url,
+                                  projectId=p1.id,
+                                  )
+    wait_until(lambda: len(client.list_template(projectCatalogId=name)) > 0)
+
+    external_id = "catalog://?catalog=" + project_name + "/" + name + \
+                  "&type=projectCatalog&template=chartmuseum" \
+                  "&version=2.7.0"
+
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+    app_data = {
+        'name': random_str(),
+        'externalId': external_id,
+        'targetNamespace': ns.name,
+        'projectId': admin_pc.project.id,
+    }
+
+    try:
+        # using this catalog creating an app in another project should fail
+        admin_pc.client.create_app(app_data)
+    except ApiError as e:
+        assert e.error.status == 422
+        assert "Cannot use catalog from" in e.error.message
+
+    # create app in the p1 project, this should work
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=p1.id)
+    remove_resource(ns)
+    app_name = random_str()
+    app_data = {
+        'name': app_name,
+        'externalId': external_id,
+        'targetNamespace': ns.name,
+        'projectId': p1.id,
+        "answers": [{
+            "values": {
+                "defaultImage": "true",
+                "image.repository": "chartmuseum/chartmuseum",
+                "image.tag": "v0.7.1",
+                "env.open.STORAGE": "local",
+                "gcp.secret.enabled": "false",
+                "gcp.secret.key": "credentials.json",
+                "persistence.enabled": "true",
+                "persistence.size": "10Gi",
+                "ingress.enabled": "true",
+                "ingress.hosts[0]": "xip.io",
+                "service.type": "NodePort",
+                "env.open.SHOW_ADVANCED": "false",
+                "env.open.DEPTH": "0",
+                "env.open.ALLOW_OVERWRITE": "false",
+                "env.open.AUTH_ANONYMOUS_GET": "false",
+                "env.open.DISABLE_METRICS": "true"
+            }
+        }]
+    }
+
+    p1_client = user_project_client(admin_pc, p1)
+    app1 = p1_client.create_app(app_data)
+    remove_resource(app1)
+    wait_for_workload(p1_client, ns.name, count=1)
+
+    app = p1_client.reload(app1)
+    # updating app without passing projectId should not throw any error
+    update_data = {
+        'name': app_name,
+        'externalId': external_id,
+        'targetNamespace': ns.name,
+        'type': app,
+        "answers": [{
+            "values": {
+                "defaultImage": "true",
+                "image.repository": "chartmuseum/chartmuseum",
+                "image.tag": "v0.7.1",
+                "env.open.STORAGE": "local",
+                "gcp.secret.enabled": "false",
+                "gcp.secret.key": "credentials.json",
+                "persistence.enabled": "true",
+                "persistence.size": "10Gi",
+                "ingress.enabled": "true",
+                "ingress.hosts[0]": "xip.io",
+                "service.type": "NodePort",
+                "env.open.SHOW_ADVANCED": "false",
+                "env.open.DEPTH": "1",
+                "env.open.ALLOW_OVERWRITE": "false",
+                "env.open.AUTH_ANONYMOUS_GET": "false",
+                "env.open.DISABLE_METRICS": "true"
+            }
+        }]
+    }
+    p1_client.update(app, update_data)
+
+
+def wait_for_workload(client, ns, timeout=60, count=0):
     start = time.time()
     interval = 0.5
     workloads = client.list_workload(namespaceId=ns)
