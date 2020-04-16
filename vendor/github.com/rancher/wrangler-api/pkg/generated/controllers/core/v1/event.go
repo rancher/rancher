@@ -22,9 +22,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,9 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	informers "k8s.io/client-go/informers/core/v1"
-	clientset "k8s.io/client-go/kubernetes/typed/core/v1"
-	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -74,18 +74,23 @@ type EventCache interface {
 type EventIndexer func(obj *v1.Event) ([]string, error)
 
 type eventController struct {
-	controllerManager *generic.ControllerManager
-	clientGetter      clientset.EventsGetter
-	informer          informers.EventInformer
-	gvk               schema.GroupVersionKind
+	controller    controller.SharedController
+	client        *client.Client
+	gvk           schema.GroupVersionKind
+	groupResource schema.GroupResource
 }
 
-func NewEventController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.EventsGetter, informer informers.EventInformer) EventController {
+func NewEventController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) EventController {
+	c, err := controller.ForKind(gvk)
+	utilruntime.Must(err)
 	return &eventController{
-		controllerManager: controllerManager,
-		clientGetter:      clientGetter,
-		informer:          informer,
-		gvk:               gvk,
+		controller: c,
+		client:     c.Client(),
+		gvk:        gvk,
+		groupResource: schema.GroupResource{
+			Group:    gvk.Group,
+			Resource: resource,
+		},
 	}
 }
 
@@ -132,12 +137,11 @@ func UpdateEventDeepCopyOnChange(client EventClient, obj *v1.Event, handler func
 }
 
 func (c *eventController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
+	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
 func (c *eventController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
 }
 
 func (c *eventController) OnChange(ctx context.Context, name string, sync EventHandler) {
@@ -145,20 +149,19 @@ func (c *eventController) OnChange(ctx context.Context, name string, sync EventH
 }
 
 func (c *eventController) OnRemove(ctx context.Context, name string, sync EventHandler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromEventHandlerToHandler(sync))
-	c.AddGenericHandler(ctx, name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromEventHandlerToHandler(sync)))
 }
 
 func (c *eventController) Enqueue(namespace, name string) {
-	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), namespace, name)
+	c.controller.Enqueue(namespace, name)
 }
 
 func (c *eventController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), namespace, name, duration)
+	c.controller.EnqueueAfter(namespace, name, duration)
 }
 
 func (c *eventController) Informer() cache.SharedIndexInformer {
-	return c.informer.Informer()
+	return c.controller.Informer()
 }
 
 func (c *eventController) GroupVersionKind() schema.GroupVersionKind {
@@ -167,53 +170,70 @@ func (c *eventController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *eventController) Cache() EventCache {
 	return &eventCache{
-		lister:  c.informer.Lister(),
-		indexer: c.informer.Informer().GetIndexer(),
+		indexer:  c.Informer().GetIndexer(),
+		resource: c.groupResource,
 	}
 }
 
 func (c *eventController) Create(obj *v1.Event) (*v1.Event, error) {
-	return c.clientGetter.Events(obj.Namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+	result := &v1.Event{}
+	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
 }
 
 func (c *eventController) Update(obj *v1.Event) (*v1.Event, error) {
-	return c.clientGetter.Events(obj.Namespace).Update(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1.Event{}
+	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
 func (c *eventController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.clientGetter.Events(namespace).Delete(context.TODO(), name, *options)
+	return c.client.Delete(context.TODO(), namespace, name, *options)
 }
 
 func (c *eventController) Get(namespace, name string, options metav1.GetOptions) (*v1.Event, error) {
-	return c.clientGetter.Events(namespace).Get(context.TODO(), name, options)
+	result := &v1.Event{}
+	return result, c.client.Get(context.TODO(), namespace, name, result, options)
 }
 
 func (c *eventController) List(namespace string, opts metav1.ListOptions) (*v1.EventList, error) {
-	return c.clientGetter.Events(namespace).List(context.TODO(), opts)
+	result := &v1.EventList{}
+	return result, c.client.List(context.TODO(), namespace, result, opts)
 }
 
 func (c *eventController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.Events(namespace).Watch(context.TODO(), opts)
+	return c.client.Watch(context.TODO(), namespace, opts)
 }
 
-func (c *eventController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
-	return c.clientGetter.Events(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
+func (c *eventController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Event, error) {
+	result := &v1.Event{}
+	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
 type eventCache struct {
-	lister  listers.EventLister
-	indexer cache.Indexer
+	indexer  cache.Indexer
+	resource schema.GroupResource
 }
 
 func (c *eventCache) Get(namespace, name string) (*v1.Event, error) {
-	return c.lister.Events(namespace).Get(name)
+	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(c.resource, name)
+	}
+	return obj.(*v1.Event), nil
 }
 
-func (c *eventCache) List(namespace string, selector labels.Selector) ([]*v1.Event, error) {
-	return c.lister.Events(namespace).List(selector)
+func (c *eventCache) List(namespace string, selector labels.Selector) (ret []*v1.Event, err error) {
+
+	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Event))
+	})
+
+	return ret, err
 }
 
 func (c *eventCache) AddIndexer(indexName string, indexer EventIndexer) {

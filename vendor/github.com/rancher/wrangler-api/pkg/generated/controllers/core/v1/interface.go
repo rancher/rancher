@@ -19,11 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/schemes"
 	v1 "k8s.io/api/core/v1"
-	informers "k8s.io/client-go/informers/core/v1"
-	clientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+func init() {
+	v1.AddToScheme(schemes.All)
+}
 
 type Interface interface {
 	ConfigMap() ConfigMapController
@@ -38,48 +42,43 @@ type Interface interface {
 	ServiceAccount() ServiceAccountController
 }
 
-func New(controllerManager *generic.ControllerManager, client clientset.CoreV1Interface,
-	informers informers.Interface) Interface {
+func New(controllerFactory controller.SharedControllerFactory) Interface {
 	return &version{
-		controllerManager: controllerManager,
-		client:            client,
-		informers:         informers,
+		controllerFactory: controllerFactory,
 	}
 }
 
 type version struct {
-	controllerManager *generic.ControllerManager
-	informers         informers.Interface
-	client            clientset.CoreV1Interface
+	controllerFactory controller.SharedControllerFactory
 }
 
 func (c *version) ConfigMap() ConfigMapController {
-	return NewConfigMapController(v1.SchemeGroupVersion.WithKind("ConfigMap"), c.controllerManager, c.client, c.informers.ConfigMaps())
+	return NewConfigMapController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}, "configmaps", c.controllerFactory)
 }
 func (c *version) Endpoints() EndpointsController {
-	return NewEndpointsController(v1.SchemeGroupVersion.WithKind("Endpoints"), c.controllerManager, c.client, c.informers.Endpoints())
+	return NewEndpointsController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Endpoints"}, "endpoints", c.controllerFactory)
 }
 func (c *version) Event() EventController {
-	return NewEventController(v1.SchemeGroupVersion.WithKind("Event"), c.controllerManager, c.client, c.informers.Events())
+	return NewEventController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}, "events", c.controllerFactory)
 }
 func (c *version) Namespace() NamespaceController {
-	return NewNamespaceController(v1.SchemeGroupVersion.WithKind("Namespace"), c.controllerManager, c.client, c.informers.Namespaces())
+	return NewNamespaceController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}, "namespaces", c.controllerFactory)
 }
 func (c *version) Node() NodeController {
-	return NewNodeController(v1.SchemeGroupVersion.WithKind("Node"), c.controllerManager, c.client, c.informers.Nodes())
+	return NewNodeController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Node"}, "nodes", c.controllerFactory)
 }
 func (c *version) PersistentVolumeClaim() PersistentVolumeClaimController {
-	return NewPersistentVolumeClaimController(v1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"), c.controllerManager, c.client, c.informers.PersistentVolumeClaims())
+	return NewPersistentVolumeClaimController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}, "persistentvolumeclaims", c.controllerFactory)
 }
 func (c *version) Pod() PodController {
-	return NewPodController(v1.SchemeGroupVersion.WithKind("Pod"), c.controllerManager, c.client, c.informers.Pods())
+	return NewPodController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}, "pods", c.controllerFactory)
 }
 func (c *version) Secret() SecretController {
-	return NewSecretController(v1.SchemeGroupVersion.WithKind("Secret"), c.controllerManager, c.client, c.informers.Secrets())
+	return NewSecretController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}, "secrets", c.controllerFactory)
 }
 func (c *version) Service() ServiceController {
-	return NewServiceController(v1.SchemeGroupVersion.WithKind("Service"), c.controllerManager, c.client, c.informers.Services())
+	return NewServiceController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, "services", c.controllerFactory)
 }
 func (c *version) ServiceAccount() ServiceAccountController {
-	return NewServiceAccountController(v1.SchemeGroupVersion.WithKind("ServiceAccount"), c.controllerManager, c.client, c.informers.ServiceAccounts())
+	return NewServiceAccountController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ServiceAccount"}, "serviceaccounts", c.controllerFactory)
 }

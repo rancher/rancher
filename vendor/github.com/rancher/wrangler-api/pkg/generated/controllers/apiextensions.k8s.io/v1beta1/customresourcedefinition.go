@@ -22,13 +22,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,18 +77,23 @@ type CustomResourceDefinitionCache interface {
 type CustomResourceDefinitionIndexer func(obj *v1beta1.CustomResourceDefinition) ([]string, error)
 
 type customResourceDefinitionController struct {
-	controllerManager *generic.ControllerManager
-	clientGetter      clientset.CustomResourceDefinitionsGetter
-	informer          informers.CustomResourceDefinitionInformer
-	gvk               schema.GroupVersionKind
+	controller    controller.SharedController
+	client        *client.Client
+	gvk           schema.GroupVersionKind
+	groupResource schema.GroupResource
 }
 
-func NewCustomResourceDefinitionController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.CustomResourceDefinitionsGetter, informer informers.CustomResourceDefinitionInformer) CustomResourceDefinitionController {
+func NewCustomResourceDefinitionController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) CustomResourceDefinitionController {
+	c, err := controller.ForKind(gvk)
+	utilruntime.Must(err)
 	return &customResourceDefinitionController{
-		controllerManager: controllerManager,
-		clientGetter:      clientGetter,
-		informer:          informer,
-		gvk:               gvk,
+		controller: c,
+		client:     c.Client(),
+		gvk:        gvk,
+		groupResource: schema.GroupResource{
+			Group:    gvk.Group,
+			Resource: resource,
+		},
 	}
 }
 
@@ -135,12 +140,11 @@ func UpdateCustomResourceDefinitionDeepCopyOnChange(client CustomResourceDefinit
 }
 
 func (c *customResourceDefinitionController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
+	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
 func (c *customResourceDefinitionController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
 }
 
 func (c *customResourceDefinitionController) OnChange(ctx context.Context, name string, sync CustomResourceDefinitionHandler) {
@@ -148,20 +152,19 @@ func (c *customResourceDefinitionController) OnChange(ctx context.Context, name 
 }
 
 func (c *customResourceDefinitionController) OnRemove(ctx context.Context, name string, sync CustomResourceDefinitionHandler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromCustomResourceDefinitionHandlerToHandler(sync))
-	c.AddGenericHandler(ctx, name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromCustomResourceDefinitionHandlerToHandler(sync)))
 }
 
 func (c *customResourceDefinitionController) Enqueue(name string) {
-	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), "", name)
+	c.controller.Enqueue("", name)
 }
 
 func (c *customResourceDefinitionController) EnqueueAfter(name string, duration time.Duration) {
-	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), "", name, duration)
+	c.controller.EnqueueAfter("", name, duration)
 }
 
 func (c *customResourceDefinitionController) Informer() cache.SharedIndexInformer {
-	return c.informer.Informer()
+	return c.controller.Informer()
 }
 
 func (c *customResourceDefinitionController) GroupVersionKind() schema.GroupVersionKind {
@@ -170,57 +173,75 @@ func (c *customResourceDefinitionController) GroupVersionKind() schema.GroupVers
 
 func (c *customResourceDefinitionController) Cache() CustomResourceDefinitionCache {
 	return &customResourceDefinitionCache{
-		lister:  c.informer.Lister(),
-		indexer: c.informer.Informer().GetIndexer(),
+		indexer:  c.Informer().GetIndexer(),
+		resource: c.groupResource,
 	}
 }
 
 func (c *customResourceDefinitionController) Create(obj *v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error) {
-	return c.clientGetter.CustomResourceDefinitions().Create(context.TODO(), obj, metav1.CreateOptions{})
+	result := &v1beta1.CustomResourceDefinition{}
+	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
 }
 
 func (c *customResourceDefinitionController) Update(obj *v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error) {
-	return c.clientGetter.CustomResourceDefinitions().Update(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1beta1.CustomResourceDefinition{}
+	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
 }
 
 func (c *customResourceDefinitionController) UpdateStatus(obj *v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error) {
-	return c.clientGetter.CustomResourceDefinitions().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1beta1.CustomResourceDefinition{}
+	return result, c.client.UpdateStatus(context.TODO(), "", obj, result, metav1.UpdateOptions{})
 }
 
 func (c *customResourceDefinitionController) Delete(name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.clientGetter.CustomResourceDefinitions().Delete(context.TODO(), name, *options)
+	return c.client.Delete(context.TODO(), "", name, *options)
 }
 
 func (c *customResourceDefinitionController) Get(name string, options metav1.GetOptions) (*v1beta1.CustomResourceDefinition, error) {
-	return c.clientGetter.CustomResourceDefinitions().Get(context.TODO(), name, options)
+	result := &v1beta1.CustomResourceDefinition{}
+	return result, c.client.Get(context.TODO(), "", name, result, options)
 }
 
 func (c *customResourceDefinitionController) List(opts metav1.ListOptions) (*v1beta1.CustomResourceDefinitionList, error) {
-	return c.clientGetter.CustomResourceDefinitions().List(context.TODO(), opts)
+	result := &v1beta1.CustomResourceDefinitionList{}
+	return result, c.client.List(context.TODO(), "", result, opts)
 }
 
 func (c *customResourceDefinitionController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.CustomResourceDefinitions().Watch(context.TODO(), opts)
+	return c.client.Watch(context.TODO(), "", opts)
 }
 
-func (c *customResourceDefinitionController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CustomResourceDefinition, err error) {
-	return c.clientGetter.CustomResourceDefinitions().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
+func (c *customResourceDefinitionController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1beta1.CustomResourceDefinition, error) {
+	result := &v1beta1.CustomResourceDefinition{}
+	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
 type customResourceDefinitionCache struct {
-	lister  listers.CustomResourceDefinitionLister
-	indexer cache.Indexer
+	indexer  cache.Indexer
+	resource schema.GroupResource
 }
 
 func (c *customResourceDefinitionCache) Get(name string) (*v1beta1.CustomResourceDefinition, error) {
-	return c.lister.Get(name)
+	obj, exists, err := c.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(c.resource, name)
+	}
+	return obj.(*v1beta1.CustomResourceDefinition), nil
 }
 
-func (c *customResourceDefinitionCache) List(selector labels.Selector) ([]*v1beta1.CustomResourceDefinition, error) {
-	return c.lister.List(selector)
+func (c *customResourceDefinitionCache) List(selector labels.Selector) (ret []*v1beta1.CustomResourceDefinition, err error) {
+
+	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.CustomResourceDefinition))
+	})
+
+	return ret, err
 }
 
 func (c *customResourceDefinitionCache) AddIndexer(indexName string, indexer CustomResourceDefinitionIndexer) {
@@ -267,6 +288,7 @@ func RegisterCustomResourceDefinitionGeneratingHandler(ctx context.Context, cont
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
+	controller.OnChange(ctx, name, statusHandler.Remove)
 	RegisterCustomResourceDefinitionStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
@@ -281,7 +303,7 @@ func (a *customResourceDefinitionStatusHandler) sync(key string, obj *v1beta1.Cu
 		return obj, nil
 	}
 
-	origStatus := obj.Status
+	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
 	newStatus, err := a.handler(obj, obj.Status)
 	if err != nil {
@@ -289,16 +311,16 @@ func (a *customResourceDefinitionStatusHandler) sync(key string, obj *v1beta1.Cu
 		newStatus = *origStatus.DeepCopy()
 	}
 
-	obj.Status = newStatus
 	if a.condition != "" {
 		if errors.IsConflict(err) {
-			a.condition.SetError(obj, "", nil)
+			a.condition.SetError(&newStatus, "", nil)
 		} else {
-			a.condition.SetError(obj, "", err)
+			a.condition.SetError(&newStatus, "", err)
 		}
 	}
-	if !equality.Semantic.DeepEqual(origStatus, obj.Status) {
+	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
 		var newErr error
+		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
@@ -315,29 +337,28 @@ type customResourceDefinitionGeneratingHandler struct {
 	name  string
 }
 
+func (a *customResourceDefinitionGeneratingHandler) Remove(key string, obj *v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error) {
+	if obj != nil {
+		return obj, nil
+	}
+
+	obj = &v1beta1.CustomResourceDefinition{}
+	obj.Namespace, obj.Name = kv.RSplit(key, "/")
+	obj.SetGroupVersionKind(a.gvk)
+
+	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects()
+}
+
 func (a *customResourceDefinitionGeneratingHandler) Handle(obj *v1beta1.CustomResourceDefinition, status v1beta1.CustomResourceDefinitionStatus) (v1beta1.CustomResourceDefinitionStatus, error) {
 	objs, newStatus, err := a.CustomResourceDefinitionGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
 
-	apply := a.apply
-
-	if !a.opts.DynamicLookup {
-		apply = apply.WithStrictCaching()
-	}
-
-	if !a.opts.AllowCrossNamespace && !a.opts.AllowClusterScoped {
-		apply = apply.WithSetOwnerReference(true, false).
-			WithDefaultNamespace(obj.GetNamespace()).
-			WithListerNamespace(obj.GetNamespace())
-	}
-
-	if !a.opts.AllowClusterScoped {
-		apply = apply.WithRestrictClusterScoped()
-	}
-
-	return newStatus, apply.
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
