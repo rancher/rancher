@@ -22,12 +22,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	informers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -74,23 +74,18 @@ type ServiceAccountCache interface {
 type ServiceAccountIndexer func(obj *v1.ServiceAccount) ([]string, error)
 
 type serviceAccountController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+	controllerManager *generic.ControllerManager
+	clientGetter      clientset.ServiceAccountsGetter
+	informer          informers.ServiceAccountInformer
+	gvk               schema.GroupVersionKind
 }
 
-func NewServiceAccountController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) ServiceAccountController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewServiceAccountController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.ServiceAccountsGetter, informer informers.ServiceAccountInformer) ServiceAccountController {
 	return &serviceAccountController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+		controllerManager: controllerManager,
+		clientGetter:      clientGetter,
+		informer:          informer,
+		gvk:               gvk,
 	}
 }
 
@@ -137,11 +132,12 @@ func UpdateServiceAccountDeepCopyOnChange(client ServiceAccountClient, obj *v1.S
 }
 
 func (c *serviceAccountController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
 }
 
 func (c *serviceAccountController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
 }
 
 func (c *serviceAccountController) OnChange(ctx context.Context, name string, sync ServiceAccountHandler) {
@@ -149,19 +145,20 @@ func (c *serviceAccountController) OnChange(ctx context.Context, name string, sy
 }
 
 func (c *serviceAccountController) OnRemove(ctx context.Context, name string, sync ServiceAccountHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromServiceAccountHandlerToHandler(sync)))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromServiceAccountHandlerToHandler(sync))
+	c.AddGenericHandler(ctx, name, removeHandler)
 }
 
 func (c *serviceAccountController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
+	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), namespace, name)
 }
 
 func (c *serviceAccountController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
+	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), namespace, name, duration)
 }
 
 func (c *serviceAccountController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
+	return c.informer.Informer()
 }
 
 func (c *serviceAccountController) GroupVersionKind() schema.GroupVersionKind {
@@ -170,70 +167,53 @@ func (c *serviceAccountController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *serviceAccountController) Cache() ServiceAccountCache {
 	return &serviceAccountCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
+		lister:  c.informer.Lister(),
+		indexer: c.informer.Informer().GetIndexer(),
 	}
 }
 
 func (c *serviceAccountController) Create(obj *v1.ServiceAccount) (*v1.ServiceAccount, error) {
-	result := &v1.ServiceAccount{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
+	return c.clientGetter.ServiceAccounts(obj.Namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *serviceAccountController) Update(obj *v1.ServiceAccount) (*v1.ServiceAccount, error) {
-	result := &v1.ServiceAccount{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.ServiceAccounts(obj.Namespace).Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *serviceAccountController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
+	return c.clientGetter.ServiceAccounts(namespace).Delete(context.TODO(), name, *options)
 }
 
 func (c *serviceAccountController) Get(namespace, name string, options metav1.GetOptions) (*v1.ServiceAccount, error) {
-	result := &v1.ServiceAccount{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
+	return c.clientGetter.ServiceAccounts(namespace).Get(context.TODO(), name, options)
 }
 
 func (c *serviceAccountController) List(namespace string, opts metav1.ListOptions) (*v1.ServiceAccountList, error) {
-	result := &v1.ServiceAccountList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
+	return c.clientGetter.ServiceAccounts(namespace).List(context.TODO(), opts)
 }
 
 func (c *serviceAccountController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
+	return c.clientGetter.ServiceAccounts(namespace).Watch(context.TODO(), opts)
 }
 
-func (c *serviceAccountController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.ServiceAccount, error) {
-	result := &v1.ServiceAccount{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
+func (c *serviceAccountController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
+	return c.clientGetter.ServiceAccounts(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type serviceAccountCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
+	lister  listers.ServiceAccountLister
+	indexer cache.Indexer
 }
 
 func (c *serviceAccountCache) Get(namespace, name string) (*v1.ServiceAccount, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.ServiceAccount), nil
+	return c.lister.ServiceAccounts(namespace).Get(name)
 }
 
-func (c *serviceAccountCache) List(namespace string, selector labels.Selector) (ret []*v1.ServiceAccount, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ServiceAccount))
-	})
-
-	return ret, err
+func (c *serviceAccountCache) List(namespace string, selector labels.Selector) ([]*v1.ServiceAccount, error) {
+	return c.lister.ServiceAccounts(namespace).List(selector)
 }
 
 func (c *serviceAccountCache) AddIndexer(indexName string, indexer ServiceAccountIndexer) {

@@ -22,12 +22,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	informers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -74,23 +74,18 @@ type SecretCache interface {
 type SecretIndexer func(obj *v1.Secret) ([]string, error)
 
 type secretController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+	controllerManager *generic.ControllerManager
+	clientGetter      clientset.SecretsGetter
+	informer          informers.SecretInformer
+	gvk               schema.GroupVersionKind
 }
 
-func NewSecretController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) SecretController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewSecretController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.SecretsGetter, informer informers.SecretInformer) SecretController {
 	return &secretController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+		controllerManager: controllerManager,
+		clientGetter:      clientGetter,
+		informer:          informer,
+		gvk:               gvk,
 	}
 }
 
@@ -137,11 +132,12 @@ func UpdateSecretDeepCopyOnChange(client SecretClient, obj *v1.Secret, handler f
 }
 
 func (c *secretController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
 }
 
 func (c *secretController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
 }
 
 func (c *secretController) OnChange(ctx context.Context, name string, sync SecretHandler) {
@@ -149,19 +145,20 @@ func (c *secretController) OnChange(ctx context.Context, name string, sync Secre
 }
 
 func (c *secretController) OnRemove(ctx context.Context, name string, sync SecretHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromSecretHandlerToHandler(sync)))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromSecretHandlerToHandler(sync))
+	c.AddGenericHandler(ctx, name, removeHandler)
 }
 
 func (c *secretController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
+	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), namespace, name)
 }
 
 func (c *secretController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
+	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), namespace, name, duration)
 }
 
 func (c *secretController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
+	return c.informer.Informer()
 }
 
 func (c *secretController) GroupVersionKind() schema.GroupVersionKind {
@@ -170,70 +167,53 @@ func (c *secretController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *secretController) Cache() SecretCache {
 	return &secretCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
+		lister:  c.informer.Lister(),
+		indexer: c.informer.Informer().GetIndexer(),
 	}
 }
 
 func (c *secretController) Create(obj *v1.Secret) (*v1.Secret, error) {
-	result := &v1.Secret{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
+	return c.clientGetter.Secrets(obj.Namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *secretController) Update(obj *v1.Secret) (*v1.Secret, error) {
-	result := &v1.Secret{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.Secrets(obj.Namespace).Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *secretController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
+	return c.clientGetter.Secrets(namespace).Delete(context.TODO(), name, *options)
 }
 
 func (c *secretController) Get(namespace, name string, options metav1.GetOptions) (*v1.Secret, error) {
-	result := &v1.Secret{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
+	return c.clientGetter.Secrets(namespace).Get(context.TODO(), name, options)
 }
 
 func (c *secretController) List(namespace string, opts metav1.ListOptions) (*v1.SecretList, error) {
-	result := &v1.SecretList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
+	return c.clientGetter.Secrets(namespace).List(context.TODO(), opts)
 }
 
 func (c *secretController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
+	return c.clientGetter.Secrets(namespace).Watch(context.TODO(), opts)
 }
 
-func (c *secretController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Secret, error) {
-	result := &v1.Secret{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
+func (c *secretController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error) {
+	return c.clientGetter.Secrets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type secretCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
+	lister  listers.SecretLister
+	indexer cache.Indexer
 }
 
 func (c *secretCache) Get(namespace, name string) (*v1.Secret, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.Secret), nil
+	return c.lister.Secrets(namespace).Get(name)
 }
 
-func (c *secretCache) List(namespace string, selector labels.Selector) (ret []*v1.Secret, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Secret))
-	})
-
-	return ret, err
+func (c *secretCache) List(namespace string, selector labels.Selector) ([]*v1.Secret, error) {
+	return c.lister.Secrets(namespace).List(selector)
 }
 
 func (c *secretCache) AddIndexer(indexName string, indexer SecretIndexer) {

@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	if err := os.RemoveAll("./pkg/wrangler/generated"); err != nil {
+	if err := os.RemoveAll("./pkg/wranger/generated"); err != nil {
 		logrus.Fatal(err)
 	}
 }

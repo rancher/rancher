@@ -19,15 +19,11 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/rancher/lasso/pkg/controller"
-	"github.com/rancher/wrangler/pkg/schemes"
+	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	informers "k8s.io/client-go/informers/rbac/v1"
+	clientset "k8s.io/client-go/kubernetes/typed/rbac/v1"
 )
-
-func init() {
-	v1.AddToScheme(schemes.All)
-}
 
 type Interface interface {
 	ClusterRole() ClusterRoleController
@@ -36,25 +32,30 @@ type Interface interface {
 	RoleBinding() RoleBindingController
 }
 
-func New(controllerFactory controller.SharedControllerFactory) Interface {
+func New(controllerManager *generic.ControllerManager, client clientset.RbacV1Interface,
+	informers informers.Interface) Interface {
 	return &version{
-		controllerFactory: controllerFactory,
+		controllerManager: controllerManager,
+		client:            client,
+		informers:         informers,
 	}
 }
 
 type version struct {
-	controllerFactory controller.SharedControllerFactory
+	controllerManager *generic.ControllerManager
+	informers         informers.Interface
+	client            clientset.RbacV1Interface
 }
 
 func (c *version) ClusterRole() ClusterRoleController {
-	return NewClusterRoleController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"}, "clusterroles", c.controllerFactory)
+	return NewClusterRoleController(v1.SchemeGroupVersion.WithKind("ClusterRole"), c.controllerManager, c.client, c.informers.ClusterRoles())
 }
 func (c *version) ClusterRoleBinding() ClusterRoleBindingController {
-	return NewClusterRoleBindingController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}, "clusterrolebindings", c.controllerFactory)
+	return NewClusterRoleBindingController(v1.SchemeGroupVersion.WithKind("ClusterRoleBinding"), c.controllerManager, c.client, c.informers.ClusterRoleBindings())
 }
 func (c *version) Role() RoleController {
-	return NewRoleController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"}, "roles", c.controllerFactory)
+	return NewRoleController(v1.SchemeGroupVersion.WithKind("Role"), c.controllerManager, c.client, c.informers.Roles())
 }
 func (c *version) RoleBinding() RoleBindingController {
-	return NewRoleBindingController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}, "rolebindings", c.controllerFactory)
+	return NewRoleBindingController(v1.SchemeGroupVersion.WithKind("RoleBinding"), c.controllerManager, c.client, c.informers.RoleBindings())
 }

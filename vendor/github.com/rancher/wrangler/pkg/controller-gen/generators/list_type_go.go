@@ -29,7 +29,11 @@ type listTypesGo struct {
 }
 
 func (f *listTypesGo) Imports(*generator.Context) []string {
-	return Imports
+	packages := []string{
+		"metav1 \"k8s.io/apimachinery/pkg/apis/meta/v1\"",
+	}
+
+	return packages
 }
 
 func (f *listTypesGo) Init(c *generator.Context, w io.Writer) error {

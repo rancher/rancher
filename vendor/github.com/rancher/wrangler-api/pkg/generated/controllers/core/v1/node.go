@@ -22,12 +22,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/kv"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	informers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -77,23 +77,18 @@ type NodeCache interface {
 type NodeIndexer func(obj *v1.Node) ([]string, error)
 
 type nodeController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+	controllerManager *generic.ControllerManager
+	clientGetter      clientset.NodesGetter
+	informer          informers.NodeInformer
+	gvk               schema.GroupVersionKind
 }
 
-func NewNodeController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) NodeController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewNodeController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.NodesGetter, informer informers.NodeInformer) NodeController {
 	return &nodeController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+		controllerManager: controllerManager,
+		clientGetter:      clientGetter,
+		informer:          informer,
+		gvk:               gvk,
 	}
 }
 
@@ -140,11 +135,12 @@ func UpdateNodeDeepCopyOnChange(client NodeClient, obj *v1.Node, handler func(ob
 }
 
 func (c *nodeController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
 }
 
 func (c *nodeController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
 }
 
 func (c *nodeController) OnChange(ctx context.Context, name string, sync NodeHandler) {
@@ -152,19 +148,20 @@ func (c *nodeController) OnChange(ctx context.Context, name string, sync NodeHan
 }
 
 func (c *nodeController) OnRemove(ctx context.Context, name string, sync NodeHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromNodeHandlerToHandler(sync)))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromNodeHandlerToHandler(sync))
+	c.AddGenericHandler(ctx, name, removeHandler)
 }
 
 func (c *nodeController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
+	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), "", name)
 }
 
 func (c *nodeController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
+	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), "", name, duration)
 }
 
 func (c *nodeController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
+	return c.informer.Informer()
 }
 
 func (c *nodeController) GroupVersionKind() schema.GroupVersionKind {
@@ -173,75 +170,57 @@ func (c *nodeController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *nodeController) Cache() NodeCache {
 	return &nodeCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
+		lister:  c.informer.Lister(),
+		indexer: c.informer.Informer().GetIndexer(),
 	}
 }
 
 func (c *nodeController) Create(obj *v1.Node) (*v1.Node, error) {
-	result := &v1.Node{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
+	return c.clientGetter.Nodes().Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *nodeController) Update(obj *v1.Node) (*v1.Node, error) {
-	result := &v1.Node{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.Nodes().Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *nodeController) UpdateStatus(obj *v1.Node) (*v1.Node, error) {
-	result := &v1.Node{}
-	return result, c.client.UpdateStatus(context.TODO(), "", obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.Nodes().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *nodeController) Delete(name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.client.Delete(context.TODO(), "", name, *options)
+	return c.clientGetter.Nodes().Delete(context.TODO(), name, *options)
 }
 
 func (c *nodeController) Get(name string, options metav1.GetOptions) (*v1.Node, error) {
-	result := &v1.Node{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
+	return c.clientGetter.Nodes().Get(context.TODO(), name, options)
 }
 
 func (c *nodeController) List(opts metav1.ListOptions) (*v1.NodeList, error) {
-	result := &v1.NodeList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
+	return c.clientGetter.Nodes().List(context.TODO(), opts)
 }
 
 func (c *nodeController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
+	return c.clientGetter.Nodes().Watch(context.TODO(), opts)
 }
 
-func (c *nodeController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
-	result := &v1.Node{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
+func (c *nodeController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error) {
+	return c.clientGetter.Nodes().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type nodeCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
+	lister  listers.NodeLister
+	indexer cache.Indexer
 }
 
 func (c *nodeCache) Get(name string) (*v1.Node, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.Node), nil
+	return c.lister.Get(name)
 }
 
-func (c *nodeCache) List(selector labels.Selector) (ret []*v1.Node, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Node))
-	})
-
-	return ret, err
+func (c *nodeCache) List(selector labels.Selector) ([]*v1.Node, error) {
+	return c.lister.List(selector)
 }
 
 func (c *nodeCache) AddIndexer(indexName string, indexer NodeIndexer) {
@@ -288,7 +267,6 @@ func RegisterNodeGeneratingHandler(ctx context.Context, controller NodeControlle
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
-	controller.OnChange(ctx, name, statusHandler.Remove)
 	RegisterNodeStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
@@ -303,7 +281,7 @@ func (a *nodeStatusHandler) sync(key string, obj *v1.Node) (*v1.Node, error) {
 		return obj, nil
 	}
 
-	origStatus := obj.Status.DeepCopy()
+	origStatus := obj.Status
 	obj = obj.DeepCopy()
 	newStatus, err := a.handler(obj, obj.Status)
 	if err != nil {
@@ -311,16 +289,16 @@ func (a *nodeStatusHandler) sync(key string, obj *v1.Node) (*v1.Node, error) {
 		newStatus = *origStatus.DeepCopy()
 	}
 
+	obj.Status = newStatus
 	if a.condition != "" {
 		if errors.IsConflict(err) {
-			a.condition.SetError(&newStatus, "", nil)
+			a.condition.SetError(obj, "", nil)
 		} else {
-			a.condition.SetError(&newStatus, "", err)
+			a.condition.SetError(obj, "", err)
 		}
 	}
-	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+	if !equality.Semantic.DeepEqual(origStatus, obj.Status) {
 		var newErr error
-		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
@@ -337,28 +315,29 @@ type nodeGeneratingHandler struct {
 	name  string
 }
 
-func (a *nodeGeneratingHandler) Remove(key string, obj *v1.Node) (*v1.Node, error) {
-	if obj != nil {
-		return obj, nil
-	}
-
-	obj = &v1.Node{}
-	obj.Namespace, obj.Name = kv.RSplit(key, "/")
-	obj.SetGroupVersionKind(a.gvk)
-
-	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
-		WithOwner(obj).
-		WithSetID(a.name).
-		ApplyObjects()
-}
-
 func (a *nodeGeneratingHandler) Handle(obj *v1.Node, status v1.NodeStatus) (v1.NodeStatus, error) {
 	objs, newStatus, err := a.NodeGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	apply := a.apply
+
+	if !a.opts.DynamicLookup {
+		apply = apply.WithStrictCaching()
+	}
+
+	if !a.opts.AllowCrossNamespace && !a.opts.AllowClusterScoped {
+		apply = apply.WithSetOwnerReference(true, false).
+			WithDefaultNamespace(obj.GetNamespace()).
+			WithListerNamespace(obj.GetNamespace())
+	}
+
+	if !a.opts.AllowClusterScoped {
+		apply = apply.WithRestrictClusterScoped()
+	}
+
+	return newStatus, apply.
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
