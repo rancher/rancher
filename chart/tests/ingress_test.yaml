@@ -45,6 +45,7 @@ tests:
       path: metadata.annotations
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
@@ -56,6 +57,7 @@ tests:
       path: metadata.annotations
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
@@ -99,6 +101,7 @@ tests:
       path: metadata.annotations
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
@@ -112,6 +115,7 @@ tests:
       path: metadata.annotations
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
@@ -178,6 +182,7 @@ tests:
       path: metadata.annotations
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
@@ -195,6 +200,7 @@ tests:
       path: metadata.annotations
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
@@ -255,6 +261,7 @@ tests:
       path: metadata.annotations
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
@@ -274,6 +281,7 @@ tests:
       path: metadata.annotations
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
