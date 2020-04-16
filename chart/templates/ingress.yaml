@@ -41,3 +41,17 @@ spec:
     - {{ .Values.hostname }}
     secretName: tls-rancher-ingress
 {{- end }}
+{{- if eq .Values.tls "ingress" }}
+  tls:
+  - hosts:
+    - {{ .Values.hostname }}
+    secretName: tls-rancher-ingress
+{{- end }}
+{{- if eq .Values.ingress.tls.source "secret" }}
+  tls:
+  - hosts:
+    - {{ .Values.hostname }}
+    secretName: {{ .Values.ingress.tls.secretName }}
+{{- end }}
+
+

@@ -58,6 +58,8 @@ ingress:
   tls:
     # options: rancher, letsEncrypt, secret
     source: rancher
+    # set secret name if TLS provided excternally via a secret
+    # secretName:
 
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
