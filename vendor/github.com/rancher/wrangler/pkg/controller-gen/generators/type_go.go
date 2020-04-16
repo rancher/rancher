@@ -35,9 +35,28 @@ type typeGo struct {
 	customArgs *args2.CustomArgs
 }
 
-func (f *typeGo) Imports(context *generator.Context) []string {
-	packages := append(Imports,
-		fmt.Sprintf("%s \"%s\"", f.gv.Version, f.name.Package))
+func (f *typeGo) Imports(*generator.Context) []string {
+	group := f.customArgs.Options.Groups[f.gv.Group]
+
+	packages := []string{
+		"metav1 \"k8s.io/apimachinery/pkg/apis/meta/v1\"",
+		"k8s.io/apimachinery/pkg/api/errors",
+		"k8s.io/apimachinery/pkg/labels",
+		"k8s.io/apimachinery/pkg/runtime",
+		"k8s.io/apimachinery/pkg/runtime/schema",
+		"k8s.io/apimachinery/pkg/api/equality",
+		"k8s.io/apimachinery/pkg/types",
+		"utilruntime \"k8s.io/apimachinery/pkg/util/runtime\"",
+		"k8s.io/apimachinery/pkg/watch",
+		"k8s.io/client-go/tools/cache",
+		"github.com/rancher/wrangler/pkg/apply",
+		"github.com/rancher/wrangler/pkg/condition",
+		fmt.Sprintf("%s \"%s\"", f.gv.Version, f.name.Package),
+		GenericPackage,
+		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
+		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
+		fmt.Sprintf("listers \"%s/%s/%s\"", group.ListersPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
+	}
 
 	return packages
 }
@@ -121,23 +140,18 @@ type {{.type}}Cache interface {
 type {{.type}}Indexer func(obj *{{.version}}.{{.type}}) ([]string, error)
 
 type {{.lowerName}}Controller struct {
-	controller controller.SharedController
-	client            *client.Client
+	controllerManager *generic.ControllerManager
+	clientGetter      clientset.{{.plural}}Getter
+	informer          informers.{{.type}}Informer
 	gvk               schema.GroupVersionKind
-	groupResource     schema.GroupResource
 }
 
-func New{{.type}}Controller(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) {{.type}}Controller {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func New{{.type}}Controller(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.{{.plural}}Getter, informer informers.{{.type}}Informer) {{.type}}Controller {
 	return &{{.lowerName}}Controller{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+		controllerManager: controllerManager,
+		clientGetter:      clientGetter,
+		informer:          informer,
+		gvk:               gvk,
 	}
 }
 
@@ -184,11 +198,12 @@ func Update{{.type}}DeepCopyOnChange(client {{.type}}Client, obj *{{.version}}.{
 }
 
 func (c *{{.lowerName}}Controller) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
 }
 
 func (c *{{.lowerName}}Controller) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
 }
 
 func (c *{{.lowerName}}Controller) OnChange(ctx context.Context, name string, sync {{.type}}Handler) {
@@ -196,19 +211,20 @@ func (c *{{.lowerName}}Controller) OnChange(ctx context.Context, name string, sy
 }
 
 func (c *{{.lowerName}}Controller) OnRemove(ctx context.Context, name string, sync {{.type}}Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), From{{.type}}HandlerToHandler(sync)))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), From{{.type}}HandlerToHandler(sync))
+	c.AddGenericHandler(ctx, name, removeHandler)
 }
 
 func (c *{{.lowerName}}Controller) Enqueue({{ if .namespaced}}namespace, {{end}}name string) {
-	c.controller.Enqueue({{ if .namespaced }}namespace, {{else}}"", {{end}}name)
+	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), {{ if .namespaced }}namespace, {{else}}"", {{end}}name)
 }
 
 func (c *{{.lowerName}}Controller) EnqueueAfter({{ if .namespaced}}namespace, {{end}}name string, duration time.Duration) {
-	c.controller.EnqueueAfter({{ if .namespaced }}namespace, {{else}}"", {{end}}name, duration)
+	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), {{ if .namespaced }}namespace, {{else}}"", {{end}}name, duration)
 }
 
 func (c *{{.lowerName}}Controller) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
+	return c.informer.Informer()
 }
 
 func (c *{{.lowerName}}Controller) GroupVersionKind() schema.GroupVersionKind {
@@ -217,25 +233,22 @@ func (c *{{.lowerName}}Controller) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *{{.lowerName}}Controller) Cache() {{.type}}Cache {
 	return &{{.lowerName}}Cache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
+		lister:  c.informer.Lister(),
+		indexer: c.informer.Informer().GetIndexer(),
 	}
 }
 
 func (c *{{.lowerName}}Controller) Create(obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
-	result := &{{.version}}.{{.type}}{}
-	return result, c.client.Create(context.TODO(), {{ if .namespaced}}obj.Namespace,{{else}}"",{{end}} obj, result, metav1.CreateOptions{})
+	return c.clientGetter.{{.plural}}({{ if .namespaced}}obj.Namespace{{end}}).Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *{{.lowerName}}Controller) Update(obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
-	result := &{{.version}}.{{.type}}{}
-	return result, c.client.Update(context.TODO(), {{ if .namespaced}}obj.Namespace,{{else}}"",{{end}} obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.{{.plural}}({{ if .namespaced}}obj.Namespace{{end}}).Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 {{ if .hasStatus -}}
 func (c *{{.lowerName}}Controller) UpdateStatus(obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
-	result := &{{.version}}.{{.type}}{}
-	return result, c.client.UpdateStatus(context.TODO(), {{ if .namespaced}}obj.Namespace,{{else}}"",{{end}} obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.{{.plural}}({{ if .namespaced}}obj.Namespace{{end}}).UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
 }
 {{- end }}
 
@@ -243,55 +256,36 @@ func (c *{{.lowerName}}Controller) Delete({{ if .namespaced}}namespace, {{end}}n
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.client.Delete(context.TODO(), {{ if .namespaced}}namespace,{{else}}"",{{end}} name, *options)
+	return c.clientGetter.{{.plural}}({{ if .namespaced}}namespace{{end}}).Delete(context.TODO(), name, *options)
 }
 
 func (c *{{.lowerName}}Controller) Get({{ if .namespaced}}namespace, {{end}}name string, options metav1.GetOptions) (*{{.version}}.{{.type}}, error) {
-	result := &{{.version}}.{{.type}}{}
-	return result, c.client.Get(context.TODO(), {{ if .namespaced}}namespace,{{else}}"",{{end}} name, result, options)
+	return c.clientGetter.{{.plural}}({{ if .namespaced}}namespace{{end}}).Get(context.TODO(), name, options)
 }
 
 func (c *{{.lowerName}}Controller) List({{ if .namespaced}}namespace string, {{end}}opts metav1.ListOptions) (*{{.version}}.{{.type}}List, error) {
-	result := &{{.version}}.{{.type}}List{}
-	return result, c.client.List(context.TODO(), {{ if .namespaced}}namespace,{{else}}"",{{end}} result, opts)
+	return c.clientGetter.{{.plural}}({{ if .namespaced}}namespace{{end}}).List(context.TODO(), opts)
 }
 
 func (c *{{.lowerName}}Controller) Watch({{ if .namespaced}}namespace string, {{end}}opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), {{ if .namespaced}}namespace,{{else}}"",{{end}} opts)
+	return c.clientGetter.{{.plural}}({{ if .namespaced}}namespace{{end}}).Watch(context.TODO(), opts)
 }
 
-func (c *{{.lowerName}}Controller) Patch({{ if .namespaced}}namespace, {{end}}name string, pt types.PatchType, data []byte, subresources ...string) (*{{.version}}.{{.type}}, error) {
-	result := &{{.version}}.{{.type}}{}
-	return result, c.client.Patch(context.TODO(), {{ if .namespaced}}namespace,{{else}}"",{{end}} name, pt, data, result, metav1.PatchOptions{}, subresources...)
+func (c *{{.lowerName}}Controller) Patch({{ if .namespaced}}namespace, {{end}}name string, pt types.PatchType, data []byte, subresources ...string) (result *{{.version}}.{{.type}}, err error) {
+	return c.clientGetter.{{.plural}}({{ if .namespaced}}namespace{{end}}).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type {{.lowerName}}Cache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
+	lister  listers.{{.type}}Lister
+	indexer cache.Indexer
 }
 
 func (c *{{.lowerName}}Cache) Get({{ if .namespaced}}namespace, {{end}}name string) (*{{.version}}.{{.type}}, error) {
-	obj, exists, err := c.indexer.GetByKey({{ if .namespaced }}namespace + "/" + {{end}}name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*{{.version}}.{{.type}}), nil
+	return c.lister.{{ if .namespaced}}{{.plural}}(namespace).{{end}}Get(name)
 }
 
-func (c *{{.lowerName}}Cache) List({{ if .namespaced}}namespace string, {{end}}selector labels.Selector) (ret []*{{.version}}.{{.type}}, err error) {
-	{{ if .namespaced }}
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*{{.version}}.{{.type}}))
-	})
-	{{else}}
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*{{.version}}.{{.type}}))
-	})
-	{{end}}
-	return ret, err
+func (c *{{.lowerName}}Cache) List({{ if .namespaced}}namespace string, {{end}}selector labels.Selector) ([]*{{.version}}.{{.type}}, error) {
+	return c.lister.{{ if .namespaced}}{{.plural}}(namespace).{{end}}List(selector)
 }
 
 func (c *{{.lowerName}}Cache) AddIndexer(indexName string, indexer {{.type}}Indexer) {
@@ -339,7 +333,6 @@ func Register{{.type}}GeneratingHandler(ctx context.Context, controller {{.type}
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
-	controller.OnChange(ctx, name, statusHandler.Remove)
 	Register{{.type}}StatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
@@ -354,7 +347,7 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 		return obj, nil
 	}
 
-	origStatus := obj.Status.DeepCopy()
+	origStatus := obj.Status
 	obj = obj.DeepCopy()
 	newStatus, err := a.handler(obj, obj.Status)
 	if err != nil {
@@ -362,16 +355,16 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 		newStatus = *origStatus.DeepCopy()
 	}
 
+	obj.Status = newStatus
 	if a.condition != "" {
 		if errors.IsConflict(err) {
-			a.condition.SetError(&newStatus, "", nil)
+			a.condition.SetError(obj, "", nil)
 		} else {
-			a.condition.SetError(&newStatus, "", err)
+			a.condition.SetError(obj, "", err)
 		}
 	}
-	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+	if !equality.Semantic.DeepEqual(origStatus, obj.Status) {
 		var newErr error
-		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
@@ -388,28 +381,29 @@ type {{.lowerName}}GeneratingHandler struct {
 	name  string
 }
 
-func (a *{{.lowerName}}GeneratingHandler) Remove(key string, obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
-	if obj != nil {
-		return obj, nil
-	}
-
-	obj = &{{.version}}.{{.type}}{}
-	obj.Namespace, obj.Name = kv.RSplit(key, "/")
-	obj.SetGroupVersionKind(a.gvk)
-
-	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
-		WithOwner(obj).
-		WithSetID(a.name).
-		ApplyObjects()
-}
-
 func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error) {
 	objs, newStatus, err := a.{{.type}}GeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	apply := a.apply
+
+	if !a.opts.DynamicLookup {
+		apply = apply.WithStrictCaching()
+	}
+
+	if !a.opts.AllowCrossNamespace && !a.opts.AllowClusterScoped {
+		apply = apply.WithSetOwnerReference(true, false).
+			WithDefaultNamespace(obj.GetNamespace()).
+			WithListerNamespace(obj.GetNamespace())
+	}
+
+	if !a.opts.AllowClusterScoped {
+		apply = apply.WithRestrictClusterScoped()
+	}
+
+	return newStatus, apply.
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)

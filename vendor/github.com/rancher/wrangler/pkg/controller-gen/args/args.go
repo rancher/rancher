@@ -19,18 +19,10 @@ type Options struct {
 }
 
 type Group struct {
-	Types         []interface{}
-	GenerateTypes bool
-	// Generate clientsets
-	GenerateClients             bool
-	OutputControllerPackageName string
-	// Generate listers
-	GenerateListers bool
-	// Generate informers
-	GenerateInformers bool
-	// The package name of the API types
-	PackageName string
-	// Use existing clientset, informer, listers
+	Types            []interface{}
+	GenerateTypes    bool
+	GenerateClients  bool
+	PackageName      string
 	ClientSetPackage string
 	ListersPackage   string
 	InformersPackage string

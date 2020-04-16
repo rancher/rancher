@@ -19,12 +19,28 @@ limitations under the License.
 package apiregistration
 
 import (
+	"context"
+	"time"
+
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/schemes"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
+	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
+	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions"
 )
 
+func init() {
+	scheme.AddToScheme(schemes.All)
+}
+
 type Factory struct {
-	*generic.Factory
+	synced            bool
+	informerFactory   informers.SharedInformerFactory
+	clientset         clientset.Interface
+	controllerManager *generic.ControllerManager
+	threadiness       map[schema.GroupVersionKind]int
 }
 
 func NewFactoryFromConfigOrDie(config *rest.Config) *Factory {
@@ -36,24 +52,60 @@ func NewFactoryFromConfigOrDie(config *rest.Config) *Factory {
 }
 
 func NewFactoryFromConfig(config *rest.Config) (*Factory, error) {
-	return NewFactoryFromConfigWithOptions(config, nil)
+	cs, err := clientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	informerFactory := informers.NewSharedInformerFactory(cs, 2*time.Hour)
+	return NewFactory(cs, informerFactory), nil
 }
 
 func NewFactoryFromConfigWithNamespace(config *rest.Config, namespace string) (*Factory, error) {
-	return NewFactoryFromConfigWithOptions(config, &FactoryOptions{
-		Namespace: namespace,
-	})
+	if namespace == "" {
+		return NewFactoryFromConfig(config)
+	}
+
+	cs, err := clientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(cs, 2*time.Hour, informers.WithNamespace(namespace))
+	return NewFactory(cs, informerFactory), nil
 }
 
-type FactoryOptions = generic.FactoryOptions
-
-func NewFactoryFromConfigWithOptions(config *rest.Config, opts *FactoryOptions) (*Factory, error) {
-	f, err := generic.NewFactoryFromConfigWithOptions(config, opts)
+func NewFactory(clientset clientset.Interface, informerFactory informers.SharedInformerFactory) *Factory {
 	return &Factory{
-		Factory: f,
-	}, err
+		threadiness:       map[schema.GroupVersionKind]int{},
+		controllerManager: &generic.ControllerManager{},
+		clientset:         clientset,
+		informerFactory:   informerFactory,
+	}
+}
+
+func (c *Factory) Controllers() map[schema.GroupVersionKind]*generic.Controller {
+	return c.controllerManager.Controllers()
+}
+
+func (c *Factory) SetThreadiness(gvk schema.GroupVersionKind, threadiness int) {
+	c.threadiness[gvk] = threadiness
+}
+
+func (c *Factory) Sync(ctx context.Context) error {
+	c.informerFactory.Start(ctx.Done())
+	c.informerFactory.WaitForCacheSync(ctx.Done())
+	return nil
+}
+
+func (c *Factory) Start(ctx context.Context, defaultThreadiness int) error {
+	if err := c.Sync(ctx); err != nil {
+		return err
+	}
+
+	return c.controllerManager.Start(ctx, defaultThreadiness, c.threadiness)
 }
 
 func (c *Factory) Apiregistration() Interface {
-	return New(c.ControllerFactory())
+	return New(c.controllerManager, c.informerFactory.Apiregistration(), c.clientset)
 }

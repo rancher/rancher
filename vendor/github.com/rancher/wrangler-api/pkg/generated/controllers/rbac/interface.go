@@ -19,8 +19,10 @@ limitations under the License.
 package rbac
 
 import (
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/generic"
+	informers "k8s.io/client-go/informers/rbac"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 type Interface interface {
@@ -28,16 +30,21 @@ type Interface interface {
 }
 
 type group struct {
-	controllerFactory controller.SharedControllerFactory
+	controllerManager *generic.ControllerManager
+	informers         informers.Interface
+	client            clientset.Interface
 }
 
 // New returns a new Interface.
-func New(controllerFactory controller.SharedControllerFactory) Interface {
+func New(controllerManager *generic.ControllerManager, informers informers.Interface,
+	client clientset.Interface) Interface {
 	return &group{
-		controllerFactory: controllerFactory,
+		controllerManager: controllerManager,
+		informers:         informers,
+		client:            client,
 	}
 }
 
 func (g *group) V1() v1.Interface {
-	return v1.New(g.controllerFactory)
+	return v1.New(g.controllerManager, g.client.RbacV1(), g.informers.V1())
 }

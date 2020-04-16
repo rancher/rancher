@@ -22,13 +22,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
+	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/management.cattle.io/v3"
+	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/management.cattle.io/v3"
+	listers "github.com/rancher/rancher/pkg/wrangler/generated/listers/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,23 +77,18 @@ type ClusterCache interface {
 type ClusterIndexer func(obj *v3.Cluster) ([]string, error)
 
 type clusterController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+	controllerManager *generic.ControllerManager
+	clientGetter      clientset.ClustersGetter
+	informer          informers.ClusterInformer
+	gvk               schema.GroupVersionKind
 }
 
-func NewClusterController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) ClusterController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewClusterController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.ClustersGetter, informer informers.ClusterInformer) ClusterController {
 	return &clusterController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+		controllerManager: controllerManager,
+		clientGetter:      clientGetter,
+		informer:          informer,
+		gvk:               gvk,
 	}
 }
 
@@ -140,11 +135,12 @@ func UpdateClusterDeepCopyOnChange(client ClusterClient, obj *v3.Cluster, handle
 }
 
 func (c *clusterController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
 }
 
 func (c *clusterController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
 }
 
 func (c *clusterController) OnChange(ctx context.Context, name string, sync ClusterHandler) {
@@ -152,19 +148,20 @@ func (c *clusterController) OnChange(ctx context.Context, name string, sync Clus
 }
 
 func (c *clusterController) OnRemove(ctx context.Context, name string, sync ClusterHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromClusterHandlerToHandler(sync)))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromClusterHandlerToHandler(sync))
+	c.AddGenericHandler(ctx, name, removeHandler)
 }
 
 func (c *clusterController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
+	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), "", name)
 }
 
 func (c *clusterController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
+	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), "", name, duration)
 }
 
 func (c *clusterController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
+	return c.informer.Informer()
 }
 
 func (c *clusterController) GroupVersionKind() schema.GroupVersionKind {
@@ -173,75 +170,57 @@ func (c *clusterController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *clusterController) Cache() ClusterCache {
 	return &clusterCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
+		lister:  c.informer.Lister(),
+		indexer: c.informer.Informer().GetIndexer(),
 	}
 }
 
 func (c *clusterController) Create(obj *v3.Cluster) (*v3.Cluster, error) {
-	result := &v3.Cluster{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
+	return c.clientGetter.Clusters().Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *clusterController) Update(obj *v3.Cluster) (*v3.Cluster, error) {
-	result := &v3.Cluster{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.Clusters().Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *clusterController) UpdateStatus(obj *v3.Cluster) (*v3.Cluster, error) {
-	result := &v3.Cluster{}
-	return result, c.client.UpdateStatus(context.TODO(), "", obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.Clusters().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *clusterController) Delete(name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.client.Delete(context.TODO(), "", name, *options)
+	return c.clientGetter.Clusters().Delete(context.TODO(), name, *options)
 }
 
 func (c *clusterController) Get(name string, options metav1.GetOptions) (*v3.Cluster, error) {
-	result := &v3.Cluster{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
+	return c.clientGetter.Clusters().Get(context.TODO(), name, options)
 }
 
 func (c *clusterController) List(opts metav1.ListOptions) (*v3.ClusterList, error) {
-	result := &v3.ClusterList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
+	return c.clientGetter.Clusters().List(context.TODO(), opts)
 }
 
 func (c *clusterController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
+	return c.clientGetter.Clusters().Watch(context.TODO(), opts)
 }
 
-func (c *clusterController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.Cluster, error) {
-	result := &v3.Cluster{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
+func (c *clusterController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Cluster, err error) {
+	return c.clientGetter.Clusters().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type clusterCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
+	lister  listers.ClusterLister
+	indexer cache.Indexer
 }
 
 func (c *clusterCache) Get(name string) (*v3.Cluster, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.Cluster), nil
+	return c.lister.Get(name)
 }
 
-func (c *clusterCache) List(selector labels.Selector) (ret []*v3.Cluster, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.Cluster))
-	})
-
-	return ret, err
+func (c *clusterCache) List(selector labels.Selector) ([]*v3.Cluster, error) {
+	return c.lister.List(selector)
 }
 
 func (c *clusterCache) AddIndexer(indexName string, indexer ClusterIndexer) {
@@ -288,7 +267,6 @@ func RegisterClusterGeneratingHandler(ctx context.Context, controller ClusterCon
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
-	controller.OnChange(ctx, name, statusHandler.Remove)
 	RegisterClusterStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
@@ -303,7 +281,7 @@ func (a *clusterStatusHandler) sync(key string, obj *v3.Cluster) (*v3.Cluster, e
 		return obj, nil
 	}
 
-	origStatus := obj.Status.DeepCopy()
+	origStatus := obj.Status
 	obj = obj.DeepCopy()
 	newStatus, err := a.handler(obj, obj.Status)
 	if err != nil {
@@ -311,16 +289,16 @@ func (a *clusterStatusHandler) sync(key string, obj *v3.Cluster) (*v3.Cluster, e
 		newStatus = *origStatus.DeepCopy()
 	}
 
+	obj.Status = newStatus
 	if a.condition != "" {
 		if errors.IsConflict(err) {
-			a.condition.SetError(&newStatus, "", nil)
+			a.condition.SetError(obj, "", nil)
 		} else {
-			a.condition.SetError(&newStatus, "", err)
+			a.condition.SetError(obj, "", err)
 		}
 	}
-	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+	if !equality.Semantic.DeepEqual(origStatus, obj.Status) {
 		var newErr error
-		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
@@ -337,28 +315,29 @@ type clusterGeneratingHandler struct {
 	name  string
 }
 
-func (a *clusterGeneratingHandler) Remove(key string, obj *v3.Cluster) (*v3.Cluster, error) {
-	if obj != nil {
-		return obj, nil
-	}
-
-	obj = &v3.Cluster{}
-	obj.Namespace, obj.Name = kv.RSplit(key, "/")
-	obj.SetGroupVersionKind(a.gvk)
-
-	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
-		WithOwner(obj).
-		WithSetID(a.name).
-		ApplyObjects()
-}
-
 func (a *clusterGeneratingHandler) Handle(obj *v3.Cluster, status v3.ClusterStatus) (v3.ClusterStatus, error) {
 	objs, newStatus, err := a.ClusterGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	apply := a.apply
+
+	if !a.opts.DynamicLookup {
+		apply = apply.WithStrictCaching()
+	}
+
+	if !a.opts.AllowCrossNamespace && !a.opts.AllowClusterScoped {
+		apply = apply.WithSetOwnerReference(true, false).
+			WithDefaultNamespace(obj.GetNamespace()).
+			WithListerNamespace(obj.GetNamespace())
+	}
+
+	if !a.opts.AllowClusterScoped {
+		apply = apply.WithRestrictClusterScoped()
+	}
+
+	return newStatus, apply.
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)

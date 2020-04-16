@@ -22,13 +22,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
+	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/management.cattle.io/v3"
+	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/management.cattle.io/v3"
+	listers "github.com/rancher/rancher/pkg/wrangler/generated/listers/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,23 +77,18 @@ type UserCache interface {
 type UserIndexer func(obj *v3.User) ([]string, error)
 
 type userController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+	controllerManager *generic.ControllerManager
+	clientGetter      clientset.UsersGetter
+	informer          informers.UserInformer
+	gvk               schema.GroupVersionKind
 }
 
-func NewUserController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) UserController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewUserController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.UsersGetter, informer informers.UserInformer) UserController {
 	return &userController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+		controllerManager: controllerManager,
+		clientGetter:      clientGetter,
+		informer:          informer,
+		gvk:               gvk,
 	}
 }
 
@@ -140,11 +135,12 @@ func UpdateUserDeepCopyOnChange(client UserClient, obj *v3.User, handler func(ob
 }
 
 func (c *userController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
 }
 
 func (c *userController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
 }
 
 func (c *userController) OnChange(ctx context.Context, name string, sync UserHandler) {
@@ -152,19 +148,20 @@ func (c *userController) OnChange(ctx context.Context, name string, sync UserHan
 }
 
 func (c *userController) OnRemove(ctx context.Context, name string, sync UserHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromUserHandlerToHandler(sync)))
+	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromUserHandlerToHandler(sync))
+	c.AddGenericHandler(ctx, name, removeHandler)
 }
 
 func (c *userController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
+	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), "", name)
 }
 
 func (c *userController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
+	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), "", name, duration)
 }
 
 func (c *userController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
+	return c.informer.Informer()
 }
 
 func (c *userController) GroupVersionKind() schema.GroupVersionKind {
@@ -173,75 +170,57 @@ func (c *userController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *userController) Cache() UserCache {
 	return &userCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
+		lister:  c.informer.Lister(),
+		indexer: c.informer.Informer().GetIndexer(),
 	}
 }
 
 func (c *userController) Create(obj *v3.User) (*v3.User, error) {
-	result := &v3.User{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
+	return c.clientGetter.Users().Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (c *userController) Update(obj *v3.User) (*v3.User, error) {
-	result := &v3.User{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.Users().Update(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *userController) UpdateStatus(obj *v3.User) (*v3.User, error) {
-	result := &v3.User{}
-	return result, c.client.UpdateStatus(context.TODO(), "", obj, result, metav1.UpdateOptions{})
+	return c.clientGetter.Users().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
 }
 
 func (c *userController) Delete(name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.client.Delete(context.TODO(), "", name, *options)
+	return c.clientGetter.Users().Delete(context.TODO(), name, *options)
 }
 
 func (c *userController) Get(name string, options metav1.GetOptions) (*v3.User, error) {
-	result := &v3.User{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
+	return c.clientGetter.Users().Get(context.TODO(), name, options)
 }
 
 func (c *userController) List(opts metav1.ListOptions) (*v3.UserList, error) {
-	result := &v3.UserList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
+	return c.clientGetter.Users().List(context.TODO(), opts)
 }
 
 func (c *userController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
+	return c.clientGetter.Users().Watch(context.TODO(), opts)
 }
 
-func (c *userController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.User, error) {
-	result := &v3.User{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
+func (c *userController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.User, err error) {
+	return c.clientGetter.Users().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 type userCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
+	lister  listers.UserLister
+	indexer cache.Indexer
 }
 
 func (c *userCache) Get(name string) (*v3.User, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.User), nil
+	return c.lister.Get(name)
 }
 
-func (c *userCache) List(selector labels.Selector) (ret []*v3.User, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.User))
-	})
-
-	return ret, err
+func (c *userCache) List(selector labels.Selector) ([]*v3.User, error) {
+	return c.lister.List(selector)
 }
 
 func (c *userCache) AddIndexer(indexName string, indexer UserIndexer) {
@@ -288,7 +267,6 @@ func RegisterUserGeneratingHandler(ctx context.Context, controller UserControlle
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
-	controller.OnChange(ctx, name, statusHandler.Remove)
 	RegisterUserStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
@@ -303,7 +281,7 @@ func (a *userStatusHandler) sync(key string, obj *v3.User) (*v3.User, error) {
 		return obj, nil
 	}
 
-	origStatus := obj.Status.DeepCopy()
+	origStatus := obj.Status
 	obj = obj.DeepCopy()
 	newStatus, err := a.handler(obj, obj.Status)
 	if err != nil {
@@ -311,16 +289,16 @@ func (a *userStatusHandler) sync(key string, obj *v3.User) (*v3.User, error) {
 		newStatus = *origStatus.DeepCopy()
 	}
 
+	obj.Status = newStatus
 	if a.condition != "" {
 		if errors.IsConflict(err) {
-			a.condition.SetError(&newStatus, "", nil)
+			a.condition.SetError(obj, "", nil)
 		} else {
-			a.condition.SetError(&newStatus, "", err)
+			a.condition.SetError(obj, "", err)
 		}
 	}
-	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+	if !equality.Semantic.DeepEqual(origStatus, obj.Status) {
 		var newErr error
-		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
@@ -337,28 +315,29 @@ type userGeneratingHandler struct {
 	name  string
 }
 
-func (a *userGeneratingHandler) Remove(key string, obj *v3.User) (*v3.User, error) {
-	if obj != nil {
-		return obj, nil
-	}
-
-	obj = &v3.User{}
-	obj.Namespace, obj.Name = kv.RSplit(key, "/")
-	obj.SetGroupVersionKind(a.gvk)
-
-	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
-		WithOwner(obj).
-		WithSetID(a.name).
-		ApplyObjects()
-}
-
 func (a *userGeneratingHandler) Handle(obj *v3.User, status v3.UserStatus) (v3.UserStatus, error) {
 	objs, newStatus, err := a.UserGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	apply := a.apply
+
+	if !a.opts.DynamicLookup {
+		apply = apply.WithStrictCaching()
+	}
+
+	if !a.opts.AllowCrossNamespace && !a.opts.AllowClusterScoped {
+		apply = apply.WithSetOwnerReference(true, false).
+			WithDefaultNamespace(obj.GetNamespace()).
+			WithListerNamespace(obj.GetNamespace())
+	}
+
+	if !a.opts.AllowClusterScoped {
+		apply = apply.WithRestrictClusterScoped()
+	}
+
+	return newStatus, apply.
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)

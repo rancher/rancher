@@ -19,34 +19,35 @@ limitations under the License.
 package v3
 
 import (
-	"github.com/rancher/lasso/pkg/controller"
+	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/management.cattle.io/v3"
+	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/wrangler/pkg/schemes"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"github.com/rancher/wrangler/pkg/generic"
 )
-
-func init() {
-	v3.AddToScheme(schemes.All)
-}
 
 type Interface interface {
 	Cluster() ClusterController
 	User() UserController
 }
 
-func New(controllerFactory controller.SharedControllerFactory) Interface {
+func New(controllerManager *generic.ControllerManager, client clientset.ManagementV3Interface,
+	informers informers.Interface) Interface {
 	return &version{
-		controllerFactory: controllerFactory,
+		controllerManager: controllerManager,
+		client:            client,
+		informers:         informers,
 	}
 }
 
 type version struct {
-	controllerFactory controller.SharedControllerFactory
+	controllerManager *generic.ControllerManager
+	informers         informers.Interface
+	client            clientset.ManagementV3Interface
 }
 
 func (c *version) Cluster() ClusterController {
-	return NewClusterController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", c.controllerFactory)
+	return NewClusterController(v3.SchemeGroupVersion.WithKind("Cluster"), c.controllerManager, c.client, c.informers.Clusters())
 }
 func (c *version) User() UserController {
-	return NewUserController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "User"}, "users", c.controllerFactory)
+	return NewUserController(v3.SchemeGroupVersion.WithKind("User"), c.controllerManager, c.client, c.informers.Users())
 }

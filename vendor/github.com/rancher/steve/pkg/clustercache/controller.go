@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schemaserver/types"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/rancher/wrangler/pkg/summary/client"
 	"github.com/rancher/wrangler/pkg/summary/informer"
@@ -50,11 +51,12 @@ type watcher struct {
 type clusterCache struct {
 	sync.RWMutex
 
-	ctx             context.Context
-	typed           map[schema2.GroupVersionKind]cache.SharedIndexInformer
-	informerFactory informer.SummarySharedInformerFactory
-	watchers        map[schema2.GroupVersionResource]*watcher
-	workqueue       workqueue.DelayingInterface
+	ctx               context.Context
+	typed             map[schema2.GroupVersionKind]cache.SharedIndexInformer
+	informerFactory   informer.SummarySharedInformerFactory
+	controllerFactory generic.ControllerManager
+	watchers          map[schema2.GroupVersionResource]*watcher
+	workqueue         workqueue.DelayingInterface
 
 	addHandlers    cancelCollection
 	removeHandlers cancelCollection
@@ -190,11 +192,15 @@ func (h *clusterCache) OnSchemas(schemas *schema.Collection) error {
 		cache.WaitForCacheSync(w.ctx.Done(), w.informer.HasSynced)
 	}
 
+	var errs []error
 	for _, w := range toStart {
+		if err := h.controllerFactory.EnsureStart(w.ctx, w.gvk, 5); err != nil {
+			errs = append(errs, err)
+		}
 		h.watchers[w.gvr] = w
 	}
 
-	return nil
+	return merr.NewErrors(errs...)
 }
 
 func (h *clusterCache) List(gvr schema2.GroupVersionResource) []interface{} {
@@ -210,7 +216,6 @@ func (h *clusterCache) List(gvr schema2.GroupVersionResource) []interface{} {
 }
 
 func (h *clusterCache) start() {
-	defer h.workqueue.ShutDown()
 	for {
 		eventObj, ok := h.workqueue.Get()
 		if ok {
@@ -222,7 +227,6 @@ func (h *clusterCache) start() {
 		w := h.watchers[event.gvr]
 		h.RUnlock()
 		if w == nil {
-			h.workqueue.Done(eventObj)
 			continue
 		}
 
@@ -243,7 +247,6 @@ func (h *clusterCache) start() {
 				logrus.Errorf("failed to handle remove event: %v", err)
 			}
 		}
-		h.workqueue.Done(eventObj)
 	}
 }
 

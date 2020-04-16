@@ -37,8 +37,12 @@ func (f *registerGroupVersionGo) Imports(*generator.Context) []string {
 	firstType := f.customArgs.TypesByGroup[f.gv][0]
 	typeGroupPath := strings.TrimSuffix(firstType.Package, "/"+f.gv.Version)
 
-	packages := append(Imports,
-		fmt.Sprintf("%s \"%s\"", groupPath(f.gv.Group), typeGroupPath))
+	packages := []string{
+		"metav1 \"k8s.io/apimachinery/pkg/apis/meta/v1\"",
+		"k8s.io/apimachinery/pkg/runtime",
+		"k8s.io/apimachinery/pkg/runtime/schema",
+		fmt.Sprintf("%s \"%s\"", groupPath(f.gv.Group), typeGroupPath),
+	}
 
 	return packages
 }

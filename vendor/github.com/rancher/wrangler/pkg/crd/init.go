@@ -3,7 +3,6 @@ package crd
 import (
 	"context"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +16,7 @@ import (
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -53,107 +52,8 @@ func (c CRD) WithSchemaFromStruct(obj interface{}) CRD {
 	return c
 }
 
-func (c CRD) WithColumn(name, path string) CRD {
-	c.Columns = append(c.Columns, v1beta1.CustomResourceColumnDefinition{
-		Name:     name,
-		Type:     "string",
-		Priority: 0,
-		JSONPath: path,
-	})
-	return c
-}
-
-func getType(obj interface{}) reflect.Type {
-	if t, ok := obj.(reflect.Type); ok {
-		return t
-	}
-
-	t := reflect.TypeOf(obj)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	return t
-}
-
-func (c CRD) WithColumnsFromStruct(obj interface{}) CRD {
-	c.Columns = append(c.Columns, readCustomColumns(getType(obj), ".")...)
-	return c
-}
-
-func fieldName(f reflect.StructField) string {
-	jsonTag := f.Tag.Get("json")
-	if jsonTag == "-" {
-		return ""
-	}
-	name := strings.Split(jsonTag, ",")[0]
-	if name == "" {
-		return f.Name
-	}
-	return name
-}
-
-func tagToColumn(f reflect.StructField) (v1beta1.CustomResourceColumnDefinition, bool) {
-	c := v1beta1.CustomResourceColumnDefinition{
-		Name: f.Name,
-		Type: "string",
-	}
-
-	columnDef, ok := f.Tag.Lookup("column")
-	if !ok {
-		return c, false
-	}
-
-	for k, v := range kv.SplitMap(columnDef, ",") {
-		switch k {
-		case "name":
-			c.Name = v
-		case "type":
-			c.Type = v
-		case "format":
-			c.Format = v
-		case "description":
-			c.Description = v
-		case "priority":
-			p, _ := strconv.Atoi(v)
-			c.Priority = int32(p)
-		case "jsonpath":
-			c.JSONPath = v
-		}
-	}
-
-	return c, true
-}
-
-func readCustomColumns(t reflect.Type, path string) (result []v1beta1.CustomResourceColumnDefinition) {
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		fieldName := fieldName(f)
-		if fieldName == "" {
-			continue
-		}
-
-		t := f.Type
-		if t.Kind() == reflect.Ptr {
-			t = t.Elem()
-		}
-		if t.Kind() == reflect.Struct {
-			if f.Anonymous {
-				result = append(result, readCustomColumns(t, path)...)
-			} else {
-				result = append(result, readCustomColumns(t, path+"."+fieldName)...)
-			}
-		} else {
-			if col, ok := tagToColumn(f); ok {
-				result = append(result, col)
-			}
-		}
-	}
-
-	return result
-}
-
-func (c CRD) WithCustomColumn(columns ...v1beta1.CustomResourceColumnDefinition) CRD {
-	c.Columns = append(c.Columns, columns...)
+func (c CRD) WithCustomColumn(columns []v1beta1.CustomResourceColumnDefinition) CRD {
+	c.Columns = columns
 	return c
 }
 
@@ -179,7 +79,10 @@ func (c CRD) WithShortNames(shortNames ...string) CRD {
 
 func (c CRD) ToCustomResourceDefinition() (apiext.CustomResourceDefinition, error) {
 	if c.SchemaObject != nil && c.GVK.Kind == "" {
-		t := getType(c.SchemaObject)
+		t := reflect.TypeOf(c.SchemaObject)
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
 		c.GVK.Kind = t.Name()
 	}
 
@@ -347,13 +250,6 @@ func (f *Factory) CreateCRDs(ctx context.Context, crds ...CRD) (map[schema.Group
 		return nil, nil
 	}
 
-	if ok, err := f.ensureAccess(ctx); err != nil {
-		return nil, err
-	} else if !ok {
-		logrus.Infof("No access to list CRDs, assuming CRDs are pre-created.")
-		return nil, err
-	}
-
 	crdStatus := map[schema.GroupVersionKind]*apiext.CustomResourceDefinition{}
 
 	ready, err := f.getReadyCRDs(ctx)
@@ -436,7 +332,6 @@ func (f *Factory) createCRD(ctx context.Context, crdDef CRD, ready map[string]*a
 	if ok {
 		if !equality.Semantic.DeepEqual(crd.Spec.Subresources, existing.Spec.Subresources) ||
 			!equality.Semantic.DeepEqual(crd.Spec.Validation, existing.Spec.Validation) ||
-			!equality.Semantic.DeepEqual(crd.Spec.AdditionalPrinterColumns, existing.Spec.AdditionalPrinterColumns) ||
 			!equality.Semantic.DeepEqual(crd.Spec.Versions, existing.Spec.Versions) {
 			existing.Spec = crd.Spec
 			logrus.Infof("Updating CRD %s", crd.Name)
@@ -446,21 +341,13 @@ func (f *Factory) createCRD(ctx context.Context, crdDef CRD, ready map[string]*a
 	}
 
 	logrus.Infof("Creating CRD %s", crd.Name)
-	if newCrd, err := f.CRDClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(ctx, &crd, metav1.CreateOptions{}); apierrors.IsAlreadyExists(err) {
+	if newCrd, err := f.CRDClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(ctx, &crd, metav1.CreateOptions{}); errors.IsAlreadyExists(err) {
 		return f.CRDClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
 	} else if err != nil {
 		return nil, err
 	} else {
 		return newCrd, nil
 	}
-}
-
-func (f *Factory) ensureAccess(ctx context.Context) (bool, error) {
-	_, err := f.CRDClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{})
-	if apierrors.IsForbidden(err) {
-		return false, nil
-	}
-	return true, err
 }
 
 func (f *Factory) getReadyCRDs(ctx context.Context) (map[string]*apiext.CustomResourceDefinition, error) {

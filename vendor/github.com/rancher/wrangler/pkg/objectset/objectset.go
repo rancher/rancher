@@ -34,8 +34,6 @@ func (o ObjectKey) String() string {
 	return fmt.Sprintf("%s/%s", o.Namespace, o.Name)
 }
 
-type ObjectKeyByGVK map[schema.GroupVersionKind][]ObjectKey
-
 type ObjectByGVK map[schema.GroupVersionKind]map[ObjectKey]runtime.Object
 
 func (o ObjectByGVK) Add(obj runtime.Object) (schema.GroupVersionKind, error) {
@@ -71,19 +69,14 @@ type ObjectSet struct {
 	gvkSeen  map[schema.GroupVersionKind]bool
 }
 
-func NewObjectSet(objs ...runtime.Object) *ObjectSet {
-	os := &ObjectSet{
+func NewObjectSet() *ObjectSet {
+	return &ObjectSet{
 		objects: ObjectByGVK{},
 		gvkSeen: map[schema.GroupVersionKind]bool{},
 	}
-	os.Add(objs...)
-	return os
 }
 
 func (o *ObjectSet) ObjectsByGVK() ObjectByGVK {
-	if o == nil {
-		return nil
-	}
 	return o.objects
 }
 
@@ -131,10 +124,6 @@ func (o *ObjectSet) Err() error {
 
 func (o *ObjectSet) Len() int {
 	return len(o.objects)
-}
-
-func (o *ObjectSet) GVKs() []schema.GroupVersionKind {
-	return o.GVKOrder()
 }
 
 func (o *ObjectSet) GVKOrder(known ...schema.GroupVersionKind) []schema.GroupVersionKind {
