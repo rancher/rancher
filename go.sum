@@ -914,8 +914,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200401220414-61a905156cd1 h1:v8mG8hHFVrhxTUAp45rAu/adLNrT3i0qOsaGdA6LnHw=
-github.com/rancher/steve v0.0.0-20200401220414-61a905156cd1/go.mod h1:jXe4ExvrdAAKwdfk3ROJ9HAYo2aqeuUD6nvSqowlqJ8=
+github.com/rancher/steve v0.0.0-20200416160046-0a5d0fbca1bc h1:mbebLrq/GG+5x0OWYTt4K69jwWHqync0sthet9or5/o=
+github.com/rancher/steve v0.0.0-20200416160046-0a5d0fbca1bc/go.mod h1:jXe4ExvrdAAKwdfk3ROJ9HAYo2aqeuUD6nvSqowlqJ8=
 github.com/rancher/system-upgrade-controller v0.3.1 h1:SpDStISy1haw05OCTGVEDw+WAo23jnpXVOh/60YlD70=
 github.com/rancher/system-upgrade-controller v0.3.1/go.mod h1:/2W/8WEqCSrz66hOYr3vjMRsIsgyWdToqO1hEVRvvLg=
 github.com/rancher/types v0.0.0-20200303162837-300a04e6f743/go.mod h1:k5LoTlUpefw0eAzFSJsZI0gf+C4WE41yrc1jm/MS1nM=
@@ -930,6 +930,8 @@ github.com/rancher/wrangler v0.4.1/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU
 github.com/rancher/wrangler v0.5.0/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
 github.com/rancher/wrangler v0.5.3 h1:wbacrpVWJAAB9aSyHC4IELx5bLZFy/7G4bGZKPFfGIA=
 github.com/rancher/wrangler v0.5.3/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
+github.com/rancher/wrangler v0.5.4-0.20200416040824-c6b27139593f h1:PAxpXR9NO1hfUxoyfow/6cB1Tdl08sR2smJeCR9BD/c=
+github.com/rancher/wrangler v0.5.4-0.20200416040824-c6b27139593f/go.mod h1:txHSBkPtVgNH/0pUCvdP0Ak0HptAOc9ffBmFxQnL4z4=
 github.com/rancher/wrangler-api v0.2.0/go.mod h1:zTPdNLZO07KvRaVOx6XQbKBSV55Fnn4s7nqmrMPJqd8=
 github.com/rancher/wrangler-api v0.2.1-0.20191025043713-b1ca9c21825a/go.mod h1:U4nfgObQ7EERMwljGhCfQIbh2ql/t8suINX8/VfWiko=
 github.com/rancher/wrangler-api v0.5.0 h1:ScVozf5SjRLW0UzOka9xzdlTJ99vLR/Gbk4/kIY49GY=

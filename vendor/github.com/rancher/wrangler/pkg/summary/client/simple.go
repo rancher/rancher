@@ -89,7 +89,10 @@ func (c *summaryResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 	go func() {
 		defer close(eventChan)
 		for event := range resp.ResultChan() {
-			event.Object = summary.Summarized(event.Object)
+			// don't encode status objects
+			if _, ok := event.Object.(*metav1.Status); !ok {
+				event.Object = summary.Summarized(event.Object)
+			}
 			eventChan <- event
 		}
 	}()
