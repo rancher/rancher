@@ -22,9 +22,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,9 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	informers "k8s.io/client-go/informers/rbac/v1"
-	clientset "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -74,18 +74,23 @@ type RoleCache interface {
 type RoleIndexer func(obj *v1.Role) ([]string, error)
 
 type roleController struct {
-	controllerManager *generic.ControllerManager
-	clientGetter      clientset.RolesGetter
-	informer          informers.RoleInformer
-	gvk               schema.GroupVersionKind
+	controller    controller.SharedController
+	client        *client.Client
+	gvk           schema.GroupVersionKind
+	groupResource schema.GroupResource
 }
 
-func NewRoleController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.RolesGetter, informer informers.RoleInformer) RoleController {
+func NewRoleController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) RoleController {
+	c, err := controller.ForKind(gvk)
+	utilruntime.Must(err)
 	return &roleController{
-		controllerManager: controllerManager,
-		clientGetter:      clientGetter,
-		informer:          informer,
-		gvk:               gvk,
+		controller: c,
+		client:     c.Client(),
+		gvk:        gvk,
+		groupResource: schema.GroupResource{
+			Group:    gvk.Group,
+			Resource: resource,
+		},
 	}
 }
 
@@ -132,12 +137,11 @@ func UpdateRoleDeepCopyOnChange(client RoleClient, obj *v1.Role, handler func(ob
 }
 
 func (c *roleController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
+	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
 func (c *roleController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
 }
 
 func (c *roleController) OnChange(ctx context.Context, name string, sync RoleHandler) {
@@ -145,20 +149,19 @@ func (c *roleController) OnChange(ctx context.Context, name string, sync RoleHan
 }
 
 func (c *roleController) OnRemove(ctx context.Context, name string, sync RoleHandler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromRoleHandlerToHandler(sync))
-	c.AddGenericHandler(ctx, name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromRoleHandlerToHandler(sync)))
 }
 
 func (c *roleController) Enqueue(namespace, name string) {
-	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), namespace, name)
+	c.controller.Enqueue(namespace, name)
 }
 
 func (c *roleController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), namespace, name, duration)
+	c.controller.EnqueueAfter(namespace, name, duration)
 }
 
 func (c *roleController) Informer() cache.SharedIndexInformer {
-	return c.informer.Informer()
+	return c.controller.Informer()
 }
 
 func (c *roleController) GroupVersionKind() schema.GroupVersionKind {
@@ -167,53 +170,70 @@ func (c *roleController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *roleController) Cache() RoleCache {
 	return &roleCache{
-		lister:  c.informer.Lister(),
-		indexer: c.informer.Informer().GetIndexer(),
+		indexer:  c.Informer().GetIndexer(),
+		resource: c.groupResource,
 	}
 }
 
 func (c *roleController) Create(obj *v1.Role) (*v1.Role, error) {
-	return c.clientGetter.Roles(obj.Namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+	result := &v1.Role{}
+	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
 }
 
 func (c *roleController) Update(obj *v1.Role) (*v1.Role, error) {
-	return c.clientGetter.Roles(obj.Namespace).Update(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1.Role{}
+	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
 func (c *roleController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.clientGetter.Roles(namespace).Delete(context.TODO(), name, *options)
+	return c.client.Delete(context.TODO(), namespace, name, *options)
 }
 
 func (c *roleController) Get(namespace, name string, options metav1.GetOptions) (*v1.Role, error) {
-	return c.clientGetter.Roles(namespace).Get(context.TODO(), name, options)
+	result := &v1.Role{}
+	return result, c.client.Get(context.TODO(), namespace, name, result, options)
 }
 
 func (c *roleController) List(namespace string, opts metav1.ListOptions) (*v1.RoleList, error) {
-	return c.clientGetter.Roles(namespace).List(context.TODO(), opts)
+	result := &v1.RoleList{}
+	return result, c.client.List(context.TODO(), namespace, result, opts)
 }
 
 func (c *roleController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.Roles(namespace).Watch(context.TODO(), opts)
+	return c.client.Watch(context.TODO(), namespace, opts)
 }
 
-func (c *roleController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Role, err error) {
-	return c.clientGetter.Roles(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
+func (c *roleController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Role, error) {
+	result := &v1.Role{}
+	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
 type roleCache struct {
-	lister  listers.RoleLister
-	indexer cache.Indexer
+	indexer  cache.Indexer
+	resource schema.GroupResource
 }
 
 func (c *roleCache) Get(namespace, name string) (*v1.Role, error) {
-	return c.lister.Roles(namespace).Get(name)
+	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(c.resource, name)
+	}
+	return obj.(*v1.Role), nil
 }
 
-func (c *roleCache) List(namespace string, selector labels.Selector) ([]*v1.Role, error) {
-	return c.lister.Roles(namespace).List(selector)
+func (c *roleCache) List(namespace string, selector labels.Selector) (ret []*v1.Role, err error) {
+
+	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Role))
+	})
+
+	return ret, err
 }
 
 func (c *roleCache) AddIndexer(indexName string, indexer RoleIndexer) {

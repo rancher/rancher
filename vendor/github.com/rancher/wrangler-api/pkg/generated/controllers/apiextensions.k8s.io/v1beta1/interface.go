@@ -19,31 +19,30 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/schemes"
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+func init() {
+	v1beta1.AddToScheme(schemes.All)
+}
 
 type Interface interface {
 	CustomResourceDefinition() CustomResourceDefinitionController
 }
 
-func New(controllerManager *generic.ControllerManager, client clientset.ApiextensionsV1beta1Interface,
-	informers informers.Interface) Interface {
+func New(controllerFactory controller.SharedControllerFactory) Interface {
 	return &version{
-		controllerManager: controllerManager,
-		client:            client,
-		informers:         informers,
+		controllerFactory: controllerFactory,
 	}
 }
 
 type version struct {
-	controllerManager *generic.ControllerManager
-	informers         informers.Interface
-	client            clientset.ApiextensionsV1beta1Interface
+	controllerFactory controller.SharedControllerFactory
 }
 
 func (c *version) CustomResourceDefinition() CustomResourceDefinitionController {
-	return NewCustomResourceDefinitionController(v1beta1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), c.controllerManager, c.client, c.informers.CustomResourceDefinitions())
+	return NewCustomResourceDefinitionController(schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1beta1", Kind: "CustomResourceDefinition"}, "customresourcedefinitions", c.controllerFactory)
 }
