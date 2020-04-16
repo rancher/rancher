@@ -19,6 +19,7 @@ metadata:
     {{- $certmanagerVer :=  split "." .Values.certmanager.version -}}
     {{- if or (.Capabilities.APIVersions.Has "cert-manager.io/v1alpha2") (and (eq (int $certmanagerVer._0) 0) (ge (int $certmanagerVer._1) 11)) }}
     cert-manager.io/issuer: {{ template "rancher.fullname" . }}
+    cert-manager.io/issuer-kind: Issuer
     {{- else if or (.Capabilities.APIVersions.Has "certmanager.k8s.io/v1alpha1") (and (eq (int $certmanagerVer._0) 0) (lt (int $certmanagerVer._1) 11)) }}
     certmanager.k8s.io/issuer: {{ template "rancher.fullname" . }}
     {{- end }}
