@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/store/storageclass"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,7 +29,10 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 
 	storageClass, err := c.Storage.StorageClasses("").Get(storageClassID, v1.GetOptions{})
 	if err != nil {
-		return err
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		return nil
 	}
 
 	// if the referenced storage class does not have a storageaccounttype, storage account creation will fail in k8s
