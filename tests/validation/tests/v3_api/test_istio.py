@@ -84,7 +84,6 @@ namespace = {"app_client": None, "app_ns": None, "gateway_url": None,
              "system_ns": None, "system_project": None,
              "istio_version": None, "istio_app": None}
 
-AUTH_ADMIN_USER = load_setup_data()["admin_user"]
 
 crd_test_data = [
     ("policy.authentication.istio.io", "authenticationpolicy.yaml"),
@@ -864,7 +863,7 @@ def update_answers():
             }
             answers.update(additional_answers)
         elif answer_type == "allow_group_access":
-            auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+            auth_admin = login_as_auth_user(load_setup_data()["admin_user"],
                                             AUTH_USER_PASSWORD)
             group_id = get_group_principal_id(group, token=auth_admin['token'])
             additional_answers = {
@@ -953,7 +952,7 @@ def create_project_client(request):
     admin_client = get_admin_client()
     ad_enabled = admin_client.by_id_auth_config("activedirectory").enabled
     if AUTH_PROVIDER == "activeDirectory" and not ad_enabled:
-        enable_ad(AUTH_ADMIN_USER, ADMIN_TOKEN, 
+        enable_ad(load_setup_data()["admin_user"], ADMIN_TOKEN, 
                   password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
 
     projects = client.list_project(name='System', clusterId=cluster.id)

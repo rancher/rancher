@@ -162,7 +162,6 @@ NESTED_GROUP_ENABLED = ast.literal_eval(
 # Admin Auth username and the shared password for all auth users
 AUTH_USER_PASSWORD = os.environ.get('RANCHER_AUTH_USER_PASSWORD', "")
 
-
 # the link to log in as an auth user
 LOGIN_AS_AUTH_USER_URL = \
     CATTLE_TEST_URL + "/v3-public/" \

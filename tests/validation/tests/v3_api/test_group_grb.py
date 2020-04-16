@@ -17,8 +17,6 @@ BRANCH = "dev"
 URL = "https://git.rancher.io/system-charts"
 # the link to search principals in the auth provider
 
-AUTH_ADMIN_USER = load_setup_data()["admin_user"]
-
 
 @if_test_group_rbac
 def test_ggrb_1(remove_resource):
@@ -35,7 +33,7 @@ def test_ggrb_1(remove_resource):
     # check that users can not create catalogs
     for user in users:
         validate_permission_create_catalog(user, False)
-    auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+    auth_admin = login_as_auth_user(load_setup_data()["admin_user"],
                                     AUTH_USER_PASSWORD)
     g_id = get_group_principal_id(target_group_name, token=auth_admin['token'])
     ggrb = get_admin_client().create_global_role_binding(
@@ -78,7 +76,7 @@ def test_ggrb_2(remove_resource):
                                              template=TEMPLATE_MANAGE_CATALOG)
     gr = admin_c.create_global_role(template)
     remove_resource(gr)
-    auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+    auth_admin = login_as_auth_user(load_setup_data()["admin_user"],
                                     AUTH_USER_PASSWORD)
     g_id = get_group_principal_id(target_group_name, token=auth_admin['token'])
     ggrb = get_admin_client().create_global_role_binding(
@@ -142,7 +140,7 @@ def test_ggrb_3(remove_resource):
     # check that user not in the group can not list clusters
     validate_permission_list_cluster(user1, 0)
 
-    auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+    auth_admin = login_as_auth_user(load_setup_data()["admin_user"],
                                     AUTH_USER_PASSWORD)
     g_id = get_group_principal_id(target_g, token=auth_admin['token'])
     # create a custom global role that permits listing clusters
@@ -246,7 +244,7 @@ def validate_permission_create_ggrb(token, permission=False):
     create group global role bindings
     """
     target_group_name = get_group()
-    auth_admin = login_as_auth_user(AUTH_ADMIN_USER,
+    auth_admin = login_as_auth_user(load_setup_data()["admin_user"],
                                     AUTH_USER_PASSWORD)
     g_id = get_group_principal_id(target_group_name, token=auth_admin['token'])
     role = generate_a_global_role()
@@ -308,7 +306,7 @@ def create_project_client(request):
     admin_client = get_admin_client()
     ad_enabled = admin_client.by_id_auth_config("activedirectory").enabled
     if AUTH_PROVIDER == "activeDirectory" and not ad_enabled:
-        enable_ad(AUTH_ADMIN_USER, ADMIN_TOKEN,
+        enable_ad(load_setup_data()["admin_user"], ADMIN_TOKEN,
                   password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
 
     if NESTED_GROUP_ENABLED:
