@@ -216,6 +216,7 @@ func (h *clusterCache) List(gvr schema2.GroupVersionResource) []interface{} {
 }
 
 func (h *clusterCache) start() {
+	defer h.workqueue.ShutDown()
 	for {
 		eventObj, ok := h.workqueue.Get()
 		if ok {
@@ -227,6 +228,7 @@ func (h *clusterCache) start() {
 		w := h.watchers[event.gvr]
 		h.RUnlock()
 		if w == nil {
+			h.workqueue.Done(eventObj)
 			continue
 		}
 
@@ -247,6 +249,7 @@ func (h *clusterCache) start() {
 				logrus.Errorf("failed to handle remove event: %v", err)
 			}
 		}
+		h.workqueue.Done(eventObj)
 	}
 }
 
