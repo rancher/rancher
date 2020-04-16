@@ -148,9 +148,11 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 			if !v3.AppConditionForceUpgrade.IsTrue(obj) {
 				v3.AppConditionForceUpgrade.True(obj)
 			}
+			logrus.Debugf("[helm-controller] App %v doesn't require update", obj.Name)
 			return obj, nil
 		}
 	}
+	logrus.Debugf("[helm-controller] Updating app %v", obj.Name)
 	created := false
 	if obj.Spec.MultiClusterAppName != "" {
 		if _, err := l.NsLister.Get("", obj.Spec.TargetNamespace); err != nil && !errors.IsNotFound(err) {

@@ -31,6 +31,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		cattleMonitorMetricClient: mgmtContext.MonitorMetrics(metav1.NamespaceAll),
 		agentDeploymentClient:     agentContext.Apps.Deployments(metav1.NamespaceAll),
 		agentStatefulSetClient:    agentContext.Apps.StatefulSets(metav1.NamespaceAll),
+		agentStatefulSetLister:    agentContext.Apps.StatefulSets(metav1.NamespaceAll).Controller().Lister(),
 		agentServiceAccountClient: agentContext.Core.ServiceAccounts(metav1.NamespaceAll),
 		agentSecretClient:         agentContext.Core.Secrets(metav1.NamespaceAll),
 		agentNodeClient:           agentContext.Core.Nodes(metav1.NamespaceAll),

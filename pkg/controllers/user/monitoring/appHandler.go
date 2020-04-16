@@ -18,6 +18,7 @@ type appHandler struct {
 	cattleMonitorMetricClient mgmtv3.MonitorMetricInterface
 	agentDeploymentClient     appsv1.DeploymentInterface
 	agentStatefulSetClient    appsv1.StatefulSetInterface
+	agentStatefulSetLister    appsv1.StatefulSetLister
 	agentServiceAccountClient corev1.ServiceAccountInterface
 	agentSecretClient         corev1.SecretInterface
 	agentNodeClient           corev1.NodeInterface
