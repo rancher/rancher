@@ -18,25 +18,23 @@ import (
 	"github.com/rancher/types/config"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/cluster-api/api/v1alpha3"
 )
 
 type handler struct {
-	CAPIClusterClient        v1alpha32.ClusterController
-	RancherClusterClient     apiv32.ClusterClient
-	RancherClusterCache      apiv32.ClusterCache
-	ClusterEnqueue           func(name string)
-	SecretLister             v12.SecretLister
-	backoff                  *flowcontrol.Backoff
+	CAPIClusterClient          v1alpha32.ClusterController
+	RancherClusterClient       apiv32.ClusterClient
+	RancherClusterCache        apiv32.ClusterCache
+	RancherClusterEnqueueAfter func(name string, duration time.Duration)
+	SecretLister               v12.SecretLister
 }
 
 type Clusters struct {
-	Clusters        []C `yaml:"clusters"`
-	Users           []User `yaml:"users"`
+	Clusters []C    `yaml:"clusters"`
+	Users    []User `yaml:"users"`
 }
 
 type DataCluster struct {
@@ -59,12 +57,11 @@ type UserData struct {
 
 func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext, manager *clustermanager.Manager) {
 	h := &handler{
-		CAPIClusterClient:        wContext.V1alpha3.Cluster(),
-		RancherClusterClient:     wContext.Mgmt.Cluster(),
-		RancherClusterCache:      wContext.Mgmt.Cluster().Cache(),
-		ClusterEnqueue:           wContext.Mgmt.Cluster().Enqueue,
-		SecretLister:             mgmtCtx.Core.Secrets("").Controller().Lister(),
-		backoff:                  flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
+		CAPIClusterClient:          wContext.V1alpha3.Cluster(),
+		RancherClusterClient:       wContext.Mgmt.Cluster(),
+		RancherClusterCache:        wContext.Mgmt.Cluster().Cache(),
+		RancherClusterEnqueueAfter: wContext.Mgmt.Cluster().EnqueueAfter,
+		SecretLister:               mgmtCtx.Core.Secrets("").Controller().Lister(),
 	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "clusterapi-provisioner", h.onClusterChange)
@@ -72,6 +69,9 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 
 func (h *handler) onClusterChange(key string, cluster *apiv3.Cluster) (*apiv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
+		if err := h.deleteClusterAPICluster(cluster); err != nil {
+			return nil, err
+		}
 		return nil, nil
 	}
 
@@ -117,11 +117,8 @@ func (h *handler) onClusterChange(key string, cluster *apiv3.Cluster) (*apiv3.Cl
 	case v1alpha3.ClusterPhaseProvisioning:
 		apiv3.ClusterConditionProvisioned.Unknown(clusterCopy)
 
-		ok, delay := h.backoffFailure(cluster.Name, fmt.Sprintf("%s-wait-provisioned", cluster.Name))
-		if ok {
-			return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for clustapi cluster [%s] to provision, delay %v", clusterAPIParentName, delay)}
-		}
-		return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for clustapi cluster [%s] to provision", clusterAPIParentName)}
+		h.RancherClusterEnqueueAfter(cluster.Name, 30*time.Second)
+		return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for clustapi cluster [%s] to provision, delay 30s", clusterAPIParentName)}
 	case v1alpha3.ClusterPhaseProvisioned:
 		apiv3.ClusterConditionProvisioned.True(clusterCopy)
 	case v1alpha3.ClusterPhaseFailed:
@@ -161,11 +158,8 @@ func (h *handler) onClusterChange(key string, cluster *apiv3.Cluster) (*apiv3.Cl
 				return cluster, err
 			}
 		}
-		ok, delay := h.backoffFailure(cluster.Name, fmt.Sprintf("%s-wait-kubeconfig", cluster.Name))
-		if ok {
-			return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for kubeconfig to be available, delay %v", delay)}
-		}
-		return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for kubeconfig to be available")}
+		h.RancherClusterEnqueueAfter(cluster.Name, 30*time.Second)
+		return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for kubeconfig to be available, delay 30s", clusterAPIParentName)}
 	}
 
 	into := Clusters{}
@@ -173,30 +167,35 @@ func (h *handler) onClusterChange(key string, cluster *apiv3.Cluster) (*apiv3.Cl
 		return cluster, err
 	}
 
-	cluster.Status.APIEndpoint = into.Clusters[0].DataCluster.Server
-	cluster.Status.CACert = into.Clusters[0].DataCluster.CertificateAuthorityData
-
 	saToken, err := generateServiceAccountToken(into.Clusters[0].DataCluster, into.Users[0].Data)
 	if err != nil {
+		h.RancherClusterEnqueueAfter(cluster.Name, 30*time.Second)
 		return cluster, err
 	}
 
+	cluster.Status.APIEndpoint = into.Clusters[0].DataCluster.Server
+	cluster.Status.CACert = into.Clusters[0].DataCluster.CertificateAuthorityData
 	cluster.Status.ServiceAccountToken = saToken
 	apiv3.ClusterConditionWaiting.True(cluster)
 	return h.RancherClusterClient.Update(cluster)
 }
 
-func (h *handler) backoffFailure(clusterName, key string) (bool, time.Duration) {
-	if h.backoff.IsInBackOffSinceUpdate(key, time.Now()) {
-		go func() {
-			time.Sleep(h.backoff.Get(key))
-			h.ClusterEnqueue(clusterName)
-		}()
-		return true, h.backoff.Get(key)
+func (h *handler) deleteClusterAPICluster(cluster *apiv3.Cluster) error {
+	if cluster == nil {
+		return nil
 	}
-	h.backoff.Next(key, time.Now())
-	return false, 0
+
+	clusterAPIParentName, _ := cluster.Labels["cattle.io/clusterapi-parent"]
+	if clusterAPIParentName == "" {
+		return nil
+	}
+
+	if err := h.CAPIClusterClient.Delete("default", clusterAPIParentName, &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
+
 func generateServiceAccountToken(cluster DataCluster, user UserData) (string, error) {
 	capem, err := base64.StdEncoding.DecodeString(cluster.CertificateAuthorityData)
 	if err != nil {

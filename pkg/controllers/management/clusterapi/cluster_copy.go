@@ -46,13 +46,27 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 }
 
 func (h *handler) onClusterChange(key string, cluster *v1alpha3.Cluster) (*v1alpha3.Cluster, error) {
-	if cluster == nil || cluster.DeletionTimestamp != nil {
+	if cluster == nil {
 		return nil, nil
 	}
 
 	matchingClusters, err := h.RancherClusterClient.List(v1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", clusterAPIParentLabel, cluster.Name)})
 	if err != nil {
 		return cluster, err
+	}
+
+	if cluster.DeletionTimestamp != nil {
+		if len(matchingClusters.Items) == 0 {
+			return nil, nil
+		}
+		// not using owner reference because the rancher cluster should be deleted right away to match
+		// rancher behavior with regular clusters. Otherwise, cluster will stay up but lose communication
+		// as clusterapi deletes infrastructure.
+		return nil, h.RancherClusterClient.Delete(matchingClusters.Items[0].Name, &v1.DeleteOptions{})
+	}
+
+	if cluster.Status.GetTypedPhase() == v1alpha3.ClusterPhaseDeleting {
+		fmt.Println("deleting but didn't delete rancher cluster")
 	}
 
 	var rancherCluster *apiv3.Cluster
@@ -62,19 +76,9 @@ func (h *handler) onClusterChange(key string, cluster *v1alpha3.Cluster) (*v1alp
 			return cluster, err
 		}
 
-		controller := true
 		rancherCluster = &apiv3.Cluster{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "c-",
-				OwnerReferences: []v1.OwnerReference{
-					{
-						APIVersion: "v1alpha3",
-						Kind:       "Cluster",
-						Name:       cluster.Name,
-						UID:        cluster.UID,
-						Controller: &controller,
-					},
-				},
 				Labels: map[string]string{
 					"cattle.io/clusterapi-parent": cluster.Name,
 				},
