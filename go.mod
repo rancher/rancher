@@ -88,7 +88,7 @@ require (
 	github.com/rancher/steve v0.0.0-20200416160046-0a5d0fbca1bc
 	github.com/rancher/system-upgrade-controller v0.3.1
 	github.com/rancher/types v0.0.0-20200410170911-a4f6ba0aa09d
-	github.com/rancher/wrangler v0.5.4-0.20200416040824-c6b27139593f
+	github.com/rancher/wrangler v0.5.4-0.20200417162130-9817cb5fdf6b
 	github.com/rancher/wrangler-api v0.5.0
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect

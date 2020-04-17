@@ -46,6 +46,7 @@ type Controller struct {
 	informer  cache.SharedIndexInformer
 	handler   Handler
 	gvk       schema.GroupVersionKind
+	preStart  []string
 }
 
 type ControllerMeta interface {
@@ -58,12 +59,11 @@ type ControllerMeta interface {
 }
 
 // NewController returns a new sample controller
-func NewController(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer, workqueue workqueue.RateLimitingInterface, handler Handler) *Controller {
+func NewController(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer, handler Handler) *Controller {
 	controller := &Controller{
-		name:      gvk.String(),
-		handler:   handler,
-		informer:  informer,
-		workqueue: workqueue,
+		name:     gvk.String(),
+		handler:  handler,
+		informer: informer,
 	}
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -94,6 +94,15 @@ func (c *Controller) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *Controller) run(threadiness int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	if c.workqueue == nil {
+		c.workqueue = workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), c.name)
+		for _, key := range c.preStart {
+			c.workqueue.Add(key)
+		}
+		c.preStart = nil
+	}
+
 	defer c.workqueue.ShutDown()
 
 	// Start the informer factories to begin populating the informer caches
@@ -110,7 +119,9 @@ func (c *Controller) run(threadiness int, stopCh <-chan struct{}) {
 
 func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 	if ok := cache.WaitForCacheSync(stopCh, c.informer.HasSynced); !ok {
-		c.workqueue.ShutDown()
+		if c.workqueue != nil {
+			c.workqueue.ShutDown()
+		}
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
@@ -177,18 +188,26 @@ func (c *Controller) syncHandler(key string) error {
 }
 
 func (c *Controller) Enqueue(namespace, name string) {
-	if namespace == "" {
-		c.workqueue.AddRateLimited(name)
+	key := name
+	if namespace != "" {
+		key = namespace + "/" + name
+	}
+	if c.workqueue == nil {
+		c.preStart = append(c.preStart, key)
 	} else {
-		c.workqueue.AddRateLimited(namespace + "/" + name)
+		c.workqueue.AddRateLimited(key)
 	}
 }
 
 func (c *Controller) EnqueueAfter(namespace, name string, duration time.Duration) {
-	if namespace == "" {
-		c.workqueue.AddAfter(name, duration)
+	key := name
+	if namespace != "" {
+		key = namespace + "/" + name
+	}
+	if c.workqueue == nil {
+		c.preStart = append(c.preStart, key)
 	} else {
-		c.workqueue.AddAfter(namespace+"/"+name, duration)
+		c.workqueue.AddAfter(key, duration)
 	}
 }
 
@@ -199,7 +218,7 @@ func (c *Controller) enqueue(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	c.workqueue.Add(key)
+	c.Enqueue("", key)
 }
 
 func (c *Controller) handleObject(obj interface{}) {
