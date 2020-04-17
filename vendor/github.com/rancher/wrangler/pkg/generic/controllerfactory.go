@@ -8,7 +8,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 )
 
 type ControllerManager struct {
@@ -89,7 +88,7 @@ func (g *ControllerManager) Enqueue(gvk schema.GroupVersionKind, informer cache.
 			if name != "*" && !nameMatches(key, name) {
 				continue
 			}
-			controller.workqueue.AddRateLimited(key)
+			controller.Enqueue("", key)
 		}
 	} else {
 		controller.Enqueue(namespace, name)
@@ -137,8 +136,7 @@ func (g *ControllerManager) getController(gvk schema.GroupVersionKind, informer 
 
 	handlers := &Handlers{}
 
-	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), gvk.String())
-	controller := NewController(gvk, informer, queue, handlers.Handle)
+	controller := NewController(gvk, informer, handlers.Handle)
 
 	if g.handlers == nil {
 		g.handlers = map[schema.GroupVersionKind]*Handlers{}
@@ -189,7 +187,7 @@ func (g *ControllerManager) addHandler(ctx context.Context, gvk schema.GroupVers
 
 	if ok {
 		for _, key := range controller.informer.GetStore().ListKeys() {
-			controller.workqueue.Add(key)
+			controller.Enqueue("", key)
 		}
 	}
 }

@@ -518,7 +518,7 @@ github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
-# github.com/rancher/wrangler v0.5.4-0.20200416040824-c6b27139593f
+# github.com/rancher/wrangler v0.5.4-0.20200417162130-9817cb5fdf6b
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/broadcast
