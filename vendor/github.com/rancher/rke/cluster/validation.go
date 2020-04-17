@@ -344,6 +344,11 @@ func validateDNSImages(c *Cluster) error {
 			return fmt.Errorf("coredns autoscaler image is not populated")
 		}
 	}
+	if c.DNS.Nodelocal != nil {
+		if len(c.SystemImages.Nodelocal) == 0 {
+			return fmt.Errorf("nodelocal image is not populated")
+		}
+	}
 	return nil
 }
 
