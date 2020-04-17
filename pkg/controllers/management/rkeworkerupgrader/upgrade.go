@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	rkedefaults "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -234,6 +235,15 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 		v3.ClusterConditionUpgraded.Unknown(clusterCopy)
 		v3.ClusterConditionUpgraded.Message(clusterCopy, "updating worker nodes")
 		clusterCopy.Status.NodeVersion++
+
+		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy == nil {
+			clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &v3.NodeUpgradeStrategy{
+				MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
+				MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
+				Drain:                      false,
+			}
+		}
+
 		var err error
 		cluster, err = uh.clusters.Update(clusterCopy)
 		if err != nil {
