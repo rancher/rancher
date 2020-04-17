@@ -104,3 +104,26 @@ def test_can_create_azure_any_accountstoragetype(admin_pc, admin_cc,
             }
         })
     remove_resource(pvc2)
+
+
+def test_can_create_pvc_no_storage_no_vol(admin_pc, remove_resource):
+    """Tests that a PVC referencing no storage class and no volume
+       can be created
+    """
+    ns = admin_pc.cluster.client.create_namespace(
+        name="ns" + random_str(),
+        projectId=admin_pc.project.id)
+    remove_resource(ns)
+
+    pvc = admin_pc.client.create_persistent_volume_claim(
+        name="pc" + random_str(),
+        namespaceId=ns.id,
+        accessModes=["ReadWriteOnce"],
+        resources={
+            "requests": {
+                "storage": "30Gi"
+            }
+        })
+    remove_resource(pvc)
+    assert pvc is not None
+    assert pvc.state == "pending"
