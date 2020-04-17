@@ -363,6 +363,13 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
+# github.com/rancher/lasso v0.0.0-20200417051414-b55b9620e2e7
+github.com/rancher/lasso/pkg/cache
+github.com/rancher/lasso/pkg/client
+github.com/rancher/lasso/pkg/controller
+github.com/rancher/lasso/pkg/log
+github.com/rancher/lasso/pkg/mapper
+github.com/rancher/lasso/pkg/scheme
 # github.com/rancher/machine v0.15.0-rancher25
 github.com/rancher/machine/libmachine/drivers
 github.com/rancher/machine/libmachine/drivers/plugin/localbinary
@@ -448,7 +455,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200401220305-4645d8df16e2
+# github.com/rancher/steve v0.0.0-20200417063946-685dea747a25
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
@@ -528,7 +535,7 @@ github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
-# github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736
+# github.com/rancher/wrangler v0.6.2-0.20200417063009-962aed6a55dc
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/broadcast
@@ -563,7 +570,7 @@ github.com/rancher/wrangler/pkg/summary
 github.com/rancher/wrangler/pkg/summary/client
 github.com/rancher/wrangler/pkg/summary/informer
 github.com/rancher/wrangler/pkg/summary/lister
-# github.com/rancher/wrangler-api v0.5.1-0.20200326194427-c13310506d04
+# github.com/rancher/wrangler-api v0.6.1-0.20200416053439-201927d62012
 github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io
 github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1
 github.com/rancher/wrangler-api/pkg/generated/controllers/apiregistration.k8s.io
@@ -866,13 +873,6 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions
-k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions
-k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1
-k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1
-k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces
-k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1
-k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1
 # k8s.io/apimachinery v0.18.0 => k8s.io/apimachinery v0.18.0
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -976,6 +976,7 @@ k8s.io/cli-runtime/pkg/resource
 # k8s.io/client-go v12.0.0+incompatible => github.com/rancher/client-go v1.18.0-rancher.1
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/cached/disk
+k8s.io/client-go/discovery/cached/memory
 k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
 k8s.io/client-go/informers
@@ -1187,18 +1188,6 @@ k8s.io/klog
 # k8s.io/kube-aggregator v0.18.0 => k8s.io/kube-aggregator v0.18.0
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
-k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
-k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset
-k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme
-k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1
-k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1beta1
-k8s.io/kube-aggregator/pkg/client/informers/externalversions
-k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration
-k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1
-k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1beta1
-k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces
-k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1
-k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1
 # k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/util/proto

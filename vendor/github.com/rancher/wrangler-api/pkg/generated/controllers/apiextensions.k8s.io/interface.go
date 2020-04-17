@@ -19,10 +19,8 @@ limitations under the License.
 package apiextensions
 
 import (
+	"github.com/rancher/lasso/pkg/controller"
 	v1beta1 "github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
-	"github.com/rancher/wrangler/pkg/generic"
-	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions"
 )
 
 type Interface interface {
@@ -30,21 +28,16 @@ type Interface interface {
 }
 
 type group struct {
-	controllerManager *generic.ControllerManager
-	informers         informers.Interface
-	client            clientset.Interface
+	controllerFactory controller.SharedControllerFactory
 }
 
 // New returns a new Interface.
-func New(controllerManager *generic.ControllerManager, informers informers.Interface,
-	client clientset.Interface) Interface {
+func New(controllerFactory controller.SharedControllerFactory) Interface {
 	return &group{
-		controllerManager: controllerManager,
-		informers:         informers,
-		client:            client,
+		controllerFactory: controllerFactory,
 	}
 }
 
 func (g *group) V1beta1() v1beta1.Interface {
-	return v1beta1.New(g.controllerManager, g.client.ApiextensionsV1beta1(), g.informers.V1beta1())
+	return v1beta1.New(g.controllerFactory)
 }

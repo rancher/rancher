@@ -1,7 +1,7 @@
 package schemes
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/rancher/lasso/pkg/scheme"
 )
 
-var All = runtime.NewScheme()
+var All = scheme.All
