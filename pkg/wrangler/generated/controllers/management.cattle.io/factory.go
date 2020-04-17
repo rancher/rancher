@@ -19,28 +19,12 @@ limitations under the License.
 package management
 
 import (
-	"context"
-	"time"
-
-	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned"
-	scheme "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/scheme"
-	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions"
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/schemes"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
 
-func init() {
-	scheme.AddToScheme(schemes.All)
-}
-
 type Factory struct {
-	synced            bool
-	informerFactory   informers.SharedInformerFactory
-	clientset         clientset.Interface
-	controllerManager *generic.ControllerManager
-	threadiness       map[schema.GroupVersionKind]int
+	*generic.Factory
 }
 
 func NewFactoryFromConfigOrDie(config *rest.Config) *Factory {
@@ -52,60 +36,24 @@ func NewFactoryFromConfigOrDie(config *rest.Config) *Factory {
 }
 
 func NewFactoryFromConfig(config *rest.Config) (*Factory, error) {
-	cs, err := clientset.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	informerFactory := informers.NewSharedInformerFactory(cs, 2*time.Hour)
-	return NewFactory(cs, informerFactory), nil
+	return NewFactoryFromConfigWithOptions(config, nil)
 }
 
 func NewFactoryFromConfigWithNamespace(config *rest.Config, namespace string) (*Factory, error) {
-	if namespace == "" {
-		return NewFactoryFromConfig(config)
-	}
-
-	cs, err := clientset.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(cs, 2*time.Hour, informers.WithNamespace(namespace))
-	return NewFactory(cs, informerFactory), nil
+	return NewFactoryFromConfigWithOptions(config, &FactoryOptions{
+		Namespace: namespace,
+	})
 }
 
-func NewFactory(clientset clientset.Interface, informerFactory informers.SharedInformerFactory) *Factory {
+type FactoryOptions = generic.FactoryOptions
+
+func NewFactoryFromConfigWithOptions(config *rest.Config, opts *FactoryOptions) (*Factory, error) {
+	f, err := generic.NewFactoryFromConfigWithOptions(config, opts)
 	return &Factory{
-		threadiness:       map[schema.GroupVersionKind]int{},
-		controllerManager: &generic.ControllerManager{},
-		clientset:         clientset,
-		informerFactory:   informerFactory,
-	}
-}
-
-func (c *Factory) Controllers() map[schema.GroupVersionKind]*generic.Controller {
-	return c.controllerManager.Controllers()
-}
-
-func (c *Factory) SetThreadiness(gvk schema.GroupVersionKind, threadiness int) {
-	c.threadiness[gvk] = threadiness
-}
-
-func (c *Factory) Sync(ctx context.Context) error {
-	c.informerFactory.Start(ctx.Done())
-	c.informerFactory.WaitForCacheSync(ctx.Done())
-	return nil
-}
-
-func (c *Factory) Start(ctx context.Context, defaultThreadiness int) error {
-	if err := c.Sync(ctx); err != nil {
-		return err
-	}
-
-	return c.controllerManager.Start(ctx, defaultThreadiness, c.threadiness)
+		Factory: f,
+	}, err
 }
 
 func (c *Factory) Management() Interface {
-	return New(c.controllerManager, c.informerFactory.Management(), c.clientset)
+	return New(c.ControllerFactory())
 }

@@ -19,10 +19,8 @@ limitations under the License.
 package management
 
 import (
-	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned"
+	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io/v3"
-	informers "github.com/rancher/rancher/pkg/wrangler/generated/informers/externalversions/management.cattle.io"
-	"github.com/rancher/wrangler/pkg/generic"
 )
 
 type Interface interface {
@@ -30,21 +28,16 @@ type Interface interface {
 }
 
 type group struct {
-	controllerManager *generic.ControllerManager
-	informers         informers.Interface
-	client            clientset.Interface
+	controllerFactory controller.SharedControllerFactory
 }
 
 // New returns a new Interface.
-func New(controllerManager *generic.ControllerManager, informers informers.Interface,
-	client clientset.Interface) Interface {
+func New(controllerFactory controller.SharedControllerFactory) Interface {
 	return &group{
-		controllerManager: controllerManager,
-		informers:         informers,
-		client:            client,
+		controllerFactory: controllerFactory,
 	}
 }
 
 func (g *group) V3() v3.Interface {
-	return v3.New(g.controllerManager, g.client.ManagementV3(), g.informers.V3())
+	return v3.New(g.controllerFactory)
 }
