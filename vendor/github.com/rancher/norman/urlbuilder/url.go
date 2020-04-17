@@ -3,7 +3,6 @@ package urlbuilder
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,7 +16,6 @@ const (
 	ForwardedAPIHostHeader = "X-API-Host"
 	ForwardedHostHeader    = "X-Forwarded-Host"
 	ForwardedProtoHeader   = "X-Forwarded-Proto"
-	ForwardedPortHeader    = "X-Forwarded-Port"
 )
 
 func New(r *http.Request, version types.APIVersion, schemas *types.Schemas) (types.URLBuilder, error) {
@@ -51,29 +49,11 @@ func GetHost(r *http.Request, scheme string) string {
 	}
 
 	host = strings.Split(r.Header.Get(ForwardedHostHeader), ",")[0]
-	if host == "" {
-		host = r.Host
-	}
-
-	port := r.Header.Get(ForwardedPortHeader)
-	if port == "" {
+	if host != "" {
 		return host
 	}
 
-	if port == "80" && scheme == "http" {
-		return host
-	}
-
-	if port == "443" && scheme == "http" {
-		return host
-	}
-
-	hostname, _, err := net.SplitHostPort(host)
-	if err != nil {
-		hostname = host
-	}
-
-	return strings.Join([]string{hostname, port}, ":")
+	return r.Host
 }
 
 func GetScheme(r *http.Request) string {
