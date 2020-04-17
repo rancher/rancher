@@ -42,6 +42,7 @@ const (
 
 	CoreDNSProvider = "coredns"
 	KubeDNSProvider = "kube-dns"
+	Nodelocal       = "nodelocal"
 )
 
 var DNSProviders = []string{KubeDNSProvider, CoreDNSProvider}
@@ -91,6 +92,17 @@ type KubeDNSOptions struct {
 	UpstreamNameservers    []string
 	StubDomains            map[string][]string
 	NodeSelector           map[string]string
+}
+
+type NodelocalOptions struct {
+	RBACConfig       string
+	NodelocalImage   string
+	ClusterDomain    string
+	ClusterDNSServer string
+	IPAddress        string
+	NodeSelector     map[string]string
+	// This is not supported in v1.0.x and is passed as empty string to enable default block in addon template
+	UpdateStrategy string
 }
 
 type addonError struct {
@@ -309,7 +321,7 @@ func (c *Cluster) deployCoreDNS(ctx context.Context, data map[string]interface{}
 	if err := c.doAddonDeploy(ctx, coreDNSYaml, getAddonResourceName(c.DNS.Provider), false); err != nil {
 		return err
 	}
-	log.Infof(ctx, "[addons] CoreDNS deployed successfully..")
+	log.Infof(ctx, "[addons] CoreDNS deployed successfully")
 	return nil
 }
 
@@ -564,7 +576,6 @@ func (c *Cluster) deployDNS(ctx context.Context, data map[string]interface{}) er
 			log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", getAddonResourceName(c.DNS.Provider), err)
 		}
 		log.Infof(ctx, "[dns] DNS provider %s deployed successfully", c.DNS.Provider)
-		return nil
 	case CoreDNSProvider:
 		if err := c.deployCoreDNS(ctx, data); err != nil {
 			if err, ok := err.(*addonError); ok && err.isCritical {
@@ -573,11 +584,63 @@ func (c *Cluster) deployDNS(ctx context.Context, data map[string]interface{}) er
 			log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", getAddonResourceName(c.DNS.Provider), err)
 		}
 		log.Infof(ctx, "[dns] DNS provider %s deployed successfully", c.DNS.Provider)
-		return nil
 	case "none":
 		return nil
 	default:
 		log.Warnf(ctx, "[dns] No valid DNS provider configured: %s", c.DNS.Provider)
 		return nil
 	}
+	// Check for nodelocal DNS
+	if c.DNS.Nodelocal == nil {
+		AddonJobExists, err := addons.AddonJobExists(getAddonResourceName(Nodelocal)+"-deploy-job", c.LocalKubeConfigPath, c.K8sWrapTransport)
+		if err != nil {
+			return err
+		}
+		if AddonJobExists {
+			log.Infof(ctx, "[dns] removing %s", Nodelocal)
+			if err := c.doAddonDelete(ctx, getAddonResourceName(Nodelocal), false); err != nil {
+				return err
+			}
+
+			log.Infof(ctx, "[dns] %s removed successfully", Nodelocal)
+			return nil
+		}
+	}
+	if c.DNS.Nodelocal != nil && c.DNS.Nodelocal.IPAddress != "" {
+		if err := c.deployNodelocal(ctx, data); err != nil {
+			if err, ok := err.(*addonError); ok && err.isCritical {
+				return err
+			}
+			log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", getAddonResourceName(Nodelocal), err)
+		}
+		return nil
+	}
+	return nil
+}
+
+func (c *Cluster) deployNodelocal(ctx context.Context, data map[string]interface{}) error {
+	log.Infof(ctx, "[dns] Setting up %s", Nodelocal)
+	NodelocalConfig := NodelocalOptions{
+		NodelocalImage:   c.SystemImages.Nodelocal,
+		RBACConfig:       c.Authorization.Mode,
+		ClusterDomain:    c.ClusterDomain,
+		ClusterDNSServer: c.ClusterDNSServer,
+		IPAddress:        c.DNS.Nodelocal.IPAddress,
+		NodeSelector:     c.DNS.Nodelocal.NodeSelector,
+		// This is not supported in v1.0.x and is passed as empty string to enable default block in addon template
+		UpdateStrategy: "",
+	}
+	tmplt, err := templates.GetVersionedTemplates(rkeData.Nodelocal, data, c.Version)
+	if err != nil {
+		return err
+	}
+	nodelocalYaml, err := templates.CompileTemplateFromMap(tmplt, NodelocalConfig)
+	if err != nil {
+		return err
+	}
+	if err := c.doAddonDeploy(ctx, nodelocalYaml, getAddonResourceName(Nodelocal), false); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[dns] %s deployed successfully", Nodelocal)
+	return nil
 }

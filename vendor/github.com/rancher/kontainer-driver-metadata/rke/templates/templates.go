@@ -15,6 +15,7 @@ const (
 	KubeDNS       = "kubeDNS"
 	MetricsServer = "metricsServer"
 	NginxIngress  = "nginxIngress"
+	Nodelocal     = "nodelocal"
 	TemplateKeys  = "templateKeys"
 
 	calicov18            = "calico-v1.8"
@@ -51,31 +52,33 @@ const (
 
 	nginxIngressv18  = "nginxingress-v1.8"
 	nginxIngressV115 = "nginxingress-v1.15"
+
+	nodelocalv115 = "nodelocal-v1.15"
 )
 
 func LoadK8sVersionedTemplates() map[string]map[string]string {
 	return map[string]map[string]string{
 		Calico: {
-			">=1.17.4-rancher0":                   calicov117Privileged,
-			">=1.17.0-rancher0 <1.17.4-rancher0":  calicov117,
-			">=1.16.8-rancher0 <1.17.0-rancher0":  calicov117Privileged,
-			">=1.16.4-rancher1 <1.16.8-rancher0":  calicov117,
-			">=1.16.0-alpha <1.16.4-rancher1":     calicov116,
-			">=1.15.11-rancher0 <1.16.0-alpha":    calicov115Privileged,
-			">=1.15.0-rancher0 <1.15.11-rancher0": calicov115,
-			">=1.13.0-rancher0 <1.15.0-rancher0":  calicov113,
-			">=1.8.0-rancher0 <1.13.0-rancher0":   calicov18,
+			">=1.17.4-rancher0":                     calicov117Privileged,
+			">=1.17.0-rancher0 <1.17.4-rancher0":    calicov117,
+			">=1.16.8-rancher0 <1.17.0-rancher0":    calicov117Privileged,
+			">=1.16.4-rancher1 <1.16.8-rancher0":    calicov117,
+			">=1.16.0-alpha <1.16.4-rancher1":       calicov116,
+			">=1.15.11-rancher1-1 <1.16.0-alpha":    calicov115Privileged,
+			">=1.15.0-rancher0 <1.15.11-rancher1-1": calicov115,
+			">=1.13.0-rancher0 <1.15.0-rancher0":    calicov113,
+			">=1.8.0-rancher0 <1.13.0-rancher0":     calicov18,
 		},
 		Canal: {
-			">=1.17.4-rancher0":                   canalv117Privileged,
-			">=1.17.0-rancher0 <1.17.4-rancher0":  canalv117,
-			">=1.16.8-rancher0 <1.17.0-rancher0":  canalv117Privileged,
-			">=1.16.4-rancher1 <1.16.8-rancher0":  canalv117,
-			">=1.16.0-alpha <1.16.4-rancher1":     canalv116,
-			">=1.15.11-rancher0 <1.16.0-alpha":    canalv115Privileged,
-			">=1.15.0-rancher0 <1.15.11-rancher0": canalv115,
-			">=1.13.0-rancher0 <1.15.0-rancher0":  canalv113,
-			">=1.8.0-rancher0 <1.13.0-rancher0":   canalv18,
+			">=1.17.4-rancher0":                     canalv117Privileged,
+			">=1.17.0-rancher0 <1.17.4-rancher0":    canalv117,
+			">=1.16.8-rancher0 <1.17.0-rancher0":    canalv117Privileged,
+			">=1.16.4-rancher1 <1.16.8-rancher0":    canalv117,
+			">=1.16.0-alpha <1.16.4-rancher1":       canalv116,
+			">=1.15.11-rancher1-1 <1.16.0-alpha":    canalv115Privileged,
+			">=1.15.0-rancher0 <1.15.11-rancher1-1": canalv115,
+			">=1.13.0-rancher0 <1.15.0-rancher0":    canalv113,
+			">=1.8.0-rancher0 <1.13.0-rancher0":     canalv18,
 		},
 		Flannel: {
 			">=1.16.0-alpha":                    flannelv116,
@@ -105,6 +108,11 @@ func LoadK8sVersionedTemplates() map[string]map[string]string {
 			">=1.14.6-rancher2 <1.15.0-rancher0":    nginxIngressV115,
 			">=1.15.0-rancher0 <=1.15.3-rancher1-1": nginxIngressv18,
 			">=1.15.3-rancher2":                     nginxIngressV115,
+		},
+		Nodelocal: {
+			">=1.15.11-rancher0 <1.16.0-alpha": nodelocalv115,
+			">=1.16.8-rancher0 <1.17.0-alpha":  nodelocalv115,
+			">=1.17.4-rancher0":                nodelocalv115,
 		},
 		TemplateKeys: getTemplates(),
 	}
@@ -146,5 +154,7 @@ func getTemplates() map[string]string {
 
 		nginxIngressv18:  NginxIngressTemplate,
 		nginxIngressV115: NginxIngressTemplateV0251Rancher1,
+
+		nodelocalv115: NodelocalTemplateV115,
 	}
 }

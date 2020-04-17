@@ -114,6 +114,8 @@ type RKESystemImages struct {
 	CoreDNS string `yaml:"coredns" json:"coredns,omitempty"`
 	// CoreDNS autoscaler image
 	CoreDNSAutoscaler string `yaml:"coredns_autoscaler" json:"corednsAutoscaler,omitempty"`
+	// Nodelocal image
+	Nodelocal string `yaml:"nodelocal" json:"nodelocal,omitempty"`
 	// Kubernetes image
 	Kubernetes string `yaml:"kubernetes" json:"kubernetes,omitempty"`
 	// Flannel image
@@ -816,6 +818,15 @@ type DNSConfig struct {
 	ReverseCIDRs []string `yaml:"reversecidrs" json:"reversecidrs,omitempty"`
 	// Stubdomains
 	StubDomains map[string][]string `yaml:"stubdomains" json:"stubdomains,omitempty"`
+	// NodeSelector key pair
+	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
+	// Nodelocal DNS
+	Nodelocal *Nodelocal `yaml:"nodelocal" json:"nodelocal,omitempy"`
+}
+
+type Nodelocal struct {
+	// link-local IP for nodelocal DNS
+	IPAddress string `yaml:"ip_address" json:"ipAddress,omitempy"`
 	// NodeSelector key pair
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 }
