@@ -25,6 +25,7 @@ type TLSFactory interface {
 	Refresh(secret *v1.Secret) (*v1.Secret, error)
 	AddCN(secret *v1.Secret, cn ...string) (*v1.Secret, bool, error)
 	Merge(target *v1.Secret, additional *v1.Secret) (*v1.Secret, bool, error)
+	Filter(cn ...string) []string
 }
 
 type SetFactory interface {
@@ -48,6 +49,7 @@ func NewListener(l net.Listener, storage TLSStorage, caCert *x509.Certificate, c
 			CAKey:        caKey,
 			CN:           config.CN,
 			Organization: config.Organization,
+			FilterCN:     config.FilterCN,
 		},
 		Listener:  l,
 		storage:   &nonNil{storage: storage},
@@ -97,6 +99,7 @@ type Config struct {
 	MaxSANs               int
 	ExpirationDaysCheck   int
 	CloseConnOnCertChange bool
+	FilterCN              func(...string) []string
 }
 
 type listener struct {
@@ -205,7 +208,7 @@ func (l *listener) Accept() (net.Conn, error) {
 
 	if !strings.Contains(host, ":") {
 		if err := l.updateCert(host); err != nil {
-			logrus.Infof("failed to create TLS cert for: %s", host)
+			logrus.Infof("failed to create TLS cert for: %s, %v", host, err)
 		}
 	}
 
@@ -259,6 +262,11 @@ func (l *listener) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate,
 }
 
 func (l *listener) updateCert(cn ...string) error {
+	cn = l.factory.Filter(cn...)
+	if len(cn) == 0 {
+		return nil
+	}
+
 	l.RLock()
 	defer l.RUnlock()
 

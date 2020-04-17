@@ -10,10 +10,12 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"net"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/rancher/dynamiclistener/cert"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -23,11 +25,16 @@ const (
 	hashKey  = "listener.cattle.io/hash"
 )
 
+var (
+	cnRegexp = regexp.MustCompile("^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$")
+)
+
 type TLS struct {
 	CACert       *x509.Certificate
 	CAKey        crypto.Signer
 	CN           string
 	Organization []string
+	FilterCN     func(...string) []string
 }
 
 func cns(secret *v1.Secret) (cns []string) {
@@ -76,10 +83,19 @@ func (t *TLS) Refresh(secret *v1.Secret) (*v1.Secret, error) {
 	return secret, err
 }
 
+func (t *TLS) Filter(cn ...string) []string {
+	if t.FilterCN == nil {
+		return cn
+	}
+	return t.FilterCN(cn...)
+}
+
 func (t *TLS) AddCN(secret *v1.Secret, cn ...string) (*v1.Secret, bool, error) {
 	var (
 		err error
 	)
+
+	cn = t.Filter(cn...)
 
 	if !NeedsUpdate(0, secret, cn...) {
 		return secret, false, nil
@@ -132,7 +148,11 @@ func populateCN(secret *v1.Secret, cn ...string) *v1.Secret {
 		secret.Annotations = map[string]string{}
 	}
 	for _, cn := range cn {
-		secret.Annotations[cnPrefix+cn] = cn
+		if cnRegexp.MatchString(cn) {
+			secret.Annotations[cnPrefix+cn] = cn
+		} else {
+			logrus.Errorf("dropping invalid CN: %s", cn)
+		}
 	}
 	return secret
 }
