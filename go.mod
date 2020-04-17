@@ -80,7 +80,7 @@ require (
 	github.com/rancher/dynamiclistener v0.2.1-0.20200403051005-4436fc6b4890
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200408195258-015d59c20dae
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200401184723-a6df1fcaebe0
+	github.com/rancher/norman v0.0.0-20200417060332-5c2a13443bb8
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83
 	github.com/rancher/rke v1.1.0
