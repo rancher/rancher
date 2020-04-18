@@ -22,9 +22,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,9 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	informers "k8s.io/client-go/informers/rbac/v1"
-	clientset "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -74,18 +74,23 @@ type ClusterRoleBindingCache interface {
 type ClusterRoleBindingIndexer func(obj *v1.ClusterRoleBinding) ([]string, error)
 
 type clusterRoleBindingController struct {
-	controllerManager *generic.ControllerManager
-	clientGetter      clientset.ClusterRoleBindingsGetter
-	informer          informers.ClusterRoleBindingInformer
-	gvk               schema.GroupVersionKind
+	controller    controller.SharedController
+	client        *client.Client
+	gvk           schema.GroupVersionKind
+	groupResource schema.GroupResource
 }
 
-func NewClusterRoleBindingController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.ClusterRoleBindingsGetter, informer informers.ClusterRoleBindingInformer) ClusterRoleBindingController {
+func NewClusterRoleBindingController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) ClusterRoleBindingController {
+	c, err := controller.ForKind(gvk)
+	utilruntime.Must(err)
 	return &clusterRoleBindingController{
-		controllerManager: controllerManager,
-		clientGetter:      clientGetter,
-		informer:          informer,
-		gvk:               gvk,
+		controller: c,
+		client:     c.Client(),
+		gvk:        gvk,
+		groupResource: schema.GroupResource{
+			Group:    gvk.Group,
+			Resource: resource,
+		},
 	}
 }
 
@@ -132,12 +137,11 @@ func UpdateClusterRoleBindingDeepCopyOnChange(client ClusterRoleBindingClient, o
 }
 
 func (c *clusterRoleBindingController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
+	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
 func (c *clusterRoleBindingController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
 }
 
 func (c *clusterRoleBindingController) OnChange(ctx context.Context, name string, sync ClusterRoleBindingHandler) {
@@ -145,20 +149,19 @@ func (c *clusterRoleBindingController) OnChange(ctx context.Context, name string
 }
 
 func (c *clusterRoleBindingController) OnRemove(ctx context.Context, name string, sync ClusterRoleBindingHandler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromClusterRoleBindingHandlerToHandler(sync))
-	c.AddGenericHandler(ctx, name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromClusterRoleBindingHandlerToHandler(sync)))
 }
 
 func (c *clusterRoleBindingController) Enqueue(name string) {
-	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), "", name)
+	c.controller.Enqueue("", name)
 }
 
 func (c *clusterRoleBindingController) EnqueueAfter(name string, duration time.Duration) {
-	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), "", name, duration)
+	c.controller.EnqueueAfter("", name, duration)
 }
 
 func (c *clusterRoleBindingController) Informer() cache.SharedIndexInformer {
-	return c.informer.Informer()
+	return c.controller.Informer()
 }
 
 func (c *clusterRoleBindingController) GroupVersionKind() schema.GroupVersionKind {
@@ -167,53 +170,70 @@ func (c *clusterRoleBindingController) GroupVersionKind() schema.GroupVersionKin
 
 func (c *clusterRoleBindingController) Cache() ClusterRoleBindingCache {
 	return &clusterRoleBindingCache{
-		lister:  c.informer.Lister(),
-		indexer: c.informer.Informer().GetIndexer(),
+		indexer:  c.Informer().GetIndexer(),
+		resource: c.groupResource,
 	}
 }
 
 func (c *clusterRoleBindingController) Create(obj *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error) {
-	return c.clientGetter.ClusterRoleBindings().Create(context.TODO(), obj, metav1.CreateOptions{})
+	result := &v1.ClusterRoleBinding{}
+	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
 }
 
 func (c *clusterRoleBindingController) Update(obj *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error) {
-	return c.clientGetter.ClusterRoleBindings().Update(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1.ClusterRoleBinding{}
+	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
 }
 
 func (c *clusterRoleBindingController) Delete(name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.clientGetter.ClusterRoleBindings().Delete(context.TODO(), name, *options)
+	return c.client.Delete(context.TODO(), "", name, *options)
 }
 
 func (c *clusterRoleBindingController) Get(name string, options metav1.GetOptions) (*v1.ClusterRoleBinding, error) {
-	return c.clientGetter.ClusterRoleBindings().Get(context.TODO(), name, options)
+	result := &v1.ClusterRoleBinding{}
+	return result, c.client.Get(context.TODO(), "", name, result, options)
 }
 
 func (c *clusterRoleBindingController) List(opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error) {
-	return c.clientGetter.ClusterRoleBindings().List(context.TODO(), opts)
+	result := &v1.ClusterRoleBindingList{}
+	return result, c.client.List(context.TODO(), "", result, opts)
 }
 
 func (c *clusterRoleBindingController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.ClusterRoleBindings().Watch(context.TODO(), opts)
+	return c.client.Watch(context.TODO(), "", opts)
 }
 
-func (c *clusterRoleBindingController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterRoleBinding, err error) {
-	return c.clientGetter.ClusterRoleBindings().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
+func (c *clusterRoleBindingController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.ClusterRoleBinding, error) {
+	result := &v1.ClusterRoleBinding{}
+	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
 type clusterRoleBindingCache struct {
-	lister  listers.ClusterRoleBindingLister
-	indexer cache.Indexer
+	indexer  cache.Indexer
+	resource schema.GroupResource
 }
 
 func (c *clusterRoleBindingCache) Get(name string) (*v1.ClusterRoleBinding, error) {
-	return c.lister.Get(name)
+	obj, exists, err := c.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(c.resource, name)
+	}
+	return obj.(*v1.ClusterRoleBinding), nil
 }
 
-func (c *clusterRoleBindingCache) List(selector labels.Selector) ([]*v1.ClusterRoleBinding, error) {
-	return c.lister.List(selector)
+func (c *clusterRoleBindingCache) List(selector labels.Selector) (ret []*v1.ClusterRoleBinding, err error) {
+
+	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ClusterRoleBinding))
+	})
+
+	return ret, err
 }
 
 func (c *clusterRoleBindingCache) AddIndexer(indexName string, indexer ClusterRoleBindingIndexer) {

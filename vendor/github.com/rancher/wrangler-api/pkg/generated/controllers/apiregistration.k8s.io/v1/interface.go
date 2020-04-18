@@ -19,31 +19,30 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/schemes"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
-	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 )
+
+func init() {
+	v1.AddToScheme(schemes.All)
+}
 
 type Interface interface {
 	APIService() APIServiceController
 }
 
-func New(controllerManager *generic.ControllerManager, client clientset.ApiregistrationV1Interface,
-	informers informers.Interface) Interface {
+func New(controllerFactory controller.SharedControllerFactory) Interface {
 	return &version{
-		controllerManager: controllerManager,
-		client:            client,
-		informers:         informers,
+		controllerFactory: controllerFactory,
 	}
 }
 
 type version struct {
-	controllerManager *generic.ControllerManager
-	informers         informers.Interface
-	client            clientset.ApiregistrationV1Interface
+	controllerFactory controller.SharedControllerFactory
 }
 
 func (c *version) APIService() APIServiceController {
-	return NewAPIServiceController(v1.SchemeGroupVersion.WithKind("APIService"), c.controllerManager, c.client, c.informers.APIServices())
+	return NewAPIServiceController(schema.GroupVersionKind{Group: "apiregistration.k8s.io", Version: "v1", Kind: "APIService"}, "apiservices", c.controllerFactory)
 }

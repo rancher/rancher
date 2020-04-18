@@ -22,9 +22,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,9 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
-	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 )
 
 type APIServiceHandler func(string, *v1.APIService) (*v1.APIService, error)
@@ -77,18 +77,23 @@ type APIServiceCache interface {
 type APIServiceIndexer func(obj *v1.APIService) ([]string, error)
 
 type aPIServiceController struct {
-	controllerManager *generic.ControllerManager
-	clientGetter      clientset.APIServicesGetter
-	informer          informers.APIServiceInformer
-	gvk               schema.GroupVersionKind
+	controller    controller.SharedController
+	client        *client.Client
+	gvk           schema.GroupVersionKind
+	groupResource schema.GroupResource
 }
 
-func NewAPIServiceController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.APIServicesGetter, informer informers.APIServiceInformer) APIServiceController {
+func NewAPIServiceController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) APIServiceController {
+	c, err := controller.ForKind(gvk)
+	utilruntime.Must(err)
 	return &aPIServiceController{
-		controllerManager: controllerManager,
-		clientGetter:      clientGetter,
-		informer:          informer,
-		gvk:               gvk,
+		controller: c,
+		client:     c.Client(),
+		gvk:        gvk,
+		groupResource: schema.GroupResource{
+			Group:    gvk.Group,
+			Resource: resource,
+		},
 	}
 }
 
@@ -135,12 +140,11 @@ func UpdateAPIServiceDeepCopyOnChange(client APIServiceClient, obj *v1.APIServic
 }
 
 func (c *aPIServiceController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
+	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
 func (c *aPIServiceController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
 }
 
 func (c *aPIServiceController) OnChange(ctx context.Context, name string, sync APIServiceHandler) {
@@ -148,20 +152,19 @@ func (c *aPIServiceController) OnChange(ctx context.Context, name string, sync A
 }
 
 func (c *aPIServiceController) OnRemove(ctx context.Context, name string, sync APIServiceHandler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromAPIServiceHandlerToHandler(sync))
-	c.AddGenericHandler(ctx, name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromAPIServiceHandlerToHandler(sync)))
 }
 
 func (c *aPIServiceController) Enqueue(name string) {
-	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), "", name)
+	c.controller.Enqueue("", name)
 }
 
 func (c *aPIServiceController) EnqueueAfter(name string, duration time.Duration) {
-	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), "", name, duration)
+	c.controller.EnqueueAfter("", name, duration)
 }
 
 func (c *aPIServiceController) Informer() cache.SharedIndexInformer {
-	return c.informer.Informer()
+	return c.controller.Informer()
 }
 
 func (c *aPIServiceController) GroupVersionKind() schema.GroupVersionKind {
@@ -170,57 +173,75 @@ func (c *aPIServiceController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *aPIServiceController) Cache() APIServiceCache {
 	return &aPIServiceCache{
-		lister:  c.informer.Lister(),
-		indexer: c.informer.Informer().GetIndexer(),
+		indexer:  c.Informer().GetIndexer(),
+		resource: c.groupResource,
 	}
 }
 
 func (c *aPIServiceController) Create(obj *v1.APIService) (*v1.APIService, error) {
-	return c.clientGetter.APIServices().Create(context.TODO(), obj, metav1.CreateOptions{})
+	result := &v1.APIService{}
+	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
 }
 
 func (c *aPIServiceController) Update(obj *v1.APIService) (*v1.APIService, error) {
-	return c.clientGetter.APIServices().Update(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1.APIService{}
+	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
 }
 
 func (c *aPIServiceController) UpdateStatus(obj *v1.APIService) (*v1.APIService, error) {
-	return c.clientGetter.APIServices().UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1.APIService{}
+	return result, c.client.UpdateStatus(context.TODO(), "", obj, result, metav1.UpdateOptions{})
 }
 
 func (c *aPIServiceController) Delete(name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.clientGetter.APIServices().Delete(context.TODO(), name, *options)
+	return c.client.Delete(context.TODO(), "", name, *options)
 }
 
 func (c *aPIServiceController) Get(name string, options metav1.GetOptions) (*v1.APIService, error) {
-	return c.clientGetter.APIServices().Get(context.TODO(), name, options)
+	result := &v1.APIService{}
+	return result, c.client.Get(context.TODO(), "", name, result, options)
 }
 
 func (c *aPIServiceController) List(opts metav1.ListOptions) (*v1.APIServiceList, error) {
-	return c.clientGetter.APIServices().List(context.TODO(), opts)
+	result := &v1.APIServiceList{}
+	return result, c.client.List(context.TODO(), "", result, opts)
 }
 
 func (c *aPIServiceController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.APIServices().Watch(context.TODO(), opts)
+	return c.client.Watch(context.TODO(), "", opts)
 }
 
-func (c *aPIServiceController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.APIService, err error) {
-	return c.clientGetter.APIServices().Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
+func (c *aPIServiceController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.APIService, error) {
+	result := &v1.APIService{}
+	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
 type aPIServiceCache struct {
-	lister  listers.APIServiceLister
-	indexer cache.Indexer
+	indexer  cache.Indexer
+	resource schema.GroupResource
 }
 
 func (c *aPIServiceCache) Get(name string) (*v1.APIService, error) {
-	return c.lister.Get(name)
+	obj, exists, err := c.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(c.resource, name)
+	}
+	return obj.(*v1.APIService), nil
 }
 
-func (c *aPIServiceCache) List(selector labels.Selector) ([]*v1.APIService, error) {
-	return c.lister.List(selector)
+func (c *aPIServiceCache) List(selector labels.Selector) (ret []*v1.APIService, err error) {
+
+	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.APIService))
+	})
+
+	return ret, err
 }
 
 func (c *aPIServiceCache) AddIndexer(indexName string, indexer APIServiceIndexer) {
@@ -267,6 +288,7 @@ func RegisterAPIServiceGeneratingHandler(ctx context.Context, controller APIServ
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
+	controller.OnChange(ctx, name, statusHandler.Remove)
 	RegisterAPIServiceStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
@@ -281,7 +303,7 @@ func (a *aPIServiceStatusHandler) sync(key string, obj *v1.APIService) (*v1.APIS
 		return obj, nil
 	}
 
-	origStatus := obj.Status
+	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
 	newStatus, err := a.handler(obj, obj.Status)
 	if err != nil {
@@ -289,16 +311,16 @@ func (a *aPIServiceStatusHandler) sync(key string, obj *v1.APIService) (*v1.APIS
 		newStatus = *origStatus.DeepCopy()
 	}
 
-	obj.Status = newStatus
 	if a.condition != "" {
 		if errors.IsConflict(err) {
-			a.condition.SetError(obj, "", nil)
+			a.condition.SetError(&newStatus, "", nil)
 		} else {
-			a.condition.SetError(obj, "", err)
+			a.condition.SetError(&newStatus, "", err)
 		}
 	}
-	if !equality.Semantic.DeepEqual(origStatus, obj.Status) {
+	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
 		var newErr error
+		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
@@ -315,29 +337,28 @@ type aPIServiceGeneratingHandler struct {
 	name  string
 }
 
+func (a *aPIServiceGeneratingHandler) Remove(key string, obj *v1.APIService) (*v1.APIService, error) {
+	if obj != nil {
+		return obj, nil
+	}
+
+	obj = &v1.APIService{}
+	obj.Namespace, obj.Name = kv.RSplit(key, "/")
+	obj.SetGroupVersionKind(a.gvk)
+
+	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects()
+}
+
 func (a *aPIServiceGeneratingHandler) Handle(obj *v1.APIService, status v1.APIServiceStatus) (v1.APIServiceStatus, error) {
 	objs, newStatus, err := a.APIServiceGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
 
-	apply := a.apply
-
-	if !a.opts.DynamicLookup {
-		apply = apply.WithStrictCaching()
-	}
-
-	if !a.opts.AllowCrossNamespace && !a.opts.AllowClusterScoped {
-		apply = apply.WithSetOwnerReference(true, false).
-			WithDefaultNamespace(obj.GetNamespace()).
-			WithListerNamespace(obj.GetNamespace())
-	}
-
-	if !a.opts.AllowClusterScoped {
-		apply = apply.WithRestrictClusterScoped()
-	}
-
-	return newStatus, apply.
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
