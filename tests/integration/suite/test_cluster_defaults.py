@@ -55,6 +55,51 @@ def test_generic_initial_conditions(admin_mc, remove_resource):
     assert 'exportYaml' not in cluster.actions
 
 
+def test_eks_cluster_immutable_subnets(admin_mc, remove_resource):
+    cluster = admin_mc.client.create_cluster(
+        name=random_str(), amazonElasticContainerServiceConfig={
+            "accessKey": "asdfsd",
+            "secretKey": "verySecretKey",
+            "subnets": [
+                "subnet-045bfaeca7d3f1cb3",
+                "subnet-02388a166136f98c4"
+            ]})
+    remove_resource(cluster)
+
+    # try to edit cluster subnets
+    with pytest.raises(ApiError) as e:
+        admin_mc.client.update_by_id_cluster(
+            id=cluster.id,
+            amazonElasticContainerServiceConfig={
+                 "accessKey": "asdfsd",
+                 "secretKey": "verySecretKey",
+                 "subnets": [
+                     "subnet-045bfaeca7d3f1cb3"
+                 ]})
+
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'cannot modify EKS subnets after creation'
+
+    # tests updates still work
+    new = admin_mc.client.update_by_id_cluster(
+       id=cluster.id,
+       name=cluster.name,
+       description="update",
+       amazonElasticContainerServiceConfig={
+           # required field when updating KE clusters
+           "driverName": "amazonelasticcontainerservice",
+           "accessKey": "asdfsd",
+           "secretKey": "verySecretKey",
+           "subnets": [
+               "subnet-045bfaeca7d3f1cb3",
+               "subnet-02388a166136f98c4"
+           ]})
+
+    assert new.id == cluster.id
+    assert not hasattr(cluster, "description")
+    assert hasattr(new, "description")
+
+
 def test_rke_initial_conditions(admin_mc, remove_resource):
     cluster = admin_mc.client.create_cluster(
         name=random_str(), rancherKubernetesEngineConfig={
