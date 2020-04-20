@@ -5,6 +5,7 @@ const (
 	ClusterSpecFieldAgentImageOverride                  = "agentImageOverride"
 	ClusterSpecFieldAmazonElasticContainerServiceConfig = "amazonElasticContainerServiceConfig"
 	ClusterSpecFieldAzureKubernetesServiceConfig        = "azureKubernetesServiceConfig"
+	ClusterSpecFieldClusterAPIConfig                    = "clusterAPIConfig"
 	ClusterSpecFieldClusterTemplateAnswers              = "answers"
 	ClusterSpecFieldClusterTemplateID                   = "clusterTemplateId"
 	ClusterSpecFieldClusterTemplateQuestions            = "questions"
@@ -34,6 +35,7 @@ type ClusterSpec struct {
 	AgentImageOverride                  string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	AmazonElasticContainerServiceConfig map[string]interface{}         `json:"amazonElasticContainerServiceConfig,omitempty" yaml:"amazonElasticContainerServiceConfig,omitempty"`
 	AzureKubernetesServiceConfig        map[string]interface{}         `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
+	ClusterAPIConfig                    string                         `json:"clusterAPIConfig,omitempty" yaml:"clusterAPIConfig,omitempty"`
 	ClusterTemplateAnswers              *Answer                        `json:"answers,omitempty" yaml:"answers,omitempty"`
 	ClusterTemplateID                   string                         `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
 	ClusterTemplateQuestions            []Question                     `json:"questions,omitempty" yaml:"questions,omitempty"`
