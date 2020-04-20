@@ -70,7 +70,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.4.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20200417180625-aaab848104ec
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20200420202156-5b01aae3840e
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200403233022-1167e391df73
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20200227003532-35fa47cccad7
