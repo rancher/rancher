@@ -40,6 +40,9 @@ var MatchTemplate = `
 {{ if eq .CurrentTarget "elasticsearch" }}
 	@type elasticsearch
 	include_tag_key  true
+	reload_connections false
+	reconnect_on_error true
+	reload_on_failure true
 	{{- if and .ElasticsearchConfig.AuthUserName .ElasticsearchConfig.AuthPassword}}
 	user {{.ElasticsearchConfig.AuthUserName}}
 	password {{.ElasticsearchConfig.AuthPassword}}
