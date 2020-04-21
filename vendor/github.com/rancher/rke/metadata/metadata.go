@@ -90,7 +90,7 @@ func readFile(file string) ([]byte, error) {
 	return ioutil.ReadFile(file)
 }
 
-const RKEVersionDev = "v0.2.3"
+const RKEVersionDev = "v1.0.7"
 
 func initAddonTemplates(data kdm.Data) {
 	K8sVersionToTemplates = data.K8sVersionedTemplates
