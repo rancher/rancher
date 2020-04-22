@@ -29,7 +29,6 @@ func main() {
 				Types: []interface{}{
 					v1alpha3.Cluster{},
 				},
-				GenerateClients: true,
 			},
 		},
 	})

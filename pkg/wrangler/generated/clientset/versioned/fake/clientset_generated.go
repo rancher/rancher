@@ -20,8 +20,6 @@ package fake
 
 import (
 	clientset "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned"
-	clusterv1alpha3 "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/cluster.x-k8s.io/v1alpha3"
-	fakeclusterv1alpha3 "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/cluster.x-k8s.io/v1alpha3/fake"
 	managementv3 "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/management.cattle.io/v3"
 	fakemanagementv3 "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/management.cattle.io/v3/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -77,11 +75,6 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 }
 
 var _ clientset.Interface = &Clientset{}
-
-// ClusterV1alpha3 retrieves the ClusterV1alpha3Client
-func (c *Clientset) ClusterV1alpha3() clusterv1alpha3.ClusterV1alpha3Interface {
-	return &fakeclusterv1alpha3.FakeClusterV1alpha3{Fake: &c.Fake}
-}
 
 // ManagementV3 retrieves the ManagementV3Client
 func (c *Clientset) ManagementV3() managementv3.ManagementV3Interface {

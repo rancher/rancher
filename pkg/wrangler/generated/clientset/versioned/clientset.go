@@ -21,7 +21,6 @@ package versioned
 import (
 	"fmt"
 
-	clusterv1alpha3 "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/cluster.x-k8s.io/v1alpha3"
 	managementv3 "github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/typed/management.cattle.io/v3"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -30,7 +29,6 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	ClusterV1alpha3() clusterv1alpha3.ClusterV1alpha3Interface
 	ManagementV3() managementv3.ManagementV3Interface
 }
 
@@ -38,13 +36,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	clusterV1alpha3 *clusterv1alpha3.ClusterV1alpha3Client
-	managementV3    *managementv3.ManagementV3Client
-}
-
-// ClusterV1alpha3 retrieves the ClusterV1alpha3Client
-func (c *Clientset) ClusterV1alpha3() clusterv1alpha3.ClusterV1alpha3Interface {
-	return c.clusterV1alpha3
+	managementV3 *managementv3.ManagementV3Client
 }
 
 // ManagementV3 retrieves the ManagementV3Client
@@ -73,10 +65,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.clusterV1alpha3, err = clusterv1alpha3.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.managementV3, err = managementv3.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -93,7 +81,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.clusterV1alpha3 = clusterv1alpha3.NewForConfigOrDie(c)
 	cs.managementV3 = managementv3.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -103,7 +90,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.clusterV1alpha3 = clusterv1alpha3.New(c)
 	cs.managementV3 = managementv3.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
