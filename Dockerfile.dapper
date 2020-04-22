@@ -12,7 +12,7 @@ ENV CATTLE_CHANNELSERVER_VERSION v0.3.0
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.6-rancher1
 ENV GO111MODULE off
 # helm 3 version
-ENV HELM_VERSION v3.1.0
+ENV HELM_VERSION v3.2.0
 ENV KUSTOMIZE_VERSION v3.5.4
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
