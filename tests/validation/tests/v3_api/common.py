@@ -67,6 +67,7 @@ AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
 AWS_S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME", "")
 AWS_S3_BUCKET_FOLDER_NAME = os.environ.get("AWS_S3_BUCKET_FOLDER_NAME", "")
 LINODE_ACCESSKEY = os.environ.get('RANCHER_LINODE_ACCESSKEY', "None")
+NFS_SERVER_MOUNT_PATH = "/nfs"
 
 TEST_RBAC = ast.literal_eval(os.environ.get('RANCHER_TEST_RBAC', "False"))
 if_test_rbac = pytest.mark.skipif(TEST_RBAC is False,
@@ -712,7 +713,8 @@ def validate_ingress(p_client, cluster, workloads, host, path,
 
 
 def validate_ingress_using_endpoint(p_client, ingress, workloads,
-                                    timeout=300, certcheck=False, is_insecure=False):
+                                    timeout=300,
+                                    certcheck=False, is_insecure=False):
     target_name_list = get_target_names(p_client, workloads)
     start = time.time()
     fqdn_available = False
@@ -824,7 +826,8 @@ def check_if_ok(url, verify=False, headers={}):
         return False
 
 
-def validate_http_response(cmd, target_name_list, client_pod=None, insecure=False):
+def validate_http_response(cmd, target_name_list, client_pod=None,
+                           insecure=False):
     if client_pod is None and cmd.startswith("http://"):
         wait_until_active(cmd, 60)
     target_hit_list = target_name_list[:]
@@ -2486,3 +2489,39 @@ def wait_for_hpa_to_active(client, hpa, timeout=DEFAULT_TIMEOUT):
         assert len(hpas) == 1
         hpa = hpas[0]
     return hpa
+
+
+def create_pv_pvc(client, ns, nfs_ip, cluster_client):
+    pv_object = create_pv(cluster_client, nfs_ip)
+
+    pvc_name = random_test_name("pvc")
+    pvc_config = {"accessModes": ["ReadWriteOnce"],
+                  "name": pvc_name,
+                  "volumeId": pv_object.id,
+                  "namespaceId": ns.id,
+                  "storageClassId": "",
+                  "resources": {"requests": {"storage": "10Gi"}}
+                  }
+    pvc_object = client.create_persistent_volume_claim(pvc_config)
+    pvc_object = wait_for_pvc_to_be_bound(client, pvc_object, timeout=300)
+
+    return pv_object, pvc_object
+
+
+def create_pv(client, nfs_ip):
+    pv_name = random_test_name("pv")
+    pv_config = {"type": "persistentVolume",
+                 "accessModes": ["ReadWriteOnce"],
+                 "name": pv_name,
+                 "nfs": {"readOnly": "false",
+                         "type": "nfsvolumesource",
+                         "path": NFS_SERVER_MOUNT_PATH,
+                         "server": nfs_ip
+                         },
+                 "capacity": {"storage": "50Gi"}
+                 }
+    pv_object = client.create_persistent_volume(pv_config)
+    capacitydict = pv_object['capacity']
+    assert capacitydict['storage'] == '50Gi'
+    assert pv_object['type'] == 'persistentVolume'
+    return pv_object
