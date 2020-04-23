@@ -82,7 +82,7 @@ require (
 	github.com/prometheus/tsdb v0.8.0 // indirect
 	github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200406202044-bf3f55d3710a
-	github.com/rancher/lasso v0.0.0-20200417051414-b55b9620e2e7
+	github.com/rancher/lasso v0.0.0-20200422230912-37670edbf743
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20200417063935-07a7713a06d9
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a

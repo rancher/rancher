@@ -109,6 +109,9 @@ func (s *sharedController) Start(ctx context.Context, workers int) error {
 
 func (s *sharedController) RegisterHandler(ctx context.Context, name string, handler SharedControllerHandler) {
 	getHandlerTransaction(ctx).do(func() {
+		// Ensure that controller is initialized
+		s.initController()
+
 		s.startLock.Lock()
 		defer s.startLock.Unlock()
 

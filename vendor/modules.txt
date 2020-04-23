@@ -365,7 +365,7 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/lasso v0.0.0-20200417051414-b55b9620e2e7
+# github.com/rancher/lasso v0.0.0-20200422230912-37670edbf743
 github.com/rancher/lasso/pkg/cache
 github.com/rancher/lasso/pkg/client
 github.com/rancher/lasso/pkg/controller
