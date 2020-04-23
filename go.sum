@@ -638,8 +638,8 @@ github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4b
 github.com/rancher/client-go v1.16.0-rancher.3 h1:bOA0zwtJi8wUeldqfrCGyDRuN6oW+zJ092i/OhWP2nU=
 github.com/rancher/client-go v1.16.0-rancher.3/go.mod h1:J69/JveO6XESwVgG53q3Uz5OSfgsv4uxpScmmyYOOlk=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190930170218-cea47774d036/go.mod h1:n9MKsJByqAqhVG61d9G5pbJuKcHUMXUw97YF8+98ar0=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20200421164156-025d63433813 h1:snKz4/kjPfAjl1NtWXV51QNh26+dfethruyKlXuhwJ0=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20200421164156-025d63433813/go.mod h1:KuGKsRpYUD0XBTTENJ1v/kBWqZUojerUGhunNuQppdU=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20200422173059-969d71dca599 h1:sAWP/6EeNGuDG2Ug3+hYYhSoFO5VlENhGTq5Z4WVsAw=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20200422173059-969d71dca599/go.mod h1:KuGKsRpYUD0XBTTENJ1v/kBWqZUojerUGhunNuQppdU=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200403233022-1167e391df73 h1:PItEde9TqbUQ/5VFnUgI7amA1vHjxzDCNAgItbNS64c=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200403233022-1167e391df73/go.mod h1:Eccd5R2X1vvjYg0O1gZ0jWAl+bDq6Egv/H2YzKz5tP0=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
@@ -659,8 +659,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8w
 github.com/rancher/remotedialer v0.2.5 h1:rNMMcJp5fU7FZ3wGFKSmDrXrSt8MYo5na4CzXddIr2A=
 github.com/rancher/remotedialer v0.2.5/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
 github.com/rancher/rke v0.3.0-rc11.0.20190930172345-88449ec73b31/go.mod h1:5uw/a0TlRpyf2ASPgEo4HBSEFsc80zuR4raGwazwJa8=
-github.com/rancher/rke v1.0.7-rc2 h1:jrjifJXfmcHqYSfIE6BIQppMI/gfPc/fWTIYTCsCv9I=
-github.com/rancher/rke v1.0.7-rc2/go.mod h1:WHYdyeKz8P+DMIq/ZGyQ1JVHuDdARQED7DF1yC9/iUw=
+github.com/rancher/rke v1.0.7-rc3 h1:rq7AbOrVXTI6qL+uOGhBc1GRZvV+SXlDjcTriWEuNds=
+github.com/rancher/rke v1.0.7-rc3/go.mod h1:AH6lL5u7o0lDzQJ8/IdKNRn0jmyEkJmhvhxPsJ/OBdk=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
