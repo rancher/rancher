@@ -107,7 +107,7 @@ def test_deploy_rancher_server():
 
 
 def test_delete_rancher_server():
-    client = get_user_client()
+    client = get_admin_client()
     clusters = client.list_cluster().data
     for cluster in clusters:
         delete_cluster(client, cluster)

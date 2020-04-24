@@ -1013,7 +1013,8 @@ def register_host_after_delay(client, cluster, node_role, delay):
         time.sleep(delay)
 
 
-def create_and_validate_custom_host(node_roles, random_cluster_name=False):
+def create_and_validate_custom_host(node_roles, random_cluster_name=False,
+                                    validate=True):
     client = get_user_client()
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
@@ -1021,8 +1022,10 @@ def create_and_validate_custom_host(node_roles, random_cluster_name=False):
 
     cluster, nodes = create_custom_host_from_nodes(aws_nodes, node_roles,
                                                    random_cluster_name)
-    cluster = validate_cluster(client, cluster, check_intermediate_state=False,
-                               k8s_version=K8S_VERSION)
+    if validate:
+        cluster = validate_cluster(client, cluster,
+                                   check_intermediate_state=False,
+                                   k8s_version=K8S_VERSION)
     return cluster, nodes
 
 
