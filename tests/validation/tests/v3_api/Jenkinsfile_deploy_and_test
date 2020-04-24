@@ -139,11 +139,14 @@ node {
 
           sh "docker stop ${setupContainer}"
           sh "docker stop ${testContainer}"
-          sh "docker stop ${deleteContainer}"
 
           sh "docker rm -v ${setupContainer}"
           sh "docker rm -v ${testContainer}"
-          sh "docker rm -v ${deleteContainer}"
+
+          if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
+            sh "docker stop ${deleteContainer}"
+            sh "docker rm -v ${deleteContainer}"
+          }
 
           sh "docker rmi ${imageName}"
         } // finally

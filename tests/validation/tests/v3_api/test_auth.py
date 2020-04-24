@@ -17,7 +17,7 @@ from .test_rke_cluster_provisioning import create_and_validate_custom_host
 Prerequisite:
 1. testautoadmin as your admin user, if the fixture detects the auth
    is disabled it will be enabled automatically.
-2. Two clusters in your setup, if none or one are detected by the fixture 
+2. Two clusters in your setup, if none or one are detected by the fixture
    will create clusters to match two
 '''
 
@@ -741,21 +741,24 @@ def create_project_client(request):
 
     cluster_total = len(client.list_cluster().data)
     node_roles = [["controlplane", "etcd", "worker"]]
+    kargs = {'node_roles': node_roles,
+             'random_cluster_name': True,
+             'validate': False}
     aws_nodes1 = cluster1 = None
     aws_nodes2 = cluster2 = None
     if cluster_total == 0:
-        cluster1, aws_nodes1 = create_and_validate_custom_host(node_roles, True)
-        cluster2, aws_nodes2 = create_and_validate_custom_host(node_roles, True)
+        cluster1, aws_nodes1 = create_and_validate_custom_host(**kargs)
+        cluster2, aws_nodes2 = create_and_validate_custom_host(**kargs)
     if cluster_total == 1:
-        cluster1, aws_nodes1 = create_and_validate_custom_host(node_roles, True)
+        cluster2, aws_nodes2 = create_and_validate_custom_host(**kargs)
 
     clusters = client.list_cluster().data
     assert len(clusters) >= 2
-    cluster1 = clusters[0]
+    cluster1 = cluster1 if cluster1 else clusters[0]
     for project in client.list_project():
         delete_existing_users_in_project(client, project)
     p1, ns1 = create_project_and_ns(ADMIN_TOKEN, cluster1)
-    cluster2 = clusters[1]
+    cluster2 = cluster2 if cluster2 else clusters[1]
     p2, ns2 = create_project_and_ns(ADMIN_TOKEN, cluster2)
     setup["cluster1"] = cluster1
     setup["project1"] = p1
@@ -773,8 +776,8 @@ def create_project_client(request):
                 cluster_cleanup(client, cluster1, aws_nodes1)
                 cluster_cleanup(client, cluster2, aws_nodes2)
         if cluster_total == 1:
-            if aws_nodes1:
-                cluster_cleanup(client, cluster1, aws_nodes1)
+            if aws_nodes2:
+                cluster_cleanup(client, cluster2, aws_nodes2)
     request.addfinalizer(fin)
 
 
