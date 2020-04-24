@@ -24,43 +24,114 @@ type nodeTemplateStore struct {
 	types.Store
 	NodePoolLister        v3.NodePoolLister
 	CloudCredentialLister corev1.SecretLister
-	NodeTemplateClient    v3.NodeTemplateInterface
+}
+
+type transformer struct {
+	NodeTemplateClient v3.NodeTemplateInterface
+}
+
+type nodeTemplateIDs struct {
+	fullOriginalID string
+	originalID     string
+	originalNs     string
+	fullMigratedID string
+	migratedID     string
+	migratedNs     string
 }
 
 func Wrap(store types.Store, npLister v3.NodePoolLister, secretLister corev1.SecretLister, ntClient v3.NodeTemplateInterface) types.Store {
-	s := &nodeTemplateStore{
-		Store:                 store,
+	t := &transformer{
+		NodeTemplateClient: ntClient,
+	}
+	s := &transform.Store{
+		Store:       store,
+		Transformer: t.filterLegacyTemplates,
+	}
+	return &nodeTemplateStore{
+		Store:                 s,
 		NodePoolLister:        npLister,
 		CloudCredentialLister: secretLister,
-		NodeTemplateClient:    ntClient,
-	}
-	return &transform.Store{
-		Store:       s,
-		Transformer: s.filterLegacyTemplates,
 	}
 }
 
-func (s *nodeTemplateStore) filterLegacyTemplates(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+func (t *transformer) filterLegacyTemplates(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 	ns, _ := data["namespaceId"].(string)
-	name, _ := data["name"].(string)
+	id, _ := data["id"].(string)
 	if ns != namespace.NodeTemplateGlobalNamespace {
-		s.NodeTemplateClient.Controller().Enqueue(ns, name)
+		// nodetemplate may not have been migrated yet, enqueue
+		t.NodeTemplateClient.Controller().Enqueue(ns, strings.TrimPrefix(id, ns+":"))
 		return nil, nil
 	}
 	return data, nil
 }
 
+func (s *nodeTemplateStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	ids := getAllIDs(id)
+	data, err := s.Store.ByID(apiContext, schema, ids.fullMigratedID)
+	if err != nil {
+		return nil, replaceIDInError(err, ids.migratedID, ids.originalID, ids.migratedNs, ids.originalNs)
+	}
+
+	data["namespaceId"] = ids.originalNs
+	data["id"] = ids.fullOriginalID
+	return data, nil
+}
+
+// getAllIDs returns the namespace and trimmed ID of the original ID
+// and its corresponding migrated ID
+func getAllIDs(id string) nodeTemplateIDs {
+	originalNs, originalID := ref.Parse(id)
+	fullMigratedID := getMigratedID(originalNs, originalID)
+	migratedNs, migratedID := ref.Parse(fullMigratedID)
+	return nodeTemplateIDs{
+		fullOriginalID: id,
+		originalID:     originalID,
+		originalNs:     originalNs,
+		fullMigratedID: fullMigratedID,
+		migratedID:     migratedID,
+		migratedNs:     migratedNs,
+	}
+}
+
+func getMigratedID(ns, id string) string {
+	if ns == namespace.NodeTemplateGlobalNamespace {
+		return fmt.Sprintf("%s:%s", ns, id)
+	}
+
+	return fmt.Sprintf("%s:nt-%s-%s", namespace.NodeTemplateGlobalNamespace, ns, id)
+}
+
+func replaceIDInError(err error, id, newID, ns, newNs string) error {
+	if apiError, ok := err.(*httperror.APIError); ok {
+		msg := strings.Replace(apiError.Message, id, newID, -1)
+		msg = strings.Replace(msg, ns, newNs, -1)
+		err = httperror.NewAPIError(apiError.Code, msg)
+	}
+	return err
+}
+
 func (s *nodeTemplateStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	ids := getAllIDs(id)
 	pools, err := s.NodePoolLister.List("", labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	for _, pool := range pools {
-		if pool.Spec.NodeTemplateName == id {
+		if pool.Spec.NodeTemplateName == ids.fullMigratedID {
 			return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "Template is in use by a node pool.")
 		}
 	}
-	return s.Store.Delete(apiContext, schema, id)
+	data, err := s.Store.Delete(apiContext, schema, ids.fullMigratedID)
+	if err != nil {
+		return nil, replaceIDInError(err, ids.migratedID, ids.originalID, ids.migratedNs, ids.originalNs)
+	}
+
+	if data != nil {
+		data["namespaceId"] = ids.originalNs
+		data["id"] = ids.fullOriginalID
+	}
+
+	return data, nil
 }
 
 func (s *nodeTemplateStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -74,7 +145,16 @@ func (s *nodeTemplateStore) Update(apiContext *types.APIContext, schema *types.S
 	if err := s.replaceCloudCredFields(apiContext, data); err != nil {
 		return data, err
 	}
-	return s.Store.Update(apiContext, schema, data, id)
+
+	ids := getAllIDs(id)
+	data, err := s.Store.Update(apiContext, schema, data, ids.fullMigratedID)
+	if err != nil {
+		return nil, replaceIDInError(err, ids.migratedID, ids.originalID, ids.migratedNs, ids.originalNs)
+	}
+
+	data["namespaceId"] = ids.originalNs
+	data["id"] = ids.fullOriginalID
+	return data, nil
 }
 
 func (s *nodeTemplateStore) replaceCloudCredFields(apiContext *types.APIContext, data map[string]interface{}) error {
