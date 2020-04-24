@@ -172,7 +172,7 @@ func (s *RegistryCertSyncer) generateCert(clusterID, projectID string) (*x509.Ce
 			DNSNames: []string{
 				utils.RegistryName,
 				fmt.Sprintf("%s.%s", utils.RegistryName, ns),
-				fmt.Sprintf("%s.%s.svc.cluster.local", utils.RegistryName, ns),
+				fmt.Sprintf("%s.%s.svc", utils.RegistryName, ns),
 			},
 		},
 	}
