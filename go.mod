@@ -68,6 +68,7 @@ require (
 	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
+	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.4.0
