@@ -165,12 +165,6 @@ func (s *sharedControllerFactory) ForResource(gvr schema.GroupVersionResource, n
 				RateLimiter: rateLimiter,
 			})
 
-			var workers int
-			if s.started {
-				workers, err = s.getWorkers(gvr, 0)
-				go controllerResult.Start(s.runningContext, workers)
-			}
-
 			return c, err
 		},
 		handler: handler,
