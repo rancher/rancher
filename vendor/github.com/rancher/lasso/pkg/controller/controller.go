@@ -36,7 +36,7 @@ type Controller interface {
 }
 
 type controller struct {
-	enqueueLock sync.Mutex
+	startLock sync.Mutex
 
 	name        string
 	workqueue   workqueue.RateLimitingInterface
@@ -45,6 +45,7 @@ type controller struct {
 	handler     Handler
 	gvk         schema.GroupVersionKind
 	startKeys   []startKey
+	started     bool
 }
 
 type startKey struct {
@@ -97,7 +98,7 @@ func (c *controller) GroupVersionKind() schema.GroupVersionKind {
 }
 
 func (c *controller) run(workers int, stopCh <-chan struct{}) {
-	c.enqueueLock.Lock()
+	c.startLock.Lock()
 	// we have to defer queue creation until we have a stopCh available because a workqueue
 	// will create a goroutine under the hood.  It we instantiate a workqueue we must have
 	// a mechanism to Shutdown it down.  Without the stopCh we don't know when to shutdown
@@ -111,7 +112,7 @@ func (c *controller) run(workers int, stopCh <-chan struct{}) {
 		}
 	}
 	c.startKeys = nil
-	c.enqueueLock.Unlock()
+	c.startLock.Unlock()
 
 	defer utilruntime.HandleCrash()
 	defer func() {
@@ -132,11 +133,19 @@ func (c *controller) run(workers int, stopCh <-chan struct{}) {
 }
 
 func (c *controller) Start(ctx context.Context, workers int) error {
+	c.startLock.Lock()
+	defer c.startLock.Unlock()
+
+	if c.started {
+		return nil
+	}
+
 	if ok := cache.WaitForCacheSync(ctx.Done(), c.informer.HasSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
 	go c.run(workers, ctx.Done())
+	c.started = true
 	return nil
 }
 
@@ -197,8 +206,8 @@ func (c *controller) syncHandler(key string) error {
 }
 
 func (c *controller) EnqueueKey(key string) {
-	c.enqueueLock.Lock()
-	defer c.enqueueLock.Unlock()
+	c.startLock.Lock()
+	defer c.startLock.Unlock()
 
 	if c.workqueue == nil {
 		c.workqueue.AddRateLimited(key)
@@ -210,8 +219,8 @@ func (c *controller) EnqueueKey(key string) {
 func (c *controller) Enqueue(namespace, name string) {
 	key := keyFunc(namespace, name)
 
-	c.enqueueLock.Lock()
-	defer c.enqueueLock.Unlock()
+	c.startLock.Lock()
+	defer c.startLock.Unlock()
 
 	if c.workqueue == nil {
 		c.startKeys = append(c.startKeys, startKey{key: key})
@@ -223,8 +232,8 @@ func (c *controller) Enqueue(namespace, name string) {
 func (c *controller) EnqueueAfter(namespace, name string, duration time.Duration) {
 	key := keyFunc(namespace, name)
 
-	c.enqueueLock.Lock()
-	defer c.enqueueLock.Unlock()
+	c.startLock.Lock()
+	defer c.startLock.Unlock()
 
 	if c.workqueue == nil {
 		c.startKeys = append(c.startKeys, startKey{key: key, after: duration})
@@ -247,13 +256,13 @@ func (c *controller) enqueue(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	c.enqueueLock.Lock()
+	c.startLock.Lock()
 	if c.workqueue == nil {
 		c.startKeys = append(c.startKeys, startKey{key: key})
 	} else {
 		c.workqueue.Add(key)
 	}
-	c.enqueueLock.Unlock()
+	c.startLock.Unlock()
 }
 
 func (c *controller) handleObject(obj interface{}) {
