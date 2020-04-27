@@ -83,9 +83,8 @@ type clusterController struct {
 	groupResource schema.GroupResource
 }
 
-func NewClusterController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) ClusterController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewClusterController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ClusterController {
+	c := controller.ForResource(gvk.GroupVersion().WithResource(resource), namespaced)
 	return &clusterController{
 		controller: c,
 		client:     c.Client(),

@@ -45,8 +45,8 @@ type version struct {
 }
 
 func (c *version) Cluster() ClusterController {
-	return NewClusterController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", c.controllerFactory)
+	return NewClusterController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", false, c.controllerFactory)
 }
 func (c *version) User() UserController {
-	return NewUserController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "User"}, "users", c.controllerFactory)
+	return NewUserController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "User"}, "users", false, c.controllerFactory)
 }
