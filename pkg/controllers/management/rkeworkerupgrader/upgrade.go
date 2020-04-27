@@ -39,6 +39,12 @@ type upgradeHandler struct {
 	ctx                  context.Context
 }
 
+var defaultUpgradeStrategy = &v3.NodeUpgradeStrategy{
+	MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
+	MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
+	Drain:                      false,
+}
+
 func Register(ctx context.Context, mgmt *config.ManagementContext, scaledContext *config.ScaledContext) {
 
 	uh := &upgradeHandler{
@@ -237,11 +243,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 		clusterCopy.Status.NodeVersion++
 
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy == nil {
-			clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &v3.NodeUpgradeStrategy{
-				MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
-				MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
-				Drain:                      false,
-			}
+			clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = defaultUpgradeStrategy
 		}
 
 		var err error
@@ -259,6 +261,9 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	}
 
 	upgradeStrategy := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy
+	if upgradeStrategy == nil {
+		upgradeStrategy = defaultUpgradeStrategy
+	}
 	toDrain := upgradeStrategy.Drain
 
 	// get current upgrade status of nodes
