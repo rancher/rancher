@@ -121,19 +121,23 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 	obj, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
+		fmt.Printf("\n[Updated] Updating condition Updated for cluster %v\n", cluster.Name)
 		anno, _ := cluster.Annotations[KontainerEngineUpdate]
 		if anno == "updated" {
 			// Cluster has already been updated proceed as usual
+			fmt.Printf("\n[Updated] Anno already updated for cluster %v\n", cluster.Name)
 			setVersion(cluster)
 			return p.update(cluster, false)
 
 		} else if strings.HasPrefix(anno, "updating/") {
+			fmt.Printf("\n[Updated] Anno is %v for cluster %v\n", anno, cluster.Name)
 			// Check if it's been updating for more than 20 seconds, this lets
 			// the controller take over attempting to update the cluster
 			pieces := strings.Split(anno, "/")
 			t, err := time.Parse(time.RFC3339, pieces[1])
 			if err != nil || int(time.Since(t)/time.Second) > 20 {
 				cluster.Annotations[KontainerEngineUpdate] = "updated"
+				fmt.Printf("\n[Updated] Updating cluster %v due to some error?\n", cluster.Name)
 				return p.Clusters.Update(cluster)
 			}
 			// Go routine is already running to update the cluster so wait
@@ -241,6 +245,7 @@ func (p *Provisioner) setKontainerEngineUpdate(cluster *v3.Cluster, anno string)
 		}
 
 		newCluster.Annotations[KontainerEngineUpdate] = anno
+		fmt.Printf("\n[setKontainerEngineUpdate] Updating cluster %v\n", newCluster.Name)
 		newCluster, err = p.Clusters.Update(newCluster)
 		if err != nil {
 			if apierrors.IsConflict(err) {
@@ -450,6 +455,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	if err != nil || spec == nil {
 		return cluster, err
 	}
+	fmt.Printf("\nnew spec not nil for cluster %v\n", cluster.Name)
 
 	if ok, delay := p.backoffFailure(cluster, spec); ok {
 		return cluster, &controller.ForgetError{Err: fmt.Errorf("backing off failure, delay: %v", delay)}
@@ -822,6 +828,8 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	if reflect.DeepEqual(oldConfig, newConfig) {
 		return nil, nil
 	}
+	fmt.Printf("\noldConfig: %v\n", oldConfig)
+	fmt.Printf("\nnewConfig: %v\n", newConfig)
 
 	newSpec, _, err = p.getConfig(true, cluster.Spec, driverName, cluster.Name)
 
