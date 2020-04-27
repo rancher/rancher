@@ -80,9 +80,8 @@ type configMapController struct {
 	groupResource schema.GroupResource
 }
 
-func NewConfigMapController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) ConfigMapController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewConfigMapController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ConfigMapController {
+	c := controller.ForResource(gvk.GroupVersion().WithResource(resource), namespaced)
 	return &configMapController{
 		controller: c,
 		client:     c.Client(),

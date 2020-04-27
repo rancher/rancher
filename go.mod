@@ -126,3 +126,9 @@ require (
 	k8s.io/kubernetes v1.18.0
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 )
+
+replace github.com/rancher/wrangler => ../wrangler
+
+replace github.com/rancher/wrangler-api => ../wrangler-api
+
+replace github.com/rancher/lasso => ../lasso

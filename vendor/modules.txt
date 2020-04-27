@@ -220,7 +220,7 @@ github.com/googleapis/gnostic/extensions
 github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.1
 github.com/gorilla/websocket
-# github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc
+# github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
 github.com/gregjones/httpcache
 github.com/gregjones/httpcache/diskcache
 # github.com/hashicorp/errwrap v1.0.0
@@ -363,7 +363,7 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/lasso v0.0.0-20200417051414-b55b9620e2e7
+# github.com/rancher/lasso v0.0.0-20200417051414-b55b9620e2e7 => ../lasso
 github.com/rancher/lasso/pkg/cache
 github.com/rancher/lasso/pkg/client
 github.com/rancher/lasso/pkg/controller
@@ -535,7 +535,7 @@ github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
-# github.com/rancher/wrangler v0.6.2-0.20200417063009-962aed6a55dc
+# github.com/rancher/wrangler v0.6.2-0.20200417063009-962aed6a55dc => ../wrangler
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/broadcast
@@ -570,7 +570,7 @@ github.com/rancher/wrangler/pkg/summary
 github.com/rancher/wrangler/pkg/summary/client
 github.com/rancher/wrangler/pkg/summary/informer
 github.com/rancher/wrangler/pkg/summary/lister
-# github.com/rancher/wrangler-api v0.6.1-0.20200416053439-201927d62012
+# github.com/rancher/wrangler-api v0.6.1-0.20200416053439-201927d62012 => ../wrangler-api
 github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io
 github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1
 github.com/rancher/wrangler-api/pkg/generated/controllers/apiregistration.k8s.io

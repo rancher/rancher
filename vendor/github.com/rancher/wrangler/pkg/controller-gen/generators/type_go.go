@@ -7,7 +7,6 @@ import (
 
 	args2 "github.com/rancher/wrangler/pkg/controller-gen/args"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -55,7 +54,7 @@ func (f *typeGo) Init(c *generator.Context, w io.Writer) error {
 		"lowerName":  namer.IL(f.name.Name),
 		"plural":     plural.Name(t),
 		"version":    f.gv.Version,
-		"namespaced": !util.MustParseClientGenTags(t.SecondClosestCommentLines).NonNamespaced,
+		"namespaced": namespaced(t),
 		"hasStatus":  hasStatus(t),
 		"statusType": statusType(t),
 	}
@@ -127,9 +126,8 @@ type {{.lowerName}}Controller struct {
 	groupResource     schema.GroupResource
 }
 
-func New{{.type}}Controller(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) {{.type}}Controller {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func New{{.type}}Controller(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) {{.type}}Controller {
+	c := controller.ForResource(gvk.GroupVersion().WithResource(resource), namespaced)
 	return &{{.lowerName}}Controller{
 		controller: c,
 		client:     c.Client(),

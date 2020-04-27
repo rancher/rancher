@@ -80,9 +80,8 @@ type endpointsController struct {
 	groupResource schema.GroupResource
 }
 
-func NewEndpointsController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) EndpointsController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewEndpointsController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) EndpointsController {
+	c := controller.ForResource(gvk.GroupVersion().WithResource(resource), namespaced)
 	return &endpointsController{
 		controller: c,
 		client:     c.Client(),

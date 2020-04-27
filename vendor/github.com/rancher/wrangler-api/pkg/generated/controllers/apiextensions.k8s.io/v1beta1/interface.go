@@ -44,5 +44,5 @@ type version struct {
 }
 
 func (c *version) CustomResourceDefinition() CustomResourceDefinitionController {
-	return NewCustomResourceDefinitionController(schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1beta1", Kind: "CustomResourceDefinition"}, "customresourcedefinitions", c.controllerFactory)
+	return NewCustomResourceDefinitionController(schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1beta1", Kind: "CustomResourceDefinition"}, "customresourcedefinitions", false, c.controllerFactory)
 }

@@ -5,14 +5,11 @@ import (
 	"sync"
 	"time"
 
-	cachetools "k8s.io/client-go/tools/cache"
-
 	"github.com/rancher/lasso/pkg/cache"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/rancher/lasso/pkg/client"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	cachetools "k8s.io/client-go/tools/cache"
 )
 
 type SharedControllerHandler interface {
@@ -36,6 +33,9 @@ type sharedController struct {
 	// this allows one to create a sharedcontroller but it will not actually be started
 	// unless some aspect of the controllers informer is accessed or needed to be used
 	deferredController func() (Controller, error)
+	// this allows one to create a sharedcontroller but it will not actually be assume
+	// the type exists until it is accessed
+	deferredClient     func() (*client.Client, error)
 	sharedCacheFactory cache.SharedCacheFactory
 	controller         Controller
 	gvk                schema.GroupVersionKind
@@ -109,6 +109,9 @@ func (s *sharedController) Start(ctx context.Context, workers int) error {
 
 func (s *sharedController) RegisterHandler(ctx context.Context, name string, handler SharedControllerHandler) {
 	getHandlerTransaction(ctx).do(func() {
+		// Ensure that controller is initialized
+		s.initController()
+
 		s.startLock.Lock()
 		defer s.startLock.Unlock()
 

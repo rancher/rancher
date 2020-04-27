@@ -80,9 +80,8 @@ type roleBindingController struct {
 	groupResource schema.GroupResource
 }
 
-func NewRoleBindingController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) RoleBindingController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewRoleBindingController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) RoleBindingController {
+	c := controller.ForResource(gvk.GroupVersion().WithResource(resource), namespaced)
 	return &roleBindingController{
 		controller: c,
 		client:     c.Client(),

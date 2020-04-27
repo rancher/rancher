@@ -83,9 +83,8 @@ type podController struct {
 	groupResource schema.GroupResource
 }
 
-func NewPodController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) PodController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewPodController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) PodController {
+	c := controller.ForResource(gvk.GroupVersion().WithResource(resource), namespaced)
 	return &podController{
 		controller: c,
 		client:     c.Client(),

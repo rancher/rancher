@@ -20,9 +20,11 @@ type SharedClientFactoryOptions struct {
 
 type SharedClientFactory interface {
 	ForKind(gvk schema.GroupVersionKind) (*Client, error)
-	ForResource(gvr schema.GroupVersionResource) (*Client, error)
+	ForResource(gvr schema.GroupVersionResource, namespaced bool) *Client
 	NewObjects(gvk schema.GroupVersionKind) (runtime.Object, runtime.Object, error)
-	GVK(obj runtime.Object) (schema.GroupVersionKind, error)
+	GVKForObject(obj runtime.Object) (schema.GroupVersionKind, error)
+	GVKForResource(gvr schema.GroupVersionResource) (schema.GroupVersionKind, error)
+	ResourceForGVK(gvk schema.GroupVersionKind) (schema.GroupVersionResource, bool, error)
 }
 
 type sharedClientFactory struct {
@@ -78,7 +80,25 @@ func applyDefaults(config *rest.Config, opts *SharedClientFactoryOptions) (*Shar
 	return &newOpts, nil
 }
 
-func (s *sharedClientFactory) GVK(obj runtime.Object) (schema.GroupVersionKind, error) {
+func (s *sharedClientFactory) GVKForResource(gvr schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	return s.Mapper.KindFor(gvr)
+}
+
+func (s *sharedClientFactory) ResourceForGVK(gvk schema.GroupVersionKind) (schema.GroupVersionResource, bool, error) {
+	mapping, err := s.Mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return schema.GroupVersionResource{}, false, err
+	}
+
+	nsed, err := IsNamespaced(mapping.Resource, s.Mapper)
+	if err != nil {
+		return schema.GroupVersionResource{}, false, err
+	}
+
+	return mapping.Resource, nsed, nil
+}
+
+func (s *sharedClientFactory) GVKForObject(obj runtime.Object) (schema.GroupVersionKind, error) {
 	gvks, _, err := s.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return schema.GroupVersionKind{}, err
@@ -104,18 +124,18 @@ func (s *sharedClientFactory) NewObjects(gvk schema.GroupVersionKind) (runtime.O
 }
 
 func (s *sharedClientFactory) ForKind(gvk schema.GroupVersionKind) (*Client, error) {
-	mapping, err := s.Mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	gvr, nsed, err := s.ResourceForGVK(gvk)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.ForResource(mapping.Resource)
+	return s.ForResource(gvr, nsed), nil
 }
 
-func (s *sharedClientFactory) ForResource(gvr schema.GroupVersionResource) (*Client, error) {
+func (s *sharedClientFactory) ForResource(gvr schema.GroupVersionResource, namespaced bool) *Client {
 	client := s.getClient(gvr)
 	if client != nil {
-		return client, nil
+		return client
 	}
 
 	s.createLock.Lock()
@@ -123,16 +143,13 @@ func (s *sharedClientFactory) ForResource(gvr schema.GroupVersionResource) (*Cli
 
 	client = s.clients[gvr]
 	if client != nil {
-		return client, nil
+		return client
 	}
 
-	client, err := NewClient(gvr, s.Mapper, s.rest)
-	if err != nil {
-		return nil, err
-	}
+	client = NewClient(gvr, namespaced, s.rest)
 
 	s.clients[gvr] = client
-	return client, nil
+	return client
 }
 
 func (s *sharedClientFactory) getClient(gvr schema.GroupVersionResource) *Client {

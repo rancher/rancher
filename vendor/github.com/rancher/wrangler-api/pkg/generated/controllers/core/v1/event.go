@@ -80,9 +80,8 @@ type eventController struct {
 	groupResource schema.GroupResource
 }
 
-func NewEventController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) EventController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewEventController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) EventController {
+	c := controller.ForResource(gvk.GroupVersion().WithResource(resource), namespaced)
 	return &eventController{
 		controller: c,
 		client:     c.Client(),
