@@ -563,7 +563,9 @@ def run_command_with_stderr(command, log_out=True):
         returncode = e.returncode
 
     if log_out:
-        print("returns: \t{0}".format(returncode))
+        print("return code: \t{0}".format(returncode))
+        if returncode != 0:
+            print("output: \t{0}".format(output))
 
     return output
 

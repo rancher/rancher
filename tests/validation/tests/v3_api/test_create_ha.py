@@ -63,8 +63,8 @@ def test_upgrade_ha(precheck_upgrade_options):
 def ha_setup(install_cm=True):
     print(RANCHER_HA_HOSTNAME)
     nodes = create_resources()
-    rke_config = create_rke_cluster_config(nodes)
-    create_rke_cluster(rke_config)
+    rke_config_path = create_rke_cluster_config(nodes)
+    create_rke_cluster(rke_config_path)
     if install_cm:
         install_cert_manager()
     add_repo_create_namespace()
@@ -277,6 +277,7 @@ def create_rke_cluster_config(aws_nodes):
                                   aws_nodes[2].private_ip_address)
 
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
+    print("cluster-ha-filled.yml: \n" + rkeconfig + "\n")
 
     clusterfilepath = DATA_SUBDIR + "/" + "cluster-ha-filled.yml"
 
