@@ -391,7 +391,8 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, err
 			continue
 		}
 
-		if node.Status.NodePlan == nil {
+		if node.Status.NodePlan == nil || v3.NodeConditionRegistered.IsUnknown(node) {
+			// node's not yet registered, change in its node plan should do nothing for cluster upgrade
 			continue
 		}
 
