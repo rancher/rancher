@@ -564,10 +564,6 @@ func (md *MetadataController) updateSettings(maxVersionForMajorK8sVersion map[st
 		return err
 	}
 
-	if err := md.updateSettingDefaultFromFields(updateSettings); err != nil {
-		return err
-	}
-
 	if !userUpdated {
 		if err := md.updateSettingFromFields(updateSettings, map[string]string{}); err != nil {
 			return err
@@ -709,36 +705,6 @@ func (md *MetadataController) updateSettingFromFields(updateField map[string]str
 		}
 	}
 	return nil
-}
-
-func (md *MetadataController) updateSettingDefaultFromFields(updateField map[string]string) error {
-	for key := range rancherUpdateSettingMap {
-		val, ok := updateField[key]
-		if !ok {
-			return fmt.Errorf("driverMetadata: default value not present for setting %s", key)
-		}
-		setting, err := md.SettingLister.Get("", key)
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				return err
-			}
-			setting, err = md.Settings.Get(key, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-		}
-		if setting.Default == val {
-			continue
-		}
-		settingCopy := setting.DeepCopy()
-		settingCopy.Default = val
-		_, err = md.Settings.Update(settingCopy)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-
 }
 
 func getUserSettings(userSettings map[string]string, defaultK8sVersions map[string]string) (map[string]string, map[string]bool, error) {
