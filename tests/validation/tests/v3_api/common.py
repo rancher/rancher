@@ -211,8 +211,8 @@ def get_user_client():
     return rancher.Client(url=CATTLE_API_URL, token=USER_TOKEN, verify=False)
 
 
-def get_client_for_token(token):
-    return rancher.Client(url=CATTLE_API_URL, token=token, verify=False)
+def get_client_for_token(token, url=CATTLE_API_URL):
+    return rancher.Client(url=url, token=token, verify=False)
 
 
 def get_project_client_for_token(project, token):
@@ -291,7 +291,8 @@ def compare_versions(v1, v2):
 
 
 def create_project_and_ns(token, cluster, project_name=None, ns_name=None):
-    client = get_client_for_token(token)
+    server_url = cluster.links['self'].split("/clusters")[0]
+    client = get_client_for_token(token, server_url)
     p = create_project(client, cluster, project_name)
     c_client = get_cluster_client_for_token(cluster, token)
     ns = create_ns(c_client, cluster, p, ns_name)
@@ -563,7 +564,9 @@ def run_command_with_stderr(command, log_out=True):
         returncode = e.returncode
 
     if log_out:
-        print("returns: \t{0}".format(returncode))
+        print("return code: \t{0}".format(returncode))
+        if returncode != 0:
+            print("output: \t{0}".format(output))
 
     return output
 

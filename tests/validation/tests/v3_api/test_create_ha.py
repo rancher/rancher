@@ -4,14 +4,18 @@ import pytest
 import rancher
 import time
 
-from .common import create_config_file
 from .common import create_user
+from .common import create_config_file
+from .common import get_custom_host_registration_cmd
 from .common import random_test_name
+from .common import random_name
 from .common import readDataFile
 from .common import run_command_with_stderr
 from .common import set_url_password_token
-
+from .common import validate_cluster
+from .common import wait_until_active
 from lib.aws import AmazonWebServices
+from .test_rke_cluster_provisioning import rke_config
 
 DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            'resource')
@@ -21,9 +25,10 @@ test_run_id = random_test_name("auto")
 # if hostname is not provided, generate one ( to support onTag )
 RANCHER_HOSTNAME_PREFIX = os.environ.get("RANCHER_HOSTNAME_PREFIX",
                                          test_run_id)
-resource_suffix = test_run_id + "-" + RANCHER_HOSTNAME_PREFIX
 RANCHER_HA_HOSTNAME = os.environ.get(
     "RANCHER_HA_HOSTNAME", RANCHER_HOSTNAME_PREFIX + ".qa.rancher.space")
+resource_prefix = RANCHER_HA_HOSTNAME.split(".qa.rancher.space")[0]
+
 RANCHER_IMAGE_TAG = os.environ.get("RANCHER_IMAGE_TAG")
 RANCHER_SERVER_URL = "https://" + RANCHER_HA_HOSTNAME
 RANCHER_HELM_REPO = os.environ.get("RANCHER_HELM_REPO", "latest")
@@ -43,41 +48,67 @@ kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
 export_cmd = "export KUBECONFIG=" + kubeconfig_path
 
 
-def test_create_ha(precheck_certificate_options):
+def test_install_rancher_ha(precheck_certificate_options):
     cm_install = True
-
     if "byo-" in RANCHER_HA_CERT_OPTION:
         cm_install = False
+    print("The hostname is: {}".format(RANCHER_HA_HOSTNAME))
 
-    ha_setup(install_cm=cm_install)
+    # prepare an RKE cluster and other resources
+    # if no kubeconfig file is provided
+    if RANCHER_HA_KUBECONFIG is None:
+        nodes = create_resources()
+        config_path = create_rke_cluster_config(nodes)
+        create_rke_cluster(config_path)
+    else:
+        write_kubeconfig()
+
+    if cm_install:
+        install_cert_manager()
+    add_repo_create_namespace()
     install_rancher()
-    ha_finalize()
+    wait_until_active(url=RANCHER_SERVER_URL)
+    print_kubeconfig()
+    admin_client = set_url_and_password()
+    create_custom_cluster(admin_client)
 
 
-def test_upgrade_ha(precheck_upgrade_options):
+def create_custom_cluster(admin_client):
+    auth_url = RANCHER_SERVER_URL + \
+               "/v3-public/localproviders/local?action=login"
+    user, user_token = create_user(admin_client, auth_url)
+
+    aws_nodes = \
+        AmazonWebServices().create_multiple_nodes(
+            5, random_test_name(resource_prefix + "-custom"))
+    node_roles = [["controlplane"], ["etcd"],
+                  ["worker"], ["worker"], ["worker"]]
+    client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
+                            token=user_token, verify=False)
+    cluster = client.create_cluster(
+        name=random_name(),
+        driver="rancherKubernetesEngine",
+        rancherKubernetesEngineConfig=rke_config)
+    assert cluster.state == "provisioning"
+    i = 0
+    for aws_node in aws_nodes:
+        docker_run_cmd = \
+            get_custom_host_registration_cmd(
+                client, cluster, node_roles[i], aws_node)
+        aws_node.execute_command(docker_run_cmd)
+        i += 1
+    validate_cluster(client, cluster, userToken=user_token)
+
+
+def test_upgrade_rancher_ha(precheck_upgrade_options):
     write_kubeconfig()
     add_repo_create_namespace()
     install_rancher(upgrade=True)
 
 
-def ha_setup(install_cm=True):
-    print(RANCHER_HA_HOSTNAME)
-    nodes = create_resources()
-    rke_config = create_rke_cluster_config(nodes)
-    create_rke_cluster(rke_config)
-    if install_cm:
-        install_cert_manager()
-    add_repo_create_namespace()
-
-
-def ha_finalize():
-    set_url_and_password()
-    print_kubeconfig()
-
-
 def create_resources():
     # Create nlb and grab ARN & dns name
-    lb = AmazonWebServices().create_network_lb(name="nlb-" + resource_suffix)
+    lb = AmazonWebServices().create_network_lb(name=resource_prefix + "-nlb")
     lbArn = lb["LoadBalancers"][0]["LoadBalancerArn"]
     lbDns = lb["LoadBalancers"][0]["DNSName"]
 
@@ -87,9 +118,9 @@ def create_resources():
 
     # Create the target groups
     tg80 = AmazonWebServices(). \
-        create_ha_target_group(80, "tg-80-" + resource_suffix)
+        create_ha_target_group(80, resource_prefix + "-tg-80")
     tg443 = AmazonWebServices(). \
-        create_ha_target_group(443, "tg-443-" + resource_suffix)
+        create_ha_target_group(443, resource_prefix + "-tg-443")
     tg80Arn = tg80["TargetGroups"][0]["TargetGroupArn"]
     tg443Arn = tg443["TargetGroups"][0]["TargetGroupArn"]
 
@@ -102,7 +133,8 @@ def create_resources():
                                                targetGroupARN=tg443Arn)
 
     targets = []
-    aws_nodes = AmazonWebServices().create_multiple_nodes(3, resource_suffix)
+    aws_nodes = AmazonWebServices().\
+        create_multiple_nodes(3, resource_prefix + "-server")
     assert len(aws_nodes) == 3
 
     for aws_node in aws_nodes:
@@ -244,6 +276,7 @@ def set_url_and_password():
     env_details += "env.ADMIN_TOKEN='" + admin_token + "'\n"
     env_details += "env.USER_TOKEN='" + user_token + "'\n"
     create_config_file(env_details)
+    return admin_client
 
 
 def create_rke_cluster(config_path):
@@ -277,6 +310,7 @@ def create_rke_cluster_config(aws_nodes):
                                   aws_nodes[2].private_ip_address)
 
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
+    print("cluster-ha-filled.yml: \n" + rkeconfig + "\n")
 
     clusterfilepath = DATA_SUBDIR + "/" + "cluster-ha-filled.yml"
 
