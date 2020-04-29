@@ -91,7 +91,7 @@ rke_config_windows = {
             "type": "kubeAPIService"}},
     "sshAgentAuth": False}
 
-rke_config_cis = {
+rke_config_cis_1_4 = {
     "addonJobTimeout": 30,
     "authentication":
     {"strategy": "x509",
@@ -186,9 +186,76 @@ rke_config_cis = {
         }},
     "sshAgentAuth": False}
 
+rke_config_cis_1_5 = {
+    "addonJobTimeout": 30,
+    "ignoreDockerVersion": True,
+    "services": {
+        "etcd": {
+            "gid": 52034,
+            "uid": 52034,
+            "type": "etcdService"},
+        "kubeApi": {
+            "podSecurityPolicy": True,
+            "secretsEncryptionConfig":
+                {"enabled": True},
+            "auditLog":
+                {"enabled": True},
+            "eventRateLimit":
+                {"enabled": True},
+            "type": "kubeAPIService"},
+        "kubeController": {
+            "extraArgs": {
+                "feature-gates": "RotateKubeletServerCertificate=true",
+            },
+        },
+        "scheduler": {
+            "image": "",
+            "extraArgs": {},
+            "extraBinds": [],
+            "extraEnv": []
+        },
+        "kubelet": {
+            "generateServingCertificate": True,
+            "extraArgs": {
+                "feature-gates": "RotateKubeletServerCertificate=true",
+                "protect-kernel-defaults": True,
+                "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_"
+                                     "128_GCM_SHA256,"
+                                     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,"
+                                     "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,"
+                                     "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,"
+                                     "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,"
+                                     "TLS_ECDHE_ECDSA_WITH_AES_"
+                                     "256_GCM_SHA384,"
+                                     "TLS_RSA_WITH_AES_256_GCM_SHA384,"
+                                     "TLS_RSA_WITH_AES_128_GCM_SHA256"
+            },
+            "extraBinds": [],
+            "extraEnv": [],
+            "clusterDomain": "",
+            "infraContainerImage": "",
+            "clusterDnsServer": "",
+            "failSwapOn": False
+        },
+    },
+    "network":
+        {"plugin": "",
+         "options": {},
+         "mtu": 0,
+         "nodeSelector": {}},
+    "authentication": {
+        "strategy": "",
+        "sans": [],
+        "webhook": None,
+    },
+    "sshAgentAuth": False,
+    "windowsPreferredCluster": False
+}
+
 if K8S_VERSION != "":
     rke_config["kubernetesVersion"] = K8S_VERSION
-    rke_config_cis["kubernetesVersion"] = K8S_VERSION
+    rke_config_cis_1_4["kubernetesVersion"] = K8S_VERSION
+    rke_config_cis_1_5["kubernetesVersion"] = K8S_VERSION
 
 
 rke_config_aws_provider = rke_config.copy()
@@ -221,14 +288,15 @@ if_test_edit_cluster = pytest.mark.skipif(
 
 def test_cis_complaint():
     # rke_config_cis
-    aws_nodes = \
-        AmazonWebServices().create_multiple_nodes(
-            8, random_test_name(HOST_NAME))
     node_roles = [
         ["controlplane"], ["controlplane"],
         ["etcd"], ["etcd"], ["etcd"],
         ["worker"], ["worker"], ["worker"]
     ]
+    aws_nodes = \
+        AmazonWebServices().create_multiple_nodes(
+            len(node_roles), random_test_name(HOST_NAME))
+    rke_config_cis = get_cis_rke_config()
     client = get_admin_client()
     cluster = client.create_cluster(
         name=evaluate_clustername(),
@@ -236,19 +304,12 @@ def test_cis_complaint():
         rancherKubernetesEngineConfig=rke_config_cis,
         defaultPodSecurityPolicyTemplateId=POD_SECURITY_POLICY_TEMPLATE)
     assert cluster.state == "provisioning"
-    i = 0
-    for aws_node in aws_nodes:
-        aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-        aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-        aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
-        if node_roles[i] == ["etcd"]:
-            aws_node.execute_command("sudo useradd etcd")
-        docker_run_cmd = \
-            get_custom_host_registration_cmd(client, cluster, node_roles[i],
-                                             aws_node)
-        aws_node.execute_command(docker_run_cmd)
-        i += 1
-    cluster = validate_cluster_state(client, cluster)
+    configure_cis_requirements(aws_nodes,
+                               CIS_SCAN_PROFILE,
+                               node_roles,
+                               client,
+                               cluster
+                               )
     cluster_cleanup(client, cluster, aws_nodes)
 
 
@@ -1069,3 +1130,21 @@ def create_custom_host_from_nodes(nodes, node_roles,
                                      check_intermediate_state=False)
 
     return cluster, nodes
+
+
+def get_cis_rke_config(profile=CIS_SCAN_PROFILE):
+    rke_tmp_config = None
+    rke_config_dict = None
+    try:
+        rke_config_dict = {
+            'rke-cis-1.4': rke_config_cis_1_4,
+            'rke-cis-1.5': rke_config_cis_1_5
+        }
+        rke_tmp_config = rke_config_dict[profile]
+    except KeyError:
+        print('Invalid RKE CIS profile. Supported profiles: ')
+        for k in rke_config_dict.keys():
+            print("{0}".format(k))
+    else:
+        print('Valid RKE CIS Profile loaded: {0}'.format(profile))
+    return rke_tmp_config

@@ -1,14 +1,12 @@
 import pytest
 import requests
 import time
-import os
 from rancher import ApiError
 from lib.aws import AmazonWebServices
-from .common import CLUSTER_MEMBER
+from .common import CLUSTER_MEMBER, configure_cis_requirements
 from .common import CLUSTER_OWNER
+from .common import CIS_SCAN_PROFILE
 from .common import cluster_cleanup
-from .common import create_kubeconfig
-from .common import execute_kubectl_cmd
 from .common import get_user_client
 from .common import get_user_client_and_cluster
 from .common import get_custom_host_registration_cmd
@@ -25,10 +23,7 @@ from .common import USER_TOKEN
 from .common import validate_cluster_state
 from .common import wait_for_cluster_node_count
 from .test_rke_cluster_provisioning import HOST_NAME, \
-    rke_config_cis, POD_SECURITY_POLICY_TEMPLATE  # NOQA
-CIS_SCAN_PROFILE = os.environ.get('RANCHER_CIS_SCAN_PROFILE', "rke-cis-1.4")
-DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'resource')
-# As of release 2.4 default rke scan profile is "rke-cis-1.4"
+    POD_SECURITY_POLICY_TEMPLATE, get_cis_rke_config  # NOQA
 
 scan_results = {
     "rke-cis-1.4": {
@@ -37,9 +32,9 @@ scan_results = {
         "not_applicable": 19, "total": 97, "fail": 0
     },
     "rke-cis-1.5": {
-        "permissive": {"pass": 0, "fail": 0, "skip": 0},
-        "hardened": {"pass": 0, "fail": 0, "skip": 0},
-        "not_applicable": 0, "total": 0, "fail": 0
+        "permissive": {"pass": 58, "fail": 0, "skip": 14},
+        "hardened": {"pass": 72, "fail": 0, "skip": 0},
+        "not_applicable": 20, "total": 92, "fail": 0
     }
 }
 DEFAULT_TIMEOUT = 120
@@ -110,7 +105,7 @@ def test_cis_scan_skip_test_ui():
         report_link,
         token=USER_TOKEN,
         test_total=scan_results[CIS_SCAN_PROFILE]["total"],
-        tests_passed=scan_results[CIS_SCAN_PROFILE]["hardened"]["pass"]-1,
+        tests_passed=scan_results[CIS_SCAN_PROFILE]["hardened"]["pass"] - 1,
         tests_skipped=scan_results[CIS_SCAN_PROFILE]["hardened"]["skip"] + 1
     )
     print(report["results"][0]["checks"][0]["state"])
@@ -170,7 +165,7 @@ def test_cis_scan_edit_cluster():
     cluster = cluster_detail["cluster"]
     # Add 2 etcd nodes to the cluster
     for i in range(0, 2):
-        aws_node = aws_nodes[3+i]
+        aws_node = aws_nodes[3 + i]
         aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
         aws_node.execute_command("sudo sysctl -w kernel.panic=10")
         aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
@@ -199,7 +194,7 @@ def test_cis_scan_edit_cluster():
 
     # edit nodes and run command
     for i in range(0, 2):
-        aws_node = aws_nodes[3+i]
+        aws_node = aws_nodes[3 + i]
         aws_node.execute_command("sudo useradd etcd")
 
     # run CIS Scan
@@ -229,7 +224,7 @@ def test_rbac_run_scan_cluster_owner():
         test_total=scan_results[CIS_SCAN_PROFILE]["total"],
         tests_passed=scan_results[CIS_SCAN_PROFILE]["permissive"]["pass"],
         tests_skipped=scan_results[CIS_SCAN_PROFILE]["permissive"]["skip"]
-        )
+    )
 
 
 @if_test_rbac
@@ -269,34 +264,23 @@ def create_project_client(request):
     node_roles = [
         ["controlplane"], ["etcd"], ["worker"]
     ]
-    profile = CIS_SCAN_PROFILE
-    if profile == "rke-cis-1.4":
-        rke_config_temp = rke_config_cis
+    rke_config_temp = get_cis_rke_config()
     client = get_user_client()
-    cluster = client.create_cluster(name=random_test_name(),
-                                    driver="rancherKubernetesEngine",
-                                    rancherKubernetesEngineConfig=
-                                    rke_config_temp,
-                                    defaultPodSecurityPolicyTemplateId=
-                                    POD_SECURITY_POLICY_TEMPLATE)
+    cluster = client.create_cluster(
+        name=random_test_name(),
+        driver="rancherKubernetesEngine",
+        rancherKubernetesEngineConfig=rke_config_temp,
+        defaultPodSecurityPolicyTemplateId=POD_SECURITY_POLICY_TEMPLATE
+    )
     assert cluster.state == "provisioning"
-    i = 0
-    for i in range(0, 3):
-        aws_node = aws_nodes[i]
-        aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-        aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-        aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
-        if node_roles[i] == ["etcd"]:
-            aws_node.execute_command("sudo useradd etcd")
-        docker_run_cmd = \
-            get_custom_host_registration_cmd(client, cluster, node_roles[i],
-                                             aws_node)
-        aws_node.execute_command(docker_run_cmd)
-    time.sleep(5)
-    cluster = validate_cluster_state(client, cluster)
-
-    # the worklods under System project to get active
-    time.sleep(20)
+    # In the original design creates 5 nodes but only 3 are used
+    # the other 2 nodes are for test_cis_scan_edit_cluster
+    cluster = configure_cis_requirements(aws_nodes[:3],
+                                         CIS_SCAN_PROFILE,
+                                         node_roles,
+                                         client,
+                                         cluster
+                                         )
     cluster_detail["cluster"] = cluster
 
     def fin():
@@ -305,10 +289,11 @@ def create_project_client(request):
     request.addfinalizer(fin)
 
 
-def verify_cis_scan_report(report_link, token, test_total,
-                           tests_passed, tests_skipped,
-                           tests_failed=scan_results[CIS_SCAN_PROFILE]["fail"],
-                           tests_na=scan_results[CIS_SCAN_PROFILE]["not_applicable"]):
+def verify_cis_scan_report(
+        report_link, token, test_total,
+        tests_passed, tests_skipped,
+        tests_failed=scan_results[CIS_SCAN_PROFILE]["fail"],
+        tests_na=scan_results[CIS_SCAN_PROFILE]["not_applicable"]):
     head = {'Authorization': 'Bearer ' + token}
     response = requests.get(report_link, verify=False, headers=head)
     report = response.json()
