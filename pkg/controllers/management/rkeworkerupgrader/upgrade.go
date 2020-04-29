@@ -230,26 +230,34 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	defer uh.clusterLock.Unlock(clusterName)
 
 	logrus.Debugf("cluster [%s] upgrading condition: [%v] plan changed: [%v]", clusterName, v3.ClusterConditionUpgraded.IsUnknown(cluster), planChanged)
+
+	var (
+		clusterCopy *v3.Cluster
+		err         error
+	)
 	if !v3.ClusterConditionUpgraded.IsUnknown(cluster) || planChanged {
-		clusterCopy := cluster.DeepCopy()
+		clusterCopy = cluster.DeepCopy()
 		v3.ClusterConditionUpgraded.Unknown(clusterCopy)
 		v3.ClusterConditionUpgraded.Message(clusterCopy, "updating worker nodes")
 		clusterCopy.Status.NodeVersion++
-
-		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy == nil {
-			clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &v3.NodeUpgradeStrategy{
-				MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
-				MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
-				Drain:                      false,
-			}
+	}
+	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy == nil {
+		if clusterCopy == nil {
+			clusterCopy = cluster.DeepCopy()
 		}
-
-		var err error
+		clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &v3.NodeUpgradeStrategy{
+			MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
+			MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
+			Drain:                      false,
+		}
+	}
+	if clusterCopy != nil {
 		cluster, err = uh.clusters.Update(clusterCopy)
 		if err != nil {
 			return err
 		}
-		logrus.Infof("cluster [%s] worker-upgrade: updated cluster for upgrading: [%v] ", clusterName, clusterCopy.Status.NodeVersion)
+		logrus.Infof("cluster [%s] worker-upgrade: updated cluster nodeVersion [%v] upgradeStrategy [%v] ", clusterName,
+			clusterCopy.Status.NodeVersion, cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy)
 	}
 
 	logrus.Debugf("cluster [%s] worker-upgrade cluster status node version [%v]", clusterName, cluster.Status.NodeVersion)
