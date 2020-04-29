@@ -1014,23 +1014,26 @@ def register_host_after_delay(client, cluster, node_role, delay):
 
 
 def create_and_validate_custom_host(node_roles, random_cluster_name=False,
-                                    validate=True):
+                                    validate=True, version=K8S_VERSION):
+
     client = get_user_client()
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
             len(node_roles), random_test_name(HOST_NAME))
 
     cluster, nodes = create_custom_host_from_nodes(aws_nodes, node_roles,
-                                                   random_cluster_name)
+                                                   random_cluster_name,
+                                                   version=version)
     if validate:
         cluster = validate_cluster(client, cluster,
                                    check_intermediate_state=False,
-                                   k8s_version=K8S_VERSION)
+                                   k8s_version=version)
     return cluster, nodes
 
 
 def create_custom_host_from_nodes(nodes, node_roles,
-                                  random_cluster_name=False, windows=False):
+                                  random_cluster_name=False, windows=False,
+                                  version=K8S_VERSION):
     client = get_user_client()
     cluster_name = random_name() if random_cluster_name \
         else evaluate_clustername()
@@ -1039,6 +1042,8 @@ def create_custom_host_from_nodes(nodes, node_roles,
         config = rke_config_windows
     else:
         config = rke_config
+    if version != "":
+        config["kubernetesVersion"] = version
 
     cluster = client.create_cluster(name=cluster_name,
                                     driver="rancherKubernetesEngine",
