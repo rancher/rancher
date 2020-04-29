@@ -65,7 +65,7 @@ ingress:
 letsEncrypt:
   # email: none@example.com
   environment: production
-  # method: DNS-01
+  # validationmethod: DNS-01
 
 ## Set these values per the instructions at https://cert-manager.io/docs/configuration/acme/dns01/ for your provider.
 # extraletsEncryptArgs:
