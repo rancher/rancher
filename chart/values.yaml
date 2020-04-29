@@ -65,6 +65,18 @@ ingress:
 letsEncrypt:
   # email: none@example.com
   environment: production
+  # method: DNS-01
+
+## Set these values per the instructions at https://cert-manager.io/docs/configuration/acme/dns01/ for your provider.
+# extraletsEncryptArgs:
+#   cloudflare:
+#     email: me@my.org
+#     apiTokenSecretRef:
+#       name: test # Should match extraletsEncryptSecretName
+#       key: api-token
+# extraletsEncryptSecretName: test # cloudflare-api-token-secret
+# extraletsEncryptSecret:
+#   api-token: test
 
 # If you are using certs signed by a private CA set to 'true' and set the 'tls-ca'
 # in the 'rancher-system' namespace. See the README.md for details
@@ -106,5 +118,5 @@ systemDefaultRegistry: ""
 useBundledSystemChart: false
 
 # Certmanager version compatibility
-certmanager: 
+certmanager:
   version: ""
