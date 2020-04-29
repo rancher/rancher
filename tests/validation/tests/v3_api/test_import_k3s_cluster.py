@@ -17,12 +17,13 @@ HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
 RANCHER_RESOURCE_NAME = os.environ.get("RANCHER_RESOURCE_NAME", "")
 RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
 RANCHER_K3S_NO_OF_SERVER_NODES = \
-    os.environ.get("RANCHER_K3S_NO_OF_SERVER_NODES", 3)
+    os.environ.get("RANCHER_K3S_NO_OF_SERVER_NODES", 2)
 RANCHER_K3S_NO_OF_WORKER_NODES = \
-    os.environ.get("RANCHER_K3S_NO_OF_WORKER_NODES", 3)
+    os.environ.get("RANCHER_K3S_NO_OF_WORKER_NODES", 0)
 RANCHER_K3S_SERVER_FLAGS = os.environ.get("RANCHER_K3S_SERVER_FLAGS", "server")
 RANCHER_K3S_WORKER_FLAGS = os.environ.get("RANCHER_K3S_WORKER_FLAGS", "agent")
 RANCHER_QA_SPACE = os.environ.get("RANCHER_QA_SPACE", "")
+RANCHER_EC2_INSTANCE_CLASS = os.environ.get("RANCHER_EC2_INSTANCE_CLASS", "t2.medium")
 
 RANCHER_EXTERNAL_DB = os.environ.get("RANCHER_EXTERNAL_DB", "mysql")
 RANCHER_EXTERNAL_DB_VERSION = os.environ.get("RANCHER_EXTERNAL_DB_VERSION", "5.7")
@@ -30,6 +31,7 @@ RANCHER_INSTANCE_CLASS = os.environ.get("RANCHER_INSTANCE_CLASS", "db.t2.micro")
 RANCHER_DB_GROUP_NAME = os.environ.get("RANCHER_DB_GROUP_NAME", "default.mysql5.7")
 RANCHER_DB_USERNAME = os.environ.get("RANCHER_DB_USERNAME", "")
 RANCHER_DB_PASSWORD = os.environ.get("RANCHER_DB_PASSWORD", "")
+RANCHER_K3S_KUBECONFIG_PATH = DATA_SUBDIR + "/k3s_kubeconfig.yaml"
 
 
 def test_create_k3s_single_control_cluster():
@@ -85,7 +87,7 @@ def create_single_control_cluster():
 
 
 def create_multiple_control_cluster():
-    k3s_kubeconfig_file = "k3s_multiple_kubeconfig.yaml"
+    k3s_kubeconfig_file = "k3s_kubeconfig.yaml"
     k3s_clusterfilepath = DATA_SUBDIR + "/" + k3s_kubeconfig_file
 
     tf_dir = DATA_SUBDIR + "/" + "terraform/master"
@@ -106,6 +108,7 @@ def create_multiple_control_cluster():
                               'external_db_version': RANCHER_EXTERNAL_DB_VERSION,
                               'db_group_name': RANCHER_DB_GROUP_NAME,
                               'instance_class': RANCHER_INSTANCE_CLASS,
+                              'ec2_instance_class': RANCHER_EC2_INSTANCE_CLASS,
                               'username': RANCHER_DB_USERNAME,
                               'password': RANCHER_DB_PASSWORD,
                               'k3s_version': RANCHER_K3S_VERSION,
@@ -125,6 +128,7 @@ def create_multiple_control_cluster():
                               'subnets': RANCHER_SUBNETS,
                               'aws_ami': RANCHER_AWS_AMI,
                               'aws_user': RANCHER_AWS_USER,
+                              'ec2_instance_class': RANCHER_EC2_INSTANCE_CLASS,
                               'resource_name': RANCHER_RESOURCE_NAME,
                               'access_key': keyPath,
                               'k3s_version': RANCHER_K3S_VERSION,
