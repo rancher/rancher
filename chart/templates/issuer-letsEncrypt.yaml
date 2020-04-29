@@ -26,7 +26,7 @@ spec:
       name: letsencrypt-{{ .Values.letsEncrypt.environment }}
     {{- if or (.Capabilities.APIVersions.Has "cert-manager.io/v1alpha2") (and (eq (int $certmanagerVer._0) 0) (ge (int $certmanagerVer._1) 11)) }}
     solvers:
-    {{- if eq .Values.letsEncrypt.method "DNS-01" }}
+    {{- if .Values.letsEncrypt.method and eq .Values.letsEncrypt.method "DNS-01" }}
     - dns01:
 {{- if .Values.extraletsEncryptArgs }}
 {{ toYaml .Values.extraletsEncryptArgs | indent 6 }}
