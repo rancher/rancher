@@ -65,7 +65,9 @@ ingress:
 letsEncrypt:
   # email: none@example.com
   environment: production
-
+  ingress:
+    # options: traefik, nginx
+    class: ""
 # If you are using certs signed by a private CA set to 'true' and set the 'tls-ca'
 # in the 'rancher-system' namespace. See the README.md for details
 privateCA: false
