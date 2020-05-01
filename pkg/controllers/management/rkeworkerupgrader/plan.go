@@ -30,6 +30,8 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*v3
 	hostAddress := node.Status.NodeConfig.Address
 	hostDockerInfo := infos[hostAddress]
 
+	logrus.Debugf("getDockerInfo for node [%s] dockerInfo [%s]", node.Name, hostDockerInfo.DockerRootDir)
+
 	svcOptions, err := uh.getServiceOptions(rkeConfig.Version, hostDockerInfo.OSType)
 	if err != nil {
 		return nil, err
@@ -85,6 +87,8 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*v3.RK
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.Debugf("getDockerInfo for node [%s] dockerInfo [%s]", node.Name, hostDockerInfo.DockerRootDir)
 
 	np := &v3.RKEConfigNodePlan{}
 

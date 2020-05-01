@@ -161,7 +161,10 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 }
 
 func (uh *upgradeHandler) updateNodePlan(node *v3.Node, cluster *v3.Cluster, create bool) (*v3.Node, error) {
-	if node.Status.NodeConfig == nil {
+	if node.Status.NodeConfig == nil || node.Status.DockerInfo == nil {
+		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] waiting for node status sync: "+
+			"nodeConfigNil [%v] dockerInfoNil [%v]", cluster.Name, node.Name, node.Status.NodeConfig == nil, node.Status.DockerInfo == nil)
+		// can't create correct node plan if node config or docker info hasn't been set
 		return node, nil
 	}
 	nodePlan, err := uh.getNodePlan(node, cluster)
@@ -230,26 +233,34 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	defer uh.clusterLock.Unlock(clusterName)
 
 	logrus.Debugf("cluster [%s] upgrading condition: [%v] plan changed: [%v]", clusterName, v3.ClusterConditionUpgraded.IsUnknown(cluster), planChanged)
+
+	var (
+		clusterCopy *v3.Cluster
+		err         error
+	)
 	if !v3.ClusterConditionUpgraded.IsUnknown(cluster) || planChanged {
-		clusterCopy := cluster.DeepCopy()
+		clusterCopy = cluster.DeepCopy()
 		v3.ClusterConditionUpgraded.Unknown(clusterCopy)
 		v3.ClusterConditionUpgraded.Message(clusterCopy, "updating worker nodes")
 		clusterCopy.Status.NodeVersion++
-
-		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy == nil {
-			clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &v3.NodeUpgradeStrategy{
-				MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
-				MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
-				Drain:                      false,
-			}
+	}
+	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy == nil {
+		if clusterCopy == nil {
+			clusterCopy = cluster.DeepCopy()
 		}
-
-		var err error
+		clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &v3.NodeUpgradeStrategy{
+			MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
+			MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
+			Drain:                      false,
+		}
+	}
+	if clusterCopy != nil {
 		cluster, err = uh.clusters.Update(clusterCopy)
 		if err != nil {
 			return err
 		}
-		logrus.Infof("cluster [%s] worker-upgrade: updated cluster for upgrading: [%v] ", clusterName, clusterCopy.Status.NodeVersion)
+		logrus.Infof("cluster [%s] worker-upgrade: updated cluster nodeVersion [%v] upgradeStrategy [%v] ", clusterName,
+			clusterCopy.Status.NodeVersion, cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy)
 	}
 
 	logrus.Debugf("cluster [%s] worker-upgrade cluster status node version [%v]", clusterName, cluster.Status.NodeVersion)
@@ -380,7 +391,8 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, err
 			continue
 		}
 
-		if node.Status.NodePlan == nil {
+		if node.Status.NodePlan == nil || v3.NodeConditionRegistered.IsUnknown(node) {
+			// node's not yet registered, change in its node plan should do nothing for cluster upgrade
 			continue
 		}
 
