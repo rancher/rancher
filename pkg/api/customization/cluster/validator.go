@@ -21,6 +21,7 @@ import (
 	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/robfig/cron"
+	"github.com/sirupsen/logrus"
 )
 
 type Validator struct {
@@ -37,35 +38,49 @@ type Validator struct {
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	var spec v3.ClusterSpec
-
-	if err := convert.ToObj(data, &spec); err != nil {
+	var clusterSpec v3.ClusterSpec
+	var clientClusterSpec mgmtclient.Cluster
+	logrus.Tracef("Validator: data: %+v\n", data)
+	if err := convert.ToObj(data, &clusterSpec); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Cluster spec conversion error")
 	}
+
+	if err := convert.ToObj(data, &clientClusterSpec); err != nil {
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Cluster spec conversion error")
+	}
+
+	logrus.Tracef("Validator: clusterSpec: %+v\n", &clusterSpec)
+	logrus.Tracef("Validator: clientClusterSpec: %+v\n", &clientClusterSpec)
 
 	if err := v.validateEnforcement(request, data); err != nil {
 		return err
 	}
 
-	if err := v.validateLocalClusterAuthEndpoint(request, &spec); err != nil {
+	if err := v.validateLocalClusterAuthEndpoint(request, &clusterSpec); err != nil {
 		return err
 	}
 
-	if err := v.validateK3sVersionUpgrade(request, &spec); err != nil {
+	if err := v.validateK3sVersionUpgrade(request, &clusterSpec); err != nil {
 		return err
 	}
 
-	if err := v.validateScheduledClusterScan(&spec); err != nil {
+	if err := v.validateScheduledClusterScan(&clientClusterSpec); err != nil {
 		return err
 	}
 
-	if err := v.validateGenericEngineConfig(request, &spec); err != nil {
+	if err := v.validateGenericEngineConfig(request, &clusterSpec); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (v *Validator) validateScheduledClusterScan(spec *v3.ClusterSpec) error {
+func (v *Validator) validateScheduledClusterScan(spec *mgmtclient.Cluster) error {
+	// If this cluster is created using a template, we dont have the version in the provided data, skip
+	if spec.ClusterTemplateRevisionID != "" {
+		return nil
+	}
+
+	// If CIS scan is not present/enabled, skip
 	if spec.ScheduledClusterScan == nil ||
 		(spec.ScheduledClusterScan != nil && !spec.ScheduledClusterScan.Enabled) {
 		return nil
@@ -85,12 +100,17 @@ func (v *Validator) validateScheduledClusterScan(spec *v3.ClusterSpec) error {
 	return validateScheduledClusterScan(spec)
 }
 
-func validateScheduledClusterScan(spec *v3.ClusterSpec) error {
+func validateScheduledClusterScan(spec *mgmtclient.Cluster) error {
+	// If this cluster is created using a template, we dont have the version in the provided data, skip
+	if spec.ClusterTemplateRevisionID != "" {
+		return nil
+	}
+
 	if spec.ScheduledClusterScan.ScanConfig != nil &&
 		spec.ScheduledClusterScan.ScanConfig.CisScanConfig != nil {
 		profile := spec.ScheduledClusterScan.ScanConfig.CisScanConfig.Profile
-		if profile != v3.CisScanProfileTypePermissive &&
-			profile != v3.CisScanProfileTypeHardened {
+		if profile != string(v3.CisScanProfileTypePermissive) &&
+			profile != string(v3.CisScanProfileTypeHardened) {
 			return httperror.NewFieldAPIError(httperror.InvalidOption, "ScheduledClusterScan.ScanConfig.CisScanConfig.Profile", "profile can be either permissive or hardened")
 		}
 	}
