@@ -2,7 +2,7 @@ package cluster
 
 import (
 	"encoding/json"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 	"testing"
 )
@@ -100,8 +100,37 @@ const clusterSpecJSON = `
 }
 `
 
+const clusterTemplateSpecJSON = `
+{
+    "dockerRootDir": "/var/lib/docker",
+    "enableClusterAlerting": false,
+    "enableClusterMonitoring": false,
+    "enableNetworkPolicy": false,
+    "labels": {},
+    "clusterTemplateRevisionId": "cattle-global-data:ctr-xxxxx",
+    "name": "testclusterfromtemplate",
+    "rancherKubernetesEngineConfig": {
+    },
+    "scheduledClusterScan": {
+        "enabled": true,
+        "scanConfig": {
+            "cisScanConfig": {
+                "failuresOnly": false,
+                "overrideBenchmarkVersion": "rke-cis-1.4",
+                "profile": "permissive",
+                "skip": null
+            }
+        },
+        "scheduleConfig": {
+            "cronSchedule": ""
+        }
+    },
+    "type": "cluster"
+}
+`
+
 func TestValidateScheduledClusterScan(t *testing.T) {
-	var clusterSpec v3.ClusterSpec
+	var clusterSpec mgmtclient.Cluster
 	err := json.Unmarshal([]byte(clusterSpecJSON), &clusterSpec)
 	if err != nil {
 		logrus.Errorf("error unmarshaling clusterspec: %v", err)
@@ -141,6 +170,21 @@ func TestValidateScheduledClusterScan(t *testing.T) {
 
 	clusterSpec.ScheduledClusterScan.ScanConfig.CisScanConfig.DebugMaster = true
 	err = validateScheduledClusterScan(&clusterSpec)
+	if err != nil {
+		logrus.Errorf("not expecting error, got: %v", err)
+		t.FailNow()
+	}
+}
+
+func TestClusterTemplateValidateScheduledClusterScan(t *testing.T) {
+	var clusterTemplateSpec mgmtclient.Cluster
+	err := json.Unmarshal([]byte(clusterTemplateSpecJSON), &clusterTemplateSpec)
+	if err != nil {
+		logrus.Errorf("error unmarshaling clusterspec: %v", err)
+		t.FailNow()
+	}
+
+	err = validateScheduledClusterScan(&clusterTemplateSpec)
 	if err != nil {
 		logrus.Errorf("not expecting error, got: %v", err)
 		t.FailNow()
