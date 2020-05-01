@@ -5,7 +5,7 @@ h2dbcattle:
   environment:
     CATTLE_DB_CATTLE_DATABASE: h2
 mysqllink:
-  image: mysql:latest
+  image: mysql:5.6
   environment:
     MYSQL_ROOT_PASSWORD: password
     MYSQL_USER: cattle
@@ -22,7 +22,7 @@ localmysqlcattle:
   ports:
     - "8082:8080"
 mysqlmanual:
-  image: mysql:latest
+  image: mysql:5.6
   ports:
     - "13306:3306"
   environment:
