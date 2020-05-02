@@ -1,7 +1,11 @@
 #!/bin/bash
+set -e -x
 
 apt-get update -q
-apt-get install -y python-dev python-pip python-tox libyaml-dev
+apt-get install -y python-dev libyaml-dev curl
+apt-get purge -y python-six
+curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+python get-pip.py
 
 pip install -U pip tox virtualenv
 curl -L https://github.com/docker/compose/releases/download/1.2.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
