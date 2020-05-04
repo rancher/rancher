@@ -21,7 +21,6 @@ import (
 	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/robfig/cron"
-	"github.com/sirupsen/logrus"
 )
 
 type Validator struct {
@@ -40,17 +39,13 @@ type Validator struct {
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	var clusterSpec v3.ClusterSpec
 	var clientClusterSpec mgmtclient.Cluster
-	logrus.Tracef("Validator: data: %+v\n", data)
 	if err := convert.ToObj(data, &clusterSpec); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Cluster spec conversion error")
 	}
 
 	if err := convert.ToObj(data, &clientClusterSpec); err != nil {
-		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Cluster spec conversion error")
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Client cluster spec conversion error")
 	}
-
-	logrus.Tracef("Validator: clusterSpec: %+v\n", &clusterSpec)
-	logrus.Tracef("Validator: clientClusterSpec: %+v\n", &clientClusterSpec)
 
 	if err := v.validateEnforcement(request, data); err != nil {
 		return err
