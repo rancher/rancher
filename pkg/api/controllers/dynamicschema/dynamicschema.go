@@ -2,6 +2,7 @@ package dynamicschema
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/rancher/norman/types"
@@ -9,6 +10,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
+	openapi "github.com/rancher/wrangler/pkg/schemas/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -92,5 +94,12 @@ func (c *Controller) add(dynamicSchema *v3.DynamicSchema) error {
 		c.Schemas.ForceAddSchema(schema)
 	}
 
+	// generate OpenAPISchema for this dynamic schema
+	jsonSchemaProps, err := openapi.ToOpenAPIFromStruct(schema)
+	if err != nil {
+		fmt.Printf("\nError generating openapi schema: %v\n", err)
+		return err
+	}
+	fmt.Printf("\njson schema properties: %v\n", jsonSchemaProps)
 	return nil
 }
