@@ -216,5 +216,6 @@ func getValidTemplateNameWithVersion(templateName, version string) string {
 	label := fmt.Sprintf("%s-%s", templateName, version)
 	label = strings.ReplaceAll(label, "+", "-")
 	label = strings.TrimSuffix(label, "-")
+	label = strings.ToLower(label)
 	return label
 }
