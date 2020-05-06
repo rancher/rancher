@@ -2652,3 +2652,17 @@ def configure_cis_requirements(aws_nodes, profile, node_roles, client,
             execute_kubectl_cmd("apply -f {0} -n {1}".
                                 format(network_policy_file, ns))
     return cluster
+
+
+def get_node_details(cluster, client):
+    """
+    lists the nodes from the cluster. This cluster has only 1 node.
+    :return: client and node object
+    """
+    create_kubeconfig(cluster)
+    nodes = client.list_node(clusterId=cluster.id).data
+    assert len(nodes) > 0
+    for node in nodes:
+        if node.worker:
+            break
+    return client, node

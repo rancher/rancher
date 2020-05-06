@@ -8,6 +8,7 @@ from .common import PROJECT_OWNER
 from .common import PROJECT_READ_ONLY
 from .common import get_client_for_token
 from .common import delete_node
+from .common import get_node_details
 from .common import get_user_client
 from .common import get_user_client_and_cluster
 from .common import execute_kubectl_cmd
@@ -44,7 +45,7 @@ def test_node_label_add():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
 
     # add label through API
     node_labels = node.labels.data_dict()
@@ -64,7 +65,7 @@ def test_node_label_edit():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
 
     # add label through API
     node_labels = node.labels.data_dict()
@@ -99,7 +100,7 @@ def test_node_label_delete():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
 
     # add labels on node
     node_labels = node.labels.data_dict()
@@ -125,7 +126,7 @@ def test_node_label_kubectl_add():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_name = node.nodeName
 
     # add label on node
@@ -150,7 +151,7 @@ def test_node_label_kubectl_edit():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_name = node.nodeName
 
     # add label on node
@@ -188,7 +189,7 @@ def test_node_label_kubectl_delete():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_name = node.nodeName
 
     # add label on node
@@ -216,7 +217,7 @@ def test_node_label_k_add_a_delete_k_add():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_name = node.nodeName
 
     command = "label nodes " + node_name + " " + test_label + "=" + label_value
@@ -256,7 +257,7 @@ def test_node_label_k_add_a_edit_k_edit():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_name = node.nodeName
 
     command = "label nodes " + node_name + " " + test_label + "=" + label_value
@@ -305,7 +306,7 @@ def test_node_label_a_add_k_delete_a_add():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_name = node.nodeName
 
     node_labels = node.labels.data_dict()
@@ -351,7 +352,7 @@ def test_node_label_a_add_k_edit_a_edit():
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_name = node.nodeName
 
     node_labels = node.labels.data_dict()
@@ -818,7 +819,7 @@ def test_rbac_node_label_add(role):
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_labels = node.labels.data_dict()
 
     # get user token and client
@@ -849,7 +850,7 @@ def test_rbac_node_label_add_kubectl(role):
     test_label = random_name()
     label_value = random_name()
     # get node details
-    client, node = get_node_details()
+    client, node = get_node_details(cluster_detail["cluster"], cluster_detail["client"])
     node_name = node.nodeName
 
     # get user token and client
@@ -1149,21 +1150,6 @@ def create_custom_node_label(node_roles, test_label,
         i += 1
     cluster = validate_cluster_state(client, cluster)
     return cluster, aws_nodes
-
-
-def get_node_details():
-    """
-    lists the nodes from the cluster. This cluster has only 1 node.
-    :return: client and node object
-    """
-    create_kubeconfig(cluster_detail["cluster"])
-    client = cluster_detail["client"]
-    cluster = cluster_detail["cluster"]
-    nodes = client.list_node(clusterId=cluster.id).data
-    assert len(nodes) > 0
-    node_id = nodes[0].id
-    node = client.by_id_node(node_id)
-    return client, node
 
 
 def create_node_template_label(client, test_label, label_value):
