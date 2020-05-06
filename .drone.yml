@@ -31,7 +31,7 @@ steps:
     - tag
 
 - name: docker-publish-head
-  image: plugins/docker
+  image: plugins/docker:18.09
   settings:
     build_args:
     - ARCH=amd64
@@ -55,7 +55,7 @@ steps:
     - push
 
 - name: docker-publish-head-agent
-  image: plugins/docker
+  image: plugins/docker:18.09
   settings:
     build_args:
     - ARCH=amd64
@@ -101,7 +101,7 @@ steps:
     - push
 
 - name: docker-publish
-  image: plugins/docker
+  image: plugins/docker:18.09
   settings:
     build_args:
     - ARCH=amd64
@@ -120,7 +120,7 @@ steps:
     - tag
 
 - name: docker-publish-agent
-  image: plugins/docker
+  image: plugins/docker:18.09
   settings:
     build_args:
     - ARCH=amd64
@@ -233,7 +233,7 @@ steps:
     - tag
 
 - name: docker-publish-head
-  image: plugins/docker
+  image: plugins/docker:18.09
   settings:
     build_args:
     - ARCH=arm64
@@ -257,7 +257,7 @@ steps:
     - push
 
 - name: docker-publish-head-agent
-  image: plugins/docker
+  image: plugins/docker:18.09
   settings:
     build_args:
     - ARCH=arm64
@@ -280,7 +280,7 @@ steps:
     - push
 
 - name: docker-publish
-  image: plugins/docker
+  image: plugins/docker:18.09
   settings:
     build_args:
     - ARCH=arm64
@@ -299,7 +299,7 @@ steps:
     - tag
 
 - name: docker-publish-agent
-  image: plugins/docker
+  image: plugins/docker:18.09
   settings:
     build_args:
     - ARCH=arm64
