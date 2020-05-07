@@ -2,6 +2,7 @@ package managementstored
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/rancher/norman/store/crd"
@@ -73,6 +74,10 @@ import (
 	client "github.com/rancher/types/client/management/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
+
+	wranglerCRD "github.com/rancher/wrangler/pkg/crd"
+	"github.com/rancher/wrangler/pkg/schemas/openapi"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager,
@@ -96,7 +101,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
 		client.ClusterScanType,
-		client.ClusterType,
+		//client.ClusterType,
 		client.ComposeConfigType,
 		client.DynamicSchemaType,
 		client.EtcdBackupType,
@@ -144,6 +149,18 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterTemplateType,
 		client.ClusterTemplateRevisionType,
 	)
+	wranglerFactory, err := wranglerCRD.NewFactoryFromClient(&apiContext.RESTConfig)
+	if err != nil {
+		fmt.Printf("\nError generating wrangler factory: %v\n", err)
+	}
+	clusterOpenAPISchema, err := openapi.ToOpenAPIFromStruct(v3.Cluster{})
+	if err != nil {
+		fmt.Printf("\nError generating cluster openAPI schema: %v\n", err)
+	}
+	clusterWCrd:= wranglerCRD.NonNamespacedType("Cluster.management.cattle.io/v3").
+		WithStatus()
+	clusterWCrd.Schema= clusterOpenAPISchema
+	wranglerFactory.BatchCreateCRDs(ctx, clusterWCrd)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
 		projectclient.AppType,

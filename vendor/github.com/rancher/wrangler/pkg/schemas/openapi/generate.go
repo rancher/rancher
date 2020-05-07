@@ -29,6 +29,7 @@ func MustGenerate(obj interface{}) *v1beta1.JSONSchemaProps {
 }
 
 func ToOpenAPIFromStruct(obj interface{}) (*v1beta1.JSONSchemaProps, error) {
+	fmt.Printf("\nIn ToOpenAPIFromStruct -1\n")
 	schemas := types.EmptySchemas()
 	schema, err := schemas.Import(obj)
 	if err != nil {
@@ -39,6 +40,7 @@ func ToOpenAPIFromStruct(obj interface{}) (*v1beta1.JSONSchemaProps, error) {
 }
 
 func toOpenAPI(name string, schemas *types.Schemas) (*v1beta1.JSONSchemaProps, error) {
+	fmt.Printf("\nIn toOpenAPI -1\n")
 	schema := schemas.Schema(name)
 	if schema == nil {
 		return nil, fmt.Errorf("failed to find schema: %s", name)
@@ -52,7 +54,7 @@ func toOpenAPI(name string, schemas *types.Schemas) (*v1beta1.JSONSchemaProps, e
 	delete(newSchema.ResourceFields, "apiVersion")
 	delete(newSchema.ResourceFields, "metadata")
 
-	return schemaToProps(newSchema, schemas, map[string]bool{})
+	return SchemaToProps(newSchema, schemas, map[string]bool{})
 }
 
 func populateField(fieldJSP *v1beta1.JSONSchemaProps, f *types.Field) error {
@@ -104,7 +106,7 @@ func typeToProps(typeName string, schemas *types.Schemas, inflight map[string]bo
 	}
 
 	if schema != nil {
-		return schemaToProps(schema, schemas, inflight)
+		return SchemaToProps(schema, schemas, inflight)
 	}
 
 	jsp := &v1beta1.JSONSchemaProps{}
@@ -137,7 +139,7 @@ func typeToProps(typeName string, schemas *types.Schemas, inflight map[string]bo
 	return jsp, nil
 }
 
-func schemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[string]bool) (*v1beta1.JSONSchemaProps, error) {
+func SchemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[string]bool) (*v1beta1.JSONSchemaProps, error) {
 	jsp := &v1beta1.JSONSchemaProps{
 		Description: schema.Description,
 		Type:        "object",
@@ -146,7 +148,7 @@ func schemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[st
 	if inflight[schema.ID] {
 		return jsp, nil
 	}
-
+	//fmt.Printf("\nIn SchemaToProps, schema: %v\n", schema.ResourceFields)
 	inflight[schema.ID] = true
 	defer delete(inflight, schema.ID)
 
