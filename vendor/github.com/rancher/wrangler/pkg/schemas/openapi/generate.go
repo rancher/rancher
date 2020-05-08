@@ -29,7 +29,6 @@ func MustGenerate(obj interface{}) *v1beta1.JSONSchemaProps {
 }
 
 func ToOpenAPIFromStruct(obj interface{}) (*v1beta1.JSONSchemaProps, error) {
-	fmt.Printf("\nIn ToOpenAPIFromStruct -1\n")
 	schemas := types.EmptySchemas()
 	schema, err := schemas.Import(obj)
 	if err != nil {
@@ -40,7 +39,6 @@ func ToOpenAPIFromStruct(obj interface{}) (*v1beta1.JSONSchemaProps, error) {
 }
 
 func toOpenAPI(name string, schemas *types.Schemas) (*v1beta1.JSONSchemaProps, error) {
-	fmt.Printf("\nIn toOpenAPI -1\n")
 	schema := schemas.Schema(name)
 	if schema == nil {
 		return nil, fmt.Errorf("failed to find schema: %s", name)
@@ -148,7 +146,6 @@ func SchemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[st
 	if inflight[schema.ID] {
 		return jsp, nil
 	}
-	//fmt.Printf("\nIn SchemaToProps, schema: %v\n", schema.ResourceFields)
 	inflight[schema.ID] = true
 	defer delete(inflight, schema.ID)
 
