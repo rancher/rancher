@@ -28,7 +28,7 @@ func Test_injectDefaultRegistry(t *testing.T) {
 		{
 			app: &v3.App{
 				Spec: v3.AppSpec{
-					ExternalID: settings.SystemExternalDNSCatalogID.Get(),
+					ExternalID: "catalog://?catalog=system-library&template=rancher-external-dns&version=0.1.0",
 				},
 			},
 			want: true,
