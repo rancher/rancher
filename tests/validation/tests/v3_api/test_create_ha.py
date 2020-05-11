@@ -7,12 +7,14 @@ import time
 from .common import create_user
 from .common import create_config_file
 from .common import get_custom_host_registration_cmd
+from .common import get_cluster_by_name
 from .common import random_test_name
 from .common import random_name
 from .common import readDataFile
 from .common import run_command_with_stderr
 from .common import set_url_password_token
 from .common import validate_cluster
+from .common import validate_cluster_state
 from .common import wait_until_active
 from lib.aws import AmazonWebServices
 from .test_rke_cluster_provisioning import rke_config
@@ -70,6 +72,8 @@ def test_install_rancher_ha(precheck_certificate_options):
     wait_until_active(url=RANCHER_SERVER_URL)
     print_kubeconfig()
     admin_client = set_url_and_password()
+    cluster = get_cluster_by_name(admin_client, "local")
+    validate_cluster_state(admin_client, cluster, False)
     create_custom_cluster(admin_client)
 
 
