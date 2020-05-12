@@ -348,7 +348,7 @@ github.com/rancher/dynamiclistener/server
 github.com/rancher/dynamiclistener/storage/file
 github.com/rancher/dynamiclistener/storage/kubernetes
 github.com/rancher/dynamiclistener/storage/memory
-# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200406202044-bf3f55d3710a
+# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200508010131-226462dc5558
 github.com/rancher/kontainer-engine/cluster
 github.com/rancher/kontainer-engine/drivers/aks
 github.com/rancher/kontainer-engine/drivers/eks

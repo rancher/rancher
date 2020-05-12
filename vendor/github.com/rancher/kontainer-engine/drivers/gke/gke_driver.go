@@ -1044,7 +1044,7 @@ func (d *Driver) SetClusterSize(ctx context.Context, info *types.ClusterInfo, co
 		return err
 	}
 
-	logrus.Info("updating cluster size")
+	logrus.Infof("[googlekubernetesengine] updating cluster [%s] size", cluster.Name)
 
 	_, err = client.Projects.Locations.Clusters.NodePools.SetSize(
 		nodePoolRRN(state.ProjectID, state.location(), cluster.Name, cluster.NodePools[0].Name), &raw.SetNodePoolSizeRequest{
@@ -1061,13 +1061,13 @@ func (d *Driver) SetClusterSize(ctx context.Context, info *types.ClusterInfo, co
 		return err
 	}
 
-	logrus.Info("cluster size updated successfully")
+	logrus.Infof("[googlekubernetesengine] cluster [%s] size updated successfully", cluster.Name)
 
 	return nil
 }
 
 func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, version *types.KubernetesVersion) error {
-	logrus.Info("updating master version")
+	logrus.Info("[googlekubernetesengine] updating master version")
 
 	err := d.updateAndWait(ctx, info, &raw.UpdateClusterRequest{
 		Update: &raw.ClusterUpdate{
@@ -1078,8 +1078,8 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 		return err
 	}
 
-	logrus.Info("master version updated successfully")
-	logrus.Info("updating node version")
+	logrus.Info("[googlekubernetesengine] master version updated successfully")
+	logrus.Info("[googlekubernetesengine] updating node version")
 
 	err = d.updateAndWait(ctx, info, &raw.UpdateClusterRequest{
 		Update: &raw.ClusterUpdate{
@@ -1091,7 +1091,7 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 		return err
 	}
 
-	logrus.Info("node version updated successfully")
+	logrus.Info("[googlekubernetesengine] node version updated successfully")
 
 	return nil
 }
