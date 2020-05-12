@@ -8,7 +8,7 @@ pipeline {
 	}
         stage('Setup Test Framework') {
             steps {
-                git poll: false, branch: 'local-ca', url: 'https://github.com/rmweir/rancher2-scaling'
+                git poll: false, branch: 'master', url: 'https://github.com/rancher/rancher2-scaling'
 		dir("testing") {
                         sh 'sudo apt-get install python3'
 			sh 'curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py'
