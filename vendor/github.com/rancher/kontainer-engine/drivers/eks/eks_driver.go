@@ -515,7 +515,7 @@ func toStringLiteralSlice(strings []*string) []string {
 }
 
 func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *types.ClusterInfo) (*types.ClusterInfo, error) {
-	logrus.Infof("Starting create")
+	logrus.Infof("[amazonelasticcontainerservice] Starting create")
 
 	state, err := getStateFromOptions(options)
 	if err != nil {
@@ -547,7 +547,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	var subnetIds []*string
 	var securityGroups []*string
 	if state.VirtualNetwork == "" {
-		logrus.Infof("Bringing up vpc")
+		logrus.Infof("[amazonelasticcontainerservice] Bringing up vpc")
 
 		stack, err := d.createStack(svc, getVPCStackName(state.DisplayName), displayName, vpcTemplate, []string{},
 			[]*cloudformation.Parameter{})
@@ -578,7 +578,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			}
 		}
 	} else {
-		logrus.Infof("VPC info provided, skipping create")
+		logrus.Infof("[amazonelasticcontainerservice] VPC info provided, skipping create")
 
 		vpcid = state.VirtualNetwork
 		subnetIds = toStringPointerSlice(state.Subnets)
@@ -587,7 +587,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 
 	var roleARN string
 	if state.ServiceRole == "" {
-		logrus.Infof("Creating service role")
+		logrus.Infof("[amazonelasticcontainerservice] Creating service role")
 
 		stack, err := d.createStack(svc, getServiceRoleName(state.DisplayName), displayName, serviceRoleTemplate,
 			[]string{cloudformation.CapabilityCapabilityIam}, nil)
@@ -600,7 +600,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			return info, fmt.Errorf("no RoleARN was returned")
 		}
 	} else {
-		logrus.Infof("Retrieving existing service role")
+		logrus.Infof("[amazonelasticcontainerservice] Retrieving existing service role")
 		iamClient := iam.New(sess, aws.NewConfig().WithRegion(state.Region))
 		role, err := iamClient.GetRole(&iam.GetRoleInput{
 			RoleName: aws.String(state.ServiceRole),
@@ -612,7 +612,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		roleARN = *role.Role.Arn
 	}
 
-	logrus.Infof("Creating EKS cluster")
+	logrus.Infof("[amazonelasticcontainerservice] Creating EKS cluster")
 
 	eksService := eks.New(sess)
 	_, err = eksService.CreateCluster(&eks.CreateClusterInput{
@@ -633,7 +633,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		return info, err
 	}
 
-	logrus.Infof("Cluster provisioned successfully")
+	logrus.Infof("[amazonelasticcontainerservice] Cluster [%s] provisioned successfully", state.ClusterName)
 
 	capem, err := base64.StdEncoding.DecodeString(*cluster.Cluster.CertificateAuthority.Data)
 	if err != nil {
@@ -659,7 +659,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		return info, fmt.Errorf("error creating key pair %v", err)
 	}
 
-	logrus.Infof("Creating worker nodes")
+	logrus.Infof("[amazonelasticcontainerservice] Creating worker nodes")
 
 	var amiID string
 	if state.AMI != "" {
@@ -786,7 +786,7 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 		return fmt.Errorf("error marshalling map roles: %v", err)
 	}
 
-	logrus.Infof("Applying ConfigMap")
+	logrus.Infof("[amazonelasticcontainerservice] Applying ConfigMap")
 
 	_, err = clientset.CoreV1().ConfigMaps("kube-system").Create(&v1.ConfigMap{
 		TypeMeta: v12.TypeMeta{
@@ -895,7 +895,7 @@ func (d *Driver) waitForClusterReady(svc *eks.EKS, state state) (*eks.DescribeCl
 	for status != eks.ClusterStatusActive {
 		time.Sleep(30 * time.Second)
 
-		logrus.Infof("Waiting for cluster to finish provisioning")
+		logrus.Infof("[amazonelasticcontainerservice] Waiting for cluster [%s] to finish provisioning", state.ClusterName)
 
 		cluster, err = svc.DescribeCluster(&eks.DescribeClusterInput{
 			Name: aws.String(state.DisplayName),
@@ -962,7 +962,7 @@ func getParameterValueFromOutput(key string, outputs []*cloudformation.Output) s
 }
 
 func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *types.DriverOptions) (*types.ClusterInfo, error) {
-	logrus.Infof("Starting update")
+	logrus.Infof("[amazonelasticcontainerservice] Starting update")
 	oldstate := &state{}
 	state, err := getState(info)
 	if err != nil {
@@ -990,7 +990,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *t
 	}
 
 	if !sendUpdate {
-		logrus.Infof("Update complete")
+		logrus.Infof("[amazonelasticcontainerservice] Update complete for cluster [%s]", state.ClusterName)
 		return info, storeState(info, state)
 	}
 
@@ -999,19 +999,19 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *t
 		return info, err
 	}
 
-	logrus.Infof("Update complete")
+	logrus.Infof("[amazonelasticcontainerservice] Update complete for cluster [%s]", state.ClusterName)
 	return info, storeState(info, state)
 }
 
 func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
-	logrus.Infof("Starting post-check")
+	logrus.Infof("[amazonelasticcontainerservice] Starting post-check")
 
 	clientset, err := getClientset(info)
 	if err != nil {
 		return nil, err
 	}
 
-	logrus.Infof("Generating service account token")
+	logrus.Infof("[amazonelasticcontainerservice] Generating service account token")
 
 	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
 	if err != nil {
@@ -1089,7 +1089,7 @@ func getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
 }
 
 func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
-	logrus.Infof("Starting delete cluster")
+	logrus.Infof("[amazonelasticcontainerservice] Starting delete cluster")
 
 	state, err := getState(info)
 	if err != nil {
@@ -1274,7 +1274,7 @@ func (d *Driver) getClusterStats(ctx context.Context, info *types.ClusterInfo) (
 }
 
 func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, version *types.KubernetesVersion) error {
-	logrus.Info("updating kubernetes version")
+	logrus.Info("[amazonelasticcontainerservice] updating kubernetes version")
 	state, err := getState(info)
 	if err != nil {
 		return err
@@ -1285,7 +1285,7 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 		return err
 	}
 
-	logrus.Info("kubernetes version update success")
+	logrus.Info("[amazonelasticcontainerservice] kubernetes version update success")
 	return nil
 }
 
@@ -1342,7 +1342,7 @@ func (d *Driver) updateClusterAndWait(ctx context.Context, state state) error {
 }
 
 func (d *Driver) waitForClusterUpdateReady(ctx context.Context, svc *eks.EKS, state state, updateID string) error {
-	logrus.Infof("waiting for update id[%s] state", updateID)
+	logrus.Infof("[amazonelasticcontainerservice] waiting for update id[%s] state", updateID)
 	var update *eks.DescribeUpdateOutput
 	var err error
 
@@ -1350,7 +1350,7 @@ func (d *Driver) waitForClusterUpdateReady(ctx context.Context, svc *eks.EKS, st
 	for status != "Successful" {
 		time.Sleep(30 * time.Second)
 
-		logrus.Infof("Waiting for cluster update to finish updating")
+		logrus.Infof("[amazonelasticcontainerservice] Waiting for cluster [%s] update to finish updating", state.ClusterName)
 
 		update, err = svc.DescribeUpdateWithContext(ctx, &eks.DescribeUpdateInput{
 			Name:     aws.String(state.DisplayName),

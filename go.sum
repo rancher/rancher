@@ -889,8 +889,8 @@ github.com/rancher/client-go v1.17.2-rancher.3/go.mod h1:QAzRgsa0C2xl4/eVpeVAZMv
 github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234 h1:wZ1Zh7fI7B9hfZw9Ouhz7171CZKu6XffM3ysUhhO6i0=
 github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
-github.com/rancher/kontainer-engine v0.0.4-dev.0.20200408195258-015d59c20dae h1:yPzHFyVc8e+A0F7H/8dY05+/R7qC+6Big7fj9NriIy8=
-github.com/rancher/kontainer-engine v0.0.4-dev.0.20200408195258-015d59c20dae/go.mod h1:8Qyam1g5ybxj/c+BU9vFymqAGDdk9pMbDRa5lWfgj+M=
+github.com/rancher/kontainer-engine v0.0.4-dev.0.20200512184531-c395feca5b3b h1:wUVA0wOHoBH+gF2KNAT/W1EuSgFWOhdAYFHT8+NCfK0=
+github.com/rancher/kontainer-engine v0.0.4-dev.0.20200512184531-c395feca5b3b/go.mod h1:8Qyam1g5ybxj/c+BU9vFymqAGDdk9pMbDRa5lWfgj+M=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=

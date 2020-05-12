@@ -618,6 +618,7 @@ const failedStatus = "Failed"
 const succeededStatus = "Succeeded"
 const creatingStatus = "Creating"
 const updatingStatus = "Updating"
+const upgradingStatus = "Upgrading"
 
 const pollInterval = 30
 
@@ -684,7 +685,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 	}
 
 	if !exists {
-		logrus.Infof("resource group %v does not exist, creating", driverState.ResourceGroup)
+		logrus.Infof("[azurekubernetesservice] resource group %v does not exist, creating", driverState.ResourceGroup)
 		err = d.createResourceGroup(ctx, resourceGroupsClient, driverState)
 		if err != nil {
 			return info, err
@@ -861,7 +862,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		return info, err
 	}
 
-	logrus.Info("Request submitted, waiting for cluster to finish creating")
+	logrus.Infof("[azurekubernetesservice] Request submitted, waiting for cluster [%s] to finish creating", driverState.Name)
 
 	failedCount := 0
 
@@ -880,24 +881,24 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 			}
 
 			failedCount = failedCount + 1
-			logrus.Infof("cluster marked as failed but waiting for recovery: retries left %v", 3-failedCount)
+			logrus.Infof("[azurekubernetesservice] cluster [%s] marked as failed but waiting for recovery: retries left %v", driverState.Name, 3-failedCount)
 			time.Sleep(pollInterval * time.Second)
 		}
 
 		if state == succeededStatus {
-			logrus.Info("Cluster provisioned successfully")
+			logrus.Infof("[azurekubernetesservice] Cluster [%s] provisioned successfully", driverState.Name)
 			info := &types.ClusterInfo{}
 			err := storeState(info, driverState)
 
 			return info, err
 		}
 
-		if state != creatingStatus && state != updatingStatus {
+		if state != creatingStatus && state != updatingStatus && state != upgradingStatus {
 			logrus.Errorf("Azure failed to provision cluster with state: %v", state)
 			return info, fmt.Errorf("failed to provision Azure cluster")
 		}
 
-		logrus.Infof("Cluster has not yet completed provisioning, waiting another %v seconds", pollInterval)
+		logrus.Infof("[azurekubernetesservice] Cluster [%s] has not yet completed provisioning, waiting another %v seconds", driverState.Name, pollInterval)
 
 		time.Sleep(pollInterval * time.Second)
 	}
@@ -1023,7 +1024,7 @@ func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, c
 		return *gotRet.ID, nil
 	}
 
-	logrus.Infof("Create Azure Log Analytics Workspace %q on Resource Group %q", workspaceName, workspaceResourceGroup)
+	logrus.Infof("[azurekubernetesservice] Create Azure Log Analytics Workspace %q on Resource Group %q", workspaceName, workspaceResourceGroup)
 
 	asyncRet, asyncErr := client.CreateOrUpdate(ctx, workspaceResourceGroup, workspaceName, operationalinsights.Workspace{
 		Location: to.StringPtr(workspaceRegion),
@@ -1253,7 +1254,7 @@ type UserInfo struct {
 const retries = 5
 
 func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
-	logrus.Info("starting post-check")
+	logrus.Info("[azurekubernetesservice] starting post-check")
 
 	clientset, err := getClientset(info)
 	if err != nil {
@@ -1266,11 +1267,11 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
 
 		if err == nil {
-			logrus.Info("service account token generated successfully")
+			logrus.Info("[azurekubernetesservice] service account token generated successfully")
 			break
 		} else {
 			if failureCount < retries {
-				logrus.Infof("service account token generation failed, retries left: %v", retries-failureCount)
+				logrus.Infof("[azurekubernetesservice] service account token generation failed, retries left: %v", retries-failureCount)
 				failureCount = failureCount + 1
 
 				time.Sleep(pollInterval * time.Second)
@@ -1281,7 +1282,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		}
 	}
 
-	logrus.Info("post-check completed successfully")
+	logrus.Info("[azurekubernetesservice] post-check completed successfully")
 
 	return info, nil
 }
@@ -1378,7 +1379,7 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 		return err
 	}
 
-	logrus.Infof("Cluster %v removed successfully", state.Name)
+	logrus.Infof("[azurekubernetesservice] Cluster [%v] removed successfully", state.Name)
 
 	return nil
 }
