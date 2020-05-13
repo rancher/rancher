@@ -890,6 +890,8 @@ github.com/rancher/kontainer-engine v0.0.4-dev.0.20200508010131-226462dc5558/go.
 github.com/rancher/lasso v0.0.0-20200416051330-84b9f0674810/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
 github.com/rancher/lasso v0.0.0-20200417051414-b55b9620e2e7 h1:8KpMYBnYT2ZykvKm/gpmIIkByLuJfKUCEPcBIMtpZnc=
 github.com/rancher/lasso v0.0.0-20200417051414-b55b9620e2e7/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
+github.com/rancher/lasso v0.0.0-20200513231433-d0ce66327a25 h1:9HDEpsuYyLxTGT0OF3axwdYSNPENZndDPaHZQT76vv4=
+github.com/rancher/lasso v0.0.0-20200513231433-d0ce66327a25/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=

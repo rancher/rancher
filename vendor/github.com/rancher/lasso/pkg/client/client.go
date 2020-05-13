@@ -21,17 +21,21 @@ type Client struct {
 	prefix     []string
 }
 
-func NewClient(gvr schema.GroupVersionResource, mapper meta.RESTMapper, client rest.Interface) (*Client, error) {
+func IsNamespaced(gvr schema.GroupVersionResource, mapper meta.RESTMapper) (bool, error) {
 	kind, err := mapper.KindFor(gvr)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	mapping, err := mapper.RESTMapping(kind.GroupKind(), kind.Version)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
+	return mapping.Scope.Name() == meta.RESTScopeNameNamespace, nil
+}
+
+func NewClient(gvr schema.GroupVersionResource, namespaced bool, client rest.Interface) *Client {
 	var (
 		prefix []string
 	)
@@ -51,11 +55,11 @@ func NewClient(gvr schema.GroupVersionResource, mapper meta.RESTMapper, client r
 
 	return &Client{
 		RESTClient: client,
-		Namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		Namespaced: namespaced,
 		GVR:        gvr,
 		prefix:     prefix,
 		resource:   gvr.Resource,
-	}, nil
+	}
 }
 
 func (c *Client) Get(ctx context.Context, namespace, name string, result runtime.Object, options metav1.GetOptions) (err error) {
