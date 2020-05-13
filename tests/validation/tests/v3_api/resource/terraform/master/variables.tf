@@ -9,6 +9,7 @@ variable "resource_name" {}
 variable "external_db" {}
 variable "external_db_version" {}
 variable "instance_class" {}
+variable "ec2_instance_class" {}
 variable "db_group_name" {}
 variable "username" {}
 variable "password" {}
