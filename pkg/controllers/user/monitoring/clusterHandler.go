@@ -118,8 +118,8 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 		}
 		if !isReady {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "prometheus is not ready")
-			return nil
+			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "prometheus pods are not ready to serve traffic")
+			return errors.New("clusterMonitoring: prometheus pods are not ready to serve traffic")
 		}
 
 		cluster.Status.MonitoringStatus.GrafanaEndpoint = fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/services/http:access-grafana:80/proxy/", cluster.Name, appTargetNamespace)
