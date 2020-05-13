@@ -718,6 +718,11 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 	if len(c.CertificateDir) == 0 {
 		c.CertificateDir = GetCertificateDirPath(c.ConfigPath, c.ConfigDir)
 	}
+	// Setting cluster Defaults
+	err = c.setClusterDefaults(ctx, flags)
+	if err != nil {
+		return nil, err
+	}
 	// We don't manage custom configuration, if it's there we just use it.
 	if isEncryptionCustomConfig(rkeConfig) {
 		if c.EncryptionConfig.EncryptionProviderFile, err = c.readEncryptionCustomConfig(); err != nil {
@@ -729,11 +734,6 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 		}
 	}
 
-	// Setting cluster Defaults
-	err = c.setClusterDefaults(ctx, flags)
-	if err != nil {
-		return nil, err
-	}
 	// extract cluster network configuration
 	if err = c.setNetworkOptions(); err != nil {
 		return nil, fmt.Errorf("failed set network options: %v", err)
