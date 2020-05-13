@@ -32,7 +32,7 @@ const (
 
 const (
 	APIVersion           = "management.cattle.io/v3"
-	RancherVersionDev    = "2.4"
+	RancherVersionDev    = "2.4.3-rc99"
 	DataJSONLocation     = "/var/lib/rancher-data/driver-metadata/data.json"
 	sendRKELabel         = "io.cattle.rke_store"
 	svcOptionLinuxKey    = "service-option-linux-key"
