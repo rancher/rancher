@@ -1,6 +1,6 @@
 resource "aws_instance" "mysql-worker" {
   ami           = "${var.aws_ami}"
-  instance_type = "t2.medium"
+  instance_type = "${var.ec2_instance_class}"
   count         = var.no_of_worker_nodes
   connection {
     type        = "ssh"

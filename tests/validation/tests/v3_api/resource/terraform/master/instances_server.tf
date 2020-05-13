@@ -17,8 +17,7 @@ resource "aws_db_instance" "mydb" {
 
 resource "aws_instance" "master" {
   ami           = "${var.aws_ami}"
-  instance_type = "t2.medium"
-  count         = var.no_of_server_nodes
+  instance_type = "${var.ec2_instance_class}"
   connection {
     type        = "ssh"
     user        = "${var.aws_user}"
@@ -37,60 +36,125 @@ resource "aws_instance" "master" {
     ]
   }
   provisioner "local-exec" {
-    command = "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${var.access_key} ${var.aws_user}@${aws_instance.master[count.index].public_ip}:/tmp/multinode_nodetoken /tmp/"
+    command = "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${var.access_key} ${var.aws_user}@${aws_instance.master.public_ip}:/tmp/multinode_nodetoken /tmp/"
   } 
   provisioner "local-exec" {
-    command = "echo ${aws_instance.master[count.index].public_ip} >/tmp/multinode_ip"
+    command = "echo ${aws_instance.master.public_ip} >/tmp/multinode_ip"
   }
   provisioner "local-exec" {
-    command = "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${var.access_key} ${var.aws_user}@${aws_instance.master[count.index].public_ip}:/tmp/multinode_kubeconfig /tmp/"
+    command = "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${var.access_key} ${var.aws_user}@${aws_instance.master.public_ip}:/tmp/multinode_kubeconfig /tmp/"
   }
 }
 
-resource "aws_lb_target_group_attachment" "aws_tg_attachment_80" {
-  target_group_arn = "${aws_lb_target_group.aws_tg_80.arn}"
-  count            = length(aws_instance.master)
-  target_id        = "${aws_instance.master[count.index].id}"
-  port             = 80
-  depends_on       = ["aws_instance.master"]
-}
-
-resource "aws_lb_target_group_attachment" "aws_tg_attachment_443" {
-  target_group_arn = "${aws_lb_target_group.aws_tg_443.arn}"
-  count            = length(aws_instance.master)
-  target_id        = "${aws_instance.master[count.index].id}"
-  port             = 443
-  depends_on       = ["aws_instance.master"]
-}
-
-resource "aws_lb_target_group_attachment" "aws_tg_attachment_6443" {
-  target_group_arn = "${aws_lb_target_group.aws_tg_6443.arn}"
-  count            = length(aws_instance.master)
-  target_id        = "${aws_instance.master[count.index].id}"
-  port             = 6443
-  depends_on       = ["aws_instance.master"]
+resource "aws_instance" "master2-ha" {
+  ami           = "${var.aws_ami}"
+  instance_type = "${var.ec2_instance_class}"
+  count         = var.no_of_server_nodes
+  connection {
+    type        = "ssh"
+    user        = "${var.aws_user}"
+    host        = self.public_ip
+    private_key = "${file(var.access_key)}"
+  }
+  key_name = "jenkins-rke-validation"
+  tags = {
+    Name = "${var.resource_name}-multinode-servers"
+  }
+  provisioner "remote-exec" {
+    inline = [
+              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='mysql://${aws_db_instance.mydb.username}:${aws_db_instance.mydb.password}@tcp(${aws_db_instance.mydb.endpoint})/${aws_db_instance.mydb.name}'",
+    ]
+  }
 }
 
 resource "aws_lb_target_group" "aws_tg_80" {
   port             = 80
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-k3s-tg-80"
+  name             = "${var.resource_name}-multinode-tg-80"
+  health_check {
+        protocol = "HTTP"
+        port = "traffic-port"
+        path = "/healthz"
+        interval = 10
+        timeout = 6
+        healthy_threshold = 3
+        unhealthy_threshold = 3
+        matcher = "200-399"
+  }
 }
+
+resource "aws_lb_target_group_attachment" "aws_tg_attachment_80" {
+  target_group_arn = "${aws_lb_target_group.aws_tg_80.arn}"
+  target_id        = "${aws_instance.master.id}"
+  port             = 80
+  depends_on       = ["aws_instance.master"]
+}
+
+resource "aws_lb_target_group_attachment" "aws_tg_attachment_80_2" {
+  target_group_arn = "${aws_lb_target_group.aws_tg_80.arn}"
+  count            = length(aws_instance.master2-ha)
+  target_id        = "${aws_instance.master2-ha[count.index].id}"
+  port             = 80
+  depends_on       = ["aws_instance.master"]
+}
+
 
 resource "aws_lb_target_group" "aws_tg_443" {
   port             = 443
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-k3s-tg-443"
+  name             = "${var.resource_name}-multinode-tg-443"
+  health_check {
+        protocol = "HTTP"
+        port = 80
+        path = "/healthz"
+        interval = 10
+        timeout = 6
+        healthy_threshold = 3
+        unhealthy_threshold = 3
+        matcher = "200-399"
+  }
 }
+
+resource "aws_lb_target_group_attachment" "aws_tg_attachment_443" {
+  target_group_arn = "${aws_lb_target_group.aws_tg_443.arn}"
+  target_id        = "${aws_instance.master.id}"
+  port             = 443
+  depends_on       = ["aws_instance.master"]
+}
+
+resource "aws_lb_target_group_attachment" "aws_tg_attachment_443_2" {
+  target_group_arn = "${aws_lb_target_group.aws_tg_443.arn}"
+  count            = length(aws_instance.master2-ha)
+  target_id        = "${aws_instance.master2-ha[count.index].id}"
+  port             = 443
+  depends_on       = ["aws_instance.master"]
+}
+
 
 resource "aws_lb_target_group" "aws_tg_6443" {
   port             = 6443
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-k3s-tg-6443"
+  name             = "${var.resource_name}-multinode-tg-6443"
 }
+
+resource "aws_lb_target_group_attachment" "aws_tg_attachment_6443" {
+  target_group_arn = "${aws_lb_target_group.aws_tg_6443.arn}"
+  target_id        = "${aws_instance.master.id}"
+  port             = 6443
+  depends_on       = ["aws_instance.master"]
+}
+
+resource "aws_lb_target_group_attachment" "aws_tg_attachment_6443_2" {
+  target_group_arn = "${aws_lb_target_group.aws_tg_6443.arn}"
+  count            = length(aws_instance.master2-ha)
+  target_id        = "${aws_instance.master2-ha[count.index].id}"
+  port             = 6443
+  depends_on       = ["aws_instance.master"]
+}
+
 
 resource "aws_lb" "aws_nlb" {
   internal           = false
@@ -129,10 +193,9 @@ resource "aws_lb_listener" "aws_nlb_listener_6443" {
   }
 }
 
-
 resource "aws_route53_record" "aws_route53" {
   zone_id            = "${data.aws_route53_zone.selected.zone_id}"
-  name               = "${var.resource_name}-multinode-route53"
+  name               = "${var.resource_name}"
   type               = "CNAME"
   ttl                = "300"
   records            = ["${aws_lb.aws_nlb.dns_name}"]
