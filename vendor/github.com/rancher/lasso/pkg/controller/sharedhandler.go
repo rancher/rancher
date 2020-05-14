@@ -62,7 +62,7 @@ func (h *sharedHandler) OnChange(key string, obj runtime.Object) error {
 
 	for _, handler := range h.handlers {
 		newObj, err := handler.handler.OnChange(key, obj)
-		if err != nil && errors.Is(err, ErrIgnore) {
+		if err != nil && !errors.Is(err, ErrIgnore) {
 			errs = append(errs, &handlerError{
 				HandlerName: handler.name,
 				Err:         err,
