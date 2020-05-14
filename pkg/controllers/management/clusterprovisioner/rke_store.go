@@ -69,6 +69,7 @@ func (a *rkeStore) GetAddonTemplates(k8sVersion string) (map[string]interface{},
 		}
 		if template != "" {
 			data[k] = template
+			logrus.Infof("getADDONtemplate: k8sVersion %s addon %s", k8sVersion, v)
 		}
 	}
 	return data, nil

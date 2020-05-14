@@ -3,9 +3,11 @@ package publicapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -62,6 +64,7 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 		return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
 	}
 
+	logrus.Infof("login: responseType: %s", responseType)
 	if responseType == "cookie" {
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
@@ -78,7 +81,8 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
 		}
-		tokenData["token"] = token.ObjectMeta.Name + ":" + token.Token
+		//logrus.Infof("token %v", tokenData)
+		//tokenData["token"] = token.ObjectMeta.Name + ":" + token.Token
 		request.WriteResponse(http.StatusCreated, tokenData)
 	}
 
@@ -167,7 +171,10 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 
 	if providerName == saml.PingName || providerName == saml.ADFSName || providerName == saml.KeyCloakName ||
 		providerName == saml.OKTAName || providerName == saml.ShibbolethName {
-		err = saml.PerformSamlLogin(providerName, request, input)
+		err = saml.PerformSamlLogin(providerName, request, input, "kubeconfig")
+		if responseType == "kubeconfig" {
+			return v3.Token{}, "kubeconfig-saml", err
+		}
 		return v3.Token{}, "saml", err
 	}
 
@@ -190,6 +197,35 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
 	}
 
+	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
+		token, err := h.getKubeConfigToken(request, user.Name, responseType)
+		if err != nil {
+			return v3.Token{}, "", err
+		}
+		return *token, responseType, nil
+	}
+
 	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
 	return rToken, responseType, err
+}
+
+func (h *loginHandler) getKubeConfigToken(apiContext *types.APIContext, userName, responseType string) (*v3.Token, error) {
+	clusterId := ""
+	responseSplit := strings.SplitN(responseType, "_", 2)
+	if len(responseSplit) == 2 {
+		clusterId = responseSplit[1]
+	}
+
+	logrus.Debugf("getKubeConfigToken: responseType %s", responseType)
+	name := "kubeconfig-" + userName
+	if clusterId != "" {
+		name = fmt.Sprintf("kubeconfig-%s.%s", userName, clusterId)
+	}
+
+	token, err := h.userMGR.GetToken(clusterId, name, "Kubeconfig token", "kubeconfig", userName)
+	if err != nil {
+		return nil, err
+	}
+
+	return token, err
 }

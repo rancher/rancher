@@ -12,12 +12,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/rancher/pkg/cluster"
+
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/steve/pkg/responsewriter"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -175,6 +178,8 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 		root.Get("ShibbolethMetadata").HandlerFunc(provider.ServeHTTP)
 	}
 
+	root.PathPrefix("/v1-saml/token").HandlerFunc(provider.ServeHTTP)
+
 	appliedVersion = configToSet.ResourceVersion
 
 	return nil
@@ -188,6 +193,7 @@ func AuthHandler() http.Handler {
 	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
 
 	root.Methods("POST").Path("/v1-saml/adfs/saml/acs").Name("AdfsACS")
+	root.Methods("GET").Path("/v1-saml/adfs/saml/kg").Name("AdfsKg")
 	root.Methods("GET").Path("/v1-saml/adfs/saml/metadata").Name("AdfsMetadata")
 
 	root.Methods("POST").Path("/v1-saml/keycloak/saml/acs").Name("KeyCloakACS")
@@ -244,10 +250,48 @@ func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string]
 	return userPrincipal, groupPrincipals, nil
 }
 
+type authInfo struct {
+	usId string
+	wsId string
+}
+
 // HandleSamlAssertion processes/handles the assertion obtained by the POST to /saml/acs from IdP
 func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, assertion *saml.Assertion) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
+
+	success := &authInfo{"", ""}
+
+	defer func(tt *authInfo) {
+		if tt.wsId == "" {
+			return
+		}
+		select {
+		case cluster.Done <- cluster.UserChan{tt.usId, tt.wsId}:
+			log.Infof("sent message", tt.wsId)
+		default:
+			fmt.Println("channel nil, no msg sent")
+		}
+
+		//dialer := websocket.Dialer{
+		//	TLSClientConfig: &tls.Config{
+		//		InsecureSkipVerify: true,
+		//	},
+		//}
+		//c, _, err := dialer.Dial("wss://localhost:8443/echo", nil)
+		//if err != nil {
+		//	log.Fatal("dial:", err)
+		//}
+		//defer c.Close()
+		//
+		//log.Infof("trying to send to channel this value tt.val %s", tt.val)
+		//err = c.WriteMessage(websocket.TextMessage, []byte(tt.val))
+		//if err != nil {
+		//	log.Println("write:", err)
+		//	return
+		//}
+
+	}(success)
 
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		// delete the cookie
@@ -340,6 +384,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			// delete the cookie
 			s.clientState.DeleteState(w, r, "Rancher_FinalRedirectURL")
 			http.Redirect(w, r, redirectURL, http.StatusFound)
+			success.wsId = "kinara"
 		}
 		return
 	}
@@ -361,6 +406,38 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 
+	//responseType := s.clientState.GetState(r, "Rancher_ResponseType")
+	//if responseType == "kubeconfig" {
+	//	log.Infof("creating kubeconfig token for saml")
+	//	tokenStrung, err := s.userMGR.EnsureToken("kubeconfig-"+user.Name, "Kubeconfig token", "kubeconfig", user.Name)
+	//	if err != nil {
+	//		log.Errorf("ensureToken error %v", err)
+	//		return
+	//	}
+	//	tokenSplit := strings.Split(tokenStrung, ":")
+	//	if len(tokenSplit) != 2 {
+	//		log.Errorf("tokenSplit error %v", tokenSplit)
+	//		return
+	//	}
+	//	token := v3.Token{
+	//		ObjectMeta: metav1.ObjectMeta{
+	//			Name: tokenSplit[0],
+	//		},
+	//		TTLMillis: 300000,
+	//		Token:     tokenSplit[1],
+	//	}
+	//	w.Header().Set("Content-Type", "application/json")
+	//	ans, _ := json.Marshal(token)
+	//	w.Write(ans)
+	//	redirectURL = s.clientState.GetState(r, "Rancher_FinalRedirectURL")
+	//	if redirectURL != "" {
+	//		log.Infof("here: redirectURL %s", redirectURL)
+	//		http.Redirect(w, r, redirectURL, http.StatusFound)
+	//	}
+	//	log.Infof("returning from here")
+	//	return
+	//}
+
 	err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
 	if err != nil {
 		log.Errorf("SAML: Failed creating token with error: %v", err)
@@ -370,6 +447,12 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	if redirectURL != "" {
 		// delete the cookie
 		s.clientState.DeleteState(w, r, "Rancher_FinalRedirectURL")
+		log.Infof("setting value true!!!")
+
+		log.Infof("Rancher_ConnToken %s", s.clientState.GetState(r, "Rancher_ConnToken"))
+
+		s.clientState.DeleteState(w, r, "Rancher_ConnToken")
+		success.usId = user.Name
 		http.Redirect(w, r, redirectURL, http.StatusFound)
 	}
 	return
