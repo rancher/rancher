@@ -16,24 +16,15 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 	}
 
 	var (
-		cfg   string
-		token string
-		err   error
+		cfg string
+		err error
 	)
 	endpointEnabled := cluster.LocalClusterAuthEndpoint != nil && cluster.LocalClusterAuthEndpoint.Enabled
-	if endpointEnabled {
-		token, err = a.getClusterToken(cluster.ID, apiContext)
-	} else {
-		token, err = a.getToken(apiContext)
-	}
-	if err != nil {
-		return err
-	}
 
 	if endpointEnabled {
-		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, apiContext.ID, apiContext.Request.Host, token)
+		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, apiContext.ID, apiContext.Request.Host)
 	} else {
-		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, apiContext.Request.Host, token)
+		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, apiContext.Request.Host)
 	}
 	if err != nil {
 		return err

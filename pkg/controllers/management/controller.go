@@ -3,6 +3,8 @@ package management
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/management/samltokens"
+
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/controllers/management/catalog"
@@ -62,6 +64,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clustertemplate.Register(ctx, management)
 	nodetemplate.Register(ctx, management)
 	rkeworkerupgrader.Register(ctx, management, manager.ScaledContext)
+	samltokens.Register(ctx, management)
 
 	// Register last
 	auth.RegisterLate(ctx, management)

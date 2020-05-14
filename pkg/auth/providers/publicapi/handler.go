@@ -48,6 +48,8 @@ func authProviderSchemas(ctx context.Context, management *config.ScaledContext, 
 		subSchema.Formatter = loginActionFormatter
 	}
 
+	schema = schemas.Schema(&publicSchema.PublicVersion, v3public.AuthTokenType)
+	setAuthTokensStore(schema, management)
 	return nil
 }
 
