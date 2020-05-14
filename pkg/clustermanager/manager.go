@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"

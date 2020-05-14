@@ -34,6 +34,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/wrangler/pkg/crd"
 	"github.com/rancher/wrangler/pkg/leader"
+	"github.com/rancher/wrangler/pkg/ratelimit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/tools/clientcmd"
@@ -109,6 +110,7 @@ func buildScaledContext(ctx context.Context, clientConfig clientcmd.ClientConfig
 		return nil, nil, nil, err
 	}
 	restConfig.Timeout = 30 * time.Second
+	restConfig.RateLimiter = ratelimit.None
 
 	kubeConfig, err := clientConfig.RawConfig()
 	if err != nil {
@@ -145,7 +147,7 @@ func buildScaledContext(ctx context.Context, clientConfig clientcmd.ClientConfig
 		tunnelServer = df.TunnelServer
 	}
 
-	wranglerContext, err := wrangler.NewContext(ctx, steveserver.RestConfigDefaults(&scaledContext.RESTConfig), tunnelServer)
+	wranglerContext, err := wrangler.NewContext(ctx, steveserver.RestConfigDefaults(&scaledContext.RESTConfig), scaledContext.ControllerFactory, tunnelServer)
 	if err != nil {
 		return nil, nil, nil, err
 	}
