@@ -10,7 +10,6 @@ jaegertracing/all-in-one rancher/jaegertracing-all-in-one 1.14
 openzipkin/zipkin rancher/openzipkin-zipkin 2.14.2
 kiali/kiali rancher/kiali-kiali v1.9
 pstauffer/curl rancher/pstauffer-curl v1.0.3
-coredns/coredns rancher/coredns-coredns 1.1.2
 istio/coredns-plugin rancher/istio-coredns-plugin 0.2-istio-1.1
 quay.io/coreos/prometheus-operator rancher/coreos-prometheus-operator v0.38.1
 quay.io/coreos/prometheus-config-reloader rancher/coreos-prometheus-config-reloader v0.38.1
