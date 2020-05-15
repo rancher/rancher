@@ -109,7 +109,7 @@ type ClusterSpecBase struct {
 
 type ClusterSpec struct {
 	ClusterSpecBase
-	DisplayName                         string              `json:"displayName" norman:"required"`
+	DisplayName                         string              `json:"displayName"`
 	Description                         string              `json:"description"`
 	Internal                            bool                `json:"internal" norman:"nocreate,noupdate"`
 	K3sConfig                           *K3sConfig          `json:"k3sConfig,omitempty"`

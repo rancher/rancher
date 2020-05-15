@@ -121,7 +121,12 @@ func (c *Controller) add(dynamicSchema *v3.DynamicSchema, key string) error {
 		return err
 	}
 
-	clusterCRD.Spec.Validation.OpenAPIV3Schema.Properties[key] = *openapiSchema
+	//if key == "googlekubernetesengineconfig" {
+	//	fmt.Printf("\ndyn schema name: %v\n", dynamicSchema.Spec.SchemaName)
+	//	fmt.Printf("\nclusterCRD.Spec.Validation.OpenAPIV3Schema.Props: %v\n", clusterCRD.Spec.Validation.OpenAPIV3Schema.Properties["spec"].Properties[dynamicSchema.Spec.SchemaName])
+	//}
+	//clusterCRD.Spec.Validation.OpenAPIV3Schema.Properties[key] = *openapiSchema
+	clusterCRD.Spec.Validation.OpenAPIV3Schema.Properties[dynamicSchema.Spec.SchemaName] = *openapiSchema
 	_, err = c.CRDClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.Background(), clusterCRD, metav1.UpdateOptions{})
 	if err != nil {
 		return err

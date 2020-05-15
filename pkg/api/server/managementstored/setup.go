@@ -4,6 +4,12 @@ import (
 	"context"
 	"net/http"
 
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/rancher/wrangler/pkg/schemas/openapi"
+
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/subtype"
@@ -74,8 +80,6 @@ import (
 	client "github.com/rancher/types/client/management/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
-	wranglerCRD "github.com/rancher/wrangler/pkg/crd"
-	"github.com/rancher/wrangler/pkg/schemas/openapi"
 )
 
 func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager,
@@ -99,7 +103,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
 		client.ClusterScanType,
-		//client.ClusterType,
+		client.ClusterType,
 		client.ComposeConfigType,
 		client.DynamicSchemaType,
 		client.EtcdBackupType,
@@ -147,18 +151,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterTemplateType,
 		client.ClusterTemplateRevisionType,
 	)
-	wranglerFactory, err := wranglerCRD.NewFactoryFromClient(&apiContext.RESTConfig)
-	if err != nil {
-		return err
-	}
-	clusterOpenAPISchema, err := openapi.ToOpenAPIFromStruct(v3.Cluster{})
-	if err != nil {
-		return err
-	}
-	clusterWCrd := wranglerCRD.NonNamespacedType("Cluster.management.cattle.io/v3").
-		WithStatus()
-	clusterWCrd.Schema = clusterOpenAPISchema
-	wranglerFactory.BatchCreateCRDs(ctx, clusterWCrd)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
 		projectclient.AppType,
@@ -229,6 +221,39 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	GlobalDNSProvidersPwdWrap(schemas, apiContext, localClusterEnabled)
 
 	return nil
+}
+
+func AddOpenAPIV3SchemaToCRD(ctx context.Context, apiContext *config.ScaledContext) error {
+	//wranglerFactory, err := wranglerCRD.NewFactoryFromClient(&apiContext.RESTConfig)
+	//if err != nil {
+	//	return err
+	//}
+
+	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
+	apiClient, err := factory.ClientGetter.APIExtClient(nil, config.ManagementStorageContext)
+	if err != nil {
+		return err
+	}
+	clusterCrd, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(ctx, "clusters.management.cattle.io", metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	clusterOpenAPISchema, err := openapi.ToOpenAPIFromStruct(v3.ClusterSpec{})
+	if err != nil {
+		return err
+	}
+	clusterCrd.Spec.Validation = &apiext.CustomResourceValidation{
+		OpenAPIV3Schema: clusterOpenAPISchema,
+	}
+	clusterCrd.Spec.Subresources = &apiext.CustomResourceSubresources{}
+	clusterCrd.Spec.Subresources.Status = &apiext.CustomResourceSubresourceStatus{}
+	apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(ctx, clusterCrd, metav1.UpdateOptions{})
+
+	return nil
+
+	//clusterWCrd := wranglerCRD.NonNamespacedType("Cluster.management.cattle.io/v3").WithStatus()
+	//WithColumn("State", "status.conditions[?(@.type==Provisioned && @.type==Updated)]").WithStatus()
+	//wranglerFactory.BatchCreateCRDs(ctx, clusterCRD).BatchWait()
 }
 
 func setupPasswordTypes(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {

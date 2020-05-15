@@ -83,7 +83,6 @@ func (s *Schemas) Import(obj interface{}, externalOverrides ...interface{}) (*Sc
 	}
 
 	t := getType(obj)
-	fmt.Printf("\nImporting type t: %v\n", t)
 	return s.importType(t, types...)
 }
 
@@ -161,17 +160,15 @@ func (s *Schemas) importType(t reflect.Type, overrides ...reflect.Type) (*Schema
 
 	existing := s.Schema(typeName)
 	if existing != nil {
-		fmt.Printf("\nreturning existing for %v %v\n", typeName,existing)
 		return existing, nil
 	}
-	fmt.Printf("\nHere for %v\n", typeName)
+
 	if s, ok := s.processingTypes[t]; ok {
 		logrus.Debugf("Returning half built schema %s for %v", typeName, t)
 		return s, nil
 	}
 
 	logrus.Debugf("Inspecting schema %s for %v", typeName, t)
-	fmt.Printf("\nARGH overrides: %v\n", overrides)
 
 	schema, err := s.newSchemaFromType(t, typeName)
 	if err != nil {

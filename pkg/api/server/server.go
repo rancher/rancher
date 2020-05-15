@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/rancher/norman/api/builtin"
@@ -34,6 +35,9 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 
 	if err := managementstored.Setup(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled); err != nil {
 		return nil, err
+	}
+	if err := managementstored.AddOpenAPIV3SchemaToCRD(ctx, scaledContext); err != nil {
+		fmt.Printf("\nerr adding openapi schema: %v\n", err)
 	}
 
 	if err := userstored.Setup(ctx, scaledContext, clusterManager, k8sProxy); err != nil {

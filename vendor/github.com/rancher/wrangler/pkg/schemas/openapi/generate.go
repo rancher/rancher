@@ -146,6 +146,7 @@ func SchemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[st
 	if inflight[schema.ID] {
 		return jsp, nil
 	}
+
 	inflight[schema.ID] = true
 	defer delete(inflight, schema.ID)
 
