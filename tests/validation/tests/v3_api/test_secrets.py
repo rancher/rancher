@@ -243,9 +243,10 @@ def test_rbac_secret_create_cluster_member(remove_resource):
     """
 
     user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
-    project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-mem"),
-                                        ns_name=random_test_name("ns-cluster-mem"))
+    project, ns = \
+        create_project_and_ns(user_token, namespace["cluster"],
+                              random_test_name("rbac-cluster-mem"),
+                              ns_name=random_test_name("ns-cluster-mem"))
     p_client = get_project_client_for_token(project, user_token)
     rbac_secret_create(p_client, ns)
 
@@ -254,10 +255,10 @@ def test_rbac_secret_create_cluster_member(remove_resource):
 
     keyvaluepair = {"testall": "valueall"}
     cluster_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
-    ownerproject, ns = create_project_and_ns(
-                        cluster_owner_token,
-                        namespace["cluster"],
-                        random_test_name("rbac-cluster-owner"))
+    ownerproject, ns = \
+        create_project_and_ns(cluster_owner_token,
+                              namespace["cluster"],
+                              random_test_name("rbac-cluster-owner"))
     cluster_member_client = get_project_client_for_token(ownerproject,
                                                          user_token)
     remove_resource(project)
@@ -278,9 +279,10 @@ def test_rbac_secret_edit_cluster_member(remove_resource):
     """
 
     user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
-    project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-mem"),
-                                        ns_name=random_test_name("ns-cluster-mem"))
+    project, ns = \
+        create_project_and_ns(user_token, namespace["cluster"],
+                              random_test_name("rbac-cluster-mem"),
+                              ns_name=random_test_name("ns-cluster-mem"))
     p_client = get_project_client_for_token(project, user_token)
     rbac_secret_edit(p_client, ns, project=project)
 
@@ -324,9 +326,10 @@ def test_rbac_secret_delete_cluster_member(remove_resource):
 
     keyvaluepair = {"testall": "valueall"}
     user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
-    project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-mem"),
-                                        ns_name=random_test_name("ns-cluster-mem"))
+    project, ns = \
+        create_project_and_ns(user_token, namespace["cluster"],
+                              random_test_name("rbac-cluster-mem"),
+                              ns_name=random_test_name("ns-cluster-mem"))
     p_client = get_project_client_for_token(project, user_token)
     rbac_secret_delete(p_client, ns)
 
@@ -437,6 +440,79 @@ def test_rbac_secret_delete_project_readonly(remove_resource):
     assert e.value.error.code == 'Forbidden'
 
 
+@if_test_rbac
+@pytest.mark.parametrize("role", rbac_role_list)
+def test_rbac_secret_list(remove_resource, role):
+
+    user_token = rbac_get_user_token_by_role(role)
+    project = rbac_get_project()
+    p_client = get_project_client_for_token(project, user_token)
+    rbac_secret_list(p_client)
+
+
+@if_test_rbac
+def test_rbac_secret_list_cluster_member(remove_resource):
+
+    """
+    Verify cluster member can list secret in the project he created
+    """
+
+    keyvaluepair = {"testall": "valueall"}
+    user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
+    project, ns = \
+        create_project_and_ns(user_token, namespace["cluster"],
+                              random_test_name("rbac-cluster-mem"),
+                              ns_name=random_test_name("ns-cluster-mem"))
+    p_client = get_project_client_for_token(project, user_token)
+    rbac_secret_list(p_client)
+
+    # Create a project as cluster owner and verify the cluster member cannot
+    # list secret in this project
+
+    cluster_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    ownerproject, ns = create_project_and_ns(
+        cluster_owner_token,
+        namespace["cluster"],
+        random_test_name("rbac-cluster-owner"))
+    cluster_owner_client = get_project_client_for_token(ownerproject,
+                                                        cluster_owner_token)
+    cluster_member_client = get_project_client_for_token(ownerproject,
+                                                         user_token)
+    ownersecret = create_secret(keyvaluepair, singlenamespace=False,
+                                p_client=cluster_owner_client)
+
+    secretdict = cluster_member_client.list_secret(name=ownersecret.name)
+    secretdata = secretdict.get('data')
+    assert len(secretdata) == 0
+    cluster_owner_client.delete(ownersecret)
+    remove_resource(project)
+    remove_resource(ownerproject)
+
+
+@if_test_rbac
+def test_rbac_secret_list_project_readonly(remove_resource):
+
+    """
+    Verify read-only user cannot list secret
+    """
+    cluster_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    project = rbac_get_project()
+    readonly_user_token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    readonly_user_client = get_project_client_for_token(project,
+                                                        readonly_user_token)
+    keyvaluepair = {"testall": "valueall"}
+    cluster_owner_p_client = get_project_client_for_token(project,
+                                                          cluster_owner_token)
+    # As a cluster owner, create a secret
+    secret = create_secret(keyvaluepair, p_client=cluster_owner_p_client)
+    # Verify Read-Only user cannot list the secret
+    secretdict = readonly_user_client.list_secret(name=secret.name)
+    secretdata = secretdict.get('data')
+    assert len(secretdata) == 0
+    cluster_owner_p_client.delete(secret)
+    remove_resource(project)
+
+
 def rbac_secret_create(p_client, ns):
 
     """
@@ -513,6 +589,25 @@ def rbac_secret_delete(p_client, ns):
                            p_client=p_client)
     # Verify deletion of secret
     delete_secret(p_client, secret, ns, keyvaluepair)
+
+
+def rbac_secret_list(p_client):
+    '''
+    Create a secret and list the secret
+    '''
+    keyvaluepair = {"testall": "valueall"}
+    secret = create_secret(keyvaluepair, singlenamespace=False,
+                           p_client=p_client)
+    secretname = secret.name
+    secretdict = p_client.list_secret(name=secretname)
+    secretlist = secretdict.get('data')
+    testsecret = secretlist[0]
+    testsecret_data = testsecret['data']
+    assert len(secretlist) == 1
+    assert testsecret.type == "secret"
+    assert testsecret.name == secretname
+    assert testsecret_data.data_dict() == keyvaluepair
+    p_client.delete(testsecret)
 
 
 @pytest.fixture(scope='module', autouse="True")
