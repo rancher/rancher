@@ -151,8 +151,6 @@ var (
 	lockPersistentVolumeClaimControllerMockGeneric                        sync.RWMutex
 	lockPersistentVolumeClaimControllerMockInformer                       sync.RWMutex
 	lockPersistentVolumeClaimControllerMockLister                         sync.RWMutex
-	lockPersistentVolumeClaimControllerMockStart                          sync.RWMutex
-	lockPersistentVolumeClaimControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that PersistentVolumeClaimControllerMock does implement PersistentVolumeClaimController.
@@ -192,12 +190,6 @@ var _ v1a.PersistentVolumeClaimController = &PersistentVolumeClaimControllerMock
 //             ListerFunc: func() v1a.PersistentVolumeClaimLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedPersistentVolumeClaimController in code that requires PersistentVolumeClaimController
@@ -231,12 +223,6 @@ type PersistentVolumeClaimControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v1a.PersistentVolumeClaimLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -308,18 +294,6 @@ type PersistentVolumeClaimControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -648,72 +622,6 @@ func (mock *PersistentVolumeClaimControllerMock) ListerCalls() []struct {
 	return calls
 }
 
-// Start calls StartFunc.
-func (mock *PersistentVolumeClaimControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("PersistentVolumeClaimControllerMock.StartFunc: method is nil but PersistentVolumeClaimController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockPersistentVolumeClaimControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockPersistentVolumeClaimControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedPersistentVolumeClaimController.StartCalls())
-func (mock *PersistentVolumeClaimControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockPersistentVolumeClaimControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockPersistentVolumeClaimControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *PersistentVolumeClaimControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("PersistentVolumeClaimControllerMock.SyncFunc: method is nil but PersistentVolumeClaimController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockPersistentVolumeClaimControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockPersistentVolumeClaimControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedPersistentVolumeClaimController.SyncCalls())
-func (mock *PersistentVolumeClaimControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockPersistentVolumeClaimControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockPersistentVolumeClaimControllerMockSync.RUnlock()
-	return calls
-}
-
 var (
 	lockPersistentVolumeClaimInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
 	lockPersistentVolumeClaimInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
@@ -792,10 +700,10 @@ var _ v1a.PersistentVolumeClaimInterface = &PersistentVolumeClaimInterfaceMock{}
 //             GetNamespacedFunc: func(namespace string, name string, opts v1b.GetOptions) (*v1.PersistentVolumeClaim, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1b.ListOptions) (*v1a.PersistentVolumeClaimList, error) {
+//             ListFunc: func(opts v1b.ListOptions) (*v1.PersistentVolumeClaimList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.PersistentVolumeClaimList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1.PersistentVolumeClaimList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
@@ -860,10 +768,10 @@ type PersistentVolumeClaimInterfaceMock struct {
 	GetNamespacedFunc func(namespace string, name string, opts v1b.GetOptions) (*v1.PersistentVolumeClaim, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1b.ListOptions) (*v1a.PersistentVolumeClaimList, error)
+	ListFunc func(opts v1b.ListOptions) (*v1.PersistentVolumeClaimList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.PersistentVolumeClaimList, error)
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1.PersistentVolumeClaimList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -1624,7 +1532,7 @@ func (mock *PersistentVolumeClaimInterfaceMock) GetNamespacedCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *PersistentVolumeClaimInterfaceMock) List(opts v1b.ListOptions) (*v1a.PersistentVolumeClaimList, error) {
+func (mock *PersistentVolumeClaimInterfaceMock) List(opts v1b.ListOptions) (*v1.PersistentVolumeClaimList, error) {
 	if mock.ListFunc == nil {
 		panic("PersistentVolumeClaimInterfaceMock.ListFunc: method is nil but PersistentVolumeClaimInterface.List was just called")
 	}
@@ -1655,7 +1563,7 @@ func (mock *PersistentVolumeClaimInterfaceMock) ListCalls() []struct {
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *PersistentVolumeClaimInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.PersistentVolumeClaimList, error) {
+func (mock *PersistentVolumeClaimInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1.PersistentVolumeClaimList, error) {
 	if mock.ListNamespacedFunc == nil {
 		panic("PersistentVolumeClaimInterfaceMock.ListNamespacedFunc: method is nil but PersistentVolumeClaimInterface.ListNamespaced was just called")
 	}

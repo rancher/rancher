@@ -74,8 +74,6 @@ type CisConfigController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CisConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type CisConfigInterface interface {
@@ -126,7 +124,7 @@ func (l *cisConfigLister) Get(namespace, name string) (*CisConfig, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CisConfigGroupVersionKind.Group,
-			Resource: "cisConfig",
+			Resource: CisConfigGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*CisConfig), nil
@@ -210,25 +208,12 @@ func (c cisConfigFactory) List() runtime.Object {
 }
 
 func (s *cisConfigClient) Controller() CisConfigController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.cisConfigControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(CisConfigGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(CisConfigGroupVersionResource, CisConfigGroupVersionKind.Kind, true))
 
-	c = &cisConfigController{
+	return &cisConfigController{
 		GenericController: genericController,
 	}
-
-	s.client.cisConfigControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type cisConfigClient struct {
@@ -259,6 +244,11 @@ func (s *cisConfigClient) GetNamespaced(namespace, name string, opts metav1.GetO
 
 func (s *cisConfigClient) Update(o *CisConfig) (*CisConfig, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*CisConfig), err
+}
+
+func (s *cisConfigClient) UpdateStatus(o *CisConfig) (*CisConfig, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*CisConfig), err
 }
 

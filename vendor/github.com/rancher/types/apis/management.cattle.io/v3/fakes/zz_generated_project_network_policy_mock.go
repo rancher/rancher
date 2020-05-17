@@ -150,8 +150,6 @@ var (
 	lockProjectNetworkPolicyControllerMockGeneric                        sync.RWMutex
 	lockProjectNetworkPolicyControllerMockInformer                       sync.RWMutex
 	lockProjectNetworkPolicyControllerMockLister                         sync.RWMutex
-	lockProjectNetworkPolicyControllerMockStart                          sync.RWMutex
-	lockProjectNetworkPolicyControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ProjectNetworkPolicyControllerMock does implement ProjectNetworkPolicyController.
@@ -191,12 +189,6 @@ var _ v3.ProjectNetworkPolicyController = &ProjectNetworkPolicyControllerMock{}
 //             ListerFunc: func() v3.ProjectNetworkPolicyLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedProjectNetworkPolicyController in code that requires ProjectNetworkPolicyController
@@ -230,12 +222,6 @@ type ProjectNetworkPolicyControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.ProjectNetworkPolicyLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type ProjectNetworkPolicyControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *ProjectNetworkPolicyControllerMock) ListerCalls() []struct {
 	lockProjectNetworkPolicyControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockProjectNetworkPolicyControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *ProjectNetworkPolicyControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("ProjectNetworkPolicyControllerMock.StartFunc: method is nil but ProjectNetworkPolicyController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockProjectNetworkPolicyControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockProjectNetworkPolicyControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedProjectNetworkPolicyController.StartCalls())
-func (mock *ProjectNetworkPolicyControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockProjectNetworkPolicyControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockProjectNetworkPolicyControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *ProjectNetworkPolicyControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("ProjectNetworkPolicyControllerMock.SyncFunc: method is nil but ProjectNetworkPolicyController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockProjectNetworkPolicyControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockProjectNetworkPolicyControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedProjectNetworkPolicyController.SyncCalls())
-func (mock *ProjectNetworkPolicyControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockProjectNetworkPolicyControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockProjectNetworkPolicyControllerMockSync.RUnlock()
 	return calls
 }
 

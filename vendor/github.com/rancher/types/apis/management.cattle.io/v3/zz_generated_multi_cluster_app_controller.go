@@ -74,8 +74,6 @@ type MultiClusterAppController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler MultiClusterAppHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type MultiClusterAppInterface interface {
@@ -126,7 +124,7 @@ func (l *multiClusterAppLister) Get(namespace, name string) (*MultiClusterApp, e
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    MultiClusterAppGroupVersionKind.Group,
-			Resource: "multiClusterApp",
+			Resource: MultiClusterAppGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*MultiClusterApp), nil
@@ -210,25 +208,12 @@ func (c multiClusterAppFactory) List() runtime.Object {
 }
 
 func (s *multiClusterAppClient) Controller() MultiClusterAppController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.multiClusterAppControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(MultiClusterAppGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(MultiClusterAppGroupVersionResource, MultiClusterAppGroupVersionKind.Kind, true))
 
-	c = &multiClusterAppController{
+	return &multiClusterAppController{
 		GenericController: genericController,
 	}
-
-	s.client.multiClusterAppControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type multiClusterAppClient struct {
@@ -259,6 +244,11 @@ func (s *multiClusterAppClient) GetNamespaced(namespace, name string, opts metav
 
 func (s *multiClusterAppClient) Update(o *MultiClusterApp) (*MultiClusterApp, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*MultiClusterApp), err
+}
+
+func (s *multiClusterAppClient) UpdateStatus(o *MultiClusterApp) (*MultiClusterApp, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*MultiClusterApp), err
 }
 

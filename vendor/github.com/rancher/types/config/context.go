@@ -4,7 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/wrangler/pkg/generic"
+
+	prommonitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	istiov1alpha3api "github.com/knative/pkg/apis/istio/v1alpha3"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient/dynamic"
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/store/proxy"
@@ -33,24 +37,47 @@ import (
 	"github.com/rancher/types/user"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/rbac"
 	wrbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/schemes"
 	"github.com/sirupsen/logrus"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	apiregistrationv12 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 var (
 	UserStorageContext       types.StorageContext = "user"
 	ManagementStorageContext types.StorageContext = "mgmt"
+	localSchemeBuilder                            = runtime.SchemeBuilder{
+		managementv3.AddToScheme,
+		projectv3.AddToScheme,
+		clusterv3.AddToScheme,
+		scheme.AddToScheme,
+		apiextensionsv1beta1.AddToScheme,
+		apiregistrationv12.AddToScheme,
+		prommonitoringv1.AddToScheme,
+		istiov1alpha3api.AddToScheme,
+	}
+	AddToScheme = localSchemeBuilder.AddToScheme
+	Scheme      = runtime.NewScheme()
 )
+
+func init() {
+	utilruntime.Must(AddToScheme(Scheme))
+	utilruntime.Must(schemes.AddToScheme(Scheme))
+}
 
 type ScaledContext struct {
 	ClientGetter      proxy.ClientGetter
 	KubeConfig        clientcmdapi.Config
 	RESTConfig        rest.Config
+	ControllerFactory controller.SharedControllerFactory
 	UnversionedClient rest.Interface
 	K8sClient         kubernetes.Interface
 	APIExtClient      clientset.Interface
@@ -70,20 +97,11 @@ type ScaledContext struct {
 	managementContext *ManagementContext
 }
 
-func (c *ScaledContext) controllers() []controller.Starter {
-	return []controller.Starter{
-		c.Management,
-		c.Project,
-		c.RBAC,
-		c.Core,
-	}
-}
-
 func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
 	if c.managementContext != nil {
 		return c.managementContext, nil
 	}
-	mgmt, err := NewManagementContext(c.RESTConfig)
+	mgmt, err := newManagementContext(c)
 	if err != nil {
 		return nil, err
 	}
@@ -100,12 +118,18 @@ func NewScaledContext(config rest.Config) (*ScaledContext, error) {
 		RESTConfig: config,
 	}
 
-	context.Management, err = managementv3.NewForConfig(config)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&context.RESTConfig, Scheme)
+	if err != nil {
+		return nil, err
+	}
+	context.ControllerFactory = controllerFactory
+
+	context.Management, err = managementv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Project, err = projectv3.NewForConfig(config)
+	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -115,16 +139,16 @@ func NewScaledContext(config rest.Config) (*ScaledContext, error) {
 		return nil, err
 	}
 
-	context.RBAC, err = rbacv1.NewForConfig(config)
+	context.RBAC, err = rbacv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Core, err = corev1.NewForConfig(config)
+	context.Core, err = corev1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
-	context.Project, err = projectv3.NewForConfig(config)
+	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -153,12 +177,13 @@ func NewScaledContext(config rest.Config) (*ScaledContext, error) {
 
 func (c *ScaledContext) Start(ctx context.Context) error {
 	logrus.Info("Starting API controllers")
-	return controller.SyncThenStart(ctx, 5, c.controllers()...)
+	return c.ControllerFactory.Start(ctx, 50)
 }
 
 type ManagementContext struct {
 	ClientGetter      proxy.ClientGetter
 	RESTConfig        rest.Config
+	ControllerFactory controller.SharedControllerFactory
 	UnversionedClient rest.Interface
 	DynamicClient     k8dynamic.Interface
 	K8sClient         kubernetes.Interface
@@ -174,19 +199,11 @@ type ManagementContext struct {
 	Core       corev1.Interface
 }
 
-func (c *ManagementContext) controllers() []controller.Starter {
-	return []controller.Starter{
-		c.Management,
-		c.Project,
-		c.RBAC,
-		c.Core,
-	}
-}
-
 type UserContext struct {
 	Management        *ManagementContext
 	ClusterName       string
 	RESTConfig        rest.Config
+	ControllerFactory controller.SharedControllerFactory
 	UnversionedClient rest.Interface
 	APIExtClient      clientset.Interface
 	K8sClient         kubernetes.Interface
@@ -210,25 +227,6 @@ type UserContext struct {
 
 	RBACw wrbacv1.Interface
 	rbacw *rbac.Factory
-}
-
-func (w *UserContext) controllers() []controller.Starter {
-	return []controller.Starter{
-		w.APIAggregation,
-		w.Apps,
-		w.Project,
-		w.Core,
-		w.RBAC,
-		w.Extensions,
-		w.BatchV1,
-		w.BatchV1Beta1,
-		w.Networking,
-		w.Monitoring,
-		w.Cluster,
-		w.Storage,
-		w.Policy,
-		w.rbacw,
-	}
 }
 
 func (w *UserContext) UserOnlyContext() *UserOnlyContext {
@@ -259,6 +257,7 @@ type UserOnlyContext struct {
 	Schemas           *types.Schemas
 	ClusterName       string
 	RESTConfig        rest.Config
+	ControllerFactory controller.SharedControllerFactory
 	UnversionedClient rest.Interface
 	K8sClient         kubernetes.Interface
 
@@ -278,35 +277,23 @@ type UserOnlyContext struct {
 	Policy          policyv1beta1.Interface
 }
 
-func (w *UserOnlyContext) controllers() []controller.Starter {
-	return []controller.Starter{
-		w.APIRegistration,
-		w.Apps,
-		w.Project,
-		w.Core,
-		w.RBAC,
-		w.Extensions,
-		w.BatchV1,
-		w.BatchV1Beta1,
-		w.Monitoring,
-		w.Storage,
-		w.Policy,
-	}
-}
-
-func NewManagementContext(config rest.Config) (*ManagementContext, error) {
+func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 	var err error
 
 	context := &ManagementContext{
-		RESTConfig: config,
+		RESTConfig: c.RESTConfig,
 	}
 
-	context.Management, err = managementv3.NewForConfig(config)
+	config := c.RESTConfig
+	controllerFactory := c.ControllerFactory
+	context.ControllerFactory = controllerFactory
+
+	context.Management, err = managementv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Project, err = projectv3.NewForConfig(config)
+	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -321,16 +308,16 @@ func NewManagementContext(config rest.Config) (*ManagementContext, error) {
 		return nil, err
 	}
 
-	context.RBAC, err = rbacv1.NewForConfig(config)
+	context.RBAC, err = rbacv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Core, err = corev1.NewForConfig(config)
+	context.Core, err = corev1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
-	context.Project, err = projectv3.NewForConfig(config)
+	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -355,17 +342,14 @@ func NewManagementContext(config rest.Config) (*ManagementContext, error) {
 		AddSchemas(clusterSchema.Schemas).
 		AddSchemas(projectSchema.Schemas)
 
-	context.Scheme = runtime.NewScheme()
-	managementv3.AddToScheme(context.Scheme)
-	projectv3.AddToScheme(context.Scheme)
+	context.Scheme = Scheme
 
 	return context, err
 }
 
 func (c *ManagementContext) Start(ctx context.Context) error {
 	logrus.Info("Starting management controllers")
-
-	return controller.SyncThenStart(ctx, 50, c.controllers()...)
+	return c.ControllerFactory.Start(ctx, 50)
 }
 
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
@@ -381,89 +365,98 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, Scheme)
+	if err != nil {
+		return nil, err
+	}
+	context.ControllerFactory = controllerFactory
+
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Apps, err = appsv1.NewForConfig(config)
+	context.Apps, err = appsv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Core, err = corev1.NewForConfig(config)
+	context.Core, err = corev1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Project, err = projectv3.NewForConfig(config)
+	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Storage, err = storagev1.NewForConfig(config)
+	context.Storage, err = storagev1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.RBAC, err = rbacv1.NewForConfig(config)
+	context.RBAC, err = rbacv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Networking, err = knetworkingv1.NewForConfig(config)
+	context.Networking, err = knetworkingv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Extensions, err = extv1beta1.NewForConfig(config)
+	context.Extensions, err = extv1beta1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Policy, err = policyv1beta1.NewForConfig(config)
+	context.Policy, err = policyv1beta1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.BatchV1, err = batchv1.NewForConfig(config)
+	context.BatchV1, err = batchv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.BatchV1Beta1, err = batchv1beta1.NewForConfig(config)
+	context.BatchV1Beta1, err = batchv1beta1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Autoscaling, err = autoscaling.NewForConfig(config)
+	context.Autoscaling, err = autoscaling.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Monitoring, err = monitoringv1.NewForConfig(config)
+	context.Monitoring, err = monitoringv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Cluster, err = clusterv3.NewForConfig(config)
+	context.Cluster, err = clusterv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Istio, err = istiov1alpha3.NewForConfig(config)
+	context.Istio, err = istiov1alpha3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.APIAggregation, err = apiregistrationv1.NewForConfig(config)
+	context.APIAggregation, err = apiregistrationv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
 	wranglerConf := config
 	wranglerConf.Timeout = 30 * time.Minute
-	context.rbacw, err = rbac.NewFactoryFromConfig(&wranglerConf)
+	opts := &generic.FactoryOptions{
+		SharedControllerFactory: controllerFactory,
+	}
+	context.rbacw, err = rbac.NewFactoryFromConfigWithOptions(&wranglerConf, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -489,10 +482,10 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 
 func (w *UserContext) Start(ctx context.Context) error {
 	logrus.Info("Starting cluster controllers for ", w.ClusterName)
-	if err := controller.SyncThenStart(w.runContext, 50, w.Management.controllers()...); err != nil {
+	if err := w.Management.ControllerFactory.Start(w.runContext, 50); err != nil {
 		return err
 	}
-	return controller.SyncThenStart(ctx, 5, w.controllers()...)
+	return w.ControllerFactory.Start(ctx, 5)
 }
 
 func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
@@ -501,77 +494,83 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 		RESTConfig: config,
 	}
 
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, Scheme)
+	if err != nil {
+		return nil, err
+	}
+	context.ControllerFactory = controllerFactory
+
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Apps, err = appsv1.NewForConfig(config)
+	context.Apps, err = appsv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Core, err = corev1.NewForConfig(config)
+	context.Core, err = corev1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Project, err = projectv3.NewForConfig(config)
+	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Storage, err = storagev1.NewForConfig(config)
+	context.Storage, err = storagev1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.RBAC, err = rbacv1.NewForConfig(config)
+	context.RBAC, err = rbacv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Extensions, err = extv1beta1.NewForConfig(config)
+	context.Extensions, err = extv1beta1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Policy, err = policyv1beta1.NewForConfig(config)
+	context.Policy, err = policyv1beta1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.BatchV1, err = batchv1.NewForConfig(config)
+	context.BatchV1, err = batchv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.BatchV1Beta1, err = batchv1beta1.NewForConfig(config)
+	context.BatchV1Beta1, err = batchv1beta1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Autoscaling, err = autoscaling.NewForConfig(config)
+	context.Autoscaling, err = autoscaling.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Monitoring, err = monitoringv1.NewForConfig(config)
+	context.Monitoring, err = monitoringv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Cluster, err = clusterv3.NewForConfig(config)
+	context.Cluster, err = clusterv3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Istio, err = istiov1alpha3.NewForConfig(config)
+	context.Istio, err = istiov1alpha3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.APIRegistration, err = apiregistrationv1.NewForConfig(config)
+	context.APIRegistration, err = apiregistrationv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -596,5 +595,5 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 
 func (w *UserOnlyContext) Start(ctx context.Context) error {
 	logrus.Info("Starting workload controllers")
-	return controller.SyncThenStart(ctx, 5, w.controllers()...)
+	return w.ControllerFactory.Start(ctx, 5)
 }

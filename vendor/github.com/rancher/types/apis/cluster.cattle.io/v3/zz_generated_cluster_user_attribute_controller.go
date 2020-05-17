@@ -74,8 +74,6 @@ type ClusterUserAttributeController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterUserAttributeHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterUserAttributeInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterUserAttributeLister) Get(namespace, name string) (*ClusterUserAt
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterUserAttributeGroupVersionKind.Group,
-			Resource: "clusterUserAttribute",
+			Resource: ClusterUserAttributeGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterUserAttribute), nil
@@ -210,25 +208,12 @@ func (c clusterUserAttributeFactory) List() runtime.Object {
 }
 
 func (s *clusterUserAttributeClient) Controller() ClusterUserAttributeController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterUserAttributeControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterUserAttributeGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterUserAttributeGroupVersionResource, ClusterUserAttributeGroupVersionKind.Kind, true))
 
-	c = &clusterUserAttributeController{
+	return &clusterUserAttributeController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterUserAttributeControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterUserAttributeClient struct {
@@ -259,6 +244,11 @@ func (s *clusterUserAttributeClient) GetNamespaced(namespace, name string, opts 
 
 func (s *clusterUserAttributeClient) Update(o *ClusterUserAttribute) (*ClusterUserAttribute, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterUserAttribute), err
+}
+
+func (s *clusterUserAttributeClient) UpdateStatus(o *ClusterUserAttribute) (*ClusterUserAttribute, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterUserAttribute), err
 }
 

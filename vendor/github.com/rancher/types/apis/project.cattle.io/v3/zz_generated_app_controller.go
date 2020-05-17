@@ -74,8 +74,6 @@ type AppController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler AppHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type AppInterface interface {
@@ -126,7 +124,7 @@ func (l *appLister) Get(namespace, name string) (*App, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    AppGroupVersionKind.Group,
-			Resource: "app",
+			Resource: AppGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*App), nil
@@ -210,25 +208,12 @@ func (c appFactory) List() runtime.Object {
 }
 
 func (s *appClient) Controller() AppController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.appControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(AppGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(AppGroupVersionResource, AppGroupVersionKind.Kind, true))
 
-	c = &appController{
+	return &appController{
 		GenericController: genericController,
 	}
-
-	s.client.appControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type appClient struct {
@@ -259,6 +244,11 @@ func (s *appClient) GetNamespaced(namespace, name string, opts metav1.GetOptions
 
 func (s *appClient) Update(o *App) (*App, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*App), err
+}
+
+func (s *appClient) UpdateStatus(o *App) (*App, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*App), err
 }
 

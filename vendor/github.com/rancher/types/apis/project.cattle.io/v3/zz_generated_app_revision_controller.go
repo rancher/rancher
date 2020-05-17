@@ -74,8 +74,6 @@ type AppRevisionController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler AppRevisionHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type AppRevisionInterface interface {
@@ -126,7 +124,7 @@ func (l *appRevisionLister) Get(namespace, name string) (*AppRevision, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    AppRevisionGroupVersionKind.Group,
-			Resource: "appRevision",
+			Resource: AppRevisionGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*AppRevision), nil
@@ -210,25 +208,12 @@ func (c appRevisionFactory) List() runtime.Object {
 }
 
 func (s *appRevisionClient) Controller() AppRevisionController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.appRevisionControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(AppRevisionGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(AppRevisionGroupVersionResource, AppRevisionGroupVersionKind.Kind, true))
 
-	c = &appRevisionController{
+	return &appRevisionController{
 		GenericController: genericController,
 	}
-
-	s.client.appRevisionControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type appRevisionClient struct {
@@ -259,6 +244,11 @@ func (s *appRevisionClient) GetNamespaced(namespace, name string, opts metav1.Ge
 
 func (s *appRevisionClient) Update(o *AppRevision) (*AppRevision, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*AppRevision), err
+}
+
+func (s *appRevisionClient) UpdateStatus(o *AppRevision) (*AppRevision, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*AppRevision), err
 }
 

@@ -73,8 +73,6 @@ type GlobalRoleBindingController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GlobalRoleBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type GlobalRoleBindingInterface interface {
@@ -125,7 +123,7 @@ func (l *globalRoleBindingLister) Get(namespace, name string) (*GlobalRoleBindin
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    GlobalRoleBindingGroupVersionKind.Group,
-			Resource: "globalRoleBinding",
+			Resource: GlobalRoleBindingGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*GlobalRoleBinding), nil
@@ -209,25 +207,12 @@ func (c globalRoleBindingFactory) List() runtime.Object {
 }
 
 func (s *globalRoleBindingClient) Controller() GlobalRoleBindingController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.globalRoleBindingControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(GlobalRoleBindingGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(GlobalRoleBindingGroupVersionResource, GlobalRoleBindingGroupVersionKind.Kind, false))
 
-	c = &globalRoleBindingController{
+	return &globalRoleBindingController{
 		GenericController: genericController,
 	}
-
-	s.client.globalRoleBindingControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type globalRoleBindingClient struct {
@@ -258,6 +243,11 @@ func (s *globalRoleBindingClient) GetNamespaced(namespace, name string, opts met
 
 func (s *globalRoleBindingClient) Update(o *GlobalRoleBinding) (*GlobalRoleBinding, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*GlobalRoleBinding), err
+}
+
+func (s *globalRoleBindingClient) UpdateStatus(o *GlobalRoleBinding) (*GlobalRoleBinding, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*GlobalRoleBinding), err
 }
 

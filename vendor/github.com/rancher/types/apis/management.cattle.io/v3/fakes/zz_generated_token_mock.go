@@ -150,8 +150,6 @@ var (
 	lockTokenControllerMockGeneric                        sync.RWMutex
 	lockTokenControllerMockInformer                       sync.RWMutex
 	lockTokenControllerMockLister                         sync.RWMutex
-	lockTokenControllerMockStart                          sync.RWMutex
-	lockTokenControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that TokenControllerMock does implement TokenController.
@@ -191,12 +189,6 @@ var _ v3.TokenController = &TokenControllerMock{}
 //             ListerFunc: func() v3.TokenLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedTokenController in code that requires TokenController
@@ -230,12 +222,6 @@ type TokenControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.TokenLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type TokenControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *TokenControllerMock) ListerCalls() []struct {
 	lockTokenControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockTokenControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *TokenControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("TokenControllerMock.StartFunc: method is nil but TokenController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockTokenControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockTokenControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedTokenController.StartCalls())
-func (mock *TokenControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockTokenControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockTokenControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *TokenControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("TokenControllerMock.SyncFunc: method is nil but TokenController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockTokenControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockTokenControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedTokenController.SyncCalls())
-func (mock *TokenControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockTokenControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockTokenControllerMockSync.RUnlock()
 	return calls
 }
 

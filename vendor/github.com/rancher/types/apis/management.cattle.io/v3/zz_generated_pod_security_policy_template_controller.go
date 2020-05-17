@@ -73,8 +73,6 @@ type PodSecurityPolicyTemplateController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PodSecurityPolicyTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PodSecurityPolicyTemplateInterface interface {
@@ -125,7 +123,7 @@ func (l *podSecurityPolicyTemplateLister) Get(namespace, name string) (*PodSecur
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PodSecurityPolicyTemplateGroupVersionKind.Group,
-			Resource: "podSecurityPolicyTemplate",
+			Resource: PodSecurityPolicyTemplateGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*PodSecurityPolicyTemplate), nil
@@ -209,25 +207,12 @@ func (c podSecurityPolicyTemplateFactory) List() runtime.Object {
 }
 
 func (s *podSecurityPolicyTemplateClient) Controller() PodSecurityPolicyTemplateController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.podSecurityPolicyTemplateControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PodSecurityPolicyTemplateGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PodSecurityPolicyTemplateGroupVersionResource, PodSecurityPolicyTemplateGroupVersionKind.Kind, false))
 
-	c = &podSecurityPolicyTemplateController{
+	return &podSecurityPolicyTemplateController{
 		GenericController: genericController,
 	}
-
-	s.client.podSecurityPolicyTemplateControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type podSecurityPolicyTemplateClient struct {
@@ -258,6 +243,11 @@ func (s *podSecurityPolicyTemplateClient) GetNamespaced(namespace, name string, 
 
 func (s *podSecurityPolicyTemplateClient) Update(o *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*PodSecurityPolicyTemplate), err
+}
+
+func (s *podSecurityPolicyTemplateClient) UpdateStatus(o *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*PodSecurityPolicyTemplate), err
 }
 

@@ -5,19 +5,19 @@ import (
 )
 
 const (
-	RKEK8sServiceOptionType                 = "rkeK8sServiceOption"
-	RKEK8sServiceOptionFieldAnnotations     = "annotations"
-	RKEK8sServiceOptionFieldCreated         = "created"
-	RKEK8sServiceOptionFieldCreatorID       = "creatorId"
-	RKEK8sServiceOptionFieldLabels          = "labels"
-	RKEK8sServiceOptionFieldName            = "name"
-	RKEK8sServiceOptionFieldOwnerReferences = "ownerReferences"
-	RKEK8sServiceOptionFieldRemoved         = "removed"
-	RKEK8sServiceOptionFieldServiceOptions  = "serviceOptions"
-	RKEK8sServiceOptionFieldUUID            = "uuid"
+	RkeK8sServiceOptionType                 = "rkeK8sServiceOption"
+	RkeK8sServiceOptionFieldAnnotations     = "annotations"
+	RkeK8sServiceOptionFieldCreated         = "created"
+	RkeK8sServiceOptionFieldCreatorID       = "creatorId"
+	RkeK8sServiceOptionFieldLabels          = "labels"
+	RkeK8sServiceOptionFieldName            = "name"
+	RkeK8sServiceOptionFieldOwnerReferences = "ownerReferences"
+	RkeK8sServiceOptionFieldRemoved         = "removed"
+	RkeK8sServiceOptionFieldServiceOptions  = "serviceOptions"
+	RkeK8sServiceOptionFieldUUID            = "uuid"
 )
 
-type RKEK8sServiceOption struct {
+type RkeK8sServiceOption struct {
 	types.Resource
 	Annotations     map[string]string          `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created         string                     `json:"created,omitempty" yaml:"created,omitempty"`
@@ -30,59 +30,59 @@ type RKEK8sServiceOption struct {
 	UUID            string                     `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
-type RKEK8sServiceOptionCollection struct {
+type RkeK8sServiceOptionCollection struct {
 	types.Collection
-	Data   []RKEK8sServiceOption `json:"data,omitempty"`
-	client *RKEK8sServiceOptionClient
+	Data   []RkeK8sServiceOption `json:"data,omitempty"`
+	client *RkeK8sServiceOptionClient
 }
 
-type RKEK8sServiceOptionClient struct {
+type RkeK8sServiceOptionClient struct {
 	apiClient *Client
 }
 
-type RKEK8sServiceOptionOperations interface {
-	List(opts *types.ListOpts) (*RKEK8sServiceOptionCollection, error)
-	ListAll(opts *types.ListOpts) (*RKEK8sServiceOptionCollection, error)
-	Create(opts *RKEK8sServiceOption) (*RKEK8sServiceOption, error)
-	Update(existing *RKEK8sServiceOption, updates interface{}) (*RKEK8sServiceOption, error)
-	Replace(existing *RKEK8sServiceOption) (*RKEK8sServiceOption, error)
-	ByID(id string) (*RKEK8sServiceOption, error)
-	Delete(container *RKEK8sServiceOption) error
+type RkeK8sServiceOptionOperations interface {
+	List(opts *types.ListOpts) (*RkeK8sServiceOptionCollection, error)
+	ListAll(opts *types.ListOpts) (*RkeK8sServiceOptionCollection, error)
+	Create(opts *RkeK8sServiceOption) (*RkeK8sServiceOption, error)
+	Update(existing *RkeK8sServiceOption, updates interface{}) (*RkeK8sServiceOption, error)
+	Replace(existing *RkeK8sServiceOption) (*RkeK8sServiceOption, error)
+	ByID(id string) (*RkeK8sServiceOption, error)
+	Delete(container *RkeK8sServiceOption) error
 }
 
-func newRKEK8sServiceOptionClient(apiClient *Client) *RKEK8sServiceOptionClient {
-	return &RKEK8sServiceOptionClient{
+func newRkeK8sServiceOptionClient(apiClient *Client) *RkeK8sServiceOptionClient {
+	return &RkeK8sServiceOptionClient{
 		apiClient: apiClient,
 	}
 }
 
-func (c *RKEK8sServiceOptionClient) Create(container *RKEK8sServiceOption) (*RKEK8sServiceOption, error) {
-	resp := &RKEK8sServiceOption{}
-	err := c.apiClient.Ops.DoCreate(RKEK8sServiceOptionType, container, resp)
+func (c *RkeK8sServiceOptionClient) Create(container *RkeK8sServiceOption) (*RkeK8sServiceOption, error) {
+	resp := &RkeK8sServiceOption{}
+	err := c.apiClient.Ops.DoCreate(RkeK8sServiceOptionType, container, resp)
 	return resp, err
 }
 
-func (c *RKEK8sServiceOptionClient) Update(existing *RKEK8sServiceOption, updates interface{}) (*RKEK8sServiceOption, error) {
-	resp := &RKEK8sServiceOption{}
-	err := c.apiClient.Ops.DoUpdate(RKEK8sServiceOptionType, &existing.Resource, updates, resp)
+func (c *RkeK8sServiceOptionClient) Update(existing *RkeK8sServiceOption, updates interface{}) (*RkeK8sServiceOption, error) {
+	resp := &RkeK8sServiceOption{}
+	err := c.apiClient.Ops.DoUpdate(RkeK8sServiceOptionType, &existing.Resource, updates, resp)
 	return resp, err
 }
 
-func (c *RKEK8sServiceOptionClient) Replace(obj *RKEK8sServiceOption) (*RKEK8sServiceOption, error) {
-	resp := &RKEK8sServiceOption{}
-	err := c.apiClient.Ops.DoReplace(RKEK8sServiceOptionType, &obj.Resource, obj, resp)
+func (c *RkeK8sServiceOptionClient) Replace(obj *RkeK8sServiceOption) (*RkeK8sServiceOption, error) {
+	resp := &RkeK8sServiceOption{}
+	err := c.apiClient.Ops.DoReplace(RkeK8sServiceOptionType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
-func (c *RKEK8sServiceOptionClient) List(opts *types.ListOpts) (*RKEK8sServiceOptionCollection, error) {
-	resp := &RKEK8sServiceOptionCollection{}
-	err := c.apiClient.Ops.DoList(RKEK8sServiceOptionType, opts, resp)
+func (c *RkeK8sServiceOptionClient) List(opts *types.ListOpts) (*RkeK8sServiceOptionCollection, error) {
+	resp := &RkeK8sServiceOptionCollection{}
+	err := c.apiClient.Ops.DoList(RkeK8sServiceOptionType, opts, resp)
 	resp.client = c
 	return resp, err
 }
 
-func (c *RKEK8sServiceOptionClient) ListAll(opts *types.ListOpts) (*RKEK8sServiceOptionCollection, error) {
-	resp := &RKEK8sServiceOptionCollection{}
+func (c *RkeK8sServiceOptionClient) ListAll(opts *types.ListOpts) (*RkeK8sServiceOptionCollection, error) {
+	resp := &RkeK8sServiceOptionCollection{}
 	resp, err := c.List(opts)
 	if err != nil {
 		return resp, err
@@ -99,9 +99,9 @@ func (c *RKEK8sServiceOptionClient) ListAll(opts *types.ListOpts) (*RKEK8sServic
 	return resp, err
 }
 
-func (cc *RKEK8sServiceOptionCollection) Next() (*RKEK8sServiceOptionCollection, error) {
+func (cc *RkeK8sServiceOptionCollection) Next() (*RkeK8sServiceOptionCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &RKEK8sServiceOptionCollection{}
+		resp := &RkeK8sServiceOptionCollection{}
 		err := cc.client.apiClient.Ops.DoNext(cc.Pagination.Next, resp)
 		resp.client = cc.client
 		return resp, err
@@ -109,12 +109,12 @@ func (cc *RKEK8sServiceOptionCollection) Next() (*RKEK8sServiceOptionCollection,
 	return nil, nil
 }
 
-func (c *RKEK8sServiceOptionClient) ByID(id string) (*RKEK8sServiceOption, error) {
-	resp := &RKEK8sServiceOption{}
-	err := c.apiClient.Ops.DoByID(RKEK8sServiceOptionType, id, resp)
+func (c *RkeK8sServiceOptionClient) ByID(id string) (*RkeK8sServiceOption, error) {
+	resp := &RkeK8sServiceOption{}
+	err := c.apiClient.Ops.DoByID(RkeK8sServiceOptionType, id, resp)
 	return resp, err
 }
 
-func (c *RKEK8sServiceOptionClient) Delete(container *RKEK8sServiceOption) error {
-	return c.apiClient.Ops.DoResourceDelete(RKEK8sServiceOptionType, &container.Resource)
+func (c *RkeK8sServiceOptionClient) Delete(container *RkeK8sServiceOption) error {
+	return c.apiClient.Ops.DoResourceDelete(RkeK8sServiceOptionType, &container.Resource)
 }

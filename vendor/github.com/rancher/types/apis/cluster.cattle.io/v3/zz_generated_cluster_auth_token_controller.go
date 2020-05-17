@@ -74,8 +74,6 @@ type ClusterAuthTokenController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterAuthTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterAuthTokenInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterAuthTokenLister) Get(namespace, name string) (*ClusterAuthToken,
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterAuthTokenGroupVersionKind.Group,
-			Resource: "clusterAuthToken",
+			Resource: ClusterAuthTokenGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterAuthToken), nil
@@ -210,25 +208,12 @@ func (c clusterAuthTokenFactory) List() runtime.Object {
 }
 
 func (s *clusterAuthTokenClient) Controller() ClusterAuthTokenController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterAuthTokenControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterAuthTokenGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterAuthTokenGroupVersionResource, ClusterAuthTokenGroupVersionKind.Kind, true))
 
-	c = &clusterAuthTokenController{
+	return &clusterAuthTokenController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterAuthTokenControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterAuthTokenClient struct {
@@ -259,6 +244,11 @@ func (s *clusterAuthTokenClient) GetNamespaced(namespace, name string, opts meta
 
 func (s *clusterAuthTokenClient) Update(o *ClusterAuthToken) (*ClusterAuthToken, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterAuthToken), err
+}
+
+func (s *clusterAuthTokenClient) UpdateStatus(o *ClusterAuthToken) (*ClusterAuthToken, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterAuthToken), err
 }
 

@@ -74,8 +74,6 @@ type GlobalDNSProviderController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GlobalDNSProviderHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type GlobalDNSProviderInterface interface {
@@ -126,7 +124,7 @@ func (l *globalDnsProviderLister) Get(namespace, name string) (*GlobalDNSProvide
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    GlobalDNSProviderGroupVersionKind.Group,
-			Resource: "globalDnsProvider",
+			Resource: GlobalDNSProviderGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*GlobalDNSProvider), nil
@@ -210,25 +208,12 @@ func (c globalDnsProviderFactory) List() runtime.Object {
 }
 
 func (s *globalDnsProviderClient) Controller() GlobalDNSProviderController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.globalDnsProviderControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(GlobalDNSProviderGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(GlobalDNSProviderGroupVersionResource, GlobalDNSProviderGroupVersionKind.Kind, true))
 
-	c = &globalDnsProviderController{
+	return &globalDnsProviderController{
 		GenericController: genericController,
 	}
-
-	s.client.globalDnsProviderControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type globalDnsProviderClient struct {
@@ -259,6 +244,11 @@ func (s *globalDnsProviderClient) GetNamespaced(namespace, name string, opts met
 
 func (s *globalDnsProviderClient) Update(o *GlobalDNSProvider) (*GlobalDNSProvider, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*GlobalDNSProvider), err
+}
+
+func (s *globalDnsProviderClient) UpdateStatus(o *GlobalDNSProvider) (*GlobalDNSProvider, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*GlobalDNSProvider), err
 }
 

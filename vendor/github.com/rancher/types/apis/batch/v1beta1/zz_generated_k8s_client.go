@@ -1,63 +1,25 @@
 package v1beta1
 
 import (
-	"context"
-	"sync"
-
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/objectclient/dynamic"
-	"github.com/rancher/norman/restwatch"
-	"k8s.io/client-go/rest"
-)
-
-type (
-	contextKeyType        struct{}
-	contextClientsKeyType struct{}
 )
 
 type Interface interface {
-	RESTClient() rest.Interface
-	controller.Starter
-
 	CronJobsGetter
 }
 
 type Client struct {
-	sync.Mutex
-	restClient rest.Interface
-	starters   []controller.Starter
-
-	cronJobControllers map[string]CronJobController
+	controllerFactory controller.SharedControllerFactory
+	clientFactory     client.SharedClientFactory
 }
 
-func NewForConfig(config rest.Config) (Interface, error) {
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = dynamic.NegotiatedSerializer
-	}
-
-	restClient, err := restwatch.UnversionedRESTClientFor(&config)
-	if err != nil {
-		return nil, err
-	}
-
+func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
 	return &Client{
-		restClient: restClient,
-
-		cronJobControllers: map[string]CronJobController{},
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
 	}, nil
-}
-
-func (c *Client) RESTClient() rest.Interface {
-	return c.restClient
-}
-
-func (c *Client) Sync(ctx context.Context) error {
-	return controller.Sync(ctx, c.starters...)
-}
-
-func (c *Client) Start(ctx context.Context, threadiness int) error {
-	return controller.Start(ctx, threadiness, c.starters...)
 }
 
 type CronJobsGetter interface {
@@ -65,7 +27,8 @@ type CronJobsGetter interface {
 }
 
 func (c *Client) CronJobs(namespace string) CronJobInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CronJobResource, CronJobGroupVersionKind, cronJobFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(CronJobGroupVersionResource, CronJobGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CronJobResource, CronJobGroupVersionKind, cronJobFactory{})
 	return &cronJobClient{
 		ns:           namespace,
 		client:       c,

@@ -74,8 +74,6 @@ type NamespacedBasicAuthController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NamespacedBasicAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NamespacedBasicAuthInterface interface {
@@ -126,7 +124,7 @@ func (l *namespacedBasicAuthLister) Get(namespace, name string) (*NamespacedBasi
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespacedBasicAuthGroupVersionKind.Group,
-			Resource: "namespacedBasicAuth",
+			Resource: NamespacedBasicAuthGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*NamespacedBasicAuth), nil
@@ -210,25 +208,12 @@ func (c namespacedBasicAuthFactory) List() runtime.Object {
 }
 
 func (s *namespacedBasicAuthClient) Controller() NamespacedBasicAuthController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.namespacedBasicAuthControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NamespacedBasicAuthGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NamespacedBasicAuthGroupVersionResource, NamespacedBasicAuthGroupVersionKind.Kind, true))
 
-	c = &namespacedBasicAuthController{
+	return &namespacedBasicAuthController{
 		GenericController: genericController,
 	}
-
-	s.client.namespacedBasicAuthControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type namespacedBasicAuthClient struct {
@@ -259,6 +244,11 @@ func (s *namespacedBasicAuthClient) GetNamespaced(namespace, name string, opts m
 
 func (s *namespacedBasicAuthClient) Update(o *NamespacedBasicAuth) (*NamespacedBasicAuth, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*NamespacedBasicAuth), err
+}
+
+func (s *namespacedBasicAuthClient) UpdateStatus(o *NamespacedBasicAuth) (*NamespacedBasicAuth, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*NamespacedBasicAuth), err
 }
 

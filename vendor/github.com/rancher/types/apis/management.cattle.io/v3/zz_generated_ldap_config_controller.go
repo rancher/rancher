@@ -73,8 +73,6 @@ type LdapConfigController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler LdapConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type LdapConfigInterface interface {
@@ -125,7 +123,7 @@ func (l *ldapConfigLister) Get(namespace, name string) (*LdapConfig, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    LdapConfigGroupVersionKind.Group,
-			Resource: "ldapConfig",
+			Resource: LdapConfigGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*LdapConfig), nil
@@ -209,25 +207,12 @@ func (c ldapConfigFactory) List() runtime.Object {
 }
 
 func (s *ldapConfigClient) Controller() LdapConfigController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.ldapConfigControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(LdapConfigGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(LdapConfigGroupVersionResource, LdapConfigGroupVersionKind.Kind, false))
 
-	c = &ldapConfigController{
+	return &ldapConfigController{
 		GenericController: genericController,
 	}
-
-	s.client.ldapConfigControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type ldapConfigClient struct {
@@ -258,6 +243,11 @@ func (s *ldapConfigClient) GetNamespaced(namespace, name string, opts metav1.Get
 
 func (s *ldapConfigClient) Update(o *LdapConfig) (*LdapConfig, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*LdapConfig), err
+}
+
+func (s *ldapConfigClient) UpdateStatus(o *LdapConfig) (*LdapConfig, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*LdapConfig), err
 }
 

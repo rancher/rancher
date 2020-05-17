@@ -74,8 +74,6 @@ type PodSecurityPolicyTemplateProjectBindingController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PodSecurityPolicyTemplateProjectBindingInterface interface {
@@ -126,7 +124,7 @@ func (l *podSecurityPolicyTemplateProjectBindingLister) Get(namespace, name stri
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Group,
-			Resource: "podSecurityPolicyTemplateProjectBinding",
+			Resource: PodSecurityPolicyTemplateProjectBindingGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*PodSecurityPolicyTemplateProjectBinding), nil
@@ -210,25 +208,12 @@ func (c podSecurityPolicyTemplateProjectBindingFactory) List() runtime.Object {
 }
 
 func (s *podSecurityPolicyTemplateProjectBindingClient) Controller() PodSecurityPolicyTemplateProjectBindingController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.podSecurityPolicyTemplateProjectBindingControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PodSecurityPolicyTemplateProjectBindingGroupVersionResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind, true))
 
-	c = &podSecurityPolicyTemplateProjectBindingController{
+	return &podSecurityPolicyTemplateProjectBindingController{
 		GenericController: genericController,
 	}
-
-	s.client.podSecurityPolicyTemplateProjectBindingControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type podSecurityPolicyTemplateProjectBindingClient struct {
@@ -259,6 +244,11 @@ func (s *podSecurityPolicyTemplateProjectBindingClient) GetNamespaced(namespace,
 
 func (s *podSecurityPolicyTemplateProjectBindingClient) Update(o *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*PodSecurityPolicyTemplateProjectBinding), err
+}
+
+func (s *podSecurityPolicyTemplateProjectBindingClient) UpdateStatus(o *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*PodSecurityPolicyTemplateProjectBinding), err
 }
 

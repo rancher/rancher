@@ -150,8 +150,6 @@ var (
 	lockTemplateVersionControllerMockGeneric                        sync.RWMutex
 	lockTemplateVersionControllerMockInformer                       sync.RWMutex
 	lockTemplateVersionControllerMockLister                         sync.RWMutex
-	lockTemplateVersionControllerMockStart                          sync.RWMutex
-	lockTemplateVersionControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that TemplateVersionControllerMock does implement TemplateVersionController.
@@ -191,12 +189,6 @@ var _ v3.TemplateVersionController = &TemplateVersionControllerMock{}
 //             ListerFunc: func() v3.TemplateVersionLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedTemplateVersionController in code that requires TemplateVersionController
@@ -230,12 +222,6 @@ type TemplateVersionControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.TemplateVersionLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type TemplateVersionControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *TemplateVersionControllerMock) ListerCalls() []struct {
 	lockTemplateVersionControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockTemplateVersionControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *TemplateVersionControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("TemplateVersionControllerMock.StartFunc: method is nil but TemplateVersionController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockTemplateVersionControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockTemplateVersionControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedTemplateVersionController.StartCalls())
-func (mock *TemplateVersionControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockTemplateVersionControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockTemplateVersionControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *TemplateVersionControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("TemplateVersionControllerMock.SyncFunc: method is nil but TemplateVersionController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockTemplateVersionControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockTemplateVersionControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedTemplateVersionController.SyncCalls())
-func (mock *TemplateVersionControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockTemplateVersionControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockTemplateVersionControllerMockSync.RUnlock()
 	return calls
 }
 

@@ -46,6 +46,7 @@ type controller struct {
 	gvk         schema.GroupVersionKind
 	startKeys   []startKey
 	started     bool
+	startCache  func(context.Context) error
 }
 
 type startKey struct {
@@ -57,7 +58,7 @@ type Options struct {
 	RateLimiter workqueue.RateLimiter
 }
 
-func New(name string, informer cache.SharedIndexInformer, handler Handler, opts *Options) Controller {
+func New(name string, informer cache.SharedIndexInformer, startCache func(context.Context) error, handler Handler, opts *Options) Controller {
 	opts = applyDefaultOptions(opts)
 
 	controller := &controller{
@@ -65,6 +66,7 @@ func New(name string, informer cache.SharedIndexInformer, handler Handler, opts 
 		handler:     handler,
 		informer:    informer,
 		rateLimiter: opts.RateLimiter,
+		startCache:  startCache,
 	}
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -140,6 +142,10 @@ func (c *controller) Start(ctx context.Context, workers int) error {
 		return nil
 	}
 
+	if err := c.startCache(ctx); err != nil {
+		return err
+	}
+
 	if ok := cache.WaitForCacheSync(ctx.Done(), c.informer.HasSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
@@ -163,7 +169,7 @@ func (c *controller) processNextWorkItem() bool {
 
 	if err := c.processSingleItem(obj); err != nil {
 		if !strings.Contains(err.Error(), "please apply your changes to the latest version and try again") {
-			utilruntime.HandleError(err)
+			log.Errorf("%v", err)
 		}
 		return true
 	}
@@ -181,7 +187,7 @@ func (c *controller) processSingleItem(obj interface{}) error {
 
 	if key, ok = obj.(string); !ok {
 		c.workqueue.Forget(obj)
-		utilruntime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", obj))
+		log.Errorf("expected string in workqueue but got %#v", obj)
 		return nil
 	}
 	if err := c.syncHandler(key); err != nil {
@@ -210,9 +216,9 @@ func (c *controller) EnqueueKey(key string) {
 	defer c.startLock.Unlock()
 
 	if c.workqueue == nil {
-		c.workqueue.AddRateLimited(key)
-	} else {
 		c.startKeys = append(c.startKeys, startKey{key: key})
+	} else {
+		c.workqueue.AddRateLimited(key)
 	}
 }
 
@@ -253,7 +259,7 @@ func (c *controller) enqueue(obj interface{}) {
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		utilruntime.HandleError(err)
+		log.Errorf("%v", err)
 		return
 	}
 	c.startLock.Lock()
@@ -269,12 +275,12 @@ func (c *controller) handleObject(obj interface{}) {
 	if _, ok := obj.(metav1.Object); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object, invalid type"))
+			log.Errorf("error decoding object, invalid type")
 			return
 		}
 		_, ok = tombstone.Obj.(metav1.Object)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
+			log.Errorf("error decoding object tombstone, invalid type")
 			return
 		}
 	}

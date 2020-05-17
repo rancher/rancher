@@ -150,8 +150,6 @@ var (
 	lockClusterTemplateRevisionControllerMockGeneric                        sync.RWMutex
 	lockClusterTemplateRevisionControllerMockInformer                       sync.RWMutex
 	lockClusterTemplateRevisionControllerMockLister                         sync.RWMutex
-	lockClusterTemplateRevisionControllerMockStart                          sync.RWMutex
-	lockClusterTemplateRevisionControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ClusterTemplateRevisionControllerMock does implement ClusterTemplateRevisionController.
@@ -191,12 +189,6 @@ var _ v3.ClusterTemplateRevisionController = &ClusterTemplateRevisionControllerM
 //             ListerFunc: func() v3.ClusterTemplateRevisionLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedClusterTemplateRevisionController in code that requires ClusterTemplateRevisionController
@@ -230,12 +222,6 @@ type ClusterTemplateRevisionControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.ClusterTemplateRevisionLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type ClusterTemplateRevisionControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *ClusterTemplateRevisionControllerMock) ListerCalls() []struct {
 	lockClusterTemplateRevisionControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockClusterTemplateRevisionControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *ClusterTemplateRevisionControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("ClusterTemplateRevisionControllerMock.StartFunc: method is nil but ClusterTemplateRevisionController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockClusterTemplateRevisionControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockClusterTemplateRevisionControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedClusterTemplateRevisionController.StartCalls())
-func (mock *ClusterTemplateRevisionControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockClusterTemplateRevisionControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockClusterTemplateRevisionControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *ClusterTemplateRevisionControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("ClusterTemplateRevisionControllerMock.SyncFunc: method is nil but ClusterTemplateRevisionController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockClusterTemplateRevisionControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockClusterTemplateRevisionControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedClusterTemplateRevisionController.SyncCalls())
-func (mock *ClusterTemplateRevisionControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockClusterTemplateRevisionControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockClusterTemplateRevisionControllerMockSync.RUnlock()
 	return calls
 }
 

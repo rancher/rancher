@@ -1,66 +1,40 @@
 package v3
 
 import (
-	"context"
-	"sync"
-
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/objectclient/dynamic"
-	"github.com/rancher/norman/restwatch"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
 
-type (
-	contextKeyType        struct{}
-	contextClientsKeyType struct{}
-)
-
 type Interface interface {
-	RESTClient() rest.Interface
-	controller.Starter
-
 	ClusterAuthTokensGetter
 	ClusterUserAttributesGetter
 }
 
 type Client struct {
-	sync.Mutex
-	restClient rest.Interface
-	starters   []controller.Starter
-
-	clusterAuthTokenControllers     map[string]ClusterAuthTokenController
-	clusterUserAttributeControllers map[string]ClusterUserAttributeController
+	controllerFactory controller.SharedControllerFactory
+	clientFactory     client.SharedClientFactory
 }
 
-func NewForConfig(config rest.Config) (Interface, error) {
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = dynamic.NegotiatedSerializer
+func NewForConfig(cfg rest.Config) (Interface, error) {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		return nil, err
 	}
-
-	restClient, err := restwatch.UnversionedRESTClientFor(&config)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&cfg, scheme)
 	if err != nil {
 		return nil, err
 	}
+	return NewFromControllerFactory(controllerFactory)
+}
 
+func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
 	return &Client{
-		restClient: restClient,
-
-		clusterAuthTokenControllers:     map[string]ClusterAuthTokenController{},
-		clusterUserAttributeControllers: map[string]ClusterUserAttributeController{},
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
 	}, nil
-}
-
-func (c *Client) RESTClient() rest.Interface {
-	return c.restClient
-}
-
-func (c *Client) Sync(ctx context.Context) error {
-	return controller.Sync(ctx, c.starters...)
-}
-
-func (c *Client) Start(ctx context.Context, threadiness int) error {
-	return controller.Start(ctx, threadiness, c.starters...)
 }
 
 type ClusterAuthTokensGetter interface {
@@ -68,7 +42,8 @@ type ClusterAuthTokensGetter interface {
 }
 
 func (c *Client) ClusterAuthTokens(namespace string) ClusterAuthTokenInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterAuthTokenResource, ClusterAuthTokenGroupVersionKind, clusterAuthTokenFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(ClusterAuthTokenGroupVersionResource, ClusterAuthTokenGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterAuthTokenResource, ClusterAuthTokenGroupVersionKind, clusterAuthTokenFactory{})
 	return &clusterAuthTokenClient{
 		ns:           namespace,
 		client:       c,
@@ -81,7 +56,8 @@ type ClusterUserAttributesGetter interface {
 }
 
 func (c *Client) ClusterUserAttributes(namespace string) ClusterUserAttributeInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterUserAttributeResource, ClusterUserAttributeGroupVersionKind, clusterUserAttributeFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(ClusterUserAttributeGroupVersionResource, ClusterUserAttributeGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterUserAttributeResource, ClusterUserAttributeGroupVersionKind, clusterUserAttributeFactory{})
 	return &clusterUserAttributeClient{
 		ns:           namespace,
 		client:       c,

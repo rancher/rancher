@@ -50,12 +50,6 @@ func NewResourceQuota(namespace, name string, obj v1.ResourceQuota) *v1.Resource
 	return &obj
 }
 
-type ResourceQuotaList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ResourceQuota `json:"items"`
-}
-
 type ResourceQuotaHandlerFunc func(key string, obj *v1.ResourceQuota) (runtime.Object, error)
 
 type ResourceQuotaChangeHandlerFunc func(obj *v1.ResourceQuota) (runtime.Object, error)
@@ -75,8 +69,6 @@ type ResourceQuotaController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ResourceQuotaHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ResourceQuotaInterface interface {
@@ -87,8 +79,8 @@ type ResourceQuotaInterface interface {
 	Update(*v1.ResourceQuota) (*v1.ResourceQuota, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*ResourceQuotaList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*ResourceQuotaList, error)
+	List(opts metav1.ListOptions) (*v1.ResourceQuotaList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ResourceQuotaList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ResourceQuotaController
@@ -127,7 +119,7 @@ func (l *resourceQuotaLister) Get(namespace, name string) (*v1.ResourceQuota, er
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ResourceQuotaGroupVersionKind.Group,
-			Resource: "resourceQuota",
+			Resource: ResourceQuotaGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.ResourceQuota), nil
@@ -207,29 +199,16 @@ func (c resourceQuotaFactory) Object() runtime.Object {
 }
 
 func (c resourceQuotaFactory) List() runtime.Object {
-	return &ResourceQuotaList{}
+	return &v1.ResourceQuotaList{}
 }
 
 func (s *resourceQuotaClient) Controller() ResourceQuotaController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.resourceQuotaControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ResourceQuotaGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ResourceQuotaGroupVersionResource, ResourceQuotaGroupVersionKind.Kind, true))
 
-	c = &resourceQuotaController{
+	return &resourceQuotaController{
 		GenericController: genericController,
 	}
-
-	s.client.resourceQuotaControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type resourceQuotaClient struct {
@@ -263,6 +242,11 @@ func (s *resourceQuotaClient) Update(o *v1.ResourceQuota) (*v1.ResourceQuota, er
 	return obj.(*v1.ResourceQuota), err
 }
 
+func (s *resourceQuotaClient) UpdateStatus(o *v1.ResourceQuota) (*v1.ResourceQuota, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.ResourceQuota), err
+}
+
 func (s *resourceQuotaClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *resourceQuotaClient) DeleteNamespaced(namespace, name string, options *
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *resourceQuotaClient) List(opts metav1.ListOptions) (*ResourceQuotaList, error) {
+func (s *resourceQuotaClient) List(opts metav1.ListOptions) (*v1.ResourceQuotaList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*ResourceQuotaList), err
+	return obj.(*v1.ResourceQuotaList), err
 }
 
-func (s *resourceQuotaClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ResourceQuotaList, error) {
+func (s *resourceQuotaClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ResourceQuotaList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*ResourceQuotaList), err
+	return obj.(*v1.ResourceQuotaList), err
 }
 
 func (s *resourceQuotaClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

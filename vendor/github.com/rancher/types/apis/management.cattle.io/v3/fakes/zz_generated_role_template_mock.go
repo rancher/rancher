@@ -150,8 +150,6 @@ var (
 	lockRoleTemplateControllerMockGeneric                        sync.RWMutex
 	lockRoleTemplateControllerMockInformer                       sync.RWMutex
 	lockRoleTemplateControllerMockLister                         sync.RWMutex
-	lockRoleTemplateControllerMockStart                          sync.RWMutex
-	lockRoleTemplateControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that RoleTemplateControllerMock does implement RoleTemplateController.
@@ -191,12 +189,6 @@ var _ v3.RoleTemplateController = &RoleTemplateControllerMock{}
 //             ListerFunc: func() v3.RoleTemplateLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedRoleTemplateController in code that requires RoleTemplateController
@@ -230,12 +222,6 @@ type RoleTemplateControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.RoleTemplateLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type RoleTemplateControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *RoleTemplateControllerMock) ListerCalls() []struct {
 	lockRoleTemplateControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockRoleTemplateControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *RoleTemplateControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("RoleTemplateControllerMock.StartFunc: method is nil but RoleTemplateController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockRoleTemplateControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockRoleTemplateControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedRoleTemplateController.StartCalls())
-func (mock *RoleTemplateControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockRoleTemplateControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockRoleTemplateControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *RoleTemplateControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("RoleTemplateControllerMock.SyncFunc: method is nil but RoleTemplateController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockRoleTemplateControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockRoleTemplateControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedRoleTemplateController.SyncCalls())
-func (mock *RoleTemplateControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockRoleTemplateControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockRoleTemplateControllerMockSync.RUnlock()
 	return calls
 }
 

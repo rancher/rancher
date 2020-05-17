@@ -150,8 +150,6 @@ var (
 	lockCatalogControllerMockGeneric                        sync.RWMutex
 	lockCatalogControllerMockInformer                       sync.RWMutex
 	lockCatalogControllerMockLister                         sync.RWMutex
-	lockCatalogControllerMockStart                          sync.RWMutex
-	lockCatalogControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that CatalogControllerMock does implement CatalogController.
@@ -191,12 +189,6 @@ var _ v3.CatalogController = &CatalogControllerMock{}
 //             ListerFunc: func() v3.CatalogLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedCatalogController in code that requires CatalogController
@@ -230,12 +222,6 @@ type CatalogControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.CatalogLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type CatalogControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *CatalogControllerMock) ListerCalls() []struct {
 	lockCatalogControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockCatalogControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *CatalogControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("CatalogControllerMock.StartFunc: method is nil but CatalogController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockCatalogControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockCatalogControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedCatalogController.StartCalls())
-func (mock *CatalogControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockCatalogControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockCatalogControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *CatalogControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("CatalogControllerMock.SyncFunc: method is nil but CatalogController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockCatalogControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockCatalogControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedCatalogController.SyncCalls())
-func (mock *CatalogControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockCatalogControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockCatalogControllerMockSync.RUnlock()
 	return calls
 }
 

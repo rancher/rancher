@@ -73,8 +73,6 @@ type CatalogController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CatalogHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type CatalogInterface interface {
@@ -125,7 +123,7 @@ func (l *catalogLister) Get(namespace, name string) (*Catalog, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CatalogGroupVersionKind.Group,
-			Resource: "catalog",
+			Resource: CatalogGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Catalog), nil
@@ -209,25 +207,12 @@ func (c catalogFactory) List() runtime.Object {
 }
 
 func (s *catalogClient) Controller() CatalogController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.catalogControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(CatalogGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(CatalogGroupVersionResource, CatalogGroupVersionKind.Kind, false))
 
-	c = &catalogController{
+	return &catalogController{
 		GenericController: genericController,
 	}
-
-	s.client.catalogControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type catalogClient struct {
@@ -258,6 +243,11 @@ func (s *catalogClient) GetNamespaced(namespace, name string, opts metav1.GetOpt
 
 func (s *catalogClient) Update(o *Catalog) (*Catalog, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Catalog), err
+}
+
+func (s *catalogClient) UpdateStatus(o *Catalog) (*Catalog, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Catalog), err
 }
 

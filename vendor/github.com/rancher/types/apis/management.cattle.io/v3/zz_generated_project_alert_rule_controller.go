@@ -74,8 +74,6 @@ type ProjectAlertRuleController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectAlertRuleHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ProjectAlertRuleInterface interface {
@@ -126,7 +124,7 @@ func (l *projectAlertRuleLister) Get(namespace, name string) (*ProjectAlertRule,
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectAlertRuleGroupVersionKind.Group,
-			Resource: "projectAlertRule",
+			Resource: ProjectAlertRuleGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ProjectAlertRule), nil
@@ -210,25 +208,12 @@ func (c projectAlertRuleFactory) List() runtime.Object {
 }
 
 func (s *projectAlertRuleClient) Controller() ProjectAlertRuleController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.projectAlertRuleControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ProjectAlertRuleGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ProjectAlertRuleGroupVersionResource, ProjectAlertRuleGroupVersionKind.Kind, true))
 
-	c = &projectAlertRuleController{
+	return &projectAlertRuleController{
 		GenericController: genericController,
 	}
-
-	s.client.projectAlertRuleControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type projectAlertRuleClient struct {
@@ -259,6 +244,11 @@ func (s *projectAlertRuleClient) GetNamespaced(namespace, name string, opts meta
 
 func (s *projectAlertRuleClient) Update(o *ProjectAlertRule) (*ProjectAlertRule, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ProjectAlertRule), err
+}
+
+func (s *projectAlertRuleClient) UpdateStatus(o *ProjectAlertRule) (*ProjectAlertRule, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ProjectAlertRule), err
 }
 

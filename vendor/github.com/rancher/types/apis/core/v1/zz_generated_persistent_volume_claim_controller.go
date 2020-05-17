@@ -50,12 +50,6 @@ func NewPersistentVolumeClaim(namespace, name string, obj v1.PersistentVolumeCla
 	return &obj
 }
 
-type PersistentVolumeClaimList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.PersistentVolumeClaim `json:"items"`
-}
-
 type PersistentVolumeClaimHandlerFunc func(key string, obj *v1.PersistentVolumeClaim) (runtime.Object, error)
 
 type PersistentVolumeClaimChangeHandlerFunc func(obj *v1.PersistentVolumeClaim) (runtime.Object, error)
@@ -75,8 +69,6 @@ type PersistentVolumeClaimController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PersistentVolumeClaimHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PersistentVolumeClaimInterface interface {
@@ -87,8 +79,8 @@ type PersistentVolumeClaimInterface interface {
 	Update(*v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*PersistentVolumeClaimList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*PersistentVolumeClaimList, error)
+	List(opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PersistentVolumeClaimController
@@ -127,7 +119,7 @@ func (l *persistentVolumeClaimLister) Get(namespace, name string) (*v1.Persisten
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PersistentVolumeClaimGroupVersionKind.Group,
-			Resource: "persistentVolumeClaim",
+			Resource: PersistentVolumeClaimGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.PersistentVolumeClaim), nil
@@ -207,29 +199,16 @@ func (c persistentVolumeClaimFactory) Object() runtime.Object {
 }
 
 func (c persistentVolumeClaimFactory) List() runtime.Object {
-	return &PersistentVolumeClaimList{}
+	return &v1.PersistentVolumeClaimList{}
 }
 
 func (s *persistentVolumeClaimClient) Controller() PersistentVolumeClaimController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.persistentVolumeClaimControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PersistentVolumeClaimGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PersistentVolumeClaimGroupVersionResource, PersistentVolumeClaimGroupVersionKind.Kind, true))
 
-	c = &persistentVolumeClaimController{
+	return &persistentVolumeClaimController{
 		GenericController: genericController,
 	}
-
-	s.client.persistentVolumeClaimControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type persistentVolumeClaimClient struct {
@@ -263,6 +242,11 @@ func (s *persistentVolumeClaimClient) Update(o *v1.PersistentVolumeClaim) (*v1.P
 	return obj.(*v1.PersistentVolumeClaim), err
 }
 
+func (s *persistentVolumeClaimClient) UpdateStatus(o *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.PersistentVolumeClaim), err
+}
+
 func (s *persistentVolumeClaimClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *persistentVolumeClaimClient) DeleteNamespaced(namespace, name string, o
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *persistentVolumeClaimClient) List(opts metav1.ListOptions) (*PersistentVolumeClaimList, error) {
+func (s *persistentVolumeClaimClient) List(opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*PersistentVolumeClaimList), err
+	return obj.(*v1.PersistentVolumeClaimList), err
 }
 
-func (s *persistentVolumeClaimClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PersistentVolumeClaimList, error) {
+func (s *persistentVolumeClaimClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*PersistentVolumeClaimList), err
+	return obj.(*v1.PersistentVolumeClaimList), err
 }
 
 func (s *persistentVolumeClaimClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

@@ -5,28 +5,28 @@ import (
 )
 
 const (
-	GlobalDNSType                      = "globalDns"
-	GlobalDNSFieldAnnotations          = "annotations"
-	GlobalDNSFieldCreated              = "created"
-	GlobalDNSFieldCreatorID            = "creatorId"
-	GlobalDNSFieldFQDN                 = "fqdn"
-	GlobalDNSFieldLabels               = "labels"
-	GlobalDNSFieldMembers              = "members"
-	GlobalDNSFieldMultiClusterAppID    = "multiClusterAppId"
-	GlobalDNSFieldName                 = "name"
-	GlobalDNSFieldOwnerReferences      = "ownerReferences"
-	GlobalDNSFieldProjectIDs           = "projectIds"
-	GlobalDNSFieldProviderID           = "providerId"
-	GlobalDNSFieldRemoved              = "removed"
-	GlobalDNSFieldState                = "state"
-	GlobalDNSFieldStatus               = "status"
-	GlobalDNSFieldTTL                  = "ttl"
-	GlobalDNSFieldTransitioning        = "transitioning"
-	GlobalDNSFieldTransitioningMessage = "transitioningMessage"
-	GlobalDNSFieldUUID                 = "uuid"
+	GlobalDnsType                      = "globalDns"
+	GlobalDnsFieldAnnotations          = "annotations"
+	GlobalDnsFieldCreated              = "created"
+	GlobalDnsFieldCreatorID            = "creatorId"
+	GlobalDnsFieldFQDN                 = "fqdn"
+	GlobalDnsFieldLabels               = "labels"
+	GlobalDnsFieldMembers              = "members"
+	GlobalDnsFieldMultiClusterAppID    = "multiClusterAppId"
+	GlobalDnsFieldName                 = "name"
+	GlobalDnsFieldOwnerReferences      = "ownerReferences"
+	GlobalDnsFieldProjectIDs           = "projectIds"
+	GlobalDnsFieldProviderID           = "providerId"
+	GlobalDnsFieldRemoved              = "removed"
+	GlobalDnsFieldState                = "state"
+	GlobalDnsFieldStatus               = "status"
+	GlobalDnsFieldTTL                  = "ttl"
+	GlobalDnsFieldTransitioning        = "transitioning"
+	GlobalDnsFieldTransitioningMessage = "transitioningMessage"
+	GlobalDnsFieldUUID                 = "uuid"
 )
 
-type GlobalDNS struct {
+type GlobalDns struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
@@ -48,63 +48,63 @@ type GlobalDNS struct {
 	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
-type GlobalDNSCollection struct {
+type GlobalDnsCollection struct {
 	types.Collection
-	Data   []GlobalDNS `json:"data,omitempty"`
-	client *GlobalDNSClient
+	Data   []GlobalDns `json:"data,omitempty"`
+	client *GlobalDnsClient
 }
 
-type GlobalDNSClient struct {
+type GlobalDnsClient struct {
 	apiClient *Client
 }
 
-type GlobalDNSOperations interface {
-	List(opts *types.ListOpts) (*GlobalDNSCollection, error)
-	ListAll(opts *types.ListOpts) (*GlobalDNSCollection, error)
-	Create(opts *GlobalDNS) (*GlobalDNS, error)
-	Update(existing *GlobalDNS, updates interface{}) (*GlobalDNS, error)
-	Replace(existing *GlobalDNS) (*GlobalDNS, error)
-	ByID(id string) (*GlobalDNS, error)
-	Delete(container *GlobalDNS) error
+type GlobalDnsOperations interface {
+	List(opts *types.ListOpts) (*GlobalDnsCollection, error)
+	ListAll(opts *types.ListOpts) (*GlobalDnsCollection, error)
+	Create(opts *GlobalDns) (*GlobalDns, error)
+	Update(existing *GlobalDns, updates interface{}) (*GlobalDns, error)
+	Replace(existing *GlobalDns) (*GlobalDns, error)
+	ByID(id string) (*GlobalDns, error)
+	Delete(container *GlobalDns) error
 
-	ActionAddProjects(resource *GlobalDNS, input *UpdateGlobalDNSTargetsInput) error
+	ActionAddProjects(resource *GlobalDns, input *UpdateGlobalDNSTargetsInput) error
 
-	ActionRemoveProjects(resource *GlobalDNS, input *UpdateGlobalDNSTargetsInput) error
+	ActionRemoveProjects(resource *GlobalDns, input *UpdateGlobalDNSTargetsInput) error
 }
 
-func newGlobalDNSClient(apiClient *Client) *GlobalDNSClient {
-	return &GlobalDNSClient{
+func newGlobalDnsClient(apiClient *Client) *GlobalDnsClient {
+	return &GlobalDnsClient{
 		apiClient: apiClient,
 	}
 }
 
-func (c *GlobalDNSClient) Create(container *GlobalDNS) (*GlobalDNS, error) {
-	resp := &GlobalDNS{}
-	err := c.apiClient.Ops.DoCreate(GlobalDNSType, container, resp)
+func (c *GlobalDnsClient) Create(container *GlobalDns) (*GlobalDns, error) {
+	resp := &GlobalDns{}
+	err := c.apiClient.Ops.DoCreate(GlobalDnsType, container, resp)
 	return resp, err
 }
 
-func (c *GlobalDNSClient) Update(existing *GlobalDNS, updates interface{}) (*GlobalDNS, error) {
-	resp := &GlobalDNS{}
-	err := c.apiClient.Ops.DoUpdate(GlobalDNSType, &existing.Resource, updates, resp)
+func (c *GlobalDnsClient) Update(existing *GlobalDns, updates interface{}) (*GlobalDns, error) {
+	resp := &GlobalDns{}
+	err := c.apiClient.Ops.DoUpdate(GlobalDnsType, &existing.Resource, updates, resp)
 	return resp, err
 }
 
-func (c *GlobalDNSClient) Replace(obj *GlobalDNS) (*GlobalDNS, error) {
-	resp := &GlobalDNS{}
-	err := c.apiClient.Ops.DoReplace(GlobalDNSType, &obj.Resource, obj, resp)
+func (c *GlobalDnsClient) Replace(obj *GlobalDns) (*GlobalDns, error) {
+	resp := &GlobalDns{}
+	err := c.apiClient.Ops.DoReplace(GlobalDnsType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
-func (c *GlobalDNSClient) List(opts *types.ListOpts) (*GlobalDNSCollection, error) {
-	resp := &GlobalDNSCollection{}
-	err := c.apiClient.Ops.DoList(GlobalDNSType, opts, resp)
+func (c *GlobalDnsClient) List(opts *types.ListOpts) (*GlobalDnsCollection, error) {
+	resp := &GlobalDnsCollection{}
+	err := c.apiClient.Ops.DoList(GlobalDnsType, opts, resp)
 	resp.client = c
 	return resp, err
 }
 
-func (c *GlobalDNSClient) ListAll(opts *types.ListOpts) (*GlobalDNSCollection, error) {
-	resp := &GlobalDNSCollection{}
+func (c *GlobalDnsClient) ListAll(opts *types.ListOpts) (*GlobalDnsCollection, error) {
+	resp := &GlobalDnsCollection{}
 	resp, err := c.List(opts)
 	if err != nil {
 		return resp, err
@@ -121,9 +121,9 @@ func (c *GlobalDNSClient) ListAll(opts *types.ListOpts) (*GlobalDNSCollection, e
 	return resp, err
 }
 
-func (cc *GlobalDNSCollection) Next() (*GlobalDNSCollection, error) {
+func (cc *GlobalDnsCollection) Next() (*GlobalDnsCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &GlobalDNSCollection{}
+		resp := &GlobalDnsCollection{}
 		err := cc.client.apiClient.Ops.DoNext(cc.Pagination.Next, resp)
 		resp.client = cc.client
 		return resp, err
@@ -131,22 +131,22 @@ func (cc *GlobalDNSCollection) Next() (*GlobalDNSCollection, error) {
 	return nil, nil
 }
 
-func (c *GlobalDNSClient) ByID(id string) (*GlobalDNS, error) {
-	resp := &GlobalDNS{}
-	err := c.apiClient.Ops.DoByID(GlobalDNSType, id, resp)
+func (c *GlobalDnsClient) ByID(id string) (*GlobalDns, error) {
+	resp := &GlobalDns{}
+	err := c.apiClient.Ops.DoByID(GlobalDnsType, id, resp)
 	return resp, err
 }
 
-func (c *GlobalDNSClient) Delete(container *GlobalDNS) error {
-	return c.apiClient.Ops.DoResourceDelete(GlobalDNSType, &container.Resource)
+func (c *GlobalDnsClient) Delete(container *GlobalDns) error {
+	return c.apiClient.Ops.DoResourceDelete(GlobalDnsType, &container.Resource)
 }
 
-func (c *GlobalDNSClient) ActionAddProjects(resource *GlobalDNS, input *UpdateGlobalDNSTargetsInput) error {
-	err := c.apiClient.Ops.DoAction(GlobalDNSType, "addProjects", &resource.Resource, input, nil)
+func (c *GlobalDnsClient) ActionAddProjects(resource *GlobalDns, input *UpdateGlobalDNSTargetsInput) error {
+	err := c.apiClient.Ops.DoAction(GlobalDnsType, "addProjects", &resource.Resource, input, nil)
 	return err
 }
 
-func (c *GlobalDNSClient) ActionRemoveProjects(resource *GlobalDNS, input *UpdateGlobalDNSTargetsInput) error {
-	err := c.apiClient.Ops.DoAction(GlobalDNSType, "removeProjects", &resource.Resource, input, nil)
+func (c *GlobalDnsClient) ActionRemoveProjects(resource *GlobalDns, input *UpdateGlobalDNSTargetsInput) error {
+	err := c.apiClient.Ops.DoAction(GlobalDnsType, "removeProjects", &resource.Resource, input, nil)
 	return err
 }

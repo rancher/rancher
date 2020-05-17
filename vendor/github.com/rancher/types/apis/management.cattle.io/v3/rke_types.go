@@ -203,7 +203,7 @@ type RKEConfigNode struct {
 	Taints []RKETaint `yaml:"taints" json:"taints,omitempty"`
 }
 
-type RKEK8sSystemImage struct {
+type RkeK8sSystemImage struct {
 	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -211,7 +211,7 @@ type RKEK8sSystemImage struct {
 	SystemImages RKESystemImages `yaml:"system_images" json:"systemImages,omitempty"`
 }
 
-type RKEK8sServiceOption struct {
+type RkeK8sServiceOption struct {
 	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -219,7 +219,7 @@ type RKEK8sServiceOption struct {
 	ServiceOptions KubernetesServicesOptions `yaml:"service_options" json:"serviceOptions,omitempty"`
 }
 
-type RKEAddon struct {
+type RkeAddon struct {
 	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

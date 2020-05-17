@@ -50,12 +50,6 @@ func NewPod(namespace, name string, obj v1.Pod) *v1.Pod {
 	return &obj
 }
 
-type PodList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Pod `json:"items"`
-}
-
 type PodHandlerFunc func(key string, obj *v1.Pod) (runtime.Object, error)
 
 type PodChangeHandlerFunc func(obj *v1.Pod) (runtime.Object, error)
@@ -75,8 +69,6 @@ type PodController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PodHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PodInterface interface {
@@ -87,8 +79,8 @@ type PodInterface interface {
 	Update(*v1.Pod) (*v1.Pod, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*PodList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*PodList, error)
+	List(opts metav1.ListOptions) (*v1.PodList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.PodList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodController
@@ -127,7 +119,7 @@ func (l *podLister) Get(namespace, name string) (*v1.Pod, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PodGroupVersionKind.Group,
-			Resource: "pod",
+			Resource: PodGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Pod), nil
@@ -207,29 +199,16 @@ func (c podFactory) Object() runtime.Object {
 }
 
 func (c podFactory) List() runtime.Object {
-	return &PodList{}
+	return &v1.PodList{}
 }
 
 func (s *podClient) Controller() PodController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.podControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PodGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PodGroupVersionResource, PodGroupVersionKind.Kind, true))
 
-	c = &podController{
+	return &podController{
 		GenericController: genericController,
 	}
-
-	s.client.podControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type podClient struct {
@@ -263,6 +242,11 @@ func (s *podClient) Update(o *v1.Pod) (*v1.Pod, error) {
 	return obj.(*v1.Pod), err
 }
 
+func (s *podClient) UpdateStatus(o *v1.Pod) (*v1.Pod, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Pod), err
+}
+
 func (s *podClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *podClient) DeleteNamespaced(namespace, name string, options *metav1.Del
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *podClient) List(opts metav1.ListOptions) (*PodList, error) {
+func (s *podClient) List(opts metav1.ListOptions) (*v1.PodList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*PodList), err
+	return obj.(*v1.PodList), err
 }
 
-func (s *podClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PodList, error) {
+func (s *podClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*PodList), err
+	return obj.(*v1.PodList), err
 }
 
 func (s *podClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

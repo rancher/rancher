@@ -74,8 +74,6 @@ type MonitorMetricController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler MonitorMetricHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type MonitorMetricInterface interface {
@@ -126,7 +124,7 @@ func (l *monitorMetricLister) Get(namespace, name string) (*MonitorMetric, error
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    MonitorMetricGroupVersionKind.Group,
-			Resource: "monitorMetric",
+			Resource: MonitorMetricGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*MonitorMetric), nil
@@ -210,25 +208,12 @@ func (c monitorMetricFactory) List() runtime.Object {
 }
 
 func (s *monitorMetricClient) Controller() MonitorMetricController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.monitorMetricControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(MonitorMetricGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(MonitorMetricGroupVersionResource, MonitorMetricGroupVersionKind.Kind, true))
 
-	c = &monitorMetricController{
+	return &monitorMetricController{
 		GenericController: genericController,
 	}
-
-	s.client.monitorMetricControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type monitorMetricClient struct {
@@ -259,6 +244,11 @@ func (s *monitorMetricClient) GetNamespaced(namespace, name string, opts metav1.
 
 func (s *monitorMetricClient) Update(o *MonitorMetric) (*MonitorMetric, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*MonitorMetric), err
+}
+
+func (s *monitorMetricClient) UpdateStatus(o *MonitorMetric) (*MonitorMetric, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*MonitorMetric), err
 }
 

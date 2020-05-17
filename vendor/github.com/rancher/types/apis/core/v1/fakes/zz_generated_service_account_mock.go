@@ -151,8 +151,6 @@ var (
 	lockServiceAccountControllerMockGeneric                        sync.RWMutex
 	lockServiceAccountControllerMockInformer                       sync.RWMutex
 	lockServiceAccountControllerMockLister                         sync.RWMutex
-	lockServiceAccountControllerMockStart                          sync.RWMutex
-	lockServiceAccountControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ServiceAccountControllerMock does implement ServiceAccountController.
@@ -192,12 +190,6 @@ var _ v1a.ServiceAccountController = &ServiceAccountControllerMock{}
 //             ListerFunc: func() v1a.ServiceAccountLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedServiceAccountController in code that requires ServiceAccountController
@@ -231,12 +223,6 @@ type ServiceAccountControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v1a.ServiceAccountLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -308,18 +294,6 @@ type ServiceAccountControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -648,72 +622,6 @@ func (mock *ServiceAccountControllerMock) ListerCalls() []struct {
 	return calls
 }
 
-// Start calls StartFunc.
-func (mock *ServiceAccountControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("ServiceAccountControllerMock.StartFunc: method is nil but ServiceAccountController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockServiceAccountControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockServiceAccountControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedServiceAccountController.StartCalls())
-func (mock *ServiceAccountControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockServiceAccountControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockServiceAccountControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *ServiceAccountControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("ServiceAccountControllerMock.SyncFunc: method is nil but ServiceAccountController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockServiceAccountControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockServiceAccountControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedServiceAccountController.SyncCalls())
-func (mock *ServiceAccountControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockServiceAccountControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockServiceAccountControllerMockSync.RUnlock()
-	return calls
-}
-
 var (
 	lockServiceAccountInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
 	lockServiceAccountInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
@@ -792,10 +700,10 @@ var _ v1a.ServiceAccountInterface = &ServiceAccountInterfaceMock{}
 //             GetNamespacedFunc: func(namespace string, name string, opts v1b.GetOptions) (*v1.ServiceAccount, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1b.ListOptions) (*v1a.ServiceAccountList, error) {
+//             ListFunc: func(opts v1b.ListOptions) (*v1.ServiceAccountList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.ServiceAccountList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1.ServiceAccountList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
@@ -860,10 +768,10 @@ type ServiceAccountInterfaceMock struct {
 	GetNamespacedFunc func(namespace string, name string, opts v1b.GetOptions) (*v1.ServiceAccount, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1b.ListOptions) (*v1a.ServiceAccountList, error)
+	ListFunc func(opts v1b.ListOptions) (*v1.ServiceAccountList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.ServiceAccountList, error)
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1.ServiceAccountList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -1624,7 +1532,7 @@ func (mock *ServiceAccountInterfaceMock) GetNamespacedCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *ServiceAccountInterfaceMock) List(opts v1b.ListOptions) (*v1a.ServiceAccountList, error) {
+func (mock *ServiceAccountInterfaceMock) List(opts v1b.ListOptions) (*v1.ServiceAccountList, error) {
 	if mock.ListFunc == nil {
 		panic("ServiceAccountInterfaceMock.ListFunc: method is nil but ServiceAccountInterface.List was just called")
 	}
@@ -1655,7 +1563,7 @@ func (mock *ServiceAccountInterfaceMock) ListCalls() []struct {
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *ServiceAccountInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.ServiceAccountList, error) {
+func (mock *ServiceAccountInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1.ServiceAccountList, error) {
 	if mock.ListNamespacedFunc == nil {
 		panic("ServiceAccountInterfaceMock.ListNamespacedFunc: method is nil but ServiceAccountInterface.ListNamespaced was just called")
 	}

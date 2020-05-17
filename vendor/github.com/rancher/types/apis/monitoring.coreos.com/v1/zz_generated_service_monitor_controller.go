@@ -50,12 +50,6 @@ func NewServiceMonitor(namespace, name string, obj v1.ServiceMonitor) *v1.Servic
 	return &obj
 }
 
-type ServiceMonitorList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ServiceMonitor `json:"items"`
-}
-
 type ServiceMonitorHandlerFunc func(key string, obj *v1.ServiceMonitor) (runtime.Object, error)
 
 type ServiceMonitorChangeHandlerFunc func(obj *v1.ServiceMonitor) (runtime.Object, error)
@@ -75,8 +69,6 @@ type ServiceMonitorController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ServiceMonitorHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ServiceMonitorInterface interface {
@@ -87,8 +79,8 @@ type ServiceMonitorInterface interface {
 	Update(*v1.ServiceMonitor) (*v1.ServiceMonitor, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*ServiceMonitorList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*ServiceMonitorList, error)
+	List(opts metav1.ListOptions) (*v1.ServiceMonitorList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ServiceMonitorList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ServiceMonitorController
@@ -127,7 +119,7 @@ func (l *serviceMonitorLister) Get(namespace, name string) (*v1.ServiceMonitor, 
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ServiceMonitorGroupVersionKind.Group,
-			Resource: "serviceMonitor",
+			Resource: ServiceMonitorGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.ServiceMonitor), nil
@@ -207,29 +199,16 @@ func (c serviceMonitorFactory) Object() runtime.Object {
 }
 
 func (c serviceMonitorFactory) List() runtime.Object {
-	return &ServiceMonitorList{}
+	return &v1.ServiceMonitorList{}
 }
 
 func (s *serviceMonitorClient) Controller() ServiceMonitorController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.serviceMonitorControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ServiceMonitorGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ServiceMonitorGroupVersionResource, ServiceMonitorGroupVersionKind.Kind, true))
 
-	c = &serviceMonitorController{
+	return &serviceMonitorController{
 		GenericController: genericController,
 	}
-
-	s.client.serviceMonitorControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type serviceMonitorClient struct {
@@ -263,6 +242,11 @@ func (s *serviceMonitorClient) Update(o *v1.ServiceMonitor) (*v1.ServiceMonitor,
 	return obj.(*v1.ServiceMonitor), err
 }
 
+func (s *serviceMonitorClient) UpdateStatus(o *v1.ServiceMonitor) (*v1.ServiceMonitor, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.ServiceMonitor), err
+}
+
 func (s *serviceMonitorClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *serviceMonitorClient) DeleteNamespaced(namespace, name string, options 
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *serviceMonitorClient) List(opts metav1.ListOptions) (*ServiceMonitorList, error) {
+func (s *serviceMonitorClient) List(opts metav1.ListOptions) (*v1.ServiceMonitorList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*ServiceMonitorList), err
+	return obj.(*v1.ServiceMonitorList), err
 }
 
-func (s *serviceMonitorClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ServiceMonitorList, error) {
+func (s *serviceMonitorClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ServiceMonitorList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*ServiceMonitorList), err
+	return obj.(*v1.ServiceMonitorList), err
 }
 
 func (s *serviceMonitorClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

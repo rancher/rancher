@@ -73,8 +73,6 @@ type RoleTemplateController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler RoleTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type RoleTemplateInterface interface {
@@ -125,7 +123,7 @@ func (l *roleTemplateLister) Get(namespace, name string) (*RoleTemplate, error) 
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    RoleTemplateGroupVersionKind.Group,
-			Resource: "roleTemplate",
+			Resource: RoleTemplateGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*RoleTemplate), nil
@@ -209,25 +207,12 @@ func (c roleTemplateFactory) List() runtime.Object {
 }
 
 func (s *roleTemplateClient) Controller() RoleTemplateController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.roleTemplateControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(RoleTemplateGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(RoleTemplateGroupVersionResource, RoleTemplateGroupVersionKind.Kind, false))
 
-	c = &roleTemplateController{
+	return &roleTemplateController{
 		GenericController: genericController,
 	}
-
-	s.client.roleTemplateControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type roleTemplateClient struct {
@@ -258,6 +243,11 @@ func (s *roleTemplateClient) GetNamespaced(namespace, name string, opts metav1.G
 
 func (s *roleTemplateClient) Update(o *RoleTemplate) (*RoleTemplate, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*RoleTemplate), err
+}
+
+func (s *roleTemplateClient) UpdateStatus(o *RoleTemplate) (*RoleTemplate, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*RoleTemplate), err
 }
 

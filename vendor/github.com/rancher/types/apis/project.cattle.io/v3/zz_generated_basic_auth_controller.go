@@ -74,8 +74,6 @@ type BasicAuthController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler BasicAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type BasicAuthInterface interface {
@@ -126,7 +124,7 @@ func (l *basicAuthLister) Get(namespace, name string) (*BasicAuth, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    BasicAuthGroupVersionKind.Group,
-			Resource: "basicAuth",
+			Resource: BasicAuthGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*BasicAuth), nil
@@ -210,25 +208,12 @@ func (c basicAuthFactory) List() runtime.Object {
 }
 
 func (s *basicAuthClient) Controller() BasicAuthController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.basicAuthControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(BasicAuthGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(BasicAuthGroupVersionResource, BasicAuthGroupVersionKind.Kind, true))
 
-	c = &basicAuthController{
+	return &basicAuthController{
 		GenericController: genericController,
 	}
-
-	s.client.basicAuthControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type basicAuthClient struct {
@@ -259,6 +244,11 @@ func (s *basicAuthClient) GetNamespaced(namespace, name string, opts metav1.GetO
 
 func (s *basicAuthClient) Update(o *BasicAuth) (*BasicAuth, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*BasicAuth), err
+}
+
+func (s *basicAuthClient) UpdateStatus(o *BasicAuth) (*BasicAuth, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*BasicAuth), err
 }
 

@@ -50,12 +50,6 @@ func NewRoleBinding(namespace, name string, obj v1.RoleBinding) *v1.RoleBinding 
 	return &obj
 }
 
-type RoleBindingList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.RoleBinding `json:"items"`
-}
-
 type RoleBindingHandlerFunc func(key string, obj *v1.RoleBinding) (runtime.Object, error)
 
 type RoleBindingChangeHandlerFunc func(obj *v1.RoleBinding) (runtime.Object, error)
@@ -75,8 +69,6 @@ type RoleBindingController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler RoleBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type RoleBindingInterface interface {
@@ -87,8 +79,8 @@ type RoleBindingInterface interface {
 	Update(*v1.RoleBinding) (*v1.RoleBinding, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*RoleBindingList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*RoleBindingList, error)
+	List(opts metav1.ListOptions) (*v1.RoleBindingList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.RoleBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleBindingController
@@ -127,7 +119,7 @@ func (l *roleBindingLister) Get(namespace, name string) (*v1.RoleBinding, error)
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    RoleBindingGroupVersionKind.Group,
-			Resource: "roleBinding",
+			Resource: RoleBindingGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.RoleBinding), nil
@@ -207,29 +199,16 @@ func (c roleBindingFactory) Object() runtime.Object {
 }
 
 func (c roleBindingFactory) List() runtime.Object {
-	return &RoleBindingList{}
+	return &v1.RoleBindingList{}
 }
 
 func (s *roleBindingClient) Controller() RoleBindingController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.roleBindingControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(RoleBindingGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(RoleBindingGroupVersionResource, RoleBindingGroupVersionKind.Kind, true))
 
-	c = &roleBindingController{
+	return &roleBindingController{
 		GenericController: genericController,
 	}
-
-	s.client.roleBindingControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type roleBindingClient struct {
@@ -263,6 +242,11 @@ func (s *roleBindingClient) Update(o *v1.RoleBinding) (*v1.RoleBinding, error) {
 	return obj.(*v1.RoleBinding), err
 }
 
+func (s *roleBindingClient) UpdateStatus(o *v1.RoleBinding) (*v1.RoleBinding, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.RoleBinding), err
+}
+
 func (s *roleBindingClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *roleBindingClient) DeleteNamespaced(namespace, name string, options *me
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *roleBindingClient) List(opts metav1.ListOptions) (*RoleBindingList, error) {
+func (s *roleBindingClient) List(opts metav1.ListOptions) (*v1.RoleBindingList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*RoleBindingList), err
+	return obj.(*v1.RoleBindingList), err
 }
 
-func (s *roleBindingClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*RoleBindingList, error) {
+func (s *roleBindingClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.RoleBindingList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*RoleBindingList), err
+	return obj.(*v1.RoleBindingList), err
 }
 
 func (s *roleBindingClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

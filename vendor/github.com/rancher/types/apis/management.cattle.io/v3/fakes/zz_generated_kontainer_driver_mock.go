@@ -150,8 +150,6 @@ var (
 	lockKontainerDriverControllerMockGeneric                        sync.RWMutex
 	lockKontainerDriverControllerMockInformer                       sync.RWMutex
 	lockKontainerDriverControllerMockLister                         sync.RWMutex
-	lockKontainerDriverControllerMockStart                          sync.RWMutex
-	lockKontainerDriverControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that KontainerDriverControllerMock does implement KontainerDriverController.
@@ -191,12 +189,6 @@ var _ v3.KontainerDriverController = &KontainerDriverControllerMock{}
 //             ListerFunc: func() v3.KontainerDriverLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedKontainerDriverController in code that requires KontainerDriverController
@@ -230,12 +222,6 @@ type KontainerDriverControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.KontainerDriverLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type KontainerDriverControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *KontainerDriverControllerMock) ListerCalls() []struct {
 	lockKontainerDriverControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockKontainerDriverControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *KontainerDriverControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("KontainerDriverControllerMock.StartFunc: method is nil but KontainerDriverController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockKontainerDriverControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockKontainerDriverControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedKontainerDriverController.StartCalls())
-func (mock *KontainerDriverControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockKontainerDriverControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockKontainerDriverControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *KontainerDriverControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("KontainerDriverControllerMock.SyncFunc: method is nil but KontainerDriverController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockKontainerDriverControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockKontainerDriverControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedKontainerDriverController.SyncCalls())
-func (mock *KontainerDriverControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockKontainerDriverControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockKontainerDriverControllerMockSync.RUnlock()
 	return calls
 }
 

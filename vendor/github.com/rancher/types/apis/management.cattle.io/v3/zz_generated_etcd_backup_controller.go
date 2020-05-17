@@ -74,8 +74,6 @@ type EtcdBackupController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler EtcdBackupHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type EtcdBackupInterface interface {
@@ -126,7 +124,7 @@ func (l *etcdBackupLister) Get(namespace, name string) (*EtcdBackup, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    EtcdBackupGroupVersionKind.Group,
-			Resource: "etcdBackup",
+			Resource: EtcdBackupGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*EtcdBackup), nil
@@ -210,25 +208,12 @@ func (c etcdBackupFactory) List() runtime.Object {
 }
 
 func (s *etcdBackupClient) Controller() EtcdBackupController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.etcdBackupControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(EtcdBackupGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(EtcdBackupGroupVersionResource, EtcdBackupGroupVersionKind.Kind, true))
 
-	c = &etcdBackupController{
+	return &etcdBackupController{
 		GenericController: genericController,
 	}
-
-	s.client.etcdBackupControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type etcdBackupClient struct {
@@ -259,6 +244,11 @@ func (s *etcdBackupClient) GetNamespaced(namespace, name string, opts metav1.Get
 
 func (s *etcdBackupClient) Update(o *EtcdBackup) (*EtcdBackup, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*EtcdBackup), err
+}
+
+func (s *etcdBackupClient) UpdateStatus(o *EtcdBackup) (*EtcdBackup, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*EtcdBackup), err
 }
 

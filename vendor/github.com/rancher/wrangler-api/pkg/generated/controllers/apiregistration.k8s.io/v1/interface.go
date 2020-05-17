@@ -26,7 +26,7 @@ import (
 )
 
 func init() {
-	v1.AddToScheme(schemes.All)
+	schemes.Register(v1.AddToScheme)
 }
 
 type Interface interface {
@@ -44,5 +44,5 @@ type version struct {
 }
 
 func (c *version) APIService() APIServiceController {
-	return NewAPIServiceController(schema.GroupVersionKind{Group: "apiregistration.k8s.io", Version: "v1", Kind: "APIService"}, "apiservices", c.controllerFactory)
+	return NewAPIServiceController(schema.GroupVersionKind{Group: "apiregistration.k8s.io", Version: "v1", Kind: "APIService"}, "apiservices", false, c.controllerFactory)
 }

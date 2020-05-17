@@ -5,7 +5,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type GlobalDNS struct {
+type GlobalDns struct {
 	types.Namespaced
 
 	metav1.TypeMeta `json:",inline"`

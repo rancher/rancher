@@ -83,9 +83,8 @@ type nodeController struct {
 	groupResource schema.GroupResource
 }
 
-func NewNodeController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) NodeController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewNodeController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) NodeController {
+	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
 	return &nodeController{
 		controller: c,
 		client:     c.Client(),

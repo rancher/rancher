@@ -74,8 +74,6 @@ type SourceCodeRepositoryController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SourceCodeRepositoryHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type SourceCodeRepositoryInterface interface {
@@ -126,7 +124,7 @@ func (l *sourceCodeRepositoryLister) Get(namespace, name string) (*SourceCodeRep
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SourceCodeRepositoryGroupVersionKind.Group,
-			Resource: "sourceCodeRepository",
+			Resource: SourceCodeRepositoryGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*SourceCodeRepository), nil
@@ -210,25 +208,12 @@ func (c sourceCodeRepositoryFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeRepositoryClient) Controller() SourceCodeRepositoryController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.sourceCodeRepositoryControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(SourceCodeRepositoryGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(SourceCodeRepositoryGroupVersionResource, SourceCodeRepositoryGroupVersionKind.Kind, true))
 
-	c = &sourceCodeRepositoryController{
+	return &sourceCodeRepositoryController{
 		GenericController: genericController,
 	}
-
-	s.client.sourceCodeRepositoryControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type sourceCodeRepositoryClient struct {
@@ -259,6 +244,11 @@ func (s *sourceCodeRepositoryClient) GetNamespaced(namespace, name string, opts 
 
 func (s *sourceCodeRepositoryClient) Update(o *SourceCodeRepository) (*SourceCodeRepository, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*SourceCodeRepository), err
+}
+
+func (s *sourceCodeRepositoryClient) UpdateStatus(o *SourceCodeRepository) (*SourceCodeRepository, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*SourceCodeRepository), err
 }
 

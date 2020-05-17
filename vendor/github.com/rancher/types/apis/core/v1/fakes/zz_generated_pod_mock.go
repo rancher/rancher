@@ -151,8 +151,6 @@ var (
 	lockPodControllerMockGeneric                        sync.RWMutex
 	lockPodControllerMockInformer                       sync.RWMutex
 	lockPodControllerMockLister                         sync.RWMutex
-	lockPodControllerMockStart                          sync.RWMutex
-	lockPodControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that PodControllerMock does implement PodController.
@@ -192,12 +190,6 @@ var _ v1a.PodController = &PodControllerMock{}
 //             ListerFunc: func() v1a.PodLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedPodController in code that requires PodController
@@ -231,12 +223,6 @@ type PodControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v1a.PodLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -308,18 +294,6 @@ type PodControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -648,72 +622,6 @@ func (mock *PodControllerMock) ListerCalls() []struct {
 	return calls
 }
 
-// Start calls StartFunc.
-func (mock *PodControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("PodControllerMock.StartFunc: method is nil but PodController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockPodControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockPodControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedPodController.StartCalls())
-func (mock *PodControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockPodControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockPodControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *PodControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("PodControllerMock.SyncFunc: method is nil but PodController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockPodControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockPodControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedPodController.SyncCalls())
-func (mock *PodControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockPodControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockPodControllerMockSync.RUnlock()
-	return calls
-}
-
 var (
 	lockPodInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
 	lockPodInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
@@ -792,10 +700,10 @@ var _ v1a.PodInterface = &PodInterfaceMock{}
 //             GetNamespacedFunc: func(namespace string, name string, opts v1b.GetOptions) (*v1.Pod, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1b.ListOptions) (*v1a.PodList, error) {
+//             ListFunc: func(opts v1b.ListOptions) (*v1.PodList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.PodList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1.PodList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
@@ -860,10 +768,10 @@ type PodInterfaceMock struct {
 	GetNamespacedFunc func(namespace string, name string, opts v1b.GetOptions) (*v1.Pod, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1b.ListOptions) (*v1a.PodList, error)
+	ListFunc func(opts v1b.ListOptions) (*v1.PodList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.PodList, error)
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1.PodList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -1624,7 +1532,7 @@ func (mock *PodInterfaceMock) GetNamespacedCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *PodInterfaceMock) List(opts v1b.ListOptions) (*v1a.PodList, error) {
+func (mock *PodInterfaceMock) List(opts v1b.ListOptions) (*v1.PodList, error) {
 	if mock.ListFunc == nil {
 		panic("PodInterfaceMock.ListFunc: method is nil but PodInterface.List was just called")
 	}
@@ -1655,7 +1563,7 @@ func (mock *PodInterfaceMock) ListCalls() []struct {
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *PodInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.PodList, error) {
+func (mock *PodInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1.PodList, error) {
 	if mock.ListNamespacedFunc == nil {
 		panic("PodInterfaceMock.ListNamespacedFunc: method is nil but PodInterface.ListNamespaced was just called")
 	}

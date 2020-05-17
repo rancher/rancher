@@ -73,8 +73,6 @@ type DynamicSchemaController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler DynamicSchemaHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type DynamicSchemaInterface interface {
@@ -125,7 +123,7 @@ func (l *dynamicSchemaLister) Get(namespace, name string) (*DynamicSchema, error
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    DynamicSchemaGroupVersionKind.Group,
-			Resource: "dynamicSchema",
+			Resource: DynamicSchemaGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*DynamicSchema), nil
@@ -209,25 +207,12 @@ func (c dynamicSchemaFactory) List() runtime.Object {
 }
 
 func (s *dynamicSchemaClient) Controller() DynamicSchemaController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.dynamicSchemaControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(DynamicSchemaGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(DynamicSchemaGroupVersionResource, DynamicSchemaGroupVersionKind.Kind, false))
 
-	c = &dynamicSchemaController{
+	return &dynamicSchemaController{
 		GenericController: genericController,
 	}
-
-	s.client.dynamicSchemaControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type dynamicSchemaClient struct {
@@ -258,6 +243,11 @@ func (s *dynamicSchemaClient) GetNamespaced(namespace, name string, opts metav1.
 
 func (s *dynamicSchemaClient) Update(o *DynamicSchema) (*DynamicSchema, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*DynamicSchema), err
+}
+
+func (s *dynamicSchemaClient) UpdateStatus(o *DynamicSchema) (*DynamicSchema, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*DynamicSchema), err
 }
 

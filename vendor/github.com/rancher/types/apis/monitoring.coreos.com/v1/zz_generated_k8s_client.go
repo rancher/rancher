@@ -1,25 +1,12 @@
 package v1
 
 import (
-	"context"
-	"sync"
-
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/objectclient/dynamic"
-	"github.com/rancher/norman/restwatch"
-	"k8s.io/client-go/rest"
-)
-
-type (
-	contextKeyType        struct{}
-	contextClientsKeyType struct{}
 )
 
 type Interface interface {
-	RESTClient() rest.Interface
-	controller.Starter
-
 	PrometheusesGetter
 	AlertmanagersGetter
 	PrometheusRulesGetter
@@ -27,46 +14,15 @@ type Interface interface {
 }
 
 type Client struct {
-	sync.Mutex
-	restClient rest.Interface
-	starters   []controller.Starter
-
-	prometheusControllers     map[string]PrometheusController
-	alertmanagerControllers   map[string]AlertmanagerController
-	prometheusRuleControllers map[string]PrometheusRuleController
-	serviceMonitorControllers map[string]ServiceMonitorController
+	controllerFactory controller.SharedControllerFactory
+	clientFactory     client.SharedClientFactory
 }
 
-func NewForConfig(config rest.Config) (Interface, error) {
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = dynamic.NegotiatedSerializer
-	}
-
-	restClient, err := restwatch.UnversionedRESTClientFor(&config)
-	if err != nil {
-		return nil, err
-	}
-
+func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
 	return &Client{
-		restClient: restClient,
-
-		prometheusControllers:     map[string]PrometheusController{},
-		alertmanagerControllers:   map[string]AlertmanagerController{},
-		prometheusRuleControllers: map[string]PrometheusRuleController{},
-		serviceMonitorControllers: map[string]ServiceMonitorController{},
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
 	}, nil
-}
-
-func (c *Client) RESTClient() rest.Interface {
-	return c.restClient
-}
-
-func (c *Client) Sync(ctx context.Context) error {
-	return controller.Sync(ctx, c.starters...)
-}
-
-func (c *Client) Start(ctx context.Context, threadiness int) error {
-	return controller.Start(ctx, threadiness, c.starters...)
 }
 
 type PrometheusesGetter interface {
@@ -74,7 +30,8 @@ type PrometheusesGetter interface {
 }
 
 func (c *Client) Prometheuses(namespace string) PrometheusInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PrometheusResource, PrometheusGroupVersionKind, prometheusFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(PrometheusGroupVersionResource, PrometheusGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PrometheusResource, PrometheusGroupVersionKind, prometheusFactory{})
 	return &prometheusClient{
 		ns:           namespace,
 		client:       c,
@@ -87,7 +44,8 @@ type AlertmanagersGetter interface {
 }
 
 func (c *Client) Alertmanagers(namespace string) AlertmanagerInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AlertmanagerResource, AlertmanagerGroupVersionKind, alertmanagerFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(AlertmanagerGroupVersionResource, AlertmanagerGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &AlertmanagerResource, AlertmanagerGroupVersionKind, alertmanagerFactory{})
 	return &alertmanagerClient{
 		ns:           namespace,
 		client:       c,
@@ -100,7 +58,8 @@ type PrometheusRulesGetter interface {
 }
 
 func (c *Client) PrometheusRules(namespace string) PrometheusRuleInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PrometheusRuleResource, PrometheusRuleGroupVersionKind, prometheusRuleFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(PrometheusRuleGroupVersionResource, PrometheusRuleGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PrometheusRuleResource, PrometheusRuleGroupVersionKind, prometheusRuleFactory{})
 	return &prometheusRuleClient{
 		ns:           namespace,
 		client:       c,
@@ -113,7 +72,8 @@ type ServiceMonitorsGetter interface {
 }
 
 func (c *Client) ServiceMonitors(namespace string) ServiceMonitorInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ServiceMonitorResource, ServiceMonitorGroupVersionKind, serviceMonitorFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(ServiceMonitorGroupVersionResource, ServiceMonitorGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ServiceMonitorResource, ServiceMonitorGroupVersionKind, serviceMonitorFactory{})
 	return &serviceMonitorClient{
 		ns:           namespace,
 		client:       c,

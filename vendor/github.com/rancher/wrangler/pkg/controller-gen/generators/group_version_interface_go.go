@@ -60,7 +60,7 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 	types = orderer.OrderTypes(types)
 
 	sw.Do("func init() {\n", nil)
-	sw.Do(f.gv.Version+".AddToScheme(schemes.All)\n", nil)
+	sw.Do("schemes.Register("+f.gv.Version+".AddToScheme)\n", nil)
 	sw.Do("}\n", nil)
 
 	sw.Do("type Interface interface {\n", nil)
@@ -86,12 +86,13 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 			"pluralLower":  strings.ToLower(plural.Name(t)),
 			"version":      f.gv.Version,
 			"group":        f.gv.Group,
+			"namespaced":   namespaced(t),
 			"versionUpper": namer.IC(f.gv.Version),
 			"groupUpper":   upperLowercase(f.gv.Group),
 		}
 
 		sw.Do("func (c *version) {{.type}}() {{.type}}Controller {\n", m)
-		sw.Do("return New{{.type}}Controller(schema.GroupVersionKind{Group:\"{{.group}}\",Version:\"{{.version}}\",Kind:\"{{.type}}\"}, \"{{.pluralLower}}\", c.controllerFactory)\n", m)
+		sw.Do("return New{{.type}}Controller(schema.GroupVersionKind{Group:\"{{.group}}\",Version:\"{{.version}}\",Kind:\"{{.type}}\"}	, \"{{.pluralLower}}\", {{.namespaced}}, c.controllerFactory)\n", m)
 		sw.Do("}\n", m)
 	}
 

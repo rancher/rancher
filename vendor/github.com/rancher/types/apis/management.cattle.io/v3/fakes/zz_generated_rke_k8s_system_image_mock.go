@@ -18,38 +18,38 @@ import (
 )
 
 var (
-	lockRKEK8sSystemImageListerMockGet  sync.RWMutex
-	lockRKEK8sSystemImageListerMockList sync.RWMutex
+	lockRkeK8sSystemImageListerMockGet  sync.RWMutex
+	lockRkeK8sSystemImageListerMockList sync.RWMutex
 )
 
-// Ensure, that RKEK8sSystemImageListerMock does implement RKEK8sSystemImageLister.
+// Ensure, that RkeK8sSystemImageListerMock does implement RkeK8sSystemImageLister.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEK8sSystemImageLister = &RKEK8sSystemImageListerMock{}
+var _ v3.RkeK8sSystemImageLister = &RkeK8sSystemImageListerMock{}
 
-// RKEK8sSystemImageListerMock is a mock implementation of RKEK8sSystemImageLister.
+// RkeK8sSystemImageListerMock is a mock implementation of RkeK8sSystemImageLister.
 //
-//     func TestSomethingThatUsesRKEK8sSystemImageLister(t *testing.T) {
+//     func TestSomethingThatUsesRkeK8sSystemImageLister(t *testing.T) {
 //
-//         // make and configure a mocked RKEK8sSystemImageLister
-//         mockedRKEK8sSystemImageLister := &RKEK8sSystemImageListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.RKEK8sSystemImage, error) {
+//         // make and configure a mocked RkeK8sSystemImageLister
+//         mockedRkeK8sSystemImageLister := &RkeK8sSystemImageListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.RkeK8sSystemImage, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RKEK8sSystemImage, error) {
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RkeK8sSystemImage, error) {
 // 	               panic("mock out the List method")
 //             },
 //         }
 //
-//         // use mockedRKEK8sSystemImageLister in code that requires RKEK8sSystemImageLister
+//         // use mockedRkeK8sSystemImageLister in code that requires RkeK8sSystemImageLister
 //         // and then make assertions.
 //
 //     }
-type RKEK8sSystemImageListerMock struct {
+type RkeK8sSystemImageListerMock struct {
 	// GetFunc mocks the Get method.
-	GetFunc func(namespace string, name string) (*v3.RKEK8sSystemImage, error)
+	GetFunc func(namespace string, name string) (*v3.RkeK8sSystemImage, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(namespace string, selector labels.Selector) ([]*v3.RKEK8sSystemImage, error)
+	ListFunc func(namespace string, selector labels.Selector) ([]*v3.RkeK8sSystemImage, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -71,9 +71,9 @@ type RKEK8sSystemImageListerMock struct {
 }
 
 // Get calls GetFunc.
-func (mock *RKEK8sSystemImageListerMock) Get(namespace string, name string) (*v3.RKEK8sSystemImage, error) {
+func (mock *RkeK8sSystemImageListerMock) Get(namespace string, name string) (*v3.RkeK8sSystemImage, error) {
 	if mock.GetFunc == nil {
-		panic("RKEK8sSystemImageListerMock.GetFunc: method is nil but RKEK8sSystemImageLister.Get was just called")
+		panic("RkeK8sSystemImageListerMock.GetFunc: method is nil but RkeK8sSystemImageLister.Get was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -82,16 +82,16 @@ func (mock *RKEK8sSystemImageListerMock) Get(namespace string, name string) (*v3
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockRKEK8sSystemImageListerMockGet.Lock()
+	lockRkeK8sSystemImageListerMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockRKEK8sSystemImageListerMockGet.Unlock()
+	lockRkeK8sSystemImageListerMockGet.Unlock()
 	return mock.GetFunc(namespace, name)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageLister.GetCalls())
-func (mock *RKEK8sSystemImageListerMock) GetCalls() []struct {
+//     len(mockedRkeK8sSystemImageLister.GetCalls())
+func (mock *RkeK8sSystemImageListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -99,16 +99,16 @@ func (mock *RKEK8sSystemImageListerMock) GetCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockRKEK8sSystemImageListerMockGet.RLock()
+	lockRkeK8sSystemImageListerMockGet.RLock()
 	calls = mock.calls.Get
-	lockRKEK8sSystemImageListerMockGet.RUnlock()
+	lockRkeK8sSystemImageListerMockGet.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *RKEK8sSystemImageListerMock) List(namespace string, selector labels.Selector) ([]*v3.RKEK8sSystemImage, error) {
+func (mock *RkeK8sSystemImageListerMock) List(namespace string, selector labels.Selector) ([]*v3.RkeK8sSystemImage, error) {
 	if mock.ListFunc == nil {
-		panic("RKEK8sSystemImageListerMock.ListFunc: method is nil but RKEK8sSystemImageLister.List was just called")
+		panic("RkeK8sSystemImageListerMock.ListFunc: method is nil but RkeK8sSystemImageLister.List was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -117,16 +117,16 @@ func (mock *RKEK8sSystemImageListerMock) List(namespace string, selector labels.
 		Namespace: namespace,
 		Selector:  selector,
 	}
-	lockRKEK8sSystemImageListerMockList.Lock()
+	lockRkeK8sSystemImageListerMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockRKEK8sSystemImageListerMockList.Unlock()
+	lockRkeK8sSystemImageListerMockList.Unlock()
 	return mock.ListFunc(namespace, selector)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageLister.ListCalls())
-func (mock *RKEK8sSystemImageListerMock) ListCalls() []struct {
+//     len(mockedRkeK8sSystemImageLister.ListCalls())
+func (mock *RkeK8sSystemImageListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
 } {
@@ -134,46 +134,44 @@ func (mock *RKEK8sSystemImageListerMock) ListCalls() []struct {
 		Namespace string
 		Selector  labels.Selector
 	}
-	lockRKEK8sSystemImageListerMockList.RLock()
+	lockRkeK8sSystemImageListerMockList.RLock()
 	calls = mock.calls.List
-	lockRKEK8sSystemImageListerMockList.RUnlock()
+	lockRkeK8sSystemImageListerMockList.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEK8sSystemImageControllerMockAddClusterScopedFeatureHandler sync.RWMutex
-	lockRKEK8sSystemImageControllerMockAddClusterScopedHandler        sync.RWMutex
-	lockRKEK8sSystemImageControllerMockAddFeatureHandler              sync.RWMutex
-	lockRKEK8sSystemImageControllerMockAddHandler                     sync.RWMutex
-	lockRKEK8sSystemImageControllerMockEnqueue                        sync.RWMutex
-	lockRKEK8sSystemImageControllerMockEnqueueAfter                   sync.RWMutex
-	lockRKEK8sSystemImageControllerMockGeneric                        sync.RWMutex
-	lockRKEK8sSystemImageControllerMockInformer                       sync.RWMutex
-	lockRKEK8sSystemImageControllerMockLister                         sync.RWMutex
-	lockRKEK8sSystemImageControllerMockStart                          sync.RWMutex
-	lockRKEK8sSystemImageControllerMockSync                           sync.RWMutex
+	lockRkeK8sSystemImageControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockRkeK8sSystemImageControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockRkeK8sSystemImageControllerMockAddFeatureHandler              sync.RWMutex
+	lockRkeK8sSystemImageControllerMockAddHandler                     sync.RWMutex
+	lockRkeK8sSystemImageControllerMockEnqueue                        sync.RWMutex
+	lockRkeK8sSystemImageControllerMockEnqueueAfter                   sync.RWMutex
+	lockRkeK8sSystemImageControllerMockGeneric                        sync.RWMutex
+	lockRkeK8sSystemImageControllerMockInformer                       sync.RWMutex
+	lockRkeK8sSystemImageControllerMockLister                         sync.RWMutex
 )
 
-// Ensure, that RKEK8sSystemImageControllerMock does implement RKEK8sSystemImageController.
+// Ensure, that RkeK8sSystemImageControllerMock does implement RkeK8sSystemImageController.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEK8sSystemImageController = &RKEK8sSystemImageControllerMock{}
+var _ v3.RkeK8sSystemImageController = &RkeK8sSystemImageControllerMock{}
 
-// RKEK8sSystemImageControllerMock is a mock implementation of RKEK8sSystemImageController.
+// RkeK8sSystemImageControllerMock is a mock implementation of RkeK8sSystemImageController.
 //
-//     func TestSomethingThatUsesRKEK8sSystemImageController(t *testing.T) {
+//     func TestSomethingThatUsesRkeK8sSystemImageController(t *testing.T) {
 //
-//         // make and configure a mocked RKEK8sSystemImageController
-//         mockedRKEK8sSystemImageController := &RKEK8sSystemImageControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEK8sSystemImageHandlerFunc)  {
+//         // make and configure a mocked RkeK8sSystemImageController
+//         mockedRkeK8sSystemImageController := &RkeK8sSystemImageControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeK8sSystemImageHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.RKEK8sSystemImageHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.RkeK8sSystemImageHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sSystemImageHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sSystemImageHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.RKEK8sSystemImageHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.RkeK8sSystemImageHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
 //             EnqueueFunc: func(namespace string, name string)  {
@@ -188,33 +186,27 @@ var _ v3.RKEK8sSystemImageController = &RKEK8sSystemImageControllerMock{}
 //             InformerFunc: func() cache.SharedIndexInformer {
 // 	               panic("mock out the Informer method")
 //             },
-//             ListerFunc: func() v3.RKEK8sSystemImageLister {
+//             ListerFunc: func() v3.RkeK8sSystemImageLister {
 // 	               panic("mock out the Lister method")
-//             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
 //             },
 //         }
 //
-//         // use mockedRKEK8sSystemImageController in code that requires RKEK8sSystemImageController
+//         // use mockedRkeK8sSystemImageController in code that requires RkeK8sSystemImageController
 //         // and then make assertions.
 //
 //     }
-type RKEK8sSystemImageControllerMock struct {
+type RkeK8sSystemImageControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEK8sSystemImageHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeK8sSystemImageHandlerFunc)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.RKEK8sSystemImageHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.RkeK8sSystemImageHandlerFunc)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sSystemImageHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sSystemImageHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, handler v3.RKEK8sSystemImageHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, handler v3.RkeK8sSystemImageHandlerFunc)
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
@@ -229,13 +221,7 @@ type RKEK8sSystemImageControllerMock struct {
 	InformerFunc func() cache.SharedIndexInformer
 
 	// ListerFunc mocks the Lister method.
-	ListerFunc func() v3.RKEK8sSystemImageLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
+	ListerFunc func() v3.RkeK8sSystemImageLister
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -250,7 +236,7 @@ type RKEK8sSystemImageControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.RKEK8sSystemImageHandlerFunc
+			Handler v3.RkeK8sSystemImageHandlerFunc
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -261,7 +247,7 @@ type RKEK8sSystemImageControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.RKEK8sSystemImageHandlerFunc
+			Handler v3.RkeK8sSystemImageHandlerFunc
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -272,7 +258,7 @@ type RKEK8sSystemImageControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sSystemImageHandlerFunc
+			Sync v3.RkeK8sSystemImageHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -281,7 +267,7 @@ type RKEK8sSystemImageControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Handler is the handler argument value.
-			Handler v3.RKEK8sSystemImageHandlerFunc
+			Handler v3.RkeK8sSystemImageHandlerFunc
 		}
 		// Enqueue holds details about calls to the Enqueue method.
 		Enqueue []struct {
@@ -308,32 +294,20 @@ type RKEK8sSystemImageControllerMock struct {
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
 		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 	}
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *RKEK8sSystemImageControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEK8sSystemImageHandlerFunc) {
+func (mock *RkeK8sSystemImageControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeK8sSystemImageHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but RKEK8sSystemImageController.AddClusterScopedFeatureHandler was just called")
+		panic("RkeK8sSystemImageControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but RkeK8sSystemImageController.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.RKEK8sSystemImageHandlerFunc
+		Handler     v3.RkeK8sSystemImageHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -341,164 +315,164 @@ func (mock *RKEK8sSystemImageControllerMock) AddClusterScopedFeatureHandler(ctx 
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockRKEK8sSystemImageControllerMockAddClusterScopedFeatureHandler.Lock()
+	lockRkeK8sSystemImageControllerMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockRKEK8sSystemImageControllerMockAddClusterScopedFeatureHandler.Unlock()
+	lockRkeK8sSystemImageControllerMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.AddClusterScopedFeatureHandlerCalls())
-func (mock *RKEK8sSystemImageControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.AddClusterScopedFeatureHandlerCalls())
+func (mock *RkeK8sSystemImageControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Handler     v3.RKEK8sSystemImageHandlerFunc
+	Handler     v3.RkeK8sSystemImageHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.RKEK8sSystemImageHandlerFunc
+		Handler     v3.RkeK8sSystemImageHandlerFunc
 	}
-	lockRKEK8sSystemImageControllerMockAddClusterScopedFeatureHandler.RLock()
+	lockRkeK8sSystemImageControllerMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockRKEK8sSystemImageControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	lockRkeK8sSystemImageControllerMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *RKEK8sSystemImageControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.RKEK8sSystemImageHandlerFunc) {
+func (mock *RkeK8sSystemImageControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.RkeK8sSystemImageHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.AddClusterScopedHandlerFunc: method is nil but RKEK8sSystemImageController.AddClusterScopedHandler was just called")
+		panic("RkeK8sSystemImageControllerMock.AddClusterScopedHandlerFunc: method is nil but RkeK8sSystemImageController.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.RKEK8sSystemImageHandlerFunc
+		Handler     v3.RkeK8sSystemImageHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockRKEK8sSystemImageControllerMockAddClusterScopedHandler.Lock()
+	lockRkeK8sSystemImageControllerMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockRKEK8sSystemImageControllerMockAddClusterScopedHandler.Unlock()
+	lockRkeK8sSystemImageControllerMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, handler)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.AddClusterScopedHandlerCalls())
-func (mock *RKEK8sSystemImageControllerMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.AddClusterScopedHandlerCalls())
+func (mock *RkeK8sSystemImageControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Handler     v3.RKEK8sSystemImageHandlerFunc
+	Handler     v3.RkeK8sSystemImageHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.RKEK8sSystemImageHandlerFunc
+		Handler     v3.RkeK8sSystemImageHandlerFunc
 	}
-	lockRKEK8sSystemImageControllerMockAddClusterScopedHandler.RLock()
+	lockRkeK8sSystemImageControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockRKEK8sSystemImageControllerMockAddClusterScopedHandler.RUnlock()
+	lockRkeK8sSystemImageControllerMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *RKEK8sSystemImageControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sSystemImageHandlerFunc) {
+func (mock *RkeK8sSystemImageControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sSystemImageHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.AddFeatureHandlerFunc: method is nil but RKEK8sSystemImageController.AddFeatureHandler was just called")
+		panic("RkeK8sSystemImageControllerMock.AddFeatureHandlerFunc: method is nil but RkeK8sSystemImageController.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEK8sSystemImageHandlerFunc
+		Sync    v3.RkeK8sSystemImageHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockRKEK8sSystemImageControllerMockAddFeatureHandler.Lock()
+	lockRkeK8sSystemImageControllerMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockRKEK8sSystemImageControllerMockAddFeatureHandler.Unlock()
+	lockRkeK8sSystemImageControllerMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.AddFeatureHandlerCalls())
-func (mock *RKEK8sSystemImageControllerMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.AddFeatureHandlerCalls())
+func (mock *RkeK8sSystemImageControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.RKEK8sSystemImageHandlerFunc
+	Sync    v3.RkeK8sSystemImageHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEK8sSystemImageHandlerFunc
+		Sync    v3.RkeK8sSystemImageHandlerFunc
 	}
-	lockRKEK8sSystemImageControllerMockAddFeatureHandler.RLock()
+	lockRkeK8sSystemImageControllerMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockRKEK8sSystemImageControllerMockAddFeatureHandler.RUnlock()
+	lockRkeK8sSystemImageControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *RKEK8sSystemImageControllerMock) AddHandler(ctx context.Context, name string, handler v3.RKEK8sSystemImageHandlerFunc) {
+func (mock *RkeK8sSystemImageControllerMock) AddHandler(ctx context.Context, name string, handler v3.RkeK8sSystemImageHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.AddHandlerFunc: method is nil but RKEK8sSystemImageController.AddHandler was just called")
+		panic("RkeK8sSystemImageControllerMock.AddHandlerFunc: method is nil but RkeK8sSystemImageController.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.RKEK8sSystemImageHandlerFunc
+		Handler v3.RkeK8sSystemImageHandlerFunc
 	}{
 		Ctx:     ctx,
 		Name:    name,
 		Handler: handler,
 	}
-	lockRKEK8sSystemImageControllerMockAddHandler.Lock()
+	lockRkeK8sSystemImageControllerMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockRKEK8sSystemImageControllerMockAddHandler.Unlock()
+	lockRkeK8sSystemImageControllerMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, handler)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.AddHandlerCalls())
-func (mock *RKEK8sSystemImageControllerMock) AddHandlerCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.AddHandlerCalls())
+func (mock *RkeK8sSystemImageControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
-	Handler v3.RKEK8sSystemImageHandlerFunc
+	Handler v3.RkeK8sSystemImageHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.RKEK8sSystemImageHandlerFunc
+		Handler v3.RkeK8sSystemImageHandlerFunc
 	}
-	lockRKEK8sSystemImageControllerMockAddHandler.RLock()
+	lockRkeK8sSystemImageControllerMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockRKEK8sSystemImageControllerMockAddHandler.RUnlock()
+	lockRkeK8sSystemImageControllerMockAddHandler.RUnlock()
 	return calls
 }
 
 // Enqueue calls EnqueueFunc.
-func (mock *RKEK8sSystemImageControllerMock) Enqueue(namespace string, name string) {
+func (mock *RkeK8sSystemImageControllerMock) Enqueue(namespace string, name string) {
 	if mock.EnqueueFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.EnqueueFunc: method is nil but RKEK8sSystemImageController.Enqueue was just called")
+		panic("RkeK8sSystemImageControllerMock.EnqueueFunc: method is nil but RkeK8sSystemImageController.Enqueue was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -507,16 +481,16 @@ func (mock *RKEK8sSystemImageControllerMock) Enqueue(namespace string, name stri
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockRKEK8sSystemImageControllerMockEnqueue.Lock()
+	lockRkeK8sSystemImageControllerMockEnqueue.Lock()
 	mock.calls.Enqueue = append(mock.calls.Enqueue, callInfo)
-	lockRKEK8sSystemImageControllerMockEnqueue.Unlock()
+	lockRkeK8sSystemImageControllerMockEnqueue.Unlock()
 	mock.EnqueueFunc(namespace, name)
 }
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.EnqueueCalls())
-func (mock *RKEK8sSystemImageControllerMock) EnqueueCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.EnqueueCalls())
+func (mock *RkeK8sSystemImageControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -524,16 +498,16 @@ func (mock *RKEK8sSystemImageControllerMock) EnqueueCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockRKEK8sSystemImageControllerMockEnqueue.RLock()
+	lockRkeK8sSystemImageControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
-	lockRKEK8sSystemImageControllerMockEnqueue.RUnlock()
+	lockRkeK8sSystemImageControllerMockEnqueue.RUnlock()
 	return calls
 }
 
 // EnqueueAfter calls EnqueueAfterFunc.
-func (mock *RKEK8sSystemImageControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
+func (mock *RkeK8sSystemImageControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
 	if mock.EnqueueAfterFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.EnqueueAfterFunc: method is nil but RKEK8sSystemImageController.EnqueueAfter was just called")
+		panic("RkeK8sSystemImageControllerMock.EnqueueAfterFunc: method is nil but RkeK8sSystemImageController.EnqueueAfter was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -544,16 +518,16 @@ func (mock *RKEK8sSystemImageControllerMock) EnqueueAfter(namespace string, name
 		Name:      name,
 		After:     after,
 	}
-	lockRKEK8sSystemImageControllerMockEnqueueAfter.Lock()
+	lockRkeK8sSystemImageControllerMockEnqueueAfter.Lock()
 	mock.calls.EnqueueAfter = append(mock.calls.EnqueueAfter, callInfo)
-	lockRKEK8sSystemImageControllerMockEnqueueAfter.Unlock()
+	lockRkeK8sSystemImageControllerMockEnqueueAfter.Unlock()
 	mock.EnqueueAfterFunc(namespace, name, after)
 }
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.EnqueueAfterCalls())
-func (mock *RKEK8sSystemImageControllerMock) EnqueueAfterCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.EnqueueAfterCalls())
+func (mock *RkeK8sSystemImageControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
 	After     time.Duration
@@ -563,217 +537,151 @@ func (mock *RKEK8sSystemImageControllerMock) EnqueueAfterCalls() []struct {
 		Name      string
 		After     time.Duration
 	}
-	lockRKEK8sSystemImageControllerMockEnqueueAfter.RLock()
+	lockRkeK8sSystemImageControllerMockEnqueueAfter.RLock()
 	calls = mock.calls.EnqueueAfter
-	lockRKEK8sSystemImageControllerMockEnqueueAfter.RUnlock()
+	lockRkeK8sSystemImageControllerMockEnqueueAfter.RUnlock()
 	return calls
 }
 
 // Generic calls GenericFunc.
-func (mock *RKEK8sSystemImageControllerMock) Generic() controller.GenericController {
+func (mock *RkeK8sSystemImageControllerMock) Generic() controller.GenericController {
 	if mock.GenericFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.GenericFunc: method is nil but RKEK8sSystemImageController.Generic was just called")
+		panic("RkeK8sSystemImageControllerMock.GenericFunc: method is nil but RkeK8sSystemImageController.Generic was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sSystemImageControllerMockGeneric.Lock()
+	lockRkeK8sSystemImageControllerMockGeneric.Lock()
 	mock.calls.Generic = append(mock.calls.Generic, callInfo)
-	lockRKEK8sSystemImageControllerMockGeneric.Unlock()
+	lockRkeK8sSystemImageControllerMockGeneric.Unlock()
 	return mock.GenericFunc()
 }
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.GenericCalls())
-func (mock *RKEK8sSystemImageControllerMock) GenericCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.GenericCalls())
+func (mock *RkeK8sSystemImageControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sSystemImageControllerMockGeneric.RLock()
+	lockRkeK8sSystemImageControllerMockGeneric.RLock()
 	calls = mock.calls.Generic
-	lockRKEK8sSystemImageControllerMockGeneric.RUnlock()
+	lockRkeK8sSystemImageControllerMockGeneric.RUnlock()
 	return calls
 }
 
 // Informer calls InformerFunc.
-func (mock *RKEK8sSystemImageControllerMock) Informer() cache.SharedIndexInformer {
+func (mock *RkeK8sSystemImageControllerMock) Informer() cache.SharedIndexInformer {
 	if mock.InformerFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.InformerFunc: method is nil but RKEK8sSystemImageController.Informer was just called")
+		panic("RkeK8sSystemImageControllerMock.InformerFunc: method is nil but RkeK8sSystemImageController.Informer was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sSystemImageControllerMockInformer.Lock()
+	lockRkeK8sSystemImageControllerMockInformer.Lock()
 	mock.calls.Informer = append(mock.calls.Informer, callInfo)
-	lockRKEK8sSystemImageControllerMockInformer.Unlock()
+	lockRkeK8sSystemImageControllerMockInformer.Unlock()
 	return mock.InformerFunc()
 }
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.InformerCalls())
-func (mock *RKEK8sSystemImageControllerMock) InformerCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.InformerCalls())
+func (mock *RkeK8sSystemImageControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sSystemImageControllerMockInformer.RLock()
+	lockRkeK8sSystemImageControllerMockInformer.RLock()
 	calls = mock.calls.Informer
-	lockRKEK8sSystemImageControllerMockInformer.RUnlock()
+	lockRkeK8sSystemImageControllerMockInformer.RUnlock()
 	return calls
 }
 
 // Lister calls ListerFunc.
-func (mock *RKEK8sSystemImageControllerMock) Lister() v3.RKEK8sSystemImageLister {
+func (mock *RkeK8sSystemImageControllerMock) Lister() v3.RkeK8sSystemImageLister {
 	if mock.ListerFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.ListerFunc: method is nil but RKEK8sSystemImageController.Lister was just called")
+		panic("RkeK8sSystemImageControllerMock.ListerFunc: method is nil but RkeK8sSystemImageController.Lister was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sSystemImageControllerMockLister.Lock()
+	lockRkeK8sSystemImageControllerMockLister.Lock()
 	mock.calls.Lister = append(mock.calls.Lister, callInfo)
-	lockRKEK8sSystemImageControllerMockLister.Unlock()
+	lockRkeK8sSystemImageControllerMockLister.Unlock()
 	return mock.ListerFunc()
 }
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageController.ListerCalls())
-func (mock *RKEK8sSystemImageControllerMock) ListerCalls() []struct {
+//     len(mockedRkeK8sSystemImageController.ListerCalls())
+func (mock *RkeK8sSystemImageControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sSystemImageControllerMockLister.RLock()
+	lockRkeK8sSystemImageControllerMockLister.RLock()
 	calls = mock.calls.Lister
-	lockRKEK8sSystemImageControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *RKEK8sSystemImageControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.StartFunc: method is nil but RKEK8sSystemImageController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockRKEK8sSystemImageControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockRKEK8sSystemImageControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedRKEK8sSystemImageController.StartCalls())
-func (mock *RKEK8sSystemImageControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockRKEK8sSystemImageControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockRKEK8sSystemImageControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *RKEK8sSystemImageControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("RKEK8sSystemImageControllerMock.SyncFunc: method is nil but RKEK8sSystemImageController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockRKEK8sSystemImageControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockRKEK8sSystemImageControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedRKEK8sSystemImageController.SyncCalls())
-func (mock *RKEK8sSystemImageControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockRKEK8sSystemImageControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockRKEK8sSystemImageControllerMockSync.RUnlock()
+	lockRkeK8sSystemImageControllerMockLister.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedHandler          sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockAddFeatureHandler                sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockAddFeatureLifecycle              sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockAddHandler                       sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockAddLifecycle                     sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockController                       sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockCreate                           sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockDelete                           sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockDeleteCollection                 sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockDeleteNamespaced                 sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockGet                              sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockGetNamespaced                    sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockList                             sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockListNamespaced                   sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockObjectClient                     sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockUpdate                           sync.RWMutex
-	lockRKEK8sSystemImageInterfaceMockWatch                            sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockAddHandler                       sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockAddLifecycle                     sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockController                       sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockCreate                           sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockDelete                           sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockDeleteCollection                 sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockGet                              sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockGetNamespaced                    sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockList                             sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockListNamespaced                   sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockObjectClient                     sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockUpdate                           sync.RWMutex
+	lockRkeK8sSystemImageInterfaceMockWatch                            sync.RWMutex
 )
 
-// Ensure, that RKEK8sSystemImageInterfaceMock does implement RKEK8sSystemImageInterface.
+// Ensure, that RkeK8sSystemImageInterfaceMock does implement RkeK8sSystemImageInterface.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEK8sSystemImageInterface = &RKEK8sSystemImageInterfaceMock{}
+var _ v3.RkeK8sSystemImageInterface = &RkeK8sSystemImageInterfaceMock{}
 
-// RKEK8sSystemImageInterfaceMock is a mock implementation of RKEK8sSystemImageInterface.
+// RkeK8sSystemImageInterfaceMock is a mock implementation of RkeK8sSystemImageInterface.
 //
-//     func TestSomethingThatUsesRKEK8sSystemImageInterface(t *testing.T) {
+//     func TestSomethingThatUsesRkeK8sSystemImageInterface(t *testing.T) {
 //
-//         // make and configure a mocked RKEK8sSystemImageInterface
-//         mockedRKEK8sSystemImageInterface := &RKEK8sSystemImageInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEK8sSystemImageHandlerFunc)  {
+//         // make and configure a mocked RkeK8sSystemImageInterface
+//         mockedRkeK8sSystemImageInterface := &RkeK8sSystemImageInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeK8sSystemImageHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEK8sSystemImageLifecycle)  {
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeK8sSystemImageLifecycle)  {
 // 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.RKEK8sSystemImageHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.RkeK8sSystemImageHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.RKEK8sSystemImageLifecycle)  {
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.RkeK8sSystemImageLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sSystemImageHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sSystemImageHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEK8sSystemImageLifecycle)  {
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeK8sSystemImageLifecycle)  {
 // 	               panic("mock out the AddFeatureLifecycle method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.RKEK8sSystemImageHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.RkeK8sSystemImageHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.RKEK8sSystemImageLifecycle)  {
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.RkeK8sSystemImageLifecycle)  {
 // 	               panic("mock out the AddLifecycle method")
 //             },
-//             ControllerFunc: func() v3.RKEK8sSystemImageController {
+//             ControllerFunc: func() v3.RkeK8sSystemImageController {
 // 	               panic("mock out the Controller method")
 //             },
-//             CreateFunc: func(in1 *v3.RKEK8sSystemImage) (*v3.RKEK8sSystemImage, error) {
+//             CreateFunc: func(in1 *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error) {
 // 	               panic("mock out the Create method")
 //             },
 //             DeleteFunc: func(name string, options *v1.DeleteOptions) error {
@@ -785,22 +693,22 @@ var _ v3.RKEK8sSystemImageInterface = &RKEK8sSystemImageInterfaceMock{}
 //             DeleteNamespacedFunc: func(namespace string, name string, options *v1.DeleteOptions) error {
 // 	               panic("mock out the DeleteNamespaced method")
 //             },
-//             GetFunc: func(name string, opts v1.GetOptions) (*v3.RKEK8sSystemImage, error) {
+//             GetFunc: func(name string, opts v1.GetOptions) (*v3.RkeK8sSystemImage, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.RKEK8sSystemImage, error) {
+//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.RkeK8sSystemImage, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error) {
+//             ListFunc: func(opts v1.ListOptions) (*v3.RkeK8sSystemImageList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.RkeK8sSystemImageList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
 //             },
-//             UpdateFunc: func(in1 *v3.RKEK8sSystemImage) (*v3.RKEK8sSystemImage, error) {
+//             UpdateFunc: func(in1 *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error) {
 // 	               panic("mock out the Update method")
 //             },
 //             WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
@@ -808,40 +716,40 @@ var _ v3.RKEK8sSystemImageInterface = &RKEK8sSystemImageInterfaceMock{}
 //             },
 //         }
 //
-//         // use mockedRKEK8sSystemImageInterface in code that requires RKEK8sSystemImageInterface
+//         // use mockedRkeK8sSystemImageInterface in code that requires RkeK8sSystemImageInterface
 //         // and then make assertions.
 //
 //     }
-type RKEK8sSystemImageInterfaceMock struct {
+type RkeK8sSystemImageInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEK8sSystemImageHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeK8sSystemImageHandlerFunc)
 
 	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
-	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEK8sSystemImageLifecycle)
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeK8sSystemImageLifecycle)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.RKEK8sSystemImageHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.RkeK8sSystemImageHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
-	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.RKEK8sSystemImageLifecycle)
+	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.RkeK8sSystemImageLifecycle)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sSystemImageHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sSystemImageHandlerFunc)
 
 	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
-	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEK8sSystemImageLifecycle)
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeK8sSystemImageLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, sync v3.RKEK8sSystemImageHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, sync v3.RkeK8sSystemImageHandlerFunc)
 
 	// AddLifecycleFunc mocks the AddLifecycle method.
-	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.RKEK8sSystemImageLifecycle)
+	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.RkeK8sSystemImageLifecycle)
 
 	// ControllerFunc mocks the Controller method.
-	ControllerFunc func() v3.RKEK8sSystemImageController
+	ControllerFunc func() v3.RkeK8sSystemImageController
 
 	// CreateFunc mocks the Create method.
-	CreateFunc func(in1 *v3.RKEK8sSystemImage) (*v3.RKEK8sSystemImage, error)
+	CreateFunc func(in1 *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
 
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(name string, options *v1.DeleteOptions) error
@@ -853,22 +761,22 @@ type RKEK8sSystemImageInterfaceMock struct {
 	DeleteNamespacedFunc func(namespace string, name string, options *v1.DeleteOptions) error
 
 	// GetFunc mocks the Get method.
-	GetFunc func(name string, opts v1.GetOptions) (*v3.RKEK8sSystemImage, error)
+	GetFunc func(name string, opts v1.GetOptions) (*v3.RkeK8sSystemImage, error)
 
 	// GetNamespacedFunc mocks the GetNamespaced method.
-	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.RKEK8sSystemImage, error)
+	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.RkeK8sSystemImage, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error)
+	ListFunc func(opts v1.ListOptions) (*v3.RkeK8sSystemImageList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error)
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.RkeK8sSystemImageList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
 
 	// UpdateFunc mocks the Update method.
-	UpdateFunc func(in1 *v3.RKEK8sSystemImage) (*v3.RKEK8sSystemImage, error)
+	UpdateFunc func(in1 *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
 
 	// WatchFunc mocks the Watch method.
 	WatchFunc func(opts v1.ListOptions) (watch.Interface, error)
@@ -886,7 +794,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sSystemImageHandlerFunc
+			Sync v3.RkeK8sSystemImageHandlerFunc
 		}
 		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
 		AddClusterScopedFeatureLifecycle []struct {
@@ -899,7 +807,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEK8sSystemImageLifecycle
+			Lifecycle v3.RkeK8sSystemImageLifecycle
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -910,7 +818,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sSystemImageHandlerFunc
+			Sync v3.RkeK8sSystemImageHandlerFunc
 		}
 		// AddClusterScopedLifecycle holds details about calls to the AddClusterScopedLifecycle method.
 		AddClusterScopedLifecycle []struct {
@@ -921,7 +829,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEK8sSystemImageLifecycle
+			Lifecycle v3.RkeK8sSystemImageLifecycle
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -932,7 +840,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sSystemImageHandlerFunc
+			Sync v3.RkeK8sSystemImageHandlerFunc
 		}
 		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
 		AddFeatureLifecycle []struct {
@@ -943,7 +851,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEK8sSystemImageLifecycle
+			Lifecycle v3.RkeK8sSystemImageLifecycle
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -952,7 +860,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sSystemImageHandlerFunc
+			Sync v3.RkeK8sSystemImageHandlerFunc
 		}
 		// AddLifecycle holds details about calls to the AddLifecycle method.
 		AddLifecycle []struct {
@@ -961,7 +869,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEK8sSystemImageLifecycle
+			Lifecycle v3.RkeK8sSystemImageLifecycle
 		}
 		// Controller holds details about calls to the Controller method.
 		Controller []struct {
@@ -969,7 +877,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 		// Create holds details about calls to the Create method.
 		Create []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.RKEK8sSystemImage
+			In1 *v3.RkeK8sSystemImage
 		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
@@ -1028,7 +936,7 @@ type RKEK8sSystemImageInterfaceMock struct {
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.RKEK8sSystemImage
+			In1 *v3.RkeK8sSystemImage
 		}
 		// Watch holds details about calls to the Watch method.
 		Watch []struct {
@@ -1039,16 +947,16 @@ type RKEK8sSystemImageInterfaceMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEK8sSystemImageHandlerFunc) {
+func (mock *RkeK8sSystemImageInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeK8sSystemImageHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but RKEK8sSystemImageInterface.AddClusterScopedFeatureHandler was just called")
+		panic("RkeK8sSystemImageInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but RkeK8sSystemImageInterface.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.RKEK8sSystemImageHandlerFunc
+		Sync        v3.RkeK8sSystemImageHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1056,46 +964,46 @@ func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedFeatureHandler(ctx c
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.AddClusterScopedFeatureHandlerCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Sync        v3.RKEK8sSystemImageHandlerFunc
+	Sync        v3.RkeK8sSystemImageHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.RKEK8sSystemImageHandlerFunc
+		Sync        v3.RkeK8sSystemImageHandlerFunc
 	}
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEK8sSystemImageLifecycle) {
+func (mock *RkeK8sSystemImageInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeK8sSystemImageLifecycle) {
 	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but RKEK8sSystemImageInterface.AddClusterScopedFeatureLifecycle was just called")
+		panic("RkeK8sSystemImageInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but RkeK8sSystemImageInterface.AddClusterScopedFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEK8sSystemImageLifecycle
+		Lifecycle   v3.RkeK8sSystemImageLifecycle
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1103,346 +1011,346 @@ func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedFeatureLifecycle(ctx
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
 	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
 	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.AddClusterScopedFeatureLifecycleCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Lifecycle   v3.RKEK8sSystemImageLifecycle
+	Lifecycle   v3.RkeK8sSystemImageLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEK8sSystemImageLifecycle
+		Lifecycle   v3.RkeK8sSystemImageLifecycle
 	}
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedFeatureLifecycle
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.RKEK8sSystemImageHandlerFunc) {
+func (mock *RkeK8sSystemImageInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.RkeK8sSystemImageHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.AddClusterScopedHandlerFunc: method is nil but RKEK8sSystemImageInterface.AddClusterScopedHandler was just called")
+		panic("RkeK8sSystemImageInterfaceMock.AddClusterScopedHandlerFunc: method is nil but RkeK8sSystemImageInterface.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.RKEK8sSystemImageHandlerFunc
+		Sync        v3.RkeK8sSystemImageHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedHandler.Lock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedHandler.Unlock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, sync)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.AddClusterScopedHandlerCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.AddClusterScopedHandlerCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Sync        v3.RKEK8sSystemImageHandlerFunc
+	Sync        v3.RkeK8sSystemImageHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.RKEK8sSystemImageHandlerFunc
+		Sync        v3.RkeK8sSystemImageHandlerFunc
 	}
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedHandler.RLock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedHandler.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedLifecycle calls AddClusterScopedLifecycleFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.RKEK8sSystemImageLifecycle) {
+func (mock *RkeK8sSystemImageInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.RkeK8sSystemImageLifecycle) {
 	if mock.AddClusterScopedLifecycleFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but RKEK8sSystemImageInterface.AddClusterScopedLifecycle was just called")
+		panic("RkeK8sSystemImageInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but RkeK8sSystemImageInterface.AddClusterScopedLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEK8sSystemImageLifecycle
+		Lifecycle   v3.RkeK8sSystemImageLifecycle
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedLifecycle.Lock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedLifecycle.Lock()
 	mock.calls.AddClusterScopedLifecycle = append(mock.calls.AddClusterScopedLifecycle, callInfo)
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedLifecycle.Unlock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedLifecycle.Unlock()
 	mock.AddClusterScopedLifecycleFunc(ctx, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.AddClusterScopedLifecycleCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.AddClusterScopedLifecycleCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Lifecycle   v3.RKEK8sSystemImageLifecycle
+	Lifecycle   v3.RkeK8sSystemImageLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEK8sSystemImageLifecycle
+		Lifecycle   v3.RkeK8sSystemImageLifecycle
 	}
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedLifecycle.RLock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
-	lockRKEK8sSystemImageInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockAddClusterScopedLifecycle.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sSystemImageHandlerFunc) {
+func (mock *RkeK8sSystemImageInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sSystemImageHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.AddFeatureHandlerFunc: method is nil but RKEK8sSystemImageInterface.AddFeatureHandler was just called")
+		panic("RkeK8sSystemImageInterfaceMock.AddFeatureHandlerFunc: method is nil but RkeK8sSystemImageInterface.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEK8sSystemImageHandlerFunc
+		Sync    v3.RkeK8sSystemImageHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockRKEK8sSystemImageInterfaceMockAddFeatureHandler.Lock()
+	lockRkeK8sSystemImageInterfaceMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockRKEK8sSystemImageInterfaceMockAddFeatureHandler.Unlock()
+	lockRkeK8sSystemImageInterfaceMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.AddFeatureHandlerCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.AddFeatureHandlerCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.RKEK8sSystemImageHandlerFunc
+	Sync    v3.RkeK8sSystemImageHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEK8sSystemImageHandlerFunc
+		Sync    v3.RkeK8sSystemImageHandlerFunc
 	}
-	lockRKEK8sSystemImageInterfaceMockAddFeatureHandler.RLock()
+	lockRkeK8sSystemImageInterfaceMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockRKEK8sSystemImageInterfaceMockAddFeatureHandler.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureLifecycle calls AddFeatureLifecycleFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEK8sSystemImageLifecycle) {
+func (mock *RkeK8sSystemImageInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeK8sSystemImageLifecycle) {
 	if mock.AddFeatureLifecycleFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.AddFeatureLifecycleFunc: method is nil but RKEK8sSystemImageInterface.AddFeatureLifecycle was just called")
+		panic("RkeK8sSystemImageInterfaceMock.AddFeatureLifecycleFunc: method is nil but RkeK8sSystemImageInterface.AddFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.RKEK8sSystemImageLifecycle
+		Lifecycle v3.RkeK8sSystemImageLifecycle
 	}{
 		Ctx:       ctx,
 		Enabled:   enabled,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockRKEK8sSystemImageInterfaceMockAddFeatureLifecycle.Lock()
+	lockRkeK8sSystemImageInterfaceMockAddFeatureLifecycle.Lock()
 	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
-	lockRKEK8sSystemImageInterfaceMockAddFeatureLifecycle.Unlock()
+	lockRkeK8sSystemImageInterfaceMockAddFeatureLifecycle.Unlock()
 	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
 }
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.AddFeatureLifecycleCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) AddFeatureLifecycleCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.AddFeatureLifecycleCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
 	Name      string
-	Lifecycle v3.RKEK8sSystemImageLifecycle
+	Lifecycle v3.RkeK8sSystemImageLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.RKEK8sSystemImageLifecycle
+		Lifecycle v3.RkeK8sSystemImageLifecycle
 	}
-	lockRKEK8sSystemImageInterfaceMockAddFeatureLifecycle.RLock()
+	lockRkeK8sSystemImageInterfaceMockAddFeatureLifecycle.RLock()
 	calls = mock.calls.AddFeatureLifecycle
-	lockRKEK8sSystemImageInterfaceMockAddFeatureLifecycle.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.RKEK8sSystemImageHandlerFunc) {
+func (mock *RkeK8sSystemImageInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.RkeK8sSystemImageHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.AddHandlerFunc: method is nil but RKEK8sSystemImageInterface.AddHandler was just called")
+		panic("RkeK8sSystemImageInterfaceMock.AddHandlerFunc: method is nil but RkeK8sSystemImageInterface.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.RKEK8sSystemImageHandlerFunc
+		Sync v3.RkeK8sSystemImageHandlerFunc
 	}{
 		Ctx:  ctx,
 		Name: name,
 		Sync: sync,
 	}
-	lockRKEK8sSystemImageInterfaceMockAddHandler.Lock()
+	lockRkeK8sSystemImageInterfaceMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockRKEK8sSystemImageInterfaceMockAddHandler.Unlock()
+	lockRkeK8sSystemImageInterfaceMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, sync)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.AddHandlerCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) AddHandlerCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.AddHandlerCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
-	Sync v3.RKEK8sSystemImageHandlerFunc
+	Sync v3.RkeK8sSystemImageHandlerFunc
 } {
 	var calls []struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.RKEK8sSystemImageHandlerFunc
+		Sync v3.RkeK8sSystemImageHandlerFunc
 	}
-	lockRKEK8sSystemImageInterfaceMockAddHandler.RLock()
+	lockRkeK8sSystemImageInterfaceMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockRKEK8sSystemImageInterfaceMockAddHandler.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockAddHandler.RUnlock()
 	return calls
 }
 
 // AddLifecycle calls AddLifecycleFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.RKEK8sSystemImageLifecycle) {
+func (mock *RkeK8sSystemImageInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.RkeK8sSystemImageLifecycle) {
 	if mock.AddLifecycleFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.AddLifecycleFunc: method is nil but RKEK8sSystemImageInterface.AddLifecycle was just called")
+		panic("RkeK8sSystemImageInterfaceMock.AddLifecycleFunc: method is nil but RkeK8sSystemImageInterface.AddLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.RKEK8sSystemImageLifecycle
+		Lifecycle v3.RkeK8sSystemImageLifecycle
 	}{
 		Ctx:       ctx,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockRKEK8sSystemImageInterfaceMockAddLifecycle.Lock()
+	lockRkeK8sSystemImageInterfaceMockAddLifecycle.Lock()
 	mock.calls.AddLifecycle = append(mock.calls.AddLifecycle, callInfo)
-	lockRKEK8sSystemImageInterfaceMockAddLifecycle.Unlock()
+	lockRkeK8sSystemImageInterfaceMockAddLifecycle.Unlock()
 	mock.AddLifecycleFunc(ctx, name, lifecycle)
 }
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.AddLifecycleCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) AddLifecycleCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.AddLifecycleCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
-	Lifecycle v3.RKEK8sSystemImageLifecycle
+	Lifecycle v3.RkeK8sSystemImageLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.RKEK8sSystemImageLifecycle
+		Lifecycle v3.RkeK8sSystemImageLifecycle
 	}
-	lockRKEK8sSystemImageInterfaceMockAddLifecycle.RLock()
+	lockRkeK8sSystemImageInterfaceMockAddLifecycle.RLock()
 	calls = mock.calls.AddLifecycle
-	lockRKEK8sSystemImageInterfaceMockAddLifecycle.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockAddLifecycle.RUnlock()
 	return calls
 }
 
 // Controller calls ControllerFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) Controller() v3.RKEK8sSystemImageController {
+func (mock *RkeK8sSystemImageInterfaceMock) Controller() v3.RkeK8sSystemImageController {
 	if mock.ControllerFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.ControllerFunc: method is nil but RKEK8sSystemImageInterface.Controller was just called")
+		panic("RkeK8sSystemImageInterfaceMock.ControllerFunc: method is nil but RkeK8sSystemImageInterface.Controller was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sSystemImageInterfaceMockController.Lock()
+	lockRkeK8sSystemImageInterfaceMockController.Lock()
 	mock.calls.Controller = append(mock.calls.Controller, callInfo)
-	lockRKEK8sSystemImageInterfaceMockController.Unlock()
+	lockRkeK8sSystemImageInterfaceMockController.Unlock()
 	return mock.ControllerFunc()
 }
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.ControllerCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) ControllerCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.ControllerCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sSystemImageInterfaceMockController.RLock()
+	lockRkeK8sSystemImageInterfaceMockController.RLock()
 	calls = mock.calls.Controller
-	lockRKEK8sSystemImageInterfaceMockController.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockController.RUnlock()
 	return calls
 }
 
 // Create calls CreateFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) Create(in1 *v3.RKEK8sSystemImage) (*v3.RKEK8sSystemImage, error) {
+func (mock *RkeK8sSystemImageInterfaceMock) Create(in1 *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error) {
 	if mock.CreateFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.CreateFunc: method is nil but RKEK8sSystemImageInterface.Create was just called")
+		panic("RkeK8sSystemImageInterfaceMock.CreateFunc: method is nil but RkeK8sSystemImageInterface.Create was just called")
 	}
 	callInfo := struct {
-		In1 *v3.RKEK8sSystemImage
+		In1 *v3.RkeK8sSystemImage
 	}{
 		In1: in1,
 	}
-	lockRKEK8sSystemImageInterfaceMockCreate.Lock()
+	lockRkeK8sSystemImageInterfaceMockCreate.Lock()
 	mock.calls.Create = append(mock.calls.Create, callInfo)
-	lockRKEK8sSystemImageInterfaceMockCreate.Unlock()
+	lockRkeK8sSystemImageInterfaceMockCreate.Unlock()
 	return mock.CreateFunc(in1)
 }
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.CreateCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) CreateCalls() []struct {
-	In1 *v3.RKEK8sSystemImage
+//     len(mockedRkeK8sSystemImageInterface.CreateCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) CreateCalls() []struct {
+	In1 *v3.RkeK8sSystemImage
 } {
 	var calls []struct {
-		In1 *v3.RKEK8sSystemImage
+		In1 *v3.RkeK8sSystemImage
 	}
-	lockRKEK8sSystemImageInterfaceMockCreate.RLock()
+	lockRkeK8sSystemImageInterfaceMockCreate.RLock()
 	calls = mock.calls.Create
-	lockRKEK8sSystemImageInterfaceMockCreate.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockCreate.RUnlock()
 	return calls
 }
 
 // Delete calls DeleteFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
+func (mock *RkeK8sSystemImageInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
 	if mock.DeleteFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.DeleteFunc: method is nil but RKEK8sSystemImageInterface.Delete was just called")
+		panic("RkeK8sSystemImageInterfaceMock.DeleteFunc: method is nil but RkeK8sSystemImageInterface.Delete was just called")
 	}
 	callInfo := struct {
 		Name    string
@@ -1451,16 +1359,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) Delete(name string, options *v1.Dele
 		Name:    name,
 		Options: options,
 	}
-	lockRKEK8sSystemImageInterfaceMockDelete.Lock()
+	lockRkeK8sSystemImageInterfaceMockDelete.Lock()
 	mock.calls.Delete = append(mock.calls.Delete, callInfo)
-	lockRKEK8sSystemImageInterfaceMockDelete.Unlock()
+	lockRkeK8sSystemImageInterfaceMockDelete.Unlock()
 	return mock.DeleteFunc(name, options)
 }
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.DeleteCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) DeleteCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.DeleteCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *v1.DeleteOptions
 } {
@@ -1468,16 +1376,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) DeleteCalls() []struct {
 		Name    string
 		Options *v1.DeleteOptions
 	}
-	lockRKEK8sSystemImageInterfaceMockDelete.RLock()
+	lockRkeK8sSystemImageInterfaceMockDelete.RLock()
 	calls = mock.calls.Delete
-	lockRKEK8sSystemImageInterfaceMockDelete.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockDelete.RUnlock()
 	return calls
 }
 
 // DeleteCollection calls DeleteCollectionFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (mock *RkeK8sSystemImageInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
 	if mock.DeleteCollectionFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.DeleteCollectionFunc: method is nil but RKEK8sSystemImageInterface.DeleteCollection was just called")
+		panic("RkeK8sSystemImageInterfaceMock.DeleteCollectionFunc: method is nil but RkeK8sSystemImageInterface.DeleteCollection was just called")
 	}
 	callInfo := struct {
 		DeleteOpts *v1.DeleteOptions
@@ -1486,16 +1394,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) DeleteCollection(deleteOpts *v1.Dele
 		DeleteOpts: deleteOpts,
 		ListOpts:   listOpts,
 	}
-	lockRKEK8sSystemImageInterfaceMockDeleteCollection.Lock()
+	lockRkeK8sSystemImageInterfaceMockDeleteCollection.Lock()
 	mock.calls.DeleteCollection = append(mock.calls.DeleteCollection, callInfo)
-	lockRKEK8sSystemImageInterfaceMockDeleteCollection.Unlock()
+	lockRkeK8sSystemImageInterfaceMockDeleteCollection.Unlock()
 	return mock.DeleteCollectionFunc(deleteOpts, listOpts)
 }
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.DeleteCollectionCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) DeleteCollectionCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.DeleteCollectionCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *v1.DeleteOptions
 	ListOpts   v1.ListOptions
 } {
@@ -1503,16 +1411,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) DeleteCollectionCalls() []struct {
 		DeleteOpts *v1.DeleteOptions
 		ListOpts   v1.ListOptions
 	}
-	lockRKEK8sSystemImageInterfaceMockDeleteCollection.RLock()
+	lockRkeK8sSystemImageInterfaceMockDeleteCollection.RLock()
 	calls = mock.calls.DeleteCollection
-	lockRKEK8sSystemImageInterfaceMockDeleteCollection.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockDeleteCollection.RUnlock()
 	return calls
 }
 
 // DeleteNamespaced calls DeleteNamespacedFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
+func (mock *RkeK8sSystemImageInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
 	if mock.DeleteNamespacedFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.DeleteNamespacedFunc: method is nil but RKEK8sSystemImageInterface.DeleteNamespaced was just called")
+		panic("RkeK8sSystemImageInterfaceMock.DeleteNamespacedFunc: method is nil but RkeK8sSystemImageInterface.DeleteNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1523,16 +1431,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) DeleteNamespaced(namespace string, n
 		Name:      name,
 		Options:   options,
 	}
-	lockRKEK8sSystemImageInterfaceMockDeleteNamespaced.Lock()
+	lockRkeK8sSystemImageInterfaceMockDeleteNamespaced.Lock()
 	mock.calls.DeleteNamespaced = append(mock.calls.DeleteNamespaced, callInfo)
-	lockRKEK8sSystemImageInterfaceMockDeleteNamespaced.Unlock()
+	lockRkeK8sSystemImageInterfaceMockDeleteNamespaced.Unlock()
 	return mock.DeleteNamespacedFunc(namespace, name, options)
 }
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.DeleteNamespacedCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) DeleteNamespacedCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.DeleteNamespacedCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Options   *v1.DeleteOptions
@@ -1542,16 +1450,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) DeleteNamespacedCalls() []struct {
 		Name      string
 		Options   *v1.DeleteOptions
 	}
-	lockRKEK8sSystemImageInterfaceMockDeleteNamespaced.RLock()
+	lockRkeK8sSystemImageInterfaceMockDeleteNamespaced.RLock()
 	calls = mock.calls.DeleteNamespaced
-	lockRKEK8sSystemImageInterfaceMockDeleteNamespaced.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockDeleteNamespaced.RUnlock()
 	return calls
 }
 
 // Get calls GetFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.RKEK8sSystemImage, error) {
+func (mock *RkeK8sSystemImageInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.RkeK8sSystemImage, error) {
 	if mock.GetFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.GetFunc: method is nil but RKEK8sSystemImageInterface.Get was just called")
+		panic("RkeK8sSystemImageInterfaceMock.GetFunc: method is nil but RkeK8sSystemImageInterface.Get was just called")
 	}
 	callInfo := struct {
 		Name string
@@ -1560,16 +1468,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) Get(name string, opts v1.GetOptions)
 		Name: name,
 		Opts: opts,
 	}
-	lockRKEK8sSystemImageInterfaceMockGet.Lock()
+	lockRkeK8sSystemImageInterfaceMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockRKEK8sSystemImageInterfaceMockGet.Unlock()
+	lockRkeK8sSystemImageInterfaceMockGet.Unlock()
 	return mock.GetFunc(name, opts)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.GetCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) GetCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.GetCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts v1.GetOptions
 } {
@@ -1577,16 +1485,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) GetCalls() []struct {
 		Name string
 		Opts v1.GetOptions
 	}
-	lockRKEK8sSystemImageInterfaceMockGet.RLock()
+	lockRkeK8sSystemImageInterfaceMockGet.RLock()
 	calls = mock.calls.Get
-	lockRKEK8sSystemImageInterfaceMockGet.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockGet.RUnlock()
 	return calls
 }
 
 // GetNamespaced calls GetNamespacedFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.RKEK8sSystemImage, error) {
+func (mock *RkeK8sSystemImageInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.RkeK8sSystemImage, error) {
 	if mock.GetNamespacedFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.GetNamespacedFunc: method is nil but RKEK8sSystemImageInterface.GetNamespaced was just called")
+		panic("RkeK8sSystemImageInterfaceMock.GetNamespacedFunc: method is nil but RkeK8sSystemImageInterface.GetNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1597,16 +1505,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) GetNamespaced(namespace string, name
 		Name:      name,
 		Opts:      opts,
 	}
-	lockRKEK8sSystemImageInterfaceMockGetNamespaced.Lock()
+	lockRkeK8sSystemImageInterfaceMockGetNamespaced.Lock()
 	mock.calls.GetNamespaced = append(mock.calls.GetNamespaced, callInfo)
-	lockRKEK8sSystemImageInterfaceMockGetNamespaced.Unlock()
+	lockRkeK8sSystemImageInterfaceMockGetNamespaced.Unlock()
 	return mock.GetNamespacedFunc(namespace, name, opts)
 }
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.GetNamespacedCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) GetNamespacedCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.GetNamespacedCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Opts      v1.GetOptions
@@ -1616,47 +1524,47 @@ func (mock *RKEK8sSystemImageInterfaceMock) GetNamespacedCalls() []struct {
 		Name      string
 		Opts      v1.GetOptions
 	}
-	lockRKEK8sSystemImageInterfaceMockGetNamespaced.RLock()
+	lockRkeK8sSystemImageInterfaceMockGetNamespaced.RLock()
 	calls = mock.calls.GetNamespaced
-	lockRKEK8sSystemImageInterfaceMockGetNamespaced.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockGetNamespaced.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) List(opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error) {
+func (mock *RkeK8sSystemImageInterfaceMock) List(opts v1.ListOptions) (*v3.RkeK8sSystemImageList, error) {
 	if mock.ListFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.ListFunc: method is nil but RKEK8sSystemImageInterface.List was just called")
+		panic("RkeK8sSystemImageInterfaceMock.ListFunc: method is nil but RkeK8sSystemImageInterface.List was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockRKEK8sSystemImageInterfaceMockList.Lock()
+	lockRkeK8sSystemImageInterfaceMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockRKEK8sSystemImageInterfaceMockList.Unlock()
+	lockRkeK8sSystemImageInterfaceMockList.Unlock()
 	return mock.ListFunc(opts)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.ListCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) ListCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.ListCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) ListCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockRKEK8sSystemImageInterfaceMockList.RLock()
+	lockRkeK8sSystemImageInterfaceMockList.RLock()
 	calls = mock.calls.List
-	lockRKEK8sSystemImageInterfaceMockList.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockList.RUnlock()
 	return calls
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error) {
+func (mock *RkeK8sSystemImageInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.RkeK8sSystemImageList, error) {
 	if mock.ListNamespacedFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.ListNamespacedFunc: method is nil but RKEK8sSystemImageInterface.ListNamespaced was just called")
+		panic("RkeK8sSystemImageInterfaceMock.ListNamespacedFunc: method is nil but RkeK8sSystemImageInterface.ListNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1665,16 +1573,16 @@ func (mock *RKEK8sSystemImageInterfaceMock) ListNamespaced(namespace string, opt
 		Namespace: namespace,
 		Opts:      opts,
 	}
-	lockRKEK8sSystemImageInterfaceMockListNamespaced.Lock()
+	lockRkeK8sSystemImageInterfaceMockListNamespaced.Lock()
 	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
-	lockRKEK8sSystemImageInterfaceMockListNamespaced.Unlock()
+	lockRkeK8sSystemImageInterfaceMockListNamespaced.Unlock()
 	return mock.ListNamespacedFunc(namespace, opts)
 }
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.ListNamespacedCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) ListNamespacedCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.ListNamespacedCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      v1.ListOptions
 } {
@@ -1682,164 +1590,164 @@ func (mock *RKEK8sSystemImageInterfaceMock) ListNamespacedCalls() []struct {
 		Namespace string
 		Opts      v1.ListOptions
 	}
-	lockRKEK8sSystemImageInterfaceMockListNamespaced.RLock()
+	lockRkeK8sSystemImageInterfaceMockListNamespaced.RLock()
 	calls = mock.calls.ListNamespaced
-	lockRKEK8sSystemImageInterfaceMockListNamespaced.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 
 // ObjectClient calls ObjectClientFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) ObjectClient() *objectclient.ObjectClient {
+func (mock *RkeK8sSystemImageInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 	if mock.ObjectClientFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.ObjectClientFunc: method is nil but RKEK8sSystemImageInterface.ObjectClient was just called")
+		panic("RkeK8sSystemImageInterfaceMock.ObjectClientFunc: method is nil but RkeK8sSystemImageInterface.ObjectClient was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sSystemImageInterfaceMockObjectClient.Lock()
+	lockRkeK8sSystemImageInterfaceMockObjectClient.Lock()
 	mock.calls.ObjectClient = append(mock.calls.ObjectClient, callInfo)
-	lockRKEK8sSystemImageInterfaceMockObjectClient.Unlock()
+	lockRkeK8sSystemImageInterfaceMockObjectClient.Unlock()
 	return mock.ObjectClientFunc()
 }
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.ObjectClientCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) ObjectClientCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.ObjectClientCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sSystemImageInterfaceMockObjectClient.RLock()
+	lockRkeK8sSystemImageInterfaceMockObjectClient.RLock()
 	calls = mock.calls.ObjectClient
-	lockRKEK8sSystemImageInterfaceMockObjectClient.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockObjectClient.RUnlock()
 	return calls
 }
 
 // Update calls UpdateFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) Update(in1 *v3.RKEK8sSystemImage) (*v3.RKEK8sSystemImage, error) {
+func (mock *RkeK8sSystemImageInterfaceMock) Update(in1 *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error) {
 	if mock.UpdateFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.UpdateFunc: method is nil but RKEK8sSystemImageInterface.Update was just called")
+		panic("RkeK8sSystemImageInterfaceMock.UpdateFunc: method is nil but RkeK8sSystemImageInterface.Update was just called")
 	}
 	callInfo := struct {
-		In1 *v3.RKEK8sSystemImage
+		In1 *v3.RkeK8sSystemImage
 	}{
 		In1: in1,
 	}
-	lockRKEK8sSystemImageInterfaceMockUpdate.Lock()
+	lockRkeK8sSystemImageInterfaceMockUpdate.Lock()
 	mock.calls.Update = append(mock.calls.Update, callInfo)
-	lockRKEK8sSystemImageInterfaceMockUpdate.Unlock()
+	lockRkeK8sSystemImageInterfaceMockUpdate.Unlock()
 	return mock.UpdateFunc(in1)
 }
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.UpdateCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) UpdateCalls() []struct {
-	In1 *v3.RKEK8sSystemImage
+//     len(mockedRkeK8sSystemImageInterface.UpdateCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) UpdateCalls() []struct {
+	In1 *v3.RkeK8sSystemImage
 } {
 	var calls []struct {
-		In1 *v3.RKEK8sSystemImage
+		In1 *v3.RkeK8sSystemImage
 	}
-	lockRKEK8sSystemImageInterfaceMockUpdate.RLock()
+	lockRkeK8sSystemImageInterfaceMockUpdate.RLock()
 	calls = mock.calls.Update
-	lockRKEK8sSystemImageInterfaceMockUpdate.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockUpdate.RUnlock()
 	return calls
 }
 
 // Watch calls WatchFunc.
-func (mock *RKEK8sSystemImageInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (mock *RkeK8sSystemImageInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	if mock.WatchFunc == nil {
-		panic("RKEK8sSystemImageInterfaceMock.WatchFunc: method is nil but RKEK8sSystemImageInterface.Watch was just called")
+		panic("RkeK8sSystemImageInterfaceMock.WatchFunc: method is nil but RkeK8sSystemImageInterface.Watch was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockRKEK8sSystemImageInterfaceMockWatch.Lock()
+	lockRkeK8sSystemImageInterfaceMockWatch.Lock()
 	mock.calls.Watch = append(mock.calls.Watch, callInfo)
-	lockRKEK8sSystemImageInterfaceMockWatch.Unlock()
+	lockRkeK8sSystemImageInterfaceMockWatch.Unlock()
 	return mock.WatchFunc(opts)
 }
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedRKEK8sSystemImageInterface.WatchCalls())
-func (mock *RKEK8sSystemImageInterfaceMock) WatchCalls() []struct {
+//     len(mockedRkeK8sSystemImageInterface.WatchCalls())
+func (mock *RkeK8sSystemImageInterfaceMock) WatchCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockRKEK8sSystemImageInterfaceMockWatch.RLock()
+	lockRkeK8sSystemImageInterfaceMockWatch.RLock()
 	calls = mock.calls.Watch
-	lockRKEK8sSystemImageInterfaceMockWatch.RUnlock()
+	lockRkeK8sSystemImageInterfaceMockWatch.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEK8sSystemImagesGetterMockRKEK8sSystemImages sync.RWMutex
+	lockRkeK8sSystemImagesGetterMockRkeK8sSystemImages sync.RWMutex
 )
 
-// Ensure, that RKEK8sSystemImagesGetterMock does implement RKEK8sSystemImagesGetter.
+// Ensure, that RkeK8sSystemImagesGetterMock does implement RkeK8sSystemImagesGetter.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEK8sSystemImagesGetter = &RKEK8sSystemImagesGetterMock{}
+var _ v3.RkeK8sSystemImagesGetter = &RkeK8sSystemImagesGetterMock{}
 
-// RKEK8sSystemImagesGetterMock is a mock implementation of RKEK8sSystemImagesGetter.
+// RkeK8sSystemImagesGetterMock is a mock implementation of RkeK8sSystemImagesGetter.
 //
-//     func TestSomethingThatUsesRKEK8sSystemImagesGetter(t *testing.T) {
+//     func TestSomethingThatUsesRkeK8sSystemImagesGetter(t *testing.T) {
 //
-//         // make and configure a mocked RKEK8sSystemImagesGetter
-//         mockedRKEK8sSystemImagesGetter := &RKEK8sSystemImagesGetterMock{
-//             RKEK8sSystemImagesFunc: func(namespace string) v3.RKEK8sSystemImageInterface {
-// 	               panic("mock out the RKEK8sSystemImages method")
+//         // make and configure a mocked RkeK8sSystemImagesGetter
+//         mockedRkeK8sSystemImagesGetter := &RkeK8sSystemImagesGetterMock{
+//             RkeK8sSystemImagesFunc: func(namespace string) v3.RkeK8sSystemImageInterface {
+// 	               panic("mock out the RkeK8sSystemImages method")
 //             },
 //         }
 //
-//         // use mockedRKEK8sSystemImagesGetter in code that requires RKEK8sSystemImagesGetter
+//         // use mockedRkeK8sSystemImagesGetter in code that requires RkeK8sSystemImagesGetter
 //         // and then make assertions.
 //
 //     }
-type RKEK8sSystemImagesGetterMock struct {
-	// RKEK8sSystemImagesFunc mocks the RKEK8sSystemImages method.
-	RKEK8sSystemImagesFunc func(namespace string) v3.RKEK8sSystemImageInterface
+type RkeK8sSystemImagesGetterMock struct {
+	// RkeK8sSystemImagesFunc mocks the RkeK8sSystemImages method.
+	RkeK8sSystemImagesFunc func(namespace string) v3.RkeK8sSystemImageInterface
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// RKEK8sSystemImages holds details about calls to the RKEK8sSystemImages method.
-		RKEK8sSystemImages []struct {
+		// RkeK8sSystemImages holds details about calls to the RkeK8sSystemImages method.
+		RkeK8sSystemImages []struct {
 			// Namespace is the namespace argument value.
 			Namespace string
 		}
 	}
 }
 
-// RKEK8sSystemImages calls RKEK8sSystemImagesFunc.
-func (mock *RKEK8sSystemImagesGetterMock) RKEK8sSystemImages(namespace string) v3.RKEK8sSystemImageInterface {
-	if mock.RKEK8sSystemImagesFunc == nil {
-		panic("RKEK8sSystemImagesGetterMock.RKEK8sSystemImagesFunc: method is nil but RKEK8sSystemImagesGetter.RKEK8sSystemImages was just called")
+// RkeK8sSystemImages calls RkeK8sSystemImagesFunc.
+func (mock *RkeK8sSystemImagesGetterMock) RkeK8sSystemImages(namespace string) v3.RkeK8sSystemImageInterface {
+	if mock.RkeK8sSystemImagesFunc == nil {
+		panic("RkeK8sSystemImagesGetterMock.RkeK8sSystemImagesFunc: method is nil but RkeK8sSystemImagesGetter.RkeK8sSystemImages was just called")
 	}
 	callInfo := struct {
 		Namespace string
 	}{
 		Namespace: namespace,
 	}
-	lockRKEK8sSystemImagesGetterMockRKEK8sSystemImages.Lock()
-	mock.calls.RKEK8sSystemImages = append(mock.calls.RKEK8sSystemImages, callInfo)
-	lockRKEK8sSystemImagesGetterMockRKEK8sSystemImages.Unlock()
-	return mock.RKEK8sSystemImagesFunc(namespace)
+	lockRkeK8sSystemImagesGetterMockRkeK8sSystemImages.Lock()
+	mock.calls.RkeK8sSystemImages = append(mock.calls.RkeK8sSystemImages, callInfo)
+	lockRkeK8sSystemImagesGetterMockRkeK8sSystemImages.Unlock()
+	return mock.RkeK8sSystemImagesFunc(namespace)
 }
 
-// RKEK8sSystemImagesCalls gets all the calls that were made to RKEK8sSystemImages.
+// RkeK8sSystemImagesCalls gets all the calls that were made to RkeK8sSystemImages.
 // Check the length with:
-//     len(mockedRKEK8sSystemImagesGetter.RKEK8sSystemImagesCalls())
-func (mock *RKEK8sSystemImagesGetterMock) RKEK8sSystemImagesCalls() []struct {
+//     len(mockedRkeK8sSystemImagesGetter.RkeK8sSystemImagesCalls())
+func (mock *RkeK8sSystemImagesGetterMock) RkeK8sSystemImagesCalls() []struct {
 	Namespace string
 } {
 	var calls []struct {
 		Namespace string
 	}
-	lockRKEK8sSystemImagesGetterMockRKEK8sSystemImages.RLock()
-	calls = mock.calls.RKEK8sSystemImages
-	lockRKEK8sSystemImagesGetterMockRKEK8sSystemImages.RUnlock()
+	lockRkeK8sSystemImagesGetterMockRkeK8sSystemImages.RLock()
+	calls = mock.calls.RkeK8sSystemImages
+	lockRkeK8sSystemImagesGetterMockRkeK8sSystemImages.RUnlock()
 	return calls
 }

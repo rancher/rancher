@@ -5,8 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/rancher/steve/pkg/server/resources/schemas"
-
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/client"
@@ -18,6 +16,7 @@ import (
 	"github.com/rancher/steve/pkg/server/handler"
 	"github.com/rancher/steve/pkg/server/resources"
 	"github.com/rancher/steve/pkg/server/resources/common"
+	"github.com/rancher/steve/pkg/server/resources/schemas"
 )
 
 var ErrConfigRequired = errors.New("rest config is required")
@@ -29,7 +28,7 @@ func setDefaults(server *Server) error {
 
 	if server.Controllers == nil {
 		var err error
-		server.Controllers, err = NewController(server.RestConfig)
+		server.Controllers, err = NewController(server.RestConfig, nil)
 		if err != nil {
 			return err
 		}

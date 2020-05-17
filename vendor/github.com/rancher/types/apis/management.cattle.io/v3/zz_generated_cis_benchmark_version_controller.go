@@ -74,8 +74,6 @@ type CisBenchmarkVersionController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CisBenchmarkVersionHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type CisBenchmarkVersionInterface interface {
@@ -126,7 +124,7 @@ func (l *cisBenchmarkVersionLister) Get(namespace, name string) (*CisBenchmarkVe
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CisBenchmarkVersionGroupVersionKind.Group,
-			Resource: "cisBenchmarkVersion",
+			Resource: CisBenchmarkVersionGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*CisBenchmarkVersion), nil
@@ -210,25 +208,12 @@ func (c cisBenchmarkVersionFactory) List() runtime.Object {
 }
 
 func (s *cisBenchmarkVersionClient) Controller() CisBenchmarkVersionController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.cisBenchmarkVersionControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(CisBenchmarkVersionGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(CisBenchmarkVersionGroupVersionResource, CisBenchmarkVersionGroupVersionKind.Kind, true))
 
-	c = &cisBenchmarkVersionController{
+	return &cisBenchmarkVersionController{
 		GenericController: genericController,
 	}
-
-	s.client.cisBenchmarkVersionControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type cisBenchmarkVersionClient struct {
@@ -259,6 +244,11 @@ func (s *cisBenchmarkVersionClient) GetNamespaced(namespace, name string, opts m
 
 func (s *cisBenchmarkVersionClient) Update(o *CisBenchmarkVersion) (*CisBenchmarkVersion, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*CisBenchmarkVersion), err
+}
+
+func (s *cisBenchmarkVersionClient) UpdateStatus(o *CisBenchmarkVersion) (*CisBenchmarkVersion, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*CisBenchmarkVersion), err
 }
 

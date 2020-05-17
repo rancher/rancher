@@ -1,63 +1,25 @@
 package v1
 
 import (
-	"context"
-	"sync"
-
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/objectclient/dynamic"
-	"github.com/rancher/norman/restwatch"
-	"k8s.io/client-go/rest"
-)
-
-type (
-	contextKeyType        struct{}
-	contextClientsKeyType struct{}
 )
 
 type Interface interface {
-	RESTClient() rest.Interface
-	controller.Starter
-
 	APIServicesGetter
 }
 
 type Client struct {
-	sync.Mutex
-	restClient rest.Interface
-	starters   []controller.Starter
-
-	apiServiceControllers map[string]APIServiceController
+	controllerFactory controller.SharedControllerFactory
+	clientFactory     client.SharedClientFactory
 }
 
-func NewForConfig(config rest.Config) (Interface, error) {
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = dynamic.NegotiatedSerializer
-	}
-
-	restClient, err := restwatch.UnversionedRESTClientFor(&config)
-	if err != nil {
-		return nil, err
-	}
-
+func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
 	return &Client{
-		restClient: restClient,
-
-		apiServiceControllers: map[string]APIServiceController{},
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
 	}, nil
-}
-
-func (c *Client) RESTClient() rest.Interface {
-	return c.restClient
-}
-
-func (c *Client) Sync(ctx context.Context) error {
-	return controller.Sync(ctx, c.starters...)
-}
-
-func (c *Client) Start(ctx context.Context, threadiness int) error {
-	return controller.Start(ctx, threadiness, c.starters...)
 }
 
 type APIServicesGetter interface {
@@ -65,7 +27,8 @@ type APIServicesGetter interface {
 }
 
 func (c *Client) APIServices(namespace string) APIServiceInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &APIServiceResource, APIServiceGroupVersionKind, apiServiceFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(APIServiceGroupVersionResource, APIServiceGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &APIServiceResource, APIServiceGroupVersionKind, apiServiceFactory{})
 	return &apiServiceClient{
 		ns:           namespace,
 		client:       c,

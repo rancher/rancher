@@ -74,8 +74,6 @@ type PipelineSettingController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PipelineSettingHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PipelineSettingInterface interface {
@@ -126,7 +124,7 @@ func (l *pipelineSettingLister) Get(namespace, name string) (*PipelineSetting, e
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PipelineSettingGroupVersionKind.Group,
-			Resource: "pipelineSetting",
+			Resource: PipelineSettingGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*PipelineSetting), nil
@@ -210,25 +208,12 @@ func (c pipelineSettingFactory) List() runtime.Object {
 }
 
 func (s *pipelineSettingClient) Controller() PipelineSettingController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.pipelineSettingControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PipelineSettingGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PipelineSettingGroupVersionResource, PipelineSettingGroupVersionKind.Kind, true))
 
-	c = &pipelineSettingController{
+	return &pipelineSettingController{
 		GenericController: genericController,
 	}
-
-	s.client.pipelineSettingControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type pipelineSettingClient struct {
@@ -259,6 +244,11 @@ func (s *pipelineSettingClient) GetNamespaced(namespace, name string, opts metav
 
 func (s *pipelineSettingClient) Update(o *PipelineSetting) (*PipelineSetting, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*PipelineSetting), err
+}
+
+func (s *pipelineSettingClient) UpdateStatus(o *PipelineSetting) (*PipelineSetting, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*PipelineSetting), err
 }
 

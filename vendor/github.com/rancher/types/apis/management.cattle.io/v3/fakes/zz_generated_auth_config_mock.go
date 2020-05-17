@@ -150,8 +150,6 @@ var (
 	lockAuthConfigControllerMockGeneric                        sync.RWMutex
 	lockAuthConfigControllerMockInformer                       sync.RWMutex
 	lockAuthConfigControllerMockLister                         sync.RWMutex
-	lockAuthConfigControllerMockStart                          sync.RWMutex
-	lockAuthConfigControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that AuthConfigControllerMock does implement AuthConfigController.
@@ -191,12 +189,6 @@ var _ v3.AuthConfigController = &AuthConfigControllerMock{}
 //             ListerFunc: func() v3.AuthConfigLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedAuthConfigController in code that requires AuthConfigController
@@ -230,12 +222,6 @@ type AuthConfigControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.AuthConfigLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type AuthConfigControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *AuthConfigControllerMock) ListerCalls() []struct {
 	lockAuthConfigControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockAuthConfigControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *AuthConfigControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("AuthConfigControllerMock.StartFunc: method is nil but AuthConfigController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockAuthConfigControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockAuthConfigControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedAuthConfigController.StartCalls())
-func (mock *AuthConfigControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockAuthConfigControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockAuthConfigControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *AuthConfigControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("AuthConfigControllerMock.SyncFunc: method is nil but AuthConfigController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockAuthConfigControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockAuthConfigControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedAuthConfigController.SyncCalls())
-func (mock *AuthConfigControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockAuthConfigControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockAuthConfigControllerMockSync.RUnlock()
 	return calls
 }
 

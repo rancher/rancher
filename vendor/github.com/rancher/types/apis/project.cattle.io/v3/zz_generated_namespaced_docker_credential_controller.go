@@ -74,8 +74,6 @@ type NamespacedDockerCredentialController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NamespacedDockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NamespacedDockerCredentialInterface interface {
@@ -126,7 +124,7 @@ func (l *namespacedDockerCredentialLister) Get(namespace, name string) (*Namespa
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespacedDockerCredentialGroupVersionKind.Group,
-			Resource: "namespacedDockerCredential",
+			Resource: NamespacedDockerCredentialGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*NamespacedDockerCredential), nil
@@ -210,25 +208,12 @@ func (c namespacedDockerCredentialFactory) List() runtime.Object {
 }
 
 func (s *namespacedDockerCredentialClient) Controller() NamespacedDockerCredentialController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.namespacedDockerCredentialControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NamespacedDockerCredentialGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NamespacedDockerCredentialGroupVersionResource, NamespacedDockerCredentialGroupVersionKind.Kind, true))
 
-	c = &namespacedDockerCredentialController{
+	return &namespacedDockerCredentialController{
 		GenericController: genericController,
 	}
-
-	s.client.namespacedDockerCredentialControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type namespacedDockerCredentialClient struct {
@@ -259,6 +244,11 @@ func (s *namespacedDockerCredentialClient) GetNamespaced(namespace, name string,
 
 func (s *namespacedDockerCredentialClient) Update(o *NamespacedDockerCredential) (*NamespacedDockerCredential, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*NamespacedDockerCredential), err
+}
+
+func (s *namespacedDockerCredentialClient) UpdateStatus(o *NamespacedDockerCredential) (*NamespacedDockerCredential, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*NamespacedDockerCredential), err
 }
 

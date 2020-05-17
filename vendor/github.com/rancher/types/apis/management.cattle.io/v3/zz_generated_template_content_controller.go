@@ -73,8 +73,6 @@ type TemplateContentController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler TemplateContentHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type TemplateContentInterface interface {
@@ -125,7 +123,7 @@ func (l *templateContentLister) Get(namespace, name string) (*TemplateContent, e
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    TemplateContentGroupVersionKind.Group,
-			Resource: "templateContent",
+			Resource: TemplateContentGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*TemplateContent), nil
@@ -209,25 +207,12 @@ func (c templateContentFactory) List() runtime.Object {
 }
 
 func (s *templateContentClient) Controller() TemplateContentController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.templateContentControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(TemplateContentGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(TemplateContentGroupVersionResource, TemplateContentGroupVersionKind.Kind, false))
 
-	c = &templateContentController{
+	return &templateContentController{
 		GenericController: genericController,
 	}
-
-	s.client.templateContentControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type templateContentClient struct {
@@ -258,6 +243,11 @@ func (s *templateContentClient) GetNamespaced(namespace, name string, opts metav
 
 func (s *templateContentClient) Update(o *TemplateContent) (*TemplateContent, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*TemplateContent), err
+}
+
+func (s *templateContentClient) UpdateStatus(o *TemplateContent) (*TemplateContent, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*TemplateContent), err
 }
 

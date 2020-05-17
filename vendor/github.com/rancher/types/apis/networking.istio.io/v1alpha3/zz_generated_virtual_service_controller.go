@@ -50,12 +50,6 @@ func NewVirtualService(namespace, name string, obj v1alpha3.VirtualService) *v1a
 	return &obj
 }
 
-type VirtualServiceList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1alpha3.VirtualService `json:"items"`
-}
-
 type VirtualServiceHandlerFunc func(key string, obj *v1alpha3.VirtualService) (runtime.Object, error)
 
 type VirtualServiceChangeHandlerFunc func(obj *v1alpha3.VirtualService) (runtime.Object, error)
@@ -75,8 +69,6 @@ type VirtualServiceController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler VirtualServiceHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type VirtualServiceInterface interface {
@@ -87,8 +79,8 @@ type VirtualServiceInterface interface {
 	Update(*v1alpha3.VirtualService) (*v1alpha3.VirtualService, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*VirtualServiceList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*VirtualServiceList, error)
+	List(opts metav1.ListOptions) (*v1alpha3.VirtualServiceList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1alpha3.VirtualServiceList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() VirtualServiceController
@@ -127,7 +119,7 @@ func (l *virtualServiceLister) Get(namespace, name string) (*v1alpha3.VirtualSer
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    VirtualServiceGroupVersionKind.Group,
-			Resource: "virtualService",
+			Resource: VirtualServiceGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1alpha3.VirtualService), nil
@@ -207,29 +199,16 @@ func (c virtualServiceFactory) Object() runtime.Object {
 }
 
 func (c virtualServiceFactory) List() runtime.Object {
-	return &VirtualServiceList{}
+	return &v1alpha3.VirtualServiceList{}
 }
 
 func (s *virtualServiceClient) Controller() VirtualServiceController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.virtualServiceControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(VirtualServiceGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(VirtualServiceGroupVersionResource, VirtualServiceGroupVersionKind.Kind, true))
 
-	c = &virtualServiceController{
+	return &virtualServiceController{
 		GenericController: genericController,
 	}
-
-	s.client.virtualServiceControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type virtualServiceClient struct {
@@ -263,6 +242,11 @@ func (s *virtualServiceClient) Update(o *v1alpha3.VirtualService) (*v1alpha3.Vir
 	return obj.(*v1alpha3.VirtualService), err
 }
 
+func (s *virtualServiceClient) UpdateStatus(o *v1alpha3.VirtualService) (*v1alpha3.VirtualService, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1alpha3.VirtualService), err
+}
+
 func (s *virtualServiceClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *virtualServiceClient) DeleteNamespaced(namespace, name string, options 
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *virtualServiceClient) List(opts metav1.ListOptions) (*VirtualServiceList, error) {
+func (s *virtualServiceClient) List(opts metav1.ListOptions) (*v1alpha3.VirtualServiceList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*VirtualServiceList), err
+	return obj.(*v1alpha3.VirtualServiceList), err
 }
 
-func (s *virtualServiceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*VirtualServiceList, error) {
+func (s *virtualServiceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1alpha3.VirtualServiceList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*VirtualServiceList), err
+	return obj.(*v1alpha3.VirtualServiceList), err
 }
 
 func (s *virtualServiceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

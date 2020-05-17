@@ -73,8 +73,6 @@ type UserController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler UserHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type UserInterface interface {
@@ -125,7 +123,7 @@ func (l *userLister) Get(namespace, name string) (*User, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    UserGroupVersionKind.Group,
-			Resource: "user",
+			Resource: UserGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*User), nil
@@ -209,25 +207,12 @@ func (c userFactory) List() runtime.Object {
 }
 
 func (s *userClient) Controller() UserController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.userControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(UserGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(UserGroupVersionResource, UserGroupVersionKind.Kind, false))
 
-	c = &userController{
+	return &userController{
 		GenericController: genericController,
 	}
-
-	s.client.userControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type userClient struct {
@@ -258,6 +243,11 @@ func (s *userClient) GetNamespaced(namespace, name string, opts metav1.GetOption
 
 func (s *userClient) Update(o *User) (*User, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*User), err
+}
+
+func (s *userClient) UpdateStatus(o *User) (*User, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*User), err
 }
 

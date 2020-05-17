@@ -50,12 +50,6 @@ func NewRole(namespace, name string, obj v1.Role) *v1.Role {
 	return &obj
 }
 
-type RoleList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Role `json:"items"`
-}
-
 type RoleHandlerFunc func(key string, obj *v1.Role) (runtime.Object, error)
 
 type RoleChangeHandlerFunc func(obj *v1.Role) (runtime.Object, error)
@@ -75,8 +69,6 @@ type RoleController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler RoleHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type RoleInterface interface {
@@ -87,8 +79,8 @@ type RoleInterface interface {
 	Update(*v1.Role) (*v1.Role, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*RoleList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*RoleList, error)
+	List(opts metav1.ListOptions) (*v1.RoleList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.RoleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleController
@@ -127,7 +119,7 @@ func (l *roleLister) Get(namespace, name string) (*v1.Role, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    RoleGroupVersionKind.Group,
-			Resource: "role",
+			Resource: RoleGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Role), nil
@@ -207,29 +199,16 @@ func (c roleFactory) Object() runtime.Object {
 }
 
 func (c roleFactory) List() runtime.Object {
-	return &RoleList{}
+	return &v1.RoleList{}
 }
 
 func (s *roleClient) Controller() RoleController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.roleControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(RoleGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(RoleGroupVersionResource, RoleGroupVersionKind.Kind, true))
 
-	c = &roleController{
+	return &roleController{
 		GenericController: genericController,
 	}
-
-	s.client.roleControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type roleClient struct {
@@ -263,6 +242,11 @@ func (s *roleClient) Update(o *v1.Role) (*v1.Role, error) {
 	return obj.(*v1.Role), err
 }
 
+func (s *roleClient) UpdateStatus(o *v1.Role) (*v1.Role, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Role), err
+}
+
 func (s *roleClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *roleClient) DeleteNamespaced(namespace, name string, options *metav1.De
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *roleClient) List(opts metav1.ListOptions) (*RoleList, error) {
+func (s *roleClient) List(opts metav1.ListOptions) (*v1.RoleList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*RoleList), err
+	return obj.(*v1.RoleList), err
 }
 
-func (s *roleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*RoleList, error) {
+func (s *roleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.RoleList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*RoleList), err
+	return obj.(*v1.RoleList), err
 }
 
 func (s *roleClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

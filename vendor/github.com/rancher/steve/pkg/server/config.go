@@ -19,6 +19,7 @@ import (
 	corev1 "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/rbac"
 	rbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/ratelimit"
 	"github.com/rancher/wrangler/pkg/start"
 	"k8s.io/client-go/kubernetes"
@@ -64,28 +65,28 @@ func RestConfigDefaults(cfg *rest.Config) *rest.Config {
 	return cfg
 }
 
-func NewController(cfg *rest.Config) (*Controllers, error) {
+func NewController(cfg *rest.Config, opts *generic.FactoryOptions) (*Controllers, error) {
 	c := &Controllers{}
 
-	core, err := core.NewFactoryFromConfig(cfg)
+	core, err := core.NewFactoryFromConfigWithOptions(cfg, opts)
 	if err != nil {
 		return nil, err
 	}
 	c.starters = append(c.starters, core)
 
-	rbac, err := rbac.NewFactoryFromConfig(cfg)
+	rbac, err := rbac.NewFactoryFromConfigWithOptions(cfg, opts)
 	if err != nil {
 		return nil, err
 	}
 	c.starters = append(c.starters, rbac)
 
-	api, err := apiregistration.NewFactoryFromConfig(cfg)
+	api, err := apiregistration.NewFactoryFromConfigWithOptions(cfg, opts)
 	if err != nil {
 		return nil, err
 	}
 	c.starters = append(c.starters, api)
 
-	crd, err := apiextensions.NewFactoryFromConfig(cfg)
+	crd, err := apiextensions.NewFactoryFromConfigWithOptions(cfg, opts)
 	if err != nil {
 		return nil, err
 	}

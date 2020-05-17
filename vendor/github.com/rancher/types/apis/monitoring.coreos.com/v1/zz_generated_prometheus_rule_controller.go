@@ -50,12 +50,6 @@ func NewPrometheusRule(namespace, name string, obj v1.PrometheusRule) *v1.Promet
 	return &obj
 }
 
-type PrometheusRuleList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.PrometheusRule `json:"items"`
-}
-
 type PrometheusRuleHandlerFunc func(key string, obj *v1.PrometheusRule) (runtime.Object, error)
 
 type PrometheusRuleChangeHandlerFunc func(obj *v1.PrometheusRule) (runtime.Object, error)
@@ -75,8 +69,6 @@ type PrometheusRuleController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PrometheusRuleHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PrometheusRuleInterface interface {
@@ -87,8 +79,8 @@ type PrometheusRuleInterface interface {
 	Update(*v1.PrometheusRule) (*v1.PrometheusRule, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*PrometheusRuleList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*PrometheusRuleList, error)
+	List(opts metav1.ListOptions) (*v1.PrometheusRuleList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.PrometheusRuleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PrometheusRuleController
@@ -127,7 +119,7 @@ func (l *prometheusRuleLister) Get(namespace, name string) (*v1.PrometheusRule, 
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PrometheusRuleGroupVersionKind.Group,
-			Resource: "prometheusRule",
+			Resource: PrometheusRuleGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.PrometheusRule), nil
@@ -207,29 +199,16 @@ func (c prometheusRuleFactory) Object() runtime.Object {
 }
 
 func (c prometheusRuleFactory) List() runtime.Object {
-	return &PrometheusRuleList{}
+	return &v1.PrometheusRuleList{}
 }
 
 func (s *prometheusRuleClient) Controller() PrometheusRuleController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.prometheusRuleControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PrometheusRuleGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PrometheusRuleGroupVersionResource, PrometheusRuleGroupVersionKind.Kind, true))
 
-	c = &prometheusRuleController{
+	return &prometheusRuleController{
 		GenericController: genericController,
 	}
-
-	s.client.prometheusRuleControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type prometheusRuleClient struct {
@@ -263,6 +242,11 @@ func (s *prometheusRuleClient) Update(o *v1.PrometheusRule) (*v1.PrometheusRule,
 	return obj.(*v1.PrometheusRule), err
 }
 
+func (s *prometheusRuleClient) UpdateStatus(o *v1.PrometheusRule) (*v1.PrometheusRule, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.PrometheusRule), err
+}
+
 func (s *prometheusRuleClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *prometheusRuleClient) DeleteNamespaced(namespace, name string, options 
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *prometheusRuleClient) List(opts metav1.ListOptions) (*PrometheusRuleList, error) {
+func (s *prometheusRuleClient) List(opts metav1.ListOptions) (*v1.PrometheusRuleList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*PrometheusRuleList), err
+	return obj.(*v1.PrometheusRuleList), err
 }
 
-func (s *prometheusRuleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PrometheusRuleList, error) {
+func (s *prometheusRuleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.PrometheusRuleList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*PrometheusRuleList), err
+	return obj.(*v1.PrometheusRuleList), err
 }
 
 func (s *prometheusRuleClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

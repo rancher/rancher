@@ -150,8 +150,6 @@ var (
 	lockProjectAlertRuleControllerMockGeneric                        sync.RWMutex
 	lockProjectAlertRuleControllerMockInformer                       sync.RWMutex
 	lockProjectAlertRuleControllerMockLister                         sync.RWMutex
-	lockProjectAlertRuleControllerMockStart                          sync.RWMutex
-	lockProjectAlertRuleControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ProjectAlertRuleControllerMock does implement ProjectAlertRuleController.
@@ -191,12 +189,6 @@ var _ v3.ProjectAlertRuleController = &ProjectAlertRuleControllerMock{}
 //             ListerFunc: func() v3.ProjectAlertRuleLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedProjectAlertRuleController in code that requires ProjectAlertRuleController
@@ -230,12 +222,6 @@ type ProjectAlertRuleControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.ProjectAlertRuleLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type ProjectAlertRuleControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *ProjectAlertRuleControllerMock) ListerCalls() []struct {
 	lockProjectAlertRuleControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockProjectAlertRuleControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *ProjectAlertRuleControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("ProjectAlertRuleControllerMock.StartFunc: method is nil but ProjectAlertRuleController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockProjectAlertRuleControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockProjectAlertRuleControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedProjectAlertRuleController.StartCalls())
-func (mock *ProjectAlertRuleControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockProjectAlertRuleControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockProjectAlertRuleControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *ProjectAlertRuleControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("ProjectAlertRuleControllerMock.SyncFunc: method is nil but ProjectAlertRuleController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockProjectAlertRuleControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockProjectAlertRuleControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedProjectAlertRuleController.SyncCalls())
-func (mock *ProjectAlertRuleControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockProjectAlertRuleControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockProjectAlertRuleControllerMockSync.RUnlock()
 	return calls
 }
 

@@ -26,7 +26,7 @@ import (
 )
 
 func init() {
-	v1.AddToScheme(schemes.All)
+	schemes.Register(v1.AddToScheme)
 }
 
 type Interface interface {
@@ -53,32 +53,32 @@ type version struct {
 }
 
 func (c *version) ConfigMap() ConfigMapController {
-	return NewConfigMapController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}, "configmaps", c.controllerFactory)
+	return NewConfigMapController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}, "configmaps", true, c.controllerFactory)
 }
 func (c *version) Endpoints() EndpointsController {
-	return NewEndpointsController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Endpoints"}, "endpoints", c.controllerFactory)
+	return NewEndpointsController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Endpoints"}, "endpoints", true, c.controllerFactory)
 }
 func (c *version) Event() EventController {
-	return NewEventController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}, "events", c.controllerFactory)
+	return NewEventController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}, "events", true, c.controllerFactory)
 }
 func (c *version) Namespace() NamespaceController {
-	return NewNamespaceController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}, "namespaces", c.controllerFactory)
+	return NewNamespaceController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}, "namespaces", false, c.controllerFactory)
 }
 func (c *version) Node() NodeController {
-	return NewNodeController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Node"}, "nodes", c.controllerFactory)
+	return NewNodeController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Node"}, "nodes", false, c.controllerFactory)
 }
 func (c *version) PersistentVolumeClaim() PersistentVolumeClaimController {
-	return NewPersistentVolumeClaimController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}, "persistentvolumeclaims", c.controllerFactory)
+	return NewPersistentVolumeClaimController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}, "persistentvolumeclaims", true, c.controllerFactory)
 }
 func (c *version) Pod() PodController {
-	return NewPodController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}, "pods", c.controllerFactory)
+	return NewPodController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}, "pods", true, c.controllerFactory)
 }
 func (c *version) Secret() SecretController {
-	return NewSecretController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}, "secrets", c.controllerFactory)
+	return NewSecretController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}, "secrets", true, c.controllerFactory)
 }
 func (c *version) Service() ServiceController {
-	return NewServiceController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, "services", c.controllerFactory)
+	return NewServiceController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, "services", true, c.controllerFactory)
 }
 func (c *version) ServiceAccount() ServiceAccountController {
-	return NewServiceAccountController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ServiceAccount"}, "serviceaccounts", c.controllerFactory)
+	return NewServiceAccountController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ServiceAccount"}, "serviceaccounts", true, c.controllerFactory)
 }

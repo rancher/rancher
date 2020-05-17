@@ -50,12 +50,6 @@ func NewSecret(namespace, name string, obj v1.Secret) *v1.Secret {
 	return &obj
 }
 
-type SecretList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Secret `json:"items"`
-}
-
 type SecretHandlerFunc func(key string, obj *v1.Secret) (runtime.Object, error)
 
 type SecretChangeHandlerFunc func(obj *v1.Secret) (runtime.Object, error)
@@ -75,8 +69,6 @@ type SecretController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SecretHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type SecretInterface interface {
@@ -87,8 +79,8 @@ type SecretInterface interface {
 	Update(*v1.Secret) (*v1.Secret, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*SecretList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*SecretList, error)
+	List(opts metav1.ListOptions) (*v1.SecretList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.SecretList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SecretController
@@ -127,7 +119,7 @@ func (l *secretLister) Get(namespace, name string) (*v1.Secret, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SecretGroupVersionKind.Group,
-			Resource: "secret",
+			Resource: SecretGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Secret), nil
@@ -207,29 +199,16 @@ func (c secretFactory) Object() runtime.Object {
 }
 
 func (c secretFactory) List() runtime.Object {
-	return &SecretList{}
+	return &v1.SecretList{}
 }
 
 func (s *secretClient) Controller() SecretController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.secretControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(SecretGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(SecretGroupVersionResource, SecretGroupVersionKind.Kind, true))
 
-	c = &secretController{
+	return &secretController{
 		GenericController: genericController,
 	}
-
-	s.client.secretControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type secretClient struct {
@@ -263,6 +242,11 @@ func (s *secretClient) Update(o *v1.Secret) (*v1.Secret, error) {
 	return obj.(*v1.Secret), err
 }
 
+func (s *secretClient) UpdateStatus(o *v1.Secret) (*v1.Secret, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Secret), err
+}
+
 func (s *secretClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *secretClient) DeleteNamespaced(namespace, name string, options *metav1.
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *secretClient) List(opts metav1.ListOptions) (*SecretList, error) {
+func (s *secretClient) List(opts metav1.ListOptions) (*v1.SecretList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*SecretList), err
+	return obj.(*v1.SecretList), err
 }
 
-func (s *secretClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*SecretList, error) {
+func (s *secretClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.SecretList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*SecretList), err
+	return obj.(*v1.SecretList), err
 }
 
 func (s *secretClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

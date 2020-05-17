@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -68,7 +69,7 @@ func (h *sharedHandler) OnChange(key string, obj runtime.Object) error {
 				Err:         err,
 			})
 		}
-		if newObj != nil {
+		if newObj != nil && !reflect.ValueOf(newObj).IsNil() {
 			obj = newObj
 		}
 	}

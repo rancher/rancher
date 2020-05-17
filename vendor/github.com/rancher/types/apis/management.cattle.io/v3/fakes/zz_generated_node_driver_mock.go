@@ -150,8 +150,6 @@ var (
 	lockNodeDriverControllerMockGeneric                        sync.RWMutex
 	lockNodeDriverControllerMockInformer                       sync.RWMutex
 	lockNodeDriverControllerMockLister                         sync.RWMutex
-	lockNodeDriverControllerMockStart                          sync.RWMutex
-	lockNodeDriverControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that NodeDriverControllerMock does implement NodeDriverController.
@@ -191,12 +189,6 @@ var _ v3.NodeDriverController = &NodeDriverControllerMock{}
 //             ListerFunc: func() v3.NodeDriverLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedNodeDriverController in code that requires NodeDriverController
@@ -230,12 +222,6 @@ type NodeDriverControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.NodeDriverLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type NodeDriverControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *NodeDriverControllerMock) ListerCalls() []struct {
 	lockNodeDriverControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockNodeDriverControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *NodeDriverControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("NodeDriverControllerMock.StartFunc: method is nil but NodeDriverController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockNodeDriverControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockNodeDriverControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedNodeDriverController.StartCalls())
-func (mock *NodeDriverControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockNodeDriverControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockNodeDriverControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *NodeDriverControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("NodeDriverControllerMock.SyncFunc: method is nil but NodeDriverController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockNodeDriverControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockNodeDriverControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedNodeDriverController.SyncCalls())
-func (mock *NodeDriverControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockNodeDriverControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockNodeDriverControllerMockSync.RUnlock()
 	return calls
 }
 

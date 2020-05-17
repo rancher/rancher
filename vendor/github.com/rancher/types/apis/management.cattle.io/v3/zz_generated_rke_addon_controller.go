@@ -18,20 +18,20 @@ import (
 )
 
 var (
-	RKEAddonGroupVersionKind = schema.GroupVersionKind{
+	RkeAddonGroupVersionKind = schema.GroupVersionKind{
 		Version: Version,
 		Group:   GroupName,
-		Kind:    "RKEAddon",
+		Kind:    "RkeAddon",
 	}
-	RKEAddonResource = metav1.APIResource{
+	RkeAddonResource = metav1.APIResource{
 		Name:         "rkeaddons",
 		SingularName: "rkeaddon",
 		Namespaced:   true,
 
-		Kind: RKEAddonGroupVersionKind.Kind,
+		Kind: RkeAddonGroupVersionKind.Kind,
 	}
 
-	RKEAddonGroupVersionResource = schema.GroupVersionResource{
+	RkeAddonGroupVersionResource = schema.GroupVersionResource{
 		Group:    GroupName,
 		Version:  Version,
 		Resource: "rkeaddons",
@@ -39,80 +39,78 @@ var (
 )
 
 func init() {
-	resource.Put(RKEAddonGroupVersionResource)
+	resource.Put(RkeAddonGroupVersionResource)
 }
 
-func NewRKEAddon(namespace, name string, obj RKEAddon) *RKEAddon {
-	obj.APIVersion, obj.Kind = RKEAddonGroupVersionKind.ToAPIVersionAndKind()
+func NewRkeAddon(namespace, name string, obj RkeAddon) *RkeAddon {
+	obj.APIVersion, obj.Kind = RkeAddonGroupVersionKind.ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
 }
 
-type RKEAddonList struct {
+type RkeAddonList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []RKEAddon `json:"items"`
+	Items           []RkeAddon `json:"items"`
 }
 
-type RKEAddonHandlerFunc func(key string, obj *RKEAddon) (runtime.Object, error)
+type RkeAddonHandlerFunc func(key string, obj *RkeAddon) (runtime.Object, error)
 
-type RKEAddonChangeHandlerFunc func(obj *RKEAddon) (runtime.Object, error)
+type RkeAddonChangeHandlerFunc func(obj *RkeAddon) (runtime.Object, error)
 
-type RKEAddonLister interface {
-	List(namespace string, selector labels.Selector) (ret []*RKEAddon, err error)
-	Get(namespace, name string) (*RKEAddon, error)
+type RkeAddonLister interface {
+	List(namespace string, selector labels.Selector) (ret []*RkeAddon, err error)
+	Get(namespace, name string) (*RkeAddon, error)
 }
 
-type RKEAddonController interface {
+type RkeAddonController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
-	Lister() RKEAddonLister
-	AddHandler(ctx context.Context, name string, handler RKEAddonHandlerFunc)
-	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RKEAddonHandlerFunc)
-	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler RKEAddonHandlerFunc)
-	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler RKEAddonHandlerFunc)
+	Lister() RkeAddonLister
+	AddHandler(ctx context.Context, name string, handler RkeAddonHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RkeAddonHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler RkeAddonHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler RkeAddonHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
-type RKEAddonInterface interface {
+type RkeAddonInterface interface {
 	ObjectClient() *objectclient.ObjectClient
-	Create(*RKEAddon) (*RKEAddon, error)
-	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*RKEAddon, error)
-	Get(name string, opts metav1.GetOptions) (*RKEAddon, error)
-	Update(*RKEAddon) (*RKEAddon, error)
+	Create(*RkeAddon) (*RkeAddon, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*RkeAddon, error)
+	Get(name string, opts metav1.GetOptions) (*RkeAddon, error)
+	Update(*RkeAddon) (*RkeAddon, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*RKEAddonList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*RKEAddonList, error)
+	List(opts metav1.ListOptions) (*RkeAddonList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*RkeAddonList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Controller() RKEAddonController
-	AddHandler(ctx context.Context, name string, sync RKEAddonHandlerFunc)
-	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RKEAddonHandlerFunc)
-	AddLifecycle(ctx context.Context, name string, lifecycle RKEAddonLifecycle)
-	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle RKEAddonLifecycle)
-	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RKEAddonHandlerFunc)
-	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync RKEAddonHandlerFunc)
-	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RKEAddonLifecycle)
-	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle RKEAddonLifecycle)
+	Controller() RkeAddonController
+	AddHandler(ctx context.Context, name string, sync RkeAddonHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RkeAddonHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle RkeAddonLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle RkeAddonLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RkeAddonHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync RkeAddonHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RkeAddonLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle RkeAddonLifecycle)
 }
 
 type rkeAddonLister struct {
 	controller *rkeAddonController
 }
 
-func (l *rkeAddonLister) List(namespace string, selector labels.Selector) (ret []*RKEAddon, err error) {
+func (l *rkeAddonLister) List(namespace string, selector labels.Selector) (ret []*RkeAddon, err error) {
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
-		ret = append(ret, obj.(*RKEAddon))
+		ret = append(ret, obj.(*RkeAddon))
 	})
 	return
 }
 
-func (l *rkeAddonLister) Get(namespace, name string) (*RKEAddon, error) {
+func (l *rkeAddonLister) Get(namespace, name string) (*RkeAddon, error) {
 	var key string
 	if namespace != "" {
 		key = namespace + "/" + name
@@ -125,11 +123,11 @@ func (l *rkeAddonLister) Get(namespace, name string) (*RKEAddon, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    RKEAddonGroupVersionKind.Group,
-			Resource: "rkeAddon",
+			Group:    RkeAddonGroupVersionKind.Group,
+			Resource: RkeAddonGroupVersionResource.Resource,
 		}, key)
 	}
-	return obj.(*RKEAddon), nil
+	return obj.(*RkeAddon), nil
 }
 
 type rkeAddonController struct {
@@ -140,17 +138,17 @@ func (c *rkeAddonController) Generic() controller.GenericController {
 	return c.GenericController
 }
 
-func (c *rkeAddonController) Lister() RKEAddonLister {
+func (c *rkeAddonController) Lister() RkeAddonLister {
 	return &rkeAddonLister{
 		controller: c,
 	}
 }
 
-func (c *rkeAddonController) AddHandler(ctx context.Context, name string, handler RKEAddonHandlerFunc) {
+func (c *rkeAddonController) AddHandler(ctx context.Context, name string, handler RkeAddonHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*RKEAddon); ok {
+		} else if v, ok := obj.(*RkeAddon); ok {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -158,13 +156,13 @@ func (c *rkeAddonController) AddHandler(ctx context.Context, name string, handle
 	})
 }
 
-func (c *rkeAddonController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler RKEAddonHandlerFunc) {
+func (c *rkeAddonController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler RkeAddonHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil
 		} else if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*RKEAddon); ok {
+		} else if v, ok := obj.(*RkeAddon); ok {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -172,11 +170,11 @@ func (c *rkeAddonController) AddFeatureHandler(ctx context.Context, enabled func
 	})
 }
 
-func (c *rkeAddonController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RKEAddonHandlerFunc) {
+func (c *rkeAddonController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RkeAddonHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*RKEAddon); ok && controller.ObjectInCluster(cluster, obj) {
+		} else if v, ok := obj.(*RkeAddon); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -184,13 +182,13 @@ func (c *rkeAddonController) AddClusterScopedHandler(ctx context.Context, name, 
 	})
 }
 
-func (c *rkeAddonController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler RKEAddonHandlerFunc) {
+func (c *rkeAddonController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler RkeAddonHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil
 		} else if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*RKEAddon); ok && controller.ObjectInCluster(cluster, obj) {
+		} else if v, ok := obj.(*RkeAddon); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -202,64 +200,56 @@ type rkeAddonFactory struct {
 }
 
 func (c rkeAddonFactory) Object() runtime.Object {
-	return &RKEAddon{}
+	return &RkeAddon{}
 }
 
 func (c rkeAddonFactory) List() runtime.Object {
-	return &RKEAddonList{}
+	return &RkeAddonList{}
 }
 
-func (s *rkeAddonClient) Controller() RKEAddonController {
-	s.client.Lock()
-	defer s.client.Unlock()
+func (s *rkeAddonClient) Controller() RkeAddonController {
+	genericController := controller.NewGenericController(RkeAddonGroupVersionKind.Kind+"Controller",
+		s.client.controllerFactory.ForResourceKind(RkeAddonGroupVersionResource, RkeAddonGroupVersionKind.Kind, true))
 
-	c, ok := s.client.rkeAddonControllers[s.ns]
-	if ok {
-		return c
-	}
-
-	genericController := controller.NewGenericController(RKEAddonGroupVersionKind.Kind+"Controller",
-		s.objectClient)
-
-	c = &rkeAddonController{
+	return &rkeAddonController{
 		GenericController: genericController,
 	}
-
-	s.client.rkeAddonControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type rkeAddonClient struct {
 	client       *Client
 	ns           string
 	objectClient *objectclient.ObjectClient
-	controller   RKEAddonController
+	controller   RkeAddonController
 }
 
 func (s *rkeAddonClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 
-func (s *rkeAddonClient) Create(o *RKEAddon) (*RKEAddon, error) {
+func (s *rkeAddonClient) Create(o *RkeAddon) (*RkeAddon, error) {
 	obj, err := s.objectClient.Create(o)
-	return obj.(*RKEAddon), err
+	return obj.(*RkeAddon), err
 }
 
-func (s *rkeAddonClient) Get(name string, opts metav1.GetOptions) (*RKEAddon, error) {
+func (s *rkeAddonClient) Get(name string, opts metav1.GetOptions) (*RkeAddon, error) {
 	obj, err := s.objectClient.Get(name, opts)
-	return obj.(*RKEAddon), err
+	return obj.(*RkeAddon), err
 }
 
-func (s *rkeAddonClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*RKEAddon, error) {
+func (s *rkeAddonClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*RkeAddon, error) {
 	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
-	return obj.(*RKEAddon), err
+	return obj.(*RkeAddon), err
 }
 
-func (s *rkeAddonClient) Update(o *RKEAddon) (*RKEAddon, error) {
+func (s *rkeAddonClient) Update(o *RkeAddon) (*RkeAddon, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
-	return obj.(*RKEAddon), err
+	return obj.(*RkeAddon), err
+}
+
+func (s *rkeAddonClient) UpdateStatus(o *RkeAddon) (*RkeAddon, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*RkeAddon), err
 }
 
 func (s *rkeAddonClient) Delete(name string, options *metav1.DeleteOptions) error {
@@ -270,14 +260,14 @@ func (s *rkeAddonClient) DeleteNamespaced(namespace, name string, options *metav
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *rkeAddonClient) List(opts metav1.ListOptions) (*RKEAddonList, error) {
+func (s *rkeAddonClient) List(opts metav1.ListOptions) (*RkeAddonList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*RKEAddonList), err
+	return obj.(*RkeAddonList), err
 }
 
-func (s *rkeAddonClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*RKEAddonList, error) {
+func (s *rkeAddonClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*RkeAddonList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*RKEAddonList), err
+	return obj.(*RkeAddonList), err
 }
 
 func (s *rkeAddonClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
@@ -285,47 +275,47 @@ func (s *rkeAddonClient) Watch(opts metav1.ListOptions) (watch.Interface, error)
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *rkeAddonClient) Patch(o *RKEAddon, patchType types.PatchType, data []byte, subresources ...string) (*RKEAddon, error) {
+func (s *rkeAddonClient) Patch(o *RkeAddon, patchType types.PatchType, data []byte, subresources ...string) (*RkeAddon, error) {
 	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
-	return obj.(*RKEAddon), err
+	return obj.(*RkeAddon), err
 }
 
 func (s *rkeAddonClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *rkeAddonClient) AddHandler(ctx context.Context, name string, sync RKEAddonHandlerFunc) {
+func (s *rkeAddonClient) AddHandler(ctx context.Context, name string, sync RkeAddonHandlerFunc) {
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *rkeAddonClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RKEAddonHandlerFunc) {
+func (s *rkeAddonClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RkeAddonHandlerFunc) {
 	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
-func (s *rkeAddonClient) AddLifecycle(ctx context.Context, name string, lifecycle RKEAddonLifecycle) {
-	sync := NewRKEAddonLifecycleAdapter(name, false, s, lifecycle)
+func (s *rkeAddonClient) AddLifecycle(ctx context.Context, name string, lifecycle RkeAddonLifecycle) {
+	sync := NewRkeAddonLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *rkeAddonClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle RKEAddonLifecycle) {
-	sync := NewRKEAddonLifecycleAdapter(name, false, s, lifecycle)
+func (s *rkeAddonClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle RkeAddonLifecycle) {
+	sync := NewRkeAddonLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
-func (s *rkeAddonClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RKEAddonHandlerFunc) {
+func (s *rkeAddonClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RkeAddonHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *rkeAddonClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync RKEAddonHandlerFunc) {
+func (s *rkeAddonClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync RkeAddonHandlerFunc) {
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
-func (s *rkeAddonClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RKEAddonLifecycle) {
-	sync := NewRKEAddonLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+func (s *rkeAddonClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RkeAddonLifecycle) {
+	sync := NewRkeAddonLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *rkeAddonClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle RKEAddonLifecycle) {
-	sync := NewRKEAddonLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+func (s *rkeAddonClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle RkeAddonLifecycle) {
+	sync := NewRkeAddonLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }

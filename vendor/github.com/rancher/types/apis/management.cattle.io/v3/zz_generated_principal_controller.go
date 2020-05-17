@@ -73,8 +73,6 @@ type PrincipalController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PrincipalHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PrincipalInterface interface {
@@ -125,7 +123,7 @@ func (l *principalLister) Get(namespace, name string) (*Principal, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PrincipalGroupVersionKind.Group,
-			Resource: "principal",
+			Resource: PrincipalGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Principal), nil
@@ -209,25 +207,12 @@ func (c principalFactory) List() runtime.Object {
 }
 
 func (s *principalClient) Controller() PrincipalController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.principalControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PrincipalGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PrincipalGroupVersionResource, PrincipalGroupVersionKind.Kind, false))
 
-	c = &principalController{
+	return &principalController{
 		GenericController: genericController,
 	}
-
-	s.client.principalControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type principalClient struct {
@@ -258,6 +243,11 @@ func (s *principalClient) GetNamespaced(namespace, name string, opts metav1.GetO
 
 func (s *principalClient) Update(o *Principal) (*Principal, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Principal), err
+}
+
+func (s *principalClient) UpdateStatus(o *Principal) (*Principal, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Principal), err
 }
 

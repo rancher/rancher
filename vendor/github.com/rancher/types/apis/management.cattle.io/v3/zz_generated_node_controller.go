@@ -74,8 +74,6 @@ type NodeController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NodeHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NodeInterface interface {
@@ -126,7 +124,7 @@ func (l *nodeLister) Get(namespace, name string) (*Node, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NodeGroupVersionKind.Group,
-			Resource: "node",
+			Resource: NodeGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Node), nil
@@ -210,25 +208,12 @@ func (c nodeFactory) List() runtime.Object {
 }
 
 func (s *nodeClient) Controller() NodeController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.nodeControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NodeGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NodeGroupVersionResource, NodeGroupVersionKind.Kind, true))
 
-	c = &nodeController{
+	return &nodeController{
 		GenericController: genericController,
 	}
-
-	s.client.nodeControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type nodeClient struct {
@@ -259,6 +244,11 @@ func (s *nodeClient) GetNamespaced(namespace, name string, opts metav1.GetOption
 
 func (s *nodeClient) Update(o *Node) (*Node, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Node), err
+}
+
+func (s *nodeClient) UpdateStatus(o *Node) (*Node, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Node), err
 }
 

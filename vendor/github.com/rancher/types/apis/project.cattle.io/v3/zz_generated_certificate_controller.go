@@ -74,8 +74,6 @@ type CertificateController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CertificateHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type CertificateInterface interface {
@@ -126,7 +124,7 @@ func (l *certificateLister) Get(namespace, name string) (*Certificate, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CertificateGroupVersionKind.Group,
-			Resource: "certificate",
+			Resource: CertificateGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Certificate), nil
@@ -210,25 +208,12 @@ func (c certificateFactory) List() runtime.Object {
 }
 
 func (s *certificateClient) Controller() CertificateController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.certificateControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(CertificateGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(CertificateGroupVersionResource, CertificateGroupVersionKind.Kind, true))
 
-	c = &certificateController{
+	return &certificateController{
 		GenericController: genericController,
 	}
-
-	s.client.certificateControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type certificateClient struct {
@@ -259,6 +244,11 @@ func (s *certificateClient) GetNamespaced(namespace, name string, opts metav1.Ge
 
 func (s *certificateClient) Update(o *Certificate) (*Certificate, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Certificate), err
+}
+
+func (s *certificateClient) UpdateStatus(o *Certificate) (*Certificate, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Certificate), err
 }
 

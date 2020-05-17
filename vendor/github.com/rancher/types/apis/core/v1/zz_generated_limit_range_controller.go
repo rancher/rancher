@@ -50,12 +50,6 @@ func NewLimitRange(namespace, name string, obj v1.LimitRange) *v1.LimitRange {
 	return &obj
 }
 
-type LimitRangeList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.LimitRange `json:"items"`
-}
-
 type LimitRangeHandlerFunc func(key string, obj *v1.LimitRange) (runtime.Object, error)
 
 type LimitRangeChangeHandlerFunc func(obj *v1.LimitRange) (runtime.Object, error)
@@ -75,8 +69,6 @@ type LimitRangeController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler LimitRangeHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type LimitRangeInterface interface {
@@ -87,8 +79,8 @@ type LimitRangeInterface interface {
 	Update(*v1.LimitRange) (*v1.LimitRange, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*LimitRangeList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*LimitRangeList, error)
+	List(opts metav1.ListOptions) (*v1.LimitRangeList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.LimitRangeList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() LimitRangeController
@@ -127,7 +119,7 @@ func (l *limitRangeLister) Get(namespace, name string) (*v1.LimitRange, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    LimitRangeGroupVersionKind.Group,
-			Resource: "limitRange",
+			Resource: LimitRangeGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.LimitRange), nil
@@ -207,29 +199,16 @@ func (c limitRangeFactory) Object() runtime.Object {
 }
 
 func (c limitRangeFactory) List() runtime.Object {
-	return &LimitRangeList{}
+	return &v1.LimitRangeList{}
 }
 
 func (s *limitRangeClient) Controller() LimitRangeController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.limitRangeControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(LimitRangeGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(LimitRangeGroupVersionResource, LimitRangeGroupVersionKind.Kind, true))
 
-	c = &limitRangeController{
+	return &limitRangeController{
 		GenericController: genericController,
 	}
-
-	s.client.limitRangeControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type limitRangeClient struct {
@@ -263,6 +242,11 @@ func (s *limitRangeClient) Update(o *v1.LimitRange) (*v1.LimitRange, error) {
 	return obj.(*v1.LimitRange), err
 }
 
+func (s *limitRangeClient) UpdateStatus(o *v1.LimitRange) (*v1.LimitRange, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.LimitRange), err
+}
+
 func (s *limitRangeClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *limitRangeClient) DeleteNamespaced(namespace, name string, options *met
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *limitRangeClient) List(opts metav1.ListOptions) (*LimitRangeList, error) {
+func (s *limitRangeClient) List(opts metav1.ListOptions) (*v1.LimitRangeList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*LimitRangeList), err
+	return obj.(*v1.LimitRangeList), err
 }
 
-func (s *limitRangeClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*LimitRangeList, error) {
+func (s *limitRangeClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.LimitRangeList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*LimitRangeList), err
+	return obj.(*v1.LimitRangeList), err
 }
 
 func (s *limitRangeClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

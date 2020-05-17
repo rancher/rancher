@@ -18,38 +18,38 @@ import (
 )
 
 var (
-	lockRKEAddonListerMockGet  sync.RWMutex
-	lockRKEAddonListerMockList sync.RWMutex
+	lockRkeAddonListerMockGet  sync.RWMutex
+	lockRkeAddonListerMockList sync.RWMutex
 )
 
-// Ensure, that RKEAddonListerMock does implement RKEAddonLister.
+// Ensure, that RkeAddonListerMock does implement RkeAddonLister.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEAddonLister = &RKEAddonListerMock{}
+var _ v3.RkeAddonLister = &RkeAddonListerMock{}
 
-// RKEAddonListerMock is a mock implementation of RKEAddonLister.
+// RkeAddonListerMock is a mock implementation of RkeAddonLister.
 //
-//     func TestSomethingThatUsesRKEAddonLister(t *testing.T) {
+//     func TestSomethingThatUsesRkeAddonLister(t *testing.T) {
 //
-//         // make and configure a mocked RKEAddonLister
-//         mockedRKEAddonLister := &RKEAddonListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.RKEAddon, error) {
+//         // make and configure a mocked RkeAddonLister
+//         mockedRkeAddonLister := &RkeAddonListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.RkeAddon, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RKEAddon, error) {
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RkeAddon, error) {
 // 	               panic("mock out the List method")
 //             },
 //         }
 //
-//         // use mockedRKEAddonLister in code that requires RKEAddonLister
+//         // use mockedRkeAddonLister in code that requires RkeAddonLister
 //         // and then make assertions.
 //
 //     }
-type RKEAddonListerMock struct {
+type RkeAddonListerMock struct {
 	// GetFunc mocks the Get method.
-	GetFunc func(namespace string, name string) (*v3.RKEAddon, error)
+	GetFunc func(namespace string, name string) (*v3.RkeAddon, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(namespace string, selector labels.Selector) ([]*v3.RKEAddon, error)
+	ListFunc func(namespace string, selector labels.Selector) ([]*v3.RkeAddon, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -71,9 +71,9 @@ type RKEAddonListerMock struct {
 }
 
 // Get calls GetFunc.
-func (mock *RKEAddonListerMock) Get(namespace string, name string) (*v3.RKEAddon, error) {
+func (mock *RkeAddonListerMock) Get(namespace string, name string) (*v3.RkeAddon, error) {
 	if mock.GetFunc == nil {
-		panic("RKEAddonListerMock.GetFunc: method is nil but RKEAddonLister.Get was just called")
+		panic("RkeAddonListerMock.GetFunc: method is nil but RkeAddonLister.Get was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -82,16 +82,16 @@ func (mock *RKEAddonListerMock) Get(namespace string, name string) (*v3.RKEAddon
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockRKEAddonListerMockGet.Lock()
+	lockRkeAddonListerMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockRKEAddonListerMockGet.Unlock()
+	lockRkeAddonListerMockGet.Unlock()
 	return mock.GetFunc(namespace, name)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedRKEAddonLister.GetCalls())
-func (mock *RKEAddonListerMock) GetCalls() []struct {
+//     len(mockedRkeAddonLister.GetCalls())
+func (mock *RkeAddonListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -99,16 +99,16 @@ func (mock *RKEAddonListerMock) GetCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockRKEAddonListerMockGet.RLock()
+	lockRkeAddonListerMockGet.RLock()
 	calls = mock.calls.Get
-	lockRKEAddonListerMockGet.RUnlock()
+	lockRkeAddonListerMockGet.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *RKEAddonListerMock) List(namespace string, selector labels.Selector) ([]*v3.RKEAddon, error) {
+func (mock *RkeAddonListerMock) List(namespace string, selector labels.Selector) ([]*v3.RkeAddon, error) {
 	if mock.ListFunc == nil {
-		panic("RKEAddonListerMock.ListFunc: method is nil but RKEAddonLister.List was just called")
+		panic("RkeAddonListerMock.ListFunc: method is nil but RkeAddonLister.List was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -117,16 +117,16 @@ func (mock *RKEAddonListerMock) List(namespace string, selector labels.Selector)
 		Namespace: namespace,
 		Selector:  selector,
 	}
-	lockRKEAddonListerMockList.Lock()
+	lockRkeAddonListerMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockRKEAddonListerMockList.Unlock()
+	lockRkeAddonListerMockList.Unlock()
 	return mock.ListFunc(namespace, selector)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedRKEAddonLister.ListCalls())
-func (mock *RKEAddonListerMock) ListCalls() []struct {
+//     len(mockedRkeAddonLister.ListCalls())
+func (mock *RkeAddonListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
 } {
@@ -134,46 +134,44 @@ func (mock *RKEAddonListerMock) ListCalls() []struct {
 		Namespace string
 		Selector  labels.Selector
 	}
-	lockRKEAddonListerMockList.RLock()
+	lockRkeAddonListerMockList.RLock()
 	calls = mock.calls.List
-	lockRKEAddonListerMockList.RUnlock()
+	lockRkeAddonListerMockList.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEAddonControllerMockAddClusterScopedFeatureHandler sync.RWMutex
-	lockRKEAddonControllerMockAddClusterScopedHandler        sync.RWMutex
-	lockRKEAddonControllerMockAddFeatureHandler              sync.RWMutex
-	lockRKEAddonControllerMockAddHandler                     sync.RWMutex
-	lockRKEAddonControllerMockEnqueue                        sync.RWMutex
-	lockRKEAddonControllerMockEnqueueAfter                   sync.RWMutex
-	lockRKEAddonControllerMockGeneric                        sync.RWMutex
-	lockRKEAddonControllerMockInformer                       sync.RWMutex
-	lockRKEAddonControllerMockLister                         sync.RWMutex
-	lockRKEAddonControllerMockStart                          sync.RWMutex
-	lockRKEAddonControllerMockSync                           sync.RWMutex
+	lockRkeAddonControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockRkeAddonControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockRkeAddonControllerMockAddFeatureHandler              sync.RWMutex
+	lockRkeAddonControllerMockAddHandler                     sync.RWMutex
+	lockRkeAddonControllerMockEnqueue                        sync.RWMutex
+	lockRkeAddonControllerMockEnqueueAfter                   sync.RWMutex
+	lockRkeAddonControllerMockGeneric                        sync.RWMutex
+	lockRkeAddonControllerMockInformer                       sync.RWMutex
+	lockRkeAddonControllerMockLister                         sync.RWMutex
 )
 
-// Ensure, that RKEAddonControllerMock does implement RKEAddonController.
+// Ensure, that RkeAddonControllerMock does implement RkeAddonController.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEAddonController = &RKEAddonControllerMock{}
+var _ v3.RkeAddonController = &RkeAddonControllerMock{}
 
-// RKEAddonControllerMock is a mock implementation of RKEAddonController.
+// RkeAddonControllerMock is a mock implementation of RkeAddonController.
 //
-//     func TestSomethingThatUsesRKEAddonController(t *testing.T) {
+//     func TestSomethingThatUsesRkeAddonController(t *testing.T) {
 //
-//         // make and configure a mocked RKEAddonController
-//         mockedRKEAddonController := &RKEAddonControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEAddonHandlerFunc)  {
+//         // make and configure a mocked RkeAddonController
+//         mockedRkeAddonController := &RkeAddonControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeAddonHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.RKEAddonHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.RkeAddonHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RKEAddonHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RkeAddonHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.RKEAddonHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.RkeAddonHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
 //             EnqueueFunc: func(namespace string, name string)  {
@@ -188,33 +186,27 @@ var _ v3.RKEAddonController = &RKEAddonControllerMock{}
 //             InformerFunc: func() cache.SharedIndexInformer {
 // 	               panic("mock out the Informer method")
 //             },
-//             ListerFunc: func() v3.RKEAddonLister {
+//             ListerFunc: func() v3.RkeAddonLister {
 // 	               panic("mock out the Lister method")
-//             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
 //             },
 //         }
 //
-//         // use mockedRKEAddonController in code that requires RKEAddonController
+//         // use mockedRkeAddonController in code that requires RkeAddonController
 //         // and then make assertions.
 //
 //     }
-type RKEAddonControllerMock struct {
+type RkeAddonControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEAddonHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeAddonHandlerFunc)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.RKEAddonHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.RkeAddonHandlerFunc)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RKEAddonHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RkeAddonHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, handler v3.RKEAddonHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, handler v3.RkeAddonHandlerFunc)
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
@@ -229,13 +221,7 @@ type RKEAddonControllerMock struct {
 	InformerFunc func() cache.SharedIndexInformer
 
 	// ListerFunc mocks the Lister method.
-	ListerFunc func() v3.RKEAddonLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
+	ListerFunc func() v3.RkeAddonLister
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -250,7 +236,7 @@ type RKEAddonControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.RKEAddonHandlerFunc
+			Handler v3.RkeAddonHandlerFunc
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -261,7 +247,7 @@ type RKEAddonControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.RKEAddonHandlerFunc
+			Handler v3.RkeAddonHandlerFunc
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -272,7 +258,7 @@ type RKEAddonControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEAddonHandlerFunc
+			Sync v3.RkeAddonHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -281,7 +267,7 @@ type RKEAddonControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Handler is the handler argument value.
-			Handler v3.RKEAddonHandlerFunc
+			Handler v3.RkeAddonHandlerFunc
 		}
 		// Enqueue holds details about calls to the Enqueue method.
 		Enqueue []struct {
@@ -308,32 +294,20 @@ type RKEAddonControllerMock struct {
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
 		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 	}
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *RKEAddonControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEAddonHandlerFunc) {
+func (mock *RkeAddonControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeAddonHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("RKEAddonControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but RKEAddonController.AddClusterScopedFeatureHandler was just called")
+		panic("RkeAddonControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but RkeAddonController.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.RKEAddonHandlerFunc
+		Handler     v3.RkeAddonHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -341,164 +315,164 @@ func (mock *RKEAddonControllerMock) AddClusterScopedFeatureHandler(ctx context.C
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockRKEAddonControllerMockAddClusterScopedFeatureHandler.Lock()
+	lockRkeAddonControllerMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockRKEAddonControllerMockAddClusterScopedFeatureHandler.Unlock()
+	lockRkeAddonControllerMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedRKEAddonController.AddClusterScopedFeatureHandlerCalls())
-func (mock *RKEAddonControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedRkeAddonController.AddClusterScopedFeatureHandlerCalls())
+func (mock *RkeAddonControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Handler     v3.RKEAddonHandlerFunc
+	Handler     v3.RkeAddonHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.RKEAddonHandlerFunc
+		Handler     v3.RkeAddonHandlerFunc
 	}
-	lockRKEAddonControllerMockAddClusterScopedFeatureHandler.RLock()
+	lockRkeAddonControllerMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockRKEAddonControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	lockRkeAddonControllerMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *RKEAddonControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.RKEAddonHandlerFunc) {
+func (mock *RkeAddonControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.RkeAddonHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("RKEAddonControllerMock.AddClusterScopedHandlerFunc: method is nil but RKEAddonController.AddClusterScopedHandler was just called")
+		panic("RkeAddonControllerMock.AddClusterScopedHandlerFunc: method is nil but RkeAddonController.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.RKEAddonHandlerFunc
+		Handler     v3.RkeAddonHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockRKEAddonControllerMockAddClusterScopedHandler.Lock()
+	lockRkeAddonControllerMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockRKEAddonControllerMockAddClusterScopedHandler.Unlock()
+	lockRkeAddonControllerMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, handler)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedRKEAddonController.AddClusterScopedHandlerCalls())
-func (mock *RKEAddonControllerMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedRkeAddonController.AddClusterScopedHandlerCalls())
+func (mock *RkeAddonControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Handler     v3.RKEAddonHandlerFunc
+	Handler     v3.RkeAddonHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.RKEAddonHandlerFunc
+		Handler     v3.RkeAddonHandlerFunc
 	}
-	lockRKEAddonControllerMockAddClusterScopedHandler.RLock()
+	lockRkeAddonControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockRKEAddonControllerMockAddClusterScopedHandler.RUnlock()
+	lockRkeAddonControllerMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *RKEAddonControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RKEAddonHandlerFunc) {
+func (mock *RkeAddonControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RkeAddonHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("RKEAddonControllerMock.AddFeatureHandlerFunc: method is nil but RKEAddonController.AddFeatureHandler was just called")
+		panic("RkeAddonControllerMock.AddFeatureHandlerFunc: method is nil but RkeAddonController.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEAddonHandlerFunc
+		Sync    v3.RkeAddonHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockRKEAddonControllerMockAddFeatureHandler.Lock()
+	lockRkeAddonControllerMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockRKEAddonControllerMockAddFeatureHandler.Unlock()
+	lockRkeAddonControllerMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedRKEAddonController.AddFeatureHandlerCalls())
-func (mock *RKEAddonControllerMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedRkeAddonController.AddFeatureHandlerCalls())
+func (mock *RkeAddonControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.RKEAddonHandlerFunc
+	Sync    v3.RkeAddonHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEAddonHandlerFunc
+		Sync    v3.RkeAddonHandlerFunc
 	}
-	lockRKEAddonControllerMockAddFeatureHandler.RLock()
+	lockRkeAddonControllerMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockRKEAddonControllerMockAddFeatureHandler.RUnlock()
+	lockRkeAddonControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *RKEAddonControllerMock) AddHandler(ctx context.Context, name string, handler v3.RKEAddonHandlerFunc) {
+func (mock *RkeAddonControllerMock) AddHandler(ctx context.Context, name string, handler v3.RkeAddonHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("RKEAddonControllerMock.AddHandlerFunc: method is nil but RKEAddonController.AddHandler was just called")
+		panic("RkeAddonControllerMock.AddHandlerFunc: method is nil but RkeAddonController.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.RKEAddonHandlerFunc
+		Handler v3.RkeAddonHandlerFunc
 	}{
 		Ctx:     ctx,
 		Name:    name,
 		Handler: handler,
 	}
-	lockRKEAddonControllerMockAddHandler.Lock()
+	lockRkeAddonControllerMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockRKEAddonControllerMockAddHandler.Unlock()
+	lockRkeAddonControllerMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, handler)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedRKEAddonController.AddHandlerCalls())
-func (mock *RKEAddonControllerMock) AddHandlerCalls() []struct {
+//     len(mockedRkeAddonController.AddHandlerCalls())
+func (mock *RkeAddonControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
-	Handler v3.RKEAddonHandlerFunc
+	Handler v3.RkeAddonHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.RKEAddonHandlerFunc
+		Handler v3.RkeAddonHandlerFunc
 	}
-	lockRKEAddonControllerMockAddHandler.RLock()
+	lockRkeAddonControllerMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockRKEAddonControllerMockAddHandler.RUnlock()
+	lockRkeAddonControllerMockAddHandler.RUnlock()
 	return calls
 }
 
 // Enqueue calls EnqueueFunc.
-func (mock *RKEAddonControllerMock) Enqueue(namespace string, name string) {
+func (mock *RkeAddonControllerMock) Enqueue(namespace string, name string) {
 	if mock.EnqueueFunc == nil {
-		panic("RKEAddonControllerMock.EnqueueFunc: method is nil but RKEAddonController.Enqueue was just called")
+		panic("RkeAddonControllerMock.EnqueueFunc: method is nil but RkeAddonController.Enqueue was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -507,16 +481,16 @@ func (mock *RKEAddonControllerMock) Enqueue(namespace string, name string) {
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockRKEAddonControllerMockEnqueue.Lock()
+	lockRkeAddonControllerMockEnqueue.Lock()
 	mock.calls.Enqueue = append(mock.calls.Enqueue, callInfo)
-	lockRKEAddonControllerMockEnqueue.Unlock()
+	lockRkeAddonControllerMockEnqueue.Unlock()
 	mock.EnqueueFunc(namespace, name)
 }
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedRKEAddonController.EnqueueCalls())
-func (mock *RKEAddonControllerMock) EnqueueCalls() []struct {
+//     len(mockedRkeAddonController.EnqueueCalls())
+func (mock *RkeAddonControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -524,16 +498,16 @@ func (mock *RKEAddonControllerMock) EnqueueCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockRKEAddonControllerMockEnqueue.RLock()
+	lockRkeAddonControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
-	lockRKEAddonControllerMockEnqueue.RUnlock()
+	lockRkeAddonControllerMockEnqueue.RUnlock()
 	return calls
 }
 
 // EnqueueAfter calls EnqueueAfterFunc.
-func (mock *RKEAddonControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
+func (mock *RkeAddonControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
 	if mock.EnqueueAfterFunc == nil {
-		panic("RKEAddonControllerMock.EnqueueAfterFunc: method is nil but RKEAddonController.EnqueueAfter was just called")
+		panic("RkeAddonControllerMock.EnqueueAfterFunc: method is nil but RkeAddonController.EnqueueAfter was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -544,16 +518,16 @@ func (mock *RKEAddonControllerMock) EnqueueAfter(namespace string, name string, 
 		Name:      name,
 		After:     after,
 	}
-	lockRKEAddonControllerMockEnqueueAfter.Lock()
+	lockRkeAddonControllerMockEnqueueAfter.Lock()
 	mock.calls.EnqueueAfter = append(mock.calls.EnqueueAfter, callInfo)
-	lockRKEAddonControllerMockEnqueueAfter.Unlock()
+	lockRkeAddonControllerMockEnqueueAfter.Unlock()
 	mock.EnqueueAfterFunc(namespace, name, after)
 }
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedRKEAddonController.EnqueueAfterCalls())
-func (mock *RKEAddonControllerMock) EnqueueAfterCalls() []struct {
+//     len(mockedRkeAddonController.EnqueueAfterCalls())
+func (mock *RkeAddonControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
 	After     time.Duration
@@ -563,217 +537,151 @@ func (mock *RKEAddonControllerMock) EnqueueAfterCalls() []struct {
 		Name      string
 		After     time.Duration
 	}
-	lockRKEAddonControllerMockEnqueueAfter.RLock()
+	lockRkeAddonControllerMockEnqueueAfter.RLock()
 	calls = mock.calls.EnqueueAfter
-	lockRKEAddonControllerMockEnqueueAfter.RUnlock()
+	lockRkeAddonControllerMockEnqueueAfter.RUnlock()
 	return calls
 }
 
 // Generic calls GenericFunc.
-func (mock *RKEAddonControllerMock) Generic() controller.GenericController {
+func (mock *RkeAddonControllerMock) Generic() controller.GenericController {
 	if mock.GenericFunc == nil {
-		panic("RKEAddonControllerMock.GenericFunc: method is nil but RKEAddonController.Generic was just called")
+		panic("RkeAddonControllerMock.GenericFunc: method is nil but RkeAddonController.Generic was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEAddonControllerMockGeneric.Lock()
+	lockRkeAddonControllerMockGeneric.Lock()
 	mock.calls.Generic = append(mock.calls.Generic, callInfo)
-	lockRKEAddonControllerMockGeneric.Unlock()
+	lockRkeAddonControllerMockGeneric.Unlock()
 	return mock.GenericFunc()
 }
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedRKEAddonController.GenericCalls())
-func (mock *RKEAddonControllerMock) GenericCalls() []struct {
+//     len(mockedRkeAddonController.GenericCalls())
+func (mock *RkeAddonControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEAddonControllerMockGeneric.RLock()
+	lockRkeAddonControllerMockGeneric.RLock()
 	calls = mock.calls.Generic
-	lockRKEAddonControllerMockGeneric.RUnlock()
+	lockRkeAddonControllerMockGeneric.RUnlock()
 	return calls
 }
 
 // Informer calls InformerFunc.
-func (mock *RKEAddonControllerMock) Informer() cache.SharedIndexInformer {
+func (mock *RkeAddonControllerMock) Informer() cache.SharedIndexInformer {
 	if mock.InformerFunc == nil {
-		panic("RKEAddonControllerMock.InformerFunc: method is nil but RKEAddonController.Informer was just called")
+		panic("RkeAddonControllerMock.InformerFunc: method is nil but RkeAddonController.Informer was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEAddonControllerMockInformer.Lock()
+	lockRkeAddonControllerMockInformer.Lock()
 	mock.calls.Informer = append(mock.calls.Informer, callInfo)
-	lockRKEAddonControllerMockInformer.Unlock()
+	lockRkeAddonControllerMockInformer.Unlock()
 	return mock.InformerFunc()
 }
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedRKEAddonController.InformerCalls())
-func (mock *RKEAddonControllerMock) InformerCalls() []struct {
+//     len(mockedRkeAddonController.InformerCalls())
+func (mock *RkeAddonControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEAddonControllerMockInformer.RLock()
+	lockRkeAddonControllerMockInformer.RLock()
 	calls = mock.calls.Informer
-	lockRKEAddonControllerMockInformer.RUnlock()
+	lockRkeAddonControllerMockInformer.RUnlock()
 	return calls
 }
 
 // Lister calls ListerFunc.
-func (mock *RKEAddonControllerMock) Lister() v3.RKEAddonLister {
+func (mock *RkeAddonControllerMock) Lister() v3.RkeAddonLister {
 	if mock.ListerFunc == nil {
-		panic("RKEAddonControllerMock.ListerFunc: method is nil but RKEAddonController.Lister was just called")
+		panic("RkeAddonControllerMock.ListerFunc: method is nil but RkeAddonController.Lister was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEAddonControllerMockLister.Lock()
+	lockRkeAddonControllerMockLister.Lock()
 	mock.calls.Lister = append(mock.calls.Lister, callInfo)
-	lockRKEAddonControllerMockLister.Unlock()
+	lockRkeAddonControllerMockLister.Unlock()
 	return mock.ListerFunc()
 }
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedRKEAddonController.ListerCalls())
-func (mock *RKEAddonControllerMock) ListerCalls() []struct {
+//     len(mockedRkeAddonController.ListerCalls())
+func (mock *RkeAddonControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEAddonControllerMockLister.RLock()
+	lockRkeAddonControllerMockLister.RLock()
 	calls = mock.calls.Lister
-	lockRKEAddonControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *RKEAddonControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("RKEAddonControllerMock.StartFunc: method is nil but RKEAddonController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockRKEAddonControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockRKEAddonControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedRKEAddonController.StartCalls())
-func (mock *RKEAddonControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockRKEAddonControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockRKEAddonControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *RKEAddonControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("RKEAddonControllerMock.SyncFunc: method is nil but RKEAddonController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockRKEAddonControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockRKEAddonControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedRKEAddonController.SyncCalls())
-func (mock *RKEAddonControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockRKEAddonControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockRKEAddonControllerMockSync.RUnlock()
+	lockRkeAddonControllerMockLister.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
-	lockRKEAddonInterfaceMockAddClusterScopedHandler          sync.RWMutex
-	lockRKEAddonInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
-	lockRKEAddonInterfaceMockAddFeatureHandler                sync.RWMutex
-	lockRKEAddonInterfaceMockAddFeatureLifecycle              sync.RWMutex
-	lockRKEAddonInterfaceMockAddHandler                       sync.RWMutex
-	lockRKEAddonInterfaceMockAddLifecycle                     sync.RWMutex
-	lockRKEAddonInterfaceMockController                       sync.RWMutex
-	lockRKEAddonInterfaceMockCreate                           sync.RWMutex
-	lockRKEAddonInterfaceMockDelete                           sync.RWMutex
-	lockRKEAddonInterfaceMockDeleteCollection                 sync.RWMutex
-	lockRKEAddonInterfaceMockDeleteNamespaced                 sync.RWMutex
-	lockRKEAddonInterfaceMockGet                              sync.RWMutex
-	lockRKEAddonInterfaceMockGetNamespaced                    sync.RWMutex
-	lockRKEAddonInterfaceMockList                             sync.RWMutex
-	lockRKEAddonInterfaceMockListNamespaced                   sync.RWMutex
-	lockRKEAddonInterfaceMockObjectClient                     sync.RWMutex
-	lockRKEAddonInterfaceMockUpdate                           sync.RWMutex
-	lockRKEAddonInterfaceMockWatch                            sync.RWMutex
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockRkeAddonInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockRkeAddonInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockRkeAddonInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockRkeAddonInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockRkeAddonInterfaceMockAddHandler                       sync.RWMutex
+	lockRkeAddonInterfaceMockAddLifecycle                     sync.RWMutex
+	lockRkeAddonInterfaceMockController                       sync.RWMutex
+	lockRkeAddonInterfaceMockCreate                           sync.RWMutex
+	lockRkeAddonInterfaceMockDelete                           sync.RWMutex
+	lockRkeAddonInterfaceMockDeleteCollection                 sync.RWMutex
+	lockRkeAddonInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockRkeAddonInterfaceMockGet                              sync.RWMutex
+	lockRkeAddonInterfaceMockGetNamespaced                    sync.RWMutex
+	lockRkeAddonInterfaceMockList                             sync.RWMutex
+	lockRkeAddonInterfaceMockListNamespaced                   sync.RWMutex
+	lockRkeAddonInterfaceMockObjectClient                     sync.RWMutex
+	lockRkeAddonInterfaceMockUpdate                           sync.RWMutex
+	lockRkeAddonInterfaceMockWatch                            sync.RWMutex
 )
 
-// Ensure, that RKEAddonInterfaceMock does implement RKEAddonInterface.
+// Ensure, that RkeAddonInterfaceMock does implement RkeAddonInterface.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEAddonInterface = &RKEAddonInterfaceMock{}
+var _ v3.RkeAddonInterface = &RkeAddonInterfaceMock{}
 
-// RKEAddonInterfaceMock is a mock implementation of RKEAddonInterface.
+// RkeAddonInterfaceMock is a mock implementation of RkeAddonInterface.
 //
-//     func TestSomethingThatUsesRKEAddonInterface(t *testing.T) {
+//     func TestSomethingThatUsesRkeAddonInterface(t *testing.T) {
 //
-//         // make and configure a mocked RKEAddonInterface
-//         mockedRKEAddonInterface := &RKEAddonInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEAddonHandlerFunc)  {
+//         // make and configure a mocked RkeAddonInterface
+//         mockedRkeAddonInterface := &RkeAddonInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeAddonHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEAddonLifecycle)  {
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeAddonLifecycle)  {
 // 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.RKEAddonHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.RkeAddonHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.RKEAddonLifecycle)  {
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.RkeAddonLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RKEAddonHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RkeAddonHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEAddonLifecycle)  {
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeAddonLifecycle)  {
 // 	               panic("mock out the AddFeatureLifecycle method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.RKEAddonHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.RkeAddonHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.RKEAddonLifecycle)  {
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.RkeAddonLifecycle)  {
 // 	               panic("mock out the AddLifecycle method")
 //             },
-//             ControllerFunc: func() v3.RKEAddonController {
+//             ControllerFunc: func() v3.RkeAddonController {
 // 	               panic("mock out the Controller method")
 //             },
-//             CreateFunc: func(in1 *v3.RKEAddon) (*v3.RKEAddon, error) {
+//             CreateFunc: func(in1 *v3.RkeAddon) (*v3.RkeAddon, error) {
 // 	               panic("mock out the Create method")
 //             },
 //             DeleteFunc: func(name string, options *v1.DeleteOptions) error {
@@ -785,22 +693,22 @@ var _ v3.RKEAddonInterface = &RKEAddonInterfaceMock{}
 //             DeleteNamespacedFunc: func(namespace string, name string, options *v1.DeleteOptions) error {
 // 	               panic("mock out the DeleteNamespaced method")
 //             },
-//             GetFunc: func(name string, opts v1.GetOptions) (*v3.RKEAddon, error) {
+//             GetFunc: func(name string, opts v1.GetOptions) (*v3.RkeAddon, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.RKEAddon, error) {
+//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.RkeAddon, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1.ListOptions) (*v3.RKEAddonList, error) {
+//             ListFunc: func(opts v1.ListOptions) (*v3.RkeAddonList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.RKEAddonList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.RkeAddonList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
 //             },
-//             UpdateFunc: func(in1 *v3.RKEAddon) (*v3.RKEAddon, error) {
+//             UpdateFunc: func(in1 *v3.RkeAddon) (*v3.RkeAddon, error) {
 // 	               panic("mock out the Update method")
 //             },
 //             WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
@@ -808,40 +716,40 @@ var _ v3.RKEAddonInterface = &RKEAddonInterfaceMock{}
 //             },
 //         }
 //
-//         // use mockedRKEAddonInterface in code that requires RKEAddonInterface
+//         // use mockedRkeAddonInterface in code that requires RkeAddonInterface
 //         // and then make assertions.
 //
 //     }
-type RKEAddonInterfaceMock struct {
+type RkeAddonInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEAddonHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeAddonHandlerFunc)
 
 	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
-	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEAddonLifecycle)
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeAddonLifecycle)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.RKEAddonHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.RkeAddonHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
-	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.RKEAddonLifecycle)
+	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.RkeAddonLifecycle)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RKEAddonHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RkeAddonHandlerFunc)
 
 	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
-	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEAddonLifecycle)
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeAddonLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, sync v3.RKEAddonHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, sync v3.RkeAddonHandlerFunc)
 
 	// AddLifecycleFunc mocks the AddLifecycle method.
-	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.RKEAddonLifecycle)
+	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.RkeAddonLifecycle)
 
 	// ControllerFunc mocks the Controller method.
-	ControllerFunc func() v3.RKEAddonController
+	ControllerFunc func() v3.RkeAddonController
 
 	// CreateFunc mocks the Create method.
-	CreateFunc func(in1 *v3.RKEAddon) (*v3.RKEAddon, error)
+	CreateFunc func(in1 *v3.RkeAddon) (*v3.RkeAddon, error)
 
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(name string, options *v1.DeleteOptions) error
@@ -853,22 +761,22 @@ type RKEAddonInterfaceMock struct {
 	DeleteNamespacedFunc func(namespace string, name string, options *v1.DeleteOptions) error
 
 	// GetFunc mocks the Get method.
-	GetFunc func(name string, opts v1.GetOptions) (*v3.RKEAddon, error)
+	GetFunc func(name string, opts v1.GetOptions) (*v3.RkeAddon, error)
 
 	// GetNamespacedFunc mocks the GetNamespaced method.
-	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.RKEAddon, error)
+	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.RkeAddon, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1.ListOptions) (*v3.RKEAddonList, error)
+	ListFunc func(opts v1.ListOptions) (*v3.RkeAddonList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.RKEAddonList, error)
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.RkeAddonList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
 
 	// UpdateFunc mocks the Update method.
-	UpdateFunc func(in1 *v3.RKEAddon) (*v3.RKEAddon, error)
+	UpdateFunc func(in1 *v3.RkeAddon) (*v3.RkeAddon, error)
 
 	// WatchFunc mocks the Watch method.
 	WatchFunc func(opts v1.ListOptions) (watch.Interface, error)
@@ -886,7 +794,7 @@ type RKEAddonInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.RKEAddonHandlerFunc
+			Sync v3.RkeAddonHandlerFunc
 		}
 		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
 		AddClusterScopedFeatureLifecycle []struct {
@@ -899,7 +807,7 @@ type RKEAddonInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEAddonLifecycle
+			Lifecycle v3.RkeAddonLifecycle
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -910,7 +818,7 @@ type RKEAddonInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.RKEAddonHandlerFunc
+			Sync v3.RkeAddonHandlerFunc
 		}
 		// AddClusterScopedLifecycle holds details about calls to the AddClusterScopedLifecycle method.
 		AddClusterScopedLifecycle []struct {
@@ -921,7 +829,7 @@ type RKEAddonInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEAddonLifecycle
+			Lifecycle v3.RkeAddonLifecycle
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -932,7 +840,7 @@ type RKEAddonInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEAddonHandlerFunc
+			Sync v3.RkeAddonHandlerFunc
 		}
 		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
 		AddFeatureLifecycle []struct {
@@ -943,7 +851,7 @@ type RKEAddonInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEAddonLifecycle
+			Lifecycle v3.RkeAddonLifecycle
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -952,7 +860,7 @@ type RKEAddonInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEAddonHandlerFunc
+			Sync v3.RkeAddonHandlerFunc
 		}
 		// AddLifecycle holds details about calls to the AddLifecycle method.
 		AddLifecycle []struct {
@@ -961,7 +869,7 @@ type RKEAddonInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEAddonLifecycle
+			Lifecycle v3.RkeAddonLifecycle
 		}
 		// Controller holds details about calls to the Controller method.
 		Controller []struct {
@@ -969,7 +877,7 @@ type RKEAddonInterfaceMock struct {
 		// Create holds details about calls to the Create method.
 		Create []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.RKEAddon
+			In1 *v3.RkeAddon
 		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
@@ -1028,7 +936,7 @@ type RKEAddonInterfaceMock struct {
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.RKEAddon
+			In1 *v3.RkeAddon
 		}
 		// Watch holds details about calls to the Watch method.
 		Watch []struct {
@@ -1039,16 +947,16 @@ type RKEAddonInterfaceMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *RKEAddonInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEAddonHandlerFunc) {
+func (mock *RkeAddonInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeAddonHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("RKEAddonInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but RKEAddonInterface.AddClusterScopedFeatureHandler was just called")
+		panic("RkeAddonInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but RkeAddonInterface.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.RKEAddonHandlerFunc
+		Sync        v3.RkeAddonHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1056,46 +964,46 @@ func (mock *RKEAddonInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Co
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedRKEAddonInterface.AddClusterScopedFeatureHandlerCalls())
-func (mock *RKEAddonInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedRkeAddonInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *RkeAddonInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Sync        v3.RKEAddonHandlerFunc
+	Sync        v3.RkeAddonHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.RKEAddonHandlerFunc
+		Sync        v3.RkeAddonHandlerFunc
 	}
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
-func (mock *RKEAddonInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEAddonLifecycle) {
+func (mock *RkeAddonInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeAddonLifecycle) {
 	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
-		panic("RKEAddonInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but RKEAddonInterface.AddClusterScopedFeatureLifecycle was just called")
+		panic("RkeAddonInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but RkeAddonInterface.AddClusterScopedFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEAddonLifecycle
+		Lifecycle   v3.RkeAddonLifecycle
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1103,346 +1011,346 @@ func (mock *RKEAddonInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
 	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
 	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedRKEAddonInterface.AddClusterScopedFeatureLifecycleCalls())
-func (mock *RKEAddonInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+//     len(mockedRkeAddonInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *RkeAddonInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Lifecycle   v3.RKEAddonLifecycle
+	Lifecycle   v3.RkeAddonLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEAddonLifecycle
+		Lifecycle   v3.RkeAddonLifecycle
 	}
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedFeatureLifecycle
-	lockRKEAddonInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	lockRkeAddonInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *RKEAddonInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.RKEAddonHandlerFunc) {
+func (mock *RkeAddonInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.RkeAddonHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("RKEAddonInterfaceMock.AddClusterScopedHandlerFunc: method is nil but RKEAddonInterface.AddClusterScopedHandler was just called")
+		panic("RkeAddonInterfaceMock.AddClusterScopedHandlerFunc: method is nil but RkeAddonInterface.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.RKEAddonHandlerFunc
+		Sync        v3.RkeAddonHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockRKEAddonInterfaceMockAddClusterScopedHandler.Lock()
+	lockRkeAddonInterfaceMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockRKEAddonInterfaceMockAddClusterScopedHandler.Unlock()
+	lockRkeAddonInterfaceMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, sync)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedRKEAddonInterface.AddClusterScopedHandlerCalls())
-func (mock *RKEAddonInterfaceMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedRkeAddonInterface.AddClusterScopedHandlerCalls())
+func (mock *RkeAddonInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Sync        v3.RKEAddonHandlerFunc
+	Sync        v3.RkeAddonHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.RKEAddonHandlerFunc
+		Sync        v3.RkeAddonHandlerFunc
 	}
-	lockRKEAddonInterfaceMockAddClusterScopedHandler.RLock()
+	lockRkeAddonInterfaceMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockRKEAddonInterfaceMockAddClusterScopedHandler.RUnlock()
+	lockRkeAddonInterfaceMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedLifecycle calls AddClusterScopedLifecycleFunc.
-func (mock *RKEAddonInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.RKEAddonLifecycle) {
+func (mock *RkeAddonInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.RkeAddonLifecycle) {
 	if mock.AddClusterScopedLifecycleFunc == nil {
-		panic("RKEAddonInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but RKEAddonInterface.AddClusterScopedLifecycle was just called")
+		panic("RkeAddonInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but RkeAddonInterface.AddClusterScopedLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEAddonLifecycle
+		Lifecycle   v3.RkeAddonLifecycle
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockRKEAddonInterfaceMockAddClusterScopedLifecycle.Lock()
+	lockRkeAddonInterfaceMockAddClusterScopedLifecycle.Lock()
 	mock.calls.AddClusterScopedLifecycle = append(mock.calls.AddClusterScopedLifecycle, callInfo)
-	lockRKEAddonInterfaceMockAddClusterScopedLifecycle.Unlock()
+	lockRkeAddonInterfaceMockAddClusterScopedLifecycle.Unlock()
 	mock.AddClusterScopedLifecycleFunc(ctx, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedRKEAddonInterface.AddClusterScopedLifecycleCalls())
-func (mock *RKEAddonInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
+//     len(mockedRkeAddonInterface.AddClusterScopedLifecycleCalls())
+func (mock *RkeAddonInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Lifecycle   v3.RKEAddonLifecycle
+	Lifecycle   v3.RkeAddonLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEAddonLifecycle
+		Lifecycle   v3.RkeAddonLifecycle
 	}
-	lockRKEAddonInterfaceMockAddClusterScopedLifecycle.RLock()
+	lockRkeAddonInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
-	lockRKEAddonInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	lockRkeAddonInterfaceMockAddClusterScopedLifecycle.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *RKEAddonInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RKEAddonHandlerFunc) {
+func (mock *RkeAddonInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RkeAddonHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("RKEAddonInterfaceMock.AddFeatureHandlerFunc: method is nil but RKEAddonInterface.AddFeatureHandler was just called")
+		panic("RkeAddonInterfaceMock.AddFeatureHandlerFunc: method is nil but RkeAddonInterface.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEAddonHandlerFunc
+		Sync    v3.RkeAddonHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockRKEAddonInterfaceMockAddFeatureHandler.Lock()
+	lockRkeAddonInterfaceMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockRKEAddonInterfaceMockAddFeatureHandler.Unlock()
+	lockRkeAddonInterfaceMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedRKEAddonInterface.AddFeatureHandlerCalls())
-func (mock *RKEAddonInterfaceMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedRkeAddonInterface.AddFeatureHandlerCalls())
+func (mock *RkeAddonInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.RKEAddonHandlerFunc
+	Sync    v3.RkeAddonHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEAddonHandlerFunc
+		Sync    v3.RkeAddonHandlerFunc
 	}
-	lockRKEAddonInterfaceMockAddFeatureHandler.RLock()
+	lockRkeAddonInterfaceMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockRKEAddonInterfaceMockAddFeatureHandler.RUnlock()
+	lockRkeAddonInterfaceMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureLifecycle calls AddFeatureLifecycleFunc.
-func (mock *RKEAddonInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEAddonLifecycle) {
+func (mock *RkeAddonInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeAddonLifecycle) {
 	if mock.AddFeatureLifecycleFunc == nil {
-		panic("RKEAddonInterfaceMock.AddFeatureLifecycleFunc: method is nil but RKEAddonInterface.AddFeatureLifecycle was just called")
+		panic("RkeAddonInterfaceMock.AddFeatureLifecycleFunc: method is nil but RkeAddonInterface.AddFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.RKEAddonLifecycle
+		Lifecycle v3.RkeAddonLifecycle
 	}{
 		Ctx:       ctx,
 		Enabled:   enabled,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockRKEAddonInterfaceMockAddFeatureLifecycle.Lock()
+	lockRkeAddonInterfaceMockAddFeatureLifecycle.Lock()
 	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
-	lockRKEAddonInterfaceMockAddFeatureLifecycle.Unlock()
+	lockRkeAddonInterfaceMockAddFeatureLifecycle.Unlock()
 	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
 }
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedRKEAddonInterface.AddFeatureLifecycleCalls())
-func (mock *RKEAddonInterfaceMock) AddFeatureLifecycleCalls() []struct {
+//     len(mockedRkeAddonInterface.AddFeatureLifecycleCalls())
+func (mock *RkeAddonInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
 	Name      string
-	Lifecycle v3.RKEAddonLifecycle
+	Lifecycle v3.RkeAddonLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.RKEAddonLifecycle
+		Lifecycle v3.RkeAddonLifecycle
 	}
-	lockRKEAddonInterfaceMockAddFeatureLifecycle.RLock()
+	lockRkeAddonInterfaceMockAddFeatureLifecycle.RLock()
 	calls = mock.calls.AddFeatureLifecycle
-	lockRKEAddonInterfaceMockAddFeatureLifecycle.RUnlock()
+	lockRkeAddonInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *RKEAddonInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.RKEAddonHandlerFunc) {
+func (mock *RkeAddonInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.RkeAddonHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("RKEAddonInterfaceMock.AddHandlerFunc: method is nil but RKEAddonInterface.AddHandler was just called")
+		panic("RkeAddonInterfaceMock.AddHandlerFunc: method is nil but RkeAddonInterface.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.RKEAddonHandlerFunc
+		Sync v3.RkeAddonHandlerFunc
 	}{
 		Ctx:  ctx,
 		Name: name,
 		Sync: sync,
 	}
-	lockRKEAddonInterfaceMockAddHandler.Lock()
+	lockRkeAddonInterfaceMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockRKEAddonInterfaceMockAddHandler.Unlock()
+	lockRkeAddonInterfaceMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, sync)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedRKEAddonInterface.AddHandlerCalls())
-func (mock *RKEAddonInterfaceMock) AddHandlerCalls() []struct {
+//     len(mockedRkeAddonInterface.AddHandlerCalls())
+func (mock *RkeAddonInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
-	Sync v3.RKEAddonHandlerFunc
+	Sync v3.RkeAddonHandlerFunc
 } {
 	var calls []struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.RKEAddonHandlerFunc
+		Sync v3.RkeAddonHandlerFunc
 	}
-	lockRKEAddonInterfaceMockAddHandler.RLock()
+	lockRkeAddonInterfaceMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockRKEAddonInterfaceMockAddHandler.RUnlock()
+	lockRkeAddonInterfaceMockAddHandler.RUnlock()
 	return calls
 }
 
 // AddLifecycle calls AddLifecycleFunc.
-func (mock *RKEAddonInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.RKEAddonLifecycle) {
+func (mock *RkeAddonInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.RkeAddonLifecycle) {
 	if mock.AddLifecycleFunc == nil {
-		panic("RKEAddonInterfaceMock.AddLifecycleFunc: method is nil but RKEAddonInterface.AddLifecycle was just called")
+		panic("RkeAddonInterfaceMock.AddLifecycleFunc: method is nil but RkeAddonInterface.AddLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.RKEAddonLifecycle
+		Lifecycle v3.RkeAddonLifecycle
 	}{
 		Ctx:       ctx,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockRKEAddonInterfaceMockAddLifecycle.Lock()
+	lockRkeAddonInterfaceMockAddLifecycle.Lock()
 	mock.calls.AddLifecycle = append(mock.calls.AddLifecycle, callInfo)
-	lockRKEAddonInterfaceMockAddLifecycle.Unlock()
+	lockRkeAddonInterfaceMockAddLifecycle.Unlock()
 	mock.AddLifecycleFunc(ctx, name, lifecycle)
 }
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedRKEAddonInterface.AddLifecycleCalls())
-func (mock *RKEAddonInterfaceMock) AddLifecycleCalls() []struct {
+//     len(mockedRkeAddonInterface.AddLifecycleCalls())
+func (mock *RkeAddonInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
-	Lifecycle v3.RKEAddonLifecycle
+	Lifecycle v3.RkeAddonLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.RKEAddonLifecycle
+		Lifecycle v3.RkeAddonLifecycle
 	}
-	lockRKEAddonInterfaceMockAddLifecycle.RLock()
+	lockRkeAddonInterfaceMockAddLifecycle.RLock()
 	calls = mock.calls.AddLifecycle
-	lockRKEAddonInterfaceMockAddLifecycle.RUnlock()
+	lockRkeAddonInterfaceMockAddLifecycle.RUnlock()
 	return calls
 }
 
 // Controller calls ControllerFunc.
-func (mock *RKEAddonInterfaceMock) Controller() v3.RKEAddonController {
+func (mock *RkeAddonInterfaceMock) Controller() v3.RkeAddonController {
 	if mock.ControllerFunc == nil {
-		panic("RKEAddonInterfaceMock.ControllerFunc: method is nil but RKEAddonInterface.Controller was just called")
+		panic("RkeAddonInterfaceMock.ControllerFunc: method is nil but RkeAddonInterface.Controller was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEAddonInterfaceMockController.Lock()
+	lockRkeAddonInterfaceMockController.Lock()
 	mock.calls.Controller = append(mock.calls.Controller, callInfo)
-	lockRKEAddonInterfaceMockController.Unlock()
+	lockRkeAddonInterfaceMockController.Unlock()
 	return mock.ControllerFunc()
 }
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedRKEAddonInterface.ControllerCalls())
-func (mock *RKEAddonInterfaceMock) ControllerCalls() []struct {
+//     len(mockedRkeAddonInterface.ControllerCalls())
+func (mock *RkeAddonInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEAddonInterfaceMockController.RLock()
+	lockRkeAddonInterfaceMockController.RLock()
 	calls = mock.calls.Controller
-	lockRKEAddonInterfaceMockController.RUnlock()
+	lockRkeAddonInterfaceMockController.RUnlock()
 	return calls
 }
 
 // Create calls CreateFunc.
-func (mock *RKEAddonInterfaceMock) Create(in1 *v3.RKEAddon) (*v3.RKEAddon, error) {
+func (mock *RkeAddonInterfaceMock) Create(in1 *v3.RkeAddon) (*v3.RkeAddon, error) {
 	if mock.CreateFunc == nil {
-		panic("RKEAddonInterfaceMock.CreateFunc: method is nil but RKEAddonInterface.Create was just called")
+		panic("RkeAddonInterfaceMock.CreateFunc: method is nil but RkeAddonInterface.Create was just called")
 	}
 	callInfo := struct {
-		In1 *v3.RKEAddon
+		In1 *v3.RkeAddon
 	}{
 		In1: in1,
 	}
-	lockRKEAddonInterfaceMockCreate.Lock()
+	lockRkeAddonInterfaceMockCreate.Lock()
 	mock.calls.Create = append(mock.calls.Create, callInfo)
-	lockRKEAddonInterfaceMockCreate.Unlock()
+	lockRkeAddonInterfaceMockCreate.Unlock()
 	return mock.CreateFunc(in1)
 }
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedRKEAddonInterface.CreateCalls())
-func (mock *RKEAddonInterfaceMock) CreateCalls() []struct {
-	In1 *v3.RKEAddon
+//     len(mockedRkeAddonInterface.CreateCalls())
+func (mock *RkeAddonInterfaceMock) CreateCalls() []struct {
+	In1 *v3.RkeAddon
 } {
 	var calls []struct {
-		In1 *v3.RKEAddon
+		In1 *v3.RkeAddon
 	}
-	lockRKEAddonInterfaceMockCreate.RLock()
+	lockRkeAddonInterfaceMockCreate.RLock()
 	calls = mock.calls.Create
-	lockRKEAddonInterfaceMockCreate.RUnlock()
+	lockRkeAddonInterfaceMockCreate.RUnlock()
 	return calls
 }
 
 // Delete calls DeleteFunc.
-func (mock *RKEAddonInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
+func (mock *RkeAddonInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
 	if mock.DeleteFunc == nil {
-		panic("RKEAddonInterfaceMock.DeleteFunc: method is nil but RKEAddonInterface.Delete was just called")
+		panic("RkeAddonInterfaceMock.DeleteFunc: method is nil but RkeAddonInterface.Delete was just called")
 	}
 	callInfo := struct {
 		Name    string
@@ -1451,16 +1359,16 @@ func (mock *RKEAddonInterfaceMock) Delete(name string, options *v1.DeleteOptions
 		Name:    name,
 		Options: options,
 	}
-	lockRKEAddonInterfaceMockDelete.Lock()
+	lockRkeAddonInterfaceMockDelete.Lock()
 	mock.calls.Delete = append(mock.calls.Delete, callInfo)
-	lockRKEAddonInterfaceMockDelete.Unlock()
+	lockRkeAddonInterfaceMockDelete.Unlock()
 	return mock.DeleteFunc(name, options)
 }
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedRKEAddonInterface.DeleteCalls())
-func (mock *RKEAddonInterfaceMock) DeleteCalls() []struct {
+//     len(mockedRkeAddonInterface.DeleteCalls())
+func (mock *RkeAddonInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *v1.DeleteOptions
 } {
@@ -1468,16 +1376,16 @@ func (mock *RKEAddonInterfaceMock) DeleteCalls() []struct {
 		Name    string
 		Options *v1.DeleteOptions
 	}
-	lockRKEAddonInterfaceMockDelete.RLock()
+	lockRkeAddonInterfaceMockDelete.RLock()
 	calls = mock.calls.Delete
-	lockRKEAddonInterfaceMockDelete.RUnlock()
+	lockRkeAddonInterfaceMockDelete.RUnlock()
 	return calls
 }
 
 // DeleteCollection calls DeleteCollectionFunc.
-func (mock *RKEAddonInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (mock *RkeAddonInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
 	if mock.DeleteCollectionFunc == nil {
-		panic("RKEAddonInterfaceMock.DeleteCollectionFunc: method is nil but RKEAddonInterface.DeleteCollection was just called")
+		panic("RkeAddonInterfaceMock.DeleteCollectionFunc: method is nil but RkeAddonInterface.DeleteCollection was just called")
 	}
 	callInfo := struct {
 		DeleteOpts *v1.DeleteOptions
@@ -1486,16 +1394,16 @@ func (mock *RKEAddonInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions
 		DeleteOpts: deleteOpts,
 		ListOpts:   listOpts,
 	}
-	lockRKEAddonInterfaceMockDeleteCollection.Lock()
+	lockRkeAddonInterfaceMockDeleteCollection.Lock()
 	mock.calls.DeleteCollection = append(mock.calls.DeleteCollection, callInfo)
-	lockRKEAddonInterfaceMockDeleteCollection.Unlock()
+	lockRkeAddonInterfaceMockDeleteCollection.Unlock()
 	return mock.DeleteCollectionFunc(deleteOpts, listOpts)
 }
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedRKEAddonInterface.DeleteCollectionCalls())
-func (mock *RKEAddonInterfaceMock) DeleteCollectionCalls() []struct {
+//     len(mockedRkeAddonInterface.DeleteCollectionCalls())
+func (mock *RkeAddonInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *v1.DeleteOptions
 	ListOpts   v1.ListOptions
 } {
@@ -1503,16 +1411,16 @@ func (mock *RKEAddonInterfaceMock) DeleteCollectionCalls() []struct {
 		DeleteOpts *v1.DeleteOptions
 		ListOpts   v1.ListOptions
 	}
-	lockRKEAddonInterfaceMockDeleteCollection.RLock()
+	lockRkeAddonInterfaceMockDeleteCollection.RLock()
 	calls = mock.calls.DeleteCollection
-	lockRKEAddonInterfaceMockDeleteCollection.RUnlock()
+	lockRkeAddonInterfaceMockDeleteCollection.RUnlock()
 	return calls
 }
 
 // DeleteNamespaced calls DeleteNamespacedFunc.
-func (mock *RKEAddonInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
+func (mock *RkeAddonInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
 	if mock.DeleteNamespacedFunc == nil {
-		panic("RKEAddonInterfaceMock.DeleteNamespacedFunc: method is nil but RKEAddonInterface.DeleteNamespaced was just called")
+		panic("RkeAddonInterfaceMock.DeleteNamespacedFunc: method is nil but RkeAddonInterface.DeleteNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1523,16 +1431,16 @@ func (mock *RKEAddonInterfaceMock) DeleteNamespaced(namespace string, name strin
 		Name:      name,
 		Options:   options,
 	}
-	lockRKEAddonInterfaceMockDeleteNamespaced.Lock()
+	lockRkeAddonInterfaceMockDeleteNamespaced.Lock()
 	mock.calls.DeleteNamespaced = append(mock.calls.DeleteNamespaced, callInfo)
-	lockRKEAddonInterfaceMockDeleteNamespaced.Unlock()
+	lockRkeAddonInterfaceMockDeleteNamespaced.Unlock()
 	return mock.DeleteNamespacedFunc(namespace, name, options)
 }
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedRKEAddonInterface.DeleteNamespacedCalls())
-func (mock *RKEAddonInterfaceMock) DeleteNamespacedCalls() []struct {
+//     len(mockedRkeAddonInterface.DeleteNamespacedCalls())
+func (mock *RkeAddonInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Options   *v1.DeleteOptions
@@ -1542,16 +1450,16 @@ func (mock *RKEAddonInterfaceMock) DeleteNamespacedCalls() []struct {
 		Name      string
 		Options   *v1.DeleteOptions
 	}
-	lockRKEAddonInterfaceMockDeleteNamespaced.RLock()
+	lockRkeAddonInterfaceMockDeleteNamespaced.RLock()
 	calls = mock.calls.DeleteNamespaced
-	lockRKEAddonInterfaceMockDeleteNamespaced.RUnlock()
+	lockRkeAddonInterfaceMockDeleteNamespaced.RUnlock()
 	return calls
 }
 
 // Get calls GetFunc.
-func (mock *RKEAddonInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.RKEAddon, error) {
+func (mock *RkeAddonInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.RkeAddon, error) {
 	if mock.GetFunc == nil {
-		panic("RKEAddonInterfaceMock.GetFunc: method is nil but RKEAddonInterface.Get was just called")
+		panic("RkeAddonInterfaceMock.GetFunc: method is nil but RkeAddonInterface.Get was just called")
 	}
 	callInfo := struct {
 		Name string
@@ -1560,16 +1468,16 @@ func (mock *RKEAddonInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.RKE
 		Name: name,
 		Opts: opts,
 	}
-	lockRKEAddonInterfaceMockGet.Lock()
+	lockRkeAddonInterfaceMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockRKEAddonInterfaceMockGet.Unlock()
+	lockRkeAddonInterfaceMockGet.Unlock()
 	return mock.GetFunc(name, opts)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedRKEAddonInterface.GetCalls())
-func (mock *RKEAddonInterfaceMock) GetCalls() []struct {
+//     len(mockedRkeAddonInterface.GetCalls())
+func (mock *RkeAddonInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts v1.GetOptions
 } {
@@ -1577,16 +1485,16 @@ func (mock *RKEAddonInterfaceMock) GetCalls() []struct {
 		Name string
 		Opts v1.GetOptions
 	}
-	lockRKEAddonInterfaceMockGet.RLock()
+	lockRkeAddonInterfaceMockGet.RLock()
 	calls = mock.calls.Get
-	lockRKEAddonInterfaceMockGet.RUnlock()
+	lockRkeAddonInterfaceMockGet.RUnlock()
 	return calls
 }
 
 // GetNamespaced calls GetNamespacedFunc.
-func (mock *RKEAddonInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.RKEAddon, error) {
+func (mock *RkeAddonInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.RkeAddon, error) {
 	if mock.GetNamespacedFunc == nil {
-		panic("RKEAddonInterfaceMock.GetNamespacedFunc: method is nil but RKEAddonInterface.GetNamespaced was just called")
+		panic("RkeAddonInterfaceMock.GetNamespacedFunc: method is nil but RkeAddonInterface.GetNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1597,16 +1505,16 @@ func (mock *RKEAddonInterfaceMock) GetNamespaced(namespace string, name string, 
 		Name:      name,
 		Opts:      opts,
 	}
-	lockRKEAddonInterfaceMockGetNamespaced.Lock()
+	lockRkeAddonInterfaceMockGetNamespaced.Lock()
 	mock.calls.GetNamespaced = append(mock.calls.GetNamespaced, callInfo)
-	lockRKEAddonInterfaceMockGetNamespaced.Unlock()
+	lockRkeAddonInterfaceMockGetNamespaced.Unlock()
 	return mock.GetNamespacedFunc(namespace, name, opts)
 }
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedRKEAddonInterface.GetNamespacedCalls())
-func (mock *RKEAddonInterfaceMock) GetNamespacedCalls() []struct {
+//     len(mockedRkeAddonInterface.GetNamespacedCalls())
+func (mock *RkeAddonInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Opts      v1.GetOptions
@@ -1616,47 +1524,47 @@ func (mock *RKEAddonInterfaceMock) GetNamespacedCalls() []struct {
 		Name      string
 		Opts      v1.GetOptions
 	}
-	lockRKEAddonInterfaceMockGetNamespaced.RLock()
+	lockRkeAddonInterfaceMockGetNamespaced.RLock()
 	calls = mock.calls.GetNamespaced
-	lockRKEAddonInterfaceMockGetNamespaced.RUnlock()
+	lockRkeAddonInterfaceMockGetNamespaced.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *RKEAddonInterfaceMock) List(opts v1.ListOptions) (*v3.RKEAddonList, error) {
+func (mock *RkeAddonInterfaceMock) List(opts v1.ListOptions) (*v3.RkeAddonList, error) {
 	if mock.ListFunc == nil {
-		panic("RKEAddonInterfaceMock.ListFunc: method is nil but RKEAddonInterface.List was just called")
+		panic("RkeAddonInterfaceMock.ListFunc: method is nil but RkeAddonInterface.List was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockRKEAddonInterfaceMockList.Lock()
+	lockRkeAddonInterfaceMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockRKEAddonInterfaceMockList.Unlock()
+	lockRkeAddonInterfaceMockList.Unlock()
 	return mock.ListFunc(opts)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedRKEAddonInterface.ListCalls())
-func (mock *RKEAddonInterfaceMock) ListCalls() []struct {
+//     len(mockedRkeAddonInterface.ListCalls())
+func (mock *RkeAddonInterfaceMock) ListCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockRKEAddonInterfaceMockList.RLock()
+	lockRkeAddonInterfaceMockList.RLock()
 	calls = mock.calls.List
-	lockRKEAddonInterfaceMockList.RUnlock()
+	lockRkeAddonInterfaceMockList.RUnlock()
 	return calls
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *RKEAddonInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.RKEAddonList, error) {
+func (mock *RkeAddonInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.RkeAddonList, error) {
 	if mock.ListNamespacedFunc == nil {
-		panic("RKEAddonInterfaceMock.ListNamespacedFunc: method is nil but RKEAddonInterface.ListNamespaced was just called")
+		panic("RkeAddonInterfaceMock.ListNamespacedFunc: method is nil but RkeAddonInterface.ListNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1665,16 +1573,16 @@ func (mock *RKEAddonInterfaceMock) ListNamespaced(namespace string, opts v1.List
 		Namespace: namespace,
 		Opts:      opts,
 	}
-	lockRKEAddonInterfaceMockListNamespaced.Lock()
+	lockRkeAddonInterfaceMockListNamespaced.Lock()
 	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
-	lockRKEAddonInterfaceMockListNamespaced.Unlock()
+	lockRkeAddonInterfaceMockListNamespaced.Unlock()
 	return mock.ListNamespacedFunc(namespace, opts)
 }
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedRKEAddonInterface.ListNamespacedCalls())
-func (mock *RKEAddonInterfaceMock) ListNamespacedCalls() []struct {
+//     len(mockedRkeAddonInterface.ListNamespacedCalls())
+func (mock *RkeAddonInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      v1.ListOptions
 } {
@@ -1682,164 +1590,164 @@ func (mock *RKEAddonInterfaceMock) ListNamespacedCalls() []struct {
 		Namespace string
 		Opts      v1.ListOptions
 	}
-	lockRKEAddonInterfaceMockListNamespaced.RLock()
+	lockRkeAddonInterfaceMockListNamespaced.RLock()
 	calls = mock.calls.ListNamespaced
-	lockRKEAddonInterfaceMockListNamespaced.RUnlock()
+	lockRkeAddonInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 
 // ObjectClient calls ObjectClientFunc.
-func (mock *RKEAddonInterfaceMock) ObjectClient() *objectclient.ObjectClient {
+func (mock *RkeAddonInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 	if mock.ObjectClientFunc == nil {
-		panic("RKEAddonInterfaceMock.ObjectClientFunc: method is nil but RKEAddonInterface.ObjectClient was just called")
+		panic("RkeAddonInterfaceMock.ObjectClientFunc: method is nil but RkeAddonInterface.ObjectClient was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEAddonInterfaceMockObjectClient.Lock()
+	lockRkeAddonInterfaceMockObjectClient.Lock()
 	mock.calls.ObjectClient = append(mock.calls.ObjectClient, callInfo)
-	lockRKEAddonInterfaceMockObjectClient.Unlock()
+	lockRkeAddonInterfaceMockObjectClient.Unlock()
 	return mock.ObjectClientFunc()
 }
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedRKEAddonInterface.ObjectClientCalls())
-func (mock *RKEAddonInterfaceMock) ObjectClientCalls() []struct {
+//     len(mockedRkeAddonInterface.ObjectClientCalls())
+func (mock *RkeAddonInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEAddonInterfaceMockObjectClient.RLock()
+	lockRkeAddonInterfaceMockObjectClient.RLock()
 	calls = mock.calls.ObjectClient
-	lockRKEAddonInterfaceMockObjectClient.RUnlock()
+	lockRkeAddonInterfaceMockObjectClient.RUnlock()
 	return calls
 }
 
 // Update calls UpdateFunc.
-func (mock *RKEAddonInterfaceMock) Update(in1 *v3.RKEAddon) (*v3.RKEAddon, error) {
+func (mock *RkeAddonInterfaceMock) Update(in1 *v3.RkeAddon) (*v3.RkeAddon, error) {
 	if mock.UpdateFunc == nil {
-		panic("RKEAddonInterfaceMock.UpdateFunc: method is nil but RKEAddonInterface.Update was just called")
+		panic("RkeAddonInterfaceMock.UpdateFunc: method is nil but RkeAddonInterface.Update was just called")
 	}
 	callInfo := struct {
-		In1 *v3.RKEAddon
+		In1 *v3.RkeAddon
 	}{
 		In1: in1,
 	}
-	lockRKEAddonInterfaceMockUpdate.Lock()
+	lockRkeAddonInterfaceMockUpdate.Lock()
 	mock.calls.Update = append(mock.calls.Update, callInfo)
-	lockRKEAddonInterfaceMockUpdate.Unlock()
+	lockRkeAddonInterfaceMockUpdate.Unlock()
 	return mock.UpdateFunc(in1)
 }
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedRKEAddonInterface.UpdateCalls())
-func (mock *RKEAddonInterfaceMock) UpdateCalls() []struct {
-	In1 *v3.RKEAddon
+//     len(mockedRkeAddonInterface.UpdateCalls())
+func (mock *RkeAddonInterfaceMock) UpdateCalls() []struct {
+	In1 *v3.RkeAddon
 } {
 	var calls []struct {
-		In1 *v3.RKEAddon
+		In1 *v3.RkeAddon
 	}
-	lockRKEAddonInterfaceMockUpdate.RLock()
+	lockRkeAddonInterfaceMockUpdate.RLock()
 	calls = mock.calls.Update
-	lockRKEAddonInterfaceMockUpdate.RUnlock()
+	lockRkeAddonInterfaceMockUpdate.RUnlock()
 	return calls
 }
 
 // Watch calls WatchFunc.
-func (mock *RKEAddonInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (mock *RkeAddonInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	if mock.WatchFunc == nil {
-		panic("RKEAddonInterfaceMock.WatchFunc: method is nil but RKEAddonInterface.Watch was just called")
+		panic("RkeAddonInterfaceMock.WatchFunc: method is nil but RkeAddonInterface.Watch was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockRKEAddonInterfaceMockWatch.Lock()
+	lockRkeAddonInterfaceMockWatch.Lock()
 	mock.calls.Watch = append(mock.calls.Watch, callInfo)
-	lockRKEAddonInterfaceMockWatch.Unlock()
+	lockRkeAddonInterfaceMockWatch.Unlock()
 	return mock.WatchFunc(opts)
 }
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedRKEAddonInterface.WatchCalls())
-func (mock *RKEAddonInterfaceMock) WatchCalls() []struct {
+//     len(mockedRkeAddonInterface.WatchCalls())
+func (mock *RkeAddonInterfaceMock) WatchCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockRKEAddonInterfaceMockWatch.RLock()
+	lockRkeAddonInterfaceMockWatch.RLock()
 	calls = mock.calls.Watch
-	lockRKEAddonInterfaceMockWatch.RUnlock()
+	lockRkeAddonInterfaceMockWatch.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEAddonsGetterMockRKEAddons sync.RWMutex
+	lockRkeAddonsGetterMockRkeAddons sync.RWMutex
 )
 
-// Ensure, that RKEAddonsGetterMock does implement RKEAddonsGetter.
+// Ensure, that RkeAddonsGetterMock does implement RkeAddonsGetter.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEAddonsGetter = &RKEAddonsGetterMock{}
+var _ v3.RkeAddonsGetter = &RkeAddonsGetterMock{}
 
-// RKEAddonsGetterMock is a mock implementation of RKEAddonsGetter.
+// RkeAddonsGetterMock is a mock implementation of RkeAddonsGetter.
 //
-//     func TestSomethingThatUsesRKEAddonsGetter(t *testing.T) {
+//     func TestSomethingThatUsesRkeAddonsGetter(t *testing.T) {
 //
-//         // make and configure a mocked RKEAddonsGetter
-//         mockedRKEAddonsGetter := &RKEAddonsGetterMock{
-//             RKEAddonsFunc: func(namespace string) v3.RKEAddonInterface {
-// 	               panic("mock out the RKEAddons method")
+//         // make and configure a mocked RkeAddonsGetter
+//         mockedRkeAddonsGetter := &RkeAddonsGetterMock{
+//             RkeAddonsFunc: func(namespace string) v3.RkeAddonInterface {
+// 	               panic("mock out the RkeAddons method")
 //             },
 //         }
 //
-//         // use mockedRKEAddonsGetter in code that requires RKEAddonsGetter
+//         // use mockedRkeAddonsGetter in code that requires RkeAddonsGetter
 //         // and then make assertions.
 //
 //     }
-type RKEAddonsGetterMock struct {
-	// RKEAddonsFunc mocks the RKEAddons method.
-	RKEAddonsFunc func(namespace string) v3.RKEAddonInterface
+type RkeAddonsGetterMock struct {
+	// RkeAddonsFunc mocks the RkeAddons method.
+	RkeAddonsFunc func(namespace string) v3.RkeAddonInterface
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// RKEAddons holds details about calls to the RKEAddons method.
-		RKEAddons []struct {
+		// RkeAddons holds details about calls to the RkeAddons method.
+		RkeAddons []struct {
 			// Namespace is the namespace argument value.
 			Namespace string
 		}
 	}
 }
 
-// RKEAddons calls RKEAddonsFunc.
-func (mock *RKEAddonsGetterMock) RKEAddons(namespace string) v3.RKEAddonInterface {
-	if mock.RKEAddonsFunc == nil {
-		panic("RKEAddonsGetterMock.RKEAddonsFunc: method is nil but RKEAddonsGetter.RKEAddons was just called")
+// RkeAddons calls RkeAddonsFunc.
+func (mock *RkeAddonsGetterMock) RkeAddons(namespace string) v3.RkeAddonInterface {
+	if mock.RkeAddonsFunc == nil {
+		panic("RkeAddonsGetterMock.RkeAddonsFunc: method is nil but RkeAddonsGetter.RkeAddons was just called")
 	}
 	callInfo := struct {
 		Namespace string
 	}{
 		Namespace: namespace,
 	}
-	lockRKEAddonsGetterMockRKEAddons.Lock()
-	mock.calls.RKEAddons = append(mock.calls.RKEAddons, callInfo)
-	lockRKEAddonsGetterMockRKEAddons.Unlock()
-	return mock.RKEAddonsFunc(namespace)
+	lockRkeAddonsGetterMockRkeAddons.Lock()
+	mock.calls.RkeAddons = append(mock.calls.RkeAddons, callInfo)
+	lockRkeAddonsGetterMockRkeAddons.Unlock()
+	return mock.RkeAddonsFunc(namespace)
 }
 
-// RKEAddonsCalls gets all the calls that were made to RKEAddons.
+// RkeAddonsCalls gets all the calls that were made to RkeAddons.
 // Check the length with:
-//     len(mockedRKEAddonsGetter.RKEAddonsCalls())
-func (mock *RKEAddonsGetterMock) RKEAddonsCalls() []struct {
+//     len(mockedRkeAddonsGetter.RkeAddonsCalls())
+func (mock *RkeAddonsGetterMock) RkeAddonsCalls() []struct {
 	Namespace string
 } {
 	var calls []struct {
 		Namespace string
 	}
-	lockRKEAddonsGetterMockRKEAddons.RLock()
-	calls = mock.calls.RKEAddons
-	lockRKEAddonsGetterMockRKEAddons.RUnlock()
+	lockRkeAddonsGetterMockRkeAddons.RLock()
+	calls = mock.calls.RkeAddons
+	lockRkeAddonsGetterMockRkeAddons.RUnlock()
 	return calls
 }

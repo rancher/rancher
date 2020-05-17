@@ -18,38 +18,38 @@ import (
 )
 
 var (
-	lockGlobalDNSListerMockGet  sync.RWMutex
-	lockGlobalDNSListerMockList sync.RWMutex
+	lockGlobalDnsListerMockGet  sync.RWMutex
+	lockGlobalDnsListerMockList sync.RWMutex
 )
 
-// Ensure, that GlobalDNSListerMock does implement GlobalDNSLister.
+// Ensure, that GlobalDnsListerMock does implement GlobalDnsLister.
 // If this is not the case, regenerate this file with moq.
-var _ v3.GlobalDNSLister = &GlobalDNSListerMock{}
+var _ v3.GlobalDnsLister = &GlobalDnsListerMock{}
 
-// GlobalDNSListerMock is a mock implementation of GlobalDNSLister.
+// GlobalDnsListerMock is a mock implementation of GlobalDnsLister.
 //
-//     func TestSomethingThatUsesGlobalDNSLister(t *testing.T) {
+//     func TestSomethingThatUsesGlobalDnsLister(t *testing.T) {
 //
-//         // make and configure a mocked GlobalDNSLister
-//         mockedGlobalDNSLister := &GlobalDNSListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.GlobalDNS, error) {
+//         // make and configure a mocked GlobalDnsLister
+//         mockedGlobalDnsLister := &GlobalDnsListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.GlobalDns, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.GlobalDNS, error) {
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.GlobalDns, error) {
 // 	               panic("mock out the List method")
 //             },
 //         }
 //
-//         // use mockedGlobalDNSLister in code that requires GlobalDNSLister
+//         // use mockedGlobalDnsLister in code that requires GlobalDnsLister
 //         // and then make assertions.
 //
 //     }
-type GlobalDNSListerMock struct {
+type GlobalDnsListerMock struct {
 	// GetFunc mocks the Get method.
-	GetFunc func(namespace string, name string) (*v3.GlobalDNS, error)
+	GetFunc func(namespace string, name string) (*v3.GlobalDns, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(namespace string, selector labels.Selector) ([]*v3.GlobalDNS, error)
+	ListFunc func(namespace string, selector labels.Selector) ([]*v3.GlobalDns, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -71,9 +71,9 @@ type GlobalDNSListerMock struct {
 }
 
 // Get calls GetFunc.
-func (mock *GlobalDNSListerMock) Get(namespace string, name string) (*v3.GlobalDNS, error) {
+func (mock *GlobalDnsListerMock) Get(namespace string, name string) (*v3.GlobalDns, error) {
 	if mock.GetFunc == nil {
-		panic("GlobalDNSListerMock.GetFunc: method is nil but GlobalDNSLister.Get was just called")
+		panic("GlobalDnsListerMock.GetFunc: method is nil but GlobalDnsLister.Get was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -82,16 +82,16 @@ func (mock *GlobalDNSListerMock) Get(namespace string, name string) (*v3.GlobalD
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockGlobalDNSListerMockGet.Lock()
+	lockGlobalDnsListerMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockGlobalDNSListerMockGet.Unlock()
+	lockGlobalDnsListerMockGet.Unlock()
 	return mock.GetFunc(namespace, name)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedGlobalDNSLister.GetCalls())
-func (mock *GlobalDNSListerMock) GetCalls() []struct {
+//     len(mockedGlobalDnsLister.GetCalls())
+func (mock *GlobalDnsListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -99,16 +99,16 @@ func (mock *GlobalDNSListerMock) GetCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockGlobalDNSListerMockGet.RLock()
+	lockGlobalDnsListerMockGet.RLock()
 	calls = mock.calls.Get
-	lockGlobalDNSListerMockGet.RUnlock()
+	lockGlobalDnsListerMockGet.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *GlobalDNSListerMock) List(namespace string, selector labels.Selector) ([]*v3.GlobalDNS, error) {
+func (mock *GlobalDnsListerMock) List(namespace string, selector labels.Selector) ([]*v3.GlobalDns, error) {
 	if mock.ListFunc == nil {
-		panic("GlobalDNSListerMock.ListFunc: method is nil but GlobalDNSLister.List was just called")
+		panic("GlobalDnsListerMock.ListFunc: method is nil but GlobalDnsLister.List was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -117,16 +117,16 @@ func (mock *GlobalDNSListerMock) List(namespace string, selector labels.Selector
 		Namespace: namespace,
 		Selector:  selector,
 	}
-	lockGlobalDNSListerMockList.Lock()
+	lockGlobalDnsListerMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockGlobalDNSListerMockList.Unlock()
+	lockGlobalDnsListerMockList.Unlock()
 	return mock.ListFunc(namespace, selector)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedGlobalDNSLister.ListCalls())
-func (mock *GlobalDNSListerMock) ListCalls() []struct {
+//     len(mockedGlobalDnsLister.ListCalls())
+func (mock *GlobalDnsListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
 } {
@@ -134,46 +134,44 @@ func (mock *GlobalDNSListerMock) ListCalls() []struct {
 		Namespace string
 		Selector  labels.Selector
 	}
-	lockGlobalDNSListerMockList.RLock()
+	lockGlobalDnsListerMockList.RLock()
 	calls = mock.calls.List
-	lockGlobalDNSListerMockList.RUnlock()
+	lockGlobalDnsListerMockList.RUnlock()
 	return calls
 }
 
 var (
-	lockGlobalDNSControllerMockAddClusterScopedFeatureHandler sync.RWMutex
-	lockGlobalDNSControllerMockAddClusterScopedHandler        sync.RWMutex
-	lockGlobalDNSControllerMockAddFeatureHandler              sync.RWMutex
-	lockGlobalDNSControllerMockAddHandler                     sync.RWMutex
-	lockGlobalDNSControllerMockEnqueue                        sync.RWMutex
-	lockGlobalDNSControllerMockEnqueueAfter                   sync.RWMutex
-	lockGlobalDNSControllerMockGeneric                        sync.RWMutex
-	lockGlobalDNSControllerMockInformer                       sync.RWMutex
-	lockGlobalDNSControllerMockLister                         sync.RWMutex
-	lockGlobalDNSControllerMockStart                          sync.RWMutex
-	lockGlobalDNSControllerMockSync                           sync.RWMutex
+	lockGlobalDnsControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockGlobalDnsControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockGlobalDnsControllerMockAddFeatureHandler              sync.RWMutex
+	lockGlobalDnsControllerMockAddHandler                     sync.RWMutex
+	lockGlobalDnsControllerMockEnqueue                        sync.RWMutex
+	lockGlobalDnsControllerMockEnqueueAfter                   sync.RWMutex
+	lockGlobalDnsControllerMockGeneric                        sync.RWMutex
+	lockGlobalDnsControllerMockInformer                       sync.RWMutex
+	lockGlobalDnsControllerMockLister                         sync.RWMutex
 )
 
-// Ensure, that GlobalDNSControllerMock does implement GlobalDNSController.
+// Ensure, that GlobalDnsControllerMock does implement GlobalDnsController.
 // If this is not the case, regenerate this file with moq.
-var _ v3.GlobalDNSController = &GlobalDNSControllerMock{}
+var _ v3.GlobalDnsController = &GlobalDnsControllerMock{}
 
-// GlobalDNSControllerMock is a mock implementation of GlobalDNSController.
+// GlobalDnsControllerMock is a mock implementation of GlobalDnsController.
 //
-//     func TestSomethingThatUsesGlobalDNSController(t *testing.T) {
+//     func TestSomethingThatUsesGlobalDnsController(t *testing.T) {
 //
-//         // make and configure a mocked GlobalDNSController
-//         mockedGlobalDNSController := &GlobalDNSControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.GlobalDNSHandlerFunc)  {
+//         // make and configure a mocked GlobalDnsController
+//         mockedGlobalDnsController := &GlobalDnsControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.GlobalDnsHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.GlobalDNSHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.GlobalDnsHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDNSHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDnsHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.GlobalDNSHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.GlobalDnsHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
 //             EnqueueFunc: func(namespace string, name string)  {
@@ -188,33 +186,27 @@ var _ v3.GlobalDNSController = &GlobalDNSControllerMock{}
 //             InformerFunc: func() cache.SharedIndexInformer {
 // 	               panic("mock out the Informer method")
 //             },
-//             ListerFunc: func() v3.GlobalDNSLister {
+//             ListerFunc: func() v3.GlobalDnsLister {
 // 	               panic("mock out the Lister method")
-//             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
 //             },
 //         }
 //
-//         // use mockedGlobalDNSController in code that requires GlobalDNSController
+//         // use mockedGlobalDnsController in code that requires GlobalDnsController
 //         // and then make assertions.
 //
 //     }
-type GlobalDNSControllerMock struct {
+type GlobalDnsControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.GlobalDNSHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.GlobalDnsHandlerFunc)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.GlobalDNSHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.GlobalDnsHandlerFunc)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDNSHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDnsHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, handler v3.GlobalDNSHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, handler v3.GlobalDnsHandlerFunc)
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
@@ -229,13 +221,7 @@ type GlobalDNSControllerMock struct {
 	InformerFunc func() cache.SharedIndexInformer
 
 	// ListerFunc mocks the Lister method.
-	ListerFunc func() v3.GlobalDNSLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
+	ListerFunc func() v3.GlobalDnsLister
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -250,7 +236,7 @@ type GlobalDNSControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.GlobalDNSHandlerFunc
+			Handler v3.GlobalDnsHandlerFunc
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -261,7 +247,7 @@ type GlobalDNSControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.GlobalDNSHandlerFunc
+			Handler v3.GlobalDnsHandlerFunc
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -272,7 +258,7 @@ type GlobalDNSControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.GlobalDNSHandlerFunc
+			Sync v3.GlobalDnsHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -281,7 +267,7 @@ type GlobalDNSControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Handler is the handler argument value.
-			Handler v3.GlobalDNSHandlerFunc
+			Handler v3.GlobalDnsHandlerFunc
 		}
 		// Enqueue holds details about calls to the Enqueue method.
 		Enqueue []struct {
@@ -308,32 +294,20 @@ type GlobalDNSControllerMock struct {
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
 		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 	}
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *GlobalDNSControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.GlobalDNSHandlerFunc) {
+func (mock *GlobalDnsControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.GlobalDnsHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("GlobalDNSControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but GlobalDNSController.AddClusterScopedFeatureHandler was just called")
+		panic("GlobalDnsControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but GlobalDnsController.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.GlobalDNSHandlerFunc
+		Handler     v3.GlobalDnsHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -341,164 +315,164 @@ func (mock *GlobalDNSControllerMock) AddClusterScopedFeatureHandler(ctx context.
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockGlobalDNSControllerMockAddClusterScopedFeatureHandler.Lock()
+	lockGlobalDnsControllerMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockGlobalDNSControllerMockAddClusterScopedFeatureHandler.Unlock()
+	lockGlobalDnsControllerMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedGlobalDNSController.AddClusterScopedFeatureHandlerCalls())
-func (mock *GlobalDNSControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedGlobalDnsController.AddClusterScopedFeatureHandlerCalls())
+func (mock *GlobalDnsControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Handler     v3.GlobalDNSHandlerFunc
+	Handler     v3.GlobalDnsHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.GlobalDNSHandlerFunc
+		Handler     v3.GlobalDnsHandlerFunc
 	}
-	lockGlobalDNSControllerMockAddClusterScopedFeatureHandler.RLock()
+	lockGlobalDnsControllerMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockGlobalDNSControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	lockGlobalDnsControllerMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *GlobalDNSControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.GlobalDNSHandlerFunc) {
+func (mock *GlobalDnsControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.GlobalDnsHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("GlobalDNSControllerMock.AddClusterScopedHandlerFunc: method is nil but GlobalDNSController.AddClusterScopedHandler was just called")
+		panic("GlobalDnsControllerMock.AddClusterScopedHandlerFunc: method is nil but GlobalDnsController.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.GlobalDNSHandlerFunc
+		Handler     v3.GlobalDnsHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockGlobalDNSControllerMockAddClusterScopedHandler.Lock()
+	lockGlobalDnsControllerMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockGlobalDNSControllerMockAddClusterScopedHandler.Unlock()
+	lockGlobalDnsControllerMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, handler)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedGlobalDNSController.AddClusterScopedHandlerCalls())
-func (mock *GlobalDNSControllerMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedGlobalDnsController.AddClusterScopedHandlerCalls())
+func (mock *GlobalDnsControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Handler     v3.GlobalDNSHandlerFunc
+	Handler     v3.GlobalDnsHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.GlobalDNSHandlerFunc
+		Handler     v3.GlobalDnsHandlerFunc
 	}
-	lockGlobalDNSControllerMockAddClusterScopedHandler.RLock()
+	lockGlobalDnsControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockGlobalDNSControllerMockAddClusterScopedHandler.RUnlock()
+	lockGlobalDnsControllerMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *GlobalDNSControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDNSHandlerFunc) {
+func (mock *GlobalDnsControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDnsHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("GlobalDNSControllerMock.AddFeatureHandlerFunc: method is nil but GlobalDNSController.AddFeatureHandler was just called")
+		panic("GlobalDnsControllerMock.AddFeatureHandlerFunc: method is nil but GlobalDnsController.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.GlobalDNSHandlerFunc
+		Sync    v3.GlobalDnsHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockGlobalDNSControllerMockAddFeatureHandler.Lock()
+	lockGlobalDnsControllerMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockGlobalDNSControllerMockAddFeatureHandler.Unlock()
+	lockGlobalDnsControllerMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedGlobalDNSController.AddFeatureHandlerCalls())
-func (mock *GlobalDNSControllerMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedGlobalDnsController.AddFeatureHandlerCalls())
+func (mock *GlobalDnsControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.GlobalDNSHandlerFunc
+	Sync    v3.GlobalDnsHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.GlobalDNSHandlerFunc
+		Sync    v3.GlobalDnsHandlerFunc
 	}
-	lockGlobalDNSControllerMockAddFeatureHandler.RLock()
+	lockGlobalDnsControllerMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockGlobalDNSControllerMockAddFeatureHandler.RUnlock()
+	lockGlobalDnsControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *GlobalDNSControllerMock) AddHandler(ctx context.Context, name string, handler v3.GlobalDNSHandlerFunc) {
+func (mock *GlobalDnsControllerMock) AddHandler(ctx context.Context, name string, handler v3.GlobalDnsHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("GlobalDNSControllerMock.AddHandlerFunc: method is nil but GlobalDNSController.AddHandler was just called")
+		panic("GlobalDnsControllerMock.AddHandlerFunc: method is nil but GlobalDnsController.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.GlobalDNSHandlerFunc
+		Handler v3.GlobalDnsHandlerFunc
 	}{
 		Ctx:     ctx,
 		Name:    name,
 		Handler: handler,
 	}
-	lockGlobalDNSControllerMockAddHandler.Lock()
+	lockGlobalDnsControllerMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockGlobalDNSControllerMockAddHandler.Unlock()
+	lockGlobalDnsControllerMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, handler)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedGlobalDNSController.AddHandlerCalls())
-func (mock *GlobalDNSControllerMock) AddHandlerCalls() []struct {
+//     len(mockedGlobalDnsController.AddHandlerCalls())
+func (mock *GlobalDnsControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
-	Handler v3.GlobalDNSHandlerFunc
+	Handler v3.GlobalDnsHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.GlobalDNSHandlerFunc
+		Handler v3.GlobalDnsHandlerFunc
 	}
-	lockGlobalDNSControllerMockAddHandler.RLock()
+	lockGlobalDnsControllerMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockGlobalDNSControllerMockAddHandler.RUnlock()
+	lockGlobalDnsControllerMockAddHandler.RUnlock()
 	return calls
 }
 
 // Enqueue calls EnqueueFunc.
-func (mock *GlobalDNSControllerMock) Enqueue(namespace string, name string) {
+func (mock *GlobalDnsControllerMock) Enqueue(namespace string, name string) {
 	if mock.EnqueueFunc == nil {
-		panic("GlobalDNSControllerMock.EnqueueFunc: method is nil but GlobalDNSController.Enqueue was just called")
+		panic("GlobalDnsControllerMock.EnqueueFunc: method is nil but GlobalDnsController.Enqueue was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -507,16 +481,16 @@ func (mock *GlobalDNSControllerMock) Enqueue(namespace string, name string) {
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockGlobalDNSControllerMockEnqueue.Lock()
+	lockGlobalDnsControllerMockEnqueue.Lock()
 	mock.calls.Enqueue = append(mock.calls.Enqueue, callInfo)
-	lockGlobalDNSControllerMockEnqueue.Unlock()
+	lockGlobalDnsControllerMockEnqueue.Unlock()
 	mock.EnqueueFunc(namespace, name)
 }
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedGlobalDNSController.EnqueueCalls())
-func (mock *GlobalDNSControllerMock) EnqueueCalls() []struct {
+//     len(mockedGlobalDnsController.EnqueueCalls())
+func (mock *GlobalDnsControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -524,16 +498,16 @@ func (mock *GlobalDNSControllerMock) EnqueueCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockGlobalDNSControllerMockEnqueue.RLock()
+	lockGlobalDnsControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
-	lockGlobalDNSControllerMockEnqueue.RUnlock()
+	lockGlobalDnsControllerMockEnqueue.RUnlock()
 	return calls
 }
 
 // EnqueueAfter calls EnqueueAfterFunc.
-func (mock *GlobalDNSControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
+func (mock *GlobalDnsControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
 	if mock.EnqueueAfterFunc == nil {
-		panic("GlobalDNSControllerMock.EnqueueAfterFunc: method is nil but GlobalDNSController.EnqueueAfter was just called")
+		panic("GlobalDnsControllerMock.EnqueueAfterFunc: method is nil but GlobalDnsController.EnqueueAfter was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -544,16 +518,16 @@ func (mock *GlobalDNSControllerMock) EnqueueAfter(namespace string, name string,
 		Name:      name,
 		After:     after,
 	}
-	lockGlobalDNSControllerMockEnqueueAfter.Lock()
+	lockGlobalDnsControllerMockEnqueueAfter.Lock()
 	mock.calls.EnqueueAfter = append(mock.calls.EnqueueAfter, callInfo)
-	lockGlobalDNSControllerMockEnqueueAfter.Unlock()
+	lockGlobalDnsControllerMockEnqueueAfter.Unlock()
 	mock.EnqueueAfterFunc(namespace, name, after)
 }
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedGlobalDNSController.EnqueueAfterCalls())
-func (mock *GlobalDNSControllerMock) EnqueueAfterCalls() []struct {
+//     len(mockedGlobalDnsController.EnqueueAfterCalls())
+func (mock *GlobalDnsControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
 	After     time.Duration
@@ -563,217 +537,151 @@ func (mock *GlobalDNSControllerMock) EnqueueAfterCalls() []struct {
 		Name      string
 		After     time.Duration
 	}
-	lockGlobalDNSControllerMockEnqueueAfter.RLock()
+	lockGlobalDnsControllerMockEnqueueAfter.RLock()
 	calls = mock.calls.EnqueueAfter
-	lockGlobalDNSControllerMockEnqueueAfter.RUnlock()
+	lockGlobalDnsControllerMockEnqueueAfter.RUnlock()
 	return calls
 }
 
 // Generic calls GenericFunc.
-func (mock *GlobalDNSControllerMock) Generic() controller.GenericController {
+func (mock *GlobalDnsControllerMock) Generic() controller.GenericController {
 	if mock.GenericFunc == nil {
-		panic("GlobalDNSControllerMock.GenericFunc: method is nil but GlobalDNSController.Generic was just called")
+		panic("GlobalDnsControllerMock.GenericFunc: method is nil but GlobalDnsController.Generic was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockGlobalDNSControllerMockGeneric.Lock()
+	lockGlobalDnsControllerMockGeneric.Lock()
 	mock.calls.Generic = append(mock.calls.Generic, callInfo)
-	lockGlobalDNSControllerMockGeneric.Unlock()
+	lockGlobalDnsControllerMockGeneric.Unlock()
 	return mock.GenericFunc()
 }
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedGlobalDNSController.GenericCalls())
-func (mock *GlobalDNSControllerMock) GenericCalls() []struct {
+//     len(mockedGlobalDnsController.GenericCalls())
+func (mock *GlobalDnsControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockGlobalDNSControllerMockGeneric.RLock()
+	lockGlobalDnsControllerMockGeneric.RLock()
 	calls = mock.calls.Generic
-	lockGlobalDNSControllerMockGeneric.RUnlock()
+	lockGlobalDnsControllerMockGeneric.RUnlock()
 	return calls
 }
 
 // Informer calls InformerFunc.
-func (mock *GlobalDNSControllerMock) Informer() cache.SharedIndexInformer {
+func (mock *GlobalDnsControllerMock) Informer() cache.SharedIndexInformer {
 	if mock.InformerFunc == nil {
-		panic("GlobalDNSControllerMock.InformerFunc: method is nil but GlobalDNSController.Informer was just called")
+		panic("GlobalDnsControllerMock.InformerFunc: method is nil but GlobalDnsController.Informer was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockGlobalDNSControllerMockInformer.Lock()
+	lockGlobalDnsControllerMockInformer.Lock()
 	mock.calls.Informer = append(mock.calls.Informer, callInfo)
-	lockGlobalDNSControllerMockInformer.Unlock()
+	lockGlobalDnsControllerMockInformer.Unlock()
 	return mock.InformerFunc()
 }
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedGlobalDNSController.InformerCalls())
-func (mock *GlobalDNSControllerMock) InformerCalls() []struct {
+//     len(mockedGlobalDnsController.InformerCalls())
+func (mock *GlobalDnsControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockGlobalDNSControllerMockInformer.RLock()
+	lockGlobalDnsControllerMockInformer.RLock()
 	calls = mock.calls.Informer
-	lockGlobalDNSControllerMockInformer.RUnlock()
+	lockGlobalDnsControllerMockInformer.RUnlock()
 	return calls
 }
 
 // Lister calls ListerFunc.
-func (mock *GlobalDNSControllerMock) Lister() v3.GlobalDNSLister {
+func (mock *GlobalDnsControllerMock) Lister() v3.GlobalDnsLister {
 	if mock.ListerFunc == nil {
-		panic("GlobalDNSControllerMock.ListerFunc: method is nil but GlobalDNSController.Lister was just called")
+		panic("GlobalDnsControllerMock.ListerFunc: method is nil but GlobalDnsController.Lister was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockGlobalDNSControllerMockLister.Lock()
+	lockGlobalDnsControllerMockLister.Lock()
 	mock.calls.Lister = append(mock.calls.Lister, callInfo)
-	lockGlobalDNSControllerMockLister.Unlock()
+	lockGlobalDnsControllerMockLister.Unlock()
 	return mock.ListerFunc()
 }
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedGlobalDNSController.ListerCalls())
-func (mock *GlobalDNSControllerMock) ListerCalls() []struct {
+//     len(mockedGlobalDnsController.ListerCalls())
+func (mock *GlobalDnsControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockGlobalDNSControllerMockLister.RLock()
+	lockGlobalDnsControllerMockLister.RLock()
 	calls = mock.calls.Lister
-	lockGlobalDNSControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *GlobalDNSControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("GlobalDNSControllerMock.StartFunc: method is nil but GlobalDNSController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockGlobalDNSControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockGlobalDNSControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedGlobalDNSController.StartCalls())
-func (mock *GlobalDNSControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockGlobalDNSControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockGlobalDNSControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *GlobalDNSControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("GlobalDNSControllerMock.SyncFunc: method is nil but GlobalDNSController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockGlobalDNSControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockGlobalDNSControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedGlobalDNSController.SyncCalls())
-func (mock *GlobalDNSControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockGlobalDNSControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockGlobalDNSControllerMockSync.RUnlock()
+	lockGlobalDnsControllerMockLister.RUnlock()
 	return calls
 }
 
 var (
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
-	lockGlobalDNSInterfaceMockAddClusterScopedHandler          sync.RWMutex
-	lockGlobalDNSInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
-	lockGlobalDNSInterfaceMockAddFeatureHandler                sync.RWMutex
-	lockGlobalDNSInterfaceMockAddFeatureLifecycle              sync.RWMutex
-	lockGlobalDNSInterfaceMockAddHandler                       sync.RWMutex
-	lockGlobalDNSInterfaceMockAddLifecycle                     sync.RWMutex
-	lockGlobalDNSInterfaceMockController                       sync.RWMutex
-	lockGlobalDNSInterfaceMockCreate                           sync.RWMutex
-	lockGlobalDNSInterfaceMockDelete                           sync.RWMutex
-	lockGlobalDNSInterfaceMockDeleteCollection                 sync.RWMutex
-	lockGlobalDNSInterfaceMockDeleteNamespaced                 sync.RWMutex
-	lockGlobalDNSInterfaceMockGet                              sync.RWMutex
-	lockGlobalDNSInterfaceMockGetNamespaced                    sync.RWMutex
-	lockGlobalDNSInterfaceMockList                             sync.RWMutex
-	lockGlobalDNSInterfaceMockListNamespaced                   sync.RWMutex
-	lockGlobalDNSInterfaceMockObjectClient                     sync.RWMutex
-	lockGlobalDNSInterfaceMockUpdate                           sync.RWMutex
-	lockGlobalDNSInterfaceMockWatch                            sync.RWMutex
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockGlobalDnsInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockGlobalDnsInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockGlobalDnsInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockGlobalDnsInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockGlobalDnsInterfaceMockAddHandler                       sync.RWMutex
+	lockGlobalDnsInterfaceMockAddLifecycle                     sync.RWMutex
+	lockGlobalDnsInterfaceMockController                       sync.RWMutex
+	lockGlobalDnsInterfaceMockCreate                           sync.RWMutex
+	lockGlobalDnsInterfaceMockDelete                           sync.RWMutex
+	lockGlobalDnsInterfaceMockDeleteCollection                 sync.RWMutex
+	lockGlobalDnsInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockGlobalDnsInterfaceMockGet                              sync.RWMutex
+	lockGlobalDnsInterfaceMockGetNamespaced                    sync.RWMutex
+	lockGlobalDnsInterfaceMockList                             sync.RWMutex
+	lockGlobalDnsInterfaceMockListNamespaced                   sync.RWMutex
+	lockGlobalDnsInterfaceMockObjectClient                     sync.RWMutex
+	lockGlobalDnsInterfaceMockUpdate                           sync.RWMutex
+	lockGlobalDnsInterfaceMockWatch                            sync.RWMutex
 )
 
-// Ensure, that GlobalDNSInterfaceMock does implement GlobalDNSInterface.
+// Ensure, that GlobalDnsInterfaceMock does implement GlobalDnsInterface.
 // If this is not the case, regenerate this file with moq.
-var _ v3.GlobalDNSInterface = &GlobalDNSInterfaceMock{}
+var _ v3.GlobalDnsInterface = &GlobalDnsInterfaceMock{}
 
-// GlobalDNSInterfaceMock is a mock implementation of GlobalDNSInterface.
+// GlobalDnsInterfaceMock is a mock implementation of GlobalDnsInterface.
 //
-//     func TestSomethingThatUsesGlobalDNSInterface(t *testing.T) {
+//     func TestSomethingThatUsesGlobalDnsInterface(t *testing.T) {
 //
-//         // make and configure a mocked GlobalDNSInterface
-//         mockedGlobalDNSInterface := &GlobalDNSInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.GlobalDNSHandlerFunc)  {
+//         // make and configure a mocked GlobalDnsInterface
+//         mockedGlobalDnsInterface := &GlobalDnsInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.GlobalDnsHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.GlobalDNSLifecycle)  {
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.GlobalDnsLifecycle)  {
 // 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.GlobalDNSHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.GlobalDnsHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.GlobalDNSLifecycle)  {
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.GlobalDnsLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDNSHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDnsHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.GlobalDNSLifecycle)  {
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.GlobalDnsLifecycle)  {
 // 	               panic("mock out the AddFeatureLifecycle method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.GlobalDNSHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.GlobalDnsHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.GlobalDNSLifecycle)  {
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.GlobalDnsLifecycle)  {
 // 	               panic("mock out the AddLifecycle method")
 //             },
-//             ControllerFunc: func() v3.GlobalDNSController {
+//             ControllerFunc: func() v3.GlobalDnsController {
 // 	               panic("mock out the Controller method")
 //             },
-//             CreateFunc: func(in1 *v3.GlobalDNS) (*v3.GlobalDNS, error) {
+//             CreateFunc: func(in1 *v3.GlobalDns) (*v3.GlobalDns, error) {
 // 	               panic("mock out the Create method")
 //             },
 //             DeleteFunc: func(name string, options *v1.DeleteOptions) error {
@@ -785,22 +693,22 @@ var _ v3.GlobalDNSInterface = &GlobalDNSInterfaceMock{}
 //             DeleteNamespacedFunc: func(namespace string, name string, options *v1.DeleteOptions) error {
 // 	               panic("mock out the DeleteNamespaced method")
 //             },
-//             GetFunc: func(name string, opts v1.GetOptions) (*v3.GlobalDNS, error) {
+//             GetFunc: func(name string, opts v1.GetOptions) (*v3.GlobalDns, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.GlobalDNS, error) {
+//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.GlobalDns, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1.ListOptions) (*v3.GlobalDNSList, error) {
+//             ListFunc: func(opts v1.ListOptions) (*v3.GlobalDnsList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.GlobalDNSList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.GlobalDnsList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
 //             },
-//             UpdateFunc: func(in1 *v3.GlobalDNS) (*v3.GlobalDNS, error) {
+//             UpdateFunc: func(in1 *v3.GlobalDns) (*v3.GlobalDns, error) {
 // 	               panic("mock out the Update method")
 //             },
 //             WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
@@ -808,40 +716,40 @@ var _ v3.GlobalDNSInterface = &GlobalDNSInterfaceMock{}
 //             },
 //         }
 //
-//         // use mockedGlobalDNSInterface in code that requires GlobalDNSInterface
+//         // use mockedGlobalDnsInterface in code that requires GlobalDnsInterface
 //         // and then make assertions.
 //
 //     }
-type GlobalDNSInterfaceMock struct {
+type GlobalDnsInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.GlobalDNSHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.GlobalDnsHandlerFunc)
 
 	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
-	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.GlobalDNSLifecycle)
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.GlobalDnsLifecycle)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.GlobalDNSHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.GlobalDnsHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
-	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.GlobalDNSLifecycle)
+	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.GlobalDnsLifecycle)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDNSHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDnsHandlerFunc)
 
 	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
-	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.GlobalDNSLifecycle)
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.GlobalDnsLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, sync v3.GlobalDNSHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, sync v3.GlobalDnsHandlerFunc)
 
 	// AddLifecycleFunc mocks the AddLifecycle method.
-	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.GlobalDNSLifecycle)
+	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.GlobalDnsLifecycle)
 
 	// ControllerFunc mocks the Controller method.
-	ControllerFunc func() v3.GlobalDNSController
+	ControllerFunc func() v3.GlobalDnsController
 
 	// CreateFunc mocks the Create method.
-	CreateFunc func(in1 *v3.GlobalDNS) (*v3.GlobalDNS, error)
+	CreateFunc func(in1 *v3.GlobalDns) (*v3.GlobalDns, error)
 
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(name string, options *v1.DeleteOptions) error
@@ -853,22 +761,22 @@ type GlobalDNSInterfaceMock struct {
 	DeleteNamespacedFunc func(namespace string, name string, options *v1.DeleteOptions) error
 
 	// GetFunc mocks the Get method.
-	GetFunc func(name string, opts v1.GetOptions) (*v3.GlobalDNS, error)
+	GetFunc func(name string, opts v1.GetOptions) (*v3.GlobalDns, error)
 
 	// GetNamespacedFunc mocks the GetNamespaced method.
-	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.GlobalDNS, error)
+	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.GlobalDns, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1.ListOptions) (*v3.GlobalDNSList, error)
+	ListFunc func(opts v1.ListOptions) (*v3.GlobalDnsList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.GlobalDNSList, error)
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.GlobalDnsList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
 
 	// UpdateFunc mocks the Update method.
-	UpdateFunc func(in1 *v3.GlobalDNS) (*v3.GlobalDNS, error)
+	UpdateFunc func(in1 *v3.GlobalDns) (*v3.GlobalDns, error)
 
 	// WatchFunc mocks the Watch method.
 	WatchFunc func(opts v1.ListOptions) (watch.Interface, error)
@@ -886,7 +794,7 @@ type GlobalDNSInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.GlobalDNSHandlerFunc
+			Sync v3.GlobalDnsHandlerFunc
 		}
 		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
 		AddClusterScopedFeatureLifecycle []struct {
@@ -899,7 +807,7 @@ type GlobalDNSInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.GlobalDNSLifecycle
+			Lifecycle v3.GlobalDnsLifecycle
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -910,7 +818,7 @@ type GlobalDNSInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.GlobalDNSHandlerFunc
+			Sync v3.GlobalDnsHandlerFunc
 		}
 		// AddClusterScopedLifecycle holds details about calls to the AddClusterScopedLifecycle method.
 		AddClusterScopedLifecycle []struct {
@@ -921,7 +829,7 @@ type GlobalDNSInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.GlobalDNSLifecycle
+			Lifecycle v3.GlobalDnsLifecycle
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -932,7 +840,7 @@ type GlobalDNSInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.GlobalDNSHandlerFunc
+			Sync v3.GlobalDnsHandlerFunc
 		}
 		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
 		AddFeatureLifecycle []struct {
@@ -943,7 +851,7 @@ type GlobalDNSInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.GlobalDNSLifecycle
+			Lifecycle v3.GlobalDnsLifecycle
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -952,7 +860,7 @@ type GlobalDNSInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.GlobalDNSHandlerFunc
+			Sync v3.GlobalDnsHandlerFunc
 		}
 		// AddLifecycle holds details about calls to the AddLifecycle method.
 		AddLifecycle []struct {
@@ -961,7 +869,7 @@ type GlobalDNSInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.GlobalDNSLifecycle
+			Lifecycle v3.GlobalDnsLifecycle
 		}
 		// Controller holds details about calls to the Controller method.
 		Controller []struct {
@@ -969,7 +877,7 @@ type GlobalDNSInterfaceMock struct {
 		// Create holds details about calls to the Create method.
 		Create []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.GlobalDNS
+			In1 *v3.GlobalDns
 		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
@@ -1028,7 +936,7 @@ type GlobalDNSInterfaceMock struct {
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.GlobalDNS
+			In1 *v3.GlobalDns
 		}
 		// Watch holds details about calls to the Watch method.
 		Watch []struct {
@@ -1039,16 +947,16 @@ type GlobalDNSInterfaceMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *GlobalDNSInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.GlobalDNSHandlerFunc) {
+func (mock *GlobalDnsInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.GlobalDnsHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("GlobalDNSInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but GlobalDNSInterface.AddClusterScopedFeatureHandler was just called")
+		panic("GlobalDnsInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but GlobalDnsInterface.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.GlobalDNSHandlerFunc
+		Sync        v3.GlobalDnsHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1056,46 +964,46 @@ func (mock *GlobalDNSInterfaceMock) AddClusterScopedFeatureHandler(ctx context.C
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.AddClusterScopedFeatureHandlerCalls())
-func (mock *GlobalDNSInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedGlobalDnsInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *GlobalDnsInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Sync        v3.GlobalDNSHandlerFunc
+	Sync        v3.GlobalDnsHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.GlobalDNSHandlerFunc
+		Sync        v3.GlobalDnsHandlerFunc
 	}
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
-func (mock *GlobalDNSInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.GlobalDNSLifecycle) {
+func (mock *GlobalDnsInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.GlobalDnsLifecycle) {
 	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
-		panic("GlobalDNSInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but GlobalDNSInterface.AddClusterScopedFeatureLifecycle was just called")
+		panic("GlobalDnsInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but GlobalDnsInterface.AddClusterScopedFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.GlobalDNSLifecycle
+		Lifecycle   v3.GlobalDnsLifecycle
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1103,346 +1011,346 @@ func (mock *GlobalDNSInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
 	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
 	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.AddClusterScopedFeatureLifecycleCalls())
-func (mock *GlobalDNSInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+//     len(mockedGlobalDnsInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *GlobalDnsInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Lifecycle   v3.GlobalDNSLifecycle
+	Lifecycle   v3.GlobalDnsLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.GlobalDNSLifecycle
+		Lifecycle   v3.GlobalDnsLifecycle
 	}
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedFeatureLifecycle
-	lockGlobalDNSInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	lockGlobalDnsInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *GlobalDNSInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.GlobalDNSHandlerFunc) {
+func (mock *GlobalDnsInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.GlobalDnsHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("GlobalDNSInterfaceMock.AddClusterScopedHandlerFunc: method is nil but GlobalDNSInterface.AddClusterScopedHandler was just called")
+		panic("GlobalDnsInterfaceMock.AddClusterScopedHandlerFunc: method is nil but GlobalDnsInterface.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.GlobalDNSHandlerFunc
+		Sync        v3.GlobalDnsHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockGlobalDNSInterfaceMockAddClusterScopedHandler.Lock()
+	lockGlobalDnsInterfaceMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockGlobalDNSInterfaceMockAddClusterScopedHandler.Unlock()
+	lockGlobalDnsInterfaceMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, sync)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.AddClusterScopedHandlerCalls())
-func (mock *GlobalDNSInterfaceMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedGlobalDnsInterface.AddClusterScopedHandlerCalls())
+func (mock *GlobalDnsInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Sync        v3.GlobalDNSHandlerFunc
+	Sync        v3.GlobalDnsHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.GlobalDNSHandlerFunc
+		Sync        v3.GlobalDnsHandlerFunc
 	}
-	lockGlobalDNSInterfaceMockAddClusterScopedHandler.RLock()
+	lockGlobalDnsInterfaceMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockGlobalDNSInterfaceMockAddClusterScopedHandler.RUnlock()
+	lockGlobalDnsInterfaceMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedLifecycle calls AddClusterScopedLifecycleFunc.
-func (mock *GlobalDNSInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.GlobalDNSLifecycle) {
+func (mock *GlobalDnsInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.GlobalDnsLifecycle) {
 	if mock.AddClusterScopedLifecycleFunc == nil {
-		panic("GlobalDNSInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but GlobalDNSInterface.AddClusterScopedLifecycle was just called")
+		panic("GlobalDnsInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but GlobalDnsInterface.AddClusterScopedLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.GlobalDNSLifecycle
+		Lifecycle   v3.GlobalDnsLifecycle
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockGlobalDNSInterfaceMockAddClusterScopedLifecycle.Lock()
+	lockGlobalDnsInterfaceMockAddClusterScopedLifecycle.Lock()
 	mock.calls.AddClusterScopedLifecycle = append(mock.calls.AddClusterScopedLifecycle, callInfo)
-	lockGlobalDNSInterfaceMockAddClusterScopedLifecycle.Unlock()
+	lockGlobalDnsInterfaceMockAddClusterScopedLifecycle.Unlock()
 	mock.AddClusterScopedLifecycleFunc(ctx, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.AddClusterScopedLifecycleCalls())
-func (mock *GlobalDNSInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
+//     len(mockedGlobalDnsInterface.AddClusterScopedLifecycleCalls())
+func (mock *GlobalDnsInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Lifecycle   v3.GlobalDNSLifecycle
+	Lifecycle   v3.GlobalDnsLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.GlobalDNSLifecycle
+		Lifecycle   v3.GlobalDnsLifecycle
 	}
-	lockGlobalDNSInterfaceMockAddClusterScopedLifecycle.RLock()
+	lockGlobalDnsInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
-	lockGlobalDNSInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	lockGlobalDnsInterfaceMockAddClusterScopedLifecycle.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *GlobalDNSInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDNSHandlerFunc) {
+func (mock *GlobalDnsInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.GlobalDnsHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("GlobalDNSInterfaceMock.AddFeatureHandlerFunc: method is nil but GlobalDNSInterface.AddFeatureHandler was just called")
+		panic("GlobalDnsInterfaceMock.AddFeatureHandlerFunc: method is nil but GlobalDnsInterface.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.GlobalDNSHandlerFunc
+		Sync    v3.GlobalDnsHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockGlobalDNSInterfaceMockAddFeatureHandler.Lock()
+	lockGlobalDnsInterfaceMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockGlobalDNSInterfaceMockAddFeatureHandler.Unlock()
+	lockGlobalDnsInterfaceMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.AddFeatureHandlerCalls())
-func (mock *GlobalDNSInterfaceMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedGlobalDnsInterface.AddFeatureHandlerCalls())
+func (mock *GlobalDnsInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.GlobalDNSHandlerFunc
+	Sync    v3.GlobalDnsHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.GlobalDNSHandlerFunc
+		Sync    v3.GlobalDnsHandlerFunc
 	}
-	lockGlobalDNSInterfaceMockAddFeatureHandler.RLock()
+	lockGlobalDnsInterfaceMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockGlobalDNSInterfaceMockAddFeatureHandler.RUnlock()
+	lockGlobalDnsInterfaceMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureLifecycle calls AddFeatureLifecycleFunc.
-func (mock *GlobalDNSInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.GlobalDNSLifecycle) {
+func (mock *GlobalDnsInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.GlobalDnsLifecycle) {
 	if mock.AddFeatureLifecycleFunc == nil {
-		panic("GlobalDNSInterfaceMock.AddFeatureLifecycleFunc: method is nil but GlobalDNSInterface.AddFeatureLifecycle was just called")
+		panic("GlobalDnsInterfaceMock.AddFeatureLifecycleFunc: method is nil but GlobalDnsInterface.AddFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.GlobalDNSLifecycle
+		Lifecycle v3.GlobalDnsLifecycle
 	}{
 		Ctx:       ctx,
 		Enabled:   enabled,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockGlobalDNSInterfaceMockAddFeatureLifecycle.Lock()
+	lockGlobalDnsInterfaceMockAddFeatureLifecycle.Lock()
 	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
-	lockGlobalDNSInterfaceMockAddFeatureLifecycle.Unlock()
+	lockGlobalDnsInterfaceMockAddFeatureLifecycle.Unlock()
 	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
 }
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.AddFeatureLifecycleCalls())
-func (mock *GlobalDNSInterfaceMock) AddFeatureLifecycleCalls() []struct {
+//     len(mockedGlobalDnsInterface.AddFeatureLifecycleCalls())
+func (mock *GlobalDnsInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
 	Name      string
-	Lifecycle v3.GlobalDNSLifecycle
+	Lifecycle v3.GlobalDnsLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.GlobalDNSLifecycle
+		Lifecycle v3.GlobalDnsLifecycle
 	}
-	lockGlobalDNSInterfaceMockAddFeatureLifecycle.RLock()
+	lockGlobalDnsInterfaceMockAddFeatureLifecycle.RLock()
 	calls = mock.calls.AddFeatureLifecycle
-	lockGlobalDNSInterfaceMockAddFeatureLifecycle.RUnlock()
+	lockGlobalDnsInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *GlobalDNSInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.GlobalDNSHandlerFunc) {
+func (mock *GlobalDnsInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.GlobalDnsHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("GlobalDNSInterfaceMock.AddHandlerFunc: method is nil but GlobalDNSInterface.AddHandler was just called")
+		panic("GlobalDnsInterfaceMock.AddHandlerFunc: method is nil but GlobalDnsInterface.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.GlobalDNSHandlerFunc
+		Sync v3.GlobalDnsHandlerFunc
 	}{
 		Ctx:  ctx,
 		Name: name,
 		Sync: sync,
 	}
-	lockGlobalDNSInterfaceMockAddHandler.Lock()
+	lockGlobalDnsInterfaceMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockGlobalDNSInterfaceMockAddHandler.Unlock()
+	lockGlobalDnsInterfaceMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, sync)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.AddHandlerCalls())
-func (mock *GlobalDNSInterfaceMock) AddHandlerCalls() []struct {
+//     len(mockedGlobalDnsInterface.AddHandlerCalls())
+func (mock *GlobalDnsInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
-	Sync v3.GlobalDNSHandlerFunc
+	Sync v3.GlobalDnsHandlerFunc
 } {
 	var calls []struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.GlobalDNSHandlerFunc
+		Sync v3.GlobalDnsHandlerFunc
 	}
-	lockGlobalDNSInterfaceMockAddHandler.RLock()
+	lockGlobalDnsInterfaceMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockGlobalDNSInterfaceMockAddHandler.RUnlock()
+	lockGlobalDnsInterfaceMockAddHandler.RUnlock()
 	return calls
 }
 
 // AddLifecycle calls AddLifecycleFunc.
-func (mock *GlobalDNSInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.GlobalDNSLifecycle) {
+func (mock *GlobalDnsInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.GlobalDnsLifecycle) {
 	if mock.AddLifecycleFunc == nil {
-		panic("GlobalDNSInterfaceMock.AddLifecycleFunc: method is nil but GlobalDNSInterface.AddLifecycle was just called")
+		panic("GlobalDnsInterfaceMock.AddLifecycleFunc: method is nil but GlobalDnsInterface.AddLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.GlobalDNSLifecycle
+		Lifecycle v3.GlobalDnsLifecycle
 	}{
 		Ctx:       ctx,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockGlobalDNSInterfaceMockAddLifecycle.Lock()
+	lockGlobalDnsInterfaceMockAddLifecycle.Lock()
 	mock.calls.AddLifecycle = append(mock.calls.AddLifecycle, callInfo)
-	lockGlobalDNSInterfaceMockAddLifecycle.Unlock()
+	lockGlobalDnsInterfaceMockAddLifecycle.Unlock()
 	mock.AddLifecycleFunc(ctx, name, lifecycle)
 }
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.AddLifecycleCalls())
-func (mock *GlobalDNSInterfaceMock) AddLifecycleCalls() []struct {
+//     len(mockedGlobalDnsInterface.AddLifecycleCalls())
+func (mock *GlobalDnsInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
-	Lifecycle v3.GlobalDNSLifecycle
+	Lifecycle v3.GlobalDnsLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.GlobalDNSLifecycle
+		Lifecycle v3.GlobalDnsLifecycle
 	}
-	lockGlobalDNSInterfaceMockAddLifecycle.RLock()
+	lockGlobalDnsInterfaceMockAddLifecycle.RLock()
 	calls = mock.calls.AddLifecycle
-	lockGlobalDNSInterfaceMockAddLifecycle.RUnlock()
+	lockGlobalDnsInterfaceMockAddLifecycle.RUnlock()
 	return calls
 }
 
 // Controller calls ControllerFunc.
-func (mock *GlobalDNSInterfaceMock) Controller() v3.GlobalDNSController {
+func (mock *GlobalDnsInterfaceMock) Controller() v3.GlobalDnsController {
 	if mock.ControllerFunc == nil {
-		panic("GlobalDNSInterfaceMock.ControllerFunc: method is nil but GlobalDNSInterface.Controller was just called")
+		panic("GlobalDnsInterfaceMock.ControllerFunc: method is nil but GlobalDnsInterface.Controller was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockGlobalDNSInterfaceMockController.Lock()
+	lockGlobalDnsInterfaceMockController.Lock()
 	mock.calls.Controller = append(mock.calls.Controller, callInfo)
-	lockGlobalDNSInterfaceMockController.Unlock()
+	lockGlobalDnsInterfaceMockController.Unlock()
 	return mock.ControllerFunc()
 }
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.ControllerCalls())
-func (mock *GlobalDNSInterfaceMock) ControllerCalls() []struct {
+//     len(mockedGlobalDnsInterface.ControllerCalls())
+func (mock *GlobalDnsInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockGlobalDNSInterfaceMockController.RLock()
+	lockGlobalDnsInterfaceMockController.RLock()
 	calls = mock.calls.Controller
-	lockGlobalDNSInterfaceMockController.RUnlock()
+	lockGlobalDnsInterfaceMockController.RUnlock()
 	return calls
 }
 
 // Create calls CreateFunc.
-func (mock *GlobalDNSInterfaceMock) Create(in1 *v3.GlobalDNS) (*v3.GlobalDNS, error) {
+func (mock *GlobalDnsInterfaceMock) Create(in1 *v3.GlobalDns) (*v3.GlobalDns, error) {
 	if mock.CreateFunc == nil {
-		panic("GlobalDNSInterfaceMock.CreateFunc: method is nil but GlobalDNSInterface.Create was just called")
+		panic("GlobalDnsInterfaceMock.CreateFunc: method is nil but GlobalDnsInterface.Create was just called")
 	}
 	callInfo := struct {
-		In1 *v3.GlobalDNS
+		In1 *v3.GlobalDns
 	}{
 		In1: in1,
 	}
-	lockGlobalDNSInterfaceMockCreate.Lock()
+	lockGlobalDnsInterfaceMockCreate.Lock()
 	mock.calls.Create = append(mock.calls.Create, callInfo)
-	lockGlobalDNSInterfaceMockCreate.Unlock()
+	lockGlobalDnsInterfaceMockCreate.Unlock()
 	return mock.CreateFunc(in1)
 }
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.CreateCalls())
-func (mock *GlobalDNSInterfaceMock) CreateCalls() []struct {
-	In1 *v3.GlobalDNS
+//     len(mockedGlobalDnsInterface.CreateCalls())
+func (mock *GlobalDnsInterfaceMock) CreateCalls() []struct {
+	In1 *v3.GlobalDns
 } {
 	var calls []struct {
-		In1 *v3.GlobalDNS
+		In1 *v3.GlobalDns
 	}
-	lockGlobalDNSInterfaceMockCreate.RLock()
+	lockGlobalDnsInterfaceMockCreate.RLock()
 	calls = mock.calls.Create
-	lockGlobalDNSInterfaceMockCreate.RUnlock()
+	lockGlobalDnsInterfaceMockCreate.RUnlock()
 	return calls
 }
 
 // Delete calls DeleteFunc.
-func (mock *GlobalDNSInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
+func (mock *GlobalDnsInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
 	if mock.DeleteFunc == nil {
-		panic("GlobalDNSInterfaceMock.DeleteFunc: method is nil but GlobalDNSInterface.Delete was just called")
+		panic("GlobalDnsInterfaceMock.DeleteFunc: method is nil but GlobalDnsInterface.Delete was just called")
 	}
 	callInfo := struct {
 		Name    string
@@ -1451,16 +1359,16 @@ func (mock *GlobalDNSInterfaceMock) Delete(name string, options *v1.DeleteOption
 		Name:    name,
 		Options: options,
 	}
-	lockGlobalDNSInterfaceMockDelete.Lock()
+	lockGlobalDnsInterfaceMockDelete.Lock()
 	mock.calls.Delete = append(mock.calls.Delete, callInfo)
-	lockGlobalDNSInterfaceMockDelete.Unlock()
+	lockGlobalDnsInterfaceMockDelete.Unlock()
 	return mock.DeleteFunc(name, options)
 }
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.DeleteCalls())
-func (mock *GlobalDNSInterfaceMock) DeleteCalls() []struct {
+//     len(mockedGlobalDnsInterface.DeleteCalls())
+func (mock *GlobalDnsInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *v1.DeleteOptions
 } {
@@ -1468,16 +1376,16 @@ func (mock *GlobalDNSInterfaceMock) DeleteCalls() []struct {
 		Name    string
 		Options *v1.DeleteOptions
 	}
-	lockGlobalDNSInterfaceMockDelete.RLock()
+	lockGlobalDnsInterfaceMockDelete.RLock()
 	calls = mock.calls.Delete
-	lockGlobalDNSInterfaceMockDelete.RUnlock()
+	lockGlobalDnsInterfaceMockDelete.RUnlock()
 	return calls
 }
 
 // DeleteCollection calls DeleteCollectionFunc.
-func (mock *GlobalDNSInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (mock *GlobalDnsInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
 	if mock.DeleteCollectionFunc == nil {
-		panic("GlobalDNSInterfaceMock.DeleteCollectionFunc: method is nil but GlobalDNSInterface.DeleteCollection was just called")
+		panic("GlobalDnsInterfaceMock.DeleteCollectionFunc: method is nil but GlobalDnsInterface.DeleteCollection was just called")
 	}
 	callInfo := struct {
 		DeleteOpts *v1.DeleteOptions
@@ -1486,16 +1394,16 @@ func (mock *GlobalDNSInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOption
 		DeleteOpts: deleteOpts,
 		ListOpts:   listOpts,
 	}
-	lockGlobalDNSInterfaceMockDeleteCollection.Lock()
+	lockGlobalDnsInterfaceMockDeleteCollection.Lock()
 	mock.calls.DeleteCollection = append(mock.calls.DeleteCollection, callInfo)
-	lockGlobalDNSInterfaceMockDeleteCollection.Unlock()
+	lockGlobalDnsInterfaceMockDeleteCollection.Unlock()
 	return mock.DeleteCollectionFunc(deleteOpts, listOpts)
 }
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.DeleteCollectionCalls())
-func (mock *GlobalDNSInterfaceMock) DeleteCollectionCalls() []struct {
+//     len(mockedGlobalDnsInterface.DeleteCollectionCalls())
+func (mock *GlobalDnsInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *v1.DeleteOptions
 	ListOpts   v1.ListOptions
 } {
@@ -1503,16 +1411,16 @@ func (mock *GlobalDNSInterfaceMock) DeleteCollectionCalls() []struct {
 		DeleteOpts *v1.DeleteOptions
 		ListOpts   v1.ListOptions
 	}
-	lockGlobalDNSInterfaceMockDeleteCollection.RLock()
+	lockGlobalDnsInterfaceMockDeleteCollection.RLock()
 	calls = mock.calls.DeleteCollection
-	lockGlobalDNSInterfaceMockDeleteCollection.RUnlock()
+	lockGlobalDnsInterfaceMockDeleteCollection.RUnlock()
 	return calls
 }
 
 // DeleteNamespaced calls DeleteNamespacedFunc.
-func (mock *GlobalDNSInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
+func (mock *GlobalDnsInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
 	if mock.DeleteNamespacedFunc == nil {
-		panic("GlobalDNSInterfaceMock.DeleteNamespacedFunc: method is nil but GlobalDNSInterface.DeleteNamespaced was just called")
+		panic("GlobalDnsInterfaceMock.DeleteNamespacedFunc: method is nil but GlobalDnsInterface.DeleteNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1523,16 +1431,16 @@ func (mock *GlobalDNSInterfaceMock) DeleteNamespaced(namespace string, name stri
 		Name:      name,
 		Options:   options,
 	}
-	lockGlobalDNSInterfaceMockDeleteNamespaced.Lock()
+	lockGlobalDnsInterfaceMockDeleteNamespaced.Lock()
 	mock.calls.DeleteNamespaced = append(mock.calls.DeleteNamespaced, callInfo)
-	lockGlobalDNSInterfaceMockDeleteNamespaced.Unlock()
+	lockGlobalDnsInterfaceMockDeleteNamespaced.Unlock()
 	return mock.DeleteNamespacedFunc(namespace, name, options)
 }
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.DeleteNamespacedCalls())
-func (mock *GlobalDNSInterfaceMock) DeleteNamespacedCalls() []struct {
+//     len(mockedGlobalDnsInterface.DeleteNamespacedCalls())
+func (mock *GlobalDnsInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Options   *v1.DeleteOptions
@@ -1542,16 +1450,16 @@ func (mock *GlobalDNSInterfaceMock) DeleteNamespacedCalls() []struct {
 		Name      string
 		Options   *v1.DeleteOptions
 	}
-	lockGlobalDNSInterfaceMockDeleteNamespaced.RLock()
+	lockGlobalDnsInterfaceMockDeleteNamespaced.RLock()
 	calls = mock.calls.DeleteNamespaced
-	lockGlobalDNSInterfaceMockDeleteNamespaced.RUnlock()
+	lockGlobalDnsInterfaceMockDeleteNamespaced.RUnlock()
 	return calls
 }
 
 // Get calls GetFunc.
-func (mock *GlobalDNSInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.GlobalDNS, error) {
+func (mock *GlobalDnsInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.GlobalDns, error) {
 	if mock.GetFunc == nil {
-		panic("GlobalDNSInterfaceMock.GetFunc: method is nil but GlobalDNSInterface.Get was just called")
+		panic("GlobalDnsInterfaceMock.GetFunc: method is nil but GlobalDnsInterface.Get was just called")
 	}
 	callInfo := struct {
 		Name string
@@ -1560,16 +1468,16 @@ func (mock *GlobalDNSInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.Gl
 		Name: name,
 		Opts: opts,
 	}
-	lockGlobalDNSInterfaceMockGet.Lock()
+	lockGlobalDnsInterfaceMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockGlobalDNSInterfaceMockGet.Unlock()
+	lockGlobalDnsInterfaceMockGet.Unlock()
 	return mock.GetFunc(name, opts)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.GetCalls())
-func (mock *GlobalDNSInterfaceMock) GetCalls() []struct {
+//     len(mockedGlobalDnsInterface.GetCalls())
+func (mock *GlobalDnsInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts v1.GetOptions
 } {
@@ -1577,16 +1485,16 @@ func (mock *GlobalDNSInterfaceMock) GetCalls() []struct {
 		Name string
 		Opts v1.GetOptions
 	}
-	lockGlobalDNSInterfaceMockGet.RLock()
+	lockGlobalDnsInterfaceMockGet.RLock()
 	calls = mock.calls.Get
-	lockGlobalDNSInterfaceMockGet.RUnlock()
+	lockGlobalDnsInterfaceMockGet.RUnlock()
 	return calls
 }
 
 // GetNamespaced calls GetNamespacedFunc.
-func (mock *GlobalDNSInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.GlobalDNS, error) {
+func (mock *GlobalDnsInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.GlobalDns, error) {
 	if mock.GetNamespacedFunc == nil {
-		panic("GlobalDNSInterfaceMock.GetNamespacedFunc: method is nil but GlobalDNSInterface.GetNamespaced was just called")
+		panic("GlobalDnsInterfaceMock.GetNamespacedFunc: method is nil but GlobalDnsInterface.GetNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1597,16 +1505,16 @@ func (mock *GlobalDNSInterfaceMock) GetNamespaced(namespace string, name string,
 		Name:      name,
 		Opts:      opts,
 	}
-	lockGlobalDNSInterfaceMockGetNamespaced.Lock()
+	lockGlobalDnsInterfaceMockGetNamespaced.Lock()
 	mock.calls.GetNamespaced = append(mock.calls.GetNamespaced, callInfo)
-	lockGlobalDNSInterfaceMockGetNamespaced.Unlock()
+	lockGlobalDnsInterfaceMockGetNamespaced.Unlock()
 	return mock.GetNamespacedFunc(namespace, name, opts)
 }
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.GetNamespacedCalls())
-func (mock *GlobalDNSInterfaceMock) GetNamespacedCalls() []struct {
+//     len(mockedGlobalDnsInterface.GetNamespacedCalls())
+func (mock *GlobalDnsInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Opts      v1.GetOptions
@@ -1616,47 +1524,47 @@ func (mock *GlobalDNSInterfaceMock) GetNamespacedCalls() []struct {
 		Name      string
 		Opts      v1.GetOptions
 	}
-	lockGlobalDNSInterfaceMockGetNamespaced.RLock()
+	lockGlobalDnsInterfaceMockGetNamespaced.RLock()
 	calls = mock.calls.GetNamespaced
-	lockGlobalDNSInterfaceMockGetNamespaced.RUnlock()
+	lockGlobalDnsInterfaceMockGetNamespaced.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *GlobalDNSInterfaceMock) List(opts v1.ListOptions) (*v3.GlobalDNSList, error) {
+func (mock *GlobalDnsInterfaceMock) List(opts v1.ListOptions) (*v3.GlobalDnsList, error) {
 	if mock.ListFunc == nil {
-		panic("GlobalDNSInterfaceMock.ListFunc: method is nil but GlobalDNSInterface.List was just called")
+		panic("GlobalDnsInterfaceMock.ListFunc: method is nil but GlobalDnsInterface.List was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockGlobalDNSInterfaceMockList.Lock()
+	lockGlobalDnsInterfaceMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockGlobalDNSInterfaceMockList.Unlock()
+	lockGlobalDnsInterfaceMockList.Unlock()
 	return mock.ListFunc(opts)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.ListCalls())
-func (mock *GlobalDNSInterfaceMock) ListCalls() []struct {
+//     len(mockedGlobalDnsInterface.ListCalls())
+func (mock *GlobalDnsInterfaceMock) ListCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockGlobalDNSInterfaceMockList.RLock()
+	lockGlobalDnsInterfaceMockList.RLock()
 	calls = mock.calls.List
-	lockGlobalDNSInterfaceMockList.RUnlock()
+	lockGlobalDnsInterfaceMockList.RUnlock()
 	return calls
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *GlobalDNSInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.GlobalDNSList, error) {
+func (mock *GlobalDnsInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.GlobalDnsList, error) {
 	if mock.ListNamespacedFunc == nil {
-		panic("GlobalDNSInterfaceMock.ListNamespacedFunc: method is nil but GlobalDNSInterface.ListNamespaced was just called")
+		panic("GlobalDnsInterfaceMock.ListNamespacedFunc: method is nil but GlobalDnsInterface.ListNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1665,16 +1573,16 @@ func (mock *GlobalDNSInterfaceMock) ListNamespaced(namespace string, opts v1.Lis
 		Namespace: namespace,
 		Opts:      opts,
 	}
-	lockGlobalDNSInterfaceMockListNamespaced.Lock()
+	lockGlobalDnsInterfaceMockListNamespaced.Lock()
 	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
-	lockGlobalDNSInterfaceMockListNamespaced.Unlock()
+	lockGlobalDnsInterfaceMockListNamespaced.Unlock()
 	return mock.ListNamespacedFunc(namespace, opts)
 }
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.ListNamespacedCalls())
-func (mock *GlobalDNSInterfaceMock) ListNamespacedCalls() []struct {
+//     len(mockedGlobalDnsInterface.ListNamespacedCalls())
+func (mock *GlobalDnsInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      v1.ListOptions
 } {
@@ -1682,164 +1590,164 @@ func (mock *GlobalDNSInterfaceMock) ListNamespacedCalls() []struct {
 		Namespace string
 		Opts      v1.ListOptions
 	}
-	lockGlobalDNSInterfaceMockListNamespaced.RLock()
+	lockGlobalDnsInterfaceMockListNamespaced.RLock()
 	calls = mock.calls.ListNamespaced
-	lockGlobalDNSInterfaceMockListNamespaced.RUnlock()
+	lockGlobalDnsInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 
 // ObjectClient calls ObjectClientFunc.
-func (mock *GlobalDNSInterfaceMock) ObjectClient() *objectclient.ObjectClient {
+func (mock *GlobalDnsInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 	if mock.ObjectClientFunc == nil {
-		panic("GlobalDNSInterfaceMock.ObjectClientFunc: method is nil but GlobalDNSInterface.ObjectClient was just called")
+		panic("GlobalDnsInterfaceMock.ObjectClientFunc: method is nil but GlobalDnsInterface.ObjectClient was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockGlobalDNSInterfaceMockObjectClient.Lock()
+	lockGlobalDnsInterfaceMockObjectClient.Lock()
 	mock.calls.ObjectClient = append(mock.calls.ObjectClient, callInfo)
-	lockGlobalDNSInterfaceMockObjectClient.Unlock()
+	lockGlobalDnsInterfaceMockObjectClient.Unlock()
 	return mock.ObjectClientFunc()
 }
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.ObjectClientCalls())
-func (mock *GlobalDNSInterfaceMock) ObjectClientCalls() []struct {
+//     len(mockedGlobalDnsInterface.ObjectClientCalls())
+func (mock *GlobalDnsInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockGlobalDNSInterfaceMockObjectClient.RLock()
+	lockGlobalDnsInterfaceMockObjectClient.RLock()
 	calls = mock.calls.ObjectClient
-	lockGlobalDNSInterfaceMockObjectClient.RUnlock()
+	lockGlobalDnsInterfaceMockObjectClient.RUnlock()
 	return calls
 }
 
 // Update calls UpdateFunc.
-func (mock *GlobalDNSInterfaceMock) Update(in1 *v3.GlobalDNS) (*v3.GlobalDNS, error) {
+func (mock *GlobalDnsInterfaceMock) Update(in1 *v3.GlobalDns) (*v3.GlobalDns, error) {
 	if mock.UpdateFunc == nil {
-		panic("GlobalDNSInterfaceMock.UpdateFunc: method is nil but GlobalDNSInterface.Update was just called")
+		panic("GlobalDnsInterfaceMock.UpdateFunc: method is nil but GlobalDnsInterface.Update was just called")
 	}
 	callInfo := struct {
-		In1 *v3.GlobalDNS
+		In1 *v3.GlobalDns
 	}{
 		In1: in1,
 	}
-	lockGlobalDNSInterfaceMockUpdate.Lock()
+	lockGlobalDnsInterfaceMockUpdate.Lock()
 	mock.calls.Update = append(mock.calls.Update, callInfo)
-	lockGlobalDNSInterfaceMockUpdate.Unlock()
+	lockGlobalDnsInterfaceMockUpdate.Unlock()
 	return mock.UpdateFunc(in1)
 }
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.UpdateCalls())
-func (mock *GlobalDNSInterfaceMock) UpdateCalls() []struct {
-	In1 *v3.GlobalDNS
+//     len(mockedGlobalDnsInterface.UpdateCalls())
+func (mock *GlobalDnsInterfaceMock) UpdateCalls() []struct {
+	In1 *v3.GlobalDns
 } {
 	var calls []struct {
-		In1 *v3.GlobalDNS
+		In1 *v3.GlobalDns
 	}
-	lockGlobalDNSInterfaceMockUpdate.RLock()
+	lockGlobalDnsInterfaceMockUpdate.RLock()
 	calls = mock.calls.Update
-	lockGlobalDNSInterfaceMockUpdate.RUnlock()
+	lockGlobalDnsInterfaceMockUpdate.RUnlock()
 	return calls
 }
 
 // Watch calls WatchFunc.
-func (mock *GlobalDNSInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (mock *GlobalDnsInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	if mock.WatchFunc == nil {
-		panic("GlobalDNSInterfaceMock.WatchFunc: method is nil but GlobalDNSInterface.Watch was just called")
+		panic("GlobalDnsInterfaceMock.WatchFunc: method is nil but GlobalDnsInterface.Watch was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockGlobalDNSInterfaceMockWatch.Lock()
+	lockGlobalDnsInterfaceMockWatch.Lock()
 	mock.calls.Watch = append(mock.calls.Watch, callInfo)
-	lockGlobalDNSInterfaceMockWatch.Unlock()
+	lockGlobalDnsInterfaceMockWatch.Unlock()
 	return mock.WatchFunc(opts)
 }
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedGlobalDNSInterface.WatchCalls())
-func (mock *GlobalDNSInterfaceMock) WatchCalls() []struct {
+//     len(mockedGlobalDnsInterface.WatchCalls())
+func (mock *GlobalDnsInterfaceMock) WatchCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockGlobalDNSInterfaceMockWatch.RLock()
+	lockGlobalDnsInterfaceMockWatch.RLock()
 	calls = mock.calls.Watch
-	lockGlobalDNSInterfaceMockWatch.RUnlock()
+	lockGlobalDnsInterfaceMockWatch.RUnlock()
 	return calls
 }
 
 var (
-	lockGlobalDNSsGetterMockGlobalDNSs sync.RWMutex
+	lockGlobalDnsesGetterMockGlobalDnses sync.RWMutex
 )
 
-// Ensure, that GlobalDNSsGetterMock does implement GlobalDNSsGetter.
+// Ensure, that GlobalDnsesGetterMock does implement GlobalDnsesGetter.
 // If this is not the case, regenerate this file with moq.
-var _ v3.GlobalDNSsGetter = &GlobalDNSsGetterMock{}
+var _ v3.GlobalDnsesGetter = &GlobalDnsesGetterMock{}
 
-// GlobalDNSsGetterMock is a mock implementation of GlobalDNSsGetter.
+// GlobalDnsesGetterMock is a mock implementation of GlobalDnsesGetter.
 //
-//     func TestSomethingThatUsesGlobalDNSsGetter(t *testing.T) {
+//     func TestSomethingThatUsesGlobalDnsesGetter(t *testing.T) {
 //
-//         // make and configure a mocked GlobalDNSsGetter
-//         mockedGlobalDNSsGetter := &GlobalDNSsGetterMock{
-//             GlobalDNSsFunc: func(namespace string) v3.GlobalDNSInterface {
-// 	               panic("mock out the GlobalDNSs method")
+//         // make and configure a mocked GlobalDnsesGetter
+//         mockedGlobalDnsesGetter := &GlobalDnsesGetterMock{
+//             GlobalDnsesFunc: func(namespace string) v3.GlobalDnsInterface {
+// 	               panic("mock out the GlobalDnses method")
 //             },
 //         }
 //
-//         // use mockedGlobalDNSsGetter in code that requires GlobalDNSsGetter
+//         // use mockedGlobalDnsesGetter in code that requires GlobalDnsesGetter
 //         // and then make assertions.
 //
 //     }
-type GlobalDNSsGetterMock struct {
-	// GlobalDNSsFunc mocks the GlobalDNSs method.
-	GlobalDNSsFunc func(namespace string) v3.GlobalDNSInterface
+type GlobalDnsesGetterMock struct {
+	// GlobalDnsesFunc mocks the GlobalDnses method.
+	GlobalDnsesFunc func(namespace string) v3.GlobalDnsInterface
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// GlobalDNSs holds details about calls to the GlobalDNSs method.
-		GlobalDNSs []struct {
+		// GlobalDnses holds details about calls to the GlobalDnses method.
+		GlobalDnses []struct {
 			// Namespace is the namespace argument value.
 			Namespace string
 		}
 	}
 }
 
-// GlobalDNSs calls GlobalDNSsFunc.
-func (mock *GlobalDNSsGetterMock) GlobalDNSs(namespace string) v3.GlobalDNSInterface {
-	if mock.GlobalDNSsFunc == nil {
-		panic("GlobalDNSsGetterMock.GlobalDNSsFunc: method is nil but GlobalDNSsGetter.GlobalDNSs was just called")
+// GlobalDnses calls GlobalDnsesFunc.
+func (mock *GlobalDnsesGetterMock) GlobalDnses(namespace string) v3.GlobalDnsInterface {
+	if mock.GlobalDnsesFunc == nil {
+		panic("GlobalDnsesGetterMock.GlobalDnsesFunc: method is nil but GlobalDnsesGetter.GlobalDnses was just called")
 	}
 	callInfo := struct {
 		Namespace string
 	}{
 		Namespace: namespace,
 	}
-	lockGlobalDNSsGetterMockGlobalDNSs.Lock()
-	mock.calls.GlobalDNSs = append(mock.calls.GlobalDNSs, callInfo)
-	lockGlobalDNSsGetterMockGlobalDNSs.Unlock()
-	return mock.GlobalDNSsFunc(namespace)
+	lockGlobalDnsesGetterMockGlobalDnses.Lock()
+	mock.calls.GlobalDnses = append(mock.calls.GlobalDnses, callInfo)
+	lockGlobalDnsesGetterMockGlobalDnses.Unlock()
+	return mock.GlobalDnsesFunc(namespace)
 }
 
-// GlobalDNSsCalls gets all the calls that were made to GlobalDNSs.
+// GlobalDnsesCalls gets all the calls that were made to GlobalDnses.
 // Check the length with:
-//     len(mockedGlobalDNSsGetter.GlobalDNSsCalls())
-func (mock *GlobalDNSsGetterMock) GlobalDNSsCalls() []struct {
+//     len(mockedGlobalDnsesGetter.GlobalDnsesCalls())
+func (mock *GlobalDnsesGetterMock) GlobalDnsesCalls() []struct {
 	Namespace string
 } {
 	var calls []struct {
 		Namespace string
 	}
-	lockGlobalDNSsGetterMockGlobalDNSs.RLock()
-	calls = mock.calls.GlobalDNSs
-	lockGlobalDNSsGetterMockGlobalDNSs.RUnlock()
+	lockGlobalDnsesGetterMockGlobalDnses.RLock()
+	calls = mock.calls.GlobalDnses
+	lockGlobalDnsesGetterMockGlobalDnses.RUnlock()
 	return calls
 }

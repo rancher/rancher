@@ -150,8 +150,6 @@ var (
 	lockUserControllerMockGeneric                        sync.RWMutex
 	lockUserControllerMockInformer                       sync.RWMutex
 	lockUserControllerMockLister                         sync.RWMutex
-	lockUserControllerMockStart                          sync.RWMutex
-	lockUserControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that UserControllerMock does implement UserController.
@@ -191,12 +189,6 @@ var _ v3.UserController = &UserControllerMock{}
 //             ListerFunc: func() v3.UserLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedUserController in code that requires UserController
@@ -230,12 +222,6 @@ type UserControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.UserLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type UserControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *UserControllerMock) ListerCalls() []struct {
 	lockUserControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockUserControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *UserControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("UserControllerMock.StartFunc: method is nil but UserController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockUserControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockUserControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedUserController.StartCalls())
-func (mock *UserControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockUserControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockUserControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *UserControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("UserControllerMock.SyncFunc: method is nil but UserController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockUserControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockUserControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedUserController.SyncCalls())
-func (mock *UserControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockUserControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockUserControllerMockSync.RUnlock()
 	return calls
 }
 

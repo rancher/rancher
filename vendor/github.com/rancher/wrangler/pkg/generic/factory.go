@@ -32,9 +32,10 @@ type Factory struct {
 }
 
 type FactoryOptions struct {
-	Namespace          string
-	Resync             time.Duration
-	SharedCacheFactory cache.SharedCacheFactory
+	Namespace               string
+	Resync                  time.Duration
+	SharedCacheFactory      cache.SharedCacheFactory
+	SharedControllerFactory controller.SharedControllerFactory
 }
 
 func NewFactoryFromConfigWithOptions(config *rest.Config, opts *FactoryOptions) (*Factory, error) {
@@ -43,10 +44,15 @@ func NewFactoryFromConfigWithOptions(config *rest.Config, opts *FactoryOptions) 
 	}
 
 	f := &Factory{
-		config:       config,
-		threadiness:  map[schema.GroupVersionKind]int{},
-		cacheFactory: opts.SharedCacheFactory,
-		opts:         *opts,
+		config:            config,
+		threadiness:       map[schema.GroupVersionKind]int{},
+		cacheFactory:      opts.SharedCacheFactory,
+		controllerFactory: opts.SharedControllerFactory,
+		opts:              *opts,
+	}
+
+	if f.cacheFactory == nil && f.controllerFactory != nil {
+		f.cacheFactory = f.controllerFactory.SharedCacheFactory()
 	}
 
 	return f, nil

@@ -74,8 +74,6 @@ type ClusterRoleTemplateBindingController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterRoleTemplateBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterRoleTemplateBindingInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterRoleTemplateBindingLister) Get(namespace, name string) (*Cluster
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterRoleTemplateBindingGroupVersionKind.Group,
-			Resource: "clusterRoleTemplateBinding",
+			Resource: ClusterRoleTemplateBindingGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterRoleTemplateBinding), nil
@@ -210,25 +208,12 @@ func (c clusterRoleTemplateBindingFactory) List() runtime.Object {
 }
 
 func (s *clusterRoleTemplateBindingClient) Controller() ClusterRoleTemplateBindingController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterRoleTemplateBindingControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterRoleTemplateBindingGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterRoleTemplateBindingGroupVersionResource, ClusterRoleTemplateBindingGroupVersionKind.Kind, true))
 
-	c = &clusterRoleTemplateBindingController{
+	return &clusterRoleTemplateBindingController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterRoleTemplateBindingControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterRoleTemplateBindingClient struct {
@@ -259,6 +244,11 @@ func (s *clusterRoleTemplateBindingClient) GetNamespaced(namespace, name string,
 
 func (s *clusterRoleTemplateBindingClient) Update(o *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterRoleTemplateBinding), err
+}
+
+func (s *clusterRoleTemplateBindingClient) UpdateStatus(o *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterRoleTemplateBinding), err
 }
 

@@ -74,8 +74,6 @@ type ClusterScanController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterScanHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterScanInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterScanLister) Get(namespace, name string) (*ClusterScan, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterScanGroupVersionKind.Group,
-			Resource: "clusterScan",
+			Resource: ClusterScanGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterScan), nil
@@ -210,25 +208,12 @@ func (c clusterScanFactory) List() runtime.Object {
 }
 
 func (s *clusterScanClient) Controller() ClusterScanController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterScanControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterScanGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterScanGroupVersionResource, ClusterScanGroupVersionKind.Kind, true))
 
-	c = &clusterScanController{
+	return &clusterScanController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterScanControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterScanClient struct {
@@ -259,6 +244,11 @@ func (s *clusterScanClient) GetNamespaced(namespace, name string, opts metav1.Ge
 
 func (s *clusterScanClient) Update(o *ClusterScan) (*ClusterScan, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterScan), err
+}
+
+func (s *clusterScanClient) UpdateStatus(o *ClusterScan) (*ClusterScan, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterScan), err
 }
 

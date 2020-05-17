@@ -74,8 +74,6 @@ type ClusterAlertRuleController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterAlertRuleHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterAlertRuleInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterAlertRuleLister) Get(namespace, name string) (*ClusterAlertRule,
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterAlertRuleGroupVersionKind.Group,
-			Resource: "clusterAlertRule",
+			Resource: ClusterAlertRuleGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterAlertRule), nil
@@ -210,25 +208,12 @@ func (c clusterAlertRuleFactory) List() runtime.Object {
 }
 
 func (s *clusterAlertRuleClient) Controller() ClusterAlertRuleController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterAlertRuleControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterAlertRuleGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterAlertRuleGroupVersionResource, ClusterAlertRuleGroupVersionKind.Kind, true))
 
-	c = &clusterAlertRuleController{
+	return &clusterAlertRuleController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterAlertRuleControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterAlertRuleClient struct {
@@ -259,6 +244,11 @@ func (s *clusterAlertRuleClient) GetNamespaced(namespace, name string, opts meta
 
 func (s *clusterAlertRuleClient) Update(o *ClusterAlertRule) (*ClusterAlertRule, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterAlertRule), err
+}
+
+func (s *clusterAlertRuleClient) UpdateStatus(o *ClusterAlertRule) (*ClusterAlertRule, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterAlertRule), err
 }
 

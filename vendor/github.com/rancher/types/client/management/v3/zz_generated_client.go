@@ -53,7 +53,7 @@ type Client struct {
 	ClusterCatalog                          ClusterCatalogOperations
 	MultiClusterApp                         MultiClusterAppOperations
 	MultiClusterAppRevision                 MultiClusterAppRevisionOperations
-	GlobalDNS                               GlobalDNSOperations
+	GlobalDns                               GlobalDnsOperations
 	GlobalDNSProvider                       GlobalDNSProviderOperations
 	KontainerDriver                         KontainerDriverOperations
 	EtcdBackup                              EtcdBackupOperations
@@ -65,9 +65,9 @@ type Client struct {
 	ManagementSecret                        ManagementSecretOperations
 	ClusterTemplate                         ClusterTemplateOperations
 	ClusterTemplateRevision                 ClusterTemplateRevisionOperations
-	RKEK8sSystemImage                       RKEK8sSystemImageOperations
-	RKEK8sServiceOption                     RKEK8sServiceOptionOperations
-	RKEAddon                                RKEAddonOperations
+	RkeK8sSystemImage                       RkeK8sSystemImageOperations
+	RkeK8sServiceOption                     RkeK8sServiceOptionOperations
+	RkeAddon                                RkeAddonOperations
 	CisConfig                               CisConfigOperations
 	CisBenchmarkVersion                     CisBenchmarkVersionOperations
 }
@@ -128,7 +128,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ClusterCatalog = newClusterCatalogClient(client)
 	client.MultiClusterApp = newMultiClusterAppClient(client)
 	client.MultiClusterAppRevision = newMultiClusterAppRevisionClient(client)
-	client.GlobalDNS = newGlobalDNSClient(client)
+	client.GlobalDns = newGlobalDnsClient(client)
 	client.GlobalDNSProvider = newGlobalDNSProviderClient(client)
 	client.KontainerDriver = newKontainerDriverClient(client)
 	client.EtcdBackup = newEtcdBackupClient(client)
@@ -140,9 +140,9 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ManagementSecret = newManagementSecretClient(client)
 	client.ClusterTemplate = newClusterTemplateClient(client)
 	client.ClusterTemplateRevision = newClusterTemplateRevisionClient(client)
-	client.RKEK8sSystemImage = newRKEK8sSystemImageClient(client)
-	client.RKEK8sServiceOption = newRKEK8sServiceOptionClient(client)
-	client.RKEAddon = newRKEAddonClient(client)
+	client.RkeK8sSystemImage = newRkeK8sSystemImageClient(client)
+	client.RkeK8sServiceOption = newRkeK8sServiceOptionClient(client)
+	client.RkeAddon = newRkeAddonClient(client)
 	client.CisConfig = newCisConfigClient(client)
 	client.CisBenchmarkVersion = newCisBenchmarkVersionClient(client)
 

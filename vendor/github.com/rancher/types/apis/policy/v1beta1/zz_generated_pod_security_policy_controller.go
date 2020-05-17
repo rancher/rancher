@@ -49,12 +49,6 @@ func NewPodSecurityPolicy(namespace, name string, obj v1beta1.PodSecurityPolicy)
 	return &obj
 }
 
-type PodSecurityPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta1.PodSecurityPolicy `json:"items"`
-}
-
 type PodSecurityPolicyHandlerFunc func(key string, obj *v1beta1.PodSecurityPolicy) (runtime.Object, error)
 
 type PodSecurityPolicyChangeHandlerFunc func(obj *v1beta1.PodSecurityPolicy) (runtime.Object, error)
@@ -74,8 +68,6 @@ type PodSecurityPolicyController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PodSecurityPolicyHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PodSecurityPolicyInterface interface {
@@ -86,8 +78,8 @@ type PodSecurityPolicyInterface interface {
 	Update(*v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*PodSecurityPolicyList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyList, error)
+	List(opts metav1.ListOptions) (*v1beta1.PodSecurityPolicyList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.PodSecurityPolicyList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyController
@@ -126,7 +118,7 @@ func (l *podSecurityPolicyLister) Get(namespace, name string) (*v1beta1.PodSecur
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PodSecurityPolicyGroupVersionKind.Group,
-			Resource: "podSecurityPolicy",
+			Resource: PodSecurityPolicyGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1beta1.PodSecurityPolicy), nil
@@ -206,29 +198,16 @@ func (c podSecurityPolicyFactory) Object() runtime.Object {
 }
 
 func (c podSecurityPolicyFactory) List() runtime.Object {
-	return &PodSecurityPolicyList{}
+	return &v1beta1.PodSecurityPolicyList{}
 }
 
 func (s *podSecurityPolicyClient) Controller() PodSecurityPolicyController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.podSecurityPolicyControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PodSecurityPolicyGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PodSecurityPolicyGroupVersionResource, PodSecurityPolicyGroupVersionKind.Kind, false))
 
-	c = &podSecurityPolicyController{
+	return &podSecurityPolicyController{
 		GenericController: genericController,
 	}
-
-	s.client.podSecurityPolicyControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type podSecurityPolicyClient struct {
@@ -262,6 +241,11 @@ func (s *podSecurityPolicyClient) Update(o *v1beta1.PodSecurityPolicy) (*v1beta1
 	return obj.(*v1beta1.PodSecurityPolicy), err
 }
 
+func (s *podSecurityPolicyClient) UpdateStatus(o *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1beta1.PodSecurityPolicy), err
+}
+
 func (s *podSecurityPolicyClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -270,14 +254,14 @@ func (s *podSecurityPolicyClient) DeleteNamespaced(namespace, name string, optio
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *podSecurityPolicyClient) List(opts metav1.ListOptions) (*PodSecurityPolicyList, error) {
+func (s *podSecurityPolicyClient) List(opts metav1.ListOptions) (*v1beta1.PodSecurityPolicyList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*PodSecurityPolicyList), err
+	return obj.(*v1beta1.PodSecurityPolicyList), err
 }
 
-func (s *podSecurityPolicyClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyList, error) {
+func (s *podSecurityPolicyClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.PodSecurityPolicyList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*PodSecurityPolicyList), err
+	return obj.(*v1beta1.PodSecurityPolicyList), err
 }
 
 func (s *podSecurityPolicyClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

@@ -74,8 +74,6 @@ type ServiceAccountTokenController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ServiceAccountTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ServiceAccountTokenInterface interface {
@@ -126,7 +124,7 @@ func (l *serviceAccountTokenLister) Get(namespace, name string) (*ServiceAccount
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ServiceAccountTokenGroupVersionKind.Group,
-			Resource: "serviceAccountToken",
+			Resource: ServiceAccountTokenGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ServiceAccountToken), nil
@@ -210,25 +208,12 @@ func (c serviceAccountTokenFactory) List() runtime.Object {
 }
 
 func (s *serviceAccountTokenClient) Controller() ServiceAccountTokenController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.serviceAccountTokenControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ServiceAccountTokenGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ServiceAccountTokenGroupVersionResource, ServiceAccountTokenGroupVersionKind.Kind, true))
 
-	c = &serviceAccountTokenController{
+	return &serviceAccountTokenController{
 		GenericController: genericController,
 	}
-
-	s.client.serviceAccountTokenControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type serviceAccountTokenClient struct {
@@ -259,6 +244,11 @@ func (s *serviceAccountTokenClient) GetNamespaced(namespace, name string, opts m
 
 func (s *serviceAccountTokenClient) Update(o *ServiceAccountToken) (*ServiceAccountToken, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ServiceAccountToken), err
+}
+
+func (s *serviceAccountTokenClient) UpdateStatus(o *ServiceAccountToken) (*ServiceAccountToken, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ServiceAccountToken), err
 }
 

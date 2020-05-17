@@ -74,8 +74,6 @@ type NamespacedServiceAccountTokenController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NamespacedServiceAccountTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NamespacedServiceAccountTokenInterface interface {
@@ -126,7 +124,7 @@ func (l *namespacedServiceAccountTokenLister) Get(namespace, name string) (*Name
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespacedServiceAccountTokenGroupVersionKind.Group,
-			Resource: "namespacedServiceAccountToken",
+			Resource: NamespacedServiceAccountTokenGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*NamespacedServiceAccountToken), nil
@@ -210,25 +208,12 @@ func (c namespacedServiceAccountTokenFactory) List() runtime.Object {
 }
 
 func (s *namespacedServiceAccountTokenClient) Controller() NamespacedServiceAccountTokenController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.namespacedServiceAccountTokenControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NamespacedServiceAccountTokenGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NamespacedServiceAccountTokenGroupVersionResource, NamespacedServiceAccountTokenGroupVersionKind.Kind, true))
 
-	c = &namespacedServiceAccountTokenController{
+	return &namespacedServiceAccountTokenController{
 		GenericController: genericController,
 	}
-
-	s.client.namespacedServiceAccountTokenControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type namespacedServiceAccountTokenClient struct {
@@ -259,6 +244,11 @@ func (s *namespacedServiceAccountTokenClient) GetNamespaced(namespace, name stri
 
 func (s *namespacedServiceAccountTokenClient) Update(o *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*NamespacedServiceAccountToken), err
+}
+
+func (s *namespacedServiceAccountTokenClient) UpdateStatus(o *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*NamespacedServiceAccountToken), err
 }
 

@@ -74,8 +74,6 @@ type ClusterTemplateController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterTemplateInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterTemplateLister) Get(namespace, name string) (*ClusterTemplate, e
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterTemplateGroupVersionKind.Group,
-			Resource: "clusterTemplate",
+			Resource: ClusterTemplateGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterTemplate), nil
@@ -210,25 +208,12 @@ func (c clusterTemplateFactory) List() runtime.Object {
 }
 
 func (s *clusterTemplateClient) Controller() ClusterTemplateController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterTemplateControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterTemplateGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterTemplateGroupVersionResource, ClusterTemplateGroupVersionKind.Kind, true))
 
-	c = &clusterTemplateController{
+	return &clusterTemplateController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterTemplateControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterTemplateClient struct {
@@ -259,6 +244,11 @@ func (s *clusterTemplateClient) GetNamespaced(namespace, name string, opts metav
 
 func (s *clusterTemplateClient) Update(o *ClusterTemplate) (*ClusterTemplate, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterTemplate), err
+}
+
+func (s *clusterTemplateClient) UpdateStatus(o *ClusterTemplate) (*ClusterTemplate, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterTemplate), err
 }
 

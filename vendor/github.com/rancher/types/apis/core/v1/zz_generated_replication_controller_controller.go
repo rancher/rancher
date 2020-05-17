@@ -50,12 +50,6 @@ func NewReplicationController(namespace, name string, obj v1.ReplicationControll
 	return &obj
 }
 
-type ReplicationControllerList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ReplicationController `json:"items"`
-}
-
 type ReplicationControllerHandlerFunc func(key string, obj *v1.ReplicationController) (runtime.Object, error)
 
 type ReplicationControllerChangeHandlerFunc func(obj *v1.ReplicationController) (runtime.Object, error)
@@ -75,8 +69,6 @@ type ReplicationControllerController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ReplicationControllerHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ReplicationControllerInterface interface {
@@ -87,8 +79,8 @@ type ReplicationControllerInterface interface {
 	Update(*v1.ReplicationController) (*v1.ReplicationController, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*ReplicationControllerList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*ReplicationControllerList, error)
+	List(opts metav1.ListOptions) (*v1.ReplicationControllerList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ReplicationControllerList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ReplicationControllerController
@@ -127,7 +119,7 @@ func (l *replicationControllerLister) Get(namespace, name string) (*v1.Replicati
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ReplicationControllerGroupVersionKind.Group,
-			Resource: "replicationController",
+			Resource: ReplicationControllerGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.ReplicationController), nil
@@ -207,29 +199,16 @@ func (c replicationControllerFactory) Object() runtime.Object {
 }
 
 func (c replicationControllerFactory) List() runtime.Object {
-	return &ReplicationControllerList{}
+	return &v1.ReplicationControllerList{}
 }
 
 func (s *replicationControllerClient) Controller() ReplicationControllerController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.replicationControllerControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ReplicationControllerGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ReplicationControllerGroupVersionResource, ReplicationControllerGroupVersionKind.Kind, true))
 
-	c = &replicationControllerController{
+	return &replicationControllerController{
 		GenericController: genericController,
 	}
-
-	s.client.replicationControllerControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type replicationControllerClient struct {
@@ -263,6 +242,11 @@ func (s *replicationControllerClient) Update(o *v1.ReplicationController) (*v1.R
 	return obj.(*v1.ReplicationController), err
 }
 
+func (s *replicationControllerClient) UpdateStatus(o *v1.ReplicationController) (*v1.ReplicationController, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.ReplicationController), err
+}
+
 func (s *replicationControllerClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *replicationControllerClient) DeleteNamespaced(namespace, name string, o
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *replicationControllerClient) List(opts metav1.ListOptions) (*ReplicationControllerList, error) {
+func (s *replicationControllerClient) List(opts metav1.ListOptions) (*v1.ReplicationControllerList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*ReplicationControllerList), err
+	return obj.(*v1.ReplicationControllerList), err
 }
 
-func (s *replicationControllerClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ReplicationControllerList, error) {
+func (s *replicationControllerClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ReplicationControllerList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*ReplicationControllerList), err
+	return obj.(*v1.ReplicationControllerList), err
 }
 
 func (s *replicationControllerClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
