@@ -31,10 +31,10 @@ type upgradeHandler struct {
 	clusterLister        v3.ClusterLister
 	lookup               *nodeserver.BundleLookup
 	systemAccountManager *systemaccount.Manager
-	serviceOptionsLister v3.RKEK8sServiceOptionLister
-	serviceOptions       v3.RKEK8sServiceOptionInterface
-	sysImagesLister      v3.RKEK8sSystemImageLister
-	sysImages            v3.RKEK8sSystemImageInterface
+	serviceOptionsLister v3.RkeK8sServiceOptionLister
+	serviceOptions       v3.RkeK8sServiceOptionInterface
+	sysImagesLister      v3.RkeK8sSystemImageLister
+	sysImages            v3.RkeK8sSystemImageInterface
 	clusterLock          *locker.Locker
 	ctx                  context.Context
 }
@@ -48,10 +48,10 @@ func Register(ctx context.Context, mgmt *config.ManagementContext, scaledContext
 		nodeLister:           mgmt.Management.Nodes("").Controller().Lister(),
 		lookup:               nodeserver.NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
-		serviceOptionsLister: mgmt.Management.RKEK8sServiceOptions("").Controller().Lister(),
-		serviceOptions:       mgmt.Management.RKEK8sServiceOptions(""),
-		sysImagesLister:      mgmt.Management.RKEK8sSystemImages("").Controller().Lister(),
-		sysImages:            mgmt.Management.RKEK8sSystemImages(""),
+		serviceOptionsLister: mgmt.Management.RkeK8sServiceOptions("").Controller().Lister(),
+		serviceOptions:       mgmt.Management.RkeK8sServiceOptions(""),
+		sysImagesLister:      mgmt.Management.RkeK8sSystemImages("").Controller().Lister(),
+		sysImages:            mgmt.Management.RkeK8sSystemImages(""),
 		clusterLock:          locker.New(),
 		ctx:                  ctx,
 	}

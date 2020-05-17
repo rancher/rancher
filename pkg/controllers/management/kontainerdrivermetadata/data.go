@@ -241,7 +241,7 @@ func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, sy
 		if !errors.IsNotFound(err) {
 			return err
 		}
-		sysImage = &v3.RKEK8sSystemImage{
+		sysImage = &v3.RkeK8sSystemImage{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      k8sVersion,
 				Namespace: namespace.GlobalNamespace,
@@ -288,7 +288,7 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		if !errors.IsNotFound(err) {
 			return err
 		}
-		svcOption = &v3.RKEK8sServiceOption{
+		svcOption = &v3.RkeK8sServiceOption{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: namespace.GlobalNamespace,
@@ -307,7 +307,7 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		}
 		return nil
 	}
-	var svcOptionCopy *v3.RKEK8sServiceOption
+	var svcOptionCopy *v3.RkeK8sServiceOption
 	dataEqual := reflect.DeepEqual(svcOption.ServiceOptions, serviceOptions)
 	labelsEqual := labelEqual(svcOption.Labels, exists)
 	if dataEqual && labelsEqual {
@@ -337,7 +337,7 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 		if !errors.IsNotFound(err) {
 			return err
 		}
-		addon = &v3.RKEAddon{
+		addon = &v3.RkeAddon{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      addonName,
 				Namespace: namespace.GlobalNamespace,
@@ -356,7 +356,7 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 		}
 		return nil
 	}
-	var addonCopy *v3.RKEAddon
+	var addonCopy *v3.RkeAddon
 	dataEqual := reflect.DeepEqual(addon.Template, template)
 	labelsEqual := labelEqual(addon.Labels, exists)
 	if dataEqual && labelsEqual {
@@ -527,15 +527,15 @@ func getRKEVendorOptions(options map[string]v3.KubernetesServicesOptions) map[st
 	return keys
 }
 
-func (md *MetadataController) getRKEAddon(name string) (*v3.RKEAddon, error) {
+func (md *MetadataController) getRKEAddon(name string) (*v3.RkeAddon, error) {
 	return md.AddonsLister.Get(namespace.GlobalNamespace, name)
 }
 
-func (md *MetadataController) getRKEServiceOption(k8sVersion string, osType OSType) (*v3.RKEK8sServiceOption, error) {
+func (md *MetadataController) getRKEServiceOption(k8sVersion string, osType OSType) (*v3.RkeK8sServiceOption, error) {
 	return md.ServiceOptionsLister.Get(namespace.GlobalNamespace, getVersionNameWithOsType(k8sVersion, osType))
 }
 
-func (md *MetadataController) getRKESystemImage(k8sVersion string) (*v3.RKEK8sSystemImage, error) {
+func (md *MetadataController) getRKESystemImage(k8sVersion string) (*v3.RkeK8sSystemImage, error) {
 	return md.SystemImagesLister.Get(namespace.GlobalNamespace, k8sVersion)
 }
 

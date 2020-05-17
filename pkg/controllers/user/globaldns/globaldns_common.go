@@ -59,7 +59,7 @@ func dedupEndpoints(endpoints []string) []string {
 	return res
 }
 
-func reconcileGlobalDNSEndpoints(globalDNS *v3.GlobalDNS) {
+func reconcileGlobalDNSEndpoints(globalDNS *v3.GlobalDns) {
 	//aggregate all clusterEndpoints and form the final DNS endpoints[]
 	var reconciledEps []string
 	originalEps := globalDNS.Status.Endpoints

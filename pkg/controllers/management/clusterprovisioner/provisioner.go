@@ -50,8 +50,8 @@ type Provisioner struct {
 	KontainerDriverLister v3.KontainerDriverLister
 	DynamicSchemasLister  v3.DynamicSchemaLister
 	Backups               v3.EtcdBackupLister
-	RKESystemImages       v3.RKEK8sSystemImageInterface
-	RKESystemImagesLister v3.RKEK8sSystemImageLister
+	RKESystemImages       v3.RkeK8sSystemImageInterface
+	RKESystemImagesLister v3.RkeK8sSystemImageLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -65,8 +65,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		DynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
 		Backups:               management.Management.EtcdBackups("").Controller().Lister(),
-		RKESystemImagesLister: management.Management.RKEK8sSystemImages("").Controller().Lister(),
-		RKESystemImages:       management.Management.RKEK8sSystemImages(""),
+		RKESystemImagesLister: management.Management.RkeK8sSystemImages("").Controller().Lister(),
+		RKESystemImages:       management.Management.RkeK8sSystemImages(""),
 	}
 
 	// Add handlers
@@ -89,12 +89,12 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	rkeDriver.LocalDialer = local.Build
 	rkeDriver.WrapTransportFactory = docker.WrapTransport
 	mgmt := management.Management
-	rkeDriver.DataStore = NewDataStore(mgmt.RKEAddons("").Controller().Lister(),
-		mgmt.RKEAddons(""),
-		mgmt.RKEK8sServiceOptions("").Controller().Lister(),
-		mgmt.RKEK8sServiceOptions(""),
-		mgmt.RKEK8sSystemImages("").Controller().Lister(),
-		mgmt.RKEK8sSystemImages(""))
+	rkeDriver.DataStore = NewDataStore(mgmt.RkeAddons("").Controller().Lister(),
+		mgmt.RkeAddons(""),
+		mgmt.RkeK8sServiceOptions("").Controller().Lister(),
+		mgmt.RkeK8sServiceOptions(""),
+		mgmt.RkeK8sSystemImages("").Controller().Lister(),
+		mgmt.RkeK8sSystemImages(""))
 }
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {

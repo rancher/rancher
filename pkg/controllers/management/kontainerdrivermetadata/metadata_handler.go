@@ -21,12 +21,12 @@ import (
 
 type MetadataController struct {
 	NamespacesLister          v1.NamespaceLister
-	SystemImagesLister        v3.RKEK8sSystemImageLister
-	SystemImages              v3.RKEK8sSystemImageInterface
-	ServiceOptionsLister      v3.RKEK8sServiceOptionLister
-	ServiceOptions            v3.RKEK8sServiceOptionInterface
-	AddonsLister              v3.RKEAddonLister
-	Addons                    v3.RKEAddonInterface
+	SystemImagesLister        v3.RkeK8sSystemImageLister
+	SystemImages              v3.RkeK8sSystemImageInterface
+	ServiceOptionsLister      v3.RkeK8sServiceOptionLister
+	ServiceOptions            v3.RkeK8sServiceOptionInterface
+	AddonsLister              v3.RkeAddonLister
+	Addons                    v3.RkeAddonInterface
 	SettingLister             v3.SettingLister
 	Settings                  v3.SettingInterface
 	CisConfigLister           v3.CisConfigLister
@@ -66,13 +66,13 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	mgmt := management.Management
 
 	m := &MetadataController{
-		SystemImagesLister:        mgmt.RKEK8sSystemImages("").Controller().Lister(),
-		SystemImages:              mgmt.RKEK8sSystemImages(""),
-		ServiceOptionsLister:      mgmt.RKEK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:            mgmt.RKEK8sServiceOptions(""),
+		SystemImagesLister:        mgmt.RkeK8sSystemImages("").Controller().Lister(),
+		SystemImages:              mgmt.RkeK8sSystemImages(""),
+		ServiceOptionsLister:      mgmt.RkeK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:            mgmt.RkeK8sServiceOptions(""),
 		NamespacesLister:          management.Core.Namespaces("").Controller().Lister(),
-		AddonsLister:              mgmt.RKEAddons("").Controller().Lister(),
-		Addons:                    mgmt.RKEAddons(""),
+		AddonsLister:              mgmt.RkeAddons("").Controller().Lister(),
+		Addons:                    mgmt.RkeAddons(""),
 		SettingLister:             mgmt.Settings("").Controller().Lister(),
 		Settings:                  mgmt.Settings(""),
 		CisConfigLister:           mgmt.CisConfigs("").Controller().Lister(),

@@ -38,7 +38,7 @@ func (w *Wrapper) Formatter(apiContext *types.APIContext, resource *types.RawRes
 }
 
 func (w *Wrapper) ActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	if err := access.ByID(request, &managementschema.Version, client.GlobalDNSType, request.ID, &client.GlobalDNS{}); err != nil {
+	if err := access.ByID(request, &managementschema.Version, client.GlobalDnsType, request.ID, &client.GlobalDns{}); err != nil {
 		return err
 	}
 	split := strings.SplitN(request.ID, ":", 2)

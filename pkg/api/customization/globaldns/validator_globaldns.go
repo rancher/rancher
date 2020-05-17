@@ -15,8 +15,8 @@ import (
 )
 
 type Wrapper struct {
-	GlobalDNSLister       v3.GlobalDNSLister
-	GlobalDNSes           v3.GlobalDNSInterface
+	GlobalDNSLister       v3.GlobalDnsLister
+	GlobalDNSes           v3.GlobalDnsInterface
 	PrtbLister            v3.ProjectRoleTemplateBindingLister
 	MultiClusterAppLister v3.MultiClusterAppLister
 	Users                 v3.UserInterface
@@ -45,7 +45,7 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		// create request, caller is owner/creator
 		// Request is POST, hence global DNS is being created.
 		// if multiclusterapp ID is provided check access to its projects
-		mcappID := convert.ToString(data[client.GlobalDNSFieldMultiClusterAppID])
+		mcappID := convert.ToString(data[client.GlobalDnsFieldMultiClusterAppID])
 		if mcappID != "" {
 			split := strings.SplitN(mcappID, ":", 2)
 			if len(split) != 2 {
@@ -60,7 +60,7 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 			}
 		} else {
 			// if not, check access to all projects provided in the projects list
-			targetProjects = convert.ToStringSlice(data[client.GlobalDNSFieldProjectIDs])
+			targetProjects = convert.ToStringSlice(data[client.GlobalDnsFieldProjectIDs])
 		}
 		return ma.CheckCallerAccessToTargets(request, targetProjects, client.ProjectType, &client.Project{})
 	}
@@ -96,7 +96,7 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	}
 
 	originalMultiClusterApp := gDNS.Spec.MultiClusterAppName
-	newMultiClusterApp := convert.ToString(data[client.GlobalDNSFieldMultiClusterAppID])
+	newMultiClusterApp := convert.ToString(data[client.GlobalDnsFieldMultiClusterAppID])
 	if newMultiClusterApp != "" && originalMultiClusterApp != newMultiClusterApp {
 		// check access to new multiclusterapp
 		return ma.CheckCallerAccessToTargets(request, []string{newMultiClusterApp}, client.MultiClusterAppType, &client.MultiClusterApp{})

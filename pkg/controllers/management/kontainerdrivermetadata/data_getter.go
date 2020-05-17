@@ -50,7 +50,7 @@ func GetCisBenchmarkVersionInfo(
 	return b.Info, nil
 }
 
-func GetRKESystemImages(k8sVersion string, sysImageLister v3.RKEK8sSystemImageLister, sysImages v3.RKEK8sSystemImageInterface) (v3.RKESystemImages, error) {
+func GetRKESystemImages(k8sVersion string, sysImageLister v3.RkeK8sSystemImageLister, sysImages v3.RkeK8sSystemImageInterface) (v3.RKESystemImages, error) {
 	name := k8sVersion
 	sysImage, err := sysImageLister.Get(namespace.GlobalNamespace, name)
 	if err != nil {
@@ -65,7 +65,7 @@ func GetRKESystemImages(k8sVersion string, sysImageLister v3.RKEK8sSystemImageLi
 	return sysImage.SystemImages, err
 }
 
-func GetRKEAddonTemplate(addonName string, addonLister v3.RKEAddonLister, addons v3.RKEAddonInterface) (string, error) {
+func GetRKEAddonTemplate(addonName string, addonLister v3.RkeAddonLister, addons v3.RkeAddonInterface) (string, error) {
 	addon, err := addonLister.Get(namespace.GlobalNamespace, addonName)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -82,7 +82,7 @@ func GetRKEAddonTemplate(addonName string, addonLister v3.RKEAddonLister, addons
 	return addon.Template, err
 }
 
-func getRKEServiceOption(name string, svcOptionLister v3.RKEK8sServiceOptionLister, svcOptions v3.RKEK8sServiceOptionInterface) (*v3.KubernetesServicesOptions, error) {
+func getRKEServiceOption(name string, svcOptionLister v3.RkeK8sServiceOptionLister, svcOptions v3.RkeK8sServiceOptionInterface) (*v3.KubernetesServicesOptions, error) {
 	var k8sSvcOption *v3.KubernetesServicesOptions
 	svcOption, err := svcOptionLister.Get(namespace.GlobalNamespace, name)
 	if err != nil {
@@ -101,9 +101,9 @@ func getRKEServiceOption(name string, svcOptionLister v3.RKEK8sServiceOptionList
 	return &svcOption.ServiceOptions, nil
 }
 
-func GetRKEK8sServiceOptions(k8sVersion string, svcOptionLister v3.RKEK8sServiceOptionLister,
-	svcOptions v3.RKEK8sServiceOptionInterface, sysImageLister v3.RKEK8sSystemImageLister,
-	sysImages v3.RKEK8sSystemImageInterface, osType OSType) (*v3.KubernetesServicesOptions, error) {
+func GetRKEK8sServiceOptions(k8sVersion string, svcOptionLister v3.RkeK8sServiceOptionLister,
+	svcOptions v3.RkeK8sServiceOptionInterface, sysImageLister v3.RkeK8sSystemImageLister,
+	sysImages v3.RkeK8sSystemImageInterface, osType OSType) (*v3.KubernetesServicesOptions, error) {
 
 	var k8sSvcOption *v3.KubernetesServicesOptions
 	sysImage, err := sysImageLister.Get(namespace.GlobalNamespace, k8sVersion)

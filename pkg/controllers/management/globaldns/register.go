@@ -9,7 +9,7 @@ import (
 func Register(ctx context.Context, management *config.ManagementContext) {
 	n := newGlobalDNSController(ctx, management)
 	if n != nil {
-		management.Management.GlobalDNSs("").AddHandler(ctx, GlobaldnsController, n.sync)
+		management.Management.GlobalDnses("").AddHandler(ctx, GlobaldnsController, n.sync)
 	}
 
 	cp := newGlobalDNSProviderCatalogLauncher(ctx, management)

@@ -319,7 +319,7 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 func CheckAccessToUpdateMembers(members []v3.Member, data map[string]interface{}, ownerAccess bool) error {
 	var requestUpdatesMembers bool
 	// Check if members are being updated, if yes, make sure only member with owner permission is making this update request
-	newMembers := convert.ToMapSlice(data[client.GlobalDNSFieldMembers])
+	newMembers := convert.ToMapSlice(data[client.GlobalDnsFieldMembers])
 	originalMembers := members
 	if len(newMembers) != len(originalMembers) && !ownerAccess {
 		return fmt.Errorf("only members with owner access can update members")
