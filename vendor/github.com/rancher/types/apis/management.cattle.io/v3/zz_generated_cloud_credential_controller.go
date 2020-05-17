@@ -74,8 +74,6 @@ type CloudCredentialController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CloudCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type CloudCredentialInterface interface {
@@ -126,7 +124,7 @@ func (l *cloudCredentialLister) Get(namespace, name string) (*CloudCredential, e
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CloudCredentialGroupVersionKind.Group,
-			Resource: "cloudCredential",
+			Resource: CloudCredentialGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*CloudCredential), nil
@@ -210,25 +208,12 @@ func (c cloudCredentialFactory) List() runtime.Object {
 }
 
 func (s *cloudCredentialClient) Controller() CloudCredentialController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.cloudCredentialControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(CloudCredentialGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(CloudCredentialGroupVersionResource, CloudCredentialGroupVersionKind.Kind, true))
 
-	c = &cloudCredentialController{
+	return &cloudCredentialController{
 		GenericController: genericController,
 	}
-
-	s.client.cloudCredentialControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type cloudCredentialClient struct {
@@ -259,6 +244,11 @@ func (s *cloudCredentialClient) GetNamespaced(namespace, name string, opts metav
 
 func (s *cloudCredentialClient) Update(o *CloudCredential) (*CloudCredential, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*CloudCredential), err
+}
+
+func (s *cloudCredentialClient) UpdateStatus(o *CloudCredential) (*CloudCredential, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*CloudCredential), err
 }
 

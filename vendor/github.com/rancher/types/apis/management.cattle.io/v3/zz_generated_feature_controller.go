@@ -73,8 +73,6 @@ type FeatureController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler FeatureHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type FeatureInterface interface {
@@ -125,7 +123,7 @@ func (l *featureLister) Get(namespace, name string) (*Feature, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    FeatureGroupVersionKind.Group,
-			Resource: "feature",
+			Resource: FeatureGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Feature), nil
@@ -209,25 +207,12 @@ func (c featureFactory) List() runtime.Object {
 }
 
 func (s *featureClient) Controller() FeatureController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.featureControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(FeatureGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(FeatureGroupVersionResource, FeatureGroupVersionKind.Kind, false))
 
-	c = &featureController{
+	return &featureController{
 		GenericController: genericController,
 	}
-
-	s.client.featureControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type featureClient struct {
@@ -258,6 +243,11 @@ func (s *featureClient) GetNamespaced(namespace, name string, opts metav1.GetOpt
 
 func (s *featureClient) Update(o *Feature) (*Feature, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Feature), err
+}
+
+func (s *featureClient) UpdateStatus(o *Feature) (*Feature, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Feature), err
 }
 

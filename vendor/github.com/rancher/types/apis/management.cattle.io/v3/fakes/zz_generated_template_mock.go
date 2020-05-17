@@ -150,8 +150,6 @@ var (
 	lockTemplateControllerMockGeneric                        sync.RWMutex
 	lockTemplateControllerMockInformer                       sync.RWMutex
 	lockTemplateControllerMockLister                         sync.RWMutex
-	lockTemplateControllerMockStart                          sync.RWMutex
-	lockTemplateControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that TemplateControllerMock does implement TemplateController.
@@ -191,12 +189,6 @@ var _ v3.TemplateController = &TemplateControllerMock{}
 //             ListerFunc: func() v3.TemplateLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedTemplateController in code that requires TemplateController
@@ -230,12 +222,6 @@ type TemplateControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.TemplateLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type TemplateControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *TemplateControllerMock) ListerCalls() []struct {
 	lockTemplateControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockTemplateControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *TemplateControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("TemplateControllerMock.StartFunc: method is nil but TemplateController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockTemplateControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockTemplateControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedTemplateController.StartCalls())
-func (mock *TemplateControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockTemplateControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockTemplateControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *TemplateControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("TemplateControllerMock.SyncFunc: method is nil but TemplateController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockTemplateControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockTemplateControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedTemplateController.SyncCalls())
-func (mock *TemplateControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockTemplateControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockTemplateControllerMockSync.RUnlock()
 	return calls
 }
 

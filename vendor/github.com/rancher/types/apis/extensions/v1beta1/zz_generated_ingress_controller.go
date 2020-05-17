@@ -50,12 +50,6 @@ func NewIngress(namespace, name string, obj v1beta1.Ingress) *v1beta1.Ingress {
 	return &obj
 }
 
-type IngressList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta1.Ingress `json:"items"`
-}
-
 type IngressHandlerFunc func(key string, obj *v1beta1.Ingress) (runtime.Object, error)
 
 type IngressChangeHandlerFunc func(obj *v1beta1.Ingress) (runtime.Object, error)
@@ -75,8 +69,6 @@ type IngressController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler IngressHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type IngressInterface interface {
@@ -87,8 +79,8 @@ type IngressInterface interface {
 	Update(*v1beta1.Ingress) (*v1beta1.Ingress, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*IngressList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*IngressList, error)
+	List(opts metav1.ListOptions) (*v1beta1.IngressList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.IngressList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() IngressController
@@ -127,7 +119,7 @@ func (l *ingressLister) Get(namespace, name string) (*v1beta1.Ingress, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    IngressGroupVersionKind.Group,
-			Resource: "ingress",
+			Resource: IngressGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1beta1.Ingress), nil
@@ -207,29 +199,16 @@ func (c ingressFactory) Object() runtime.Object {
 }
 
 func (c ingressFactory) List() runtime.Object {
-	return &IngressList{}
+	return &v1beta1.IngressList{}
 }
 
 func (s *ingressClient) Controller() IngressController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.ingressControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(IngressGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(IngressGroupVersionResource, IngressGroupVersionKind.Kind, true))
 
-	c = &ingressController{
+	return &ingressController{
 		GenericController: genericController,
 	}
-
-	s.client.ingressControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type ingressClient struct {
@@ -263,6 +242,11 @@ func (s *ingressClient) Update(o *v1beta1.Ingress) (*v1beta1.Ingress, error) {
 	return obj.(*v1beta1.Ingress), err
 }
 
+func (s *ingressClient) UpdateStatus(o *v1beta1.Ingress) (*v1beta1.Ingress, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1beta1.Ingress), err
+}
+
 func (s *ingressClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *ingressClient) DeleteNamespaced(namespace, name string, options *metav1
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *ingressClient) List(opts metav1.ListOptions) (*IngressList, error) {
+func (s *ingressClient) List(opts metav1.ListOptions) (*v1beta1.IngressList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*IngressList), err
+	return obj.(*v1beta1.IngressList), err
 }
 
-func (s *ingressClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*IngressList, error) {
+func (s *ingressClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.IngressList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*IngressList), err
+	return obj.(*v1beta1.IngressList), err
 }
 
 func (s *ingressClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

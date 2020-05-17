@@ -5,19 +5,19 @@ import (
 )
 
 const (
-	RKEK8sSystemImageType                 = "rkeK8sSystemImage"
-	RKEK8sSystemImageFieldAnnotations     = "annotations"
-	RKEK8sSystemImageFieldCreated         = "created"
-	RKEK8sSystemImageFieldCreatorID       = "creatorId"
-	RKEK8sSystemImageFieldLabels          = "labels"
-	RKEK8sSystemImageFieldName            = "name"
-	RKEK8sSystemImageFieldOwnerReferences = "ownerReferences"
-	RKEK8sSystemImageFieldRemoved         = "removed"
-	RKEK8sSystemImageFieldSystemImages    = "systemImages"
-	RKEK8sSystemImageFieldUUID            = "uuid"
+	RkeK8sSystemImageType                 = "rkeK8sSystemImage"
+	RkeK8sSystemImageFieldAnnotations     = "annotations"
+	RkeK8sSystemImageFieldCreated         = "created"
+	RkeK8sSystemImageFieldCreatorID       = "creatorId"
+	RkeK8sSystemImageFieldLabels          = "labels"
+	RkeK8sSystemImageFieldName            = "name"
+	RkeK8sSystemImageFieldOwnerReferences = "ownerReferences"
+	RkeK8sSystemImageFieldRemoved         = "removed"
+	RkeK8sSystemImageFieldSystemImages    = "systemImages"
+	RkeK8sSystemImageFieldUUID            = "uuid"
 )
 
-type RKEK8sSystemImage struct {
+type RkeK8sSystemImage struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
@@ -30,59 +30,59 @@ type RKEK8sSystemImage struct {
 	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
-type RKEK8sSystemImageCollection struct {
+type RkeK8sSystemImageCollection struct {
 	types.Collection
-	Data   []RKEK8sSystemImage `json:"data,omitempty"`
-	client *RKEK8sSystemImageClient
+	Data   []RkeK8sSystemImage `json:"data,omitempty"`
+	client *RkeK8sSystemImageClient
 }
 
-type RKEK8sSystemImageClient struct {
+type RkeK8sSystemImageClient struct {
 	apiClient *Client
 }
 
-type RKEK8sSystemImageOperations interface {
-	List(opts *types.ListOpts) (*RKEK8sSystemImageCollection, error)
-	ListAll(opts *types.ListOpts) (*RKEK8sSystemImageCollection, error)
-	Create(opts *RKEK8sSystemImage) (*RKEK8sSystemImage, error)
-	Update(existing *RKEK8sSystemImage, updates interface{}) (*RKEK8sSystemImage, error)
-	Replace(existing *RKEK8sSystemImage) (*RKEK8sSystemImage, error)
-	ByID(id string) (*RKEK8sSystemImage, error)
-	Delete(container *RKEK8sSystemImage) error
+type RkeK8sSystemImageOperations interface {
+	List(opts *types.ListOpts) (*RkeK8sSystemImageCollection, error)
+	ListAll(opts *types.ListOpts) (*RkeK8sSystemImageCollection, error)
+	Create(opts *RkeK8sSystemImage) (*RkeK8sSystemImage, error)
+	Update(existing *RkeK8sSystemImage, updates interface{}) (*RkeK8sSystemImage, error)
+	Replace(existing *RkeK8sSystemImage) (*RkeK8sSystemImage, error)
+	ByID(id string) (*RkeK8sSystemImage, error)
+	Delete(container *RkeK8sSystemImage) error
 }
 
-func newRKEK8sSystemImageClient(apiClient *Client) *RKEK8sSystemImageClient {
-	return &RKEK8sSystemImageClient{
+func newRkeK8sSystemImageClient(apiClient *Client) *RkeK8sSystemImageClient {
+	return &RkeK8sSystemImageClient{
 		apiClient: apiClient,
 	}
 }
 
-func (c *RKEK8sSystemImageClient) Create(container *RKEK8sSystemImage) (*RKEK8sSystemImage, error) {
-	resp := &RKEK8sSystemImage{}
-	err := c.apiClient.Ops.DoCreate(RKEK8sSystemImageType, container, resp)
+func (c *RkeK8sSystemImageClient) Create(container *RkeK8sSystemImage) (*RkeK8sSystemImage, error) {
+	resp := &RkeK8sSystemImage{}
+	err := c.apiClient.Ops.DoCreate(RkeK8sSystemImageType, container, resp)
 	return resp, err
 }
 
-func (c *RKEK8sSystemImageClient) Update(existing *RKEK8sSystemImage, updates interface{}) (*RKEK8sSystemImage, error) {
-	resp := &RKEK8sSystemImage{}
-	err := c.apiClient.Ops.DoUpdate(RKEK8sSystemImageType, &existing.Resource, updates, resp)
+func (c *RkeK8sSystemImageClient) Update(existing *RkeK8sSystemImage, updates interface{}) (*RkeK8sSystemImage, error) {
+	resp := &RkeK8sSystemImage{}
+	err := c.apiClient.Ops.DoUpdate(RkeK8sSystemImageType, &existing.Resource, updates, resp)
 	return resp, err
 }
 
-func (c *RKEK8sSystemImageClient) Replace(obj *RKEK8sSystemImage) (*RKEK8sSystemImage, error) {
-	resp := &RKEK8sSystemImage{}
-	err := c.apiClient.Ops.DoReplace(RKEK8sSystemImageType, &obj.Resource, obj, resp)
+func (c *RkeK8sSystemImageClient) Replace(obj *RkeK8sSystemImage) (*RkeK8sSystemImage, error) {
+	resp := &RkeK8sSystemImage{}
+	err := c.apiClient.Ops.DoReplace(RkeK8sSystemImageType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
-func (c *RKEK8sSystemImageClient) List(opts *types.ListOpts) (*RKEK8sSystemImageCollection, error) {
-	resp := &RKEK8sSystemImageCollection{}
-	err := c.apiClient.Ops.DoList(RKEK8sSystemImageType, opts, resp)
+func (c *RkeK8sSystemImageClient) List(opts *types.ListOpts) (*RkeK8sSystemImageCollection, error) {
+	resp := &RkeK8sSystemImageCollection{}
+	err := c.apiClient.Ops.DoList(RkeK8sSystemImageType, opts, resp)
 	resp.client = c
 	return resp, err
 }
 
-func (c *RKEK8sSystemImageClient) ListAll(opts *types.ListOpts) (*RKEK8sSystemImageCollection, error) {
-	resp := &RKEK8sSystemImageCollection{}
+func (c *RkeK8sSystemImageClient) ListAll(opts *types.ListOpts) (*RkeK8sSystemImageCollection, error) {
+	resp := &RkeK8sSystemImageCollection{}
 	resp, err := c.List(opts)
 	if err != nil {
 		return resp, err
@@ -99,9 +99,9 @@ func (c *RKEK8sSystemImageClient) ListAll(opts *types.ListOpts) (*RKEK8sSystemIm
 	return resp, err
 }
 
-func (cc *RKEK8sSystemImageCollection) Next() (*RKEK8sSystemImageCollection, error) {
+func (cc *RkeK8sSystemImageCollection) Next() (*RkeK8sSystemImageCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &RKEK8sSystemImageCollection{}
+		resp := &RkeK8sSystemImageCollection{}
 		err := cc.client.apiClient.Ops.DoNext(cc.Pagination.Next, resp)
 		resp.client = cc.client
 		return resp, err
@@ -109,12 +109,12 @@ func (cc *RKEK8sSystemImageCollection) Next() (*RKEK8sSystemImageCollection, err
 	return nil, nil
 }
 
-func (c *RKEK8sSystemImageClient) ByID(id string) (*RKEK8sSystemImage, error) {
-	resp := &RKEK8sSystemImage{}
-	err := c.apiClient.Ops.DoByID(RKEK8sSystemImageType, id, resp)
+func (c *RkeK8sSystemImageClient) ByID(id string) (*RkeK8sSystemImage, error) {
+	resp := &RkeK8sSystemImage{}
+	err := c.apiClient.Ops.DoByID(RkeK8sSystemImageType, id, resp)
 	return resp, err
 }
 
-func (c *RKEK8sSystemImageClient) Delete(container *RKEK8sSystemImage) error {
-	return c.apiClient.Ops.DoResourceDelete(RKEK8sSystemImageType, &container.Resource)
+func (c *RkeK8sSystemImageClient) Delete(container *RkeK8sSystemImage) error {
+	return c.apiClient.Ops.DoResourceDelete(RkeK8sSystemImageType, &container.Resource)
 }

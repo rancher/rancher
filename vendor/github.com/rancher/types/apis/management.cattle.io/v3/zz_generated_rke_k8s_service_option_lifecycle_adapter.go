@@ -6,14 +6,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-type RKEK8sServiceOptionLifecycle interface {
-	Create(obj *RKEK8sServiceOption) (runtime.Object, error)
-	Remove(obj *RKEK8sServiceOption) (runtime.Object, error)
-	Updated(obj *RKEK8sServiceOption) (runtime.Object, error)
+type RkeK8sServiceOptionLifecycle interface {
+	Create(obj *RkeK8sServiceOption) (runtime.Object, error)
+	Remove(obj *RkeK8sServiceOption) (runtime.Object, error)
+	Updated(obj *RkeK8sServiceOption) (runtime.Object, error)
 }
 
 type rkeK8sServiceOptionLifecycleAdapter struct {
-	lifecycle RKEK8sServiceOptionLifecycle
+	lifecycle RkeK8sServiceOptionLifecycle
 }
 
 func (w *rkeK8sServiceOptionLifecycleAdapter) HasCreate() bool {
@@ -27,7 +27,7 @@ func (w *rkeK8sServiceOptionLifecycleAdapter) HasFinalize() bool {
 }
 
 func (w *rkeK8sServiceOptionLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Create(obj.(*RKEK8sServiceOption))
+	o, err := w.lifecycle.Create(obj.(*RkeK8sServiceOption))
 	if o == nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (w *rkeK8sServiceOptionLifecycleAdapter) Create(obj runtime.Object) (runtim
 }
 
 func (w *rkeK8sServiceOptionLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Remove(obj.(*RKEK8sServiceOption))
+	o, err := w.lifecycle.Remove(obj.(*RkeK8sServiceOption))
 	if o == nil {
 		return nil, err
 	}
@@ -43,20 +43,20 @@ func (w *rkeK8sServiceOptionLifecycleAdapter) Finalize(obj runtime.Object) (runt
 }
 
 func (w *rkeK8sServiceOptionLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Updated(obj.(*RKEK8sServiceOption))
+	o, err := w.lifecycle.Updated(obj.(*RkeK8sServiceOption))
 	if o == nil {
 		return nil, err
 	}
 	return o, err
 }
 
-func NewRKEK8sServiceOptionLifecycleAdapter(name string, clusterScoped bool, client RKEK8sServiceOptionInterface, l RKEK8sServiceOptionLifecycle) RKEK8sServiceOptionHandlerFunc {
+func NewRkeK8sServiceOptionLifecycleAdapter(name string, clusterScoped bool, client RkeK8sServiceOptionInterface, l RkeK8sServiceOptionLifecycle) RkeK8sServiceOptionHandlerFunc {
 	if clusterScoped {
-		resource.PutClusterScoped(RKEK8sServiceOptionGroupVersionResource)
+		resource.PutClusterScoped(RkeK8sServiceOptionGroupVersionResource)
 	}
 	adapter := &rkeK8sServiceOptionLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *RKEK8sServiceOption) (runtime.Object, error) {
+	return func(key string, obj *RkeK8sServiceOption) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
 		if o, ok := newObj.(runtime.Object); ok {
 			return o, err

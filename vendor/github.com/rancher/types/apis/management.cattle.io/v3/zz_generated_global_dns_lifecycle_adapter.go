@@ -6,14 +6,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-type GlobalDNSLifecycle interface {
-	Create(obj *GlobalDNS) (runtime.Object, error)
-	Remove(obj *GlobalDNS) (runtime.Object, error)
-	Updated(obj *GlobalDNS) (runtime.Object, error)
+type GlobalDnsLifecycle interface {
+	Create(obj *GlobalDns) (runtime.Object, error)
+	Remove(obj *GlobalDns) (runtime.Object, error)
+	Updated(obj *GlobalDns) (runtime.Object, error)
 }
 
 type globalDnsLifecycleAdapter struct {
-	lifecycle GlobalDNSLifecycle
+	lifecycle GlobalDnsLifecycle
 }
 
 func (w *globalDnsLifecycleAdapter) HasCreate() bool {
@@ -27,7 +27,7 @@ func (w *globalDnsLifecycleAdapter) HasFinalize() bool {
 }
 
 func (w *globalDnsLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Create(obj.(*GlobalDNS))
+	o, err := w.lifecycle.Create(obj.(*GlobalDns))
 	if o == nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (w *globalDnsLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, 
 }
 
 func (w *globalDnsLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Remove(obj.(*GlobalDNS))
+	o, err := w.lifecycle.Remove(obj.(*GlobalDns))
 	if o == nil {
 		return nil, err
 	}
@@ -43,20 +43,20 @@ func (w *globalDnsLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object
 }
 
 func (w *globalDnsLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Updated(obj.(*GlobalDNS))
+	o, err := w.lifecycle.Updated(obj.(*GlobalDns))
 	if o == nil {
 		return nil, err
 	}
 	return o, err
 }
 
-func NewGlobalDNSLifecycleAdapter(name string, clusterScoped bool, client GlobalDNSInterface, l GlobalDNSLifecycle) GlobalDNSHandlerFunc {
+func NewGlobalDnsLifecycleAdapter(name string, clusterScoped bool, client GlobalDnsInterface, l GlobalDnsLifecycle) GlobalDnsHandlerFunc {
 	if clusterScoped {
-		resource.PutClusterScoped(GlobalDNSGroupVersionResource)
+		resource.PutClusterScoped(GlobalDnsGroupVersionResource)
 	}
 	adapter := &globalDnsLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *GlobalDNS) (runtime.Object, error) {
+	return func(key string, obj *GlobalDns) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
 		if o, ok := newObj.(runtime.Object); ok {
 			return o, err

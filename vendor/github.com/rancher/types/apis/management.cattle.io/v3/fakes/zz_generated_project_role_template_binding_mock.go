@@ -150,8 +150,6 @@ var (
 	lockProjectRoleTemplateBindingControllerMockGeneric                        sync.RWMutex
 	lockProjectRoleTemplateBindingControllerMockInformer                       sync.RWMutex
 	lockProjectRoleTemplateBindingControllerMockLister                         sync.RWMutex
-	lockProjectRoleTemplateBindingControllerMockStart                          sync.RWMutex
-	lockProjectRoleTemplateBindingControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ProjectRoleTemplateBindingControllerMock does implement ProjectRoleTemplateBindingController.
@@ -191,12 +189,6 @@ var _ v3.ProjectRoleTemplateBindingController = &ProjectRoleTemplateBindingContr
 //             ListerFunc: func() v3.ProjectRoleTemplateBindingLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedProjectRoleTemplateBindingController in code that requires ProjectRoleTemplateBindingController
@@ -230,12 +222,6 @@ type ProjectRoleTemplateBindingControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.ProjectRoleTemplateBindingLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type ProjectRoleTemplateBindingControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *ProjectRoleTemplateBindingControllerMock) ListerCalls() []struct {
 	lockProjectRoleTemplateBindingControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockProjectRoleTemplateBindingControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *ProjectRoleTemplateBindingControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("ProjectRoleTemplateBindingControllerMock.StartFunc: method is nil but ProjectRoleTemplateBindingController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockProjectRoleTemplateBindingControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockProjectRoleTemplateBindingControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedProjectRoleTemplateBindingController.StartCalls())
-func (mock *ProjectRoleTemplateBindingControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockProjectRoleTemplateBindingControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockProjectRoleTemplateBindingControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *ProjectRoleTemplateBindingControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("ProjectRoleTemplateBindingControllerMock.SyncFunc: method is nil but ProjectRoleTemplateBindingController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockProjectRoleTemplateBindingControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockProjectRoleTemplateBindingControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedProjectRoleTemplateBindingController.SyncCalls())
-func (mock *ProjectRoleTemplateBindingControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockProjectRoleTemplateBindingControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockProjectRoleTemplateBindingControllerMockSync.RUnlock()
 	return calls
 }
 

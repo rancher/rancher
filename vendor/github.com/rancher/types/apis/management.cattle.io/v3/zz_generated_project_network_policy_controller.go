@@ -74,8 +74,6 @@ type ProjectNetworkPolicyController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectNetworkPolicyHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ProjectNetworkPolicyInterface interface {
@@ -126,7 +124,7 @@ func (l *projectNetworkPolicyLister) Get(namespace, name string) (*ProjectNetwor
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectNetworkPolicyGroupVersionKind.Group,
-			Resource: "projectNetworkPolicy",
+			Resource: ProjectNetworkPolicyGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ProjectNetworkPolicy), nil
@@ -210,25 +208,12 @@ func (c projectNetworkPolicyFactory) List() runtime.Object {
 }
 
 func (s *projectNetworkPolicyClient) Controller() ProjectNetworkPolicyController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.projectNetworkPolicyControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ProjectNetworkPolicyGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ProjectNetworkPolicyGroupVersionResource, ProjectNetworkPolicyGroupVersionKind.Kind, true))
 
-	c = &projectNetworkPolicyController{
+	return &projectNetworkPolicyController{
 		GenericController: genericController,
 	}
-
-	s.client.projectNetworkPolicyControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type projectNetworkPolicyClient struct {
@@ -259,6 +244,11 @@ func (s *projectNetworkPolicyClient) GetNamespaced(namespace, name string, opts 
 
 func (s *projectNetworkPolicyClient) Update(o *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ProjectNetworkPolicy), err
+}
+
+func (s *projectNetworkPolicyClient) UpdateStatus(o *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ProjectNetworkPolicy), err
 }
 

@@ -83,9 +83,8 @@ type customResourceDefinitionController struct {
 	groupResource schema.GroupResource
 }
 
-func NewCustomResourceDefinitionController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) CustomResourceDefinitionController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewCustomResourceDefinitionController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) CustomResourceDefinitionController {
+	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
 	return &customResourceDefinitionController{
 		controller: c,
 		client:     c.Client(),

@@ -74,8 +74,6 @@ type ClusterCatalogController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterCatalogHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterCatalogInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterCatalogLister) Get(namespace, name string) (*ClusterCatalog, err
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterCatalogGroupVersionKind.Group,
-			Resource: "clusterCatalog",
+			Resource: ClusterCatalogGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterCatalog), nil
@@ -210,25 +208,12 @@ func (c clusterCatalogFactory) List() runtime.Object {
 }
 
 func (s *clusterCatalogClient) Controller() ClusterCatalogController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterCatalogControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterCatalogGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterCatalogGroupVersionResource, ClusterCatalogGroupVersionKind.Kind, true))
 
-	c = &clusterCatalogController{
+	return &clusterCatalogController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterCatalogControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterCatalogClient struct {
@@ -259,6 +244,11 @@ func (s *clusterCatalogClient) GetNamespaced(namespace, name string, opts metav1
 
 func (s *clusterCatalogClient) Update(o *ClusterCatalog) (*ClusterCatalog, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterCatalog), err
+}
+
+func (s *clusterCatalogClient) UpdateStatus(o *ClusterCatalog) (*ClusterCatalog, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterCatalog), err
 }
 

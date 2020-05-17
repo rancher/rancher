@@ -74,8 +74,6 @@ type ClusterAlertGroupController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterAlertGroupHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterAlertGroupInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterAlertGroupLister) Get(namespace, name string) (*ClusterAlertGrou
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterAlertGroupGroupVersionKind.Group,
-			Resource: "clusterAlertGroup",
+			Resource: ClusterAlertGroupGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterAlertGroup), nil
@@ -210,25 +208,12 @@ func (c clusterAlertGroupFactory) List() runtime.Object {
 }
 
 func (s *clusterAlertGroupClient) Controller() ClusterAlertGroupController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterAlertGroupControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterAlertGroupGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterAlertGroupGroupVersionResource, ClusterAlertGroupGroupVersionKind.Kind, true))
 
-	c = &clusterAlertGroupController{
+	return &clusterAlertGroupController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterAlertGroupControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterAlertGroupClient struct {
@@ -259,6 +244,11 @@ func (s *clusterAlertGroupClient) GetNamespaced(namespace, name string, opts met
 
 func (s *clusterAlertGroupClient) Update(o *ClusterAlertGroup) (*ClusterAlertGroup, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterAlertGroup), err
+}
+
+func (s *clusterAlertGroupClient) UpdateStatus(o *ClusterAlertGroup) (*ClusterAlertGroup, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterAlertGroup), err
 }
 

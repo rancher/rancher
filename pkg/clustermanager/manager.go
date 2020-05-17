@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
@@ -147,6 +147,7 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	if !r.started {
 		go func() {
 			if err := m.doStart(r, clusterOwner); err != nil {
+				logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
 				m.markUnavailable(r.clusterRec.Name)
 				m.Stop(r.clusterRec)
 			}

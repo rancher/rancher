@@ -50,12 +50,6 @@ func NewReplicaSet(namespace, name string, obj v1.ReplicaSet) *v1.ReplicaSet {
 	return &obj
 }
 
-type ReplicaSetList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ReplicaSet `json:"items"`
-}
-
 type ReplicaSetHandlerFunc func(key string, obj *v1.ReplicaSet) (runtime.Object, error)
 
 type ReplicaSetChangeHandlerFunc func(obj *v1.ReplicaSet) (runtime.Object, error)
@@ -75,8 +69,6 @@ type ReplicaSetController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ReplicaSetHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ReplicaSetInterface interface {
@@ -87,8 +79,8 @@ type ReplicaSetInterface interface {
 	Update(*v1.ReplicaSet) (*v1.ReplicaSet, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*ReplicaSetList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*ReplicaSetList, error)
+	List(opts metav1.ListOptions) (*v1.ReplicaSetList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ReplicaSetList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ReplicaSetController
@@ -127,7 +119,7 @@ func (l *replicaSetLister) Get(namespace, name string) (*v1.ReplicaSet, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ReplicaSetGroupVersionKind.Group,
-			Resource: "replicaSet",
+			Resource: ReplicaSetGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.ReplicaSet), nil
@@ -207,29 +199,16 @@ func (c replicaSetFactory) Object() runtime.Object {
 }
 
 func (c replicaSetFactory) List() runtime.Object {
-	return &ReplicaSetList{}
+	return &v1.ReplicaSetList{}
 }
 
 func (s *replicaSetClient) Controller() ReplicaSetController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.replicaSetControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ReplicaSetGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ReplicaSetGroupVersionResource, ReplicaSetGroupVersionKind.Kind, true))
 
-	c = &replicaSetController{
+	return &replicaSetController{
 		GenericController: genericController,
 	}
-
-	s.client.replicaSetControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type replicaSetClient struct {
@@ -263,6 +242,11 @@ func (s *replicaSetClient) Update(o *v1.ReplicaSet) (*v1.ReplicaSet, error) {
 	return obj.(*v1.ReplicaSet), err
 }
 
+func (s *replicaSetClient) UpdateStatus(o *v1.ReplicaSet) (*v1.ReplicaSet, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.ReplicaSet), err
+}
+
 func (s *replicaSetClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *replicaSetClient) DeleteNamespaced(namespace, name string, options *met
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *replicaSetClient) List(opts metav1.ListOptions) (*ReplicaSetList, error) {
+func (s *replicaSetClient) List(opts metav1.ListOptions) (*v1.ReplicaSetList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*ReplicaSetList), err
+	return obj.(*v1.ReplicaSetList), err
 }
 
-func (s *replicaSetClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ReplicaSetList, error) {
+func (s *replicaSetClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ReplicaSetList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*ReplicaSetList), err
+	return obj.(*v1.ReplicaSetList), err
 }
 
 func (s *replicaSetClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

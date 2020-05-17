@@ -74,8 +74,6 @@ type NodePoolController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NodePoolHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NodePoolInterface interface {
@@ -126,7 +124,7 @@ func (l *nodePoolLister) Get(namespace, name string) (*NodePool, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NodePoolGroupVersionKind.Group,
-			Resource: "nodePool",
+			Resource: NodePoolGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*NodePool), nil
@@ -210,25 +208,12 @@ func (c nodePoolFactory) List() runtime.Object {
 }
 
 func (s *nodePoolClient) Controller() NodePoolController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.nodePoolControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NodePoolGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NodePoolGroupVersionResource, NodePoolGroupVersionKind.Kind, true))
 
-	c = &nodePoolController{
+	return &nodePoolController{
 		GenericController: genericController,
 	}
-
-	s.client.nodePoolControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type nodePoolClient struct {
@@ -259,6 +244,11 @@ func (s *nodePoolClient) GetNamespaced(namespace, name string, opts metav1.GetOp
 
 func (s *nodePoolClient) Update(o *NodePool) (*NodePool, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*NodePool), err
+}
+
+func (s *nodePoolClient) UpdateStatus(o *NodePool) (*NodePool, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*NodePool), err
 }
 

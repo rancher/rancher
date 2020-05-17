@@ -83,9 +83,8 @@ type serviceController struct {
 	groupResource schema.GroupResource
 }
 
-func NewServiceController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) ServiceController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewServiceController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ServiceController {
+	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
 	return &serviceController{
 		controller: c,
 		client:     c.Client(),

@@ -49,12 +49,6 @@ func NewEvent(namespace, name string, obj v1.Event) *v1.Event {
 	return &obj
 }
 
-type EventList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Event `json:"items"`
-}
-
 type EventHandlerFunc func(key string, obj *v1.Event) (runtime.Object, error)
 
 type EventChangeHandlerFunc func(obj *v1.Event) (runtime.Object, error)
@@ -74,8 +68,6 @@ type EventController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler EventHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type EventInterface interface {
@@ -86,8 +78,8 @@ type EventInterface interface {
 	Update(*v1.Event) (*v1.Event, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*EventList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*EventList, error)
+	List(opts metav1.ListOptions) (*v1.EventList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.EventList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EventController
@@ -126,7 +118,7 @@ func (l *eventLister) Get(namespace, name string) (*v1.Event, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    EventGroupVersionKind.Group,
-			Resource: "event",
+			Resource: EventGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Event), nil
@@ -206,29 +198,16 @@ func (c eventFactory) Object() runtime.Object {
 }
 
 func (c eventFactory) List() runtime.Object {
-	return &EventList{}
+	return &v1.EventList{}
 }
 
 func (s *eventClient) Controller() EventController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.eventControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(EventGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(EventGroupVersionResource, EventGroupVersionKind.Kind, false))
 
-	c = &eventController{
+	return &eventController{
 		GenericController: genericController,
 	}
-
-	s.client.eventControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type eventClient struct {
@@ -262,6 +241,11 @@ func (s *eventClient) Update(o *v1.Event) (*v1.Event, error) {
 	return obj.(*v1.Event), err
 }
 
+func (s *eventClient) UpdateStatus(o *v1.Event) (*v1.Event, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Event), err
+}
+
 func (s *eventClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -270,14 +254,14 @@ func (s *eventClient) DeleteNamespaced(namespace, name string, options *metav1.D
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *eventClient) List(opts metav1.ListOptions) (*EventList, error) {
+func (s *eventClient) List(opts metav1.ListOptions) (*v1.EventList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*EventList), err
+	return obj.(*v1.EventList), err
 }
 
-func (s *eventClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*EventList, error) {
+func (s *eventClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.EventList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*EventList), err
+	return obj.(*v1.EventList), err
 }
 
 func (s *eventClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

@@ -3,7 +3,9 @@ package generators
 import (
 	"strings"
 
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 )
 
 var (
@@ -30,6 +32,24 @@ var (
 		"k8s.io/client-go/tools/cache",
 	}
 )
+
+func namespaced(t *types.Type) bool {
+	if util.MustParseClientGenTags(t.SecondClosestCommentLines).NonNamespaced {
+		return false
+	}
+
+	kubeBuilder := false
+	for _, line := range t.SecondClosestCommentLines {
+		if strings.HasPrefix(line, "+kubebuilder:resource:path=") {
+			kubeBuilder = true
+			if strings.Contains(line, "scope=Namespaced") {
+				return true
+			}
+		}
+	}
+
+	return !kubeBuilder
+}
 
 func groupPath(group string) string {
 	g := strings.Replace(strings.Split(group, ".")[0], "-", "", -1)

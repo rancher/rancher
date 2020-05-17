@@ -74,8 +74,6 @@ type DockerCredentialController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler DockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type DockerCredentialInterface interface {
@@ -126,7 +124,7 @@ func (l *dockerCredentialLister) Get(namespace, name string) (*DockerCredential,
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    DockerCredentialGroupVersionKind.Group,
-			Resource: "dockerCredential",
+			Resource: DockerCredentialGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*DockerCredential), nil
@@ -210,25 +208,12 @@ func (c dockerCredentialFactory) List() runtime.Object {
 }
 
 func (s *dockerCredentialClient) Controller() DockerCredentialController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.dockerCredentialControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(DockerCredentialGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(DockerCredentialGroupVersionResource, DockerCredentialGroupVersionKind.Kind, true))
 
-	c = &dockerCredentialController{
+	return &dockerCredentialController{
 		GenericController: genericController,
 	}
-
-	s.client.dockerCredentialControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type dockerCredentialClient struct {
@@ -259,6 +244,11 @@ func (s *dockerCredentialClient) GetNamespaced(namespace, name string, opts meta
 
 func (s *dockerCredentialClient) Update(o *DockerCredential) (*DockerCredential, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*DockerCredential), err
+}
+
+func (s *dockerCredentialClient) UpdateStatus(o *DockerCredential) (*DockerCredential, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*DockerCredential), err
 }
 

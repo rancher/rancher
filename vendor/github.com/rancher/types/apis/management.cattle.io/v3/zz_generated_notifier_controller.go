@@ -74,8 +74,6 @@ type NotifierController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NotifierHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NotifierInterface interface {
@@ -126,7 +124,7 @@ func (l *notifierLister) Get(namespace, name string) (*Notifier, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NotifierGroupVersionKind.Group,
-			Resource: "notifier",
+			Resource: NotifierGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Notifier), nil
@@ -210,25 +208,12 @@ func (c notifierFactory) List() runtime.Object {
 }
 
 func (s *notifierClient) Controller() NotifierController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.notifierControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NotifierGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NotifierGroupVersionResource, NotifierGroupVersionKind.Kind, true))
 
-	c = &notifierController{
+	return &notifierController{
 		GenericController: genericController,
 	}
-
-	s.client.notifierControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type notifierClient struct {
@@ -259,6 +244,11 @@ func (s *notifierClient) GetNamespaced(namespace, name string, opts metav1.GetOp
 
 func (s *notifierClient) Update(o *Notifier) (*Notifier, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Notifier), err
+}
+
+func (s *notifierClient) UpdateStatus(o *Notifier) (*Notifier, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Notifier), err
 }
 

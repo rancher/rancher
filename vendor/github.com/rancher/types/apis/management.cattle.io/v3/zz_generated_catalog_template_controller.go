@@ -74,8 +74,6 @@ type CatalogTemplateController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CatalogTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type CatalogTemplateInterface interface {
@@ -126,7 +124,7 @@ func (l *catalogTemplateLister) Get(namespace, name string) (*CatalogTemplate, e
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CatalogTemplateGroupVersionKind.Group,
-			Resource: "catalogTemplate",
+			Resource: CatalogTemplateGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*CatalogTemplate), nil
@@ -210,25 +208,12 @@ func (c catalogTemplateFactory) List() runtime.Object {
 }
 
 func (s *catalogTemplateClient) Controller() CatalogTemplateController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.catalogTemplateControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(CatalogTemplateGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(CatalogTemplateGroupVersionResource, CatalogTemplateGroupVersionKind.Kind, true))
 
-	c = &catalogTemplateController{
+	return &catalogTemplateController{
 		GenericController: genericController,
 	}
-
-	s.client.catalogTemplateControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type catalogTemplateClient struct {
@@ -259,6 +244,11 @@ func (s *catalogTemplateClient) GetNamespaced(namespace, name string, opts metav
 
 func (s *catalogTemplateClient) Update(o *CatalogTemplate) (*CatalogTemplate, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*CatalogTemplate), err
+}
+
+func (s *catalogTemplateClient) UpdateStatus(o *CatalogTemplate) (*CatalogTemplate, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*CatalogTemplate), err
 }
 

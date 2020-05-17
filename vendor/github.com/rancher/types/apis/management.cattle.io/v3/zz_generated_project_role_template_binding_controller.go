@@ -74,8 +74,6 @@ type ProjectRoleTemplateBindingController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectRoleTemplateBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ProjectRoleTemplateBindingInterface interface {
@@ -126,7 +124,7 @@ func (l *projectRoleTemplateBindingLister) Get(namespace, name string) (*Project
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectRoleTemplateBindingGroupVersionKind.Group,
-			Resource: "projectRoleTemplateBinding",
+			Resource: ProjectRoleTemplateBindingGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ProjectRoleTemplateBinding), nil
@@ -210,25 +208,12 @@ func (c projectRoleTemplateBindingFactory) List() runtime.Object {
 }
 
 func (s *projectRoleTemplateBindingClient) Controller() ProjectRoleTemplateBindingController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.projectRoleTemplateBindingControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ProjectRoleTemplateBindingGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ProjectRoleTemplateBindingGroupVersionResource, ProjectRoleTemplateBindingGroupVersionKind.Kind, true))
 
-	c = &projectRoleTemplateBindingController{
+	return &projectRoleTemplateBindingController{
 		GenericController: genericController,
 	}
-
-	s.client.projectRoleTemplateBindingControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type projectRoleTemplateBindingClient struct {
@@ -259,6 +244,11 @@ func (s *projectRoleTemplateBindingClient) GetNamespaced(namespace, name string,
 
 func (s *projectRoleTemplateBindingClient) Update(o *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ProjectRoleTemplateBinding), err
+}
+
+func (s *projectRoleTemplateBindingClient) UpdateStatus(o *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ProjectRoleTemplateBinding), err
 }
 

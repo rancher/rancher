@@ -74,8 +74,6 @@ type ProjectAlertGroupController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectAlertGroupHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ProjectAlertGroupInterface interface {
@@ -126,7 +124,7 @@ func (l *projectAlertGroupLister) Get(namespace, name string) (*ProjectAlertGrou
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectAlertGroupGroupVersionKind.Group,
-			Resource: "projectAlertGroup",
+			Resource: ProjectAlertGroupGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ProjectAlertGroup), nil
@@ -210,25 +208,12 @@ func (c projectAlertGroupFactory) List() runtime.Object {
 }
 
 func (s *projectAlertGroupClient) Controller() ProjectAlertGroupController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.projectAlertGroupControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ProjectAlertGroupGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ProjectAlertGroupGroupVersionResource, ProjectAlertGroupGroupVersionKind.Kind, true))
 
-	c = &projectAlertGroupController{
+	return &projectAlertGroupController{
 		GenericController: genericController,
 	}
-
-	s.client.projectAlertGroupControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type projectAlertGroupClient struct {
@@ -259,6 +244,11 @@ func (s *projectAlertGroupClient) GetNamespaced(namespace, name string, opts met
 
 func (s *projectAlertGroupClient) Update(o *ProjectAlertGroup) (*ProjectAlertGroup, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ProjectAlertGroup), err
+}
+
+func (s *projectAlertGroupClient) UpdateStatus(o *ProjectAlertGroup) (*ProjectAlertGroup, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ProjectAlertGroup), err
 }
 

@@ -74,8 +74,6 @@ type ProjectLoggingController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectLoggingHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ProjectLoggingInterface interface {
@@ -126,7 +124,7 @@ func (l *projectLoggingLister) Get(namespace, name string) (*ProjectLogging, err
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectLoggingGroupVersionKind.Group,
-			Resource: "projectLogging",
+			Resource: ProjectLoggingGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ProjectLogging), nil
@@ -210,25 +208,12 @@ func (c projectLoggingFactory) List() runtime.Object {
 }
 
 func (s *projectLoggingClient) Controller() ProjectLoggingController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.projectLoggingControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ProjectLoggingGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ProjectLoggingGroupVersionResource, ProjectLoggingGroupVersionKind.Kind, true))
 
-	c = &projectLoggingController{
+	return &projectLoggingController{
 		GenericController: genericController,
 	}
-
-	s.client.projectLoggingControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type projectLoggingClient struct {
@@ -259,6 +244,11 @@ func (s *projectLoggingClient) GetNamespaced(namespace, name string, opts metav1
 
 func (s *projectLoggingClient) Update(o *ProjectLogging) (*ProjectLogging, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ProjectLogging), err
+}
+
+func (s *projectLoggingClient) UpdateStatus(o *ProjectLogging) (*ProjectLogging, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ProjectLogging), err
 }
 

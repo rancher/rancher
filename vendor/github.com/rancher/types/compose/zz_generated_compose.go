@@ -53,7 +53,7 @@ type Config struct {
 	ClusterCatalogs                          map[string]managementClient.ClusterCatalog                          `json:"clusterCatalogs,omitempty" yaml:"clusterCatalogs,omitempty"`
 	MultiClusterApps                         map[string]managementClient.MultiClusterApp                         `json:"multiClusterApps,omitempty" yaml:"multiClusterApps,omitempty"`
 	MultiClusterAppRevisions                 map[string]managementClient.MultiClusterAppRevision                 `json:"multiClusterAppRevisions,omitempty" yaml:"multiClusterAppRevisions,omitempty"`
-	GlobalDNSs                               map[string]managementClient.GlobalDNS                               `json:"globalDnses,omitempty" yaml:"globalDnses,omitempty"`
+	GlobalDnss                               map[string]managementClient.GlobalDns                               `json:"globalDnses,omitempty" yaml:"globalDnses,omitempty"`
 	GlobalDNSProviders                       map[string]managementClient.GlobalDNSProvider                       `json:"globalDnsProviders,omitempty" yaml:"globalDnsProviders,omitempty"`
 	KontainerDrivers                         map[string]managementClient.KontainerDriver                         `json:"kontainerDrivers,omitempty" yaml:"kontainerDrivers,omitempty"`
 	EtcdBackups                              map[string]managementClient.EtcdBackup                              `json:"etcdBackups,omitempty" yaml:"etcdBackups,omitempty"`
@@ -64,9 +64,9 @@ type Config struct {
 	ManagementSecrets                        map[string]managementClient.ManagementSecret                        `json:"managementSecrets,omitempty" yaml:"managementSecrets,omitempty"`
 	ClusterTemplates                         map[string]managementClient.ClusterTemplate                         `json:"clusterTemplates,omitempty" yaml:"clusterTemplates,omitempty"`
 	ClusterTemplateRevisions                 map[string]managementClient.ClusterTemplateRevision                 `json:"clusterTemplateRevisions,omitempty" yaml:"clusterTemplateRevisions,omitempty"`
-	RKEK8sSystemImages                       map[string]managementClient.RKEK8sSystemImage                       `json:"rkeK8sSystemImages,omitempty" yaml:"rkeK8sSystemImages,omitempty"`
-	RKEK8sServiceOptions                     map[string]managementClient.RKEK8sServiceOption                     `json:"rkeK8sServiceOptions,omitempty" yaml:"rkeK8sServiceOptions,omitempty"`
-	RKEAddons                                map[string]managementClient.RKEAddon                                `json:"rkeAddons,omitempty" yaml:"rkeAddons,omitempty"`
+	RkeK8sSystemImages                       map[string]managementClient.RkeK8sSystemImage                       `json:"rkeK8sSystemImages,omitempty" yaml:"rkeK8sSystemImages,omitempty"`
+	RkeK8sServiceOptions                     map[string]managementClient.RkeK8sServiceOption                     `json:"rkeK8sServiceOptions,omitempty" yaml:"rkeK8sServiceOptions,omitempty"`
+	RkeAddons                                map[string]managementClient.RkeAddon                                `json:"rkeAddons,omitempty" yaml:"rkeAddons,omitempty"`
 	CisConfigs                               map[string]managementClient.CisConfig                               `json:"cisConfigs,omitempty" yaml:"cisConfigs,omitempty"`
 	CisBenchmarkVersions                     map[string]managementClient.CisBenchmarkVersion                     `json:"cisBenchmarkVersions,omitempty" yaml:"cisBenchmarkVersions,omitempty"`
 

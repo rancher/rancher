@@ -74,8 +74,6 @@ type SourceCodeProviderConfigController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SourceCodeProviderConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type SourceCodeProviderConfigInterface interface {
@@ -126,7 +124,7 @@ func (l *sourceCodeProviderConfigLister) Get(namespace, name string) (*SourceCod
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SourceCodeProviderConfigGroupVersionKind.Group,
-			Resource: "sourceCodeProviderConfig",
+			Resource: SourceCodeProviderConfigGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*SourceCodeProviderConfig), nil
@@ -210,25 +208,12 @@ func (c sourceCodeProviderConfigFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeProviderConfigClient) Controller() SourceCodeProviderConfigController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.sourceCodeProviderConfigControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(SourceCodeProviderConfigGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(SourceCodeProviderConfigGroupVersionResource, SourceCodeProviderConfigGroupVersionKind.Kind, true))
 
-	c = &sourceCodeProviderConfigController{
+	return &sourceCodeProviderConfigController{
 		GenericController: genericController,
 	}
-
-	s.client.sourceCodeProviderConfigControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type sourceCodeProviderConfigClient struct {
@@ -259,6 +244,11 @@ func (s *sourceCodeProviderConfigClient) GetNamespaced(namespace, name string, o
 
 func (s *sourceCodeProviderConfigClient) Update(o *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*SourceCodeProviderConfig), err
+}
+
+func (s *sourceCodeProviderConfigClient) UpdateStatus(o *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*SourceCodeProviderConfig), err
 }
 

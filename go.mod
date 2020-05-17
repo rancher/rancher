@@ -73,25 +73,25 @@ require (
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
 	github.com/pborman/uuid v1.2.0
 	github.com/pierrec/lz4 v2.2.6+incompatible // indirect
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.4.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.9.1
 	github.com/prometheus/tsdb v0.8.0 // indirect
 	github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200508010131-226462dc5558
-	github.com/rancher/lasso v0.0.0-20200513231433-d0ce66327a25
+	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200417063935-07a7713a06d9
+	github.com/rancher/norman v0.0.0-20200517050325-f53cae161640
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
 	github.com/rancher/rke v1.1.0-rc9.0.20200513225439-53fcc37e950f
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200417063946-685dea747a25
+	github.com/rancher/steve v0.0.0-20200517052547-afbc6a4186b1
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
-	github.com/rancher/types v0.0.0-20200410165108-8b729a8f3a1b
-	github.com/rancher/wrangler v0.6.2-0.20200417063009-962aed6a55dc
-	github.com/rancher/wrangler-api v0.6.1-0.20200416053439-201927d62012
+	github.com/rancher/types v0.0.0-20200517054142-ecd764720a0f
+	github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f
+	github.com/rancher/wrangler-api v0.6.1-0.20200515193802-dcf70881b087
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
 	github.com/satori/go.uuid v1.2.0

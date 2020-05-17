@@ -50,12 +50,6 @@ func NewJob(namespace, name string, obj v1.Job) *v1.Job {
 	return &obj
 }
 
-type JobList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Job `json:"items"`
-}
-
 type JobHandlerFunc func(key string, obj *v1.Job) (runtime.Object, error)
 
 type JobChangeHandlerFunc func(obj *v1.Job) (runtime.Object, error)
@@ -75,8 +69,6 @@ type JobController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler JobHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type JobInterface interface {
@@ -87,8 +79,8 @@ type JobInterface interface {
 	Update(*v1.Job) (*v1.Job, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*JobList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*JobList, error)
+	List(opts metav1.ListOptions) (*v1.JobList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.JobList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() JobController
@@ -127,7 +119,7 @@ func (l *jobLister) Get(namespace, name string) (*v1.Job, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    JobGroupVersionKind.Group,
-			Resource: "job",
+			Resource: JobGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Job), nil
@@ -207,29 +199,16 @@ func (c jobFactory) Object() runtime.Object {
 }
 
 func (c jobFactory) List() runtime.Object {
-	return &JobList{}
+	return &v1.JobList{}
 }
 
 func (s *jobClient) Controller() JobController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.jobControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(JobGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(JobGroupVersionResource, JobGroupVersionKind.Kind, true))
 
-	c = &jobController{
+	return &jobController{
 		GenericController: genericController,
 	}
-
-	s.client.jobControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type jobClient struct {
@@ -263,6 +242,11 @@ func (s *jobClient) Update(o *v1.Job) (*v1.Job, error) {
 	return obj.(*v1.Job), err
 }
 
+func (s *jobClient) UpdateStatus(o *v1.Job) (*v1.Job, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Job), err
+}
+
 func (s *jobClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *jobClient) DeleteNamespaced(namespace, name string, options *metav1.Del
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *jobClient) List(opts metav1.ListOptions) (*JobList, error) {
+func (s *jobClient) List(opts metav1.ListOptions) (*v1.JobList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*JobList), err
+	return obj.(*v1.JobList), err
 }
 
-func (s *jobClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*JobList, error) {
+func (s *jobClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.JobList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*JobList), err
+	return obj.(*v1.JobList), err
 }
 
 func (s *jobClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

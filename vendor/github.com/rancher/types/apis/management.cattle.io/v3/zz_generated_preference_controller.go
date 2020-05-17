@@ -74,8 +74,6 @@ type PreferenceController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PreferenceHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PreferenceInterface interface {
@@ -126,7 +124,7 @@ func (l *preferenceLister) Get(namespace, name string) (*Preference, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PreferenceGroupVersionKind.Group,
-			Resource: "preference",
+			Resource: PreferenceGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Preference), nil
@@ -210,25 +208,12 @@ func (c preferenceFactory) List() runtime.Object {
 }
 
 func (s *preferenceClient) Controller() PreferenceController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.preferenceControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PreferenceGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PreferenceGroupVersionResource, PreferenceGroupVersionKind.Kind, true))
 
-	c = &preferenceController{
+	return &preferenceController{
 		GenericController: genericController,
 	}
-
-	s.client.preferenceControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type preferenceClient struct {
@@ -259,6 +244,11 @@ func (s *preferenceClient) GetNamespaced(namespace, name string, opts metav1.Get
 
 func (s *preferenceClient) Update(o *Preference) (*Preference, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Preference), err
+}
+
+func (s *preferenceClient) UpdateStatus(o *Preference) (*Preference, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Preference), err
 }
 

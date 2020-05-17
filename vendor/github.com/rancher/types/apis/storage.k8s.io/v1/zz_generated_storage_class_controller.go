@@ -49,12 +49,6 @@ func NewStorageClass(namespace, name string, obj v1.StorageClass) *v1.StorageCla
 	return &obj
 }
 
-type StorageClassList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.StorageClass `json:"items"`
-}
-
 type StorageClassHandlerFunc func(key string, obj *v1.StorageClass) (runtime.Object, error)
 
 type StorageClassChangeHandlerFunc func(obj *v1.StorageClass) (runtime.Object, error)
@@ -74,8 +68,6 @@ type StorageClassController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler StorageClassHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type StorageClassInterface interface {
@@ -86,8 +78,8 @@ type StorageClassInterface interface {
 	Update(*v1.StorageClass) (*v1.StorageClass, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*StorageClassList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*StorageClassList, error)
+	List(opts metav1.ListOptions) (*v1.StorageClassList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.StorageClassList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() StorageClassController
@@ -126,7 +118,7 @@ func (l *storageClassLister) Get(namespace, name string) (*v1.StorageClass, erro
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    StorageClassGroupVersionKind.Group,
-			Resource: "storageClass",
+			Resource: StorageClassGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.StorageClass), nil
@@ -206,29 +198,16 @@ func (c storageClassFactory) Object() runtime.Object {
 }
 
 func (c storageClassFactory) List() runtime.Object {
-	return &StorageClassList{}
+	return &v1.StorageClassList{}
 }
 
 func (s *storageClassClient) Controller() StorageClassController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.storageClassControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(StorageClassGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(StorageClassGroupVersionResource, StorageClassGroupVersionKind.Kind, false))
 
-	c = &storageClassController{
+	return &storageClassController{
 		GenericController: genericController,
 	}
-
-	s.client.storageClassControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type storageClassClient struct {
@@ -262,6 +241,11 @@ func (s *storageClassClient) Update(o *v1.StorageClass) (*v1.StorageClass, error
 	return obj.(*v1.StorageClass), err
 }
 
+func (s *storageClassClient) UpdateStatus(o *v1.StorageClass) (*v1.StorageClass, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.StorageClass), err
+}
+
 func (s *storageClassClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -270,14 +254,14 @@ func (s *storageClassClient) DeleteNamespaced(namespace, name string, options *m
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *storageClassClient) List(opts metav1.ListOptions) (*StorageClassList, error) {
+func (s *storageClassClient) List(opts metav1.ListOptions) (*v1.StorageClassList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*StorageClassList), err
+	return obj.(*v1.StorageClassList), err
 }
 
-func (s *storageClassClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*StorageClassList, error) {
+func (s *storageClassClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.StorageClassList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*StorageClassList), err
+	return obj.(*v1.StorageClassList), err
 }
 
 func (s *storageClassClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

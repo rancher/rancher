@@ -72,7 +72,7 @@ func (w *SysComponentWatcher) watchRule() error {
 	return nil
 }
 
-func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatusList, alert *v3.ClusterAlertRule) {
+func (w *SysComponentWatcher) checkComponentHealthy(statuses *corev1.ComponentStatusList, alert *v3.ClusterAlertRule) {
 	for _, cs := range statuses.Items {
 		if strings.HasPrefix(cs.Name, alert.Spec.SystemServiceRule.Condition) {
 			for _, cond := range cs.Conditions {

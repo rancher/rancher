@@ -35,13 +35,13 @@ func (p *ProviderStore) Delete(apiContext *types.APIContext, schema *types.Schem
 func canDeleteProvider(apiContext *types.APIContext, id string) error {
 
 	//check if there are any globalDNS entries referencing this provider
-	var globalDNSs []managementv3.GlobalDNS
+	var globalDNSs []managementv3.GlobalDns
 
 	conditions := []*types.QueryCondition{
-		types.NewConditionFromString(managementv3.GlobalDNSFieldProviderID, types.ModifierEQ, []string{id}...),
+		types.NewConditionFromString(managementv3.GlobalDnsFieldProviderID, types.ModifierEQ, []string{id}...),
 	}
 
-	if err := access.List(apiContext, apiContext.Version, managementv3.GlobalDNSType, &types.QueryOptions{Conditions: conditions}, &globalDNSs); err != nil {
+	if err := access.List(apiContext, apiContext.Version, managementv3.GlobalDnsType, &types.QueryOptions{Conditions: conditions}, &globalDNSs); err != nil {
 		return err
 	}
 

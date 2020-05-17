@@ -150,8 +150,6 @@ var (
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockGeneric                        sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockInformer                       sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockLister                         sync.RWMutex
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockStart                          sync.RWMutex
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that PodSecurityPolicyTemplateProjectBindingControllerMock does implement PodSecurityPolicyTemplateProjectBindingController.
@@ -191,12 +189,6 @@ var _ v3.PodSecurityPolicyTemplateProjectBindingController = &PodSecurityPolicyT
 //             ListerFunc: func() v3.PodSecurityPolicyTemplateProjectBindingLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedPodSecurityPolicyTemplateProjectBindingController in code that requires PodSecurityPolicyTemplateProjectBindingController
@@ -230,12 +222,6 @@ type PodSecurityPolicyTemplateProjectBindingControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.PodSecurityPolicyTemplateProjectBindingLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type PodSecurityPolicyTemplateProjectBindingControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) ListerCalls()
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("PodSecurityPolicyTemplateProjectBindingControllerMock.StartFunc: method is nil but PodSecurityPolicyTemplateProjectBindingController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.StartCalls())
-func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("PodSecurityPolicyTemplateProjectBindingControllerMock.SyncFunc: method is nil but PodSecurityPolicyTemplateProjectBindingController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.SyncCalls())
-func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockPodSecurityPolicyTemplateProjectBindingControllerMockSync.RUnlock()
 	return calls
 }
 

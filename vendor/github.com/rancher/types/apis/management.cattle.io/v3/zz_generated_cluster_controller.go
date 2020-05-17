@@ -73,8 +73,6 @@ type ClusterController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterInterface interface {
@@ -125,7 +123,7 @@ func (l *clusterLister) Get(namespace, name string) (*Cluster, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterGroupVersionKind.Group,
-			Resource: "cluster",
+			Resource: ClusterGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Cluster), nil
@@ -209,25 +207,12 @@ func (c clusterFactory) List() runtime.Object {
 }
 
 func (s *clusterClient) Controller() ClusterController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterGroupVersionResource, ClusterGroupVersionKind.Kind, false))
 
-	c = &clusterController{
+	return &clusterController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterClient struct {
@@ -258,6 +243,11 @@ func (s *clusterClient) GetNamespaced(namespace, name string, opts metav1.GetOpt
 
 func (s *clusterClient) Update(o *Cluster) (*Cluster, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Cluster), err
+}
+
+func (s *clusterClient) UpdateStatus(o *Cluster) (*Cluster, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Cluster), err
 }
 

@@ -74,8 +74,6 @@ type SourceCodeCredentialController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SourceCodeCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type SourceCodeCredentialInterface interface {
@@ -126,7 +124,7 @@ func (l *sourceCodeCredentialLister) Get(namespace, name string) (*SourceCodeCre
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SourceCodeCredentialGroupVersionKind.Group,
-			Resource: "sourceCodeCredential",
+			Resource: SourceCodeCredentialGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*SourceCodeCredential), nil
@@ -210,25 +208,12 @@ func (c sourceCodeCredentialFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeCredentialClient) Controller() SourceCodeCredentialController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.sourceCodeCredentialControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(SourceCodeCredentialGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(SourceCodeCredentialGroupVersionResource, SourceCodeCredentialGroupVersionKind.Kind, true))
 
-	c = &sourceCodeCredentialController{
+	return &sourceCodeCredentialController{
 		GenericController: genericController,
 	}
-
-	s.client.sourceCodeCredentialControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type sourceCodeCredentialClient struct {
@@ -259,6 +244,11 @@ func (s *sourceCodeCredentialClient) GetNamespaced(namespace, name string, opts 
 
 func (s *sourceCodeCredentialClient) Update(o *SourceCodeCredential) (*SourceCodeCredential, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*SourceCodeCredential), err
+}
+
+func (s *sourceCodeCredentialClient) UpdateStatus(o *SourceCodeCredential) (*SourceCodeCredential, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*SourceCodeCredential), err
 }
 

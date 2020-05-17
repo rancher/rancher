@@ -13,7 +13,7 @@ type errorController struct {
 
 func newErrorController() *errorController {
 	return &errorController{
-		informer: cache.NewSharedIndexInformer(nil, nil, 0, nil),
+		informer: cache.NewSharedIndexInformer(nil, nil, 0, cache.Indexers{}),
 	}
 }
 

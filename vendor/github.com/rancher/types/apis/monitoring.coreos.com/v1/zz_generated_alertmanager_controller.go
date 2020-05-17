@@ -50,12 +50,6 @@ func NewAlertmanager(namespace, name string, obj v1.Alertmanager) *v1.Alertmanag
 	return &obj
 }
 
-type AlertmanagerList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Alertmanager `json:"items"`
-}
-
 type AlertmanagerHandlerFunc func(key string, obj *v1.Alertmanager) (runtime.Object, error)
 
 type AlertmanagerChangeHandlerFunc func(obj *v1.Alertmanager) (runtime.Object, error)
@@ -75,8 +69,6 @@ type AlertmanagerController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler AlertmanagerHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type AlertmanagerInterface interface {
@@ -87,8 +79,8 @@ type AlertmanagerInterface interface {
 	Update(*v1.Alertmanager) (*v1.Alertmanager, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*AlertmanagerList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*AlertmanagerList, error)
+	List(opts metav1.ListOptions) (*v1.AlertmanagerList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.AlertmanagerList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() AlertmanagerController
@@ -127,7 +119,7 @@ func (l *alertmanagerLister) Get(namespace, name string) (*v1.Alertmanager, erro
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    AlertmanagerGroupVersionKind.Group,
-			Resource: "alertmanager",
+			Resource: AlertmanagerGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Alertmanager), nil
@@ -207,29 +199,16 @@ func (c alertmanagerFactory) Object() runtime.Object {
 }
 
 func (c alertmanagerFactory) List() runtime.Object {
-	return &AlertmanagerList{}
+	return &v1.AlertmanagerList{}
 }
 
 func (s *alertmanagerClient) Controller() AlertmanagerController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.alertmanagerControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(AlertmanagerGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(AlertmanagerGroupVersionResource, AlertmanagerGroupVersionKind.Kind, true))
 
-	c = &alertmanagerController{
+	return &alertmanagerController{
 		GenericController: genericController,
 	}
-
-	s.client.alertmanagerControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type alertmanagerClient struct {
@@ -263,6 +242,11 @@ func (s *alertmanagerClient) Update(o *v1.Alertmanager) (*v1.Alertmanager, error
 	return obj.(*v1.Alertmanager), err
 }
 
+func (s *alertmanagerClient) UpdateStatus(o *v1.Alertmanager) (*v1.Alertmanager, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Alertmanager), err
+}
+
 func (s *alertmanagerClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *alertmanagerClient) DeleteNamespaced(namespace, name string, options *m
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *alertmanagerClient) List(opts metav1.ListOptions) (*AlertmanagerList, error) {
+func (s *alertmanagerClient) List(opts metav1.ListOptions) (*v1.AlertmanagerList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*AlertmanagerList), err
+	return obj.(*v1.AlertmanagerList), err
 }
 
-func (s *alertmanagerClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*AlertmanagerList, error) {
+func (s *alertmanagerClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.AlertmanagerList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*AlertmanagerList), err
+	return obj.(*v1.AlertmanagerList), err
 }
 
 func (s *alertmanagerClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

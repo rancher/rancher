@@ -73,8 +73,6 @@ type UserAttributeController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler UserAttributeHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type UserAttributeInterface interface {
@@ -125,7 +123,7 @@ func (l *userAttributeLister) Get(namespace, name string) (*UserAttribute, error
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    UserAttributeGroupVersionKind.Group,
-			Resource: "userAttribute",
+			Resource: UserAttributeGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*UserAttribute), nil
@@ -209,25 +207,12 @@ func (c userAttributeFactory) List() runtime.Object {
 }
 
 func (s *userAttributeClient) Controller() UserAttributeController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.userAttributeControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(UserAttributeGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(UserAttributeGroupVersionResource, UserAttributeGroupVersionKind.Kind, false))
 
-	c = &userAttributeController{
+	return &userAttributeController{
 		GenericController: genericController,
 	}
-
-	s.client.userAttributeControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type userAttributeClient struct {
@@ -258,6 +243,11 @@ func (s *userAttributeClient) GetNamespaced(namespace, name string, opts metav1.
 
 func (s *userAttributeClient) Update(o *UserAttribute) (*UserAttribute, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*UserAttribute), err
+}
+
+func (s *userAttributeClient) UpdateStatus(o *UserAttribute) (*UserAttribute, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*UserAttribute), err
 }
 

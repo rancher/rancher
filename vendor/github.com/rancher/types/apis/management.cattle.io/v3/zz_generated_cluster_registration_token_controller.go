@@ -74,8 +74,6 @@ type ClusterRegistrationTokenController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterRegistrationTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterRegistrationTokenInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterRegistrationTokenLister) Get(namespace, name string) (*ClusterRe
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterRegistrationTokenGroupVersionKind.Group,
-			Resource: "clusterRegistrationToken",
+			Resource: ClusterRegistrationTokenGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterRegistrationToken), nil
@@ -210,25 +208,12 @@ func (c clusterRegistrationTokenFactory) List() runtime.Object {
 }
 
 func (s *clusterRegistrationTokenClient) Controller() ClusterRegistrationTokenController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterRegistrationTokenControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterRegistrationTokenGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterRegistrationTokenGroupVersionResource, ClusterRegistrationTokenGroupVersionKind.Kind, true))
 
-	c = &clusterRegistrationTokenController{
+	return &clusterRegistrationTokenController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterRegistrationTokenControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterRegistrationTokenClient struct {
@@ -259,6 +244,11 @@ func (s *clusterRegistrationTokenClient) GetNamespaced(namespace, name string, o
 
 func (s *clusterRegistrationTokenClient) Update(o *ClusterRegistrationToken) (*ClusterRegistrationToken, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterRegistrationToken), err
+}
+
+func (s *clusterRegistrationTokenClient) UpdateStatus(o *ClusterRegistrationToken) (*ClusterRegistrationToken, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterRegistrationToken), err
 }
 

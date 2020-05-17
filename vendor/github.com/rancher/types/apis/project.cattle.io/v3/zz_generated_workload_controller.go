@@ -74,8 +74,6 @@ type WorkloadController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler WorkloadHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type WorkloadInterface interface {
@@ -126,7 +124,7 @@ func (l *workloadLister) Get(namespace, name string) (*Workload, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    WorkloadGroupVersionKind.Group,
-			Resource: "workload",
+			Resource: WorkloadGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Workload), nil
@@ -210,25 +208,12 @@ func (c workloadFactory) List() runtime.Object {
 }
 
 func (s *workloadClient) Controller() WorkloadController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.workloadControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(WorkloadGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(WorkloadGroupVersionResource, WorkloadGroupVersionKind.Kind, true))
 
-	c = &workloadController{
+	return &workloadController{
 		GenericController: genericController,
 	}
-
-	s.client.workloadControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type workloadClient struct {
@@ -259,6 +244,11 @@ func (s *workloadClient) GetNamespaced(namespace, name string, opts metav1.GetOp
 
 func (s *workloadClient) Update(o *Workload) (*Workload, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Workload), err
+}
+
+func (s *workloadClient) UpdateStatus(o *Workload) (*Workload, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Workload), err
 }
 

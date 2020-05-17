@@ -80,9 +80,8 @@ type serviceAccountController struct {
 	groupResource schema.GroupResource
 }
 
-func NewServiceAccountController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) ServiceAccountController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewServiceAccountController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ServiceAccountController {
+	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
 	return &serviceAccountController{
 		controller: c,
 		client:     c.Client(),

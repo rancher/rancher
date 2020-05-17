@@ -73,8 +73,6 @@ type TemplateVersionController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler TemplateVersionHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type TemplateVersionInterface interface {
@@ -125,7 +123,7 @@ func (l *templateVersionLister) Get(namespace, name string) (*TemplateVersion, e
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    TemplateVersionGroupVersionKind.Group,
-			Resource: "templateVersion",
+			Resource: TemplateVersionGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*TemplateVersion), nil
@@ -209,25 +207,12 @@ func (c templateVersionFactory) List() runtime.Object {
 }
 
 func (s *templateVersionClient) Controller() TemplateVersionController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.templateVersionControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(TemplateVersionGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(TemplateVersionGroupVersionResource, TemplateVersionGroupVersionKind.Kind, false))
 
-	c = &templateVersionController{
+	return &templateVersionController{
 		GenericController: genericController,
 	}
-
-	s.client.templateVersionControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type templateVersionClient struct {
@@ -258,6 +243,11 @@ func (s *templateVersionClient) GetNamespaced(namespace, name string, opts metav
 
 func (s *templateVersionClient) Update(o *TemplateVersion) (*TemplateVersion, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*TemplateVersion), err
+}
+
+func (s *templateVersionClient) UpdateStatus(o *TemplateVersion) (*TemplateVersion, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*TemplateVersion), err
 }
 

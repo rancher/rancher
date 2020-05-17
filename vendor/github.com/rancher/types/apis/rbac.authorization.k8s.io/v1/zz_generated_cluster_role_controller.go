@@ -49,12 +49,6 @@ func NewClusterRole(namespace, name string, obj v1.ClusterRole) *v1.ClusterRole 
 	return &obj
 }
 
-type ClusterRoleList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ClusterRole `json:"items"`
-}
-
 type ClusterRoleHandlerFunc func(key string, obj *v1.ClusterRole) (runtime.Object, error)
 
 type ClusterRoleChangeHandlerFunc func(obj *v1.ClusterRole) (runtime.Object, error)
@@ -74,8 +68,6 @@ type ClusterRoleController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterRoleHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterRoleInterface interface {
@@ -86,8 +78,8 @@ type ClusterRoleInterface interface {
 	Update(*v1.ClusterRole) (*v1.ClusterRole, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*ClusterRoleList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterRoleList, error)
+	List(opts metav1.ListOptions) (*v1.ClusterRoleList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ClusterRoleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRoleController
@@ -126,7 +118,7 @@ func (l *clusterRoleLister) Get(namespace, name string) (*v1.ClusterRole, error)
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterRoleGroupVersionKind.Group,
-			Resource: "clusterRole",
+			Resource: ClusterRoleGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.ClusterRole), nil
@@ -206,29 +198,16 @@ func (c clusterRoleFactory) Object() runtime.Object {
 }
 
 func (c clusterRoleFactory) List() runtime.Object {
-	return &ClusterRoleList{}
+	return &v1.ClusterRoleList{}
 }
 
 func (s *clusterRoleClient) Controller() ClusterRoleController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterRoleControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterRoleGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterRoleGroupVersionResource, ClusterRoleGroupVersionKind.Kind, false))
 
-	c = &clusterRoleController{
+	return &clusterRoleController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterRoleControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterRoleClient struct {
@@ -262,6 +241,11 @@ func (s *clusterRoleClient) Update(o *v1.ClusterRole) (*v1.ClusterRole, error) {
 	return obj.(*v1.ClusterRole), err
 }
 
+func (s *clusterRoleClient) UpdateStatus(o *v1.ClusterRole) (*v1.ClusterRole, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.ClusterRole), err
+}
+
 func (s *clusterRoleClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -270,14 +254,14 @@ func (s *clusterRoleClient) DeleteNamespaced(namespace, name string, options *me
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *clusterRoleClient) List(opts metav1.ListOptions) (*ClusterRoleList, error) {
+func (s *clusterRoleClient) List(opts metav1.ListOptions) (*v1.ClusterRoleList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*ClusterRoleList), err
+	return obj.(*v1.ClusterRoleList), err
 }
 
-func (s *clusterRoleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterRoleList, error) {
+func (s *clusterRoleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ClusterRoleList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*ClusterRoleList), err
+	return obj.(*v1.ClusterRoleList), err
 }
 
 func (s *clusterRoleClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

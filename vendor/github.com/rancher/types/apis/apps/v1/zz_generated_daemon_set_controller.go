@@ -50,12 +50,6 @@ func NewDaemonSet(namespace, name string, obj v1.DaemonSet) *v1.DaemonSet {
 	return &obj
 }
 
-type DaemonSetList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.DaemonSet `json:"items"`
-}
-
 type DaemonSetHandlerFunc func(key string, obj *v1.DaemonSet) (runtime.Object, error)
 
 type DaemonSetChangeHandlerFunc func(obj *v1.DaemonSet) (runtime.Object, error)
@@ -75,8 +69,6 @@ type DaemonSetController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler DaemonSetHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type DaemonSetInterface interface {
@@ -87,8 +79,8 @@ type DaemonSetInterface interface {
 	Update(*v1.DaemonSet) (*v1.DaemonSet, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*DaemonSetList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*DaemonSetList, error)
+	List(opts metav1.ListOptions) (*v1.DaemonSetList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.DaemonSetList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DaemonSetController
@@ -127,7 +119,7 @@ func (l *daemonSetLister) Get(namespace, name string) (*v1.DaemonSet, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    DaemonSetGroupVersionKind.Group,
-			Resource: "daemonSet",
+			Resource: DaemonSetGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.DaemonSet), nil
@@ -207,29 +199,16 @@ func (c daemonSetFactory) Object() runtime.Object {
 }
 
 func (c daemonSetFactory) List() runtime.Object {
-	return &DaemonSetList{}
+	return &v1.DaemonSetList{}
 }
 
 func (s *daemonSetClient) Controller() DaemonSetController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.daemonSetControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(DaemonSetGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(DaemonSetGroupVersionResource, DaemonSetGroupVersionKind.Kind, true))
 
-	c = &daemonSetController{
+	return &daemonSetController{
 		GenericController: genericController,
 	}
-
-	s.client.daemonSetControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type daemonSetClient struct {
@@ -263,6 +242,11 @@ func (s *daemonSetClient) Update(o *v1.DaemonSet) (*v1.DaemonSet, error) {
 	return obj.(*v1.DaemonSet), err
 }
 
+func (s *daemonSetClient) UpdateStatus(o *v1.DaemonSet) (*v1.DaemonSet, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.DaemonSet), err
+}
+
 func (s *daemonSetClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *daemonSetClient) DeleteNamespaced(namespace, name string, options *meta
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *daemonSetClient) List(opts metav1.ListOptions) (*DaemonSetList, error) {
+func (s *daemonSetClient) List(opts metav1.ListOptions) (*v1.DaemonSetList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*DaemonSetList), err
+	return obj.(*v1.DaemonSetList), err
 }
 
-func (s *daemonSetClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*DaemonSetList, error) {
+func (s *daemonSetClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.DaemonSetList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*DaemonSetList), err
+	return obj.(*v1.DaemonSetList), err
 }
 
 func (s *daemonSetClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

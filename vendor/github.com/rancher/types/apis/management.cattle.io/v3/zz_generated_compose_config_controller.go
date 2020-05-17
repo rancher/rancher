@@ -73,8 +73,6 @@ type ComposeConfigController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ComposeConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ComposeConfigInterface interface {
@@ -125,7 +123,7 @@ func (l *composeConfigLister) Get(namespace, name string) (*ComposeConfig, error
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ComposeConfigGroupVersionKind.Group,
-			Resource: "composeConfig",
+			Resource: ComposeConfigGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ComposeConfig), nil
@@ -209,25 +207,12 @@ func (c composeConfigFactory) List() runtime.Object {
 }
 
 func (s *composeConfigClient) Controller() ComposeConfigController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.composeConfigControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ComposeConfigGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ComposeConfigGroupVersionResource, ComposeConfigGroupVersionKind.Kind, false))
 
-	c = &composeConfigController{
+	return &composeConfigController{
 		GenericController: genericController,
 	}
-
-	s.client.composeConfigControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type composeConfigClient struct {
@@ -258,6 +243,11 @@ func (s *composeConfigClient) GetNamespaced(namespace, name string, opts metav1.
 
 func (s *composeConfigClient) Update(o *ComposeConfig) (*ComposeConfig, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ComposeConfig), err
+}
+
+func (s *composeConfigClient) UpdateStatus(o *ComposeConfig) (*ComposeConfig, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ComposeConfig), err
 }
 

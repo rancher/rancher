@@ -73,8 +73,6 @@ type NodeDriverController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NodeDriverHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NodeDriverInterface interface {
@@ -125,7 +123,7 @@ func (l *nodeDriverLister) Get(namespace, name string) (*NodeDriver, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NodeDriverGroupVersionKind.Group,
-			Resource: "nodeDriver",
+			Resource: NodeDriverGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*NodeDriver), nil
@@ -209,25 +207,12 @@ func (c nodeDriverFactory) List() runtime.Object {
 }
 
 func (s *nodeDriverClient) Controller() NodeDriverController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.nodeDriverControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NodeDriverGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NodeDriverGroupVersionResource, NodeDriverGroupVersionKind.Kind, false))
 
-	c = &nodeDriverController{
+	return &nodeDriverController{
 		GenericController: genericController,
 	}
-
-	s.client.nodeDriverControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type nodeDriverClient struct {
@@ -258,6 +243,11 @@ func (s *nodeDriverClient) GetNamespaced(namespace, name string, opts metav1.Get
 
 func (s *nodeDriverClient) Update(o *NodeDriver) (*NodeDriver, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*NodeDriver), err
+}
+
+func (s *nodeDriverClient) UpdateStatus(o *NodeDriver) (*NodeDriver, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*NodeDriver), err
 }
 

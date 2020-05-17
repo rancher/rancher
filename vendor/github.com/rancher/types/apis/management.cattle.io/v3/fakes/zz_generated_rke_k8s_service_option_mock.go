@@ -18,38 +18,38 @@ import (
 )
 
 var (
-	lockRKEK8sServiceOptionListerMockGet  sync.RWMutex
-	lockRKEK8sServiceOptionListerMockList sync.RWMutex
+	lockRkeK8sServiceOptionListerMockGet  sync.RWMutex
+	lockRkeK8sServiceOptionListerMockList sync.RWMutex
 )
 
-// Ensure, that RKEK8sServiceOptionListerMock does implement RKEK8sServiceOptionLister.
+// Ensure, that RkeK8sServiceOptionListerMock does implement RkeK8sServiceOptionLister.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEK8sServiceOptionLister = &RKEK8sServiceOptionListerMock{}
+var _ v3.RkeK8sServiceOptionLister = &RkeK8sServiceOptionListerMock{}
 
-// RKEK8sServiceOptionListerMock is a mock implementation of RKEK8sServiceOptionLister.
+// RkeK8sServiceOptionListerMock is a mock implementation of RkeK8sServiceOptionLister.
 //
-//     func TestSomethingThatUsesRKEK8sServiceOptionLister(t *testing.T) {
+//     func TestSomethingThatUsesRkeK8sServiceOptionLister(t *testing.T) {
 //
-//         // make and configure a mocked RKEK8sServiceOptionLister
-//         mockedRKEK8sServiceOptionLister := &RKEK8sServiceOptionListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.RKEK8sServiceOption, error) {
+//         // make and configure a mocked RkeK8sServiceOptionLister
+//         mockedRkeK8sServiceOptionLister := &RkeK8sServiceOptionListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.RkeK8sServiceOption, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RKEK8sServiceOption, error) {
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RkeK8sServiceOption, error) {
 // 	               panic("mock out the List method")
 //             },
 //         }
 //
-//         // use mockedRKEK8sServiceOptionLister in code that requires RKEK8sServiceOptionLister
+//         // use mockedRkeK8sServiceOptionLister in code that requires RkeK8sServiceOptionLister
 //         // and then make assertions.
 //
 //     }
-type RKEK8sServiceOptionListerMock struct {
+type RkeK8sServiceOptionListerMock struct {
 	// GetFunc mocks the Get method.
-	GetFunc func(namespace string, name string) (*v3.RKEK8sServiceOption, error)
+	GetFunc func(namespace string, name string) (*v3.RkeK8sServiceOption, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(namespace string, selector labels.Selector) ([]*v3.RKEK8sServiceOption, error)
+	ListFunc func(namespace string, selector labels.Selector) ([]*v3.RkeK8sServiceOption, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -71,9 +71,9 @@ type RKEK8sServiceOptionListerMock struct {
 }
 
 // Get calls GetFunc.
-func (mock *RKEK8sServiceOptionListerMock) Get(namespace string, name string) (*v3.RKEK8sServiceOption, error) {
+func (mock *RkeK8sServiceOptionListerMock) Get(namespace string, name string) (*v3.RkeK8sServiceOption, error) {
 	if mock.GetFunc == nil {
-		panic("RKEK8sServiceOptionListerMock.GetFunc: method is nil but RKEK8sServiceOptionLister.Get was just called")
+		panic("RkeK8sServiceOptionListerMock.GetFunc: method is nil but RkeK8sServiceOptionLister.Get was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -82,16 +82,16 @@ func (mock *RKEK8sServiceOptionListerMock) Get(namespace string, name string) (*
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockRKEK8sServiceOptionListerMockGet.Lock()
+	lockRkeK8sServiceOptionListerMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockRKEK8sServiceOptionListerMockGet.Unlock()
+	lockRkeK8sServiceOptionListerMockGet.Unlock()
 	return mock.GetFunc(namespace, name)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionLister.GetCalls())
-func (mock *RKEK8sServiceOptionListerMock) GetCalls() []struct {
+//     len(mockedRkeK8sServiceOptionLister.GetCalls())
+func (mock *RkeK8sServiceOptionListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -99,16 +99,16 @@ func (mock *RKEK8sServiceOptionListerMock) GetCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockRKEK8sServiceOptionListerMockGet.RLock()
+	lockRkeK8sServiceOptionListerMockGet.RLock()
 	calls = mock.calls.Get
-	lockRKEK8sServiceOptionListerMockGet.RUnlock()
+	lockRkeK8sServiceOptionListerMockGet.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *RKEK8sServiceOptionListerMock) List(namespace string, selector labels.Selector) ([]*v3.RKEK8sServiceOption, error) {
+func (mock *RkeK8sServiceOptionListerMock) List(namespace string, selector labels.Selector) ([]*v3.RkeK8sServiceOption, error) {
 	if mock.ListFunc == nil {
-		panic("RKEK8sServiceOptionListerMock.ListFunc: method is nil but RKEK8sServiceOptionLister.List was just called")
+		panic("RkeK8sServiceOptionListerMock.ListFunc: method is nil but RkeK8sServiceOptionLister.List was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -117,16 +117,16 @@ func (mock *RKEK8sServiceOptionListerMock) List(namespace string, selector label
 		Namespace: namespace,
 		Selector:  selector,
 	}
-	lockRKEK8sServiceOptionListerMockList.Lock()
+	lockRkeK8sServiceOptionListerMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockRKEK8sServiceOptionListerMockList.Unlock()
+	lockRkeK8sServiceOptionListerMockList.Unlock()
 	return mock.ListFunc(namespace, selector)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionLister.ListCalls())
-func (mock *RKEK8sServiceOptionListerMock) ListCalls() []struct {
+//     len(mockedRkeK8sServiceOptionLister.ListCalls())
+func (mock *RkeK8sServiceOptionListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
 } {
@@ -134,46 +134,44 @@ func (mock *RKEK8sServiceOptionListerMock) ListCalls() []struct {
 		Namespace string
 		Selector  labels.Selector
 	}
-	lockRKEK8sServiceOptionListerMockList.RLock()
+	lockRkeK8sServiceOptionListerMockList.RLock()
 	calls = mock.calls.List
-	lockRKEK8sServiceOptionListerMockList.RUnlock()
+	lockRkeK8sServiceOptionListerMockList.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedFeatureHandler sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedHandler        sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockAddFeatureHandler              sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockAddHandler                     sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockEnqueue                        sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockEnqueueAfter                   sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockGeneric                        sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockInformer                       sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockLister                         sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockStart                          sync.RWMutex
-	lockRKEK8sServiceOptionControllerMockSync                           sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockAddFeatureHandler              sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockAddHandler                     sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockEnqueue                        sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockEnqueueAfter                   sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockGeneric                        sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockInformer                       sync.RWMutex
+	lockRkeK8sServiceOptionControllerMockLister                         sync.RWMutex
 )
 
-// Ensure, that RKEK8sServiceOptionControllerMock does implement RKEK8sServiceOptionController.
+// Ensure, that RkeK8sServiceOptionControllerMock does implement RkeK8sServiceOptionController.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEK8sServiceOptionController = &RKEK8sServiceOptionControllerMock{}
+var _ v3.RkeK8sServiceOptionController = &RkeK8sServiceOptionControllerMock{}
 
-// RKEK8sServiceOptionControllerMock is a mock implementation of RKEK8sServiceOptionController.
+// RkeK8sServiceOptionControllerMock is a mock implementation of RkeK8sServiceOptionController.
 //
-//     func TestSomethingThatUsesRKEK8sServiceOptionController(t *testing.T) {
+//     func TestSomethingThatUsesRkeK8sServiceOptionController(t *testing.T) {
 //
-//         // make and configure a mocked RKEK8sServiceOptionController
-//         mockedRKEK8sServiceOptionController := &RKEK8sServiceOptionControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEK8sServiceOptionHandlerFunc)  {
+//         // make and configure a mocked RkeK8sServiceOptionController
+//         mockedRkeK8sServiceOptionController := &RkeK8sServiceOptionControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeK8sServiceOptionHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.RKEK8sServiceOptionHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.RkeK8sServiceOptionHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sServiceOptionHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sServiceOptionHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.RKEK8sServiceOptionHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.RkeK8sServiceOptionHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
 //             EnqueueFunc: func(namespace string, name string)  {
@@ -188,33 +186,27 @@ var _ v3.RKEK8sServiceOptionController = &RKEK8sServiceOptionControllerMock{}
 //             InformerFunc: func() cache.SharedIndexInformer {
 // 	               panic("mock out the Informer method")
 //             },
-//             ListerFunc: func() v3.RKEK8sServiceOptionLister {
+//             ListerFunc: func() v3.RkeK8sServiceOptionLister {
 // 	               panic("mock out the Lister method")
-//             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
 //             },
 //         }
 //
-//         // use mockedRKEK8sServiceOptionController in code that requires RKEK8sServiceOptionController
+//         // use mockedRkeK8sServiceOptionController in code that requires RkeK8sServiceOptionController
 //         // and then make assertions.
 //
 //     }
-type RKEK8sServiceOptionControllerMock struct {
+type RkeK8sServiceOptionControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEK8sServiceOptionHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeK8sServiceOptionHandlerFunc)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.RKEK8sServiceOptionHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.RkeK8sServiceOptionHandlerFunc)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sServiceOptionHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sServiceOptionHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, handler v3.RKEK8sServiceOptionHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, handler v3.RkeK8sServiceOptionHandlerFunc)
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
@@ -229,13 +221,7 @@ type RKEK8sServiceOptionControllerMock struct {
 	InformerFunc func() cache.SharedIndexInformer
 
 	// ListerFunc mocks the Lister method.
-	ListerFunc func() v3.RKEK8sServiceOptionLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
+	ListerFunc func() v3.RkeK8sServiceOptionLister
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -250,7 +236,7 @@ type RKEK8sServiceOptionControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.RKEK8sServiceOptionHandlerFunc
+			Handler v3.RkeK8sServiceOptionHandlerFunc
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -261,7 +247,7 @@ type RKEK8sServiceOptionControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.RKEK8sServiceOptionHandlerFunc
+			Handler v3.RkeK8sServiceOptionHandlerFunc
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -272,7 +258,7 @@ type RKEK8sServiceOptionControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sServiceOptionHandlerFunc
+			Sync v3.RkeK8sServiceOptionHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -281,7 +267,7 @@ type RKEK8sServiceOptionControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Handler is the handler argument value.
-			Handler v3.RKEK8sServiceOptionHandlerFunc
+			Handler v3.RkeK8sServiceOptionHandlerFunc
 		}
 		// Enqueue holds details about calls to the Enqueue method.
 		Enqueue []struct {
@@ -308,32 +294,20 @@ type RKEK8sServiceOptionControllerMock struct {
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
 		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 	}
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *RKEK8sServiceOptionControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RKEK8sServiceOptionHandlerFunc) {
+func (mock *RkeK8sServiceOptionControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.RkeK8sServiceOptionHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but RKEK8sServiceOptionController.AddClusterScopedFeatureHandler was just called")
+		panic("RkeK8sServiceOptionControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but RkeK8sServiceOptionController.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.RKEK8sServiceOptionHandlerFunc
+		Handler     v3.RkeK8sServiceOptionHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -341,164 +315,164 @@ func (mock *RKEK8sServiceOptionControllerMock) AddClusterScopedFeatureHandler(ct
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedFeatureHandler.Lock()
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedFeatureHandler.Unlock()
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.AddClusterScopedFeatureHandlerCalls())
-func (mock *RKEK8sServiceOptionControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.AddClusterScopedFeatureHandlerCalls())
+func (mock *RkeK8sServiceOptionControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Handler     v3.RKEK8sServiceOptionHandlerFunc
+	Handler     v3.RkeK8sServiceOptionHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.RKEK8sServiceOptionHandlerFunc
+		Handler     v3.RkeK8sServiceOptionHandlerFunc
 	}
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedFeatureHandler.RLock()
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *RKEK8sServiceOptionControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.RKEK8sServiceOptionHandlerFunc) {
+func (mock *RkeK8sServiceOptionControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.RkeK8sServiceOptionHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.AddClusterScopedHandlerFunc: method is nil but RKEK8sServiceOptionController.AddClusterScopedHandler was just called")
+		panic("RkeK8sServiceOptionControllerMock.AddClusterScopedHandlerFunc: method is nil but RkeK8sServiceOptionController.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.RKEK8sServiceOptionHandlerFunc
+		Handler     v3.RkeK8sServiceOptionHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedHandler.Lock()
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedHandler.Unlock()
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, handler)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.AddClusterScopedHandlerCalls())
-func (mock *RKEK8sServiceOptionControllerMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.AddClusterScopedHandlerCalls())
+func (mock *RkeK8sServiceOptionControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Handler     v3.RKEK8sServiceOptionHandlerFunc
+	Handler     v3.RkeK8sServiceOptionHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.RKEK8sServiceOptionHandlerFunc
+		Handler     v3.RkeK8sServiceOptionHandlerFunc
 	}
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedHandler.RLock()
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockRKEK8sServiceOptionControllerMockAddClusterScopedHandler.RUnlock()
+	lockRkeK8sServiceOptionControllerMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *RKEK8sServiceOptionControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sServiceOptionHandlerFunc) {
+func (mock *RkeK8sServiceOptionControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sServiceOptionHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.AddFeatureHandlerFunc: method is nil but RKEK8sServiceOptionController.AddFeatureHandler was just called")
+		panic("RkeK8sServiceOptionControllerMock.AddFeatureHandlerFunc: method is nil but RkeK8sServiceOptionController.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEK8sServiceOptionHandlerFunc
+		Sync    v3.RkeK8sServiceOptionHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockRKEK8sServiceOptionControllerMockAddFeatureHandler.Lock()
+	lockRkeK8sServiceOptionControllerMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockRKEK8sServiceOptionControllerMockAddFeatureHandler.Unlock()
+	lockRkeK8sServiceOptionControllerMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.AddFeatureHandlerCalls())
-func (mock *RKEK8sServiceOptionControllerMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.AddFeatureHandlerCalls())
+func (mock *RkeK8sServiceOptionControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.RKEK8sServiceOptionHandlerFunc
+	Sync    v3.RkeK8sServiceOptionHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEK8sServiceOptionHandlerFunc
+		Sync    v3.RkeK8sServiceOptionHandlerFunc
 	}
-	lockRKEK8sServiceOptionControllerMockAddFeatureHandler.RLock()
+	lockRkeK8sServiceOptionControllerMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockRKEK8sServiceOptionControllerMockAddFeatureHandler.RUnlock()
+	lockRkeK8sServiceOptionControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *RKEK8sServiceOptionControllerMock) AddHandler(ctx context.Context, name string, handler v3.RKEK8sServiceOptionHandlerFunc) {
+func (mock *RkeK8sServiceOptionControllerMock) AddHandler(ctx context.Context, name string, handler v3.RkeK8sServiceOptionHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.AddHandlerFunc: method is nil but RKEK8sServiceOptionController.AddHandler was just called")
+		panic("RkeK8sServiceOptionControllerMock.AddHandlerFunc: method is nil but RkeK8sServiceOptionController.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.RKEK8sServiceOptionHandlerFunc
+		Handler v3.RkeK8sServiceOptionHandlerFunc
 	}{
 		Ctx:     ctx,
 		Name:    name,
 		Handler: handler,
 	}
-	lockRKEK8sServiceOptionControllerMockAddHandler.Lock()
+	lockRkeK8sServiceOptionControllerMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockRKEK8sServiceOptionControllerMockAddHandler.Unlock()
+	lockRkeK8sServiceOptionControllerMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, handler)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.AddHandlerCalls())
-func (mock *RKEK8sServiceOptionControllerMock) AddHandlerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.AddHandlerCalls())
+func (mock *RkeK8sServiceOptionControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
-	Handler v3.RKEK8sServiceOptionHandlerFunc
+	Handler v3.RkeK8sServiceOptionHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.RKEK8sServiceOptionHandlerFunc
+		Handler v3.RkeK8sServiceOptionHandlerFunc
 	}
-	lockRKEK8sServiceOptionControllerMockAddHandler.RLock()
+	lockRkeK8sServiceOptionControllerMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockRKEK8sServiceOptionControllerMockAddHandler.RUnlock()
+	lockRkeK8sServiceOptionControllerMockAddHandler.RUnlock()
 	return calls
 }
 
 // Enqueue calls EnqueueFunc.
-func (mock *RKEK8sServiceOptionControllerMock) Enqueue(namespace string, name string) {
+func (mock *RkeK8sServiceOptionControllerMock) Enqueue(namespace string, name string) {
 	if mock.EnqueueFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.EnqueueFunc: method is nil but RKEK8sServiceOptionController.Enqueue was just called")
+		panic("RkeK8sServiceOptionControllerMock.EnqueueFunc: method is nil but RkeK8sServiceOptionController.Enqueue was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -507,16 +481,16 @@ func (mock *RKEK8sServiceOptionControllerMock) Enqueue(namespace string, name st
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockRKEK8sServiceOptionControllerMockEnqueue.Lock()
+	lockRkeK8sServiceOptionControllerMockEnqueue.Lock()
 	mock.calls.Enqueue = append(mock.calls.Enqueue, callInfo)
-	lockRKEK8sServiceOptionControllerMockEnqueue.Unlock()
+	lockRkeK8sServiceOptionControllerMockEnqueue.Unlock()
 	mock.EnqueueFunc(namespace, name)
 }
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.EnqueueCalls())
-func (mock *RKEK8sServiceOptionControllerMock) EnqueueCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.EnqueueCalls())
+func (mock *RkeK8sServiceOptionControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -524,16 +498,16 @@ func (mock *RKEK8sServiceOptionControllerMock) EnqueueCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockRKEK8sServiceOptionControllerMockEnqueue.RLock()
+	lockRkeK8sServiceOptionControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
-	lockRKEK8sServiceOptionControllerMockEnqueue.RUnlock()
+	lockRkeK8sServiceOptionControllerMockEnqueue.RUnlock()
 	return calls
 }
 
 // EnqueueAfter calls EnqueueAfterFunc.
-func (mock *RKEK8sServiceOptionControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
+func (mock *RkeK8sServiceOptionControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
 	if mock.EnqueueAfterFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.EnqueueAfterFunc: method is nil but RKEK8sServiceOptionController.EnqueueAfter was just called")
+		panic("RkeK8sServiceOptionControllerMock.EnqueueAfterFunc: method is nil but RkeK8sServiceOptionController.EnqueueAfter was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -544,16 +518,16 @@ func (mock *RKEK8sServiceOptionControllerMock) EnqueueAfter(namespace string, na
 		Name:      name,
 		After:     after,
 	}
-	lockRKEK8sServiceOptionControllerMockEnqueueAfter.Lock()
+	lockRkeK8sServiceOptionControllerMockEnqueueAfter.Lock()
 	mock.calls.EnqueueAfter = append(mock.calls.EnqueueAfter, callInfo)
-	lockRKEK8sServiceOptionControllerMockEnqueueAfter.Unlock()
+	lockRkeK8sServiceOptionControllerMockEnqueueAfter.Unlock()
 	mock.EnqueueAfterFunc(namespace, name, after)
 }
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.EnqueueAfterCalls())
-func (mock *RKEK8sServiceOptionControllerMock) EnqueueAfterCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.EnqueueAfterCalls())
+func (mock *RkeK8sServiceOptionControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
 	After     time.Duration
@@ -563,217 +537,151 @@ func (mock *RKEK8sServiceOptionControllerMock) EnqueueAfterCalls() []struct {
 		Name      string
 		After     time.Duration
 	}
-	lockRKEK8sServiceOptionControllerMockEnqueueAfter.RLock()
+	lockRkeK8sServiceOptionControllerMockEnqueueAfter.RLock()
 	calls = mock.calls.EnqueueAfter
-	lockRKEK8sServiceOptionControllerMockEnqueueAfter.RUnlock()
+	lockRkeK8sServiceOptionControllerMockEnqueueAfter.RUnlock()
 	return calls
 }
 
 // Generic calls GenericFunc.
-func (mock *RKEK8sServiceOptionControllerMock) Generic() controller.GenericController {
+func (mock *RkeK8sServiceOptionControllerMock) Generic() controller.GenericController {
 	if mock.GenericFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.GenericFunc: method is nil but RKEK8sServiceOptionController.Generic was just called")
+		panic("RkeK8sServiceOptionControllerMock.GenericFunc: method is nil but RkeK8sServiceOptionController.Generic was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sServiceOptionControllerMockGeneric.Lock()
+	lockRkeK8sServiceOptionControllerMockGeneric.Lock()
 	mock.calls.Generic = append(mock.calls.Generic, callInfo)
-	lockRKEK8sServiceOptionControllerMockGeneric.Unlock()
+	lockRkeK8sServiceOptionControllerMockGeneric.Unlock()
 	return mock.GenericFunc()
 }
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.GenericCalls())
-func (mock *RKEK8sServiceOptionControllerMock) GenericCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.GenericCalls())
+func (mock *RkeK8sServiceOptionControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sServiceOptionControllerMockGeneric.RLock()
+	lockRkeK8sServiceOptionControllerMockGeneric.RLock()
 	calls = mock.calls.Generic
-	lockRKEK8sServiceOptionControllerMockGeneric.RUnlock()
+	lockRkeK8sServiceOptionControllerMockGeneric.RUnlock()
 	return calls
 }
 
 // Informer calls InformerFunc.
-func (mock *RKEK8sServiceOptionControllerMock) Informer() cache.SharedIndexInformer {
+func (mock *RkeK8sServiceOptionControllerMock) Informer() cache.SharedIndexInformer {
 	if mock.InformerFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.InformerFunc: method is nil but RKEK8sServiceOptionController.Informer was just called")
+		panic("RkeK8sServiceOptionControllerMock.InformerFunc: method is nil but RkeK8sServiceOptionController.Informer was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sServiceOptionControllerMockInformer.Lock()
+	lockRkeK8sServiceOptionControllerMockInformer.Lock()
 	mock.calls.Informer = append(mock.calls.Informer, callInfo)
-	lockRKEK8sServiceOptionControllerMockInformer.Unlock()
+	lockRkeK8sServiceOptionControllerMockInformer.Unlock()
 	return mock.InformerFunc()
 }
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.InformerCalls())
-func (mock *RKEK8sServiceOptionControllerMock) InformerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.InformerCalls())
+func (mock *RkeK8sServiceOptionControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sServiceOptionControllerMockInformer.RLock()
+	lockRkeK8sServiceOptionControllerMockInformer.RLock()
 	calls = mock.calls.Informer
-	lockRKEK8sServiceOptionControllerMockInformer.RUnlock()
+	lockRkeK8sServiceOptionControllerMockInformer.RUnlock()
 	return calls
 }
 
 // Lister calls ListerFunc.
-func (mock *RKEK8sServiceOptionControllerMock) Lister() v3.RKEK8sServiceOptionLister {
+func (mock *RkeK8sServiceOptionControllerMock) Lister() v3.RkeK8sServiceOptionLister {
 	if mock.ListerFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.ListerFunc: method is nil but RKEK8sServiceOptionController.Lister was just called")
+		panic("RkeK8sServiceOptionControllerMock.ListerFunc: method is nil but RkeK8sServiceOptionController.Lister was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sServiceOptionControllerMockLister.Lock()
+	lockRkeK8sServiceOptionControllerMockLister.Lock()
 	mock.calls.Lister = append(mock.calls.Lister, callInfo)
-	lockRKEK8sServiceOptionControllerMockLister.Unlock()
+	lockRkeK8sServiceOptionControllerMockLister.Unlock()
 	return mock.ListerFunc()
 }
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionController.ListerCalls())
-func (mock *RKEK8sServiceOptionControllerMock) ListerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionController.ListerCalls())
+func (mock *RkeK8sServiceOptionControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sServiceOptionControllerMockLister.RLock()
+	lockRkeK8sServiceOptionControllerMockLister.RLock()
 	calls = mock.calls.Lister
-	lockRKEK8sServiceOptionControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *RKEK8sServiceOptionControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.StartFunc: method is nil but RKEK8sServiceOptionController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockRKEK8sServiceOptionControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockRKEK8sServiceOptionControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedRKEK8sServiceOptionController.StartCalls())
-func (mock *RKEK8sServiceOptionControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockRKEK8sServiceOptionControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockRKEK8sServiceOptionControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *RKEK8sServiceOptionControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("RKEK8sServiceOptionControllerMock.SyncFunc: method is nil but RKEK8sServiceOptionController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockRKEK8sServiceOptionControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockRKEK8sServiceOptionControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedRKEK8sServiceOptionController.SyncCalls())
-func (mock *RKEK8sServiceOptionControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockRKEK8sServiceOptionControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockRKEK8sServiceOptionControllerMockSync.RUnlock()
+	lockRkeK8sServiceOptionControllerMockLister.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedHandler          sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureHandler                sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureLifecycle              sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockAddHandler                       sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockAddLifecycle                     sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockController                       sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockCreate                           sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockDelete                           sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockDeleteCollection                 sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockDeleteNamespaced                 sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockGet                              sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockGetNamespaced                    sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockList                             sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockListNamespaced                   sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockObjectClient                     sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockUpdate                           sync.RWMutex
-	lockRKEK8sServiceOptionInterfaceMockWatch                            sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockAddHandler                       sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockAddLifecycle                     sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockController                       sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockCreate                           sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockDelete                           sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockDeleteCollection                 sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockGet                              sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockGetNamespaced                    sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockList                             sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockListNamespaced                   sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockObjectClient                     sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockUpdate                           sync.RWMutex
+	lockRkeK8sServiceOptionInterfaceMockWatch                            sync.RWMutex
 )
 
-// Ensure, that RKEK8sServiceOptionInterfaceMock does implement RKEK8sServiceOptionInterface.
+// Ensure, that RkeK8sServiceOptionInterfaceMock does implement RkeK8sServiceOptionInterface.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEK8sServiceOptionInterface = &RKEK8sServiceOptionInterfaceMock{}
+var _ v3.RkeK8sServiceOptionInterface = &RkeK8sServiceOptionInterfaceMock{}
 
-// RKEK8sServiceOptionInterfaceMock is a mock implementation of RKEK8sServiceOptionInterface.
+// RkeK8sServiceOptionInterfaceMock is a mock implementation of RkeK8sServiceOptionInterface.
 //
-//     func TestSomethingThatUsesRKEK8sServiceOptionInterface(t *testing.T) {
+//     func TestSomethingThatUsesRkeK8sServiceOptionInterface(t *testing.T) {
 //
-//         // make and configure a mocked RKEK8sServiceOptionInterface
-//         mockedRKEK8sServiceOptionInterface := &RKEK8sServiceOptionInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEK8sServiceOptionHandlerFunc)  {
+//         // make and configure a mocked RkeK8sServiceOptionInterface
+//         mockedRkeK8sServiceOptionInterface := &RkeK8sServiceOptionInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeK8sServiceOptionHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEK8sServiceOptionLifecycle)  {
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeK8sServiceOptionLifecycle)  {
 // 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.RKEK8sServiceOptionHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.RkeK8sServiceOptionHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.RKEK8sServiceOptionLifecycle)  {
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.RkeK8sServiceOptionLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sServiceOptionHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sServiceOptionHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEK8sServiceOptionLifecycle)  {
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeK8sServiceOptionLifecycle)  {
 // 	               panic("mock out the AddFeatureLifecycle method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.RKEK8sServiceOptionHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.RkeK8sServiceOptionHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.RKEK8sServiceOptionLifecycle)  {
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.RkeK8sServiceOptionLifecycle)  {
 // 	               panic("mock out the AddLifecycle method")
 //             },
-//             ControllerFunc: func() v3.RKEK8sServiceOptionController {
+//             ControllerFunc: func() v3.RkeK8sServiceOptionController {
 // 	               panic("mock out the Controller method")
 //             },
-//             CreateFunc: func(in1 *v3.RKEK8sServiceOption) (*v3.RKEK8sServiceOption, error) {
+//             CreateFunc: func(in1 *v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error) {
 // 	               panic("mock out the Create method")
 //             },
 //             DeleteFunc: func(name string, options *v1.DeleteOptions) error {
@@ -785,22 +693,22 @@ var _ v3.RKEK8sServiceOptionInterface = &RKEK8sServiceOptionInterfaceMock{}
 //             DeleteNamespacedFunc: func(namespace string, name string, options *v1.DeleteOptions) error {
 // 	               panic("mock out the DeleteNamespaced method")
 //             },
-//             GetFunc: func(name string, opts v1.GetOptions) (*v3.RKEK8sServiceOption, error) {
+//             GetFunc: func(name string, opts v1.GetOptions) (*v3.RkeK8sServiceOption, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.RKEK8sServiceOption, error) {
+//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.RkeK8sServiceOption, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1.ListOptions) (*v3.RKEK8sServiceOptionList, error) {
+//             ListFunc: func(opts v1.ListOptions) (*v3.RkeK8sServiceOptionList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.RKEK8sServiceOptionList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.RkeK8sServiceOptionList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
 //             },
-//             UpdateFunc: func(in1 *v3.RKEK8sServiceOption) (*v3.RKEK8sServiceOption, error) {
+//             UpdateFunc: func(in1 *v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error) {
 // 	               panic("mock out the Update method")
 //             },
 //             WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
@@ -808,40 +716,40 @@ var _ v3.RKEK8sServiceOptionInterface = &RKEK8sServiceOptionInterfaceMock{}
 //             },
 //         }
 //
-//         // use mockedRKEK8sServiceOptionInterface in code that requires RKEK8sServiceOptionInterface
+//         // use mockedRkeK8sServiceOptionInterface in code that requires RkeK8sServiceOptionInterface
 //         // and then make assertions.
 //
 //     }
-type RKEK8sServiceOptionInterfaceMock struct {
+type RkeK8sServiceOptionInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEK8sServiceOptionHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeK8sServiceOptionHandlerFunc)
 
 	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
-	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEK8sServiceOptionLifecycle)
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeK8sServiceOptionLifecycle)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.RKEK8sServiceOptionHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.RkeK8sServiceOptionHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
-	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.RKEK8sServiceOptionLifecycle)
+	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.RkeK8sServiceOptionLifecycle)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sServiceOptionHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sServiceOptionHandlerFunc)
 
 	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
-	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEK8sServiceOptionLifecycle)
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeK8sServiceOptionLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, sync v3.RKEK8sServiceOptionHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, sync v3.RkeK8sServiceOptionHandlerFunc)
 
 	// AddLifecycleFunc mocks the AddLifecycle method.
-	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.RKEK8sServiceOptionLifecycle)
+	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.RkeK8sServiceOptionLifecycle)
 
 	// ControllerFunc mocks the Controller method.
-	ControllerFunc func() v3.RKEK8sServiceOptionController
+	ControllerFunc func() v3.RkeK8sServiceOptionController
 
 	// CreateFunc mocks the Create method.
-	CreateFunc func(in1 *v3.RKEK8sServiceOption) (*v3.RKEK8sServiceOption, error)
+	CreateFunc func(in1 *v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error)
 
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(name string, options *v1.DeleteOptions) error
@@ -853,22 +761,22 @@ type RKEK8sServiceOptionInterfaceMock struct {
 	DeleteNamespacedFunc func(namespace string, name string, options *v1.DeleteOptions) error
 
 	// GetFunc mocks the Get method.
-	GetFunc func(name string, opts v1.GetOptions) (*v3.RKEK8sServiceOption, error)
+	GetFunc func(name string, opts v1.GetOptions) (*v3.RkeK8sServiceOption, error)
 
 	// GetNamespacedFunc mocks the GetNamespaced method.
-	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.RKEK8sServiceOption, error)
+	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.RkeK8sServiceOption, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1.ListOptions) (*v3.RKEK8sServiceOptionList, error)
+	ListFunc func(opts v1.ListOptions) (*v3.RkeK8sServiceOptionList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.RKEK8sServiceOptionList, error)
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.RkeK8sServiceOptionList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
 
 	// UpdateFunc mocks the Update method.
-	UpdateFunc func(in1 *v3.RKEK8sServiceOption) (*v3.RKEK8sServiceOption, error)
+	UpdateFunc func(in1 *v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error)
 
 	// WatchFunc mocks the Watch method.
 	WatchFunc func(opts v1.ListOptions) (watch.Interface, error)
@@ -886,7 +794,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sServiceOptionHandlerFunc
+			Sync v3.RkeK8sServiceOptionHandlerFunc
 		}
 		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
 		AddClusterScopedFeatureLifecycle []struct {
@@ -899,7 +807,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEK8sServiceOptionLifecycle
+			Lifecycle v3.RkeK8sServiceOptionLifecycle
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -910,7 +818,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sServiceOptionHandlerFunc
+			Sync v3.RkeK8sServiceOptionHandlerFunc
 		}
 		// AddClusterScopedLifecycle holds details about calls to the AddClusterScopedLifecycle method.
 		AddClusterScopedLifecycle []struct {
@@ -921,7 +829,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEK8sServiceOptionLifecycle
+			Lifecycle v3.RkeK8sServiceOptionLifecycle
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -932,7 +840,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sServiceOptionHandlerFunc
+			Sync v3.RkeK8sServiceOptionHandlerFunc
 		}
 		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
 		AddFeatureLifecycle []struct {
@@ -943,7 +851,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEK8sServiceOptionLifecycle
+			Lifecycle v3.RkeK8sServiceOptionLifecycle
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -952,7 +860,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.RKEK8sServiceOptionHandlerFunc
+			Sync v3.RkeK8sServiceOptionHandlerFunc
 		}
 		// AddLifecycle holds details about calls to the AddLifecycle method.
 		AddLifecycle []struct {
@@ -961,7 +869,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.RKEK8sServiceOptionLifecycle
+			Lifecycle v3.RkeK8sServiceOptionLifecycle
 		}
 		// Controller holds details about calls to the Controller method.
 		Controller []struct {
@@ -969,7 +877,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 		// Create holds details about calls to the Create method.
 		Create []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.RKEK8sServiceOption
+			In1 *v3.RkeK8sServiceOption
 		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
@@ -1028,7 +936,7 @@ type RKEK8sServiceOptionInterfaceMock struct {
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.RKEK8sServiceOption
+			In1 *v3.RkeK8sServiceOption
 		}
 		// Watch holds details about calls to the Watch method.
 		Watch []struct {
@@ -1039,16 +947,16 @@ type RKEK8sServiceOptionInterfaceMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RKEK8sServiceOptionHandlerFunc) {
+func (mock *RkeK8sServiceOptionInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.RkeK8sServiceOptionHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but RKEK8sServiceOptionInterface.AddClusterScopedFeatureHandler was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but RkeK8sServiceOptionInterface.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.RKEK8sServiceOptionHandlerFunc
+		Sync        v3.RkeK8sServiceOptionHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1056,46 +964,46 @@ func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedFeatureHandler(ctx
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.AddClusterScopedFeatureHandlerCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Sync        v3.RKEK8sServiceOptionHandlerFunc
+	Sync        v3.RkeK8sServiceOptionHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.RKEK8sServiceOptionHandlerFunc
+		Sync        v3.RkeK8sServiceOptionHandlerFunc
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RKEK8sServiceOptionLifecycle) {
+func (mock *RkeK8sServiceOptionInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.RkeK8sServiceOptionLifecycle) {
 	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but RKEK8sServiceOptionInterface.AddClusterScopedFeatureLifecycle was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but RkeK8sServiceOptionInterface.AddClusterScopedFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEK8sServiceOptionLifecycle
+		Lifecycle   v3.RkeK8sServiceOptionLifecycle
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1103,346 +1011,346 @@ func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedFeatureLifecycle(c
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
 	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
 	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.AddClusterScopedFeatureLifecycleCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Lifecycle   v3.RKEK8sServiceOptionLifecycle
+	Lifecycle   v3.RkeK8sServiceOptionLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEK8sServiceOptionLifecycle
+		Lifecycle   v3.RkeK8sServiceOptionLifecycle
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedFeatureLifecycle
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.RKEK8sServiceOptionHandlerFunc) {
+func (mock *RkeK8sServiceOptionInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.RkeK8sServiceOptionHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.AddClusterScopedHandlerFunc: method is nil but RKEK8sServiceOptionInterface.AddClusterScopedHandler was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.AddClusterScopedHandlerFunc: method is nil but RkeK8sServiceOptionInterface.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.RKEK8sServiceOptionHandlerFunc
+		Sync        v3.RkeK8sServiceOptionHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedHandler.Lock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedHandler.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, sync)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.AddClusterScopedHandlerCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.AddClusterScopedHandlerCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Sync        v3.RKEK8sServiceOptionHandlerFunc
+	Sync        v3.RkeK8sServiceOptionHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.RKEK8sServiceOptionHandlerFunc
+		Sync        v3.RkeK8sServiceOptionHandlerFunc
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedHandler.RLock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedHandler.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedLifecycle calls AddClusterScopedLifecycleFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.RKEK8sServiceOptionLifecycle) {
+func (mock *RkeK8sServiceOptionInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.RkeK8sServiceOptionLifecycle) {
 	if mock.AddClusterScopedLifecycleFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but RKEK8sServiceOptionInterface.AddClusterScopedLifecycle was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but RkeK8sServiceOptionInterface.AddClusterScopedLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEK8sServiceOptionLifecycle
+		Lifecycle   v3.RkeK8sServiceOptionLifecycle
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedLifecycle.Lock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedLifecycle.Lock()
 	mock.calls.AddClusterScopedLifecycle = append(mock.calls.AddClusterScopedLifecycle, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedLifecycle.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedLifecycle.Unlock()
 	mock.AddClusterScopedLifecycleFunc(ctx, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.AddClusterScopedLifecycleCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.AddClusterScopedLifecycleCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Lifecycle   v3.RKEK8sServiceOptionLifecycle
+	Lifecycle   v3.RkeK8sServiceOptionLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.RKEK8sServiceOptionLifecycle
+		Lifecycle   v3.RkeK8sServiceOptionLifecycle
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedLifecycle.RLock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
-	lockRKEK8sServiceOptionInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockAddClusterScopedLifecycle.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RKEK8sServiceOptionHandlerFunc) {
+func (mock *RkeK8sServiceOptionInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.RkeK8sServiceOptionHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.AddFeatureHandlerFunc: method is nil but RKEK8sServiceOptionInterface.AddFeatureHandler was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.AddFeatureHandlerFunc: method is nil but RkeK8sServiceOptionInterface.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEK8sServiceOptionHandlerFunc
+		Sync    v3.RkeK8sServiceOptionHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureHandler.Lock()
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureHandler.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.AddFeatureHandlerCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.AddFeatureHandlerCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.RKEK8sServiceOptionHandlerFunc
+	Sync    v3.RkeK8sServiceOptionHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.RKEK8sServiceOptionHandlerFunc
+		Sync    v3.RkeK8sServiceOptionHandlerFunc
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureHandler.RLock()
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureHandler.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureLifecycle calls AddFeatureLifecycleFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.RKEK8sServiceOptionLifecycle) {
+func (mock *RkeK8sServiceOptionInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.RkeK8sServiceOptionLifecycle) {
 	if mock.AddFeatureLifecycleFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.AddFeatureLifecycleFunc: method is nil but RKEK8sServiceOptionInterface.AddFeatureLifecycle was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.AddFeatureLifecycleFunc: method is nil but RkeK8sServiceOptionInterface.AddFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.RKEK8sServiceOptionLifecycle
+		Lifecycle v3.RkeK8sServiceOptionLifecycle
 	}{
 		Ctx:       ctx,
 		Enabled:   enabled,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureLifecycle.Lock()
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureLifecycle.Lock()
 	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureLifecycle.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureLifecycle.Unlock()
 	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
 }
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.AddFeatureLifecycleCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) AddFeatureLifecycleCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.AddFeatureLifecycleCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
 	Name      string
-	Lifecycle v3.RKEK8sServiceOptionLifecycle
+	Lifecycle v3.RkeK8sServiceOptionLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.RKEK8sServiceOptionLifecycle
+		Lifecycle v3.RkeK8sServiceOptionLifecycle
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureLifecycle.RLock()
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureLifecycle.RLock()
 	calls = mock.calls.AddFeatureLifecycle
-	lockRKEK8sServiceOptionInterfaceMockAddFeatureLifecycle.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.RKEK8sServiceOptionHandlerFunc) {
+func (mock *RkeK8sServiceOptionInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.RkeK8sServiceOptionHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.AddHandlerFunc: method is nil but RKEK8sServiceOptionInterface.AddHandler was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.AddHandlerFunc: method is nil but RkeK8sServiceOptionInterface.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.RKEK8sServiceOptionHandlerFunc
+		Sync v3.RkeK8sServiceOptionHandlerFunc
 	}{
 		Ctx:  ctx,
 		Name: name,
 		Sync: sync,
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddHandler.Lock()
+	lockRkeK8sServiceOptionInterfaceMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockAddHandler.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, sync)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.AddHandlerCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) AddHandlerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.AddHandlerCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
-	Sync v3.RKEK8sServiceOptionHandlerFunc
+	Sync v3.RkeK8sServiceOptionHandlerFunc
 } {
 	var calls []struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.RKEK8sServiceOptionHandlerFunc
+		Sync v3.RkeK8sServiceOptionHandlerFunc
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddHandler.RLock()
+	lockRkeK8sServiceOptionInterfaceMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockRKEK8sServiceOptionInterfaceMockAddHandler.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockAddHandler.RUnlock()
 	return calls
 }
 
 // AddLifecycle calls AddLifecycleFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.RKEK8sServiceOptionLifecycle) {
+func (mock *RkeK8sServiceOptionInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.RkeK8sServiceOptionLifecycle) {
 	if mock.AddLifecycleFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.AddLifecycleFunc: method is nil but RKEK8sServiceOptionInterface.AddLifecycle was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.AddLifecycleFunc: method is nil but RkeK8sServiceOptionInterface.AddLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.RKEK8sServiceOptionLifecycle
+		Lifecycle v3.RkeK8sServiceOptionLifecycle
 	}{
 		Ctx:       ctx,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddLifecycle.Lock()
+	lockRkeK8sServiceOptionInterfaceMockAddLifecycle.Lock()
 	mock.calls.AddLifecycle = append(mock.calls.AddLifecycle, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockAddLifecycle.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockAddLifecycle.Unlock()
 	mock.AddLifecycleFunc(ctx, name, lifecycle)
 }
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.AddLifecycleCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) AddLifecycleCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.AddLifecycleCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
-	Lifecycle v3.RKEK8sServiceOptionLifecycle
+	Lifecycle v3.RkeK8sServiceOptionLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.RKEK8sServiceOptionLifecycle
+		Lifecycle v3.RkeK8sServiceOptionLifecycle
 	}
-	lockRKEK8sServiceOptionInterfaceMockAddLifecycle.RLock()
+	lockRkeK8sServiceOptionInterfaceMockAddLifecycle.RLock()
 	calls = mock.calls.AddLifecycle
-	lockRKEK8sServiceOptionInterfaceMockAddLifecycle.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockAddLifecycle.RUnlock()
 	return calls
 }
 
 // Controller calls ControllerFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) Controller() v3.RKEK8sServiceOptionController {
+func (mock *RkeK8sServiceOptionInterfaceMock) Controller() v3.RkeK8sServiceOptionController {
 	if mock.ControllerFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.ControllerFunc: method is nil but RKEK8sServiceOptionInterface.Controller was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.ControllerFunc: method is nil but RkeK8sServiceOptionInterface.Controller was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sServiceOptionInterfaceMockController.Lock()
+	lockRkeK8sServiceOptionInterfaceMockController.Lock()
 	mock.calls.Controller = append(mock.calls.Controller, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockController.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockController.Unlock()
 	return mock.ControllerFunc()
 }
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.ControllerCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) ControllerCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.ControllerCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sServiceOptionInterfaceMockController.RLock()
+	lockRkeK8sServiceOptionInterfaceMockController.RLock()
 	calls = mock.calls.Controller
-	lockRKEK8sServiceOptionInterfaceMockController.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockController.RUnlock()
 	return calls
 }
 
 // Create calls CreateFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) Create(in1 *v3.RKEK8sServiceOption) (*v3.RKEK8sServiceOption, error) {
+func (mock *RkeK8sServiceOptionInterfaceMock) Create(in1 *v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error) {
 	if mock.CreateFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.CreateFunc: method is nil but RKEK8sServiceOptionInterface.Create was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.CreateFunc: method is nil but RkeK8sServiceOptionInterface.Create was just called")
 	}
 	callInfo := struct {
-		In1 *v3.RKEK8sServiceOption
+		In1 *v3.RkeK8sServiceOption
 	}{
 		In1: in1,
 	}
-	lockRKEK8sServiceOptionInterfaceMockCreate.Lock()
+	lockRkeK8sServiceOptionInterfaceMockCreate.Lock()
 	mock.calls.Create = append(mock.calls.Create, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockCreate.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockCreate.Unlock()
 	return mock.CreateFunc(in1)
 }
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.CreateCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) CreateCalls() []struct {
-	In1 *v3.RKEK8sServiceOption
+//     len(mockedRkeK8sServiceOptionInterface.CreateCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) CreateCalls() []struct {
+	In1 *v3.RkeK8sServiceOption
 } {
 	var calls []struct {
-		In1 *v3.RKEK8sServiceOption
+		In1 *v3.RkeK8sServiceOption
 	}
-	lockRKEK8sServiceOptionInterfaceMockCreate.RLock()
+	lockRkeK8sServiceOptionInterfaceMockCreate.RLock()
 	calls = mock.calls.Create
-	lockRKEK8sServiceOptionInterfaceMockCreate.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockCreate.RUnlock()
 	return calls
 }
 
 // Delete calls DeleteFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
+func (mock *RkeK8sServiceOptionInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
 	if mock.DeleteFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.DeleteFunc: method is nil but RKEK8sServiceOptionInterface.Delete was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.DeleteFunc: method is nil but RkeK8sServiceOptionInterface.Delete was just called")
 	}
 	callInfo := struct {
 		Name    string
@@ -1451,16 +1359,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) Delete(name string, options *v1.De
 		Name:    name,
 		Options: options,
 	}
-	lockRKEK8sServiceOptionInterfaceMockDelete.Lock()
+	lockRkeK8sServiceOptionInterfaceMockDelete.Lock()
 	mock.calls.Delete = append(mock.calls.Delete, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockDelete.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockDelete.Unlock()
 	return mock.DeleteFunc(name, options)
 }
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.DeleteCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) DeleteCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.DeleteCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *v1.DeleteOptions
 } {
@@ -1468,16 +1376,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) DeleteCalls() []struct {
 		Name    string
 		Options *v1.DeleteOptions
 	}
-	lockRKEK8sServiceOptionInterfaceMockDelete.RLock()
+	lockRkeK8sServiceOptionInterfaceMockDelete.RLock()
 	calls = mock.calls.Delete
-	lockRKEK8sServiceOptionInterfaceMockDelete.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockDelete.RUnlock()
 	return calls
 }
 
 // DeleteCollection calls DeleteCollectionFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (mock *RkeK8sServiceOptionInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
 	if mock.DeleteCollectionFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.DeleteCollectionFunc: method is nil but RKEK8sServiceOptionInterface.DeleteCollection was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.DeleteCollectionFunc: method is nil but RkeK8sServiceOptionInterface.DeleteCollection was just called")
 	}
 	callInfo := struct {
 		DeleteOpts *v1.DeleteOptions
@@ -1486,16 +1394,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) DeleteCollection(deleteOpts *v1.De
 		DeleteOpts: deleteOpts,
 		ListOpts:   listOpts,
 	}
-	lockRKEK8sServiceOptionInterfaceMockDeleteCollection.Lock()
+	lockRkeK8sServiceOptionInterfaceMockDeleteCollection.Lock()
 	mock.calls.DeleteCollection = append(mock.calls.DeleteCollection, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockDeleteCollection.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockDeleteCollection.Unlock()
 	return mock.DeleteCollectionFunc(deleteOpts, listOpts)
 }
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.DeleteCollectionCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) DeleteCollectionCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.DeleteCollectionCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *v1.DeleteOptions
 	ListOpts   v1.ListOptions
 } {
@@ -1503,16 +1411,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) DeleteCollectionCalls() []struct {
 		DeleteOpts *v1.DeleteOptions
 		ListOpts   v1.ListOptions
 	}
-	lockRKEK8sServiceOptionInterfaceMockDeleteCollection.RLock()
+	lockRkeK8sServiceOptionInterfaceMockDeleteCollection.RLock()
 	calls = mock.calls.DeleteCollection
-	lockRKEK8sServiceOptionInterfaceMockDeleteCollection.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockDeleteCollection.RUnlock()
 	return calls
 }
 
 // DeleteNamespaced calls DeleteNamespacedFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
+func (mock *RkeK8sServiceOptionInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
 	if mock.DeleteNamespacedFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.DeleteNamespacedFunc: method is nil but RKEK8sServiceOptionInterface.DeleteNamespaced was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.DeleteNamespacedFunc: method is nil but RkeK8sServiceOptionInterface.DeleteNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1523,16 +1431,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) DeleteNamespaced(namespace string,
 		Name:      name,
 		Options:   options,
 	}
-	lockRKEK8sServiceOptionInterfaceMockDeleteNamespaced.Lock()
+	lockRkeK8sServiceOptionInterfaceMockDeleteNamespaced.Lock()
 	mock.calls.DeleteNamespaced = append(mock.calls.DeleteNamespaced, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockDeleteNamespaced.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockDeleteNamespaced.Unlock()
 	return mock.DeleteNamespacedFunc(namespace, name, options)
 }
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.DeleteNamespacedCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) DeleteNamespacedCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.DeleteNamespacedCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Options   *v1.DeleteOptions
@@ -1542,16 +1450,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) DeleteNamespacedCalls() []struct {
 		Name      string
 		Options   *v1.DeleteOptions
 	}
-	lockRKEK8sServiceOptionInterfaceMockDeleteNamespaced.RLock()
+	lockRkeK8sServiceOptionInterfaceMockDeleteNamespaced.RLock()
 	calls = mock.calls.DeleteNamespaced
-	lockRKEK8sServiceOptionInterfaceMockDeleteNamespaced.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockDeleteNamespaced.RUnlock()
 	return calls
 }
 
 // Get calls GetFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.RKEK8sServiceOption, error) {
+func (mock *RkeK8sServiceOptionInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.RkeK8sServiceOption, error) {
 	if mock.GetFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.GetFunc: method is nil but RKEK8sServiceOptionInterface.Get was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.GetFunc: method is nil but RkeK8sServiceOptionInterface.Get was just called")
 	}
 	callInfo := struct {
 		Name string
@@ -1560,16 +1468,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) Get(name string, opts v1.GetOption
 		Name: name,
 		Opts: opts,
 	}
-	lockRKEK8sServiceOptionInterfaceMockGet.Lock()
+	lockRkeK8sServiceOptionInterfaceMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockGet.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockGet.Unlock()
 	return mock.GetFunc(name, opts)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.GetCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) GetCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.GetCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts v1.GetOptions
 } {
@@ -1577,16 +1485,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) GetCalls() []struct {
 		Name string
 		Opts v1.GetOptions
 	}
-	lockRKEK8sServiceOptionInterfaceMockGet.RLock()
+	lockRkeK8sServiceOptionInterfaceMockGet.RLock()
 	calls = mock.calls.Get
-	lockRKEK8sServiceOptionInterfaceMockGet.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockGet.RUnlock()
 	return calls
 }
 
 // GetNamespaced calls GetNamespacedFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.RKEK8sServiceOption, error) {
+func (mock *RkeK8sServiceOptionInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.RkeK8sServiceOption, error) {
 	if mock.GetNamespacedFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.GetNamespacedFunc: method is nil but RKEK8sServiceOptionInterface.GetNamespaced was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.GetNamespacedFunc: method is nil but RkeK8sServiceOptionInterface.GetNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1597,16 +1505,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) GetNamespaced(namespace string, na
 		Name:      name,
 		Opts:      opts,
 	}
-	lockRKEK8sServiceOptionInterfaceMockGetNamespaced.Lock()
+	lockRkeK8sServiceOptionInterfaceMockGetNamespaced.Lock()
 	mock.calls.GetNamespaced = append(mock.calls.GetNamespaced, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockGetNamespaced.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockGetNamespaced.Unlock()
 	return mock.GetNamespacedFunc(namespace, name, opts)
 }
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.GetNamespacedCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) GetNamespacedCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.GetNamespacedCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Opts      v1.GetOptions
@@ -1616,47 +1524,47 @@ func (mock *RKEK8sServiceOptionInterfaceMock) GetNamespacedCalls() []struct {
 		Name      string
 		Opts      v1.GetOptions
 	}
-	lockRKEK8sServiceOptionInterfaceMockGetNamespaced.RLock()
+	lockRkeK8sServiceOptionInterfaceMockGetNamespaced.RLock()
 	calls = mock.calls.GetNamespaced
-	lockRKEK8sServiceOptionInterfaceMockGetNamespaced.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockGetNamespaced.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) List(opts v1.ListOptions) (*v3.RKEK8sServiceOptionList, error) {
+func (mock *RkeK8sServiceOptionInterfaceMock) List(opts v1.ListOptions) (*v3.RkeK8sServiceOptionList, error) {
 	if mock.ListFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.ListFunc: method is nil but RKEK8sServiceOptionInterface.List was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.ListFunc: method is nil but RkeK8sServiceOptionInterface.List was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockRKEK8sServiceOptionInterfaceMockList.Lock()
+	lockRkeK8sServiceOptionInterfaceMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockList.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockList.Unlock()
 	return mock.ListFunc(opts)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.ListCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) ListCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.ListCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) ListCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockRKEK8sServiceOptionInterfaceMockList.RLock()
+	lockRkeK8sServiceOptionInterfaceMockList.RLock()
 	calls = mock.calls.List
-	lockRKEK8sServiceOptionInterfaceMockList.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockList.RUnlock()
 	return calls
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.RKEK8sServiceOptionList, error) {
+func (mock *RkeK8sServiceOptionInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.RkeK8sServiceOptionList, error) {
 	if mock.ListNamespacedFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.ListNamespacedFunc: method is nil but RKEK8sServiceOptionInterface.ListNamespaced was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.ListNamespacedFunc: method is nil but RkeK8sServiceOptionInterface.ListNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1665,16 +1573,16 @@ func (mock *RKEK8sServiceOptionInterfaceMock) ListNamespaced(namespace string, o
 		Namespace: namespace,
 		Opts:      opts,
 	}
-	lockRKEK8sServiceOptionInterfaceMockListNamespaced.Lock()
+	lockRkeK8sServiceOptionInterfaceMockListNamespaced.Lock()
 	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockListNamespaced.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockListNamespaced.Unlock()
 	return mock.ListNamespacedFunc(namespace, opts)
 }
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.ListNamespacedCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) ListNamespacedCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.ListNamespacedCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      v1.ListOptions
 } {
@@ -1682,164 +1590,164 @@ func (mock *RKEK8sServiceOptionInterfaceMock) ListNamespacedCalls() []struct {
 		Namespace string
 		Opts      v1.ListOptions
 	}
-	lockRKEK8sServiceOptionInterfaceMockListNamespaced.RLock()
+	lockRkeK8sServiceOptionInterfaceMockListNamespaced.RLock()
 	calls = mock.calls.ListNamespaced
-	lockRKEK8sServiceOptionInterfaceMockListNamespaced.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 
 // ObjectClient calls ObjectClientFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) ObjectClient() *objectclient.ObjectClient {
+func (mock *RkeK8sServiceOptionInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 	if mock.ObjectClientFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.ObjectClientFunc: method is nil but RKEK8sServiceOptionInterface.ObjectClient was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.ObjectClientFunc: method is nil but RkeK8sServiceOptionInterface.ObjectClient was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockRKEK8sServiceOptionInterfaceMockObjectClient.Lock()
+	lockRkeK8sServiceOptionInterfaceMockObjectClient.Lock()
 	mock.calls.ObjectClient = append(mock.calls.ObjectClient, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockObjectClient.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockObjectClient.Unlock()
 	return mock.ObjectClientFunc()
 }
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.ObjectClientCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) ObjectClientCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.ObjectClientCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockRKEK8sServiceOptionInterfaceMockObjectClient.RLock()
+	lockRkeK8sServiceOptionInterfaceMockObjectClient.RLock()
 	calls = mock.calls.ObjectClient
-	lockRKEK8sServiceOptionInterfaceMockObjectClient.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockObjectClient.RUnlock()
 	return calls
 }
 
 // Update calls UpdateFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) Update(in1 *v3.RKEK8sServiceOption) (*v3.RKEK8sServiceOption, error) {
+func (mock *RkeK8sServiceOptionInterfaceMock) Update(in1 *v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error) {
 	if mock.UpdateFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.UpdateFunc: method is nil but RKEK8sServiceOptionInterface.Update was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.UpdateFunc: method is nil but RkeK8sServiceOptionInterface.Update was just called")
 	}
 	callInfo := struct {
-		In1 *v3.RKEK8sServiceOption
+		In1 *v3.RkeK8sServiceOption
 	}{
 		In1: in1,
 	}
-	lockRKEK8sServiceOptionInterfaceMockUpdate.Lock()
+	lockRkeK8sServiceOptionInterfaceMockUpdate.Lock()
 	mock.calls.Update = append(mock.calls.Update, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockUpdate.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockUpdate.Unlock()
 	return mock.UpdateFunc(in1)
 }
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.UpdateCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) UpdateCalls() []struct {
-	In1 *v3.RKEK8sServiceOption
+//     len(mockedRkeK8sServiceOptionInterface.UpdateCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) UpdateCalls() []struct {
+	In1 *v3.RkeK8sServiceOption
 } {
 	var calls []struct {
-		In1 *v3.RKEK8sServiceOption
+		In1 *v3.RkeK8sServiceOption
 	}
-	lockRKEK8sServiceOptionInterfaceMockUpdate.RLock()
+	lockRkeK8sServiceOptionInterfaceMockUpdate.RLock()
 	calls = mock.calls.Update
-	lockRKEK8sServiceOptionInterfaceMockUpdate.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockUpdate.RUnlock()
 	return calls
 }
 
 // Watch calls WatchFunc.
-func (mock *RKEK8sServiceOptionInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (mock *RkeK8sServiceOptionInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	if mock.WatchFunc == nil {
-		panic("RKEK8sServiceOptionInterfaceMock.WatchFunc: method is nil but RKEK8sServiceOptionInterface.Watch was just called")
+		panic("RkeK8sServiceOptionInterfaceMock.WatchFunc: method is nil but RkeK8sServiceOptionInterface.Watch was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockRKEK8sServiceOptionInterfaceMockWatch.Lock()
+	lockRkeK8sServiceOptionInterfaceMockWatch.Lock()
 	mock.calls.Watch = append(mock.calls.Watch, callInfo)
-	lockRKEK8sServiceOptionInterfaceMockWatch.Unlock()
+	lockRkeK8sServiceOptionInterfaceMockWatch.Unlock()
 	return mock.WatchFunc(opts)
 }
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionInterface.WatchCalls())
-func (mock *RKEK8sServiceOptionInterfaceMock) WatchCalls() []struct {
+//     len(mockedRkeK8sServiceOptionInterface.WatchCalls())
+func (mock *RkeK8sServiceOptionInterfaceMock) WatchCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockRKEK8sServiceOptionInterfaceMockWatch.RLock()
+	lockRkeK8sServiceOptionInterfaceMockWatch.RLock()
 	calls = mock.calls.Watch
-	lockRKEK8sServiceOptionInterfaceMockWatch.RUnlock()
+	lockRkeK8sServiceOptionInterfaceMockWatch.RUnlock()
 	return calls
 }
 
 var (
-	lockRKEK8sServiceOptionsGetterMockRKEK8sServiceOptions sync.RWMutex
+	lockRkeK8sServiceOptionsGetterMockRkeK8sServiceOptions sync.RWMutex
 )
 
-// Ensure, that RKEK8sServiceOptionsGetterMock does implement RKEK8sServiceOptionsGetter.
+// Ensure, that RkeK8sServiceOptionsGetterMock does implement RkeK8sServiceOptionsGetter.
 // If this is not the case, regenerate this file with moq.
-var _ v3.RKEK8sServiceOptionsGetter = &RKEK8sServiceOptionsGetterMock{}
+var _ v3.RkeK8sServiceOptionsGetter = &RkeK8sServiceOptionsGetterMock{}
 
-// RKEK8sServiceOptionsGetterMock is a mock implementation of RKEK8sServiceOptionsGetter.
+// RkeK8sServiceOptionsGetterMock is a mock implementation of RkeK8sServiceOptionsGetter.
 //
-//     func TestSomethingThatUsesRKEK8sServiceOptionsGetter(t *testing.T) {
+//     func TestSomethingThatUsesRkeK8sServiceOptionsGetter(t *testing.T) {
 //
-//         // make and configure a mocked RKEK8sServiceOptionsGetter
-//         mockedRKEK8sServiceOptionsGetter := &RKEK8sServiceOptionsGetterMock{
-//             RKEK8sServiceOptionsFunc: func(namespace string) v3.RKEK8sServiceOptionInterface {
-// 	               panic("mock out the RKEK8sServiceOptions method")
+//         // make and configure a mocked RkeK8sServiceOptionsGetter
+//         mockedRkeK8sServiceOptionsGetter := &RkeK8sServiceOptionsGetterMock{
+//             RkeK8sServiceOptionsFunc: func(namespace string) v3.RkeK8sServiceOptionInterface {
+// 	               panic("mock out the RkeK8sServiceOptions method")
 //             },
 //         }
 //
-//         // use mockedRKEK8sServiceOptionsGetter in code that requires RKEK8sServiceOptionsGetter
+//         // use mockedRkeK8sServiceOptionsGetter in code that requires RkeK8sServiceOptionsGetter
 //         // and then make assertions.
 //
 //     }
-type RKEK8sServiceOptionsGetterMock struct {
-	// RKEK8sServiceOptionsFunc mocks the RKEK8sServiceOptions method.
-	RKEK8sServiceOptionsFunc func(namespace string) v3.RKEK8sServiceOptionInterface
+type RkeK8sServiceOptionsGetterMock struct {
+	// RkeK8sServiceOptionsFunc mocks the RkeK8sServiceOptions method.
+	RkeK8sServiceOptionsFunc func(namespace string) v3.RkeK8sServiceOptionInterface
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// RKEK8sServiceOptions holds details about calls to the RKEK8sServiceOptions method.
-		RKEK8sServiceOptions []struct {
+		// RkeK8sServiceOptions holds details about calls to the RkeK8sServiceOptions method.
+		RkeK8sServiceOptions []struct {
 			// Namespace is the namespace argument value.
 			Namespace string
 		}
 	}
 }
 
-// RKEK8sServiceOptions calls RKEK8sServiceOptionsFunc.
-func (mock *RKEK8sServiceOptionsGetterMock) RKEK8sServiceOptions(namespace string) v3.RKEK8sServiceOptionInterface {
-	if mock.RKEK8sServiceOptionsFunc == nil {
-		panic("RKEK8sServiceOptionsGetterMock.RKEK8sServiceOptionsFunc: method is nil but RKEK8sServiceOptionsGetter.RKEK8sServiceOptions was just called")
+// RkeK8sServiceOptions calls RkeK8sServiceOptionsFunc.
+func (mock *RkeK8sServiceOptionsGetterMock) RkeK8sServiceOptions(namespace string) v3.RkeK8sServiceOptionInterface {
+	if mock.RkeK8sServiceOptionsFunc == nil {
+		panic("RkeK8sServiceOptionsGetterMock.RkeK8sServiceOptionsFunc: method is nil but RkeK8sServiceOptionsGetter.RkeK8sServiceOptions was just called")
 	}
 	callInfo := struct {
 		Namespace string
 	}{
 		Namespace: namespace,
 	}
-	lockRKEK8sServiceOptionsGetterMockRKEK8sServiceOptions.Lock()
-	mock.calls.RKEK8sServiceOptions = append(mock.calls.RKEK8sServiceOptions, callInfo)
-	lockRKEK8sServiceOptionsGetterMockRKEK8sServiceOptions.Unlock()
-	return mock.RKEK8sServiceOptionsFunc(namespace)
+	lockRkeK8sServiceOptionsGetterMockRkeK8sServiceOptions.Lock()
+	mock.calls.RkeK8sServiceOptions = append(mock.calls.RkeK8sServiceOptions, callInfo)
+	lockRkeK8sServiceOptionsGetterMockRkeK8sServiceOptions.Unlock()
+	return mock.RkeK8sServiceOptionsFunc(namespace)
 }
 
-// RKEK8sServiceOptionsCalls gets all the calls that were made to RKEK8sServiceOptions.
+// RkeK8sServiceOptionsCalls gets all the calls that were made to RkeK8sServiceOptions.
 // Check the length with:
-//     len(mockedRKEK8sServiceOptionsGetter.RKEK8sServiceOptionsCalls())
-func (mock *RKEK8sServiceOptionsGetterMock) RKEK8sServiceOptionsCalls() []struct {
+//     len(mockedRkeK8sServiceOptionsGetter.RkeK8sServiceOptionsCalls())
+func (mock *RkeK8sServiceOptionsGetterMock) RkeK8sServiceOptionsCalls() []struct {
 	Namespace string
 } {
 	var calls []struct {
 		Namespace string
 	}
-	lockRKEK8sServiceOptionsGetterMockRKEK8sServiceOptions.RLock()
-	calls = mock.calls.RKEK8sServiceOptions
-	lockRKEK8sServiceOptionsGetterMockRKEK8sServiceOptions.RUnlock()
+	lockRkeK8sServiceOptionsGetterMockRkeK8sServiceOptions.RLock()
+	calls = mock.calls.RkeK8sServiceOptions
+	lockRkeK8sServiceOptionsGetterMockRkeK8sServiceOptions.RUnlock()
 	return calls
 }

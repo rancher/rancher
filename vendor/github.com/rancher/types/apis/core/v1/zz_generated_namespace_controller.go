@@ -49,12 +49,6 @@ func NewNamespace(namespace, name string, obj v1.Namespace) *v1.Namespace {
 	return &obj
 }
 
-type NamespaceList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Namespace `json:"items"`
-}
-
 type NamespaceHandlerFunc func(key string, obj *v1.Namespace) (runtime.Object, error)
 
 type NamespaceChangeHandlerFunc func(obj *v1.Namespace) (runtime.Object, error)
@@ -74,8 +68,6 @@ type NamespaceController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NamespaceHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NamespaceInterface interface {
@@ -86,8 +78,8 @@ type NamespaceInterface interface {
 	Update(*v1.Namespace) (*v1.Namespace, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*NamespaceList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*NamespaceList, error)
+	List(opts metav1.ListOptions) (*v1.NamespaceList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.NamespaceList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespaceController
@@ -126,7 +118,7 @@ func (l *namespaceLister) Get(namespace, name string) (*v1.Namespace, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespaceGroupVersionKind.Group,
-			Resource: "namespace",
+			Resource: NamespaceGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Namespace), nil
@@ -206,29 +198,16 @@ func (c namespaceFactory) Object() runtime.Object {
 }
 
 func (c namespaceFactory) List() runtime.Object {
-	return &NamespaceList{}
+	return &v1.NamespaceList{}
 }
 
 func (s *namespaceClient) Controller() NamespaceController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.namespaceControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NamespaceGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NamespaceGroupVersionResource, NamespaceGroupVersionKind.Kind, false))
 
-	c = &namespaceController{
+	return &namespaceController{
 		GenericController: genericController,
 	}
-
-	s.client.namespaceControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type namespaceClient struct {
@@ -262,6 +241,11 @@ func (s *namespaceClient) Update(o *v1.Namespace) (*v1.Namespace, error) {
 	return obj.(*v1.Namespace), err
 }
 
+func (s *namespaceClient) UpdateStatus(o *v1.Namespace) (*v1.Namespace, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Namespace), err
+}
+
 func (s *namespaceClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -270,14 +254,14 @@ func (s *namespaceClient) DeleteNamespaced(namespace, name string, options *meta
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *namespaceClient) List(opts metav1.ListOptions) (*NamespaceList, error) {
+func (s *namespaceClient) List(opts metav1.ListOptions) (*v1.NamespaceList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*NamespaceList), err
+	return obj.(*v1.NamespaceList), err
 }
 
-func (s *namespaceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*NamespaceList, error) {
+func (s *namespaceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.NamespaceList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*NamespaceList), err
+	return obj.(*v1.NamespaceList), err
 }
 
 func (s *namespaceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

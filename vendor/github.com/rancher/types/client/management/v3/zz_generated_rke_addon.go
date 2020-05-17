@@ -5,19 +5,19 @@ import (
 )
 
 const (
-	RKEAddonType                 = "rkeAddon"
-	RKEAddonFieldAnnotations     = "annotations"
-	RKEAddonFieldCreated         = "created"
-	RKEAddonFieldCreatorID       = "creatorId"
-	RKEAddonFieldLabels          = "labels"
-	RKEAddonFieldName            = "name"
-	RKEAddonFieldOwnerReferences = "ownerReferences"
-	RKEAddonFieldRemoved         = "removed"
-	RKEAddonFieldTemplate        = "template"
-	RKEAddonFieldUUID            = "uuid"
+	RkeAddonType                 = "rkeAddon"
+	RkeAddonFieldAnnotations     = "annotations"
+	RkeAddonFieldCreated         = "created"
+	RkeAddonFieldCreatorID       = "creatorId"
+	RkeAddonFieldLabels          = "labels"
+	RkeAddonFieldName            = "name"
+	RkeAddonFieldOwnerReferences = "ownerReferences"
+	RkeAddonFieldRemoved         = "removed"
+	RkeAddonFieldTemplate        = "template"
+	RkeAddonFieldUUID            = "uuid"
 )
 
-type RKEAddon struct {
+type RkeAddon struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
@@ -30,59 +30,59 @@ type RKEAddon struct {
 	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
-type RKEAddonCollection struct {
+type RkeAddonCollection struct {
 	types.Collection
-	Data   []RKEAddon `json:"data,omitempty"`
-	client *RKEAddonClient
+	Data   []RkeAddon `json:"data,omitempty"`
+	client *RkeAddonClient
 }
 
-type RKEAddonClient struct {
+type RkeAddonClient struct {
 	apiClient *Client
 }
 
-type RKEAddonOperations interface {
-	List(opts *types.ListOpts) (*RKEAddonCollection, error)
-	ListAll(opts *types.ListOpts) (*RKEAddonCollection, error)
-	Create(opts *RKEAddon) (*RKEAddon, error)
-	Update(existing *RKEAddon, updates interface{}) (*RKEAddon, error)
-	Replace(existing *RKEAddon) (*RKEAddon, error)
-	ByID(id string) (*RKEAddon, error)
-	Delete(container *RKEAddon) error
+type RkeAddonOperations interface {
+	List(opts *types.ListOpts) (*RkeAddonCollection, error)
+	ListAll(opts *types.ListOpts) (*RkeAddonCollection, error)
+	Create(opts *RkeAddon) (*RkeAddon, error)
+	Update(existing *RkeAddon, updates interface{}) (*RkeAddon, error)
+	Replace(existing *RkeAddon) (*RkeAddon, error)
+	ByID(id string) (*RkeAddon, error)
+	Delete(container *RkeAddon) error
 }
 
-func newRKEAddonClient(apiClient *Client) *RKEAddonClient {
-	return &RKEAddonClient{
+func newRkeAddonClient(apiClient *Client) *RkeAddonClient {
+	return &RkeAddonClient{
 		apiClient: apiClient,
 	}
 }
 
-func (c *RKEAddonClient) Create(container *RKEAddon) (*RKEAddon, error) {
-	resp := &RKEAddon{}
-	err := c.apiClient.Ops.DoCreate(RKEAddonType, container, resp)
+func (c *RkeAddonClient) Create(container *RkeAddon) (*RkeAddon, error) {
+	resp := &RkeAddon{}
+	err := c.apiClient.Ops.DoCreate(RkeAddonType, container, resp)
 	return resp, err
 }
 
-func (c *RKEAddonClient) Update(existing *RKEAddon, updates interface{}) (*RKEAddon, error) {
-	resp := &RKEAddon{}
-	err := c.apiClient.Ops.DoUpdate(RKEAddonType, &existing.Resource, updates, resp)
+func (c *RkeAddonClient) Update(existing *RkeAddon, updates interface{}) (*RkeAddon, error) {
+	resp := &RkeAddon{}
+	err := c.apiClient.Ops.DoUpdate(RkeAddonType, &existing.Resource, updates, resp)
 	return resp, err
 }
 
-func (c *RKEAddonClient) Replace(obj *RKEAddon) (*RKEAddon, error) {
-	resp := &RKEAddon{}
-	err := c.apiClient.Ops.DoReplace(RKEAddonType, &obj.Resource, obj, resp)
+func (c *RkeAddonClient) Replace(obj *RkeAddon) (*RkeAddon, error) {
+	resp := &RkeAddon{}
+	err := c.apiClient.Ops.DoReplace(RkeAddonType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
-func (c *RKEAddonClient) List(opts *types.ListOpts) (*RKEAddonCollection, error) {
-	resp := &RKEAddonCollection{}
-	err := c.apiClient.Ops.DoList(RKEAddonType, opts, resp)
+func (c *RkeAddonClient) List(opts *types.ListOpts) (*RkeAddonCollection, error) {
+	resp := &RkeAddonCollection{}
+	err := c.apiClient.Ops.DoList(RkeAddonType, opts, resp)
 	resp.client = c
 	return resp, err
 }
 
-func (c *RKEAddonClient) ListAll(opts *types.ListOpts) (*RKEAddonCollection, error) {
-	resp := &RKEAddonCollection{}
+func (c *RkeAddonClient) ListAll(opts *types.ListOpts) (*RkeAddonCollection, error) {
+	resp := &RkeAddonCollection{}
 	resp, err := c.List(opts)
 	if err != nil {
 		return resp, err
@@ -99,9 +99,9 @@ func (c *RKEAddonClient) ListAll(opts *types.ListOpts) (*RKEAddonCollection, err
 	return resp, err
 }
 
-func (cc *RKEAddonCollection) Next() (*RKEAddonCollection, error) {
+func (cc *RkeAddonCollection) Next() (*RkeAddonCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &RKEAddonCollection{}
+		resp := &RkeAddonCollection{}
 		err := cc.client.apiClient.Ops.DoNext(cc.Pagination.Next, resp)
 		resp.client = cc.client
 		return resp, err
@@ -109,12 +109,12 @@ func (cc *RKEAddonCollection) Next() (*RKEAddonCollection, error) {
 	return nil, nil
 }
 
-func (c *RKEAddonClient) ByID(id string) (*RKEAddon, error) {
-	resp := &RKEAddon{}
-	err := c.apiClient.Ops.DoByID(RKEAddonType, id, resp)
+func (c *RkeAddonClient) ByID(id string) (*RkeAddon, error) {
+	resp := &RkeAddon{}
+	err := c.apiClient.Ops.DoByID(RkeAddonType, id, resp)
 	return resp, err
 }
 
-func (c *RKEAddonClient) Delete(container *RKEAddon) error {
-	return c.apiClient.Ops.DoResourceDelete(RKEAddonType, &container.Resource)
+func (c *RkeAddonClient) Delete(container *RkeAddon) error {
+	return c.apiClient.Ops.DoResourceDelete(RkeAddonType, &container.Resource)
 }

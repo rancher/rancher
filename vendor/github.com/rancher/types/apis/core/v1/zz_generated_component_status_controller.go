@@ -49,12 +49,6 @@ func NewComponentStatus(namespace, name string, obj v1.ComponentStatus) *v1.Comp
 	return &obj
 }
 
-type ComponentStatusList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ComponentStatus `json:"items"`
-}
-
 type ComponentStatusHandlerFunc func(key string, obj *v1.ComponentStatus) (runtime.Object, error)
 
 type ComponentStatusChangeHandlerFunc func(obj *v1.ComponentStatus) (runtime.Object, error)
@@ -74,8 +68,6 @@ type ComponentStatusController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ComponentStatusHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ComponentStatusInterface interface {
@@ -86,8 +78,8 @@ type ComponentStatusInterface interface {
 	Update(*v1.ComponentStatus) (*v1.ComponentStatus, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*ComponentStatusList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*ComponentStatusList, error)
+	List(opts metav1.ListOptions) (*v1.ComponentStatusList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ComponentStatusList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComponentStatusController
@@ -126,7 +118,7 @@ func (l *componentStatusLister) Get(namespace, name string) (*v1.ComponentStatus
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ComponentStatusGroupVersionKind.Group,
-			Resource: "componentStatus",
+			Resource: ComponentStatusGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.ComponentStatus), nil
@@ -206,29 +198,16 @@ func (c componentStatusFactory) Object() runtime.Object {
 }
 
 func (c componentStatusFactory) List() runtime.Object {
-	return &ComponentStatusList{}
+	return &v1.ComponentStatusList{}
 }
 
 func (s *componentStatusClient) Controller() ComponentStatusController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.componentStatusControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ComponentStatusGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ComponentStatusGroupVersionResource, ComponentStatusGroupVersionKind.Kind, false))
 
-	c = &componentStatusController{
+	return &componentStatusController{
 		GenericController: genericController,
 	}
-
-	s.client.componentStatusControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type componentStatusClient struct {
@@ -262,6 +241,11 @@ func (s *componentStatusClient) Update(o *v1.ComponentStatus) (*v1.ComponentStat
 	return obj.(*v1.ComponentStatus), err
 }
 
+func (s *componentStatusClient) UpdateStatus(o *v1.ComponentStatus) (*v1.ComponentStatus, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.ComponentStatus), err
+}
+
 func (s *componentStatusClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -270,14 +254,14 @@ func (s *componentStatusClient) DeleteNamespaced(namespace, name string, options
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *componentStatusClient) List(opts metav1.ListOptions) (*ComponentStatusList, error) {
+func (s *componentStatusClient) List(opts metav1.ListOptions) (*v1.ComponentStatusList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*ComponentStatusList), err
+	return obj.(*v1.ComponentStatusList), err
 }
 
-func (s *componentStatusClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ComponentStatusList, error) {
+func (s *componentStatusClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.ComponentStatusList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*ComponentStatusList), err
+	return obj.(*v1.ComponentStatusList), err
 }
 
 func (s *componentStatusClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

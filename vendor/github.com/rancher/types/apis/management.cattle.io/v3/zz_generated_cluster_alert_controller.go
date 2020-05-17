@@ -74,8 +74,6 @@ type ClusterAlertController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterAlertHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterAlertInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterAlertLister) Get(namespace, name string) (*ClusterAlert, error) 
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterAlertGroupVersionKind.Group,
-			Resource: "clusterAlert",
+			Resource: ClusterAlertGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterAlert), nil
@@ -210,25 +208,12 @@ func (c clusterAlertFactory) List() runtime.Object {
 }
 
 func (s *clusterAlertClient) Controller() ClusterAlertController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterAlertControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterAlertGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterAlertGroupVersionResource, ClusterAlertGroupVersionKind.Kind, true))
 
-	c = &clusterAlertController{
+	return &clusterAlertController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterAlertControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterAlertClient struct {
@@ -259,6 +244,11 @@ func (s *clusterAlertClient) GetNamespaced(namespace, name string, opts metav1.G
 
 func (s *clusterAlertClient) Update(o *ClusterAlert) (*ClusterAlert, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterAlert), err
+}
+
+func (s *clusterAlertClient) UpdateStatus(o *ClusterAlert) (*ClusterAlert, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterAlert), err
 }
 

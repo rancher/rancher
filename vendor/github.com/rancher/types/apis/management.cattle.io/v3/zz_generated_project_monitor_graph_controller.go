@@ -74,8 +74,6 @@ type ProjectMonitorGraphController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectMonitorGraphHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ProjectMonitorGraphInterface interface {
@@ -126,7 +124,7 @@ func (l *projectMonitorGraphLister) Get(namespace, name string) (*ProjectMonitor
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectMonitorGraphGroupVersionKind.Group,
-			Resource: "projectMonitorGraph",
+			Resource: ProjectMonitorGraphGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ProjectMonitorGraph), nil
@@ -210,25 +208,12 @@ func (c projectMonitorGraphFactory) List() runtime.Object {
 }
 
 func (s *projectMonitorGraphClient) Controller() ProjectMonitorGraphController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.projectMonitorGraphControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ProjectMonitorGraphGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ProjectMonitorGraphGroupVersionResource, ProjectMonitorGraphGroupVersionKind.Kind, true))
 
-	c = &projectMonitorGraphController{
+	return &projectMonitorGraphController{
 		GenericController: genericController,
 	}
-
-	s.client.projectMonitorGraphControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type projectMonitorGraphClient struct {
@@ -259,6 +244,11 @@ func (s *projectMonitorGraphClient) GetNamespaced(namespace, name string, opts m
 
 func (s *projectMonitorGraphClient) Update(o *ProjectMonitorGraph) (*ProjectMonitorGraph, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ProjectMonitorGraph), err
+}
+
+func (s *projectMonitorGraphClient) UpdateStatus(o *ProjectMonitorGraph) (*ProjectMonitorGraph, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ProjectMonitorGraph), err
 }
 

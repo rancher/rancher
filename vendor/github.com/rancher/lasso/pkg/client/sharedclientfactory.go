@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rancher/lasso/pkg/mapper"
 	"github.com/rancher/lasso/pkg/scheme"
@@ -20,7 +21,8 @@ type SharedClientFactoryOptions struct {
 
 type SharedClientFactory interface {
 	ForKind(gvk schema.GroupVersionKind) (*Client, error)
-	ForResource(gvr schema.GroupVersionResource, namespaced bool) *Client
+	ForResource(gvr schema.GroupVersionResource, namespaced bool) (*Client, error)
+	ForResourceKind(gvr schema.GroupVersionResource, kind string, namespaced bool) *Client
 	NewObjects(gvk schema.GroupVersionKind) (runtime.Object, runtime.Object, error)
 	GVKForObject(obj runtime.Object) (schema.GroupVersionKind, error)
 	GVKForResource(gvr schema.GroupVersionResource) (schema.GroupVersionKind, error)
@@ -30,6 +32,7 @@ type SharedClientFactory interface {
 type sharedClientFactory struct {
 	createLock sync.RWMutex
 	clients    map[schema.GroupVersionResource]*Client
+	timeout    time.Duration
 	rest       rest.Interface
 
 	Mapper meta.RESTMapper
@@ -46,12 +49,14 @@ func NewSharedClientFactory(config *rest.Config, opts *SharedClientFactoryOption
 		return nil, err
 	}
 
-	rest, err := rest.UnversionedRESTClientFor(populateConfig(opts.Scheme, config))
+	config, timeout := populateConfig(opts.Scheme, config)
+	rest, err := rest.UnversionedRESTClientFor(config)
 	if err != nil {
 		return nil, err
 	}
 
 	return &sharedClientFactory{
+		timeout: timeout,
 		clients: map[schema.GroupVersionResource]*Client{},
 		Scheme:  opts.Scheme,
 		Mapper:  opts.Mapper,
@@ -129,10 +134,18 @@ func (s *sharedClientFactory) ForKind(gvk schema.GroupVersionKind) (*Client, err
 		return nil, err
 	}
 
-	return s.ForResource(gvr, nsed), nil
+	return s.ForResourceKind(gvr, gvk.Kind, nsed), nil
 }
 
-func (s *sharedClientFactory) ForResource(gvr schema.GroupVersionResource, namespaced bool) *Client {
+func (s *sharedClientFactory) ForResource(gvr schema.GroupVersionResource, namespaced bool) (*Client, error) {
+	gvk, err := s.GVKForResource(gvr)
+	if err != nil {
+		return nil, err
+	}
+	return s.ForResourceKind(gvr, gvk.Kind, namespaced), nil
+}
+
+func (s *sharedClientFactory) ForResourceKind(gvr schema.GroupVersionResource, kind string, namespaced bool) *Client {
 	client := s.getClient(gvr)
 	if client != nil {
 		return client
@@ -146,7 +159,7 @@ func (s *sharedClientFactory) ForResource(gvr schema.GroupVersionResource, names
 		return client
 	}
 
-	client = NewClient(gvr, namespaced, s.rest)
+	client = NewClient(gvr, kind, namespaced, s.rest, s.timeout)
 
 	s.clients[gvr] = client
 	return client
@@ -158,11 +171,13 @@ func (s *sharedClientFactory) getClient(gvr schema.GroupVersionResource) *Client
 	return s.clients[gvr]
 }
 
-func populateConfig(scheme *runtime.Scheme, config *rest.Config) *rest.Config {
+func populateConfig(scheme *runtime.Scheme, config *rest.Config) (*rest.Config, time.Duration) {
 	config = rest.CopyConfig(config)
 	config.NegotiatedSerializer = serializer.NewCodecFactory(scheme).WithoutConversion()
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	return config
+	timeout := config.Timeout
+	config.Timeout = 0
+	return config, timeout
 }

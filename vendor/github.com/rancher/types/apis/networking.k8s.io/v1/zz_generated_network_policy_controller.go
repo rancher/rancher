@@ -50,12 +50,6 @@ func NewNetworkPolicy(namespace, name string, obj v1.NetworkPolicy) *v1.NetworkP
 	return &obj
 }
 
-type NetworkPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.NetworkPolicy `json:"items"`
-}
-
 type NetworkPolicyHandlerFunc func(key string, obj *v1.NetworkPolicy) (runtime.Object, error)
 
 type NetworkPolicyChangeHandlerFunc func(obj *v1.NetworkPolicy) (runtime.Object, error)
@@ -75,8 +69,6 @@ type NetworkPolicyController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NetworkPolicyHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NetworkPolicyInterface interface {
@@ -87,8 +79,8 @@ type NetworkPolicyInterface interface {
 	Update(*v1.NetworkPolicy) (*v1.NetworkPolicy, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*NetworkPolicyList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*NetworkPolicyList, error)
+	List(opts metav1.ListOptions) (*v1.NetworkPolicyList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.NetworkPolicyList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NetworkPolicyController
@@ -127,7 +119,7 @@ func (l *networkPolicyLister) Get(namespace, name string) (*v1.NetworkPolicy, er
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NetworkPolicyGroupVersionKind.Group,
-			Resource: "networkPolicy",
+			Resource: NetworkPolicyGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.NetworkPolicy), nil
@@ -207,29 +199,16 @@ func (c networkPolicyFactory) Object() runtime.Object {
 }
 
 func (c networkPolicyFactory) List() runtime.Object {
-	return &NetworkPolicyList{}
+	return &v1.NetworkPolicyList{}
 }
 
 func (s *networkPolicyClient) Controller() NetworkPolicyController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.networkPolicyControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NetworkPolicyGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NetworkPolicyGroupVersionResource, NetworkPolicyGroupVersionKind.Kind, true))
 
-	c = &networkPolicyController{
+	return &networkPolicyController{
 		GenericController: genericController,
 	}
-
-	s.client.networkPolicyControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type networkPolicyClient struct {
@@ -263,6 +242,11 @@ func (s *networkPolicyClient) Update(o *v1.NetworkPolicy) (*v1.NetworkPolicy, er
 	return obj.(*v1.NetworkPolicy), err
 }
 
+func (s *networkPolicyClient) UpdateStatus(o *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.NetworkPolicy), err
+}
+
 func (s *networkPolicyClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *networkPolicyClient) DeleteNamespaced(namespace, name string, options *
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *networkPolicyClient) List(opts metav1.ListOptions) (*NetworkPolicyList, error) {
+func (s *networkPolicyClient) List(opts metav1.ListOptions) (*v1.NetworkPolicyList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*NetworkPolicyList), err
+	return obj.(*v1.NetworkPolicyList), err
 }
 
-func (s *networkPolicyClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*NetworkPolicyList, error) {
+func (s *networkPolicyClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.NetworkPolicyList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*NetworkPolicyList), err
+	return obj.(*v1.NetworkPolicyList), err
 }
 
 func (s *networkPolicyClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

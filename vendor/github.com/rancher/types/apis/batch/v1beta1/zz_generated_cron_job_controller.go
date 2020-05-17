@@ -50,12 +50,6 @@ func NewCronJob(namespace, name string, obj v1beta1.CronJob) *v1beta1.CronJob {
 	return &obj
 }
 
-type CronJobList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta1.CronJob `json:"items"`
-}
-
 type CronJobHandlerFunc func(key string, obj *v1beta1.CronJob) (runtime.Object, error)
 
 type CronJobChangeHandlerFunc func(obj *v1beta1.CronJob) (runtime.Object, error)
@@ -75,8 +69,6 @@ type CronJobController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CronJobHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type CronJobInterface interface {
@@ -87,8 +79,8 @@ type CronJobInterface interface {
 	Update(*v1beta1.CronJob) (*v1beta1.CronJob, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*CronJobList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*CronJobList, error)
+	List(opts metav1.ListOptions) (*v1beta1.CronJobList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.CronJobList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CronJobController
@@ -127,7 +119,7 @@ func (l *cronJobLister) Get(namespace, name string) (*v1beta1.CronJob, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CronJobGroupVersionKind.Group,
-			Resource: "cronJob",
+			Resource: CronJobGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1beta1.CronJob), nil
@@ -207,29 +199,16 @@ func (c cronJobFactory) Object() runtime.Object {
 }
 
 func (c cronJobFactory) List() runtime.Object {
-	return &CronJobList{}
+	return &v1beta1.CronJobList{}
 }
 
 func (s *cronJobClient) Controller() CronJobController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.cronJobControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(CronJobGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(CronJobGroupVersionResource, CronJobGroupVersionKind.Kind, true))
 
-	c = &cronJobController{
+	return &cronJobController{
 		GenericController: genericController,
 	}
-
-	s.client.cronJobControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type cronJobClient struct {
@@ -263,6 +242,11 @@ func (s *cronJobClient) Update(o *v1beta1.CronJob) (*v1beta1.CronJob, error) {
 	return obj.(*v1beta1.CronJob), err
 }
 
+func (s *cronJobClient) UpdateStatus(o *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1beta1.CronJob), err
+}
+
 func (s *cronJobClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *cronJobClient) DeleteNamespaced(namespace, name string, options *metav1
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *cronJobClient) List(opts metav1.ListOptions) (*CronJobList, error) {
+func (s *cronJobClient) List(opts metav1.ListOptions) (*v1beta1.CronJobList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*CronJobList), err
+	return obj.(*v1beta1.CronJobList), err
 }
 
-func (s *cronJobClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*CronJobList, error) {
+func (s *cronJobClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.CronJobList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*CronJobList), err
+	return obj.(*v1beta1.CronJobList), err
 }
 
 func (s *cronJobClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

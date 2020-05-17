@@ -50,12 +50,6 @@ func NewDestinationRule(namespace, name string, obj v1alpha3.DestinationRule) *v
 	return &obj
 }
 
-type DestinationRuleList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1alpha3.DestinationRule `json:"items"`
-}
-
 type DestinationRuleHandlerFunc func(key string, obj *v1alpha3.DestinationRule) (runtime.Object, error)
 
 type DestinationRuleChangeHandlerFunc func(obj *v1alpha3.DestinationRule) (runtime.Object, error)
@@ -75,8 +69,6 @@ type DestinationRuleController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler DestinationRuleHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type DestinationRuleInterface interface {
@@ -87,8 +79,8 @@ type DestinationRuleInterface interface {
 	Update(*v1alpha3.DestinationRule) (*v1alpha3.DestinationRule, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*DestinationRuleList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*DestinationRuleList, error)
+	List(opts metav1.ListOptions) (*v1alpha3.DestinationRuleList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1alpha3.DestinationRuleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DestinationRuleController
@@ -127,7 +119,7 @@ func (l *destinationRuleLister) Get(namespace, name string) (*v1alpha3.Destinati
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    DestinationRuleGroupVersionKind.Group,
-			Resource: "destinationRule",
+			Resource: DestinationRuleGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1alpha3.DestinationRule), nil
@@ -207,29 +199,16 @@ func (c destinationRuleFactory) Object() runtime.Object {
 }
 
 func (c destinationRuleFactory) List() runtime.Object {
-	return &DestinationRuleList{}
+	return &v1alpha3.DestinationRuleList{}
 }
 
 func (s *destinationRuleClient) Controller() DestinationRuleController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.destinationRuleControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(DestinationRuleGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(DestinationRuleGroupVersionResource, DestinationRuleGroupVersionKind.Kind, true))
 
-	c = &destinationRuleController{
+	return &destinationRuleController{
 		GenericController: genericController,
 	}
-
-	s.client.destinationRuleControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type destinationRuleClient struct {
@@ -263,6 +242,11 @@ func (s *destinationRuleClient) Update(o *v1alpha3.DestinationRule) (*v1alpha3.D
 	return obj.(*v1alpha3.DestinationRule), err
 }
 
+func (s *destinationRuleClient) UpdateStatus(o *v1alpha3.DestinationRule) (*v1alpha3.DestinationRule, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1alpha3.DestinationRule), err
+}
+
 func (s *destinationRuleClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *destinationRuleClient) DeleteNamespaced(namespace, name string, options
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *destinationRuleClient) List(opts metav1.ListOptions) (*DestinationRuleList, error) {
+func (s *destinationRuleClient) List(opts metav1.ListOptions) (*v1alpha3.DestinationRuleList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*DestinationRuleList), err
+	return obj.(*v1alpha3.DestinationRuleList), err
 }
 
-func (s *destinationRuleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*DestinationRuleList, error) {
+func (s *destinationRuleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1alpha3.DestinationRuleList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*DestinationRuleList), err
+	return obj.(*v1alpha3.DestinationRuleList), err
 }
 
 func (s *destinationRuleClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

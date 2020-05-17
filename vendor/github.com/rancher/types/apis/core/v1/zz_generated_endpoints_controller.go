@@ -50,12 +50,6 @@ func NewEndpoints(namespace, name string, obj v1.Endpoints) *v1.Endpoints {
 	return &obj
 }
 
-type EndpointsList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Endpoints `json:"items"`
-}
-
 type EndpointsHandlerFunc func(key string, obj *v1.Endpoints) (runtime.Object, error)
 
 type EndpointsChangeHandlerFunc func(obj *v1.Endpoints) (runtime.Object, error)
@@ -75,8 +69,6 @@ type EndpointsController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler EndpointsHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type EndpointsInterface interface {
@@ -87,8 +79,8 @@ type EndpointsInterface interface {
 	Update(*v1.Endpoints) (*v1.Endpoints, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*EndpointsList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*EndpointsList, error)
+	List(opts metav1.ListOptions) (*v1.EndpointsList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.EndpointsList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EndpointsController
@@ -127,7 +119,7 @@ func (l *endpointsLister) Get(namespace, name string) (*v1.Endpoints, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    EndpointsGroupVersionKind.Group,
-			Resource: "endpoints",
+			Resource: EndpointsGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Endpoints), nil
@@ -207,29 +199,16 @@ func (c endpointsFactory) Object() runtime.Object {
 }
 
 func (c endpointsFactory) List() runtime.Object {
-	return &EndpointsList{}
+	return &v1.EndpointsList{}
 }
 
 func (s *endpointsClient) Controller() EndpointsController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.endpointsControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(EndpointsGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(EndpointsGroupVersionResource, EndpointsGroupVersionKind.Kind, true))
 
-	c = &endpointsController{
+	return &endpointsController{
 		GenericController: genericController,
 	}
-
-	s.client.endpointsControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type endpointsClient struct {
@@ -263,6 +242,11 @@ func (s *endpointsClient) Update(o *v1.Endpoints) (*v1.Endpoints, error) {
 	return obj.(*v1.Endpoints), err
 }
 
+func (s *endpointsClient) UpdateStatus(o *v1.Endpoints) (*v1.Endpoints, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Endpoints), err
+}
+
 func (s *endpointsClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *endpointsClient) DeleteNamespaced(namespace, name string, options *meta
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *endpointsClient) List(opts metav1.ListOptions) (*EndpointsList, error) {
+func (s *endpointsClient) List(opts metav1.ListOptions) (*v1.EndpointsList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*EndpointsList), err
+	return obj.(*v1.EndpointsList), err
 }
 
-func (s *endpointsClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*EndpointsList, error) {
+func (s *endpointsClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.EndpointsList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*EndpointsList), err
+	return obj.(*v1.EndpointsList), err
 }
 
 func (s *endpointsClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

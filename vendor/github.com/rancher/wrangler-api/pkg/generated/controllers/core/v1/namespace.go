@@ -83,9 +83,8 @@ type namespaceController struct {
 	groupResource schema.GroupResource
 }
 
-func NewNamespaceController(gvk schema.GroupVersionKind, resource string, controller controller.SharedControllerFactory) NamespaceController {
-	c, err := controller.ForKind(gvk)
-	utilruntime.Must(err)
+func NewNamespaceController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) NamespaceController {
+	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
 	return &namespaceController{
 		controller: c,
 		client:     c.Client(),

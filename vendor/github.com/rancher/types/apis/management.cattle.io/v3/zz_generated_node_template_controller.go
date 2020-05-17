@@ -74,8 +74,6 @@ type NodeTemplateController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NodeTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NodeTemplateInterface interface {
@@ -126,7 +124,7 @@ func (l *nodeTemplateLister) Get(namespace, name string) (*NodeTemplate, error) 
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NodeTemplateGroupVersionKind.Group,
-			Resource: "nodeTemplate",
+			Resource: NodeTemplateGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*NodeTemplate), nil
@@ -210,25 +208,12 @@ func (c nodeTemplateFactory) List() runtime.Object {
 }
 
 func (s *nodeTemplateClient) Controller() NodeTemplateController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.nodeTemplateControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NodeTemplateGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NodeTemplateGroupVersionResource, NodeTemplateGroupVersionKind.Kind, true))
 
-	c = &nodeTemplateController{
+	return &nodeTemplateController{
 		GenericController: genericController,
 	}
-
-	s.client.nodeTemplateControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type nodeTemplateClient struct {
@@ -259,6 +244,11 @@ func (s *nodeTemplateClient) GetNamespaced(namespace, name string, opts metav1.G
 
 func (s *nodeTemplateClient) Update(o *NodeTemplate) (*NodeTemplate, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*NodeTemplate), err
+}
+
+func (s *nodeTemplateClient) UpdateStatus(o *NodeTemplate) (*NodeTemplate, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*NodeTemplate), err
 }
 

@@ -73,8 +73,6 @@ type GroupController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GroupHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type GroupInterface interface {
@@ -125,7 +123,7 @@ func (l *groupLister) Get(namespace, name string) (*Group, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    GroupGroupVersionKind.Group,
-			Resource: "group",
+			Resource: GroupGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Group), nil
@@ -209,25 +207,12 @@ func (c groupFactory) List() runtime.Object {
 }
 
 func (s *groupClient) Controller() GroupController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.groupControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(GroupGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(GroupGroupVersionResource, GroupGroupVersionKind.Kind, false))
 
-	c = &groupController{
+	return &groupController{
 		GenericController: genericController,
 	}
-
-	s.client.groupControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type groupClient struct {
@@ -258,6 +243,11 @@ func (s *groupClient) GetNamespaced(namespace, name string, opts metav1.GetOptio
 
 func (s *groupClient) Update(o *Group) (*Group, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Group), err
+}
+
+func (s *groupClient) UpdateStatus(o *Group) (*Group, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Group), err
 }
 

@@ -49,12 +49,6 @@ func NewNode(namespace, name string, obj v1.Node) *v1.Node {
 	return &obj
 }
 
-type NodeList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Node `json:"items"`
-}
-
 type NodeHandlerFunc func(key string, obj *v1.Node) (runtime.Object, error)
 
 type NodeChangeHandlerFunc func(obj *v1.Node) (runtime.Object, error)
@@ -74,8 +68,6 @@ type NodeController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NodeHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NodeInterface interface {
@@ -86,8 +78,8 @@ type NodeInterface interface {
 	Update(*v1.Node) (*v1.Node, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*NodeList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*NodeList, error)
+	List(opts metav1.ListOptions) (*v1.NodeList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.NodeList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeController
@@ -126,7 +118,7 @@ func (l *nodeLister) Get(namespace, name string) (*v1.Node, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NodeGroupVersionKind.Group,
-			Resource: "node",
+			Resource: NodeGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Node), nil
@@ -206,29 +198,16 @@ func (c nodeFactory) Object() runtime.Object {
 }
 
 func (c nodeFactory) List() runtime.Object {
-	return &NodeList{}
+	return &v1.NodeList{}
 }
 
 func (s *nodeClient) Controller() NodeController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.nodeControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NodeGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NodeGroupVersionResource, NodeGroupVersionKind.Kind, false))
 
-	c = &nodeController{
+	return &nodeController{
 		GenericController: genericController,
 	}
-
-	s.client.nodeControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type nodeClient struct {
@@ -262,6 +241,11 @@ func (s *nodeClient) Update(o *v1.Node) (*v1.Node, error) {
 	return obj.(*v1.Node), err
 }
 
+func (s *nodeClient) UpdateStatus(o *v1.Node) (*v1.Node, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Node), err
+}
+
 func (s *nodeClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -270,14 +254,14 @@ func (s *nodeClient) DeleteNamespaced(namespace, name string, options *metav1.De
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *nodeClient) List(opts metav1.ListOptions) (*NodeList, error) {
+func (s *nodeClient) List(opts metav1.ListOptions) (*v1.NodeList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*NodeList), err
+	return obj.(*v1.NodeList), err
 }
 
-func (s *nodeClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*NodeList, error) {
+func (s *nodeClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.NodeList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*NodeList), err
+	return obj.(*v1.NodeList), err
 }
 
 func (s *nodeClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

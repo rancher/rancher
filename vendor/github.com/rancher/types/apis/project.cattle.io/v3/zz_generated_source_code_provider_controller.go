@@ -73,8 +73,6 @@ type SourceCodeProviderController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SourceCodeProviderHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type SourceCodeProviderInterface interface {
@@ -125,7 +123,7 @@ func (l *sourceCodeProviderLister) Get(namespace, name string) (*SourceCodeProvi
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SourceCodeProviderGroupVersionKind.Group,
-			Resource: "sourceCodeProvider",
+			Resource: SourceCodeProviderGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*SourceCodeProvider), nil
@@ -209,25 +207,12 @@ func (c sourceCodeProviderFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeProviderClient) Controller() SourceCodeProviderController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.sourceCodeProviderControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(SourceCodeProviderGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(SourceCodeProviderGroupVersionResource, SourceCodeProviderGroupVersionKind.Kind, false))
 
-	c = &sourceCodeProviderController{
+	return &sourceCodeProviderController{
 		GenericController: genericController,
 	}
-
-	s.client.sourceCodeProviderControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type sourceCodeProviderClient struct {
@@ -258,6 +243,11 @@ func (s *sourceCodeProviderClient) GetNamespaced(namespace, name string, opts me
 
 func (s *sourceCodeProviderClient) Update(o *SourceCodeProvider) (*SourceCodeProvider, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*SourceCodeProvider), err
+}
+
+func (s *sourceCodeProviderClient) UpdateStatus(o *SourceCodeProvider) (*SourceCodeProvider, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*SourceCodeProvider), err
 }
 

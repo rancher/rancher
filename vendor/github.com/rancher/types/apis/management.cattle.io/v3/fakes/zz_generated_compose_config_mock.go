@@ -150,8 +150,6 @@ var (
 	lockComposeConfigControllerMockGeneric                        sync.RWMutex
 	lockComposeConfigControllerMockInformer                       sync.RWMutex
 	lockComposeConfigControllerMockLister                         sync.RWMutex
-	lockComposeConfigControllerMockStart                          sync.RWMutex
-	lockComposeConfigControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ComposeConfigControllerMock does implement ComposeConfigController.
@@ -191,12 +189,6 @@ var _ v3.ComposeConfigController = &ComposeConfigControllerMock{}
 //             ListerFunc: func() v3.ComposeConfigLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedComposeConfigController in code that requires ComposeConfigController
@@ -230,12 +222,6 @@ type ComposeConfigControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.ComposeConfigLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type ComposeConfigControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *ComposeConfigControllerMock) ListerCalls() []struct {
 	lockComposeConfigControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockComposeConfigControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *ComposeConfigControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("ComposeConfigControllerMock.StartFunc: method is nil but ComposeConfigController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockComposeConfigControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockComposeConfigControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedComposeConfigController.StartCalls())
-func (mock *ComposeConfigControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockComposeConfigControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockComposeConfigControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *ComposeConfigControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("ComposeConfigControllerMock.SyncFunc: method is nil but ComposeConfigController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockComposeConfigControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockComposeConfigControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedComposeConfigController.SyncCalls())
-func (mock *ComposeConfigControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockComposeConfigControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockComposeConfigControllerMockSync.RUnlock()
 	return calls
 }
 

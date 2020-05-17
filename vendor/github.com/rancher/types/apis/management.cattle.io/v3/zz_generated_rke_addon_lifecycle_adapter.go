@@ -6,14 +6,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-type RKEAddonLifecycle interface {
-	Create(obj *RKEAddon) (runtime.Object, error)
-	Remove(obj *RKEAddon) (runtime.Object, error)
-	Updated(obj *RKEAddon) (runtime.Object, error)
+type RkeAddonLifecycle interface {
+	Create(obj *RkeAddon) (runtime.Object, error)
+	Remove(obj *RkeAddon) (runtime.Object, error)
+	Updated(obj *RkeAddon) (runtime.Object, error)
 }
 
 type rkeAddonLifecycleAdapter struct {
-	lifecycle RKEAddonLifecycle
+	lifecycle RkeAddonLifecycle
 }
 
 func (w *rkeAddonLifecycleAdapter) HasCreate() bool {
@@ -27,7 +27,7 @@ func (w *rkeAddonLifecycleAdapter) HasFinalize() bool {
 }
 
 func (w *rkeAddonLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Create(obj.(*RKEAddon))
+	o, err := w.lifecycle.Create(obj.(*RkeAddon))
 	if o == nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (w *rkeAddonLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, e
 }
 
 func (w *rkeAddonLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Remove(obj.(*RKEAddon))
+	o, err := w.lifecycle.Remove(obj.(*RkeAddon))
 	if o == nil {
 		return nil, err
 	}
@@ -43,20 +43,20 @@ func (w *rkeAddonLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object,
 }
 
 func (w *rkeAddonLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Updated(obj.(*RKEAddon))
+	o, err := w.lifecycle.Updated(obj.(*RkeAddon))
 	if o == nil {
 		return nil, err
 	}
 	return o, err
 }
 
-func NewRKEAddonLifecycleAdapter(name string, clusterScoped bool, client RKEAddonInterface, l RKEAddonLifecycle) RKEAddonHandlerFunc {
+func NewRkeAddonLifecycleAdapter(name string, clusterScoped bool, client RkeAddonInterface, l RkeAddonLifecycle) RkeAddonHandlerFunc {
 	if clusterScoped {
-		resource.PutClusterScoped(RKEAddonGroupVersionResource)
+		resource.PutClusterScoped(RkeAddonGroupVersionResource)
 	}
 	adapter := &rkeAddonLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *RKEAddon) (runtime.Object, error) {
+	return func(key string, obj *RkeAddon) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
 		if o, ok := newObj.(runtime.Object); ok {
 			return o, err

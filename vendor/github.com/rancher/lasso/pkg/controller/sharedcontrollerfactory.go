@@ -16,6 +16,7 @@ type SharedControllerFactory interface {
 	ForObject(obj runtime.Object) (SharedController, error)
 	ForKind(gvk schema.GroupVersionKind) (SharedController, error)
 	ForResource(gvr schema.GroupVersionResource, namespaced bool) SharedController
+	ForResourceKind(gvr schema.GroupVersionResource, kind string, namespaced bool) SharedController
 	SharedCacheFactory() cache.SharedCacheFactory
 	Start(ctx context.Context, workers int) error
 }
@@ -33,9 +34,6 @@ type sharedControllerFactory struct {
 
 	sharedCacheFactory cache.SharedCacheFactory
 	controllers        map[schema.GroupVersionResource]*sharedController
-
-	started        bool
-	runningContext context.Context
 
 	rateLimiter     workqueue.RateLimiter
 	workers         int
@@ -80,7 +78,10 @@ func (s *sharedControllerFactory) Start(ctx context.Context, defaultWorkers int)
 	s.controllerLock.Lock()
 	defer s.controllerLock.Unlock()
 
-	s.sharedCacheFactory.Start(ctx)
+	if err := s.sharedCacheFactory.Start(ctx); err != nil {
+		return err
+	}
+
 	for gvr, controller := range s.controllers {
 		w, err := s.getWorkers(gvr, defaultWorkers)
 		if err != nil {
@@ -90,19 +91,6 @@ func (s *sharedControllerFactory) Start(ctx context.Context, defaultWorkers int)
 			return err
 		}
 	}
-
-	s.started = true
-	s.runningContext = ctx
-
-	go func() {
-		<-ctx.Done()
-
-		s.controllerLock.Lock()
-		defer s.controllerLock.Unlock()
-
-		s.started = false
-		s.runningContext = nil
-	}()
 
 	return nil
 }
@@ -121,10 +109,14 @@ func (s *sharedControllerFactory) ForKind(gvk schema.GroupVersionKind) (SharedCo
 		return nil, err
 	}
 
-	return s.ForResource(gvr, nsed), nil
+	return s.ForResourceKind(gvr, gvk.Kind, nsed), nil
 }
 
 func (s *sharedControllerFactory) ForResource(gvr schema.GroupVersionResource, namespaced bool) SharedController {
+	return s.ForResourceKind(gvr, "", namespaced)
+}
+
+func (s *sharedControllerFactory) ForResourceKind(gvr schema.GroupVersionResource, kind string, namespaced bool) SharedController {
 	controllerResult := s.byResource(gvr)
 	if controllerResult != nil {
 		return controllerResult
@@ -138,18 +130,27 @@ func (s *sharedControllerFactory) ForResource(gvr schema.GroupVersionResource, n
 		return controllerResult
 	}
 
-	client := s.sharedCacheFactory.SharedClientFactory().ForResource(gvr, namespaced)
+	client := s.sharedCacheFactory.SharedClientFactory().ForResourceKind(gvr, kind, namespaced)
 
 	handler := &sharedHandler{}
 
 	controllerResult = &sharedController{
 		deferredController: func() (Controller, error) {
-			gvk, err := s.sharedCacheFactory.SharedClientFactory().GVKForResource(gvr)
-			if err != nil {
-				return nil, err
+			var (
+				gvk schema.GroupVersionKind
+				err error
+			)
+
+			if kind == "" {
+				gvk, err = s.sharedCacheFactory.SharedClientFactory().GVKForResource(gvr)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				gvk = gvr.GroupVersion().WithKind(kind)
 			}
 
-			cache, err := s.sharedCacheFactory.ForKind(gvk)
+			cache, err := s.sharedCacheFactory.ForResourceKind(gvr, kind, namespaced)
 			if err != nil {
 				return nil, err
 			}
@@ -159,7 +160,11 @@ func (s *sharedControllerFactory) ForResource(gvr schema.GroupVersionResource, n
 				rateLimiter = s.rateLimiter
 			}
 
-			c := New(gvk.String(), cache, handler, &Options{
+			starter := func(ctx context.Context) error {
+				return s.sharedCacheFactory.StartGVK(ctx, gvk)
+			}
+
+			c := New(gvk.String(), cache, starter, handler, &Options{
 				RateLimiter: rateLimiter,
 			})
 

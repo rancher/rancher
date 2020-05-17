@@ -73,8 +73,6 @@ type AuthProviderController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler AuthProviderHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type AuthProviderInterface interface {
@@ -125,7 +123,7 @@ func (l *authProviderLister) Get(namespace, name string) (*AuthProvider, error) 
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    AuthProviderGroupVersionKind.Group,
-			Resource: "authProvider",
+			Resource: AuthProviderGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*AuthProvider), nil
@@ -209,25 +207,12 @@ func (c authProviderFactory) List() runtime.Object {
 }
 
 func (s *authProviderClient) Controller() AuthProviderController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.authProviderControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(AuthProviderGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(AuthProviderGroupVersionResource, AuthProviderGroupVersionKind.Kind, false))
 
-	c = &authProviderController{
+	return &authProviderController{
 		GenericController: genericController,
 	}
-
-	s.client.authProviderControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type authProviderClient struct {
@@ -258,6 +243,11 @@ func (s *authProviderClient) GetNamespaced(namespace, name string, opts metav1.G
 
 func (s *authProviderClient) Update(o *AuthProvider) (*AuthProvider, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*AuthProvider), err
+}
+
+func (s *authProviderClient) UpdateStatus(o *AuthProvider) (*AuthProvider, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*AuthProvider), err
 }
 

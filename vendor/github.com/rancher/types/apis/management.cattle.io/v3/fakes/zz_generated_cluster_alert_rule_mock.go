@@ -150,8 +150,6 @@ var (
 	lockClusterAlertRuleControllerMockGeneric                        sync.RWMutex
 	lockClusterAlertRuleControllerMockInformer                       sync.RWMutex
 	lockClusterAlertRuleControllerMockLister                         sync.RWMutex
-	lockClusterAlertRuleControllerMockStart                          sync.RWMutex
-	lockClusterAlertRuleControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ClusterAlertRuleControllerMock does implement ClusterAlertRuleController.
@@ -191,12 +189,6 @@ var _ v3.ClusterAlertRuleController = &ClusterAlertRuleControllerMock{}
 //             ListerFunc: func() v3.ClusterAlertRuleLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedClusterAlertRuleController in code that requires ClusterAlertRuleController
@@ -230,12 +222,6 @@ type ClusterAlertRuleControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.ClusterAlertRuleLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type ClusterAlertRuleControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *ClusterAlertRuleControllerMock) ListerCalls() []struct {
 	lockClusterAlertRuleControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockClusterAlertRuleControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *ClusterAlertRuleControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("ClusterAlertRuleControllerMock.StartFunc: method is nil but ClusterAlertRuleController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockClusterAlertRuleControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockClusterAlertRuleControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedClusterAlertRuleController.StartCalls())
-func (mock *ClusterAlertRuleControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockClusterAlertRuleControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockClusterAlertRuleControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *ClusterAlertRuleControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("ClusterAlertRuleControllerMock.SyncFunc: method is nil but ClusterAlertRuleController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockClusterAlertRuleControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockClusterAlertRuleControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedClusterAlertRuleController.SyncCalls())
-func (mock *ClusterAlertRuleControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockClusterAlertRuleControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockClusterAlertRuleControllerMockSync.RUnlock()
 	return calls
 }
 

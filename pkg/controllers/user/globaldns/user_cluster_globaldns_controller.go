@@ -18,7 +18,7 @@ import (
 
 type UserGlobalDNSController struct {
 	ingressLister         v1beta1Rancher.IngressLister
-	globalDNSs            v3.GlobalDNSInterface
+	globalDNSs            v3.GlobalDnsInterface
 	multiclusterappLister v3.MultiClusterAppLister
 	namespaceLister       v1coreRancher.NamespaceLister
 	clusterName           string
@@ -27,7 +27,7 @@ type UserGlobalDNSController struct {
 func newUserGlobalDNSController(clusterContext *config.UserContext) *UserGlobalDNSController {
 	g := UserGlobalDNSController{
 		ingressLister:         clusterContext.Extensions.Ingresses("").Controller().Lister(),
-		globalDNSs:            clusterContext.Management.Management.GlobalDNSs(""),
+		globalDNSs:            clusterContext.Management.Management.GlobalDnses(""),
 		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
 		namespaceLister:       clusterContext.Core.Namespaces("").Controller().Lister(),
 		clusterName:           clusterContext.ClusterName,
@@ -35,7 +35,7 @@ func newUserGlobalDNSController(clusterContext *config.UserContext) *UserGlobalD
 	return &g
 }
 
-func (g *UserGlobalDNSController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, error) {
+func (g *UserGlobalDNSController) sync(key string, obj *v3.GlobalDns) (runtime.Object, error) {
 
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
@@ -58,7 +58,7 @@ func (g *UserGlobalDNSController) sync(key string, obj *v3.GlobalDNS) (runtime.O
 	return g.refreshGlobalDNSEndpoints(obj, targetEndpoints)
 }
 
-func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDNS) ([]string, error) {
+func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDns) ([]string, error) {
 	// If multiclusterappID is set, look for ingresses in the projects of multiclusterapp's targets
 	// Get multiclusterapp by name set on GlobalDNS spec
 	mcappName, err := getMultiClusterAppName(obj.Spec.MultiClusterAppName)
@@ -100,7 +100,7 @@ func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDNS) ([
 	return g.fetchGlobalDNSEndpointsForIngresses(allIngresses, obj)
 }
 
-func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDNS) ([]string, error) {
+func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDns) ([]string, error) {
 	// go through target projects which are part of the current cluster and find all ingresses
 	var allIngresses []*v1beta1.Ingress
 
@@ -139,7 +139,7 @@ func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDNS) ([]string
 	return g.fetchGlobalDNSEndpointsForIngresses(allIngresses, obj)
 }
 
-func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses []*v1beta1.Ingress, obj *v3.GlobalDNS) ([]string, error) {
+func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses []*v1beta1.Ingress, obj *v3.GlobalDns) ([]string, error) {
 	if len(ingresses) == 0 {
 		return nil, nil
 	}
@@ -160,7 +160,7 @@ func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses 
 	return allEndpoints, nil
 }
 
-func (g *UserGlobalDNSController) refreshGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpointsForCluster []string) (*v3.GlobalDNS, error) {
+func (g *UserGlobalDNSController) refreshGlobalDNSEndpoints(globalDNS *v3.GlobalDns, ingressEndpointsForCluster []string) (*v3.GlobalDns, error) {
 
 	globalDNSToUpdate := globalDNS.DeepCopy()
 	uniqueEndpointsForCluster := dedupEndpoints(ingressEndpointsForCluster)

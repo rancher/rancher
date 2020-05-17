@@ -73,8 +73,6 @@ type SettingController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SettingHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type SettingInterface interface {
@@ -125,7 +123,7 @@ func (l *settingLister) Get(namespace, name string) (*Setting, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SettingGroupVersionKind.Group,
-			Resource: "setting",
+			Resource: SettingGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Setting), nil
@@ -209,25 +207,12 @@ func (c settingFactory) List() runtime.Object {
 }
 
 func (s *settingClient) Controller() SettingController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.settingControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(SettingGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(SettingGroupVersionResource, SettingGroupVersionKind.Kind, false))
 
-	c = &settingController{
+	return &settingController{
 		GenericController: genericController,
 	}
-
-	s.client.settingControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type settingClient struct {
@@ -258,6 +243,11 @@ func (s *settingClient) GetNamespaced(namespace, name string, opts metav1.GetOpt
 
 func (s *settingClient) Update(o *Setting) (*Setting, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Setting), err
+}
+
+func (s *settingClient) UpdateStatus(o *Setting) (*Setting, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Setting), err
 }
 

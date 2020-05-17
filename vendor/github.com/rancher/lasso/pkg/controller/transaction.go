@@ -16,8 +16,12 @@ type HandlerTransaction struct {
 func (h *HandlerTransaction) do(f func()) {
 	if h == nil {
 		f()
-	} else if h.shouldContinue() {
-		f()
+	} else {
+		go func() {
+			if h.shouldContinue() {
+				f()
+			}
+		}()
 	}
 }
 

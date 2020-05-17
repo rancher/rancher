@@ -33,9 +33,6 @@ type sharedController struct {
 	// this allows one to create a sharedcontroller but it will not actually be started
 	// unless some aspect of the controllers informer is accessed or needed to be used
 	deferredController func() (Controller, error)
-	// this allows one to create a sharedcontroller but it will not actually be assume
-	// the type exists until it is accessed
-	deferredClient     func() (*client.Client, error)
 	sharedCacheFactory cache.SharedCacheFactory
 	controller         Controller
 	gvk                schema.GroupVersionKind
@@ -108,16 +105,15 @@ func (s *sharedController) Start(ctx context.Context, workers int) error {
 }
 
 func (s *sharedController) RegisterHandler(ctx context.Context, name string, handler SharedControllerHandler) {
+	// Ensure that controller is initialized
+	c := s.initController()
+
 	getHandlerTransaction(ctx).do(func() {
-		// Ensure that controller is initialized
-		s.initController()
+		s.handler.Register(ctx, name, handler)
 
 		s.startLock.Lock()
 		defer s.startLock.Unlock()
-
-		s.handler.Register(ctx, name, handler)
 		if s.started {
-			c := s.initController()
 			for _, key := range c.Informer().GetStore().ListKeys() {
 				c.EnqueueKey(key)
 			}

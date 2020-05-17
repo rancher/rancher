@@ -1,63 +1,39 @@
 package v3public
 
 import (
-	"context"
-	"sync"
-
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/objectclient/dynamic"
-	"github.com/rancher/norman/restwatch"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
 
-type (
-	contextKeyType        struct{}
-	contextClientsKeyType struct{}
-)
-
 type Interface interface {
-	RESTClient() rest.Interface
-	controller.Starter
-
 	AuthProvidersGetter
 }
 
 type Client struct {
-	sync.Mutex
-	restClient rest.Interface
-	starters   []controller.Starter
-
-	authProviderControllers map[string]AuthProviderController
+	controllerFactory controller.SharedControllerFactory
+	clientFactory     client.SharedClientFactory
 }
 
-func NewForConfig(config rest.Config) (Interface, error) {
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = dynamic.NegotiatedSerializer
+func NewForConfig(cfg rest.Config) (Interface, error) {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		return nil, err
 	}
-
-	restClient, err := restwatch.UnversionedRESTClientFor(&config)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&cfg, scheme)
 	if err != nil {
 		return nil, err
 	}
+	return NewFromControllerFactory(controllerFactory)
+}
 
+func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
 	return &Client{
-		restClient: restClient,
-
-		authProviderControllers: map[string]AuthProviderController{},
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
 	}, nil
-}
-
-func (c *Client) RESTClient() rest.Interface {
-	return c.restClient
-}
-
-func (c *Client) Sync(ctx context.Context) error {
-	return controller.Sync(ctx, c.starters...)
-}
-
-func (c *Client) Start(ctx context.Context, threadiness int) error {
-	return controller.Start(ctx, threadiness, c.starters...)
 }
 
 type AuthProvidersGetter interface {
@@ -65,7 +41,8 @@ type AuthProvidersGetter interface {
 }
 
 func (c *Client) AuthProviders(namespace string) AuthProviderInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AuthProviderResource, AuthProviderGroupVersionKind, authProviderFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(AuthProviderGroupVersionResource, AuthProviderGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &AuthProviderResource, AuthProviderGroupVersionKind, authProviderFactory{})
 	return &authProviderClient{
 		ns:           namespace,
 		client:       c,

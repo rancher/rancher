@@ -1,25 +1,12 @@
 package v1
 
 import (
-	"context"
-	"sync"
-
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/objectclient/dynamic"
-	"github.com/rancher/norman/restwatch"
-	"k8s.io/client-go/rest"
-)
-
-type (
-	contextKeyType        struct{}
-	contextClientsKeyType struct{}
 )
 
 type Interface interface {
-	RESTClient() rest.Interface
-	controller.Starter
-
 	ClusterRoleBindingsGetter
 	ClusterRolesGetter
 	RoleBindingsGetter
@@ -27,46 +14,15 @@ type Interface interface {
 }
 
 type Client struct {
-	sync.Mutex
-	restClient rest.Interface
-	starters   []controller.Starter
-
-	clusterRoleBindingControllers map[string]ClusterRoleBindingController
-	clusterRoleControllers        map[string]ClusterRoleController
-	roleBindingControllers        map[string]RoleBindingController
-	roleControllers               map[string]RoleController
+	controllerFactory controller.SharedControllerFactory
+	clientFactory     client.SharedClientFactory
 }
 
-func NewForConfig(config rest.Config) (Interface, error) {
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = dynamic.NegotiatedSerializer
-	}
-
-	restClient, err := restwatch.UnversionedRESTClientFor(&config)
-	if err != nil {
-		return nil, err
-	}
-
+func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
 	return &Client{
-		restClient: restClient,
-
-		clusterRoleBindingControllers: map[string]ClusterRoleBindingController{},
-		clusterRoleControllers:        map[string]ClusterRoleController{},
-		roleBindingControllers:        map[string]RoleBindingController{},
-		roleControllers:               map[string]RoleController{},
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
 	}, nil
-}
-
-func (c *Client) RESTClient() rest.Interface {
-	return c.restClient
-}
-
-func (c *Client) Sync(ctx context.Context) error {
-	return controller.Sync(ctx, c.starters...)
-}
-
-func (c *Client) Start(ctx context.Context, threadiness int) error {
-	return controller.Start(ctx, threadiness, c.starters...)
 }
 
 type ClusterRoleBindingsGetter interface {
@@ -74,7 +30,8 @@ type ClusterRoleBindingsGetter interface {
 }
 
 func (c *Client) ClusterRoleBindings(namespace string) ClusterRoleBindingInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterRoleBindingResource, ClusterRoleBindingGroupVersionKind, clusterRoleBindingFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(ClusterRoleBindingGroupVersionResource, ClusterRoleBindingGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterRoleBindingResource, ClusterRoleBindingGroupVersionKind, clusterRoleBindingFactory{})
 	return &clusterRoleBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -87,7 +44,8 @@ type ClusterRolesGetter interface {
 }
 
 func (c *Client) ClusterRoles(namespace string) ClusterRoleInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterRoleResource, ClusterRoleGroupVersionKind, clusterRoleFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(ClusterRoleGroupVersionResource, ClusterRoleGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterRoleResource, ClusterRoleGroupVersionKind, clusterRoleFactory{})
 	return &clusterRoleClient{
 		ns:           namespace,
 		client:       c,
@@ -100,7 +58,8 @@ type RoleBindingsGetter interface {
 }
 
 func (c *Client) RoleBindings(namespace string) RoleBindingInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &RoleBindingResource, RoleBindingGroupVersionKind, roleBindingFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(RoleBindingGroupVersionResource, RoleBindingGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RoleBindingResource, RoleBindingGroupVersionKind, roleBindingFactory{})
 	return &roleBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -113,7 +72,8 @@ type RolesGetter interface {
 }
 
 func (c *Client) Roles(namespace string) RoleInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &RoleResource, RoleGroupVersionKind, roleFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(RoleGroupVersionResource, RoleGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RoleResource, RoleGroupVersionKind, roleFactory{})
 	return &roleClient{
 		ns:           namespace,
 		client:       c,

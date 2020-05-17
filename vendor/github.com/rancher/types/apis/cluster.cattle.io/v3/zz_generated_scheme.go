@@ -35,7 +35,9 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 
 		&ClusterAuthToken{},
+		&ClusterAuthTokenList{},
 		&ClusterUserAttribute{},
+		&ClusterUserAttributeList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

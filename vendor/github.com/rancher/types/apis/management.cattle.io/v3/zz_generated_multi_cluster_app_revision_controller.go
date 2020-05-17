@@ -74,8 +74,6 @@ type MultiClusterAppRevisionController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler MultiClusterAppRevisionHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type MultiClusterAppRevisionInterface interface {
@@ -126,7 +124,7 @@ func (l *multiClusterAppRevisionLister) Get(namespace, name string) (*MultiClust
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    MultiClusterAppRevisionGroupVersionKind.Group,
-			Resource: "multiClusterAppRevision",
+			Resource: MultiClusterAppRevisionGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*MultiClusterAppRevision), nil
@@ -210,25 +208,12 @@ func (c multiClusterAppRevisionFactory) List() runtime.Object {
 }
 
 func (s *multiClusterAppRevisionClient) Controller() MultiClusterAppRevisionController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.multiClusterAppRevisionControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(MultiClusterAppRevisionGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(MultiClusterAppRevisionGroupVersionResource, MultiClusterAppRevisionGroupVersionKind.Kind, true))
 
-	c = &multiClusterAppRevisionController{
+	return &multiClusterAppRevisionController{
 		GenericController: genericController,
 	}
-
-	s.client.multiClusterAppRevisionControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type multiClusterAppRevisionClient struct {
@@ -259,6 +244,11 @@ func (s *multiClusterAppRevisionClient) GetNamespaced(namespace, name string, op
 
 func (s *multiClusterAppRevisionClient) Update(o *MultiClusterAppRevision) (*MultiClusterAppRevision, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*MultiClusterAppRevision), err
+}
+
+func (s *multiClusterAppRevisionClient) UpdateStatus(o *MultiClusterAppRevision) (*MultiClusterAppRevision, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*MultiClusterAppRevision), err
 }
 

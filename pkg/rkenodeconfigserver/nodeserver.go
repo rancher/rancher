@@ -40,10 +40,10 @@ type RKENodeConfigServer struct {
 	auth                 *tunnelserver.Authorizer
 	lookup               *BundleLookup
 	systemAccountManager *systemaccount.Manager
-	serviceOptionsLister v3.RKEK8sServiceOptionLister
-	serviceOptions       v3.RKEK8sServiceOptionInterface
-	sysImagesLister      v3.RKEK8sSystemImageLister
-	sysImages            v3.RKEK8sSystemImageInterface
+	serviceOptionsLister v3.RkeK8sServiceOptionLister
+	serviceOptions       v3.RkeK8sServiceOptionInterface
+	sysImagesLister      v3.RkeK8sSystemImageLister
+	sysImages            v3.RkeK8sSystemImageInterface
 	nodes                v3.NodeInterface
 }
 
@@ -52,10 +52,10 @@ func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext)
 		auth:                 auth,
 		lookup:               NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
-		serviceOptionsLister: scaledContext.Management.RKEK8sServiceOptions("").Controller().Lister(),
-		serviceOptions:       scaledContext.Management.RKEK8sServiceOptions(""),
-		sysImagesLister:      scaledContext.Management.RKEK8sSystemImages("").Controller().Lister(),
-		sysImages:            scaledContext.Management.RKEK8sSystemImages(""),
+		serviceOptionsLister: scaledContext.Management.RkeK8sServiceOptions("").Controller().Lister(),
+		serviceOptions:       scaledContext.Management.RkeK8sServiceOptions(""),
+		sysImagesLister:      scaledContext.Management.RkeK8sSystemImages("").Controller().Lister(),
+		sysImages:            scaledContext.Management.RkeK8sSystemImages(""),
 		nodes:                scaledContext.Management.Nodes(""),
 	}
 }

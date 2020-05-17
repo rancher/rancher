@@ -74,8 +74,6 @@ type ProjectController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ProjectInterface interface {
@@ -126,7 +124,7 @@ func (l *projectLister) Get(namespace, name string) (*Project, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectGroupVersionKind.Group,
-			Resource: "project",
+			Resource: ProjectGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Project), nil
@@ -210,25 +208,12 @@ func (c projectFactory) List() runtime.Object {
 }
 
 func (s *projectClient) Controller() ProjectController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.projectControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ProjectGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ProjectGroupVersionResource, ProjectGroupVersionKind.Kind, true))
 
-	c = &projectController{
+	return &projectController{
 		GenericController: genericController,
 	}
-
-	s.client.projectControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type projectClient struct {
@@ -259,6 +244,11 @@ func (s *projectClient) GetNamespaced(namespace, name string, opts metav1.GetOpt
 
 func (s *projectClient) Update(o *Project) (*Project, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Project), err
+}
+
+func (s *projectClient) UpdateStatus(o *Project) (*Project, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Project), err
 }
 

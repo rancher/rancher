@@ -150,8 +150,6 @@ var (
 	lockNodePoolControllerMockGeneric                        sync.RWMutex
 	lockNodePoolControllerMockInformer                       sync.RWMutex
 	lockNodePoolControllerMockLister                         sync.RWMutex
-	lockNodePoolControllerMockStart                          sync.RWMutex
-	lockNodePoolControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that NodePoolControllerMock does implement NodePoolController.
@@ -191,12 +189,6 @@ var _ v3.NodePoolController = &NodePoolControllerMock{}
 //             ListerFunc: func() v3.NodePoolLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedNodePoolController in code that requires NodePoolController
@@ -230,12 +222,6 @@ type NodePoolControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v3.NodePoolLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -307,18 +293,6 @@ type NodePoolControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -644,72 +618,6 @@ func (mock *NodePoolControllerMock) ListerCalls() []struct {
 	lockNodePoolControllerMockLister.RLock()
 	calls = mock.calls.Lister
 	lockNodePoolControllerMockLister.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *NodePoolControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("NodePoolControllerMock.StartFunc: method is nil but NodePoolController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockNodePoolControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockNodePoolControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedNodePoolController.StartCalls())
-func (mock *NodePoolControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockNodePoolControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockNodePoolControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *NodePoolControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("NodePoolControllerMock.SyncFunc: method is nil but NodePoolController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockNodePoolControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockNodePoolControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedNodePoolController.SyncCalls())
-func (mock *NodePoolControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockNodePoolControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockNodePoolControllerMockSync.RUnlock()
 	return calls
 }
 

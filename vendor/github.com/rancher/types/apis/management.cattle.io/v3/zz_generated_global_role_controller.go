@@ -73,8 +73,6 @@ type GlobalRoleController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GlobalRoleHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type GlobalRoleInterface interface {
@@ -125,7 +123,7 @@ func (l *globalRoleLister) Get(namespace, name string) (*GlobalRole, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    GlobalRoleGroupVersionKind.Group,
-			Resource: "globalRole",
+			Resource: GlobalRoleGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*GlobalRole), nil
@@ -209,25 +207,12 @@ func (c globalRoleFactory) List() runtime.Object {
 }
 
 func (s *globalRoleClient) Controller() GlobalRoleController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.globalRoleControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(GlobalRoleGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(GlobalRoleGroupVersionResource, GlobalRoleGroupVersionKind.Kind, false))
 
-	c = &globalRoleController{
+	return &globalRoleController{
 		GenericController: genericController,
 	}
-
-	s.client.globalRoleControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type globalRoleClient struct {
@@ -258,6 +243,11 @@ func (s *globalRoleClient) GetNamespaced(namespace, name string, opts metav1.Get
 
 func (s *globalRoleClient) Update(o *GlobalRole) (*GlobalRole, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*GlobalRole), err
+}
+
+func (s *globalRoleClient) UpdateStatus(o *GlobalRole) (*GlobalRole, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*GlobalRole), err
 }
 

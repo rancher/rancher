@@ -151,8 +151,6 @@ var (
 	lockNodeControllerMockGeneric                        sync.RWMutex
 	lockNodeControllerMockInformer                       sync.RWMutex
 	lockNodeControllerMockLister                         sync.RWMutex
-	lockNodeControllerMockStart                          sync.RWMutex
-	lockNodeControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that NodeControllerMock does implement NodeController.
@@ -192,12 +190,6 @@ var _ v1a.NodeController = &NodeControllerMock{}
 //             ListerFunc: func() v1a.NodeLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedNodeController in code that requires NodeController
@@ -231,12 +223,6 @@ type NodeControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v1a.NodeLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -308,18 +294,6 @@ type NodeControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -648,72 +622,6 @@ func (mock *NodeControllerMock) ListerCalls() []struct {
 	return calls
 }
 
-// Start calls StartFunc.
-func (mock *NodeControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("NodeControllerMock.StartFunc: method is nil but NodeController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockNodeControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockNodeControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedNodeController.StartCalls())
-func (mock *NodeControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockNodeControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockNodeControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *NodeControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("NodeControllerMock.SyncFunc: method is nil but NodeController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockNodeControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockNodeControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedNodeController.SyncCalls())
-func (mock *NodeControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockNodeControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockNodeControllerMockSync.RUnlock()
-	return calls
-}
-
 var (
 	lockNodeInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
 	lockNodeInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
@@ -792,10 +700,10 @@ var _ v1a.NodeInterface = &NodeInterfaceMock{}
 //             GetNamespacedFunc: func(namespace string, name string, opts v1b.GetOptions) (*v1.Node, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1b.ListOptions) (*v1a.NodeList, error) {
+//             ListFunc: func(opts v1b.ListOptions) (*v1.NodeList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.NodeList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1.NodeList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
@@ -860,10 +768,10 @@ type NodeInterfaceMock struct {
 	GetNamespacedFunc func(namespace string, name string, opts v1b.GetOptions) (*v1.Node, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1b.ListOptions) (*v1a.NodeList, error)
+	ListFunc func(opts v1b.ListOptions) (*v1.NodeList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.NodeList, error)
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1.NodeList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -1624,7 +1532,7 @@ func (mock *NodeInterfaceMock) GetNamespacedCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *NodeInterfaceMock) List(opts v1b.ListOptions) (*v1a.NodeList, error) {
+func (mock *NodeInterfaceMock) List(opts v1b.ListOptions) (*v1.NodeList, error) {
 	if mock.ListFunc == nil {
 		panic("NodeInterfaceMock.ListFunc: method is nil but NodeInterface.List was just called")
 	}
@@ -1655,7 +1563,7 @@ func (mock *NodeInterfaceMock) ListCalls() []struct {
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *NodeInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.NodeList, error) {
+func (mock *NodeInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1.NodeList, error) {
 	if mock.ListNamespacedFunc == nil {
 		panic("NodeInterfaceMock.ListNamespacedFunc: method is nil but NodeInterface.ListNamespaced was just called")
 	}

@@ -74,8 +74,6 @@ type CatalogTemplateVersionController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CatalogTemplateVersionHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type CatalogTemplateVersionInterface interface {
@@ -126,7 +124,7 @@ func (l *catalogTemplateVersionLister) Get(namespace, name string) (*CatalogTemp
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    CatalogTemplateVersionGroupVersionKind.Group,
-			Resource: "catalogTemplateVersion",
+			Resource: CatalogTemplateVersionGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*CatalogTemplateVersion), nil
@@ -210,25 +208,12 @@ func (c catalogTemplateVersionFactory) List() runtime.Object {
 }
 
 func (s *catalogTemplateVersionClient) Controller() CatalogTemplateVersionController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.catalogTemplateVersionControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(CatalogTemplateVersionGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(CatalogTemplateVersionGroupVersionResource, CatalogTemplateVersionGroupVersionKind.Kind, true))
 
-	c = &catalogTemplateVersionController{
+	return &catalogTemplateVersionController{
 		GenericController: genericController,
 	}
-
-	s.client.catalogTemplateVersionControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type catalogTemplateVersionClient struct {
@@ -259,6 +244,11 @@ func (s *catalogTemplateVersionClient) GetNamespaced(namespace, name string, opt
 
 func (s *catalogTemplateVersionClient) Update(o *CatalogTemplateVersion) (*CatalogTemplateVersion, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*CatalogTemplateVersion), err
+}
+
+func (s *catalogTemplateVersionClient) UpdateStatus(o *CatalogTemplateVersion) (*CatalogTemplateVersion, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*CatalogTemplateVersion), err
 }
 

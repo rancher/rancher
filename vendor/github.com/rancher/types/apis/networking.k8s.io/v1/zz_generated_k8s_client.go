@@ -1,63 +1,25 @@
 package v1
 
 import (
-	"context"
-	"sync"
-
-	"github.com/rancher/norman/controller"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/objectclient/dynamic"
-	"github.com/rancher/norman/restwatch"
-	"k8s.io/client-go/rest"
-)
-
-type (
-	contextKeyType        struct{}
-	contextClientsKeyType struct{}
 )
 
 type Interface interface {
-	RESTClient() rest.Interface
-	controller.Starter
-
 	NetworkPoliciesGetter
 }
 
 type Client struct {
-	sync.Mutex
-	restClient rest.Interface
-	starters   []controller.Starter
-
-	networkPolicyControllers map[string]NetworkPolicyController
+	controllerFactory controller.SharedControllerFactory
+	clientFactory     client.SharedClientFactory
 }
 
-func NewForConfig(config rest.Config) (Interface, error) {
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = dynamic.NegotiatedSerializer
-	}
-
-	restClient, err := restwatch.UnversionedRESTClientFor(&config)
-	if err != nil {
-		return nil, err
-	}
-
+func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
 	return &Client{
-		restClient: restClient,
-
-		networkPolicyControllers: map[string]NetworkPolicyController{},
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
 	}, nil
-}
-
-func (c *Client) RESTClient() rest.Interface {
-	return c.restClient
-}
-
-func (c *Client) Sync(ctx context.Context) error {
-	return controller.Sync(ctx, c.starters...)
-}
-
-func (c *Client) Start(ctx context.Context, threadiness int) error {
-	return controller.Start(ctx, threadiness, c.starters...)
 }
 
 type NetworkPoliciesGetter interface {
@@ -65,7 +27,8 @@ type NetworkPoliciesGetter interface {
 }
 
 func (c *Client) NetworkPolicies(namespace string) NetworkPolicyInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &NetworkPolicyResource, NetworkPolicyGroupVersionKind, networkPolicyFactory{})
+	sharedClient := c.clientFactory.ForResourceKind(NetworkPolicyGroupVersionResource, NetworkPolicyGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NetworkPolicyResource, NetworkPolicyGroupVersionKind, networkPolicyFactory{})
 	return &networkPolicyClient{
 		ns:           namespace,
 		client:       c,

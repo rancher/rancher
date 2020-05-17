@@ -25,7 +25,7 @@ type Store struct {
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	fqdn := convert.ToString(data[managementv3.GlobalDNSFieldFQDN])
+	fqdn := convert.ToString(data[managementv3.GlobalDnsFieldFQDN])
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -38,14 +38,14 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	updatedFQDN := convert.ToString(data[managementv3.GlobalDNSFieldFQDN])
+	updatedFQDN := convert.ToString(data[managementv3.GlobalDnsFieldFQDN])
 
 	existingGlobalDNS, err := p.ByID(apiContext, schema, id)
 	if err != nil {
 		return nil, err
 	}
 
-	fqdn := convert.ToString(existingGlobalDNS[managementv3.GlobalDNSFieldFQDN])
+	fqdn := convert.ToString(existingGlobalDNS[managementv3.GlobalDnsFieldFQDN])
 
 	if !strings.EqualFold(updatedFQDN, fqdn) {
 		p.mu.Lock()
@@ -60,18 +60,18 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func canUseFQDN(apiContext *types.APIContext, fqdnRequested string) error {
-	var globalDNSs []managementv3.GlobalDNS
+	var globalDNSs []managementv3.GlobalDns
 
 	conditions := []*types.QueryCondition{
-		types.NewConditionFromString(managementv3.GlobalDNSFieldFQDN, types.ModifierEQ, []string{fqdnRequested}...),
+		types.NewConditionFromString(managementv3.GlobalDnsFieldFQDN, types.ModifierEQ, []string{fqdnRequested}...),
 	}
 
-	if err := access.List(apiContext, apiContext.Version, managementv3.GlobalDNSType, &types.QueryOptions{Conditions: conditions}, &globalDNSs); err != nil {
+	if err := access.List(apiContext, apiContext.Version, managementv3.GlobalDnsType, &types.QueryOptions{Conditions: conditions}, &globalDNSs); err != nil {
 		return err
 	}
 
 	if len(globalDNSs) > 0 {
-		return httperror.NewFieldAPIError(httperror.NotUnique, managementv3.GlobalDNSFieldFQDN, "")
+		return httperror.NewFieldAPIError(httperror.NotUnique, managementv3.GlobalDnsFieldFQDN, "")
 	}
 
 	return nil

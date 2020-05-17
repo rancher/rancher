@@ -50,12 +50,6 @@ func NewDeployment(namespace, name string, obj v1.Deployment) *v1.Deployment {
 	return &obj
 }
 
-type DeploymentList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Deployment `json:"items"`
-}
-
 type DeploymentHandlerFunc func(key string, obj *v1.Deployment) (runtime.Object, error)
 
 type DeploymentChangeHandlerFunc func(obj *v1.Deployment) (runtime.Object, error)
@@ -75,8 +69,6 @@ type DeploymentController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler DeploymentHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type DeploymentInterface interface {
@@ -87,8 +79,8 @@ type DeploymentInterface interface {
 	Update(*v1.Deployment) (*v1.Deployment, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*DeploymentList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*DeploymentList, error)
+	List(opts metav1.ListOptions) (*v1.DeploymentList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.DeploymentList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DeploymentController
@@ -127,7 +119,7 @@ func (l *deploymentLister) Get(namespace, name string) (*v1.Deployment, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    DeploymentGroupVersionKind.Group,
-			Resource: "deployment",
+			Resource: DeploymentGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.Deployment), nil
@@ -207,29 +199,16 @@ func (c deploymentFactory) Object() runtime.Object {
 }
 
 func (c deploymentFactory) List() runtime.Object {
-	return &DeploymentList{}
+	return &v1.DeploymentList{}
 }
 
 func (s *deploymentClient) Controller() DeploymentController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.deploymentControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(DeploymentGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(DeploymentGroupVersionResource, DeploymentGroupVersionKind.Kind, true))
 
-	c = &deploymentController{
+	return &deploymentController{
 		GenericController: genericController,
 	}
-
-	s.client.deploymentControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type deploymentClient struct {
@@ -263,6 +242,11 @@ func (s *deploymentClient) Update(o *v1.Deployment) (*v1.Deployment, error) {
 	return obj.(*v1.Deployment), err
 }
 
+func (s *deploymentClient) UpdateStatus(o *v1.Deployment) (*v1.Deployment, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.Deployment), err
+}
+
 func (s *deploymentClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -271,14 +255,14 @@ func (s *deploymentClient) DeleteNamespaced(namespace, name string, options *met
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *deploymentClient) List(opts metav1.ListOptions) (*DeploymentList, error) {
+func (s *deploymentClient) List(opts metav1.ListOptions) (*v1.DeploymentList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*DeploymentList), err
+	return obj.(*v1.DeploymentList), err
 }
 
-func (s *deploymentClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*DeploymentList, error) {
+func (s *deploymentClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.DeploymentList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*DeploymentList), err
+	return obj.(*v1.DeploymentList), err
 }
 
 func (s *deploymentClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

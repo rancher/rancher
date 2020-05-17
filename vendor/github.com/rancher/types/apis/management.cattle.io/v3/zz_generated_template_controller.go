@@ -73,8 +73,6 @@ type TemplateController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler TemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type TemplateInterface interface {
@@ -125,7 +123,7 @@ func (l *templateLister) Get(namespace, name string) (*Template, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    TemplateGroupVersionKind.Group,
-			Resource: "template",
+			Resource: TemplateGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*Template), nil
@@ -209,25 +207,12 @@ func (c templateFactory) List() runtime.Object {
 }
 
 func (s *templateClient) Controller() TemplateController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.templateControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(TemplateGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(TemplateGroupVersionResource, TemplateGroupVersionKind.Kind, false))
 
-	c = &templateController{
+	return &templateController{
 		GenericController: genericController,
 	}
-
-	s.client.templateControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type templateClient struct {
@@ -258,6 +243,11 @@ func (s *templateClient) GetNamespaced(namespace, name string, opts metav1.GetOp
 
 func (s *templateClient) Update(o *Template) (*Template, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*Template), err
+}
+
+func (s *templateClient) UpdateStatus(o *Template) (*Template, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*Template), err
 }
 

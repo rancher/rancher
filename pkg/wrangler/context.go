@@ -3,14 +3,15 @@ package wrangler
 import (
 	"context"
 
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/steve/pkg/accesscontrol"
-
 	"github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io"
 	managementv3 "github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/remotedialer"
+	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/apply"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/start"
 	"k8s.io/client-go/rest"
 )
@@ -33,8 +34,12 @@ func (w *Context) Start(ctx context.Context) error {
 	return start.All(ctx, 5, w.starters...)
 }
 
-func NewContext(ctx context.Context, restConfig *rest.Config, tunnelServer *remotedialer.Server) (*Context, error) {
-	steveControllers, err := server.NewController(restConfig)
+func NewContext(ctx context.Context, restConfig *rest.Config, controllerFactory controller.SharedControllerFactory, tunnelServer *remotedialer.Server) (*Context, error) {
+	opts := &generic.FactoryOptions{
+		SharedControllerFactory: controllerFactory,
+	}
+
+	steveControllers, err := server.NewController(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +49,7 @@ func NewContext(ctx context.Context, restConfig *rest.Config, tunnelServer *remo
 		return nil, err
 	}
 
-	mgmt, err := management.NewFactoryFromConfig(restConfig)
+	mgmt, err := management.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}

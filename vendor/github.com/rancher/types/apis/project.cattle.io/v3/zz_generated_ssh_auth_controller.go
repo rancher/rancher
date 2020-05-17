@@ -74,8 +74,6 @@ type SSHAuthController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SSHAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type SSHAuthInterface interface {
@@ -126,7 +124,7 @@ func (l *sshAuthLister) Get(namespace, name string) (*SSHAuth, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    SSHAuthGroupVersionKind.Group,
-			Resource: "sshAuth",
+			Resource: SSHAuthGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*SSHAuth), nil
@@ -210,25 +208,12 @@ func (c sshAuthFactory) List() runtime.Object {
 }
 
 func (s *sshAuthClient) Controller() SSHAuthController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.sshAuthControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(SSHAuthGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(SSHAuthGroupVersionResource, SSHAuthGroupVersionKind.Kind, true))
 
-	c = &sshAuthController{
+	return &sshAuthController{
 		GenericController: genericController,
 	}
-
-	s.client.sshAuthControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type sshAuthClient struct {
@@ -259,6 +244,11 @@ func (s *sshAuthClient) GetNamespaced(namespace, name string, opts metav1.GetOpt
 
 func (s *sshAuthClient) Update(o *SSHAuth) (*SSHAuth, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*SSHAuth), err
+}
+
+func (s *sshAuthClient) UpdateStatus(o *SSHAuth) (*SSHAuth, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*SSHAuth), err
 }
 

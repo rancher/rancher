@@ -73,8 +73,6 @@ type GroupMemberController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GroupMemberHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type GroupMemberInterface interface {
@@ -125,7 +123,7 @@ func (l *groupMemberLister) Get(namespace, name string) (*GroupMember, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    GroupMemberGroupVersionKind.Group,
-			Resource: "groupMember",
+			Resource: GroupMemberGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*GroupMember), nil
@@ -209,25 +207,12 @@ func (c groupMemberFactory) List() runtime.Object {
 }
 
 func (s *groupMemberClient) Controller() GroupMemberController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.groupMemberControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(GroupMemberGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(GroupMemberGroupVersionResource, GroupMemberGroupVersionKind.Kind, false))
 
-	c = &groupMemberController{
+	return &groupMemberController{
 		GenericController: genericController,
 	}
-
-	s.client.groupMemberControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type groupMemberClient struct {
@@ -258,6 +243,11 @@ func (s *groupMemberClient) GetNamespaced(namespace, name string, opts metav1.Ge
 
 func (s *groupMemberClient) Update(o *GroupMember) (*GroupMember, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*GroupMember), err
+}
+
+func (s *groupMemberClient) UpdateStatus(o *GroupMember) (*GroupMember, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*GroupMember), err
 }
 

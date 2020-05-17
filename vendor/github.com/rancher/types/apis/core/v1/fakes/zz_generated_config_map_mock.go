@@ -151,8 +151,6 @@ var (
 	lockConfigMapControllerMockGeneric                        sync.RWMutex
 	lockConfigMapControllerMockInformer                       sync.RWMutex
 	lockConfigMapControllerMockLister                         sync.RWMutex
-	lockConfigMapControllerMockStart                          sync.RWMutex
-	lockConfigMapControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ConfigMapControllerMock does implement ConfigMapController.
@@ -192,12 +190,6 @@ var _ v1a.ConfigMapController = &ConfigMapControllerMock{}
 //             ListerFunc: func() v1a.ConfigMapLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedConfigMapController in code that requires ConfigMapController
@@ -231,12 +223,6 @@ type ConfigMapControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v1a.ConfigMapLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -308,18 +294,6 @@ type ConfigMapControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -648,72 +622,6 @@ func (mock *ConfigMapControllerMock) ListerCalls() []struct {
 	return calls
 }
 
-// Start calls StartFunc.
-func (mock *ConfigMapControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("ConfigMapControllerMock.StartFunc: method is nil but ConfigMapController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockConfigMapControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockConfigMapControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedConfigMapController.StartCalls())
-func (mock *ConfigMapControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockConfigMapControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockConfigMapControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *ConfigMapControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("ConfigMapControllerMock.SyncFunc: method is nil but ConfigMapController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockConfigMapControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockConfigMapControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedConfigMapController.SyncCalls())
-func (mock *ConfigMapControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockConfigMapControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockConfigMapControllerMockSync.RUnlock()
-	return calls
-}
-
 var (
 	lockConfigMapInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
 	lockConfigMapInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
@@ -792,10 +700,10 @@ var _ v1a.ConfigMapInterface = &ConfigMapInterfaceMock{}
 //             GetNamespacedFunc: func(namespace string, name string, opts v1b.GetOptions) (*v1.ConfigMap, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1b.ListOptions) (*v1a.ConfigMapList, error) {
+//             ListFunc: func(opts v1b.ListOptions) (*v1.ConfigMapList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.ConfigMapList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1.ConfigMapList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
@@ -860,10 +768,10 @@ type ConfigMapInterfaceMock struct {
 	GetNamespacedFunc func(namespace string, name string, opts v1b.GetOptions) (*v1.ConfigMap, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1b.ListOptions) (*v1a.ConfigMapList, error)
+	ListFunc func(opts v1b.ListOptions) (*v1.ConfigMapList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.ConfigMapList, error)
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1.ConfigMapList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -1624,7 +1532,7 @@ func (mock *ConfigMapInterfaceMock) GetNamespacedCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *ConfigMapInterfaceMock) List(opts v1b.ListOptions) (*v1a.ConfigMapList, error) {
+func (mock *ConfigMapInterfaceMock) List(opts v1b.ListOptions) (*v1.ConfigMapList, error) {
 	if mock.ListFunc == nil {
 		panic("ConfigMapInterfaceMock.ListFunc: method is nil but ConfigMapInterface.List was just called")
 	}
@@ -1655,7 +1563,7 @@ func (mock *ConfigMapInterfaceMock) ListCalls() []struct {
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *ConfigMapInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.ConfigMapList, error) {
+func (mock *ConfigMapInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1.ConfigMapList, error) {
 	if mock.ListNamespacedFunc == nil {
 		panic("ConfigMapInterfaceMock.ListNamespacedFunc: method is nil but ConfigMapInterface.ListNamespaced was just called")
 	}

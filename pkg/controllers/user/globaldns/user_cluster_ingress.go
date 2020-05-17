@@ -25,16 +25,16 @@ const (
 )
 
 type UserIngressController struct {
-	globalDNSs            v3.GlobalDNSInterface
-	globalDNSLister       v3.GlobalDNSLister
+	globalDNSs            v3.GlobalDnsInterface
+	globalDNSLister       v3.GlobalDnsLister
 	multiclusterappLister v3.MultiClusterAppLister
 	clusterName           string
 }
 
 func newUserIngressController(ctx context.Context, clusterContext *config.UserContext) *UserIngressController {
 	n := &UserIngressController{
-		globalDNSs:            clusterContext.Management.Management.GlobalDNSs(""),
-		globalDNSLister:       clusterContext.Management.Management.GlobalDNSs("").Controller().Lister(),
+		globalDNSs:            clusterContext.Management.Management.GlobalDnses(""),
+		globalDNSLister:       clusterContext.Management.Management.GlobalDnses("").Controller().Lister(),
 		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
 		clusterName:           clusterContext.ClusterName,
 	}
@@ -45,7 +45,7 @@ func Register(ctx context.Context, clusterContext *config.UserContext) {
 	n := newUserIngressController(ctx, clusterContext)
 	clusterContext.Extensions.Ingresses("").AddHandler(ctx, UserIngressControllerName, n.sync)
 	g := newUserGlobalDNSController(clusterContext)
-	clusterContext.Management.Management.GlobalDNSs("").AddHandler(ctx, UserGlobalDNSControllerName, g.sync)
+	clusterContext.Management.Management.GlobalDnses("").AddHandler(ctx, UserGlobalDNSControllerName, g.sync)
 }
 
 func (ic *UserIngressController) sync(key string, obj *v1beta1.Ingress) (runtime.Object, error) {
@@ -81,7 +81,7 @@ func (ic *UserIngressController) reconcileAllGlobalDNSs() (runtime.Object, error
 	return nil, nil
 }
 
-func (ic *UserIngressController) doesGlobalDNSTargetCurrentCluster(globalDNS *v3.GlobalDNS) (bool, error) {
+func (ic *UserIngressController) doesGlobalDNSTargetCurrentCluster(globalDNS *v3.GlobalDns) (bool, error) {
 	var targetProjectNames []string
 
 	if globalDNS.Spec.MultiClusterAppName != "" {

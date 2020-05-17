@@ -74,8 +74,6 @@ type ClusterTemplateRevisionController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterTemplateRevisionHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ClusterTemplateRevisionInterface interface {
@@ -126,7 +124,7 @@ func (l *clusterTemplateRevisionLister) Get(namespace, name string) (*ClusterTem
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ClusterTemplateRevisionGroupVersionKind.Group,
-			Resource: "clusterTemplateRevision",
+			Resource: ClusterTemplateRevisionGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ClusterTemplateRevision), nil
@@ -210,25 +208,12 @@ func (c clusterTemplateRevisionFactory) List() runtime.Object {
 }
 
 func (s *clusterTemplateRevisionClient) Controller() ClusterTemplateRevisionController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.clusterTemplateRevisionControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ClusterTemplateRevisionGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ClusterTemplateRevisionGroupVersionResource, ClusterTemplateRevisionGroupVersionKind.Kind, true))
 
-	c = &clusterTemplateRevisionController{
+	return &clusterTemplateRevisionController{
 		GenericController: genericController,
 	}
-
-	s.client.clusterTemplateRevisionControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type clusterTemplateRevisionClient struct {
@@ -259,6 +244,11 @@ func (s *clusterTemplateRevisionClient) GetNamespaced(namespace, name string, op
 
 func (s *clusterTemplateRevisionClient) Update(o *ClusterTemplateRevision) (*ClusterTemplateRevision, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ClusterTemplateRevision), err
+}
+
+func (s *clusterTemplateRevisionClient) UpdateStatus(o *ClusterTemplateRevision) (*ClusterTemplateRevision, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ClusterTemplateRevision), err
 }
 

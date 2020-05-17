@@ -74,8 +74,6 @@ type PipelineExecutionController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PipelineExecutionHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type PipelineExecutionInterface interface {
@@ -126,7 +124,7 @@ func (l *pipelineExecutionLister) Get(namespace, name string) (*PipelineExecutio
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    PipelineExecutionGroupVersionKind.Group,
-			Resource: "pipelineExecution",
+			Resource: PipelineExecutionGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*PipelineExecution), nil
@@ -210,25 +208,12 @@ func (c pipelineExecutionFactory) List() runtime.Object {
 }
 
 func (s *pipelineExecutionClient) Controller() PipelineExecutionController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.pipelineExecutionControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(PipelineExecutionGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(PipelineExecutionGroupVersionResource, PipelineExecutionGroupVersionKind.Kind, true))
 
-	c = &pipelineExecutionController{
+	return &pipelineExecutionController{
 		GenericController: genericController,
 	}
-
-	s.client.pipelineExecutionControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type pipelineExecutionClient struct {
@@ -259,6 +244,11 @@ func (s *pipelineExecutionClient) GetNamespaced(namespace, name string, opts met
 
 func (s *pipelineExecutionClient) Update(o *PipelineExecution) (*PipelineExecution, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*PipelineExecution), err
+}
+
+func (s *pipelineExecutionClient) UpdateStatus(o *PipelineExecution) (*PipelineExecution, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*PipelineExecution), err
 }
 

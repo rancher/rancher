@@ -74,8 +74,6 @@ type NamespacedCertificateController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NamespacedCertificateHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type NamespacedCertificateInterface interface {
@@ -126,7 +124,7 @@ func (l *namespacedCertificateLister) Get(namespace, name string) (*NamespacedCe
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    NamespacedCertificateGroupVersionKind.Group,
-			Resource: "namespacedCertificate",
+			Resource: NamespacedCertificateGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*NamespacedCertificate), nil
@@ -210,25 +208,12 @@ func (c namespacedCertificateFactory) List() runtime.Object {
 }
 
 func (s *namespacedCertificateClient) Controller() NamespacedCertificateController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.namespacedCertificateControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(NamespacedCertificateGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(NamespacedCertificateGroupVersionResource, NamespacedCertificateGroupVersionKind.Kind, true))
 
-	c = &namespacedCertificateController{
+	return &namespacedCertificateController{
 		GenericController: genericController,
 	}
-
-	s.client.namespacedCertificateControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type namespacedCertificateClient struct {
@@ -259,6 +244,11 @@ func (s *namespacedCertificateClient) GetNamespaced(namespace, name string, opts
 
 func (s *namespacedCertificateClient) Update(o *NamespacedCertificate) (*NamespacedCertificate, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*NamespacedCertificate), err
+}
+
+func (s *namespacedCertificateClient) UpdateStatus(o *NamespacedCertificate) (*NamespacedCertificate, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*NamespacedCertificate), err
 }
 

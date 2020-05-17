@@ -49,12 +49,6 @@ func NewAPIService(namespace, name string, obj v1.APIService) *v1.APIService {
 	return &obj
 }
 
-type APIServiceList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.APIService `json:"items"`
-}
-
 type APIServiceHandlerFunc func(key string, obj *v1.APIService) (runtime.Object, error)
 
 type APIServiceChangeHandlerFunc func(obj *v1.APIService) (runtime.Object, error)
@@ -74,8 +68,6 @@ type APIServiceController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler APIServiceHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type APIServiceInterface interface {
@@ -86,8 +78,8 @@ type APIServiceInterface interface {
 	Update(*v1.APIService) (*v1.APIService, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*APIServiceList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*APIServiceList, error)
+	List(opts metav1.ListOptions) (*v1.APIServiceList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.APIServiceList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() APIServiceController
@@ -126,7 +118,7 @@ func (l *apiServiceLister) Get(namespace, name string) (*v1.APIService, error) {
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    APIServiceGroupVersionKind.Group,
-			Resource: "apiService",
+			Resource: APIServiceGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*v1.APIService), nil
@@ -206,29 +198,16 @@ func (c apiServiceFactory) Object() runtime.Object {
 }
 
 func (c apiServiceFactory) List() runtime.Object {
-	return &APIServiceList{}
+	return &v1.APIServiceList{}
 }
 
 func (s *apiServiceClient) Controller() APIServiceController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.apiServiceControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(APIServiceGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(APIServiceGroupVersionResource, APIServiceGroupVersionKind.Kind, false))
 
-	c = &apiServiceController{
+	return &apiServiceController{
 		GenericController: genericController,
 	}
-
-	s.client.apiServiceControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type apiServiceClient struct {
@@ -262,6 +241,11 @@ func (s *apiServiceClient) Update(o *v1.APIService) (*v1.APIService, error) {
 	return obj.(*v1.APIService), err
 }
 
+func (s *apiServiceClient) UpdateStatus(o *v1.APIService) (*v1.APIService, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
+	return obj.(*v1.APIService), err
+}
+
 func (s *apiServiceClient) Delete(name string, options *metav1.DeleteOptions) error {
 	return s.objectClient.Delete(name, options)
 }
@@ -270,14 +254,14 @@ func (s *apiServiceClient) DeleteNamespaced(namespace, name string, options *met
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *apiServiceClient) List(opts metav1.ListOptions) (*APIServiceList, error) {
+func (s *apiServiceClient) List(opts metav1.ListOptions) (*v1.APIServiceList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*APIServiceList), err
+	return obj.(*v1.APIServiceList), err
 }
 
-func (s *apiServiceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*APIServiceList, error) {
+func (s *apiServiceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.APIServiceList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*APIServiceList), err
+	return obj.(*v1.APIServiceList), err
 }
 
 func (s *apiServiceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {

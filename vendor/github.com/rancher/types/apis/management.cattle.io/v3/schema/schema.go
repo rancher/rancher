@@ -103,12 +103,12 @@ func mgmtSecretTypes(schemas *types.Schemas) *types.Schemas {
 
 func driverMetadataTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, v3.RKEK8sSystemImage{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.RKEK8sServiceOption{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.RKEAddon{}, m.Drop{Field: "namespaceId"}).
-		MustImport(&Version, v3.RKEK8sSystemImage{}).
-		MustImport(&Version, v3.RKEK8sServiceOption{}).
-		MustImport(&Version, v3.RKEAddon{})
+		AddMapperForType(&Version, v3.RkeK8sSystemImage{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.RkeK8sServiceOption{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.RkeAddon{}, m.Drop{Field: "namespaceId"}).
+		MustImport(&Version, v3.RkeK8sSystemImage{}).
+		MustImport(&Version, v3.RkeK8sServiceOption{}).
+		MustImport(&Version, v3.RkeAddon{})
 }
 
 func driverMetadataCisTypes(schemas *types.Schemas) *types.Schemas {
@@ -797,15 +797,15 @@ func multiClusterAppTypes(schemas *types.Schemas) *types.Schemas {
 
 func globalDNSTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		TypeName("globalDns", v3.GlobalDNS{}).
+		TypeName("globalDns", v3.GlobalDns{}).
 		TypeName("globalDnsProvider", v3.GlobalDNSProvider{}).
 		TypeName("globalDnsSpec", v3.GlobalDNSSpec{}).
 		TypeName("globalDnsStatus", v3.GlobalDNSStatus{}).
 		TypeName("globalDnsProviderSpec", v3.GlobalDNSProviderSpec{}).
 		MustImport(&Version, v3.UpdateGlobalDNSTargetsInput{}).
-		AddMapperForType(&Version, v3.GlobalDNS{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.GlobalDns{}, m.Drop{Field: "namespaceId"}).
 		AddMapperForType(&Version, v3.GlobalDNSProvider{}, m.Drop{Field: "namespaceId"}).
-		MustImportAndCustomize(&Version, v3.GlobalDNS{}, func(schema *types.Schema) {
+		MustImportAndCustomize(&Version, v3.GlobalDns{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"addProjects": {
 					Input: "updateGlobalDNSTargetsInput",

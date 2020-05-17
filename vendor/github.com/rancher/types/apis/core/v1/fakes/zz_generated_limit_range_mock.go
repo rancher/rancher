@@ -151,8 +151,6 @@ var (
 	lockLimitRangeControllerMockGeneric                        sync.RWMutex
 	lockLimitRangeControllerMockInformer                       sync.RWMutex
 	lockLimitRangeControllerMockLister                         sync.RWMutex
-	lockLimitRangeControllerMockStart                          sync.RWMutex
-	lockLimitRangeControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that LimitRangeControllerMock does implement LimitRangeController.
@@ -192,12 +190,6 @@ var _ v1a.LimitRangeController = &LimitRangeControllerMock{}
 //             ListerFunc: func() v1a.LimitRangeLister {
 // 	               panic("mock out the Lister method")
 //             },
-//             StartFunc: func(ctx context.Context, threadiness int) error {
-// 	               panic("mock out the Start method")
-//             },
-//             SyncFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Sync method")
-//             },
 //         }
 //
 //         // use mockedLimitRangeController in code that requires LimitRangeController
@@ -231,12 +223,6 @@ type LimitRangeControllerMock struct {
 
 	// ListerFunc mocks the Lister method.
 	ListerFunc func() v1a.LimitRangeLister
-
-	// StartFunc mocks the Start method.
-	StartFunc func(ctx context.Context, threadiness int) error
-
-	// SyncFunc mocks the Sync method.
-	SyncFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -308,18 +294,6 @@ type LimitRangeControllerMock struct {
 		}
 		// Lister holds details about calls to the Lister method.
 		Lister []struct {
-		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Threadiness is the threadiness argument value.
-			Threadiness int
-		}
-		// Sync holds details about calls to the Sync method.
-		Sync []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 		}
 	}
 }
@@ -648,72 +622,6 @@ func (mock *LimitRangeControllerMock) ListerCalls() []struct {
 	return calls
 }
 
-// Start calls StartFunc.
-func (mock *LimitRangeControllerMock) Start(ctx context.Context, threadiness int) error {
-	if mock.StartFunc == nil {
-		panic("LimitRangeControllerMock.StartFunc: method is nil but LimitRangeController.Start was just called")
-	}
-	callInfo := struct {
-		Ctx         context.Context
-		Threadiness int
-	}{
-		Ctx:         ctx,
-		Threadiness: threadiness,
-	}
-	lockLimitRangeControllerMockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockLimitRangeControllerMockStart.Unlock()
-	return mock.StartFunc(ctx, threadiness)
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedLimitRangeController.StartCalls())
-func (mock *LimitRangeControllerMock) StartCalls() []struct {
-	Ctx         context.Context
-	Threadiness int
-} {
-	var calls []struct {
-		Ctx         context.Context
-		Threadiness int
-	}
-	lockLimitRangeControllerMockStart.RLock()
-	calls = mock.calls.Start
-	lockLimitRangeControllerMockStart.RUnlock()
-	return calls
-}
-
-// Sync calls SyncFunc.
-func (mock *LimitRangeControllerMock) Sync(ctx context.Context) error {
-	if mock.SyncFunc == nil {
-		panic("LimitRangeControllerMock.SyncFunc: method is nil but LimitRangeController.Sync was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	lockLimitRangeControllerMockSync.Lock()
-	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockLimitRangeControllerMockSync.Unlock()
-	return mock.SyncFunc(ctx)
-}
-
-// SyncCalls gets all the calls that were made to Sync.
-// Check the length with:
-//     len(mockedLimitRangeController.SyncCalls())
-func (mock *LimitRangeControllerMock) SyncCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	lockLimitRangeControllerMockSync.RLock()
-	calls = mock.calls.Sync
-	lockLimitRangeControllerMockSync.RUnlock()
-	return calls
-}
-
 var (
 	lockLimitRangeInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
 	lockLimitRangeInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
@@ -792,10 +700,10 @@ var _ v1a.LimitRangeInterface = &LimitRangeInterfaceMock{}
 //             GetNamespacedFunc: func(namespace string, name string, opts v1b.GetOptions) (*v1.LimitRange, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1b.ListOptions) (*v1a.LimitRangeList, error) {
+//             ListFunc: func(opts v1b.ListOptions) (*v1.LimitRangeList, error) {
 // 	               panic("mock out the List method")
 //             },
-//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.LimitRangeList, error) {
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1.LimitRangeList, error) {
 // 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
@@ -860,10 +768,10 @@ type LimitRangeInterfaceMock struct {
 	GetNamespacedFunc func(namespace string, name string, opts v1b.GetOptions) (*v1.LimitRange, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1b.ListOptions) (*v1a.LimitRangeList, error)
+	ListFunc func(opts v1b.ListOptions) (*v1.LimitRangeList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.LimitRangeList, error)
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1.LimitRangeList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -1624,7 +1532,7 @@ func (mock *LimitRangeInterfaceMock) GetNamespacedCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *LimitRangeInterfaceMock) List(opts v1b.ListOptions) (*v1a.LimitRangeList, error) {
+func (mock *LimitRangeInterfaceMock) List(opts v1b.ListOptions) (*v1.LimitRangeList, error) {
 	if mock.ListFunc == nil {
 		panic("LimitRangeInterfaceMock.ListFunc: method is nil but LimitRangeInterface.List was just called")
 	}
@@ -1655,7 +1563,7 @@ func (mock *LimitRangeInterfaceMock) ListCalls() []struct {
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *LimitRangeInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.LimitRangeList, error) {
+func (mock *LimitRangeInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1.LimitRangeList, error) {
 	if mock.ListNamespacedFunc == nil {
 		panic("LimitRangeInterfaceMock.ListNamespacedFunc: method is nil but LimitRangeInterface.ListNamespaced was just called")
 	}

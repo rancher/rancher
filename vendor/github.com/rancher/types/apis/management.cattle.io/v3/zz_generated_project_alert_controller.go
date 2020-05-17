@@ -74,8 +74,6 @@ type ProjectAlertController interface {
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectAlertHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
-	Sync(ctx context.Context) error
-	Start(ctx context.Context, threadiness int) error
 }
 
 type ProjectAlertInterface interface {
@@ -126,7 +124,7 @@ func (l *projectAlertLister) Get(namespace, name string) (*ProjectAlert, error) 
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
 			Group:    ProjectAlertGroupVersionKind.Group,
-			Resource: "projectAlert",
+			Resource: ProjectAlertGroupVersionResource.Resource,
 		}, key)
 	}
 	return obj.(*ProjectAlert), nil
@@ -210,25 +208,12 @@ func (c projectAlertFactory) List() runtime.Object {
 }
 
 func (s *projectAlertClient) Controller() ProjectAlertController {
-	s.client.Lock()
-	defer s.client.Unlock()
-
-	c, ok := s.client.projectAlertControllers[s.ns]
-	if ok {
-		return c
-	}
-
 	genericController := controller.NewGenericController(ProjectAlertGroupVersionKind.Kind+"Controller",
-		s.objectClient)
+		s.client.controllerFactory.ForResourceKind(ProjectAlertGroupVersionResource, ProjectAlertGroupVersionKind.Kind, true))
 
-	c = &projectAlertController{
+	return &projectAlertController{
 		GenericController: genericController,
 	}
-
-	s.client.projectAlertControllers[s.ns] = c
-	s.client.starters = append(s.client.starters, c)
-
-	return c
 }
 
 type projectAlertClient struct {
@@ -259,6 +244,11 @@ func (s *projectAlertClient) GetNamespaced(namespace, name string, opts metav1.G
 
 func (s *projectAlertClient) Update(o *ProjectAlert) (*ProjectAlert, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
+	return obj.(*ProjectAlert), err
+}
+
+func (s *projectAlertClient) UpdateStatus(o *ProjectAlert) (*ProjectAlert, error) {
+	obj, err := s.objectClient.UpdateStatus(o.Name, o)
 	return obj.(*ProjectAlert), err
 }
 

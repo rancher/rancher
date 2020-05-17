@@ -126,9 +126,9 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
 		client.ProjectType,
-		client.RKEK8sSystemImageType,
-		client.RKEK8sServiceOptionType,
-		client.RKEAddonType,
+		client.RkeK8sSystemImageType,
+		client.RkeK8sServiceOptionType,
+		client.RkeAddonType,
 		client.RoleTemplateType,
 		client.CisConfigType,
 		client.CisBenchmarkVersionType,
@@ -139,7 +139,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.TokenType,
 		client.UserAttributeType,
 		client.UserType,
-		client.GlobalDNSType,
+		client.GlobalDnsType,
 		client.GlobalDNSProviderType,
 		client.ClusterTemplateType,
 		client.ClusterTemplateRevisionType,
@@ -720,12 +720,12 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
 	metadataHandler := md.MetadataController{
-		SystemImagesLister:        management.Management.RKEK8sSystemImages("").Controller().Lister(),
-		SystemImages:              management.Management.RKEK8sSystemImages(""),
-		ServiceOptionsLister:      management.Management.RKEK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:            management.Management.RKEK8sServiceOptions(""),
-		AddonsLister:              management.Management.RKEAddons("").Controller().Lister(),
-		Addons:                    management.Management.RKEAddons(""),
+		SystemImagesLister:        management.Management.RkeK8sSystemImages("").Controller().Lister(),
+		SystemImages:              management.Management.RkeK8sSystemImages(""),
+		ServiceOptionsLister:      management.Management.RkeK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:            management.Management.RkeK8sServiceOptions(""),
+		AddonsLister:              management.Management.RkeAddons("").Controller().Lister(),
+		Addons:                    management.Management.RkeAddons(""),
 		CisConfigLister:           management.Management.CisConfigs("").Controller().Lister(),
 		CisConfig:                 management.Management.CisConfigs(""),
 		CisBenchmarkVersionLister: management.Management.CisBenchmarkVersions("").Controller().Lister(),
@@ -739,8 +739,8 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		MetadataHandler:       metadataHandler,
 	}
 	lh := kontainerdriver.ListHandler{
-		SysImageLister: management.Management.RKEK8sSystemImages("").Controller().Lister(),
-		SysImages:      management.Management.RKEK8sSystemImages(""),
+		SysImageLister: management.Management.RkeK8sSystemImages("").Controller().Lister(),
+		SysImages:      management.Management.RkeK8sSystemImages(""),
 		CatalogLister:  management.Management.Catalogs("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.ActionHandler
@@ -784,15 +784,15 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 
 func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
 	gdns := globaldns.Wrapper{
-		GlobalDNSes:           management.Management.GlobalDNSs(""),
-		GlobalDNSLister:       management.Management.GlobalDNSs("").Controller().Lister(),
+		GlobalDNSes:           management.Management.GlobalDnses(""),
+		GlobalDNSLister:       management.Management.GlobalDnses("").Controller().Lister(),
 		PrtbLister:            management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		MultiClusterAppLister: management.Management.MultiClusterApps("").Controller().Lister(),
 		Users:                 management.Management.Users(""),
 		GrbLister:             management.Management.GlobalRoleBindings("").Controller().Lister(),
 		GrLister:              management.Management.GlobalRoles("").Controller().Lister(),
 	}
-	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
+	schema := schemas.Schema(&managementschema.Version, client.GlobalDnsType)
 	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
 	schema.Formatter = gdns.Formatter
 	schema.ActionHandler = gdns.ActionHandler
@@ -855,7 +855,7 @@ func ClusterScans(schemas *types.Schemas, management *config.ScaledContext, clus
 }
 
 func SystemImages(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.RKEK8sSystemImageType)
+	schema := schemas.Schema(&managementschema.Version, client.RkeK8sSystemImageType)
 	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
 }
 

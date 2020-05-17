@@ -69,7 +69,24 @@ func applyDefaults(opts *SharedCacheFactoryOptions) *SharedCacheFactoryOptions {
 	return &newOpts
 }
 
-func (f *sharedCacheFactory) Start(ctx context.Context) {
+func (f *sharedCacheFactory) StartGVK(ctx context.Context, gvk schema.GroupVersionKind) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informer, ok := f.caches[gvk]
+	if !ok {
+		return nil
+	}
+
+	if !f.startedCaches[gvk] {
+		go informer.Run(ctx.Done())
+		f.startedCaches[gvk] = true
+	}
+
+	return nil
+}
+
+func (f *sharedCacheFactory) Start(ctx context.Context) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -79,6 +96,8 @@ func (f *sharedCacheFactory) Start(ctx context.Context) {
 			f.startedCaches[informerType] = true
 		}
 	}
+
+	return nil
 }
 
 func (f *sharedCacheFactory) WaitForCacheSync(ctx context.Context) map[schema.GroupVersionKind]bool {
@@ -106,7 +125,33 @@ func (f *sharedCacheFactory) ForObject(obj runtime.Object) (cache.SharedIndexInf
 	return f.ForKind(obj.GetObjectKind().GroupVersionKind())
 }
 
+func (f *sharedCacheFactory) ForResource(gvr schema.GroupVersionResource, namespaced bool) (cache.SharedIndexInformer, error) {
+	return f.ForResourceKind(gvr, "", namespaced)
+}
+
 func (f *sharedCacheFactory) ForKind(gvk schema.GroupVersionKind) (cache.SharedIndexInformer, error) {
+	gvr, namespaced, err := f.sharedClientFactory.ResourceForGVK(gvk)
+	if err != nil {
+		return nil, err
+	}
+	return f.ForResourceKind(gvr, gvk.Kind, namespaced)
+}
+
+func (f *sharedCacheFactory) ForResourceKind(gvr schema.GroupVersionResource, kind string, namespaced bool) (cache.SharedIndexInformer, error) {
+	var (
+		gvk schema.GroupVersionKind
+		err error
+	)
+
+	if kind == "" {
+		gvk, err = f.sharedClientFactory.GVKForResource(gvr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		gvk = gvr.GroupVersion().WithKind(kind)
+	}
+
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -135,10 +180,7 @@ func (f *sharedCacheFactory) ForKind(gvk schema.GroupVersionKind) (cache.SharedI
 		return nil, err
 	}
 
-	client, err := f.sharedClientFactory.ForKind(gvk)
-	if err != nil {
-		return nil, err
-	}
+	client := f.sharedClientFactory.ForResourceKind(gvr, kind, namespaced)
 
 	cache := NewCache(obj, objList, client, &Options{
 		Namespace: namespace,
@@ -155,9 +197,12 @@ func (f *sharedCacheFactory) SharedClientFactory() client.SharedClientFactory {
 }
 
 type SharedCacheFactory interface {
-	Start(ctx context.Context)
+	Start(ctx context.Context) error
+	StartGVK(ctx context.Context, gvk schema.GroupVersionKind) error
 	ForObject(obj runtime.Object) (cache.SharedIndexInformer, error)
 	ForKind(gvk schema.GroupVersionKind) (cache.SharedIndexInformer, error)
+	ForResource(gvr schema.GroupVersionResource, namespaced bool) (cache.SharedIndexInformer, error)
+	ForResourceKind(gvr schema.GroupVersionResource, kind string, namespaced bool) (cache.SharedIndexInformer, error)
 	WaitForCacheSync(ctx context.Context) map[schema.GroupVersionKind]bool
 	SharedClientFactory() client.SharedClientFactory
 }

@@ -26,7 +26,7 @@ import (
 )
 
 func init() {
-	v1.AddToScheme(schemes.All)
+	schemes.Register(v1.AddToScheme)
 }
 
 type Interface interface {
@@ -47,14 +47,14 @@ type version struct {
 }
 
 func (c *version) ClusterRole() ClusterRoleController {
-	return NewClusterRoleController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"}, "clusterroles", c.controllerFactory)
+	return NewClusterRoleController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"}, "clusterroles", false, c.controllerFactory)
 }
 func (c *version) ClusterRoleBinding() ClusterRoleBindingController {
-	return NewClusterRoleBindingController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}, "clusterrolebindings", c.controllerFactory)
+	return NewClusterRoleBindingController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}, "clusterrolebindings", false, c.controllerFactory)
 }
 func (c *version) Role() RoleController {
-	return NewRoleController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"}, "roles", c.controllerFactory)
+	return NewRoleController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"}, "roles", true, c.controllerFactory)
 }
 func (c *version) RoleBinding() RoleBindingController {
-	return NewRoleBindingController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}, "rolebindings", c.controllerFactory)
+	return NewRoleBindingController(schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}, "rolebindings", true, c.controllerFactory)
 }

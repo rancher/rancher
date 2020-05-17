@@ -44,7 +44,7 @@ func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext)
 }
 
 //sync is called periodically and on real updates
-func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, error) {
+func (n *GDController) sync(key string, obj *v3.GlobalDns) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -98,7 +98,7 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 	return nil, nil
 }
 
-func (n *GDController) getIngressForGlobalDNS(globaldns *v3.GlobalDNS) (*v1beta1.Ingress, error) {
+func (n *GDController) getIngressForGlobalDNS(globaldns *v3.GlobalDns) (*v1beta1.Ingress, error) {
 	ingress, err := n.ingresses.Get(context.TODO(), strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"), metav1.GetOptions{}) //n.Get("", strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"))
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func (n *GDController) getIngressForGlobalDNS(globaldns *v3.GlobalDNS) (*v1beta1
 	return nil, nil
 }
 
-func (n *GDController) isIngressOwnedByGlobalDNS(ingress *v1beta1.Ingress, globaldns *v3.GlobalDNS) bool {
+func (n *GDController) isIngressOwnedByGlobalDNS(ingress *v1beta1.Ingress, globaldns *v3.GlobalDns) bool {
 	for i, owners := 0, ingress.GetOwnerReferences(); owners != nil && i < len(owners); i++ {
 		if owners[i].UID == globaldns.UID && owners[i].Kind == globaldns.Kind {
 			return true
@@ -119,7 +119,7 @@ func (n *GDController) isIngressOwnedByGlobalDNS(ingress *v1beta1.Ingress, globa
 	return false
 }
 
-func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDNS) (*v1beta1.Ingress, error) {
+func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDns) (*v1beta1.Ingress, error) {
 	ingressSpec := n.generateNewIngressSpec(globaldns)
 	if globaldns.Spec.TTL != 0 {
 		ingressSpec.ObjectMeta.Annotations[annotationDNSTTL] = strconv.FormatInt(globaldns.Spec.TTL, 10)
@@ -132,7 +132,7 @@ func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDNS) (*v1be
 	return ingressObj, nil
 }
 
-func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDNS) *v1beta1.Ingress {
+func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDns) *v1beta1.Ingress {
 	controller := true
 	return &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -176,7 +176,7 @@ func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDNS) *v1beta1.
 	}
 }
 
-func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.GlobalDNS) error {
+func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.GlobalDns) error {
 	var err error
 
 	if n.ifEndpointsDiffer(ingress.Status.LoadBalancer.Ingress, obj.Status.Endpoints) {
