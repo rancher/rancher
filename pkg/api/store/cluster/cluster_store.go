@@ -310,6 +310,18 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateAnswers] = finalAnswerMap
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateQuestions] = revisionQuestions
 
+	dataFromTemplate[managementv3.ClusterSpecFieldDescription] = convert.ToString(data[managementv3.ClusterSpecFieldDescription])
+
+	annotations, ok := data[managementv3.MetadataUpdateFieldAnnotations]
+	if ok {
+		dataFromTemplate[managementv3.MetadataUpdateFieldAnnotations] = convert.ToMapInterface(annotations)
+	}
+
+	labels, ok := data[managementv3.MetadataUpdateFieldLabels]
+	if ok {
+		dataFromTemplate[managementv3.MetadataUpdateFieldLabels] = convert.ToMapInterface(labels)
+	}
+
 	//validate that the data loaded is valid clusterSpec
 	var spec v3.ClusterSpec
 	if err := convert.ToObj(dataFromTemplate, &spec); err != nil {
