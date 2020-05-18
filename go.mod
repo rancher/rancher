@@ -87,7 +87,7 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
 	github.com/rancher/rke v1.1.0-rc9.0.20200513225439-53fcc37e950f
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200517052547-afbc6a4186b1
+	github.com/rancher/steve v0.0.0-20200518163824-9e4ed62a470a
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
 	github.com/rancher/types v0.0.0-20200517054142-ecd764720a0f
 	github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f
