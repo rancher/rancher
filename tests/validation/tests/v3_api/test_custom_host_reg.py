@@ -18,7 +18,7 @@ KEYPAIR_NAME_PREFIX = os.environ.get('RANCHER_KEYPAIR_NAME_PREFIX', "")
 RANCHER_CLUSTER_NAME = os.environ.get('RANCHER_CLUSTER_NAME', "")
 RANCHER_ELASTIC_SEARCH_ENDPOINT = os.environ.get(
     'RANCHER_ELASTIC_SEARCH_ENDPOINT', "")
-
+K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 
 def test_add_custom_host():
     aws_nodes = AmazonWebServices().create_multiple_nodes(
@@ -89,6 +89,10 @@ def test_deploy_rancher_server():
                       ["worker"], ["worker"], ["worker"]]
         client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
                                 token=user_token, verify=False)
+        if K8S_VERSION != "":
+            rke_config["kubernetesVersion"] = K8S_VERSION
+        print("the rke config for creating the cluster:")
+        print(rke_config)
         cluster = client.create_cluster(
             name=random_name(),
             driver="rancherKubernetesEngine",
