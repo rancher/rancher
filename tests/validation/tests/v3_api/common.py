@@ -1147,14 +1147,11 @@ def get_cluster_type(client, cluster):
 
 def delete_cluster(client, cluster):
     nodes = client.list_node(clusterId=cluster.id).data
-    # Delete Cluster
-    client.delete(cluster)
     # Delete nodes(in cluster) from AWS for Imported and Custom Cluster
     if len(nodes) > 0:
         cluster_type = get_cluster_type(client, cluster)
         print(cluster_type)
         if get_cluster_type(client, cluster) in ["Imported", "Custom"]:
-            nodes = client.list_node(clusterId=cluster.id).data
             filters = [
                 {'Name': 'tag:Name',
                  'Values': ['testcustom*', 'teststress*', 'testsa*']}]
@@ -1170,9 +1167,17 @@ def delete_cluster(client, cluster):
             assert len(ip_filter) > 0
             print(ip_filter)
             aws_nodes = AmazonWebServices().get_nodes(filters)
-            for node in aws_nodes:
-                print(node.public_ip_address)
+            if aws_nodes is None:
+                # search instances by IPs in case names do not follow patterns
+                aws_nodes = AmazonWebServices().get_nodes(filters=[ip_filter])
+            if aws_nodes is None:
+                print("no instance is found in AWS")
+            else:
+                for node in aws_nodes:
+                    print(node.public_ip_address)
                 AmazonWebServices().delete_nodes(aws_nodes)
+    # Delete Cluster
+    client.delete(cluster)
 
 
 def check_connectivity_between_workloads(p_client1, workload1, p_client2,
@@ -1779,14 +1784,14 @@ def create_user(client, cattle_auth_url=CATTLE_AUTH_URL):
     client.create_global_role_binding(globalRoleId="user",
                                       subjectKind="User",
                                       userId=user.id)
-    user_token = get_user_token(user, cattle_auth_url)
+    user_token = get_user_token(user.username, USER_PASSWORD, cattle_auth_url)
     return user, user_token
 
 
-def get_user_token(user, cattle_auth_url=CATTLE_AUTH_URL):
+def get_user_token(username, password, cattle_auth_url=CATTLE_AUTH_URL):
     r = requests.post(cattle_auth_url, json={
-        'username': user.username,
-        'password': USER_PASSWORD,
+        'username': username,
+        'password': password,
         'responseType': 'json',
     }, verify=False)
     print(r.json())
@@ -2525,3 +2530,55 @@ def create_pv(client, nfs_ip):
     assert capacitydict['storage'] == '50Gi'
     assert pv_object['type'] == 'persistentVolume'
     return pv_object
+
+
+def delete_resource_in_AWS_by_prefix(resource_prefix):
+    """
+    :param resource_prefix: the prefix of resource name
+    :return: None
+    """
+    # delete nodes
+    node_filter = [{
+        'Name': 'tag:Name',
+        'Values': [resource_prefix + "-*"]
+    }]
+    nodes = AmazonWebServices().get_nodes(filters=node_filter)
+    if nodes is None:
+        print("deleting the following instances: None")
+    else:
+        print("deleting the following instances: {}"
+              .format([node.public_ip_address for node in nodes]))
+        AmazonWebServices().delete_nodes(nodes)
+
+    # delete load balancer and target groups
+    tg_list = []
+    lb_list = []
+    lb_names = [resource_prefix + '-nlb',
+                resource_prefix + '-multinode-nlb',
+                resource_prefix + '-k3s-nlb']
+    for name in lb_names:
+        lb_arn = AmazonWebServices().get_lb(name)
+        if lb_arn is not None:
+            lb_list.append(lb_arn)
+            res = AmazonWebServices().get_target_groups(lb_arn)
+            tg_list.extend(res)
+
+    print("deleting the following load balancers: {}".format(lb_list))
+    print("deleting the following target groups: {}".format(tg_list))
+    for lb in lb_list:
+        AmazonWebServices().delete_lb(lb)
+    for tg in tg_list:
+        AmazonWebServices().delete_target_group(tg)
+
+    # delete rds
+    db_name = resource_prefix + "-multinode-db"
+    print("deleting the database: {}".format(db_name))
+    AmazonWebServices().delete_db(db_name)
+
+    # delete the route 53 record
+    record_name = resource_prefix + ".qa.rancher.space."
+    print("deleting the route53 record: {}".format(record_name))
+    AmazonWebServices().delete_route_53_record(record_name)
+
+    print("deletion is done")
+    return None

@@ -5,6 +5,7 @@ import os
 import rsa
 import time
 from boto3.exceptions import Boto3Error
+from botocore.exceptions import ClientError
 from .cloud_provider import CloudProviderBase
 from .node import Node
 
@@ -55,6 +56,12 @@ class AmazonWebServices(CloudProviderBase):
             'route53',
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
+
+        self._db_client = boto3.client(
+            'rds',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION)
 
         self.master_ssh_key = None
         self.master_ssh_key_path = None
@@ -438,6 +445,29 @@ class AmazonWebServices(CloudProviderBase):
             }
         )
 
+    def delete_route_53_record(self, record_name):
+        record = None
+        try:
+            res = self._route53_client.list_resource_record_sets(
+                HostedZoneId=AWS_HOSTED_ZONE_ID,
+                StartRecordName=record_name,
+                StartRecordType='CNAME',
+                MaxItems='1')
+            record = res["ResourceRecordSets"][0]
+        except ClientError as e:
+            print(e.response)
+
+        if record is not None and record["Name"] == record_name:
+            self._route53_client.change_resource_record_sets(
+                HostedZoneId=AWS_HOSTED_ZONE_ID,
+                ChangeBatch={
+                    'Comment': 'delete record',
+                    'Changes': [{
+                        'Action': 'DELETE',
+                        'ResourceRecordSet': record}]
+                }
+            )
+
     def decrypt_windows_password(self, instance_id):
         password = ""
         password_data = self._client. \
@@ -476,3 +506,39 @@ class AmazonWebServices(CloudProviderBase):
                   "in region {}: {}".format(security_group_id,
                                             AWS_REGION, str(e))
             raise RuntimeError(msg)
+
+    def get_target_groups(self, lb_arn):
+        tg_list = []
+        try:
+            res = self._elbv2_client.describe_listeners(
+                LoadBalancerArn=lb_arn)
+        except ClientError:
+            return tg_list
+        if res is not None:
+            for item in res["Listeners"]:
+                tg_arn = item["DefaultActions"][0]["TargetGroupArn"]
+                tg_list.append(tg_arn)
+        return tg_list
+
+    def get_lb(self, name):
+        try:
+            res = self._elbv2_client.describe_load_balancers(Names=[name])
+            return res['LoadBalancers'][0]['LoadBalancerArn']
+        except ClientError:
+            return None
+
+    def get_db(self, db_id):
+        try:
+            res = self._db_client.\
+                describe_db_instances(DBInstanceIdentifier=db_id)
+            return res['DBInstances'][0]['DBInstanceIdentifier']
+        except ClientError:
+            return None
+
+    def delete_db(self, db_id):
+        try:
+            self._db_client.delete_db_instance(DBInstanceIdentifier=db_id,
+                                               SkipFinalSnapshot=True,
+                                               DeleteAutomatedBackups=True)
+        except ClientError:
+            return None
