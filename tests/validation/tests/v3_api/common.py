@@ -2537,7 +2537,7 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
     :param resource_prefix: the prefix of resource name
     :return: None
     """
-    # delete nodes
+    # delete nodes of both local and custom clusters
     node_filter = [{
         'Name': 'tag:Name',
         'Values': [resource_prefix + "-*"]

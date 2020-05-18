@@ -54,6 +54,10 @@ def test_import_k3s_multiple_control_cluster():
     cluster = create_rancher_cluster(client, k3s_clusterfilepath)
 
 
+def test_delete_k3s():
+    delete_resource_in_AWS_by_prefix(RANCHER_RESOURCE_NAME)
+
+
 def create_single_control_cluster():
     # Get URL and User_Token
     client = get_user_client()
