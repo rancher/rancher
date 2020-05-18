@@ -1,16 +1,17 @@
 #!/bin/bash
 
-# Usage: ./mirror.sh <docker hub org>
+# Usage: ./mirror.sh <image_src>
 
 # Requires manifest-tool for inspecting from gcr.
 #   GO111MODULE=off go get github.com/estesp/manifest-tool
+# Requires Docker experimental features to be enabled to run `docker manifest`
 # Can mirror existing manifests or create new manifests from template.
 # Forces os, arch, & variant for platform specific tags (modifies image).
 # Platform tags as REPO:OS-ARCH(-VARIANT).
 
 set -e
 
-ORG=${ORG:-'k3sio'}
+ORG=${ORG:-'rancher'}
 TEMPLATE=${TEMPLATE:-'REPO-ARCH:VERSION'}
 PLATFORMS=${PLATFORMS:-'linux/amd64,linux/arm64,linux/arm'}
 PARALLEL=${PARALLEL:-'false'}
@@ -21,6 +22,11 @@ info() {
 
 if [ -z "${ORG}" ]; then
     info "Must pass in organization that the images will be pushed to using ORG env"
+    exit 1
+fi
+
+if ! command -v manifest-tool &>/dev/null; then
+    info "Script requires github.com/estesp/manifest-tool for inspecting from gcr."
     exit 1
 fi
 
@@ -60,11 +66,15 @@ cleanup-mirror() {
 }
 
 tr_repo() {
-  (tr '/' '_' | tr ':' '-') <<<$1
+  (tr '/' '-' | tr ':' '-') <<<$1
+}
+
+image_from_src() {
+    (rev | cut -d / -f1,2 | rev) <<<$1
 }
 
 create-mirror() {
-  local image=${1#docker.io/}
+  local image=$(image_from_src $1)
   local repo=${image%:*}
   local version=${image#$repo:}
   local mirror="${ORG}/$(tr_repo ${repo}):${version}"
@@ -74,7 +84,7 @@ create-mirror() {
 
   process-manifest() {
     while read -r arch_img os arch variant; do
-      local tag="${mirror_repo}:${os}-${arch}"
+      local tag="${mirror_repo}:${version}-${arch}"
       local annotate_args="--os ${os} --arch ${arch}"
       local platform="${os}/${arch}"
       if [ -n "${variant}" ]; then
@@ -148,7 +158,7 @@ manifest-inspect() {
 }
 
 manifest-template() {
-  local image=${1#docker.io/}
+  local image=$(image_from_src $1)
   local repo=${image%:*}
   local version=${image#$repo:}
   info "??? Generating manifest template for ${image}"
