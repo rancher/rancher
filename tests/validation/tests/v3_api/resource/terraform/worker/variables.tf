@@ -1,6 +1,8 @@
 variable "region" {}
 variable "aws_ami" {}
 variable "aws_user" {}
+variable "vpc_id" {}
+variable "subnets" {}
 variable "resource_name" {}
 variable "access_key" {}
 variable "k3s_version" {}
