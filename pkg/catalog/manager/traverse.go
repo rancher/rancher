@@ -87,7 +87,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 
 		template := v3.CatalogTemplate{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: chart,
+				Name: strings.ToLower(chart),
 			},
 		}
 		template.Namespace = templateNamespace
@@ -110,7 +110,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		var versions []v3.TemplateVersionSpec
 		for _, version := range metadata {
 			v := v3.TemplateVersionSpec{
-				Version: version.Version,
+				Version: strings.ToLower(version.Version),
 			}
 
 			files, err := helm.FetchLocalFiles(version)
