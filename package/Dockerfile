@@ -13,10 +13,10 @@ WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.3
+ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.3
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG RANCHER_METADATA_BRANCH=
+ARG RANCHER_METADATA_BRANCH=dev-v2.3
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.14.3-rancher1
