@@ -754,6 +754,38 @@ def test_save_as_template_action(admin_mc, list_remove_resource):
         assert e is not None
 
 
+def test_cluster_desc_update(admin_mc, list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc,
+                                               [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+    templateId = cluster_template.id
+
+    rev = \
+        create_cluster_template_revision(admin_mc.client, templateId)
+
+    # create a cluster with this template
+    client = admin_mc.client
+
+    cname = random_str()
+    cluster = wait_for_cluster_create(admin_mc.client, name=cname,
+                                      clusterTemplateRevisionId=rev.id,
+                                      description="template from cluster")
+    remove_list.insert(0, cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+    assert cluster.description == 'template from cluster'
+
+    # edit cluster description
+    updatedC = client.update(cluster, name=cname,
+                             clusterTemplateRevisionId=rev.id,
+                             description="updated desc")
+    assert updatedC.description == 'updated desc'
+
+    client.delete(cluster)
+    wait_for_cluster_to_be_deleted(client, cluster.id)
+
+
 def rtb_cb(client, rtb):
     """Wait for the prtb to have the userId populated"""
     def cb():
