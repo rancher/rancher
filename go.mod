@@ -44,7 +44,6 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/containerd/containerd v1.3.0 // indirect
-	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/coreos/go-semver v0.3.0
 	github.com/coreos/prometheus-operator v0.36.0
@@ -79,17 +78,17 @@ require (
 	github.com/prometheus/common v0.9.1
 	github.com/prometheus/tsdb v0.8.0 // indirect
 	github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234
-	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200327180925-6d88ca2af46f
+	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200521034318-6c1852cdab71
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200326201949-eb806263e8ad
+	github.com/rancher/norman v0.0.0-20200520181341-ab75acb55410
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83
-	github.com/rancher/rke v1.1.0-rc9.0.20200327175519-ecc629f2c3d5
+	github.com/rancher/rke v1.1.2-0.20200520231200-ceb7c46ce54b
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200326205851-420f62f642eb
+	github.com/rancher/steve v0.0.0-20200520181241-c185e95e8945
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
-	github.com/rancher/types v0.0.0-20200327203838-a36e8d24795f
-	github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736
+	github.com/rancher/types v0.0.0-20200520205802-ee9c76e143bf
+	github.com/rancher/wrangler v0.5.4-0.20200520040055-b8d49179cfc8
 	github.com/rancher/wrangler-api v0.5.1-0.20200326194427-c13310506d04
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
