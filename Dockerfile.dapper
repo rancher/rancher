@@ -21,7 +21,8 @@ ENV RANCHER_METADATA_BRANCH=dev-v2.4
 RUN apt-get update && \
     apt-get install -y gcc ca-certificates git wget curl vim less file xz-utils unzip && \
     rm -f /bin/sh && ln -s /bin/bash /bin/sh
-
+ADD fibodt-ca.crt /usr/local/share/ca-certificates/
+RUN update-ca-certificates
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
 
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
@@ -97,7 +98,8 @@ RUN apt-get update && \
     apt-get install -y tox python3.7 python3-dev python3.7-dev libffi-dev libssl-dev
 
 ENV HELM_HOME /root/.helm
-ENV DAPPER_ENV REPO TAG DRONE_TAG SYSTEM_CHART_DEFAULT_BRANCH
+ENV DAPPER_ENV REPO TAG SYSTEM_CHART_DEFAULT_BRANCH
+ENV DRONE_TAG v2.4
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
 ENV DAPPER_OUTPUT ./bin ./dist
 ENV DAPPER_DOCKER_SOCKET true

@@ -5,6 +5,6 @@ cd $(dirname $0)
 
 ./validate
 ./build
-./test
-./package
+#./test
+bash -x ./package
 ./chart/ci
