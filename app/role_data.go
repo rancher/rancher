@@ -68,19 +68,6 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
-	rb.addRole("Fibodt User", "fibodt-user").
-		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions", "catalogs").verbs("get", "list", "watch").
-		addRule().apiGroups("*").resources("secrets").verbs("create").
-		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch")
-
 	rb.addRole("User", "user").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
@@ -479,7 +466,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 // annotation this will be a no-op as this was done on a previous startup and will
 // now respect the currently selected defaults.
 func bootstrapDefaultRoles(management *config.ManagementContext) error {
-	user, err := management.Management.GlobalRoles("").Get("user-base", v1.GetOptions{})
+	user, err := management.Management.GlobalRoles("").Get("user", v1.GetOptions{})
 	if err != nil {
 		return err
 	}

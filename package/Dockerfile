@@ -9,8 +9,6 @@ RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/reset-password && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin && \
     rm -f /bin/sh && ln -s /bin/bash /bin/sh
-ADD fibodt-ca.crt /usr/local/share/ca-certificates/
-RUN update-ca-certificates
 WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64

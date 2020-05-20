@@ -20,7 +20,7 @@ fi
 if [ -n "$DRONE_TAG" ]; then
     TAG=$DRONE_TAG
 fi
-pwd
+
 cp ../bin/rancher ../bin/agent ../bin/data.json .
 
 IMAGE=${REPO}/rancher:${TAG}
@@ -29,14 +29,14 @@ AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
 if [ ${ARCH} == arm64 ]; then
     sed -i -e '$a\' -e 'ENV ETCD_UNSUPPORTED_ARCH=arm64' Dockerfile
 fi
-echo "docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} -t ${IMAGE} --network=host ."
-docker build --add-host storage.googleapis.com:192.168.7.58 --add-host kubernetes-charts.storage.googleapis.com:192.168.7.58 --add-host get.helm.sh:192.168.7.58 --add-host registry.yarnpkg.com:192.168.7.58 --add-host get.docker.com:192.168.7.58 --add-host releases.rancher.com:192.168.7.58 --add-host github.com:192.168.7.58 --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} -t ${IMAGE}  .
-echo "docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} -t ${AGENT_IMAGE} --network=host -f Dockerfile.agent ."
-docker build --add-host releases.rancher.com:192.168.7.58 --add-host github.com:192.168.7.58 --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} -t ${AGENT_IMAGE} -f Dockerfile.agent .
+
+docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} -t ${IMAGE} .
+docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 echo ${IMAGE} > ../dist/images
 echo ${AGENT_IMAGE} >> ../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}
 echo
+
 cd ../bin
 mkdir -p /tmp/system-charts && git clone --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts /tmp/system-charts
 TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go /tmp/system-charts $IMAGE $AGENT_IMAGE

@@ -12,11 +12,10 @@ if echo "$VERSION" | grep -q -e '^v.*' ; then
     UI_INDEX="local"
 fi
 UI_INDEX=${UI_INDEX:-"https://releases.rancher.com/ui/latest-2.4/index.html"}
-DASHBOARD_INDEX=${DASHBOARD_INDEX:-"local"}
 RKE_VERSION="$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')"
 
 # Inject Setting values
-DEFAULT_VALUES="{\"ui-index\":\"${UI_INDEX}\",\"rke-version\":\"${RKE_VERSION}\",\"dashboard-index\":\"${DASHBOARD_INDEX}\"}"
+DEFAULT_VALUES="{\"ui-index\":\"${UI_INDEX}\",\"rke-version\":\"${RKE_VERSION}\"}"
 
 CGO_ENABLED=0 go build -i -tags k8s \
   -ldflags \
