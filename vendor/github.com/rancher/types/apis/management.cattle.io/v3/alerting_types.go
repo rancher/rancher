@@ -359,7 +359,7 @@ type SMTPConfig struct {
 	Password         string `json:"password,omitempty" norman:"type=password"`
 	Sender           string `json:"sender,omitempty" norman:"required"`
 	DefaultRecipient string `json:"defaultRecipient,omitempty" norman:"required"`
-	TLS              bool   `json:"tls,omitempty" norman:"required,default=true"`
+	TLS              *bool  `json:"tls,omitempty" norman:"required,default=true"`
 }
 
 type SlackConfig struct {

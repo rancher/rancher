@@ -36,5 +36,5 @@ type NodeTemplateSpec struct {
 	EngineRegistryMirror     []string          `json:"engineRegistryMirror,omitempty" yaml:"engineRegistryMirror,omitempty"`
 	EngineStorageDriver      string            `json:"engineStorageDriver,omitempty" yaml:"engineStorageDriver,omitempty"`
 	NodeTaints               []Taint           `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
-	UseInternalIPAddress     bool              `json:"useInternalIpAddress,omitempty" yaml:"useInternalIpAddress,omitempty"`
+	UseInternalIPAddress     *bool             `json:"useInternalIpAddress,omitempty" yaml:"useInternalIpAddress,omitempty"`
 }

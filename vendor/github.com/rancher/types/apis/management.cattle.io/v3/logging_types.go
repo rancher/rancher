@@ -177,7 +177,7 @@ type FluentForwarderConfig struct {
 	ClientKey     string         `json:"clientKey,omitempty"`
 	ClientKeyPass string         `json:"clientKeyPass,omitempty"`
 	SSLVerify     bool           `json:"sslVerify,omitempty"`
-	Compress      bool           `json:"compress,omitempty" norman:"default=true"`
+	Compress      *bool          `json:"compress,omitempty" norman:"default=true"`
 	FluentServers []FluentServer `json:"fluentServers,omitempty" norman:"required"`
 }
 
