@@ -226,7 +226,7 @@ func getFlags(input *v3.NodeDrainInput) []string {
 		fmt.Sprintf("--delete-local-data=%v", input.DeleteLocalData),
 		fmt.Sprintf("--force=%v", input.Force),
 		fmt.Sprintf("--grace-period=%v", input.GracePeriod),
-		fmt.Sprintf("--ignore-daemonsets=%v", input.IgnoreDaemonSets),
+		fmt.Sprintf("--ignore-daemonsets=%v", *input.IgnoreDaemonSets),
 		fmt.Sprintf("--timeout=%s", convert.ToString(input.Timeout)+"s")}
 }
 
