@@ -15,7 +15,7 @@ AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
 AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
-engine_install_url = "https://releases.rancher.com/install-docker/18.09.sh"
+engine_install_url = "https://releases.rancher.com/install-docker/19.03.sh"
 
 rke_config = {
     "addonJobTimeout": 30,
@@ -956,10 +956,11 @@ def node_template_do():
     node_template = client.create_node_template(
         digitaloceanConfig={"region": "nyc3",
                             "size": "2gb",
-                            "image": "ubuntu-16-04-x64"},
+                            "image": "ubuntu-18-04-x64"},
         name=random_name(),
         driver="digitalocean",
         cloudCredentialId=do_cloud_credential.id,
+        engineInstallURL=engine_install_url,
         useInternalIpAddress=True)
     node_template = client.wait_success(node_template)
     return node_template
