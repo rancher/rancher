@@ -66,6 +66,48 @@ def test_destination_rule(admin_pc):
     client.delete(ns)
 
 
+# consistentHash has a "oneOf" only openAPI validation on it,
+# and our types were passing multiple options which failed.
+# This test ensures you can pass a single option.
+# See: https://github.com/rancher/rancher/issues/25515
+def test_destination_rule_on_cookie(admin_pc, remove_resource):
+    client = admin_pc.client
+    ns = admin_pc.cluster.client.create_namespace(
+        name=random_str(),
+        projectId=admin_pc.project.id)
+    remove_resource(ns)
+    name = random_str()
+    cookie_name = name + "_cookie"
+    dr = client.create_destinationRule(
+        name=name,
+        namespaceId=ns.id,
+        host="test",
+        subsets=[{
+            "name": "v1",
+            "labels": {
+                "version": "v1",
+            }
+        }],
+        trafficPolicy={
+            "loadBalancer": {
+                "consistentHash": {
+                    "httpCookie": {
+                        "ttl": "0s",
+                        "name": cookie_name,
+                    }
+                }
+            }
+        }
+    )
+    remove_resource(dr)
+    destinationRules = client.list_destinationRule(
+        namespaceId=ns.id
+    )
+    assert len(destinationRules) == 1
+    assert destinationRules.data[0].trafficPolicy.loadBalancer\
+        .consistentHash.httpCookie.name == cookie_name
+
+
 @pytest.mark.nonparallel
 def test_gateway(admin_pc):
     client = admin_pc.client
