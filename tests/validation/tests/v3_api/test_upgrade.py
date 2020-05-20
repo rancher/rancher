@@ -1,7 +1,6 @@
 import base64
 import pytest
 
-
 from .common import *  # NOQA
 from .test_secrets import (
     create_and_validate_workload_with_secret_as_env_variable,
@@ -38,7 +37,6 @@ ingress_wlname2 = "-testingresswl2"
 project_name = "-p1"
 ns_name1 = "-ns1"
 ns_name2 = "-ns2"
-
 
 wl_name_create = create_prefix + wl_name
 sd_name_create = create_prefix + sd_name
@@ -90,6 +88,42 @@ if_upgrade_rancher = pytest.mark.skipif(
     upgrade_check_stage != "upgrade_rancher",
     reason='This test is only for testing upgrading Rancher')
 
+
+def test_check_kubelet_restart():
+    cluster = namespace["cluster"]
+    client = get_user_client()
+    if get_cluster_type(client, cluster) != "rancherKubernetesEngineConfig":
+        pytest.skip("only apply for Rancher launched cluster")
+    nodes = client.list_node(clusterId=cluster.id).data
+    assert len(nodes) != 0, "no node is found"
+    for node in nodes:
+        print(node)
+        headers = {'Authorization': 'Bearer ' + USER_TOKEN}
+        response = requests.get(headers=headers,
+                                url=node.links["nodeConfig"],
+                                verify=False)
+        print(response)
+        print(response.headers)
+        assert response.status_code == 200, "failed to download the SSH key"
+        name = response.headers["Content-Disposition"].split("filename=")[1]
+        dir = name[0:-4]
+        try:
+            open(name, 'wb').write(response.content)
+        except OSError:
+            pytest.fail("failed to save the SSH key")
+        run_command_with_stderr("unzip -o " + name)
+
+        docker_cmd = " 'sudo docker inspect kubelet | grep RestartCount' "
+        cmd = "ssh -i ./{}/id_rsa ubuntu@{} {}".format(dir,
+                                                       node.externalIpAddress,
+                                                       docker_cmd)
+        output = run_command_with_stderr(cmd)
+        print(output)
+        assert "0" in str(output), "RestartCount is not zero"
+
+        # remove files
+        rm_cmd = "rm {0}; rm -rf {1}".format(name, dir)
+        run_command_with_stderr(rm_cmd)
 
 @if_post_upgrade
 @pytest.mark.run(order=1)
@@ -302,7 +336,6 @@ def create_and_validate_ingress_xip_io_wl():
 
 
 def modify_workload_validate_deployment():
-
     # This method increments the deployment scale and validates it
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -314,7 +347,6 @@ def modify_workload_validate_deployment():
 
 
 def modify_workload_validate_ingress():
-
     # This method increments the workload scale and validates the ingress
     # pointing to it
     p_client = namespace["p_client"]
@@ -335,7 +367,6 @@ def modify_workload_validate_ingress():
 
 
 def modify_workload_validate_sd():
-
     # This method increments the workload scale and validates
     # service discovery
     p_client = namespace["p_client"]
@@ -352,7 +383,6 @@ def modify_workload_validate_sd():
 
 
 def modify_workload_validate_secret():
-
     # This method increments the scale of worlkoad with secret and validates it
 
     p_client = namespace["p_client"]
@@ -455,7 +485,6 @@ def validate_service_discovery_upgrade(sd_record_name, workload_names):
 
 
 def create_validate_wokloads_with_secret():
-
     p_client = namespace["p_client"]
     ns = namespace["ns"]
 
@@ -605,24 +634,24 @@ def upgrade_rancher_server(serverIp,
 
     stopCommand = "docker stop " + containerName
     print(exec_shell_command(serverIp, 22, stopCommand, "",
-          sshUser, sshKeyPath))
+                             sshUser, sshKeyPath))
 
     createVolumeCommand = "docker create --volumes-from " + containerName + \
                           " --name rancher-data rancher/rancher:" + \
                           rancherVersion
 
     print(exec_shell_command(serverIp, 22, createVolumeCommand, "",
-          sshUser, sshKeyPath))
+                             sshUser, sshKeyPath))
 
     removeCommand = "docker rm " + containerName
     print(exec_shell_command(serverIp, 22, removeCommand, "",
-          sshUser, sshKeyPath))
+                             sshUser, sshKeyPath))
 
     runCommand = "docker run -d --volumes-from rancher-data " \
                  "--restart=unless-stopped " \
                  "-p 80:80 -p 443:443 " + upgradeImage + ":" + upgradeVersion
     print(exec_shell_command(serverIp, 22, runCommand, "",
-          sshUser, sshKeyPath))
+                             sshUser, sshKeyPath))
 
     wait_until_active(CATTLE_TEST_URL)
 
