@@ -57,7 +57,6 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		ClusterName:           user.ClusterName,
 		AppRevisionGetter:     user.Management.Project,
 		AppGetter:             user.Management.Project,
-		AppsLister:            user.Management.Project.Apps("").Controller().Lister(),
 		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
 	}
@@ -82,7 +81,6 @@ type Lifecycle struct {
 	ClusterName           string
 	AppRevisionGetter     v3.AppRevisionsGetter
 	AppGetter             v3.AppsGetter
-	AppsLister            v3.AppLister
 	NsLister              corev1.NamespaceLister
 	NsClient              corev1.NamespaceInterface
 }
@@ -116,7 +114,8 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 	// always refresh app to avoid updating app twice
 	_, projectName := ref.Parse(obj.Spec.ProjectName)
 	var err error
-	obj, err = l.AppsLister.Get(projectName, obj.Name)
+	// cannot use lister to get refreshed app because it randomly returns stale obj which causes duplicate appRevisions
+	obj, err = l.AppGetter.Apps(projectName).Get(obj.Name, metav1.GetOptions{})
 	if err != nil {
 		return obj, err
 	}
