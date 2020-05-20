@@ -880,8 +880,8 @@ github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4b
 github.com/rancher/client-go v1.18.0-rancher.1 h1:YmROLJNSiBc+BU0MBsJU4QuNXV31ZqpGc+phrLk6jY0=
 github.com/rancher/client-go v1.18.0-rancher.1/go.mod h1:uQSYDYs4WhVZ9i6AIoEZuwUggLVEF64HOD37boKAtF8=
 github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
-github.com/rancher/dynamiclistener v0.2.1-0.20200319061731-763229ddcd6e h1:idy8TXAiZjZKa2J3A3DKXSfSz1sY+zMjk3rJNqoMREQ=
-github.com/rancher/dynamiclistener v0.2.1-0.20200319061731-763229ddcd6e/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
+github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234 h1:wZ1Zh7fI7B9hfZw9Ouhz7171CZKu6XffM3ysUhhO6i0=
+github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200327180925-6d88ca2af46f h1:/myTs4LNAFQunAs81BpelXn5I9wVj4y/t+MBunqgioQ=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200327180925-6d88ca2af46f/go.mod h1:mQnNiMtNrIcliLZDPQqmdfd4ucSr84h0DQDWo9C9KqE=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
@@ -895,8 +895,8 @@ github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e h1:j6+HqCET/NLPBtew2m5
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e/go.mod h1:XbYHTPaXuw8ZY9bylhYKQh/nJxDaTKk3YhAxPl4Qy/k=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAXBa/AuNAG0bhMusIXVh74dc1bbYOAe+HY=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
-github.com/rancher/remotedialer v0.2.5 h1:rNMMcJp5fU7FZ3wGFKSmDrXrSt8MYo5na4CzXddIr2A=
-github.com/rancher/remotedialer v0.2.5/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
+github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83 h1:0+HVgp5uVy7BvBn1Ee3PrXG4GktYlD/mwCBBKH77RCw=
+github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
 github.com/rancher/rke v1.1.0-rc9.0.20200327175519-ecc629f2c3d5 h1:oFsVADIU2D2+DZaoufecjzQufwSzv2kMZa87VdFdtKA=
 github.com/rancher/rke v1.1.0-rc9.0.20200327175519-ecc629f2c3d5/go.mod h1:EsJzVba2zttfJgdk/awBWfG2yNrZvKlMlN9LwkxbM+o=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
