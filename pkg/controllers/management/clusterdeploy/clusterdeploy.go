@@ -66,7 +66,7 @@ type clusterDeploy struct {
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
-	logrus.Tracef("clusterDeploy: sync called for cluster [%s], key [%s]", cluster.Name, key)
+	logrus.Tracef("clusterDeploy: sync called for key [%s]", key)
 	var (
 		err, updateErr error
 	)
