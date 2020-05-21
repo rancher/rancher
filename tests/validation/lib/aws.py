@@ -453,7 +453,8 @@ class AmazonWebServices(CloudProviderBase):
                 StartRecordName=record_name,
                 StartRecordType='CNAME',
                 MaxItems='1')
-            record = res["ResourceRecordSets"][0]
+            if len(res["ResourceRecordSets"]) > 0:
+                record = res["ResourceRecordSets"][0]
         except ClientError as e:
             print(e.response)
 
