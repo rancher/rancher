@@ -1115,6 +1115,9 @@ func istioTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, istiov1alpha3.VirtualService{}, projectOverride{}, struct {
 			Status interface{}
 		}{}).
+		MustImport(&Version, istiov1alpha3.ConsistentHashLB{}, struct {
+			UseSourceIP *bool `json:"useSourceIp,omitempty"`
+		}{}).
 		MustImport(&Version, istiov1alpha3.DestinationRule{}, projectOverride{}, struct {
 			Status interface{}
 		}{}).
