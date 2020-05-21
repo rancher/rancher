@@ -874,13 +874,20 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
         check_intermediate_state=check_intermediate_state,
         intermediate_state=intermediate_state,
         nodes_not_in_active_state=nodes_not_in_active_state)
-    # Create Daemon set workload and have an Ingress with Workload
-    # rule pointing to this daemonset
     create_kubeconfig(cluster)
     if k8s_version != "":
         check_cluster_version(cluster, k8s_version)
     if hasattr(cluster, 'rancherKubernetesEngineConfig'):
         check_cluster_state(len(get_role_nodes(cluster, "etcd", client)))
+    # check all workloads under the system project are active
+    print("checking if workloads under the system project are active")
+    sys_project = client.list_project(name='System',
+                                      clusterId=cluster.id).data[0]
+    sys_p_client = get_project_client_for_token(sys_project, userToken)
+    for wl in sys_p_client.list_workload().data:
+        wait_for_wl_to_active(sys_p_client, wl)
+    # Create Daemon set workload and have an Ingress with Workload
+    # rule pointing to this daemonSet
     project, ns = create_project_and_ns(userToken, cluster)
     p_client = get_project_client_for_token(project, userToken)
     con = [{"name": "test1",
