@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/templates"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,7 +26,9 @@ func getAddonJob(addonName, nodeName, image string, isDelete bool) (string, erro
 		"Image":     image,
 		"DeleteJob": strconv.FormatBool(isDelete),
 	}
-	return templates.CompileTemplateFromMap(templates.AddonJobTemplate, jobConfig)
+	template, err := templates.CompileTemplateFromMap(templates.AddonJobTemplate, jobConfig)
+	logrus.Tracef("template for [%s] is: [%s]", addonName, template)
+	return template, err
 }
 
 func AddonJobExists(addonJobName, kubeConfigPath string, k8sWrapTransport transport.WrapperFunc) (bool, error) {

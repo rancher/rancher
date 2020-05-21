@@ -33,6 +33,8 @@ const (
 
 	IngressAddonJobName            = "rke-ingress-controller-deploy-job"
 	MetricsServerAddonJobName      = "rke-metrics-addon-deploy-job"
+	UserAddonJobName               = "rke-user-addon-deploy-job"
+	UserAddonIncludeJobName        = "rke-user-includes-addons-deploy-job"
 	MetricsServerAddonResourceName = "rke-metrics-addon"
 	NginxIngressAddonAppName       = "ingress-nginx"
 	KubeDNSAddonAppName            = "kube-dns"
@@ -156,10 +158,34 @@ func (c *Cluster) deployUserAddOns(ctx context.Context) error {
 		if err := c.doAddonDeploy(ctx, c.Addons, UserAddonResourceName, false); err != nil {
 			return err
 		}
+	} else {
+		addonJobExists, err := addons.AddonJobExists(UserAddonJobName, c.LocalKubeConfigPath, c.K8sWrapTransport)
+		if err != nil {
+			return nil
+		}
+		if addonJobExists {
+			log.Infof(ctx, "[addons] Removing user addons")
+			if err := c.doAddonDelete(ctx, UserAddonResourceName, false); err != nil {
+				return err
+			}
+
+			log.Infof(ctx, "[addons] User addons removed successfully")
+		}
 	}
 	if len(c.AddonsInclude) > 0 {
 		if err := c.deployAddonsInclude(ctx); err != nil {
 			return err
+		}
+	} else {
+		addonJobExists, err := addons.AddonJobExists(UserAddonIncludeJobName, c.LocalKubeConfigPath, c.K8sWrapTransport)
+		if err != nil {
+			return nil
+		}
+
+		if addonJobExists {
+			if err := c.doAddonDelete(ctx, UserAddonsIncludeResourceName, false); err != nil {
+				return err
+			}
 		}
 	}
 	if c.Addons == "" && len(c.AddonsInclude) == 0 {
@@ -469,7 +495,6 @@ func (c *Cluster) doAddonDelete(ctx context.Context, resourceName string, isCrit
 	if err := k8s.DeleteK8sSystemJob(deleteJob, k8sClient, c.AddonJobTimeout); err != nil {
 		return err
 	}
-
 	return nil
 
 }
