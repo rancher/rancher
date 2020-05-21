@@ -1482,6 +1482,72 @@
     "v": "2"
    }
   },
+  "v1.18": {
+   "etcd": {
+    "client-cert-auth": "true",
+    "enable-v2": "true",
+    "peer-client-cert-auth": "true"
+   },
+   "kubeapi": {
+    "allow-privileged": "true",
+    "anonymous-auth": "false",
+    "bind-address": "0.0.0.0",
+    "enable-admission-plugins": "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,NodeRestriction,Priority,TaintNodesByCondition,PersistentVolumeClaimResize",
+    "insecure-port": "0",
+    "kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+    "profiling": "false",
+    "requestheader-extra-headers-prefix": "X-Remote-Extra-",
+    "requestheader-group-headers": "X-Remote-Group",
+    "requestheader-username-headers": "X-Remote-User",
+    "runtime-config": "authorization.k8s.io/v1beta1=true",
+    "secure-port": "6443",
+    "service-account-lookup": "true",
+    "storage-backend": "etcd3",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+   },
+   "kubelet": {
+    "address": "0.0.0.0",
+    "anonymous-auth": "false",
+    "authentication-token-webhook": "true",
+    "authorization-mode": "Webhook",
+    "cgroups-per-qos": "True",
+    "cni-bin-dir": "/opt/cni/bin",
+    "cni-conf-dir": "/etc/cni/net.d",
+    "enforce-node-allocatable": "",
+    "event-qps": "0",
+    "make-iptables-util-chains": "true",
+    "network-plugin": "cni",
+    "read-only-port": "0",
+    "resolv-conf": "/etc/resolv.conf",
+    "streaming-connection-idle-timeout": "30m",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+    "v": "2",
+    "volume-plugin-dir": "/var/lib/kubelet/volumeplugins"
+   },
+   "kubeproxy": {
+    "healthz-bind-address": "127.0.0.1",
+    "v": "2"
+   },
+   "kubeController": {
+    "address": "0.0.0.0",
+    "allocate-node-cidrs": "true",
+    "allow-untagged-cloud": "true",
+    "configure-cloud-routes": "false",
+    "enable-hostpath-provisioner": "false",
+    "leader-elect": "true",
+    "node-monitor-grace-period": "40s",
+    "pod-eviction-timeout": "5m0s",
+    "profiling": "false",
+    "terminated-pod-gc-threshold": "1000",
+    "v": "2"
+   },
+   "scheduler": {
+    "address": "0.0.0.0",
+    "leader-elect": "true",
+    "profiling": "false",
+    "v": "2"
+   }
+  },
   "v1.9": {
    "etcd": null,
    "kubeapi": {
@@ -3337,6 +3403,39 @@
    "metricsServer": "rancher/metrics-server:v0.3.3",
    "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
   },
+  "v1.15.12-rancher1-2": {
+   "etcd": "rancher/coreos-etcd:v3.3.10-rancher1",
+   "alpine": "rancher/rke-tools:v0.1.56",
+   "nginxProxy": "rancher/rke-tools:v0.1.56",
+   "certDownloader": "rancher/rke-tools:v0.1.56",
+   "kubernetesServicesSidecar": "rancher/rke-tools:v0.1.56",
+   "kubedns": "rancher/k8s-dns-kube-dns:1.15.0",
+   "dnsmasq": "rancher/k8s-dns-dnsmasq-nanny:1.15.0",
+   "kubednsSidecar": "rancher/k8s-dns-sidecar:1.15.0",
+   "kubednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.3.0",
+   "coredns": "rancher/coredns-coredns:1.3.1",
+   "corednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.3.0",
+   "nodelocal": "rancher/k8s-dns-node-cache:1.15.7",
+   "kubernetes": "rancher/hyperkube:v1.15.12-rancher1",
+   "flannel": "rancher/coreos-flannel:v0.11.0-rancher1",
+   "flannelCni": "rancher/flannel-cni:v0.3.0-rancher5",
+   "calicoNode": "rancher/calico-node:v3.13.0",
+   "calicoCni": "rancher/calico-cni:v3.13.0",
+   "calicoControllers": "rancher/calico-kube-controllers:v3.13.0",
+   "calicoCtl": "rancher/calico-ctl:v2.0.0",
+   "calicoFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.0",
+   "canalNode": "rancher/calico-node:v3.13.0",
+   "canalCni": "rancher/calico-cni:v3.13.0",
+   "canalFlannel": "rancher/coreos-flannel:v0.11.0",
+   "canalFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.0",
+   "weaveNode": "weaveworks/weave-kube:2.5.2",
+   "weaveCni": "weaveworks/weave-npc:2.5.2",
+   "podInfraContainer": "rancher/pause:3.1",
+   "ingress": "rancher/nginx-ingress-controller:nginx-0.32.0-rancher1",
+   "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
+   "metricsServer": "rancher/metrics-server:v0.3.3",
+   "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
+  },
   "v1.15.2-rancher1-1": {
    "etcd": "rancher/coreos-etcd:v3.3.10-rancher1",
    "alpine": "rancher/rke-tools:v0.1.40",
@@ -3660,6 +3759,39 @@
    "weaveCni": "weaveworks/weave-npc:2.5.2",
    "podInfraContainer": "rancher/pause:3.1",
    "ingress": "rancher/nginx-ingress-controller:nginx-0.25.1-rancher1",
+   "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
+   "metricsServer": "rancher/metrics-server:v0.3.4",
+   "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
+  },
+  "v1.16.10-rancher1-1": {
+   "etcd": "rancher/coreos-etcd:v3.3.15-rancher1",
+   "alpine": "rancher/rke-tools:v0.1.56",
+   "nginxProxy": "rancher/rke-tools:v0.1.56",
+   "certDownloader": "rancher/rke-tools:v0.1.56",
+   "kubernetesServicesSidecar": "rancher/rke-tools:v0.1.56",
+   "kubedns": "rancher/k8s-dns-kube-dns:1.15.0",
+   "dnsmasq": "rancher/k8s-dns-dnsmasq-nanny:1.15.0",
+   "kubednsSidecar": "rancher/k8s-dns-sidecar:1.15.0",
+   "kubednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "coredns": "rancher/coredns-coredns:1.6.2",
+   "corednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "nodelocal": "rancher/k8s-dns-node-cache:1.15.7",
+   "kubernetes": "rancher/hyperkube:v1.16.10-rancher1",
+   "flannel": "rancher/coreos-flannel:v0.11.0-rancher1",
+   "flannelCni": "rancher/flannel-cni:v0.3.0-rancher5",
+   "calicoNode": "rancher/calico-node:v3.13.0",
+   "calicoCni": "rancher/calico-cni:v3.13.0",
+   "calicoControllers": "rancher/calico-kube-controllers:v3.13.0",
+   "calicoCtl": "rancher/calico-ctl:v2.0.0",
+   "calicoFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.0",
+   "canalNode": "rancher/calico-node:v3.13.0",
+   "canalCni": "rancher/calico-cni:v3.13.0",
+   "canalFlannel": "rancher/coreos-flannel:v0.11.0",
+   "canalFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.0",
+   "weaveNode": "weaveworks/weave-kube:2.5.2",
+   "weaveCni": "weaveworks/weave-npc:2.5.2",
+   "podInfraContainer": "rancher/pause:3.1",
+   "ingress": "rancher/nginx-ingress-controller:nginx-0.32.0-rancher1",
    "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
    "metricsServer": "rancher/metrics-server:v0.3.4",
    "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
@@ -4234,6 +4366,72 @@
    "metricsServer": "rancher/metrics-server:v0.3.6",
    "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
   },
+  "v1.17.6-rancher1-1": {
+   "etcd": "rancher/coreos-etcd:v3.4.3-rancher1",
+   "alpine": "rancher/rke-tools:v0.1.56",
+   "nginxProxy": "rancher/rke-tools:v0.1.56",
+   "certDownloader": "rancher/rke-tools:v0.1.56",
+   "kubernetesServicesSidecar": "rancher/rke-tools:v0.1.56",
+   "kubedns": "rancher/k8s-dns-kube-dns:1.15.0",
+   "dnsmasq": "rancher/k8s-dns-dnsmasq-nanny:1.15.0",
+   "kubednsSidecar": "rancher/k8s-dns-sidecar:1.15.0",
+   "kubednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "coredns": "rancher/coredns-coredns:1.6.5",
+   "corednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "nodelocal": "rancher/k8s-dns-node-cache:1.15.7",
+   "kubernetes": "rancher/hyperkube:v1.17.6-rancher1",
+   "flannel": "rancher/coreos-flannel:v0.11.0-rancher1",
+   "flannelCni": "rancher/flannel-cni:v0.3.0-rancher5",
+   "calicoNode": "rancher/calico-node:v3.13.0",
+   "calicoCni": "rancher/calico-cni:v3.13.0",
+   "calicoControllers": "rancher/calico-kube-controllers:v3.13.0",
+   "calicoCtl": "rancher/calico-ctl:v2.0.0",
+   "calicoFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.0",
+   "canalNode": "rancher/calico-node:v3.13.0",
+   "canalCni": "rancher/calico-cni:v3.13.0",
+   "canalFlannel": "rancher/coreos-flannel:v0.11.0",
+   "canalFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.0",
+   "weaveNode": "weaveworks/weave-kube:2.5.2",
+   "weaveCni": "weaveworks/weave-npc:2.5.2",
+   "podInfraContainer": "rancher/pause:3.1",
+   "ingress": "rancher/nginx-ingress-controller:nginx-0.32.0-rancher1",
+   "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
+   "metricsServer": "rancher/metrics-server:v0.3.6",
+   "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
+  },
+  "v1.18.3-rancher1-1": {
+   "etcd": "rancher/coreos-etcd:v3.4.3-rancher1",
+   "alpine": "rancher/rke-tools:v0.1.56",
+   "nginxProxy": "rancher/rke-tools:v0.1.56",
+   "certDownloader": "rancher/rke-tools:v0.1.56",
+   "kubernetesServicesSidecar": "rancher/rke-tools:v0.1.56",
+   "kubedns": "rancher/k8s-dns-kube-dns:1.15.2",
+   "dnsmasq": "rancher/k8s-dns-dnsmasq-nanny:1.15.2",
+   "kubednsSidecar": "rancher/k8s-dns-sidecar:1.15.2",
+   "kubednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "coredns": "rancher/coredns-coredns:1.6.9",
+   "corednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "nodelocal": "rancher/k8s-dns-node-cache:1.15.7",
+   "kubernetes": "rancher/hyperkube:v1.18.3-rancher1",
+   "flannel": "rancher/coreos-flannel:v0.11.0-rancher1",
+   "flannelCni": "rancher/flannel-cni:v0.3.0-rancher5",
+   "calicoNode": "rancher/calico-node:v3.13.0",
+   "calicoCni": "rancher/calico-cni:v3.13.0",
+   "calicoControllers": "rancher/calico-kube-controllers:v3.13.0",
+   "calicoCtl": "rancher/calico-ctl:v2.0.0",
+   "calicoFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.0",
+   "canalNode": "rancher/calico-node:v3.13.0",
+   "canalCni": "rancher/calico-cni:v3.13.0",
+   "canalFlannel": "rancher/coreos-flannel:v0.11.0",
+   "canalFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.0",
+   "weaveNode": "weaveworks/weave-kube:2.6.2",
+   "weaveCni": "weaveworks/weave-npc:2.6.2",
+   "podInfraContainer": "rancher/pause:3.1",
+   "ingress": "rancher/nginx-ingress-controller:nginx-0.32.0-rancher1",
+   "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
+   "metricsServer": "rancher/metrics-server:v0.3.6",
+   "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
+  },
   "v1.8.11-rancher2-1": {
    "etcd": "rancher/coreos-etcd:v3.0.17",
    "alpine": "rancher/rke-tools:v0.1.8",
@@ -4381,7 +4579,12 @@
    "\u003e=1.14.0-rancher0 \u003c=1.14.6-rancher1-1": "nginxingress-v1.8",
    "\u003e=1.14.6-rancher2 \u003c1.15.0-rancher0": "nginxingress-v1.15",
    "\u003e=1.15.0-rancher0 \u003c=1.15.3-rancher1-1": "nginxingress-v1.8",
-   "\u003e=1.15.3-rancher2": "nginxingress-v1.15",
+   "\u003e=1.15.12-rancher1-2 \u003c1.16.1-rancher1-1": "nginxingress-v1.15.12",
+   "\u003e=1.15.3-rancher2 \u003c1.15.12-rancher1-2": "nginxingress-v1.15",
+   "\u003e=1.16.1-rancher1-1 \u003c1.16.10-rancher1-1": "nginxingress-v1.15",
+   "\u003e=1.16.10-rancher1-1 \u003c1.17.0-rancher1-1": "nginxingress-v1.15.12",
+   "\u003e=1.17.0-rancher1-1 \u003c1.17.6-rancher1-1": "nginxingress-v1.15",
+   "\u003e=1.17.6-rancher1-1": "nginxingress-v1.15.12",
    "\u003e=1.8.0-rancher0 \u003c1.13.10-rancher1-3": "nginxingress-v1.8"
   },
   "nodelocal": {
@@ -4414,6 +4617,7 @@
    "kubedns-v1.8": "\n---\napiVersion: apps/v1beta1\nkind: Deployment\nmetadata:\n  name: kube-dns-autoscaler\n  namespace: kube-system\n  labels:\n    k8s-app: kube-dns-autoscaler\nspec:\n  template:\n    metadata:\n      labels:\n        k8s-app: kube-dns-autoscaler\n    spec:\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n      serviceAccountName: kube-dns-autoscaler\n      tolerations:\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      containers:\n      - name: autoscaler\n        image: {{.KubeDNSAutoScalerImage}}\n        resources:\n            requests:\n                cpu: \"20m\"\n                memory: \"10Mi\"\n        command:\n          - /cluster-proportional-autoscaler\n          - --namespace=kube-system\n          - --configmap=kube-dns-autoscaler\n          - --target=Deployment/kube-dns\n          # When cluster is using large nodes(with more cores), \"coresPerReplica\" should dominate.\n          # If using small nodes, \"nodesPerReplica\" should dominate.\n{{if .LinearAutoscalerParams}}\n          - --default-params={\"linear\":{{.LinearAutoscalerParams}}}\n{{else}}\n          - --default-params={\"linear\":{\"coresPerReplica\":128,\"nodesPerReplica\":4,\"min\":1}}\n{{end}}\n          - --logtostderr=true\n          - --v=2\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: kube-dns-autoscaler\n  namespace: kube-system\n  labels:\n    kubernetes.io/cluster-service: \"true\"\n    addonmanager.kubernetes.io/mode: Reconcile\n{{- if eq .RBACConfig \"rbac\"}}\n---\nkind: ClusterRole\napiVersion: rbac.authorization.k8s.io/v1\nmetadata:\n  name: system:kube-dns-autoscaler\nrules:\n  - apiGroups: [\"\"]\n    resources: [\"nodes\"]\n    verbs: [\"list\", \"watch\"]\n  - apiGroups: [\"\"]\n    resources: [\"replicationcontrollers/scale\"]\n    verbs: [\"get\", \"update\"]\n  - apiGroups: [\"extensions\"]\n    resources: [\"deployments/scale\", \"replicasets/scale\"]\n    verbs: [\"get\", \"update\"]\n  - apiGroups: [\"\"]\n    resources: [\"configmaps\"]\n    verbs: [\"get\", \"create\"]\n---\nkind: ClusterRoleBinding\napiVersion: rbac.authorization.k8s.io/v1\nmetadata:\n  name: system:kube-dns-autoscaler\nsubjects:\n  - kind: ServiceAccount\n    name: kube-dns-autoscaler\n    namespace: kube-system\nroleRef:\n  kind: ClusterRole\n  name: system:kube-dns-autoscaler\n  apiGroup: rbac.authorization.k8s.io\n{{- end }}\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: kube-dns\n  namespace: kube-system\n  labels:\n    kubernetes.io/cluster-service: \"true\"\n    addonmanager.kubernetes.io/mode: Reconcile\n---\napiVersion: extensions/v1beta1\nkind: Deployment\nmetadata:\n  name: kube-dns\n  namespace: kube-system\n  labels:\n    k8s-app: kube-dns\n    kubernetes.io/cluster-service: \"true\"\n    addonmanager.kubernetes.io/mode: Reconcile\nspec:\n  # replicas: not specified here:\n  # 1. In order to make Addon Manager do not reconcile this replicas parameter.\n  # 2. Default is 1.\n  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.\n  strategy:\n{{if .UpdateStrategy}}\n{{ toYaml .UpdateStrategy | indent 4}}\n{{else}}\n    rollingUpdate:\n      maxSurge: 10%\n      maxUnavailable: 0\n{{end}}\n  selector:\n    matchLabels:\n      k8s-app: kube-dns\n  template:\n    metadata:\n      labels:\n        k8s-app: kube-dns\n      annotations:\n        scheduler.alpha.kubernetes.io/critical-pod: ''\n    spec:\n{{if .NodeSelector}}\n      nodeSelector:\n      {{ range $k, $v := .NodeSelector }}\n        {{ $k }}: \"{{ $v }}\"\n      {{ end }}\n{{end}}\n      affinity:\n        podAntiAffinity:\n          preferredDuringSchedulingIgnoredDuringExecution:\n          - weight: 100\n            podAffinityTerm:\n              labelSelector:\n                matchExpressions:\n                  - key: k8s-app\n                    operator: In\n                    values: [\"kube-dns\"]\n              topologyKey: kubernetes.io/hostname\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n      tolerations:\n      - key: \"CriticalAddonsOnly\"\n        operator: \"Exists\"\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      volumes:\n      - name: kube-dns-config\n        configMap:\n          name: kube-dns\n          optional: true\n      containers:\n      - name: kubedns\n        image: {{.KubeDNSImage}}\n        resources:\n          # TODO: Set memory limits when we've profiled the container for large\n          # clusters, then set request = limit to keep this container in\n          # guaranteed class. Currently, this container falls into the\n          # \"burstable\" category so the kubelet doesn't backoff from restarting it.\n          limits:\n            memory: 170Mi\n          requests:\n            cpu: 100m\n            memory: 70Mi\n        livenessProbe:\n          httpGet:\n            path: /healthcheck/kubedns\n            port: 10054\n            scheme: HTTP\n          initialDelaySeconds: 60\n          timeoutSeconds: 5\n          successThreshold: 1\n          failureThreshold: 5\n        readinessProbe:\n          httpGet:\n            path: /readiness\n            port: 8081\n            scheme: HTTP\n          # we poll on pod startup for the Kubernetes master service and\n          # only setup the /readiness HTTP server once that's available.\n          initialDelaySeconds: 3\n          timeoutSeconds: 5\n        args:\n        - --domain={{.ClusterDomain}}.\n        - --dns-port=10053\n        - --config-dir=/kube-dns-config\n        - --v=2\n        env:\n        - name: PROMETHEUS_PORT\n          value: \"10055\"\n        ports:\n        - containerPort: 10053\n          name: dns-local\n          protocol: UDP\n        - containerPort: 10053\n          name: dns-tcp-local\n          protocol: TCP\n        - containerPort: 10055\n          name: metrics\n          protocol: TCP\n        volumeMounts:\n        - name: kube-dns-config\n          mountPath: /kube-dns-config\n      - name: dnsmasq\n        image: {{.DNSMasqImage}}\n        livenessProbe:\n          httpGet:\n            path: /healthcheck/dnsmasq\n            port: 10054\n            scheme: HTTP\n          initialDelaySeconds: 60\n          timeoutSeconds: 5\n          successThreshold: 1\n          failureThreshold: 5\n        args:\n        - -v=2\n        - -logtostderr\n        - -configDir=/etc/k8s/dns/dnsmasq-nanny\n        - -restartDnsmasq=true\n        - --\n        - -k\n        - --cache-size=1000\n        - --log-facility=-\n        - --server=/{{.ClusterDomain}}/127.0.0.1#10053\n\t{{- if .ReverseCIDRs }}\n\t{{- range .ReverseCIDRs }}\n        - --server=/{{.}}/127.0.0.1#10053\n\t{{- end }}\n\t{{- else }}\n        - --server=/in-addr.arpa/127.0.0.1#10053\n        - --server=/ip6.arpa/127.0.0.1#10053\n\t{{- end }}\n        ports:\n        - containerPort: 53\n          name: dns\n          protocol: UDP\n        - containerPort: 53\n          name: dns-tcp\n          protocol: TCP\n        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details\n        resources:\n          requests:\n            cpu: 150m\n            memory: 20Mi\n        volumeMounts:\n        - name: kube-dns-config\n          mountPath: /etc/k8s/dns/dnsmasq-nanny\n      - name: sidecar\n        image: {{.KubeDNSSidecarImage}}\n        livenessProbe:\n          httpGet:\n            path: /metrics\n            port: 10054\n            scheme: HTTP\n          initialDelaySeconds: 60\n          timeoutSeconds: 5\n          successThreshold: 1\n          failureThreshold: 5\n        args:\n        - --v=2\n        - --logtostderr\n        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.{{.ClusterDomain}},5,A\n        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.{{.ClusterDomain}},5,A\n        ports:\n        - containerPort: 10054\n          name: metrics\n          protocol: TCP\n        resources:\n          requests:\n            memory: 20Mi\n            cpu: 10m\n      dnsPolicy: Default  # Don't use cluster DNS.\n      serviceAccountName: kube-dns\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: kube-dns\n  namespace: kube-system\n  labels:\n    k8s-app: kube-dns\n    kubernetes.io/cluster-service: \"true\"\n    addonmanager.kubernetes.io/mode: Reconcile\n    kubernetes.io/name: \"KubeDNS\"\nspec:\n  selector:\n    k8s-app: kube-dns\n  clusterIP: {{.ClusterDNSServer}}\n  ports:\n  - name: dns\n    port: 53\n    protocol: UDP\n  - name: dns-tcp\n    port: 53\n    protocol: TCP\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-dns\n  namespace: kube-system\ndata:\n{{- if .UpstreamNameservers }}\n  upstreamNameservers: |\n    [{{range $i, $v := .UpstreamNameservers}}{{if $i}}, {{end}}{{printf \"%q\" .}}{{end}}]\n{{- end }}\n{{- if .StubDomains }}\n  stubDomains: |\n    {{ GetKubednsStubDomains .StubDomains }}\n{{- end }}",
    "metricsserver-v1.8": "\n{{- if eq .RBACConfig \"rbac\"}}\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRoleBinding\nmetadata:\n  name: metrics-server:system:auth-delegator\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: system:auth-delegator\nsubjects:\n- kind: ServiceAccount\n  name: metrics-server\n  namespace: kube-system\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: RoleBinding\nmetadata:\n  name: metrics-server-auth-reader\n  namespace: kube-system\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: extension-apiserver-authentication-reader\nsubjects:\n- kind: ServiceAccount\n  name: metrics-server\n  namespace: kube-system\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: system:metrics-server\nrules:\n- apiGroups:\n  - \"\"\n  resources:\n  - pods\n  - nodes\n  - nodes/stats\n  - namespaces\n  verbs:\n  - get\n  - list\n  - watch\n- apiGroups:\n  - \"extensions\"\n  resources:\n  - deployments\n  verbs:\n  - get\n  - list\n  - watch\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata:\n  name: system:metrics-server\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: system:metrics-server\nsubjects:\n- kind: ServiceAccount\n  name: metrics-server\n  namespace: kube-system\n{{- end }}\n---\napiVersion: apiregistration.k8s.io/v1beta1\nkind: APIService\nmetadata:\n  name: v1beta1.metrics.k8s.io\nspec:\n  service:\n    name: metrics-server\n    namespace: kube-system\n  group: metrics.k8s.io\n  version: v1beta1\n  insecureSkipTLSVerify: true\n  groupPriorityMinimum: 100\n  versionPriority: 100\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: metrics-server\n  namespace: kube-system\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: metrics-server\n  namespace: kube-system\n  labels:\n    k8s-app: metrics-server\nspec:\n{{if .Replicas}}\n  replicas: {{.Replicas}}\n{{end}}\n  selector:\n    matchLabels:\n      k8s-app: metrics-server\n{{if .UpdateStrategy}}\n  strategy:\n{{ toYaml .UpdateStrategy | indent 4}}\n{{end}}\n  template:\n    metadata:\n      name: metrics-server\n      labels:\n        k8s-app: metrics-server\n    spec:\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n{{if .NodeSelector}}\n      nodeSelector:\n      {{ range $k, $v := .NodeSelector }}\n        {{ $k }}: \"{{ $v }}\"\n      {{ end }}\n{{end}}\n      serviceAccountName: metrics-server\n      tolerations:\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      containers:\n      - name: metrics-server\n        image: {{ .MetricsServerImage }}\n        imagePullPolicy: Always\n        command:\n        - /metrics-server\n        {{- if eq .Version \"v0.3\" }}\n        - --kubelet-insecure-tls\n        - --kubelet-preferred-address-types=InternalIP\n        - --logtostderr\n        {{- else }}\n        - --source=kubernetes.summary_api:https://kubernetes.default.svc?kubeletHttps=true\u0026kubeletPort=10250\u0026useServiceAccount=true\u0026insecure=true\n        {{- end }}\n        {{ range $k,$v := .Options }}\n        -  --{{ $k }}={{ $v }}\n        {{ end }}\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: metrics-server\n  namespace: kube-system\n  labels:\n    kubernetes.io/name: \"Metrics-server\"\nspec:\n  selector:\n    k8s-app: metrics-server\n  ports:\n  - port: 443\n    protocol: TCP\n    targetPort: 443\n",
    "nginxingress-v1.15": "\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: ingress-nginx\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: nginx-configuration\n  namespace: ingress-nginx\n  labels:\n    app: ingress-nginx\ndata:\n{{ range $k,$v := .Options }}\n  {{ $k }}: \"{{ $v }}\"\n{{ end }}\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: tcp-services\n  namespace: ingress-nginx\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: udp-services\n  namespace: ingress-nginx\n{{if eq .RBACConfig \"rbac\"}}\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: nginx-ingress-serviceaccount\n  namespace: ingress-nginx\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRole\nmetadata:\n  name: nginx-ingress-clusterrole\nrules:\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n      - endpoints\n      - nodes\n      - pods\n      - secrets\n    verbs:\n      - list\n      - watch\n  - apiGroups:\n      - \"\"\n    resources:\n      - nodes\n    verbs:\n      - get\n  - apiGroups:\n      - \"\"\n    resources:\n      - services\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - \"extensions\"\n      - \"networking.k8s.io\"\n    resources:\n      - ingresses\n      - daemonsets\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - \"\"\n    resources:\n        - events\n    verbs:\n        - create\n        - patch\n  - apiGroups:\n      - \"extensions\"\n      - \"networking.k8s.io\"\n    resources:\n      - ingresses/status\n    verbs:\n      - update\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: Role\nmetadata:\n  name: nginx-ingress-role\n  namespace: ingress-nginx\nrules:\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n      - pods\n      - secrets\n      - namespaces\n    verbs:\n      - get\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n    resourceNames:\n      # Defaults to \"\u003celection-id\u003e-\u003cingress-class\u003e\"\n      # Here: \"\u003cingress-controller-leader\u003e-\u003cnginx\u003e\"\n      # This has to be adapted if you change either parameter\n      # when launching the nginx-ingress-controller.\n      - \"ingress-controller-leader-nginx\"\n    verbs:\n      - get\n      - update\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n    verbs:\n      - create\n  - apiGroups:\n      - \"\"\n    resources:\n      - endpoints\n    verbs:\n      - get\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: RoleBinding\nmetadata:\n  name: nginx-ingress-role-nisa-binding\n  namespace: ingress-nginx\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: nginx-ingress-role\nsubjects:\n  - kind: ServiceAccount\n    name: nginx-ingress-serviceaccount\n    namespace: ingress-nginx\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRoleBinding\nmetadata:\n  name: nginx-ingress-clusterrole-nisa-binding\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: nginx-ingress-clusterrole\nsubjects:\n  - kind: ServiceAccount\n    name: nginx-ingress-serviceaccount\n    namespace: ingress-nginx\n{{ end }}\n---\napiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: nginx-ingress-controller\n  namespace: ingress-nginx\nspec:\n  selector:\n    matchLabels:\n      app: ingress-nginx\n{{if .UpdateStrategy}}\n  updateStrategy:\n{{ toYaml .UpdateStrategy | indent 4}}\n{{end}}\n  template:\n    metadata:\n      labels:\n        app: ingress-nginx\n      annotations:\n        prometheus.io/port: '10254'\n        prometheus.io/scrape: 'true'\n    spec:\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n      hostNetwork: true\n      {{if .DNSPolicy}}\n      dnsPolicy: {{.DNSPolicy}}\n      {{end}}\n{{if .NodeSelector}}\n      nodeSelector:\n      {{ range $k, $v := .NodeSelector }}\n        {{ $k }}: \"{{ $v }}\"\n      {{ end }}\n{{end}}\n      {{if eq .RBACConfig \"rbac\"}}\n      serviceAccountName: nginx-ingress-serviceaccount\n      {{ end }}\n      tolerations:\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      {{- if ne .AlpineImage \"\"}}\n      initContainers:\n      - command:\n        - sh\n        - -c\n        - sysctl -w net.core.somaxconn=32768; sysctl -w net.ipv4.ip_local_port_range=\"1024 65535\"\n        image: {{.AlpineImage}}\n        imagePullPolicy: IfNotPresent\n        name: sysctl\n        securityContext:\n          privileged: true\n      {{- end }}\n      containers:\n        - name: nginx-ingress-controller\n          image: {{.IngressImage}}\n          args:\n            - /nginx-ingress-controller\n            - --default-backend-service=$(POD_NAMESPACE)/default-http-backend\n            - --configmap=$(POD_NAMESPACE)/nginx-configuration\n            - --tcp-services-configmap=$(POD_NAMESPACE)/tcp-services\n            - --udp-services-configmap=$(POD_NAMESPACE)/udp-services\n            - --annotations-prefix=nginx.ingress.kubernetes.io\n          {{ range $k, $v := .ExtraArgs }}\n            - --{{ $k }}{{if ne $v \"\" }}={{ $v }}{{end}}\n          {{ end }}\n          {{- if eq .AlpineImage \"\"}}\n          securityContext:\n            capabilities:\n                drop:\n                - ALL\n                add:\n                - NET_BIND_SERVICE\n            runAsUser: 33\n          {{- end }}\n          env:\n            - name: POD_NAME\n              valueFrom:\n                fieldRef:\n                  fieldPath: metadata.name\n            - name: POD_NAMESPACE\n              valueFrom:\n                fieldRef:\n                  fieldPath: metadata.namespace\n{{if .ExtraEnvs}}\n{{ toYaml .ExtraEnvs | indent 12}}\n{{end}}\n          ports:\n          - name: http\n            containerPort: 80\n          - name: https\n            containerPort: 443\n          livenessProbe:\n            failureThreshold: 3\n            httpGet:\n              path: /healthz\n              port: 10254\n              scheme: HTTP\n            initialDelaySeconds: 10\n            periodSeconds: 10\n            successThreshold: 1\n            timeoutSeconds: 1\n          readinessProbe:\n            failureThreshold: 3\n            httpGet:\n              path: /healthz\n              port: 10254\n              scheme: HTTP\n            periodSeconds: 10\n            successThreshold: 1\n            timeoutSeconds: 1\n{{if .ExtraVolumeMounts}}\n          volumeMounts:\n{{ toYaml .ExtraVolumeMounts | indent 12}}\n{{end}}\n{{if .ExtraVolumes}}\n      volumes:\n{{ toYaml .ExtraVolumes | indent 8}}\n{{end}}\n\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: default-http-backend\n  labels:\n    app: default-http-backend\n  namespace: ingress-nginx\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: default-http-backend\n  template:\n    metadata:\n      labels:\n        app: default-http-backend\n    spec:\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n      terminationGracePeriodSeconds: 60\n      tolerations:\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      containers:\n      - name: default-http-backend\n        # Any image is permissable as long as:\n        # 1. It serves a 404 page at /\n        # 2. It serves 200 on a /healthz endpoint\n        image: {{.IngressBackend}}\n        livenessProbe:\n          httpGet:\n            path: /healthz\n            port: 8080\n            scheme: HTTP\n          initialDelaySeconds: 30\n          timeoutSeconds: 5\n        ports:\n        - containerPort: 8080\n        resources:\n          limits:\n            cpu: 10m\n            memory: 20Mi\n          requests:\n            cpu: 10m\n            memory: 20Mi\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: default-http-backend\n  namespace: ingress-nginx\n  labels:\n    app: default-http-backend\nspec:\n  ports:\n  - port: 80\n    targetPort: 8080\n  selector:\n    app: default-http-backend\n",
+   "nginxingress-v1.15.12": "\n# this template is intended for use by \u003e= nginx-0.32.0\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: ingress-nginx\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: nginx-configuration\n  namespace: ingress-nginx\n  labels:\n    app: ingress-nginx\ndata:\n{{ range $k,$v := .Options }}\n  {{ $k }}: \"{{ $v }}\"\n{{ end }}\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: tcp-services\n  namespace: ingress-nginx\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: udp-services\n  namespace: ingress-nginx\n{{if eq .RBACConfig \"rbac\"}}\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: nginx-ingress-serviceaccount\n  namespace: ingress-nginx\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRole\nmetadata:\n  name: nginx-ingress-clusterrole\nrules:\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n      - endpoints\n      - nodes\n      - pods\n      - secrets\n    verbs:\n      - list\n      - watch\n  - apiGroups:\n      - \"\"\n    resources:\n      - nodes\n    verbs:\n      - get\n  - apiGroups:\n      - \"\"\n    resources:\n      - services\n    verbs:\n      - get\n      - list\n      - update\n      - watch\n  - apiGroups:\n      - extensions\n      - \"networking.k8s.io\" # k8s 1.14+\n    resources:\n      - ingresses\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - \"\"\n    resources:\n      - events\n    verbs:\n      - create\n      - patch\n  - apiGroups:\n      - extensions\n      - \"networking.k8s.io\" # k8s 1.14+\n    resources:\n      - ingresses/status\n    verbs:\n      - update\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: Role\nmetadata:\n  name: nginx-ingress-role\n  namespace: ingress-nginx\nrules:\n  - apiGroups:\n      - \"\"\n    resources:\n      - namespaces\n    verbs:\n      - get\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n      - pods\n      - secrets\n      - endpoints\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - \"\"\n    resources:\n      - services\n    verbs:\n      - get\n      - list\n      - update\n      - watch\n  - apiGroups:\n      - extensions\n      - \"networking.k8s.io\" # k8s 1.14+\n    resources:\n      - ingresses\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - extensions\n      - \"networking.k8s.io\" # k8s 1.14+\n    resources:\n      - ingresses/status\n    verbs:\n      - update\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n    resourceNames:\n      # Defaults to \"\u003celection-id\u003e-\u003cingress-class\u003e\"\n      # Here: \"\u003cingress-controller-leader\u003e-\u003cnginx\u003e\"\n      # This has to be adapted if you change either parameter\n      # when launching the nginx-ingress-controller.\n      - ingress-controller-leader-nginx\n    verbs:\n      - get\n      - update\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n    verbs:\n      - create\n  - apiGroups:\n      - \"\"\n    resources:\n      - endpoints\n    verbs:\n      - create\n      - get\n      - update\n  - apiGroups:\n      - \"\"\n    resources:\n      - events\n    verbs:\n      - create\n      - patch\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: RoleBinding\nmetadata:\n  name: nginx-ingress-role-nisa-binding\n  namespace: ingress-nginx\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: nginx-ingress-role\nsubjects:\n  - kind: ServiceAccount\n    name: nginx-ingress-serviceaccount\n    namespace: ingress-nginx\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRoleBinding\nmetadata:\n  name: nginx-ingress-clusterrole-nisa-binding\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: nginx-ingress-clusterrole\nsubjects:\n  - kind: ServiceAccount\n    name: nginx-ingress-serviceaccount\n    namespace: ingress-nginx\n{{ end }}\n---\napiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: nginx-ingress-controller\n  namespace: ingress-nginx\nspec:\n  selector:\n    matchLabels:\n      app: ingress-nginx\n{{if .UpdateStrategy}}\n  updateStrategy:\n{{ toYaml .UpdateStrategy | indent 4}}\n{{end}}\n  template:\n    metadata:\n      labels:\n        app: ingress-nginx\n      annotations:\n        prometheus.io/port: '10254'\n        prometheus.io/scrape: 'true'\n    spec:\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n      hostNetwork: true\n      {{if .DNSPolicy}}\n      dnsPolicy: {{.DNSPolicy}}\n      {{end}}\n{{if .NodeSelector}}\n      nodeSelector:\n      {{ range $k, $v := .NodeSelector }}\n        {{ $k }}: \"{{ $v }}\"\n      {{ end }}\n{{end}}\n      {{if eq .RBACConfig \"rbac\"}}\n      serviceAccountName: nginx-ingress-serviceaccount\n      {{ end }}\n      terminationGracePeriodSeconds: 60\n      tolerations:\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      containers:\n        - name: nginx-ingress-controller\n          image: {{.IngressImage}}\n          args:\n            - /nginx-ingress-controller\n            - --default-backend-service=$(POD_NAMESPACE)/default-http-backend\n            - --configmap=$(POD_NAMESPACE)/nginx-configuration\n            - --election-id=ingress-controller-leader\n            - --ingress-class=nginx\n            - --tcp-services-configmap=$(POD_NAMESPACE)/tcp-services\n            - --udp-services-configmap=$(POD_NAMESPACE)/udp-services\n            - --annotations-prefix=nginx.ingress.kubernetes.io\n          {{ range $k, $v := .ExtraArgs }}\n            - --{{ $k }}{{if ne $v \"\" }}={{ $v }}{{end}}\n          {{ end }}\n          securityContext:\n            capabilities:\n                drop:\n                - ALL\n                add:\n                - NET_BIND_SERVICE\n            runAsUser: 101\n          env:\n            - name: POD_NAME\n              valueFrom:\n                fieldRef:\n                  fieldPath: metadata.name\n            - name: POD_NAMESPACE\n              valueFrom:\n                fieldRef:\n                  fieldPath: metadata.namespace\n{{if .ExtraEnvs}}\n{{ toYaml .ExtraEnvs | indent 12}}\n{{end}}\n          ports:\n          - name: http\n            containerPort: 80\n          - name: https\n            containerPort: 443\n          livenessProbe:\n            failureThreshold: 3\n            httpGet:\n              path: /healthz\n              port: 10254\n              scheme: HTTP\n            initialDelaySeconds: 10\n            periodSeconds: 10\n            successThreshold: 1\n            timeoutSeconds: 1\n          readinessProbe:\n            failureThreshold: 3\n            httpGet:\n              path: /healthz\n              port: 10254\n              scheme: HTTP\n            initialDelaySeconds: 10\n            periodSeconds: 10\n            successThreshold: 1\n            timeoutSeconds: 1\n{{if .ExtraVolumeMounts}}\n          volumeMounts:\n{{ toYaml .ExtraVolumeMounts | indent 12}}\n{{end}}\n{{if .ExtraVolumes}}\n      volumes:\n{{ toYaml .ExtraVolumes | indent 8}}\n{{end}}\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: default-http-backend\n  labels:\n    app: default-http-backend\n  namespace: ingress-nginx\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: default-http-backend\n  template:\n    metadata:\n      labels:\n        app: default-http-backend\n    spec:\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n      terminationGracePeriodSeconds: 60\n      tolerations:\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      containers:\n      - name: default-http-backend\n        # Any image is permissable as long as:\n        # 1. It serves a 404 page at /\n        # 2. It serves 200 on a /healthz endpoint\n        image: {{.IngressBackend}}\n        livenessProbe:\n          httpGet:\n            path: /healthz\n            port: 8080\n            scheme: HTTP\n          initialDelaySeconds: 30\n          timeoutSeconds: 5\n        ports:\n        - containerPort: 8080\n        resources:\n          limits:\n            cpu: 10m\n            memory: 20Mi\n          requests:\n            cpu: 10m\n            memory: 20Mi\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: default-http-backend\n  namespace: ingress-nginx\n  labels:\n    app: default-http-backend\nspec:\n  ports:\n  - port: 80\n    targetPort: 8080\n  selector:\n    app: default-http-backend\n",
    "nginxingress-v1.8": "\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: ingress-nginx\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: nginx-configuration\n  namespace: ingress-nginx\n  labels:\n    app: ingress-nginx\ndata:\n{{ range $k,$v := .Options }}\n  {{ $k }}: \"{{ $v }}\"\n{{ end }}\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: tcp-services\n  namespace: ingress-nginx\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: udp-services\n  namespace: ingress-nginx\n{{if eq .RBACConfig \"rbac\"}}\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: nginx-ingress-serviceaccount\n  namespace: ingress-nginx\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRole\nmetadata:\n  name: nginx-ingress-clusterrole\nrules:\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n      - endpoints\n      - nodes\n      - pods\n      - secrets\n    verbs:\n      - list\n      - watch\n  - apiGroups:\n      - \"\"\n    resources:\n      - nodes\n    verbs:\n      - get\n  - apiGroups:\n      - \"\"\n    resources:\n      - services\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - \"extensions\"\n    resources:\n      - ingresses\n      - daemonsets\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - \"\"\n    resources:\n        - events\n    verbs:\n        - create\n        - patch\n  - apiGroups:\n      - \"extensions\"\n    resources:\n      - ingresses/status\n    verbs:\n      - update\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: Role\nmetadata:\n  name: nginx-ingress-role\n  namespace: ingress-nginx\nrules:\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n      - pods\n      - secrets\n      - namespaces\n    verbs:\n      - get\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n    resourceNames:\n      # Defaults to \"\u003celection-id\u003e-\u003cingress-class\u003e\"\n      # Here: \"\u003cingress-controller-leader\u003e-\u003cnginx\u003e\"\n      # This has to be adapted if you change either parameter\n      # when launching the nginx-ingress-controller.\n      - \"ingress-controller-leader-nginx\"\n    verbs:\n      - get\n      - update\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n    verbs:\n      - create\n  - apiGroups:\n      - \"\"\n    resources:\n      - endpoints\n    verbs:\n      - get\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: RoleBinding\nmetadata:\n  name: nginx-ingress-role-nisa-binding\n  namespace: ingress-nginx\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: nginx-ingress-role\nsubjects:\n  - kind: ServiceAccount\n    name: nginx-ingress-serviceaccount\n    namespace: ingress-nginx\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRoleBinding\nmetadata:\n  name: nginx-ingress-clusterrole-nisa-binding\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: nginx-ingress-clusterrole\nsubjects:\n  - kind: ServiceAccount\n    name: nginx-ingress-serviceaccount\n    namespace: ingress-nginx\n{{ end }}\n---\napiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: nginx-ingress-controller\n  namespace: ingress-nginx\nspec:\n  selector:\n    matchLabels:\n      app: ingress-nginx\n{{if .UpdateStrategy}}\n  updateStrategy:\n{{ toYaml .UpdateStrategy | indent 4}}\n{{end}}\n  template:\n    metadata:\n      labels:\n        app: ingress-nginx\n      annotations:\n        prometheus.io/port: '10254'\n        prometheus.io/scrape: 'true'\n    spec:\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n      hostNetwork: true\n      {{if .DNSPolicy}}\n      dnsPolicy: {{.DNSPolicy}}\n      {{end}}\n{{if .NodeSelector}}\n      nodeSelector:\n      {{ range $k, $v := .NodeSelector }}\n        {{ $k }}: \"{{ $v }}\"\n      {{ end }}\n{{end}}\n      {{if eq .RBACConfig \"rbac\"}}\n      serviceAccountName: nginx-ingress-serviceaccount\n      {{ end }}\n      tolerations:\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      {{- if ne .AlpineImage \"\"}}\n      initContainers:\n      - command:\n        - sh\n        - -c\n        - sysctl -w net.core.somaxconn=32768; sysctl -w net.ipv4.ip_local_port_range=\"1024 65535\"\n        image: {{.AlpineImage}}\n        imagePullPolicy: IfNotPresent\n        name: sysctl\n        securityContext:\n          privileged: true\n      {{- end }}\n      containers:\n        - name: nginx-ingress-controller\n          image: {{.IngressImage}}\n          args:\n            - /nginx-ingress-controller\n            - --default-backend-service=$(POD_NAMESPACE)/default-http-backend\n            - --configmap=$(POD_NAMESPACE)/nginx-configuration\n            - --tcp-services-configmap=$(POD_NAMESPACE)/tcp-services\n            - --udp-services-configmap=$(POD_NAMESPACE)/udp-services\n            - --annotations-prefix=nginx.ingress.kubernetes.io\n          {{ range $k, $v := .ExtraArgs }}\n            - --{{ $k }}{{if ne $v \"\" }}={{ $v }}{{end}}\n          {{ end }}\n          {{- if eq .AlpineImage \"\"}}\n          securityContext:\n            capabilities:\n                drop:\n                - ALL\n                add:\n                - NET_BIND_SERVICE\n            runAsUser: 33\n          {{- end }}\n          env:\n            - name: POD_NAME\n              valueFrom:\n                fieldRef:\n                  fieldPath: metadata.name\n            - name: POD_NAMESPACE\n              valueFrom:\n                fieldRef:\n                  fieldPath: metadata.namespace\n{{if .ExtraEnvs}}\n{{ toYaml .ExtraEnvs | indent 12}}\n{{end}}\n          ports:\n          - name: http\n            containerPort: 80\n          - name: https\n            containerPort: 443\n          livenessProbe:\n            failureThreshold: 3\n            httpGet:\n              path: /healthz\n              port: 10254\n              scheme: HTTP\n            initialDelaySeconds: 10\n            periodSeconds: 10\n            successThreshold: 1\n            timeoutSeconds: 1\n          readinessProbe:\n            failureThreshold: 3\n            httpGet:\n              path: /healthz\n              port: 10254\n              scheme: HTTP\n            periodSeconds: 10\n            successThreshold: 1\n            timeoutSeconds: 1\n{{if .ExtraVolumeMounts}}\n          volumeMounts:\n{{ toYaml .ExtraVolumeMounts | indent 12}}\n{{end}}\n{{if .ExtraVolumes}}\n      volumes:\n{{ toYaml .ExtraVolumes | indent 8}}\n{{end}}\n\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: default-http-backend\n  labels:\n    app: default-http-backend\n  namespace: ingress-nginx\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: default-http-backend\n  template:\n    metadata:\n      labels:\n        app: default-http-backend\n    spec:\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n                - key: node-role.kubernetes.io/worker\n                  operator: Exists\n      terminationGracePeriodSeconds: 60\n      tolerations:\n      - effect: NoExecute\n        operator: Exists\n      - effect: NoSchedule\n        operator: Exists\n      containers:\n      - name: default-http-backend\n        # Any image is permissable as long as:\n        # 1. It serves a 404 page at /\n        # 2. It serves 200 on a /healthz endpoint\n        image: {{.IngressBackend}}\n        livenessProbe:\n          httpGet:\n            path: /healthz\n            port: 8080\n            scheme: HTTP\n          initialDelaySeconds: 30\n          timeoutSeconds: 5\n        ports:\n        - containerPort: 8080\n        resources:\n          limits:\n            cpu: 10m\n            memory: 20Mi\n          requests:\n            cpu: 10m\n            memory: 20Mi\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: default-http-backend\n  namespace: ingress-nginx\n  labels:\n    app: default-http-backend\nspec:\n  ports:\n  - port: 80\n    targetPort: 8080\n  selector:\n    app: default-http-backend\n",
    "nodelocal-v1.15": "\n{{- if eq .RBACConfig \"rbac\"}}\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: node-local-dns\n  namespace: kube-system\n  labels:\n    kubernetes.io/cluster-service: \"true\"\n    addonmanager.kubernetes.io/mode: Reconcile\n{{- end }}\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: kube-dns-upstream\n  namespace: kube-system\n  labels:\n    k8s-app: kube-dns\n    kubernetes.io/cluster-service: \"true\"\n    addonmanager.kubernetes.io/mode: Reconcile\n    kubernetes.io/name: \"KubeDNSUpstream\"\nspec:\n  ports:\n  - name: dns\n    port: 53\n    protocol: UDP\n    targetPort: 53\n  - name: dns-tcp\n    port: 53\n    protocol: TCP\n    targetPort: 53\n  selector:\n    k8s-app: kube-dns\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: node-local-dns\n  namespace: kube-system\n  labels:\n    addonmanager.kubernetes.io/mode: Reconcile\ndata:\n  Corefile: |\n    {{.ClusterDomain}}:53 {\n        errors\n        cache {\n                success 9984 30\n                denial 9984 5\n        }\n        reload\n        loop\n        bind {{.IPAddress}} {{.ClusterDNSServer}}\n        forward . __PILLAR__CLUSTER__DNS__ {\n                force_tcp\n        }\n        prometheus :9253\n        health {{.IPAddress}}:8080\n        }\n    in-addr.arpa:53 {\n        errors\n        cache 30\n        reload\n        loop\n        bind {{.IPAddress}} {{.ClusterDNSServer}}\n        forward . __PILLAR__CLUSTER__DNS__ {\n                force_tcp\n        }\n        prometheus :9253\n        }\n    ip6.arpa:53 {\n        errors\n        cache 30\n        reload\n        loop\n        bind {{.IPAddress}} {{.ClusterDNSServer}}\n        forward . __PILLAR__CLUSTER__DNS__ {\n                force_tcp\n        }\n        prometheus :9253\n        }\n    .:53 {\n        errors\n        cache 30\n        reload\n        loop\n        bind {{.IPAddress}} {{.ClusterDNSServer}}\n        forward . __PILLAR__UPSTREAM__SERVERS__ {\n                force_tcp\n        }\n        prometheus :9253\n        }\n---\napiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: node-local-dns\n  namespace: kube-system\n  labels:\n    k8s-app: node-local-dns\n    kubernetes.io/cluster-service: \"true\"\n    addonmanager.kubernetes.io/mode: Reconcile\nspec:\n  updateStrategy:\n{{if .UpdateStrategy}}\n{{ toYaml .UpdateStrategy | indent 4}}\n{{else}}\n    rollingUpdate:\n      maxUnavailable: 1\n{{end}}\n  selector:\n    matchLabels:\n      k8s-app: node-local-dns\n  template:\n    metadata:\n       labels:\n          k8s-app: node-local-dns\n    spec:\n      priorityClassName: system-node-critical\n{{- if eq .RBACConfig \"rbac\"}}\n      serviceAccountName: node-local-dns\n{{- end }}\n      affinity:\n        nodeAffinity:\n          requiredDuringSchedulingIgnoredDuringExecution:\n            nodeSelectorTerms:\n              - matchExpressions:\n                - key: beta.kubernetes.io/os\n                  operator: NotIn\n                  values:\n                    - windows\n      hostNetwork: true\n{{if .NodeSelector}}\n      nodeSelector:\n      {{ range $k, $v := .NodeSelector }}\n        {{ $k }}: \"{{ $v }}\"\n      {{ end }}\n{{end}}\n      dnsPolicy: Default  # Don't use cluster DNS.\n      tolerations:\n      - operator: Exists\n      containers:\n      - name: node-cache\n        image: {{.NodelocalImage}}\n        resources:\n          requests:\n            cpu: 25m\n            memory: 5Mi\n        args: [ \"-localip\", \"{{.IPAddress}},{{.ClusterDNSServer}}\", \"-conf\", \"/etc/Corefile\", \"-upstreamsvc\", \"kube-dns-upstream\" ]\n        securityContext:\n          privileged: true\n        ports:\n        - containerPort: 53\n          name: dns\n          protocol: UDP\n        - containerPort: 53\n          name: dns-tcp\n          protocol: TCP\n        - containerPort: 9253\n          name: metrics\n          protocol: TCP\n        livenessProbe:\n          httpGet:\n            host: {{.IPAddress}}\n            path: /health\n            port: 8080\n          initialDelaySeconds: 60\n          timeoutSeconds: 5\n        volumeMounts:\n        - mountPath: /run/xtables.lock\n          name: xtables-lock\n          readOnly: false\n        - name: config-volume\n          mountPath: /etc/coredns\n        - name: kube-dns-config\n          mountPath: /etc/kube-dns\n      volumes:\n      - name: xtables-lock\n        hostPath:\n          path: /run/xtables.lock\n          type: FileOrCreate\n      - name: kube-dns-config\n        configMap:\n          name: kube-dns\n          optional: true\n      - name: config-volume\n        configMap:\n          name: node-local-dns\n          items:\n            - key: Corefile\n              path: Corefile.base\n",
    "weave-v1.16": "\n---\n# This ConfigMap can be used to configure a self-hosted Weave Net installation.\napiVersion: v1\nkind: List\nitems:\n  - apiVersion: v1\n    kind: ServiceAccount\n    metadata:\n      name: weave-net\n      namespace: kube-system\n  - apiVersion: apps/v1\n    kind: DaemonSet\n    metadata:\n      name: weave-net\n      labels:\n        name: weave-net\n      namespace: kube-system\n    spec:\n      selector:\n        matchLabels:\n          name: weave-net\n      template:\n        metadata:\n          annotations:\n            scheduler.alpha.kubernetes.io/critical-pod: ''\n            scheduler.alpha.kubernetes.io/tolerations: \u003e-\n              [{\"key\":\"dedicated\",\"operator\":\"Equal\",\"value\":\"master\",\"effect\":\"NoSchedule\"}]\n          labels:\n            name: weave-net\n        spec:\n          affinity:\n            nodeAffinity:\n              requiredDuringSchedulingIgnoredDuringExecution:\n                nodeSelectorTerms:\n                  - matchExpressions:\n                    - key: beta.kubernetes.io/os\n                      operator: NotIn\n                      values:\n                        - windows\n{{if .NodeSelector}}\n          nodeSelector:\n            {{ range $k, $v := .NodeSelector }}\n              {{ $k }}: \"{{ $v }}\"\n            {{ end }}\n{{end}}\n          containers:\n            - name: weave\n              command:\n                - /home/weave/launch.sh\n              env:\n                - name: HOSTNAME\n                  valueFrom:\n                    fieldRef:\n                      apiVersion: v1\n                      fieldPath: spec.nodeName\n                - name: IPALLOC_RANGE\n                  value: \"{{.ClusterCIDR}}\"\n                {{- if .WeavePassword}}\n                - name: WEAVE_PASSWORD\n                  value: \"{{.WeavePassword}}\"\n                {{- end}}\n                {{- if .MTU }}\n                {{- if ne .MTU 0 }}\n                - name: WEAVE_MTU\n                  value: \"{{.MTU}}\"\n                {{- end }}\n                {{- end }}\n              image: {{.Image}}\n              readinessProbe:\n                httpGet:\n                  host: 127.0.0.1\n                  path: /status\n                  port: 6784\n                initialDelaySeconds: 30\n              resources:\n                requests:\n                  cpu: 10m\n              securityContext:\n                privileged: true\n              volumeMounts:\n                - name: weavedb\n                  mountPath: /weavedb\n                - name: cni-bin\n                  mountPath: /host/opt\n                - name: cni-bin2\n                  mountPath: /host/home\n                - name: cni-conf\n                  mountPath: /host/etc\n                - name: dbus\n                  mountPath: /host/var/lib/dbus\n                - name: lib-modules\n                  mountPath: /lib/modules\n                - name: xtables-lock\n                  mountPath: /run/xtables.lock\n            - name: weave-npc\n              env:\n                - name: HOSTNAME\n                  valueFrom:\n                    fieldRef:\n                      apiVersion: v1\n                      fieldPath: spec.nodeName\n              image: {{.CNIImage}}\n              resources:\n                requests:\n                  cpu: 10m\n              securityContext:\n                privileged: true\n              volumeMounts:\n                - name: xtables-lock\n                  mountPath: /run/xtables.lock\n            - name: weave-plugins\n              command:\n                - /opt/rke-tools/weave-plugins-cni.sh\n              image: {{.WeaveLoopbackImage}}\n              securityContext:\n                privileged: true\n              volumeMounts:\n                - name: cni-bin\n                  mountPath: /opt\n          hostNetwork: true\n          hostPID: true\n          restartPolicy: Always\n          securityContext:\n            seLinuxOptions: {}\n          serviceAccountName: weave-net\n          tolerations:\n          - operator: Exists\n            effect: NoSchedule\n          - operator: Exists\n            effect: NoExecute\n          volumes:\n            - name: weavedb\n              hostPath:\n                path: /var/lib/weave\n            - name: cni-bin\n              hostPath:\n                path: /opt\n            - name: cni-bin2\n              hostPath:\n                path: /home\n            - name: cni-conf\n              hostPath:\n                path: /etc\n            - name: dbus\n              hostPath:\n                path: /var/lib/dbus\n            - name: lib-modules\n              hostPath:\n                path: /lib/modules\n            - name: xtables-lock\n              hostPath:\n                path: /run/xtables.lock\n      updateStrategy:\n{{if .UpdateStrategy}}\n{{ toYaml .UpdateStrategy | indent 8}}\n{{end}}\n        type: RollingUpdate\n{{- if eq .RBACConfig \"rbac\"}}\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: weave-net\n  labels:\n    name: weave-net\n  namespace: kube-system\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRole\nmetadata:\n  name: weave-net\n  labels:\n    name: weave-net\nrules:\n  - apiGroups:\n      - ''\n    resources:\n      - pods\n      - namespaces\n      - nodes\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - networking.k8s.io\n    resources:\n      - networkpolicies\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - ''\n    resources:\n      - nodes/status\n    verbs:\n      - patch\n      - update\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: ClusterRoleBinding\nmetadata:\n  name: weave-net\n  labels:\n    name: weave-net\nroleRef:\n  kind: ClusterRole\n  name: weave-net\n  apiGroup: rbac.authorization.k8s.io\nsubjects:\n  - kind: ServiceAccount\n    name: weave-net\n    namespace: kube-system\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: Role\nmetadata:\n  name: weave-net\n  labels:\n    name: weave-net\n  namespace: kube-system\nrules:\n  - apiGroups:\n      - ''\n    resourceNames:\n      - weave-net\n    resources:\n      - configmaps\n    verbs:\n      - get\n      - update\n  - apiGroups:\n      - ''\n    resources:\n      - configmaps\n    verbs:\n      - create\n---\napiVersion: rbac.authorization.k8s.io/v1beta1\nkind: RoleBinding\nmetadata:\n  name: weave-net\n  labels:\n    name: weave-net\n  namespace: kube-system\nroleRef:\n  kind: Role\n  name: weave-net\n  apiGroup: rbac.authorization.k8s.io\nsubjects:\n  - kind: ServiceAccount\n    name: weave-net\n    namespace: kube-system\n{{- end}}\n",
@@ -4461,9 +4665,17 @@
    "minRKEVersion": "1.0.7",
    "minRancherVersion": "2.3.7"
   },
+  "v1.15.12-rancher1-2": {
+   "minRKEVersion": "1.0.7",
+   "minRancherVersion": "2.3.7"
+  },
   "v1.15.5-rancher1-1": {
    "maxRKEVersion": "0.2.8",
    "maxRancherVersion": "2.2.9"
+  },
+  "v1.16.10-rancher1-1": {
+   "minRKEVersion": "1.0.7",
+   "minRancherVersion": "2.3.7"
   },
   "v1.16.8-rancher1-1": {
    "minRKEVersion": "1.0.0",
@@ -4488,6 +4700,14 @@
   "v1.17.5-rancher1-1": {
    "minRKEVersion": "1.0.7",
    "minRancherVersion": "2.3.7-rc0"
+  },
+  "v1.17.6-rancher1-1": {
+   "minRKEVersion": "1.0.7",
+   "minRancherVersion": "2.3.7"
+  },
+  "v1.18.3-rancher1-1": {
+   "minRKEVersion": "1.1.1-rc99",
+   "minRancherVersion": "2.4.4-rc0"
   },
   "v1.8": {
    "maxRKEVersion": "0.2.2",
@@ -4516,11 +4736,12 @@
   "2.3.1": "v1.15.x",
   "2.3.2": "v1.15.x",
   "2.3.3": "v1.16.x",
+  "2.4.4": "v1.18.x",
   "default": "v1.17.x"
  },
  "RKEDefaultK8sVersions": {
   "0.3": "v1.16.3-rancher1-1",
-  "default": "v1.17.5-rancher1-1"
+  "default": "v1.18.3-rancher1-1"
  },
  "K8sVersionDockerInfo": {
   "1.10": [
@@ -4591,6 +4812,15 @@
    "19.03.x"
   ],
   "1.17": [
+   "1.13.x",
+   "17.03.x",
+   "17.06.x",
+   "17.09.x",
+   "18.06.x",
+   "18.09.x",
+   "19.03.x"
+  ],
+  "1.18": [
    "1.13.x",
    "17.03.x",
    "17.06.x",
@@ -4691,6 +4921,43 @@
    "scheduler": null
   },
   "v1.17": {
+   "etcd": null,
+   "kubeapi": null,
+   "kubelet": {
+    "address": "0.0.0.0",
+    "anonymous-auth": "false",
+    "authentication-token-webhook": "true",
+    "authorization-mode": "Webhook",
+    "cert-dir": "[PREFIX_PATH]/var/lib/kubelet/pki",
+    "cgroups-per-qos": "false",
+    "cni-bin-dir": "[PREFIX_PATH]/opt/cni/bin",
+    "cni-conf-dir": "[PREFIX_PATH]/etc/cni/net.d",
+    "enforce-node-allocatable": "''",
+    "event-qps": "0",
+    "feature-gates": "HyperVContainer=true,WindowsGMSA=true",
+    "image-pull-progress-deadline": "30m",
+    "kube-reserved": "cpu=500m,memory=500Mi,ephemeral-storage=1Gi",
+    "make-iptables-util-chains": "true",
+    "network-plugin": "cni",
+    "read-only-port": "0",
+    "resolv-conf": "''",
+    "streaming-connection-idle-timeout": "30m",
+    "system-reserved": "cpu=1000m,memory=2Gi,ephemeral-storage=2Gi",
+    "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+    "v": "2",
+    "volume-plugin-dir": "[PREFIX_PATH]/var/lib/kubelet/volumeplugins"
+   },
+   "kubeproxy": {
+    "enable-dsr": "false",
+    "feature-gates": "WinOverlay=true",
+    "healthz-bind-address": "127.0.0.1",
+    "proxy-mode": "kernelspace",
+    "v": "2"
+   },
+   "kubeController": null,
+   "scheduler": null
+  },
+  "v1.18": {
    "etcd": null,
    "kubeapi": null,
    "kubelet": {
@@ -4846,9 +5113,14 @@
  "k3s": {
   "releases": [
    {
-    "maxChannelServerVersion": "v2.4.99",
+    "maxChannelServerVersion": "v2.4.2",
     "minChannelServerVersion": "v2.4.0-rc1",
     "version": "v1.17.4+k3s1"
+   },
+   {
+    "maxChannelServerVersion": "v2.4.99",
+    "minChannelServerVersion": "v2.4.3-rc1",
+    "version": "v1.17.5+k3s1"
    }
   ]
  }
