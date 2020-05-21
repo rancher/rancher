@@ -323,6 +323,17 @@ func (c *Cluster) setClusterServicesDefaults() {
 		}
 
 	}
+
+	enableEncryptionByDefault, err := checkVersionNeedsEncryptionDefault(c.Version)
+	if err != nil {
+		logrus.Warnf("Cannot determine if cluster version [%s] needs to have encryption enabled by default: %v", c.Version, err)
+	}
+	if enableEncryptionByDefault && c.Services.KubeAPI.SecretsEncryptionConfig == nil {
+		logrus.Debugf("Enabling encryption of secret data at rest by default for cluster version [%s]", c.Version)
+		c.Services.KubeAPI.SecretsEncryptionConfig = &v3.SecretsEncryptionConfig{
+			Enabled: true,
+		}
+	}
 	if c.Services.KubeAPI.AuditLog != nil &&
 		c.Services.KubeAPI.AuditLog.Enabled {
 		if c.Services.KubeAPI.AuditLog.Configuration == nil {
@@ -711,5 +722,24 @@ func checkVersionNeedsKubeAPIAuditLog(k8sVersion string) (bool, error) {
 		return true, nil
 	}
 	logrus.Debugf("Cluster version [%s] does not need to have kube-api audit log enabled", k8sVersion[1:])
+	return false, nil
+}
+
+func checkVersionNeedsEncryptionDefault(k8sVersion string) (bool, error) {
+	toMatch, err := semver.Make(k8sVersion[1:])
+	if err != nil {
+		return false, fmt.Errorf("Cluster version [%s] can not be parsed as semver", k8sVersion[1:])
+	}
+	logrus.Debugf("Checking if cluster version [%s] needs to have encryption enabled by default", k8sVersion[1:])
+	// encryption turned on by default in k8s 1.18.0 and up
+	clusterDefaultEncryptionRange, err := semver.ParseRange(">=1.18.0-rancher0")
+	if err != nil {
+		return false, errors.New("Failed to parse semver range while checking if encryption is enabled by default")
+	}
+	if clusterDefaultEncryptionRange(toMatch) {
+		logrus.Debugf("Cluster version [%s] needs to have encryption enabled by default", k8sVersion[1:])
+		return true, nil
+	}
+	logrus.Debugf("Cluster version [%s] does not need to have encryption enabled by default", k8sVersion[1:])
 	return false, nil
 }
