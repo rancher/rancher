@@ -60,6 +60,7 @@ var (
 	UIFeedBackForm                    = NewSetting("ui-feedback-form", "")
 	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest-2.4/index.html")
 	UIPath                            = NewSetting("ui-path", "")
+	UIIssues                          = NewSetting("ui-issues", "")
 	UIPL                              = NewSetting("ui-pl", "rancher")
 	UIKubernetesSupportedVersions     = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
 	UIKubernetesDefaultVersion        = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
