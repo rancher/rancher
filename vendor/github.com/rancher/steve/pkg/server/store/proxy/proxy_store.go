@@ -462,6 +462,7 @@ func (s *Store) Update(apiOp *types.APIRequest, schema *types.APISchema, params 
 		return types.APIObject{}, err
 	}
 
+	rowToObject(resp)
 	return toAPI(schema, resp), nil
 }
 
