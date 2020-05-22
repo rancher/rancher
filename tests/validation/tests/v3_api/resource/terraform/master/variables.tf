@@ -1,3 +1,4 @@
+variable "db" {}
 variable "aws_ami" {}
 variable "aws_user" {}
 variable "region" {}

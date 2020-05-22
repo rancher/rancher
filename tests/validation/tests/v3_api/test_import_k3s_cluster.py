@@ -25,14 +25,15 @@ RANCHER_K3S_WORKER_FLAGS = os.environ.get("RANCHER_K3S_WORKER_FLAGS", "agent")
 RANCHER_QA_SPACE = os.environ.get("RANCHER_QA_SPACE", "")
 RANCHER_EC2_INSTANCE_CLASS = os.environ.get("RANCHER_EC2_INSTANCE_CLASS", "t2.medium")
 
-RANCHER_EXTERNAL_DB = os.environ.get("RANCHER_EXTERNAL_DB", "mysql")
-RANCHER_EXTERNAL_DB_VERSION = os.environ.get("RANCHER_EXTERNAL_DB_VERSION", "5.7")
+RANCHER_EXTERNAL_DB = os.environ.get("RANCHER_EXTERNAL_DB")
+RANCHER_EXTERNAL_DB_VERSION = os.environ.get("RANCHER_EXTERNAL_DB_VERSION")
+RANCHER_DB_GROUP_NAME = os.environ.get("RANCHER_DB_GROUP_NAME")
+
 RANCHER_INSTANCE_CLASS = os.environ.get("RANCHER_INSTANCE_CLASS", "db.t2.micro")
-RANCHER_DB_GROUP_NAME = os.environ.get("RANCHER_DB_GROUP_NAME", "default.mysql5.7")
 RANCHER_DB_USERNAME = os.environ.get("RANCHER_DB_USERNAME", "")
 RANCHER_DB_PASSWORD = os.environ.get("RANCHER_DB_PASSWORD", "")
 RANCHER_K3S_KUBECONFIG_PATH = DATA_SUBDIR + "/k3s_kubeconfig.yaml"
-
+RANCHER_DB_TYPE = os.environ.get("RANCHER_DB_TYPE")
 
 def test_create_k3s_single_control_cluster():
     aws_nodes, client, k3s_clusterfilepath = create_single_control_cluster()
@@ -91,6 +92,8 @@ def create_single_control_cluster():
 
 
 def create_multiple_control_cluster():
+    global RANCHER_EXTERNAL_DB_VERSION 
+    global RANCHER_DB_GROUP_NAME
     k3s_kubeconfig_file = "k3s_kubeconfig.yaml"
     k3s_clusterfilepath = DATA_SUBDIR + "/" + k3s_kubeconfig_file
 
@@ -99,6 +102,19 @@ def create_multiple_control_cluster():
     os.chmod(keyPath, 0o400)
     no_of_servers = int(RANCHER_K3S_NO_OF_SERVER_NODES)
     no_of_servers = no_of_servers - 1
+
+    if RANCHER_EXTERNAL_DB == "MariaDB":
+        RANCHER_DB_TYPE = "mysql"
+        RANCHER_EXTERNAL_DB_VERSION = "10.3.20" if not RANCHER_EXTERNAL_DB_VERSION else RANCHER_EXTERNAL_DB_VERSION
+        RANCHER_DB_GROUP_NAME = "default.mariadb10.3" if not RANCHER_DB_GROUP_NAME else RANCHER_DB_GROUP_NAME
+    elif RANCHER_EXTERNAL_DB == "postgres":
+        RANCHER_DB_TYPE = "postgres"
+        RANCHER_EXTERNAL_DB_VERSION = "11.5" if not RANCHER_EXTERNAL_DB_VERSION else RANCHER_EXTERNAL_DB_VERSION
+        RANCHER_DB_GROUP_NAME = "default.postgres11" if not RANCHER_DB_GROUP_NAME else RANCHER_DB_GROUP_NAME
+    else:
+        RANCHER_DB_TYPE = "mysql"
+        RANCHER_EXTERNAL_DB_VERSION = "5.7" if not RANCHER_EXTERNAL_DB_VERSION else RANCHER_EXTERNAL_DB_VERSION
+        RANCHER_DB_GROUP_NAME = "default.mysql5.7" if not RANCHER_DB_GROUP_NAME else RANCHER_DB_GROUP_NAME
 
     tf = Terraform(working_dir=tf_dir,
                    variables={'region': RANCHER_REGION,
@@ -118,7 +134,8 @@ def create_multiple_control_cluster():
                               'k3s_version': RANCHER_K3S_VERSION,
                               'no_of_server_nodes': no_of_servers,
                               'server_flags': RANCHER_K3S_SERVER_FLAGS,
-                              'qa_space': RANCHER_QA_SPACE})
+                              'qa_space': RANCHER_QA_SPACE,
+                              'db': RANCHER_DB_TYPE})
     print("Creating cluster")
     tf.init()
     print(tf.plan(out="plan_server.out"))
