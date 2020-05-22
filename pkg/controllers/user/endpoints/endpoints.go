@@ -305,6 +305,9 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 		if rule.Host == ipDomain {
 			continue
 		}
+		if rule.HTTP == nil {
+			continue
+		}
 		for _, path := range rule.HTTP.Paths {
 			for port, proto := range ports {
 				if port == 80 {
