@@ -1,4 +1,4 @@
-resource "aws_db_instance" "mydb" {
+resource "aws_db_instance" "db" {
   identifier = "${var.resource_name}-multinode-db"
   allocated_storage    = 20
   storage_type         = "gp2"
@@ -30,7 +30,7 @@ resource "aws_instance" "master" {
   }
   provisioner "remote-exec" {
     inline = [
-              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='mysql://${aws_db_instance.mydb.username}:${aws_db_instance.mydb.password}@tcp(${aws_db_instance.mydb.endpoint})/${aws_db_instance.mydb.name}'",
+              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='${data.template_file.test.rendered}'",
               "sudo cat /var/lib/rancher/k3s/server/node-token >/tmp/multinode_nodetoken",
               "sudo cat /etc/rancher/k3s/k3s.yaml >/tmp/multinode_kubeconfig",
     ]
@@ -62,9 +62,13 @@ resource "aws_instance" "master2-ha" {
   }
   provisioner "remote-exec" {
     inline = [
-              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='mysql://${aws_db_instance.mydb.username}:${aws_db_instance.mydb.password}@tcp(${aws_db_instance.mydb.endpoint})/${aws_db_instance.mydb.name}'",
+              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='${data.template_file.test.rendered}'",
     ]
   }
+}
+
+data "template_file" "test" {
+  template = (var.db == "mysql" ? "mysql://${aws_db_instance.db.username}:${aws_db_instance.db.password}@tcp(${aws_db_instance.db.endpoint})/${aws_db_instance.db.name}": "postgres://${aws_db_instance.db.username}:${aws_db_instance.db.password}@${aws_db_instance.db.endpoint}/${aws_db_instance.db.name}")
 }
 
 resource "aws_lb_target_group" "aws_tg_80" {
@@ -227,19 +231,19 @@ output "Route53_info" {
 }
 
 output "db_instance_name" {
-  value = "${aws_db_instance.mydb.name}"
+  value = "${aws_db_instance.db.name}"
 }
 
 output "db_instance_username" {
-  value = "${aws_db_instance.mydb.username}"
+  value = "${aws_db_instance.db.username}"
 }
 
 output "db_instance_password" {
-  value = "${aws_db_instance.mydb.password}"
+  value = "${aws_db_instance.db.password}"
 }
 
 output "rds_instance_endpoint" {
-  value = "${aws_db_instance.mydb.endpoint}"
+  value = "${aws_db_instance.db.endpoint}"
 }
 
 output "hostnames" {
