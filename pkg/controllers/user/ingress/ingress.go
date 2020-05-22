@@ -97,6 +97,9 @@ func generateExpectedServices(state map[string]string, obj *v1beta1.Ingress) (ma
 	rtn := map[string]ingressService{}
 	for _, r := range obj.Spec.Rules {
 		host := r.Host
+		if r.HTTP == nil {
+			continue
+		}
 		for _, b := range r.HTTP.Paths {
 			key := GetStateKey(obj.Name, obj.Namespace, host, b.Path, convert.ToString(b.Backend.ServicePort.IntVal))
 			if workloadIDs, ok := state[key]; ok {
