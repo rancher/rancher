@@ -10063,6 +10063,7 @@ func (in *UserAttribute) DeepCopyInto(out *UserAttribute) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.UserPrincipal.DeepCopyInto(&out.UserPrincipal)
 	if in.GroupPrincipals != nil {
 		in, out := &in.GroupPrincipals, &out.GroupPrincipals
 		*out = make(map[string]Principals, len(*in))
