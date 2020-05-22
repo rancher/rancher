@@ -70,6 +70,7 @@ def test_destination_rule(admin_pc):
 # and our types were passing multiple options which failed.
 # This test ensures you can pass a single option.
 # See: https://github.com/rancher/rancher/issues/25515
+@pytest.mark.nonparallel
 def test_destination_rule_on_cookie(admin_pc, remove_resource):
     client = admin_pc.client
     ns = admin_pc.cluster.client.create_namespace(
