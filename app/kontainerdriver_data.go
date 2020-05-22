@@ -69,8 +69,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"tencentkubernetesengine",
-		"https://drivers.rancher.cn/kontainer-engine-driver-tencent/0.2.3/kontainer-engine-driver-tencent-linux",
-		"144f785473290ee2f63cf35da0c6bde12bc307878078500a47a0a8d04422ae53",
+		"https://drivers.rancher.cn/kontainer-engine-driver-tencent/0.3.0/kontainer-engine-driver-tencent-linux",
+		"ad5406502daf826874889963d7bdaed78db4689f147889ecf97394bc4e8d3d76",
 		"",
 		false,
 		"*.tencentcloudapi.com", "*.qcloud.com",
