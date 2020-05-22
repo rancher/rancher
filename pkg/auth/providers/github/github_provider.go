@@ -377,6 +377,11 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token *v3.T
 		if token != nil {
 			princ.Me = g.isThisUserMe(token.UserPrincipal, princ)
 		}
+		princ.ExtraInfo = map[string]string{
+			"Email":    acct.Email,
+			"Company":  acct.Company,
+			"Location": acct.Location,
+		}
 	} else {
 		princ.PrincipalType = "group"
 		if token != nil {
