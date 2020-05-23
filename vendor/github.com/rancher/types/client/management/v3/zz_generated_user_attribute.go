@@ -14,6 +14,7 @@ const (
 	UserAttributeFieldRemoved         = "removed"
 	UserAttributeFieldUUID            = "uuid"
 	UserAttributeFieldUserName        = "userName"
+	UserAttributeFieldUserPrincipal   = "userPrincipal"
 )
 
 type UserAttribute struct {
@@ -29,4 +30,5 @@ type UserAttribute struct {
 	Removed         string               `json:"removed,omitempty" yaml:"removed,omitempty"`
 	UUID            string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserName        string               `json:"userName,omitempty" yaml:"userName,omitempty"`
+	UserPrincipal   *Principal           `json:"userPrincipal,omitempty" yaml:"userPrincipal,omitempty"`
 }
