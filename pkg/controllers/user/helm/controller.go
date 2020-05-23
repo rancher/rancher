@@ -237,12 +237,12 @@ func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 		}
 	}
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
-		template, notes, tempDirs, err := l.generateTemplates(obj)
+		template, tempDirs, err := l.generateTemplates(obj)
 		if err != nil {
 			return obj, err
 		}
 		defer os.RemoveAll(tempDirs.FullPath)
-		if err := l.Run(obj, template, notes, tempDirs); err != nil {
+		if err := l.Run(obj, template, tempDirs); err != nil {
 			return obj, err
 		}
 		return obj, nil
@@ -316,12 +316,13 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Run(obj *v3.App, template, notes string, tempDirs *hCommon.HelmPath) error {
+func (l *Lifecycle) Run(obj *v3.App, template string, tempDirs *hCommon.HelmPath) error {
 	err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, false)
 	if err != nil {
 		return err
 	}
-	if err := helmInstall(tempDirs, obj); err != nil {
+	notes, err := helmInstall(tempDirs, obj)
+	if err != nil {
 		// create an app revision so that user can decide to continue
 		err2 := l.createAppRevision(obj, template, notes, true)
 		if err2 != nil {

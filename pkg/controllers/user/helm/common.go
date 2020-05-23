@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
@@ -54,7 +55,7 @@ func getAppSubDir(files map[string]string) string {
 	return appSubDir
 }
 
-func helmInstall(tempDirs *common.HelmPath, app *v3.App) error {
+func helmInstall(tempDirs *common.HelmPath, app *v3.App) (string, error) {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
@@ -66,7 +67,11 @@ func helmInstall(tempDirs *common.HelmPath, app *v3.App) error {
 			}
 		}()
 	}
-	return common.InstallCharts(tempDirs, addr, app)
+	err := common.InstallCharts(tempDirs, addr, app)
+	if err != nil {
+		return "", err
+	}
+	return renderNotes(app, tempDirs, addr)
 }
 
 func helmDelete(tempDirs *common.HelmPath, app *v3.App) error {
@@ -84,44 +89,44 @@ func helmDelete(tempDirs *common.HelmPath, app *v3.App) error {
 	return common.DeleteCharts(tempDirs, addr, app)
 }
 
-func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.HelmPath, error) {
+func (l *Lifecycle) generateTemplates(obj *v3.App) (string, *common.HelmPath, error) {
 	var appSubDir string
 	files := map[string]string{}
 	if obj.Spec.ExternalID != "" {
 		templateVersionID, templateVersionNamespace, err := common.ParseExternalID(obj.Spec.ExternalID)
 		if err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		}
 
 		templateVersion, err := l.TemplateVersionClient.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{})
 		if err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		}
 
 		namespace, catalogName, catalogType, _, _, err := common.SplitExternalID(templateVersion.Spec.ExternalID)
 		if err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		}
 		catalog, err := helmlib.GetCatalog(catalogType, namespace, catalogName, l.CatalogLister, l.ClusterCatalogLister, l.ProjectCatalogLister)
 		if err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		}
 
 		helm, err := helmlib.New(catalog)
 		if err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		}
 
 		files, err = helm.LoadChart(&templateVersion.Spec, nil)
 		if err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		}
 		appSubDir = templateVersion.Spec.VersionName
 	} else {
 		for k, v := range obj.Spec.Files {
 			content, err := base64.StdEncoding.DecodeString(v)
 			if err != nil {
-				return "", "", nil, err
+				return "", nil, err
 			}
 			files[k] = string(content)
 		}
@@ -130,10 +135,10 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.Helm
 
 	tempDir, err := createTempDir(obj)
 	if err != nil {
-		return "", "", nil, err
+		return "", nil, err
 	}
 	if err := writeTempDir(tempDir.FullPath, files); err != nil {
-		return "", "", nil, err
+		return "", nil, err
 	}
 
 	appDir := filepath.Join(tempDir.InJailPath, appSubDir)
@@ -143,7 +148,7 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.Helm
 	extraArgs := common.GetExtraArgs(obj)
 	setValues, err := common.GenerateAnswerSetValues(obj, tempDir, extraArgs)
 	if err != nil {
-		return "", "", nil, err
+		return "", nil, err
 	}
 
 	var commands []string
@@ -151,7 +156,7 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.Helm
 	if common.IsHelm3(obj.Status.HelmVersion) {
 		err = l.writeKubeConfig(obj, tempDir.KubeConfigFull, false)
 		if err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		}
 		commands = append([]string{"template", obj.Name, "--include-crds", appDir, "--namespace", obj.Spec.TargetNamespace, "--kubeconfig", tempDir.KubeConfigInJail}, setValues...)
 		cmd = exec.Command(common.HelmV3, commands...)
@@ -165,49 +170,17 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.Helm
 	cmd.Stderr = sbErr
 	cmd, err = common.JailCommand(cmd, tempDir.FullPath)
 	if err != nil {
-		return "", "", nil, err
+		return "", nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		return "", "", nil, errors.Wrapf(err, "start helm template failed. %s", sbErr.String())
+		return "", nil, errors.Wrapf(err, "start helm template failed. %s", sbErr.String())
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", nil, errors.Wrapf(err, "wait helm template failed. %s", sbErr.String())
+		return "", nil, errors.Wrapf(err, "wait helm template failed. %s", sbErr.String())
 	}
 
-	// notes.txt
-	// do not log --dry-run for helm 3 as it can contain sensitive information
-	if common.IsHelm3(obj.Status.HelmVersion) {
-		commands = append([]string{"upgrade", "--install", obj.Name, appDir, "--dry-run", "--namespace", obj.Spec.TargetNamespace, "--kubeconfig", tempDir.KubeConfigInJail}, setValues...)
-		cmd = exec.Command(common.HelmV3, commands...)
-	} else {
-		commands = append([]string{"template", appDir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}, setValues...)
-		cmd = exec.Command(common.HelmV2, commands...)
-	}
-	noteOut := &bytes.Buffer{}
-	sbErr = &bytes.Buffer{}
-	cmd.Stdout = noteOut
-	cmd.Stderr = sbErr
-	cmd, err = common.JailCommand(cmd, tempDir.FullPath)
-	if err != nil {
-		return "", "", nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return "", "", nil, errors.Wrapf(err, "start helm template rendering notes failed. %s", sbErr.String())
-	}
-	if err := cmd.Wait(); err != nil {
-		return "", "", nil, errors.Wrapf(err, "wait helm template rendering notes failed. %s", sbErr.String())
-	}
 	template := sbOut.String()
-	notes := noteOut.String()
-	if common.IsHelm3(obj.Status.HelmVersion) {
-		splitNotes := strings.SplitAfter(notes, "NOTES:")
-		if len(splitNotes) > 1 {
-			notes = splitNotes[1]
-		} else {
-			notes = ""
-		}
-	}
-	return template, notes, tempDir, nil
+	return template, tempDir, nil
 }
 
 func createTempDir(obj *v3.App) (*common.HelmPath, error) {
@@ -243,4 +216,34 @@ func createTempDir(obj *v3.App) (*common.HelmPath, error) {
 	}
 
 	return paths, nil
+}
+
+func renderNotes(obj *v3.App, tempDirs *common.HelmPath, port string) (string, error) {
+	var cmd *exec.Cmd
+	if common.IsHelm3(obj.Status.HelmVersion) {
+		commands := append([]string{"get", "notes", obj.Name, "-n", obj.Spec.TargetNamespace, "--kubeconfig", tempDirs.KubeConfigInJail})
+		cmd = exec.Command(common.HelmV3, commands...)
+	} else {
+		// helm get requires tiller to be running
+		commands := append([]string{"get", "notes", obj.Name})
+		cmd = exec.Command(common.HelmV2, commands...)
+		cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
+	}
+	noteOut := &bytes.Buffer{}
+	sbErr := &bytes.Buffer{}
+	cmd.Stdout = noteOut
+	cmd.Stderr = sbErr
+	var err error
+	cmd, err = common.JailCommand(cmd, tempDirs.FullPath)
+	if err != nil {
+		return "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", errors.Wrapf(err, "start helm get notes failed. %s", sbErr.String())
+	}
+	if err := cmd.Wait(); err != nil {
+		return "", errors.Wrapf(err, "wait helm get notes failed. %s", sbErr.String())
+	}
+	notes := noteOut.String()
+	return notes, nil
 }
