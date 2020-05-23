@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"sort"
 	"time"
 
@@ -560,6 +561,7 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 			},
 		},
 		GroupPrincipals: map[string]v3.Principals{},
+		UserPrincipal:   v3.Principal{},
 		LastRefresh:     "",
 		NeedsRefresh:    false,
 	}
@@ -567,14 +569,14 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 	return attribs, true, nil
 }
 
-func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal) error {
+func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, userPrincipal v3.Principal, groupPrincipals []v3.Principal) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
 	}
 
 	if needCreate {
-		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+		updateAttribs(attribs, provider, userPrincipal, groupPrincipals)
 		_, err := m.userAttributes.Create(attribs)
 		if err != nil {
 			return err
@@ -583,8 +585,8 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	}
 
 	// Exists, just update if necessary
-	if m.UserAttributeChanged(attribs, provider, groupPrincipals) {
-		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+	if m.UserAttributeChanged(attribs, provider, userPrincipal, groupPrincipals) {
+		updateAttribs(attribs, provider, userPrincipal, groupPrincipals)
 		_, err := m.userAttributes.Update(attribs)
 		if err != nil {
 			return err
@@ -594,7 +596,13 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	return nil
 }
 
-func (m *Manager) UserAttributeChanged(attribs *v3.UserAttribute, provider string, groupPrincipals []v3.Principal) bool {
+func updateAttribs(attribs *v3.UserAttribute, provider string, userPrincipal v3.Principal, groupPrincipals []v3.Principal) {
+	attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+	attribs.UserPrincipal = userPrincipal
+	attribs.UserName = userPrincipal.DisplayName
+}
+
+func (m *Manager) UserAttributeChanged(attribs *v3.UserAttribute, provider string, userPrincipal v3.Principal, groupPrincipals []v3.Principal) bool {
 	oldSet := []string{}
 	newSet := []string{}
 	for _, principal := range attribs.GroupPrincipals[provider].Items {
@@ -615,7 +623,12 @@ func (m *Manager) UserAttributeChanged(attribs *v3.UserAttribute, provider strin
 			return true
 		}
 	}
-
+	if !reflect.DeepEqual(attribs.UserPrincipal, userPrincipal) {
+		return true
+	}
+	if attribs.UserName != userPrincipal.DisplayName {
+		return true
+	}
 	return false
 }
 
@@ -636,7 +649,7 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 	}
 
 	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
-		err := m.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals)
+		err := m.UserAttributeCreateOrUpdate(userID, provider, userPrincipal, groupPrincipals)
 		if err != nil {
 			logrus.Warnf("Problem creating or updating userAttribute for %v: %v", userID, err)
 		}

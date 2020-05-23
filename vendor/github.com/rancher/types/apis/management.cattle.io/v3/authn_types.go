@@ -80,6 +80,7 @@ type UserAttribute struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	UserName        string
+	UserPrincipal   Principal
 	GroupPrincipals map[string]Principals // the value is a []Principal, but code generator cannot handle slice as a value
 	LastRefresh     string
 	NeedsRefresh    bool
