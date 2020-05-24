@@ -150,6 +150,7 @@ func (c *Collection) startStopTemplate(schemas map[string]*types.APISchema) {
 
 		subCtx, cancel := context.WithCancel(c.ctx)
 		if err := template.Start(subCtx); err != nil {
+			cancel()
 			logrus.Errorf("failed to start schema template: %s", id)
 			continue
 		}
