@@ -60,7 +60,6 @@ def test_deploy_rke():
         env_details += cluster.name
         print("Successfully deployed {} with kubernetes version {}".format(
             cluster.name, k8s_version))
-    create_config_file(env_details)
 
 
 @if_not_auto_deploy_eks
@@ -162,4 +161,7 @@ def set_data(request):
     def fin():
         global env_details
         env_details += "'"
+        print("\n{}".format(env_details))
+        create_config_file(env_details)
+
     request.addfinalizer(fin)
