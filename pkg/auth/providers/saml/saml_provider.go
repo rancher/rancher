@@ -103,7 +103,7 @@ func (s *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	return v3.Principal{}, nil, "", fmt.Errorf("SAML providers do not implement Authenticate User API")
 }
 
-func PerformSamlLogin(name string, apiContext *types.APIContext, input interface{}) error {
+func PerformSamlLogin(name string, apiContext *types.APIContext, input interface{}, responseType string) error {
 	//input will contain the FINAL redirect URL
 	login, ok := input.(*v3public.SamlLoginInput)
 	if !ok {
@@ -114,6 +114,11 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 	if provider, ok := SamlProviders[name]; ok {
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_Action", loginAction)
+		//logrus.Infof("header value: %s", apiContext.Request.Header.Get("Rancher-Token"))
+		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_ConnToken", "testhello")
+		if responseType == "kubeconfig" {
+			provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_ResponseType", "kubeconfig")
+		}
 		idpRedirectURL, err := provider.HandleSamlLogin(apiContext.Response, apiContext.Request)
 		if err != nil {
 			return err
@@ -122,8 +127,10 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 			"idpRedirectUrl": idpRedirectURL,
 			"type":           "samlLoginOutput",
 		}
-
 		apiContext.WriteResponse(http.StatusOK, data)
+		//logrus.Infof("redirecting to %s", finalRedirectURL)
+		//http.Redirect(apiContext.Response, apiContext.Request, finalRedirectURL, http.StatusOK)
+
 		return nil
 	}
 

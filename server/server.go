@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	webhook2 "github.com/rancher/rancher/pkg/auth/webhook"
 	"github.com/rancher/rancher/pkg/channelserver"
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/httpproxy"
@@ -83,6 +84,8 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 
 	websocketHandler := websocket.NewWebsocketHandler(authedHandler)
 
+	kubeConfigTokenHandler := cluster.KubeConfigTokenHander(ctx, scaledContext)
+
 	auditHandler := audit.NewAuditLogFilter(ctx, auditLogWriter, websocketHandler)
 
 	webhookHandler := hooks.New(scaledContext)
@@ -106,6 +109,7 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 	root.Handle("/v3/settings/ui-issues", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/tokenreview", tokenReview).Methods(http.MethodPost)
 	root.PathPrefix("/metrics").Handler(metricsHandler)
+	root.PathPrefix("/kubeconfig-token").Handler(kubeConfigTokenHandler)
 	root.PathPrefix("/v3").Handler(chainGzip.Handler(auditHandler))
 	root.PathPrefix("/hooks").Handler(webhookHandler)
 	root.PathPrefix("/k8s/clusters/").Handler(auditHandler)

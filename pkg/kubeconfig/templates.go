@@ -18,7 +18,16 @@ clusters:
 users:
 - name: "{{.User}}"
   user:
-    token: "{{.Token}}"
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+        - token
+        - --server={{.Host}}
+        - --user={{.User}}
+{{- if .EndpointEnabled }}
+        - --cluster={{.ClusterID}}
+{{- end }}
+      command: ./cli
 
 contexts:
 {{- range .Nodes}}

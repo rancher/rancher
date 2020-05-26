@@ -26,12 +26,14 @@ type websocketHandler struct {
 }
 
 func (h websocketHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	//logrus.Infof("serveHTTP websocket %s", req.URL)
 	if isWebsocket(req) && isBrowserUserAgent(req.Header) {
 		if !checkSameOrigin(req) {
 			response(rw, httperror.PermissionDenied, "origin not allowed")
 			return
 		}
 	}
+	//logrus.Infof("going to next serveHTTP?")
 	h.next.ServeHTTP(rw, req)
 }
 
