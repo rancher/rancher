@@ -17,6 +17,6 @@ type SMTPConfig struct {
 	Password         string `json:"password,omitempty" yaml:"password,omitempty"`
 	Port             int64  `json:"port,omitempty" yaml:"port,omitempty"`
 	Sender           string `json:"sender,omitempty" yaml:"sender,omitempty"`
-	TLS              bool   `json:"tls,omitempty" yaml:"tls,omitempty"`
+	TLS              *bool  `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Username         string `json:"username,omitempty" yaml:"username,omitempty"`
 }

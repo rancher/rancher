@@ -628,7 +628,7 @@ func parseNodeDrainInput(clusterFile string, rkeConfig *v3.RancherKubernetesEngi
 	var update bool
 	if _, ok := nodeDrainInputMap["ignore_daemonsets"]; !ok {
 		// user hasn't provided any input, default to true
-		nodeDrainInput.IgnoreDaemonSets = DefaultNodeDrainIgnoreDaemonsets
+		nodeDrainInput.IgnoreDaemonSets = &DefaultNodeDrainIgnoreDaemonsets
 		update = true
 	}
 	if _, ok := nodeDrainInputMap["timeout"]; !ok {

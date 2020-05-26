@@ -63,7 +63,7 @@ type NodeTemplate struct {
 	Transitioning            string              `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage     string              `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                     string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	UseInternalIPAddress     bool                `json:"useInternalIpAddress,omitempty" yaml:"useInternalIpAddress,omitempty"`
+	UseInternalIPAddress     *bool               `json:"useInternalIpAddress,omitempty" yaml:"useInternalIpAddress,omitempty"`
 }
 
 type NodeTemplateCollection struct {

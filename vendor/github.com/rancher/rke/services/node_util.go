@@ -52,7 +52,7 @@ func getDrainHelper(kubeClient *kubernetes.Clientset, upgradeStrategy v3.NodeUpg
 	drainHelper := drain.Helper{
 		Client:              kubeClient,
 		Force:               upgradeStrategy.DrainInput.Force,
-		IgnoreAllDaemonSets: upgradeStrategy.DrainInput.IgnoreDaemonSets,
+		IgnoreAllDaemonSets: *upgradeStrategy.DrainInput.IgnoreDaemonSets,
 		DeleteLocalData:     upgradeStrategy.DrainInput.DeleteLocalData,
 		GracePeriodSeconds:  upgradeStrategy.DrainInput.GracePeriod,
 		Timeout:             time.Second * time.Duration(upgradeStrategy.DrainInput.Timeout),
