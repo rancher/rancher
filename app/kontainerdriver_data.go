@@ -58,9 +58,9 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"aliyunkubernetescontainerservice",
-		"https://drivers.rancher.cn/kontainer-engine-driver-aliyun/0.2.5/kontainer-engine-driver-aliyun-linux",
-		"31aa0a44450c5a5eb128dd0956292dfd91aab726d1a548f6d527a9212a27db9b",
-		"",
+		"https://drivers.rancher.cn/kontainer-engine-driver-aliyun/0.2.6/kontainer-engine-driver-aliyun-linux",
+		"8a5360269ec803e3d8cf2c9cc94c66879da03a1fd2b580912c1a83454509c84c",
+		"https://drivers.rancher.cn/pandaria/ui/cluster-driver-aliyun/0.1.1/component.js",
 		false,
 		"*.aliyuncs.com",
 	); err != nil {
