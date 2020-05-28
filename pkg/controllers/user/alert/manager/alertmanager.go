@@ -115,7 +115,7 @@ func (m *AlertManager) GetAlertManagerEndpoint() (string, error) {
 		return "", fmt.Errorf("Failed to get service for alertmanager, %v", err)
 	}
 
-	url := "http://" + svc.Name + "." + svc.Namespace + ".svc.cluster.local:" + port
+	url := "http://" + svc.Name + "." + svc.Namespace + ".svc:" + port
 	return url, nil
 }
 
