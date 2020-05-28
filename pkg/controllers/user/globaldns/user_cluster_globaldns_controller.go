@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/namespace"
 	v1coreRancher "github.com/rancher/types/apis/core/v1"
 	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/extensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
