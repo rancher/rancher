@@ -10,12 +10,12 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 )

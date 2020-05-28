@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	mVersion "github.com/mcuadros/go-version"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -10,11 +10,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )

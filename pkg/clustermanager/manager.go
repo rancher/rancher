@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/rancher/pkg/clusterrouter"
+
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	authv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -523,4 +526,13 @@ func (m *Manager) KubeConfig(clusterName, token string) *clientcmdapi.Config {
 
 func (m *Manager) GetHTTPSPort() int {
 	return m.httpsPort
+}
+
+func (m *Manager) SubjectAccessReviewForCluster(req *http.Request) (authv1.SubjectAccessReviewInterface, error) {
+	clusterID := clusterrouter.GetClusterID(req)
+	userContext, err := m.UserContext(clusterID)
+	if err != nil {
+		return nil, err
+	}
+	return userContext.K8sClient.AuthorizationV1().SubjectAccessReviews(), nil
 }

@@ -3,11 +3,11 @@ package systemaccount
 import (
 	"fmt"
 
-	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

@@ -11,11 +11,11 @@ import (
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/namespace"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
