@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -78,6 +79,12 @@ var (
 )
 
 func init() {
+	// setup auth setting
+	authsettings.AuthUserInfoResyncCron = AuthUserInfoResyncCron
+	authsettings.AuthUserSessionTTLMinutes = AuthUserSessionTTLMinutes
+	authsettings.AuthUserInfoMaxAgeSeconds = AuthUserInfoMaxAgeSeconds
+	authsettings.FirstLogin = FirstLogin
+
 	if InjectDefaults == "" {
 		return
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/api/customization/authn"
+	"github.com/rancher/rancher/pkg/auth/api/user"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/urfave/cli"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +65,7 @@ func resetPassword() {
 
 		admin := admins.Items[0]
 		pass := generatePassword(length)
-		hashedPass, err := authn.HashPasswordString(string(pass))
+		hashedPass, err := user.HashPasswordString(string(pass))
 		if err != nil {
 			return err
 		}

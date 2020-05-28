@@ -4,12 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/clusterrouter"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	authV1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 // SubjectAccessReview checks if a user can impersonate as another user or group
@@ -21,17 +19,21 @@ type SubjectAccessReview interface {
 }
 
 type subjectAccessReview struct {
-	clusterManager *clustermanager.Manager
+	sarClientGetter SubjectAccessReviewClientGetter
 }
 
-func NewSubjectAccessReview(clusterManager *clustermanager.Manager) SubjectAccessReview {
+type SubjectAccessReviewClientGetter interface {
+	SubjectAccessReviewForCluster(request *http.Request) (v1.SubjectAccessReviewInterface, error)
+}
+
+func NewSubjectAccessReview(getter SubjectAccessReviewClientGetter) SubjectAccessReview {
 	return subjectAccessReview{
-		clusterManager: clusterManager,
+		sarClientGetter: getter,
 	}
 }
 
 func (sar subjectAccessReview) UserCanImpersonateUser(req *http.Request, user, impUser string) (bool, error) {
-	userContext, err := sar.getUserContextFromRequest(req)
+	userContext, err := sar.sarClientGetter.SubjectAccessReviewForCluster(req)
 	if err != nil {
 		return false, err
 	}
@@ -39,19 +41,14 @@ func (sar subjectAccessReview) UserCanImpersonateUser(req *http.Request, user, i
 }
 
 func (sar subjectAccessReview) UserCanImpersonateGroups(req *http.Request, user string, groups []string) (bool, error) {
-	userContext, err := sar.getUserContextFromRequest(req)
+	userContext, err := sar.sarClientGetter.SubjectAccessReviewForCluster(req)
 	if err != nil {
 		return false, err
 	}
 	return sar.checkUserCanImpersonateGroup(userContext, user, groups)
 }
 
-func (sar subjectAccessReview) getUserContextFromRequest(req *http.Request) (*config.UserContext, error) {
-	clusterID := clusterrouter.GetClusterID(req)
-	return sar.clusterManager.UserContext(clusterID)
-}
-
-func (sar subjectAccessReview) checkUserCanImpersonateUser(userContext *config.UserContext, user, impUser string) (bool, error) {
+func (sar subjectAccessReview) checkUserCanImpersonateUser(sarClient v1.SubjectAccessReviewInterface, user, impUser string) (bool, error) {
 	review := authV1.SubjectAccessReview{
 		Spec: authV1.SubjectAccessReviewSpec{
 			User: user,
@@ -63,7 +60,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateUser(userContext *config.U
 		},
 	}
 
-	result, err := userContext.K8sClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), &review, metav1.CreateOptions{})
+	result, err := sarClient.Create(context.TODO(), &review, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -71,7 +68,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateUser(userContext *config.U
 	return result.Status.Allowed, nil
 }
 
-func (sar subjectAccessReview) checkUserCanImpersonateGroup(userContext *config.UserContext, user string, groups []string) (bool, error) {
+func (sar subjectAccessReview) checkUserCanImpersonateGroup(sarClient v1.SubjectAccessReviewInterface, user string, groups []string) (bool, error) {
 	for _, group := range groups {
 		review := authV1.SubjectAccessReview{
 			Spec: authV1.SubjectAccessReviewSpec{
@@ -84,7 +81,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateGroup(userContext *config.
 			},
 		}
 
-		result, err := userContext.K8sClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), &review, metav1.CreateOptions{})
+		result, err := sarClient.Create(context.TODO(), &review, metav1.CreateOptions{})
 		if err != nil {
 			return false, err
 		}

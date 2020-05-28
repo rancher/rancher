@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/clusterrouter"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -47,7 +48,7 @@ func SetRTBStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledC
 
 	s := &Store{
 		Store: t,
-		auth:  requests.NewAuthenticator(ctx, mgmt),
+		auth:  requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, mgmt),
 	}
 
 	schema.Store = s

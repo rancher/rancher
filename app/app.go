@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/rancher/norman/pkg/k8scheck"
-	"github.com/rancher/rancher/pkg/audit"
+	"github.com/rancher/rancher/pkg/auth/audit"
+	"github.com/rancher/rancher/pkg/auth/data"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -19,7 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/steve"
 	"github.com/rancher/rancher/pkg/steve/pkg/clusterapi"
 	"github.com/rancher/rancher/pkg/telemetry"
@@ -252,9 +252,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}
 
 		tokens.StartPurgeDaemon(ctx, management)
-		cronTime := settings.AuthUserInfoResyncCron.Get()
-		maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
-		providerrefresh.StartRefreshDaemon(ctx, r.ScaledContext, management, cronTime, maxAge)
+		providerrefresh.StartRefreshDaemon(ctx, r.ScaledContext, management)
 		cleanupOrphanedSystemUsers(ctx, management)
 		logrus.Infof("Rancher startup complete")
 
@@ -288,7 +286,7 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		}
 	}
 
-	if err := addAuthConfigs(management); err != nil {
+	if err := data.AuthConfigs(management); err != nil {
 		return err
 	}
 

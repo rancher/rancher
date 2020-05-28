@@ -58,11 +58,12 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/scoped"
 	settingstore "github.com/rancher/rancher/pkg/api/store/setting"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
-	"github.com/rancher/rancher/pkg/auth/principals"
+	authapi "github.com/rancher/rancher/pkg/auth/api"
+	"github.com/rancher/rancher/pkg/auth/api/user"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
-	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/nodeconfig"
@@ -201,9 +202,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		return err
 	}
 
-	principals.Schema(ctx, apiContext, schemas)
-	providers.SetupAuthConfig(ctx, apiContext, schemas)
-	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), apiContext)
+	authapi.Setup(ctx, clusterrouter.GetClusterID, apiContext, schemas)
 	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType), apiContext)
 	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType), apiContext)
 	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
@@ -455,7 +454,7 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 
 func User(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
-	handler := &authn.Handler{
+	handler := &user.Handler{
 		UserClient:               management.Management.Users(""),
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
 		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),

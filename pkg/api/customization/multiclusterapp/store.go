@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/clusterrouter"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
@@ -56,7 +57,7 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 
 	s := &Store{
 		Store:                 t,
-		auth:                  requests.NewAuthenticator(ctx, mgmt),
+		auth:                  requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, mgmt),
 		crtbLister:            mgmt.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		prtbLister:            mgmt.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		grbLister:             mgmt.Management.GlobalRoleBindings("").Controller().Lister(),

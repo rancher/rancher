@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/steve/pkg/auth"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -34,7 +34,9 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
 
-func NewAuthenticator(ctx context.Context, mgmtCtx *config.ScaledContext) Authenticator {
+type ClusterRouter func(req *http.Request) string
+
+func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx *config.ScaledContext) Authenticator {
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 
@@ -45,6 +47,8 @@ func NewAuthenticator(ctx context.Context, mgmtCtx *config.ScaledContext) Authen
 		userAttributeLister: mgmtCtx.Management.UserAttributes("").Controller().Lister(),
 		userAttributes:      mgmtCtx.Management.UserAttributes(""),
 		userLister:          mgmtCtx.Management.Users("").Controller().Lister(),
+		clusterRouter:       clusterRouter,
+		userAuthRefresher:   providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx),
 	}
 }
 
@@ -55,6 +59,8 @@ type tokenAuthenticator struct {
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
 	userLister          v3.UserLister
+	clusterRouter       ClusterRouter
+	userAuthRefresher   providerrefresh.UserAuthRefresher
 }
 
 const (
@@ -79,7 +85,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 	if token.Enabled != nil && !*token.Enabled {
 		return false, "", []string{}, fmt.Errorf("user's token is not enabled")
 	}
-	if token.ClusterName != "" && token.ClusterName != clusterrouter.GetClusterID(req) {
+	if token.ClusterName != "" && token.ClusterName != a.clusterRouter(req) {
 		return false, "", []string{}, fmt.Errorf("clusterID does not match")
 	}
 
@@ -121,6 +127,10 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 	}
 
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
+
+	if !strings.HasPrefix(token.UserID, "system:") {
+		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
+	}
 
 	return true, token.UserID, groups, nil
 }

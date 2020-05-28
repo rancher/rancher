@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -35,7 +35,6 @@ func NewUserAuthRefresher(ctx context.Context, scaledContext *config.ScaledConte
 		tokenMGR:            tokens.NewManager(ctx, scaledContext),
 		userAttributes:      scaledContext.Management.UserAttributes(""),
 		userAttributeLister: scaledContext.Management.UserAttributes("").Controller().Lister(),
-		settingLister:       scaledContext.Management.Settings("").Controller().Lister(),
 	}
 }
 
@@ -50,7 +49,6 @@ type refresher struct {
 	intervalInSeconds   int64
 	unparsedMaxAge      string
 	maxAge              time.Duration
-	settingLister       v3.SettingLister
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
