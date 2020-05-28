@@ -24,10 +24,11 @@ library/nginx rancher/nginx 1.17.4-alpine
 jenkins/jnlp-slave rancher/jenkins-jnlp-slave 3.40-1
 thanosio/thanos rancher/thanos v0.10.1
 quay.io/jetstack/cert-manager-controller rancher/jetstack-cert-manager-controller v0.8.1
-quay.io/calico/node rancher/calico-node v3.13.0
-quay.io/calico/cni rancher/calico-cni v3.13.0
-quay.io/calico/kube-controllers rancher/calico-kube-controllers v3.4.0
-quay.io/calico/pod2daemon-flexvol rancher/calico-pod2daemon-flexvol v3.13.0
+quay.io/calico/node rancher/calico-node v3.8.9
+quay.io/calico/cni rancher/calico-cni v3.8.9
+quay.io/calico/kube-controllers rancher/calico-kube-controllers v3.8.9
+quay.io/calico/pod2daemon-flexvol rancher/calico-pod2daemon-flexvol v3.8.9
+quay.io/calico/ctl rancher/calico-ctl v3.8.9
 us.gcr.io/k8s-artifacts-prod/external-dns/external-dns rancher/kubernetes-external-dns v0.6.0
 quay.io/open-policy-agent/gatekeeper rancher/opa-gatekeeper v3.1.0-beta.8
 k8s.gcr.io/k8s-dns-node-cache rancher/k8s-dns-node-cache 1.15.7
