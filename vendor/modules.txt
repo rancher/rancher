@@ -496,7 +496,7 @@ github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1
 github.com/rancher/system-upgrade-controller/pkg/condition
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/scheme
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1
-# github.com/rancher/types v0.0.0-20200522181207-0db99d3f04a9
+# github.com/rancher/types v0.0.0-20200528211210-57a315b44c03
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
@@ -532,6 +532,7 @@ github.com/rancher/types/factory
 github.com/rancher/types/image
 github.com/rancher/types/kdm
 github.com/rancher/types/mapper
+github.com/rancher/types/namespace
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
@@ -556,6 +557,7 @@ github.com/rancher/wrangler/pkg/merr
 github.com/rancher/wrangler/pkg/name
 github.com/rancher/wrangler/pkg/objectset
 github.com/rancher/wrangler/pkg/patch
+github.com/rancher/wrangler/pkg/randomtoken
 github.com/rancher/wrangler/pkg/ratelimit
 github.com/rancher/wrangler/pkg/schemas
 github.com/rancher/wrangler/pkg/schemas/definition
