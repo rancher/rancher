@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
-	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/namespace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"

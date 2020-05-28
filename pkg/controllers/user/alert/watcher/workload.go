@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 
-	nsutils "github.com/rancher/rancher/pkg/namespace"
+	nsutils "github.com/rancher/types/namespace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

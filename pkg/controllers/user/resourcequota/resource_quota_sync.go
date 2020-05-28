@@ -10,10 +10,10 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/types/convert"
-	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	namespaceutil "github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"

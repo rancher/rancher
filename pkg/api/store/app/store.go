@@ -10,12 +10,12 @@ import (
 	pv3app "github.com/rancher/rancher/pkg/api/customization/app"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/namespace"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 

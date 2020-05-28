@@ -15,11 +15,11 @@ import (
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/controllers/management/k3supgrade"
 	"github.com/rancher/rancher/pkg/controllers/user/cis"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	mgmtclient "github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/namespace"
 	"github.com/robfig/cron"
 )
 

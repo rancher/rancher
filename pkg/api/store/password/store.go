@@ -6,20 +6,17 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/randomtoken"
-
-	"github.com/rancher/types/config"
-
-	"github.com/rancher/norman/types/convert"
-	"k8s.io/apimachinery/pkg/api/errors"
-
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	v1 "github.com/rancher/types/apis/core/v1"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
+	"github.com/rancher/types/config"
+	"github.com/rancher/types/namespace"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

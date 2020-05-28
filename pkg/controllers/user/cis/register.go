@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

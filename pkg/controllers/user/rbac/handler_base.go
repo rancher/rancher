@@ -9,12 +9,12 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
-	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
+	nsutils "github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 
 	rbacv1 "k8s.io/api/rbac/v1"

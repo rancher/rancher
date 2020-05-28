@@ -9,9 +9,9 @@ import (
 	"github.com/rancher/norman/types"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
-	ns "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	ns "github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

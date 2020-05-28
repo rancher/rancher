@@ -6,7 +6,6 @@ import (
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
@@ -14,6 +13,7 @@ import (
 	v1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/namespace"
 
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
