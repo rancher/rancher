@@ -17,3 +17,4 @@ variable "password" {}
 variable "k3s_version" {}
 variable "no_of_server_nodes" {}
 variable "server_flags" {}
+variable "install_mode" {}
