@@ -395,3 +395,32 @@ func GetInternalAddressForHosts(hostList []*Host) []string {
 	}
 	return hostAddresses
 }
+
+func IsDockerSELinuxEnabled(host *Host) bool {
+	for _, securityOpt := range host.DockerInfo.SecurityOptions {
+		if securityOpt == "selinux" {
+			logrus.Debugf("Host [%s] has SELinux enabled in Docker", host.Address)
+			return true
+		}
+	}
+	return false
+}
+
+func IsEnterpriseLinuxHost(host *Host) bool {
+	operatingSystem := strings.ToLower(host.DockerInfo.OperatingSystem)
+	if strings.Contains(operatingSystem, "centos") || strings.Contains(operatingSystem, "red hat") {
+		logrus.Debugf("Host [%s] with OperatingSystem [%s] is Enterprise Linux", host.Address, operatingSystem)
+		return true
+	}
+	return false
+}
+
+func IsEnterpriseLinuxDocker(host *Host) bool {
+	dockerInitBinary := host.DockerInfo.InitBinary
+	// Init binary for Enterprise Linux Docker (not upstream) is /usr/libexec/docker/docker-init-current
+	// Init binary for upstream Docker is docker-init
+	if strings.EqualFold(dockerInitBinary, "/usr/libexec/docker/docker-init-current") {
+		return true
+	}
+	return false
+}
