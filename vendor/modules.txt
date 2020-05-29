@@ -429,7 +429,7 @@ github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
-# github.com/rancher/rke v1.2.0-rc1.0.20200529084158-147aaebcf71c
+# github.com/rancher/rke v1.2.0-rc1.0.20200529233023-94e9c1a01c86
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
