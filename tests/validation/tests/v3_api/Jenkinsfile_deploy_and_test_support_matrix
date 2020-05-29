@@ -108,17 +108,21 @@ node {
 
           stage('Deploy Clusters') {
             try {
-              // deploy clusters of different versions
-              sh "docker run --name ${clusterSetupContainer} -t --env-file ${envFile} " +
-                  "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
-                  "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
-                  "&& pytest -v -s --junit-xml=${clusterSetupResultsOut} " +
-                "${deployClusterPytestOptions} ${testsDir}\'"
+              if (env.RANCHER_CLUSTER_NAMES == "") {
+                  // deploy clusters of different versions
+                  sh "docker run --name ${clusterSetupContainer} -t --env-file ${envFile} " +
+                      "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
+                      "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
+                      "&& pytest -v -s --junit-xml=${clusterSetupResultsOut} " +
+                    "${deployClusterPytestOptions} ${testsDir}\'"
 
-              // copy file containing CLUSTER_NAMES and load into environment variables
-              sh "docker cp ${clusterSetupContainer}:${rootPath}${testsDir}${rancherConfig} ."
-              load rancherConfig
-
+                  // copy file containing RANCHER_CLUSTER_NAMES and load into environment variables
+                  sh "docker cp ${clusterSetupContainer}:${rootPath}${testsDir}${rancherConfig} ."
+                  load rancherConfig
+               }
+               else {
+                  echo "Given clusters: ${env.RANCHER_CLUSTER_NAMES}"
+               }
             } catch(err) {
               echo "Error: " + err
             }
@@ -130,9 +134,9 @@ node {
                 sh "docker run --rm --name testEnvironmentCheck -t --env-file ${envFile} " +
                    "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
                    "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
-                   "&& export RANCHER_CLUSTER_NAMES=${env.CLUSTER_NAMES} " + "&& printenv\'"
+                   "&& export RANCHER_CLUSTER_NAMES=${env.RANCHER_CLUSTER_NAMES} " + "&& printenv\'"
                 jobs = [:]
-                cluster_arr = env.CLUSTER_NAMES.split(",")
+                cluster_arr = env.RANCHER_CLUSTER_NAMES.split(",")
                 cluster_count = cluster_arr.size()
                 for (int i = 0; i < cluster_count; i++) {
                   def params = [
