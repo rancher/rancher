@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/noderemove"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/user/nsserviceaccount"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline"
 	"github.com/rancher/rancher/pkg/controllers/user/rbac"
 	"github.com/rancher/rancher/pkg/controllers/user/rbac/podsecuritypolicy"
@@ -73,6 +74,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	certsexpiration.Register(ctx, cluster)
 	ingresshostgen.Register(ctx, cluster.UserOnlyContext())
 	windows.Register(ctx, clusterRec, cluster)
+	nsserviceaccount.Register(ctx, cluster)
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()
