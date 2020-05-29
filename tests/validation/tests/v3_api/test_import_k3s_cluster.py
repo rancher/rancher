@@ -34,6 +34,7 @@ RANCHER_DB_USERNAME = os.environ.get("RANCHER_DB_USERNAME", "")
 RANCHER_DB_PASSWORD = os.environ.get("RANCHER_DB_PASSWORD", "")
 RANCHER_K3S_KUBECONFIG_PATH = DATA_SUBDIR + "/k3s_kubeconfig.yaml"
 RANCHER_DB_TYPE = os.environ.get("RANCHER_DB_TYPE")
+RANCHER_INSTALL_MODE = os.environ.get("RANCHER_INSTALL_MODE", "VERSION")
 
 def test_create_k3s_single_control_cluster():
     aws_nodes, client, k3s_clusterfilepath = create_single_control_cluster()
@@ -135,7 +136,8 @@ def create_multiple_control_cluster():
                               'no_of_server_nodes': no_of_servers,
                               'server_flags': RANCHER_K3S_SERVER_FLAGS,
                               'qa_space': RANCHER_QA_SPACE,
-                              'db': RANCHER_DB_TYPE})
+                              'db': RANCHER_DB_TYPE,
+                              'install_mode': RANCHER_INSTALL_MODE})
     print("Creating cluster")
     tf.init()
     print(tf.plan(out="plan_server.out"))
@@ -154,7 +156,8 @@ def create_multiple_control_cluster():
                               'access_key': keyPath,
                               'k3s_version': RANCHER_K3S_VERSION,
                               'no_of_worker_nodes': int(RANCHER_K3S_NO_OF_WORKER_NODES),
-                              'worker_flags': RANCHER_K3S_WORKER_FLAGS})
+                              'worker_flags': RANCHER_K3S_WORKER_FLAGS,
+                              'install_mode': RANCHER_INSTALL_MODE})
 
     print("Joining worker nodes")
     tf.init()

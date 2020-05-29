@@ -14,7 +14,7 @@ resource "aws_instance" "mysql-worker" {
   }
   provisioner "remote-exec" {
     inline      = [
-              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.worker_flags} sh -s -  --server https://${local.master_ip}:6443 --token ${local.node_token}"
+              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_${var.install_mode}=${var.k3s_version} INSTALL_K3S_EXEC=${var.worker_flags} sh -s -  --server https://${local.master_ip}:6443 --token ${local.node_token}"
     ]
   }
 }
