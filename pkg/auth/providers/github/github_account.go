@@ -16,9 +16,6 @@ type Account struct {
 	AvatarURL string `json:"avatar_url,omitempty"`
 	HTMLURL   string `json:"html_url,omitempty"`
 	Type      string `json:"type,omitempty"`
-	Email     string `json:"email,omitempty"`
-	Company   string `json:"company,omitempty"`
-	Location  string `json:"location,omitempty"`
 }
 
 //Team defines properties a team on github has
@@ -27,12 +24,6 @@ type Team struct {
 	Organization map[string]interface{} `json:"organization,omitempty"`
 	Name         string                 `json:"name,omitempty"`
 	Slug         string                 `json:"slug,omitempty"`
-}
-
-// EmailResponse is used for getting response from the emails endpoint. https://developer.github.com/v3/users/emails/#response .We only need the Email and Primary fields
-type EmailResponse struct {
-	Email   string `json:"email,omitempty"`
-	Primary bool   `json:"primary,omitempty"`
 }
 
 func (t *Team) toGithubAccount(url string, account *Account) {
