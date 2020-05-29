@@ -76,27 +76,7 @@ func (g *GClient) getUser(githubAccessToken string, config *v3.GithubConfig) (Ac
 		logrus.Errorf("Github getGithubUser: error unmarshalling response, err: %v", err)
 		return Account{}, err
 	}
-	// If the UserInfo endpoint does not return the email of a user, we need to query the emails endpoint
-	if githubAcct.Email == "" {
-		emailURL := g.getURL("USER_EMAIL", config)
-		emailResp, _, err := g.getFromGithub(githubAccessToken, emailURL)
-		if err != nil {
-			logrus.Errorf("Github getGithubUser: GET email url %v received error from github, err: %v", emailURL, err)
-			return Account{}, err
-		}
-		var userEmails []EmailResponse
-		if err := json.Unmarshal(emailResp, &userEmails); err != nil {
-			logrus.Errorf("Github getGithubUser: error unmarshalling email response, err: %v", err)
-			return Account{}, err
-		}
-		// This api endpoint doesn't accept query parameter to filter on primary, so we get all emails and loop through it
-		for _, userEmail := range userEmails {
-			if userEmail.Primary {
-				githubAcct.Email = userEmail.Email
-				break
-			}
-		}
-	}
+
 	return githubAcct, nil
 }
 
@@ -376,8 +356,6 @@ func (g *GClient) getURL(endpoint string, config *v3.GithubConfig) string {
 		toReturn = apiEndpoint + "/orgs/"
 	case "USER_INFO":
 		toReturn = apiEndpoint + "/user"
-	case "USER_EMAIL":
-		toReturn = apiEndpoint + "/user/emails"
 	case "ORG_INFO":
 		toReturn = apiEndpoint + "/user/orgs?per_page=1"
 	case "USER_PICTURE":
