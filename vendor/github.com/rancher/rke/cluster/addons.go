@@ -450,7 +450,13 @@ func (c *Cluster) deployIngress(ctx context.Context) error {
 	var version string
 	ingressSplits := strings.SplitN(c.SystemImages.Ingress, ":", 2)
 	if len(ingressSplits) == 2 {
-		version = strings.Split(ingressSplits[1], "-")[0]
+		if strings.HasPrefix(ingressSplits[1], "nginx") {
+			// new version format nginx-0.25.1-rancher1
+			version = strings.Split(ingressSplits[1], "-")[1]
+		} else {
+			// old version format 0.16.0-rancher1
+			version = strings.Split(ingressSplits[1], "-")[0]
+		}
 		if version < "0.16.0" {
 			ingressConfig.AlpineImage = c.SystemImages.Alpine
 		}
