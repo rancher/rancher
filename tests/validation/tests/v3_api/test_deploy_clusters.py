@@ -10,7 +10,7 @@ KDM_URL = os.environ.get(
     "RANCHER_KDM_URL",
     "https://github.com/rancher/kontainer-driver-metadata.git")
 
-env_details = "env.CLUSTER_NAMES='"
+env_details = "env.RANCHER_CLUSTER_NAMES='"
 
 if_not_auto_deploy_rke = pytest.mark.skipif(
     ast.literal_eval(
@@ -49,7 +49,7 @@ def test_deploy_rke():
 
     # Create clusters
     for k8s_version in default_k8s_versions:
-        if env_details != "env.CLUSTER_NAMES='":
+        if env_details != "env.RANCHER_CLUSTER_NAMES='":
             env_details += ","
         print("Deploying RKE Cluster using kubernetes version {}".format(
             k8s_version))
@@ -73,7 +73,7 @@ def test_deploy_eks():
         k8s_versions = [EKS_K8S_VERSIONS[0]]
 
     for version in k8s_versions:
-        if env_details != "env.CLUSTER_NAMES='":
+        if env_details != "env.RANCHER_CLUSTER_NAMES='":
             env_details += ","
         try:
             print("Deploying EKS Cluster using kubernetes version {}".format(
@@ -96,7 +96,7 @@ def test_deploy_gke():
 
     for i, version in enumerate(gke_versions, start=1):
         c_name = "test-auto-gke-{}".format(i)
-        if env_details != "env.CLUSTER_NAMES='":
+        if env_details != "env.RANCHER_CLUSTER_NAMES='":
             env_details += ","
         try:
             print("Deploying GKE Cluster using kubernetes version {}".format(
@@ -119,7 +119,7 @@ def test_deploy_aks():
     aks_versions = get_aks_version(multiple_versions=True)
 
     for version in aks_versions:
-        if env_details != "env.CLUSTER_NAMES='":
+        if env_details != "env.RANCHER_CLUSTER_NAMES='":
             env_details += ","
         try:
             print("Deploying AKS Cluster using kubernetes version {}".format(
