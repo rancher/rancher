@@ -529,6 +529,10 @@ spec:
   selector:
     matchLabels:
       app: ingress-nginx
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   template:
     metadata:
       labels:
