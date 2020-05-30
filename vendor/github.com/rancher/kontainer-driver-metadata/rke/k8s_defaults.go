@@ -3,13 +3,14 @@ package rke
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/blang/semver"
-	"github.com/rancher/kontainer-driver-metadata/rke/templates"
-	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/blang/semver"
+	"github.com/rancher/kontainer-driver-metadata/rke/templates"
+	"github.com/sirupsen/logrus"
+
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/image"
 )
 
