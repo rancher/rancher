@@ -266,7 +266,12 @@ func NSFindIterate(el *etree.Element, namespace, tag string, handle NSIterHandle
 // returned by NSFindIterate.
 func NSFindIterateCtx(ctx NSContext, el *etree.Element, namespace, tag string, handle NSIterHandler) error {
 	err := NSTraverse(ctx, el, func(ctx NSContext, el *etree.Element) error {
-		currentNS, err := ctx.LookupPrefix(el.Space)
+		_ctx, err := ctx.SubContext(el)
+		if err != nil {
+			return err
+		}
+
+		currentNS, err := _ctx.LookupPrefix(el.Space)
 		if err != nil {
 			return err
 		}
@@ -303,6 +308,80 @@ func NSFindOneCtx(ctx NSContext, el *etree.Element, namespace, tag string) (*etr
 	})
 
 	if err != nil {
+		return nil, err
+	}
+
+	return found, nil
+}
+
+// NSIterateChildren iterates the children of an element, invoking the passed
+// handler with each direct child of the element, and the context surrounding
+// that child.
+func NSIterateChildren(ctx NSContext, el *etree.Element, handle NSIterHandler) error {
+	ctx, err := ctx.SubContext(el)
+	if err != nil {
+		return err
+	}
+
+	// Iterate the child elements.
+	for _, child := range el.ChildElements() {
+		err = handle(ctx, child)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// NSFindIterateChildrenCtx takes an element and its surrounding context, and iterates
+// the children of that element searching for an element matching the passed namespace
+// and tag. For each such element that is found, handle is invoked with the matched
+// element and its own surrounding context.
+func NSFindChildrenIterateCtx(ctx NSContext, el *etree.Element, namespace, tag string, handle NSIterHandler) error {
+	err := NSIterateChildren(ctx, el, func(ctx NSContext, el *etree.Element) error {
+		_ctx, err := ctx.SubContext(el)
+		if err != nil {
+			return err
+		}
+
+		currentNS, err := _ctx.LookupPrefix(el.Space)
+		if err != nil {
+			return err
+		}
+
+		// Base case, el is the sought after element.
+		if currentNS == namespace && el.Tag == tag {
+			return handle(ctx, el)
+		}
+
+		return nil
+	})
+
+	if err != nil && err != ErrTraversalHalted {
+		return err
+	}
+
+	return nil
+}
+
+// NSFindOneChild behaves identically to NSFindOneChildCtx, but uses
+// DefaultNSContext for context.
+func NSFindOneChild(el *etree.Element, namespace, tag string) (*etree.Element, error) {
+	return NSFindOneChildCtx(DefaultNSContext, el, namespace, tag)
+}
+
+// NSFindOneCtx conducts a depth-first search for the specified element. If such an
+// element is found a reference to it is returned.
+func NSFindOneChildCtx(ctx NSContext, el *etree.Element, namespace, tag string) (*etree.Element, error) {
+	var found *etree.Element
+
+	err := NSFindChildrenIterateCtx(ctx, el, namespace, tag, func(ctx NSContext, el *etree.Element) error {
+		found = el
+		return ErrTraversalHalted
+	})
+
+	if err != nil && err != ErrTraversalHalted {
 		return nil, err
 	}
 

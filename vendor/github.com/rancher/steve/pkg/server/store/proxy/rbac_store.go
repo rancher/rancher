@@ -182,6 +182,7 @@ func (r *RBACStore) Watch(apiOp *types.APIRequest, schema *types.APISchema, w ty
 	}
 
 	ctx, cancel := context.WithCancel(apiOp.Context())
+	defer cancel()
 	apiOp = apiOp.WithContext(ctx)
 
 	eg := errgroup.Group{}

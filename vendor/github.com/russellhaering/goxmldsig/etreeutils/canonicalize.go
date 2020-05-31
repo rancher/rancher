@@ -16,7 +16,7 @@ func TransformExcC14n(el *etree.Element, inclusiveNamespacesPrefixList string) e
 		prefixSet[prefix] = struct{}{}
 	}
 
-	err := transformExcC14n(DefaultNSContext, EmptyNSContext, el, prefixSet)
+	err := transformExcC14n(DefaultNSContext, DefaultNSContext, el, prefixSet)
 	if err != nil {
 		return err
 	}
