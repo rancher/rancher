@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -18,7 +19,9 @@ var (
 	c   = cron.New()
 )
 
-func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext, refreshCronTime string, maxAge string) {
+func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext) {
+	refreshCronTime := settings.AuthUserInfoResyncCron.Get()
+	maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
 	ref = &refresher{
 		tokenLister:         mgmtContext.Management.Tokens("").Controller().Lister(),
 		tokens:              mgmtContext.Management.Tokens(""),
@@ -26,7 +29,6 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 		tokenMGR:            tokens.NewManager(ctx, scaledContext),
 		userAttributes:      mgmtContext.Management.UserAttributes(""),
 		userAttributeLister: mgmtContext.Management.UserAttributes("").Controller().Lister(),
-		settingLister:       mgmtContext.Management.Settings("").Controller().Lister(),
 	}
 
 	UpdateRefreshMaxAge(maxAge)

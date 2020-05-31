@@ -88,6 +88,7 @@ def test_default_pod_sec(admin_mc, list_remove_resource):
                                                   clusterTemplateId=tId,
                                                   enabled="true")
 
+    time.sleep(2)
     cluster = wait_for_cluster_create(client, name=random_str(),
                                       clusterTemplateRevisionId=rev.id)
     remove_list.insert(0, cluster)

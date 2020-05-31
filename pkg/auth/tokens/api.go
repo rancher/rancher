@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	rancherapi "github.com/rancher/rancher/pkg/api"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
@@ -25,7 +25,9 @@ var crdVersions = []*types.APIVersion{
 	&managementSchema.Version,
 }
 
-func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext) (http.Handler, error) {
+type ServerOption func(server *normanapi.Server)
+
+func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext, opts ...ServerOption) (http.Handler, error) {
 	api := &tokenAPI{
 		mgr: NewManager(ctx, apiContext),
 	}
@@ -41,7 +43,16 @@ func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext) (http.
 	schema.CreateHandler = api.tokenCreateHandler
 	schema.DeleteHandler = api.tokenDeleteHandler
 
-	return rancherapi.NewServer(schemas)
+	server := normanapi.NewAPIServer()
+	if err := server.AddSchemas(schemas); err != nil {
+		return nil, err
+	}
+
+	for _, opt := range opts {
+		opt(server)
+	}
+
+	return server, nil
 }
 
 type tokenAPI struct {

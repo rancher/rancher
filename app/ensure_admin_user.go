@@ -6,7 +6,7 @@ import (
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/api/customization/authn"
+	"github.com/rancher/rancher/pkg/auth/api/user"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/urfave/cli"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -95,7 +95,7 @@ func ensureDefaultAdmin() {
 
 func createNewAdmin(client v3.Interface, length int) error {
 	pass := generatePassword(length)
-	hashedPass, err := authn.HashPasswordString(string(pass))
+	hashedPass, err := user.HashPasswordString(string(pass))
 	if err != nil {
 		return err
 	}

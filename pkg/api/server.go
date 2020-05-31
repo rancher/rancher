@@ -11,8 +11,12 @@ func NewServer(schemas *types.Schemas) (*normanapi.Server, error) {
 	if err := server.AddSchemas(schemas); err != nil {
 		return nil, err
 	}
-	server.CustomAPIUIResponseWriter(cssURL, jsURL, settings.APIUIVersion.Get)
+	ConfigureAPIUI(server)
 	return server, nil
+}
+
+func ConfigureAPIUI(server *normanapi.Server) {
+	server.CustomAPIUIResponseWriter(cssURL, jsURL, settings.APIUIVersion.Get)
 }
 
 func cssURL() string {

@@ -6,10 +6,11 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rancher/rancher/pkg/api"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/vsphere"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
-	"github.com/rancher/rancher/pkg/audit"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -18,6 +19,7 @@ import (
 	webhook2 "github.com/rancher/rancher/pkg/auth/webhook"
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/clusterrouter"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
@@ -36,12 +38,12 @@ import (
 )
 
 func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter, authz auth.Middleware) (auth.Middleware, http.Handler, error) {
-	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, api.ConfigureAPIUI)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, scaledContext)
+	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, api.ConfigureAPIUI)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -59,7 +61,7 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy, scaledContext)
 
-	auth := requests.NewAuthenticator(ctx, scaledContext)
+	auth := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, scaledContext)
 	auth = requests.NewImpersonatingAuth(auth, sar.NewSubjectAccessReview(clusterManager))
 	if f, ok := scaledContext.Dialer.(*rancherdialer.Factory); ok {
 		auth = requests.Chain(auth, f.TunnelAuthorizer)
@@ -70,13 +72,13 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 		Authenticator: auth,
 	}
 
-	authedHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, rawAuthedAPIs)
+	authedHandler, err := requests.NewAuthenticationFilter(auth, rawAuthedAPIs)
 	if err != nil {
 		return nil, nil, err
 	}
 	authedHandler = authz.Wrap(authedHandler)
 
-	metricsHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()))
+	metricsHandler, err := requests.NewAuthenticationFilter(auth, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()))
 	if err != nil {
 		return nil, nil, err
 	}

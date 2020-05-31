@@ -10,7 +10,6 @@ import (
 	"reflect"
 
 	"github.com/rancher/rancher/pkg/auth/util"
-
 	"github.com/sirupsen/logrus"
 )
 

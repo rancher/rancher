@@ -11,7 +11,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/auth"
+	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -197,7 +197,7 @@ func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
 	storedSamlConfig.Annotations = config.Annotations
 	config.ObjectMeta = storedSamlConfig.ObjectMeta
 
-	field := strings.ToLower(auth.TypeToFields[configType][0])
+	field := strings.ToLower(secrets.TypeToFields[configType][0])
 	if err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey,
 		field, strings.ToLower(config.Type)); err != nil {
 		return err

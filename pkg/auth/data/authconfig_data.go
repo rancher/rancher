@@ -1,4 +1,4 @@
-package app
+package data
 
 import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
@@ -17,7 +17,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func addAuthConfigs(management *config.ManagementContext) error {
+func AuthConfigs(management *config.ManagementContext) error {
 	if err := addAuthConfig(github.Name, client.GithubConfigType, false, management); err != nil {
 		return err
 	}

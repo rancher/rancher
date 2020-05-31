@@ -5,13 +5,14 @@ import (
 	"net/url"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/requests"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 )
 
-func Schema(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {
-	p := newPrincipalsHandler(ctx, management)
+func Schema(ctx context.Context, clusterRouter requests.ClusterRouter, management *config.ScaledContext, schemas *types.Schemas) error {
+	p := newPrincipalsHandler(ctx, clusterRouter, management)
 	schema := schemas.Schema(&managementSchema.Version, client.PrincipalType)
 	schema.ActionHandler = p.actions
 	schema.ListHandler = p.list

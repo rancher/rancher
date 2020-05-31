@@ -4,21 +4,32 @@ import (
 	"context"
 	"net/http"
 
+	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
-	rancherapi "github.com/rancher/rancher/pkg/api"
 	publicSchema "github.com/rancher/types/apis/management.cattle.io/v3public/schema"
 	v3public "github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 )
 
-func NewHandler(ctx context.Context, mgmtCtx *config.ScaledContext) (http.Handler, error) {
+type ServerOption func(server *normanapi.Server)
+
+func NewHandler(ctx context.Context, mgmtCtx *config.ScaledContext, opts ...ServerOption) (http.Handler, error) {
 	schemas := types.NewSchemas().AddSchemas(publicSchema.PublicSchemas)
 	if err := authProviderSchemas(ctx, mgmtCtx, schemas); err != nil {
 		return nil, err
 	}
 
-	return rancherapi.NewServer(schemas)
+	server := normanapi.NewAPIServer()
+	if err := server.AddSchemas(schemas); err != nil {
+		return nil, err
+	}
+
+	for _, opt := range opts {
+		opt(server)
+	}
+
+	return server, nil
 }
 
 var authProviderTypes = []string{

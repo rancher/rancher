@@ -1,32 +1,23 @@
 package requests
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/audit"
-	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/util"
-	"github.com/rancher/types/config"
 )
 
-func NewAuthenticationFilter(ctx context.Context, auth Authenticator, managementContext *config.ScaledContext, next http.Handler) (http.Handler, error) {
-	if managementContext == nil {
-		return nil, fmt.Errorf("Failed to build NewAuthenticationFilter, nil ManagementContext")
-	}
+func NewAuthenticationFilter(auth Authenticator, next http.Handler) (http.Handler, error) {
 	return &authHeaderHandler{
-		auth:              auth,
-		next:              next,
-		userAuthRefresher: providerrefresh.NewUserAuthRefresher(ctx, managementContext),
+		auth: auth,
+		next: next,
 	}, nil
 }
 
 type authHeaderHandler struct {
-	auth              Authenticator
-	next              http.Handler
-	userAuthRefresher providerrefresh.UserAuthRefresher
+	auth Authenticator
+	next http.Handler
 }
 
 func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -53,10 +44,6 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	if ok {
 		auditUser.Name = user
 		auditUser.Group = groups
-	}
-
-	if !strings.HasPrefix(user, "system:") {
-		go h.userAuthRefresher.TriggerUserRefresh(user, false)
 	}
 
 	h.next.ServeHTTP(rw, req)

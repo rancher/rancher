@@ -27,12 +27,12 @@ type principalsHandler struct {
 	ac               types.AccessControl
 }
 
-func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext) *principalsHandler {
+func newPrincipalsHandler(ctx context.Context, clusterRouter requests.ClusterRouter, mgmt *config.ScaledContext) *principalsHandler {
 	providers.Configure(ctx, mgmt)
 	return &principalsHandler{
 		principalsClient: mgmt.Management.Principals(""),
 		tokensClient:     mgmt.Management.Tokens(""),
-		auth:             requests.NewAuthenticator(ctx, mgmt),
+		auth:             requests.NewAuthenticator(ctx, clusterRouter, mgmt),
 		tokenMGR:         tokens.NewManager(ctx, mgmt),
 		ac:               mgmt.AccessControl,
 	}
