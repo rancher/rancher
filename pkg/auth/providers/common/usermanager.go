@@ -36,6 +36,24 @@ const (
 	roleTemplatesRequired        = "authz.management.cattle.io/creator-role-bindings"
 )
 
+func NewUserManagerNoBindings(scaledContext *config.ScaledContext) (user.Manager, error) {
+	userInformer := scaledContext.Management.Users("").Controller().Informer()
+	userIndexers := map[string]cache.IndexFunc{
+		userByPrincipalIndex: userByPrincipal,
+	}
+	if err := userInformer.AddIndexers(userIndexers); err != nil {
+		return nil, err
+	}
+
+	return &userManager{
+		users:       scaledContext.Management.Users(""),
+		userIndexer: userInformer.GetIndexer(),
+		tokens:      scaledContext.Management.Tokens(""),
+		tokenLister: scaledContext.Management.Tokens("").Controller().Lister(),
+		rbacClient:  scaledContext.RBAC,
+	}, nil
+}
+
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	userInformer := scaledContext.Management.Users("").Controller().Informer()
 	userIndexers := map[string]cache.IndexFunc{
@@ -70,6 +88,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	}
 
 	return &userManager{
+		manageBindings:           true,
 		users:                    scaledContext.Management.Users(""),
 		userIndexer:              userInformer.GetIndexer(),
 		crtbIndexer:              crtbInformer.GetIndexer(),
@@ -86,6 +105,8 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 }
 
 type userManager struct {
+	// manageBinding means whether or not we gr, grb, crtb, and prtb exist in the cluster
+	manageBindings           bool
 	users                    v3.UserInterface
 	globalRoleBindings       v3.GlobalRoleBindingInterface
 	globalRoleLister         v3.GlobalRoleLister
@@ -322,6 +343,10 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 }
 
 func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error {
+	if !m.manageBindings {
+		return nil
+	}
+
 	roleName := userName + "-view"
 	bindingName := "grb-" + roleName
 
@@ -394,6 +419,10 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 }
 
 func (m *userManager) createUsersBindings(user *v3.User) error {
+	if !m.manageBindings {
+		return nil
+	}
+
 	roleMap := make(map[string][]string)
 	err := json.Unmarshal([]byte(user.Annotations[roleTemplatesRequired]), &roleMap)
 	if err != nil {
@@ -472,6 +501,10 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 }
 
 func (m *userManager) createUsersRoleAnnotation() (map[string]string, error) {
+	if !m.manageBindings {
+		return nil, nil
+	}
+
 	roleMap := make(map[string][]string)
 
 	roles, err := m.globalRoleLister.List("", labels.NewSelector())
@@ -527,6 +560,10 @@ func (m *userManager) checkCache(principalName string) (*v3.User, error) {
 }
 
 func (m *userManager) userExistsInClusterOrProject(userNameAndPrincipals []string) (bool, error) {
+	if !m.manageBindings {
+		return false, nil
+	}
+
 	for _, principal := range userNameAndPrincipals {
 		crtbs, err := m.crtbIndexer.ByIndex(crtbsByPrincipalAndUserIndex, principal)
 		if err != nil {

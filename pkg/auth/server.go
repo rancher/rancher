@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/data"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -28,6 +29,11 @@ type Server struct {
 
 func NewServer(ctx context.Context, cfg *rest.Config) (*Server, error) {
 	sc, err := config.NewScaledContext(*cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	sc.UserManager, err = common.NewUserManagerNoBindings(sc)
 	if err != nil {
 		return nil, err
 	}
