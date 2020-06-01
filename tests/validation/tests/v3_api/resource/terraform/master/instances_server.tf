@@ -163,7 +163,7 @@ resource "aws_lb_target_group_attachment" "aws_tg_attachment_6443_2" {
 resource "aws_lb" "aws_nlb" {
   internal           = false
   load_balancer_type = "network"
-  subnets            = ["${var.subnets}"] 
+  subnets            = split(",", "${var.subnets}")
   name               = "${var.resource_name}-multinode-nlb"
 }
 
