@@ -6,7 +6,7 @@ import (
 
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/kontainer-driver-metadata/rke"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 var (
@@ -30,7 +30,7 @@ func InitMetadata(ctx context.Context) error {
 	return nil
 }
 
-const RKEVersionDev = "v1.0.7"
+const RKEVersionDev = "v1.0.9"
 
 func initAddonTemplates() {
 	K8sVersionToTemplates = rke.DriverData.K8sVersionedTemplates

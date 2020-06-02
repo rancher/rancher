@@ -83,12 +83,16 @@ func loadK8sVersionInfo() map[string]v3.K8sVersionInfo {
 			MinRancherVersion: "2.3.7-rc0",
 			MinRKEVersion:     "1.0.7",
 		},
+		"v1.15.12-rancher1-1": {
+			MaxRancherVersion: "2.2.99",
+			MaxRKEVersion: "0.2.99",
+		},
 		// The Calico/Canal template in this version use functions that are only available in RKE v1.0.0 and up
 		// This version includes nodelocal dns only available in RKE v1.0.7 and up
 		// It also includes ingress-nginx 0.32.0
 		"v1.15.12-rancher2-2": {
-			MinRancherVersion: "2.3.7",
-			MinRKEVersion:     "1.0.7",
+			MinRancherVersion: "2.3.8-rc0",
+			MinRKEVersion:     "1.0.9-rc0",
 		},
 		// The Calico/Canal template in this version use functions that are only available in RKE v1.0.0 and up
 		"v1.16.8-rancher1-1": {
@@ -110,8 +114,8 @@ func loadK8sVersionInfo() map[string]v3.K8sVersionInfo {
 		// This version includes nodelocal dns only available in RKE v1.0.7 and up
 		// It also includes ingress-nginx 0.32.0
 		"v1.16.10-rancher2-1": {
-			MinRancherVersion: "2.3.7",
-			MinRKEVersion:     "1.0.7",
+			MinRancherVersion: "2.3.8-rc0",
+			MinRKEVersion:     "1.0.9-rc0",
 		},
 		// The Calico/Canal template in this version use functions that are only available in RKE v1.0.0 and up
 		"v1.17.4-rancher1-1": {
@@ -133,8 +137,8 @@ func loadK8sVersionInfo() map[string]v3.K8sVersionInfo {
 		// This version includes nodelocal dns only available in RKE v1.0.7 and up
 		// It also includes ingress-nginx 0.32.0
 		"v1.17.6-rancher2-1": {
-			MinRancherVersion: "2.3.7",
-			MinRKEVersion:     "1.0.7",
+			MinRancherVersion: "2.3.8-rc0",
+			MinRKEVersion:     "1.0.9-rc0",
 		},
 		"v1.8.10-rancher1-1": {
 			DeprecateRKEVersion:     "0.2.2",
