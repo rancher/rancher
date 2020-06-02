@@ -160,13 +160,6 @@ class AmazonWebServices(CloudProviderBase):
 
         if wait_for_ready:
             nodes = self.wait_for_nodes_state(nodes)
-            # hack for instances
-            if self.DOCKER_INSTALLED.lower() == 'true':
-                time.sleep(5)
-                self.reboot_nodes(nodes)
-                time.sleep(10)
-                nodes = self.wait_for_nodes_state(nodes)
-
             # wait for window nodes to come up so we can decrypt the password
             if ssh_user == "Administrator":
                 time.sleep(60 * 6)
