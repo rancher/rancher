@@ -256,6 +256,7 @@ if K8S_VERSION != "":
     rke_config["kubernetesVersion"] = K8S_VERSION
     rke_config_cis_1_4["kubernetesVersion"] = K8S_VERSION
     rke_config_cis_1_5["kubernetesVersion"] = K8S_VERSION
+    rke_config_windows["kubernetesVersion"] = K8S_VERSION
 
 
 rke_config_aws_provider = rke_config.copy()
