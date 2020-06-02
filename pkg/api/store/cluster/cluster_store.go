@@ -885,10 +885,10 @@ func validateS3Credentials(data map[string]interface{}) error {
 	}
 	exists, err := s3Client.BucketExists(bucket)
 	if err != nil {
-		return fmt.Errorf("Unable to validate S3 backup target configration: %v", err)
+		return fmt.Errorf("Unable to validate S3 backup target configuration: %v", err)
 	}
 	if !exists {
-		return fmt.Errorf("Unable to validate S3 backup target configration: bucket [%v] not found", bucket)
+		return fmt.Errorf("Unable to validate S3 backup target configuration: bucket [%v] not found", bucket)
 	}
 	return nil
 }
