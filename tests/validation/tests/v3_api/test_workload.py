@@ -786,7 +786,6 @@ def test_rbac_project_read_only_wl_edit(remove_resource):
     workload = cluster_owner_p_client.create_workload(name=name,
                                                       containers=con,
                                                       namespaceId=ns.id)
-    wait_for_wl_to_active(cluster_owner_p_client, workload)
     # project read-only can NOT edit existing workload
     with pytest.raises(ApiError) as e:
         p_client.update(workload, scale=2)
@@ -943,25 +942,35 @@ def test_rbac_wl_daemonset_list(role, remove_resource):
     wait_for_wl_to_active(p_client, workload)
     # switch to rbac role
     user_token = rbac_get_user_token_by_role(role)
-    p_client = get_project_client_for_token(project, user_token)
+    p_client_rbac = get_project_client_for_token(project, user_token)
+    assert len(p_client_rbac.list_workload(uuid=workload.uuid).data) == 1
     remove_resource(workload)
-    if role == CLUSTER_MEMBER:
-        assert len(p_client.list_workload().data) == 1
-    else:
-        assert len(p_client.list_workload().data) == 2
 
 
 
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
 def test_rbac_wl_daemonset_list_negative(role, remove_resource):
-    # roles can NOT see workloads in the project they have no access to
+    unshared_project = rbac_get_unshared_project()
+    ns = rbac_get_unshared_ns()
+    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    p_client = get_project_client_for_token(unshared_project, user_token)
+    con = [{"name": "test1", "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name,
+                                        containers=con,
+                                        namespaceId=ns.id,
+                                        daemonSetConfig={})
+    wait_for_wl_to_active(p_client, workload)
+
+    # switch to rbac role
+    user_token = rbac_get_user_token_by_role(role)
+    p_client_rbac = get_project_client_for_token(unshared_project, user_token)
     if role != CLUSTER_OWNER:
-        p2 = rbac_get_unshared_project()
-        user_token = rbac_get_user_token_by_role(role)
-        p_client = get_project_client_for_token(p2, user_token)
-        workloads = p_client.list_workload().data
-        assert len(workloads) == 0
+        assert len(p_client_rbac.list_workload(uuid=workload.uuid).data) == 0
+    else:
+        assert len(p_client_rbac.list_workload(uuid=workload.uuid).data) == 1
+    remove_resource(workload)
 
 
 @if_test_rbac
