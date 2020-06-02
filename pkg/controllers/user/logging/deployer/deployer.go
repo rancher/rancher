@@ -1,6 +1,7 @@
 package deployer
 
 import (
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
@@ -15,7 +16,6 @@ import (
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,7 +151,25 @@ func (d *Deployer) deployRancherLogging(systemProjectID, appCreator string) erro
 		return err
 	}
 
-	app := rancherLoggingApp(appCreator, systemProjectID, templateVersion.ExternalID, driverDir, dockerRootDir)
+	var clusterLogging *mgmtv3.ClusterLogging
+	if cls, err := d.clusterLoggingLister.List("", labels.NewSelector()); err == nil {
+		for _, cl := range cls {
+			if cl.Spec.ClusterName == cluster.Name {
+				clusterLogging = cl
+			}
+		}
+	} else {
+		return err
+	}
+
+	var tolerations []corev1.Toleration
+	if clusterLogging != nil {
+		tolerations = clusterLogging.Spec.Tolerations
+	} else {
+		tolerations = []corev1.Toleration{}
+	}
+
+	app := rancherLoggingApp(appCreator, systemProjectID, templateVersion.ExternalID, driverDir, dockerRootDir, tolerations)
 
 	windowsNodes, err := d.nodeLister.List(metav1.NamespaceAll, windowNodeLabel)
 	if err != nil {

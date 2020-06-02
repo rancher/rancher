@@ -141,10 +141,38 @@ func (d *AppDeployer) isDeploySuccess(targetNamespace string, selector map[strin
 	}
 }
 
-func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, dockerRoot string) *projectv3.App {
+func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, dockerRoot string, tolerations []k8scorev1.Toleration) *projectv3.App {
 	appName := loggingconfig.AppName
 	namepspace := loggingconfig.LoggingNamespace
 	_, systemProjectName := ref.Parse(systemProjectID)
+
+	answers := map[string]string{
+		//compatible with old version
+		"fluentd.enabled":              "true",
+		"fluentd.cluster.dockerRoot":   dockerRoot,
+		"log-aggregator.enabled":       "true",
+		"log-aggregator.flexVolumeDir": driverDir,
+
+		//new version
+		"fluentd.fluentd-linux.enabled":                     "true",
+                "fluentd.fluentd-linux.cluster.dockerRoot":          dockerRoot,
+		"log-aggregator.log-aggregator-linux.enabled":       "true",
+		"log-aggregator.log-aggregator-linux.flexVolumeDir": driverDir,
+	}
+
+	for i, toleration := range tolerations {
+		// linux
+		answers[fmt.Sprintf("log-aggregator.log-aggregator-linux.tolerations[%d].key", i)] = toleration.Key
+		answers[fmt.Sprintf("log-aggregator.log-aggregator-linux.tolerations[%d].value", i)] = toleration.Value
+		answers[fmt.Sprintf("log-aggregator.log-aggregator-linux.tolerations[%d].effect", i)] = string(toleration.Effect)
+		answers[fmt.Sprintf("log-aggregator.log-aggregator-linux.tolerations[%d].operator", i)] = string(toleration.Operator)
+
+		// windows
+		answers[fmt.Sprintf("log-aggregator.log-aggregator-windows.tolerations[%d].key", i)] = toleration.Key
+		answers[fmt.Sprintf("log-aggregator.log-aggregator-windows.tolerations[%d].value", i)] = toleration.Value
+		answers[fmt.Sprintf("log-aggregator.log-aggregator-windows.tolerations[%d].effect", i)] = string(toleration.Effect)
+		answers[fmt.Sprintf("log-aggregator.log-aggregator-windows.tolerations[%d].operator", i)] = string(toleration.Operator)
+	}
 
 	return &projectv3.App{
 		ObjectMeta: metav1.ObjectMeta{
@@ -155,19 +183,7 @@ func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, docker
 			Namespace: systemProjectName,
 		},
 		Spec: projectv3.AppSpec{
-			Answers: map[string]string{
-				//compatible with old version
-				"fluentd.enabled":              "true",
-				"fluentd.cluster.dockerRoot":   dockerRoot,
-				"log-aggregator.enabled":       "true",
-				"log-aggregator.flexVolumeDir": driverDir,
-
-				//new version
-				"fluentd.fluentd-linux.enabled":                     "true",
-				"fluentd.fluentd-linux.cluster.dockerRoot":          dockerRoot,
-				"log-aggregator.log-aggregator-linux.enabled":       "true",
-				"log-aggregator.log-aggregator-linux.flexVolumeDir": driverDir,
-			},
+			Answers:         answers,
 			Description:     "Rancher Logging for collect logs",
 			ExternalID:      catalogID,
 			ProjectName:     systemProjectID,
