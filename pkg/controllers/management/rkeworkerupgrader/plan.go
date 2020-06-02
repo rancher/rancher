@@ -194,7 +194,7 @@ func processChanged(newp v3.Process, oldp v3.Process) bool {
 		return true
 	}
 
-	if sliceChanged(oldp.Binds, newp.Binds) {
+	if sliceChangedUnordered(oldp.Binds, newp.Binds) {
 		logrus.Infof("binds changed for [%s] old: %v new %v", name, oldp.Binds, newp.Binds)
 		return true
 	}
