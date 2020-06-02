@@ -317,7 +317,8 @@ func clusterUpLocal(ctx *cli.Context) error {
 		rkeConfig.Nodes = []v3.RKEConfigNode{*cluster.GetLocalRKENodeConfig()}
 	}
 
-	rkeConfig.IgnoreDockerVersion = ctx.Bool("ignore-docker-version")
+	ignoreDockerVersion := ctx.Bool("ignore-docker-version")
+	rkeConfig.IgnoreDockerVersion = &ignoreDockerVersion
 
 	// setting up the dialers
 	dialers := hosts.GetDialerOptions(nil, hosts.LocalHealthcheckFactory, nil)

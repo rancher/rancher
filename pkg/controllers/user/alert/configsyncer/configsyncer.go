@@ -578,7 +578,7 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 					Smarthost:      notifier.Spec.SMTPConfig.Host + ":" + strconv.Itoa(notifier.Spec.SMTPConfig.Port),
 					AuthPassword:   alertconfig.Secret(notifier.Spec.SMTPConfig.Password),
 					AuthUsername:   notifier.Spec.SMTPConfig.Username,
-					RequireTLS:     &notifier.Spec.SMTPConfig.TLS,
+					RequireTLS:     notifier.Spec.SMTPConfig.TLS,
 					To:             notifier.Spec.SMTPConfig.DefaultRecipient,
 					Headers:        header,
 					From:           notifier.Spec.SMTPConfig.Sender,

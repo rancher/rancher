@@ -89,10 +89,10 @@ const (
 	DefaultMaxUnavailableControlplane = "1"
 	DefaultNodeDrainTimeout           = 120
 	DefaultNodeDrainGracePeriod       = -1
-	DefaultNodeDrainIgnoreDaemonsets  = true
 )
 
 var (
+	DefaultNodeDrainIgnoreDaemonsets      = true
 	DefaultDaemonSetMaxUnavailable        = intstr.FromInt(1)
 	DefaultDeploymentUpdateStrategyParams = intstr.FromString("25%")
 	DefaultDaemonSetUpdateStrategy        = v3.DaemonSetUpdateStrategy{
@@ -242,7 +242,7 @@ func (c *Cluster) setNodeUpgradeStrategy() {
 	}
 	if c.UpgradeStrategy.DrainInput == nil {
 		c.UpgradeStrategy.DrainInput = &v3.NodeDrainInput{
-			IgnoreDaemonSets: DefaultNodeDrainIgnoreDaemonsets,
+			IgnoreDaemonSets: &DefaultNodeDrainIgnoreDaemonsets,
 			// default to 120 seems to work better for controlplane nodes
 			Timeout: DefaultNodeDrainTimeout,
 			//Period of time in seconds given to each pod to terminate gracefully.
