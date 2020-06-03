@@ -2639,13 +2639,9 @@ def configure_cis_requirements(aws_nodes, profile, node_roles, client,
     if profile == 'rke-cis-1.5':
         create_kubeconfig(cluster)
         network_policy_file = DATA_SUBDIR + "/default-allow-all.yaml"
-        account_update_file = DATA_SUBDIR + "/account_update.yaml"
         items = execute_kubectl_cmd("get namespaces -A")["items"]
         all_ns = [item["metadata"]["name"] for item in items]
         for ns in all_ns:
             execute_kubectl_cmd("apply -f {0} -n {1}".
                                 format(network_policy_file, ns))
-            execute_kubectl_cmd('patch serviceaccount default'
-                                ' -n {0} -p "$(cat {1})"'.
-                                format(ns, account_update_file))
     return cluster
