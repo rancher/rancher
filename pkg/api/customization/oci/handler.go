@@ -1,27 +1,24 @@
 package oci
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 
-	"github.com/rancher/norman/api/access"
-	"github.com/rancher/norman/types"
-	client "github.com/rancher/types/client/management/v3"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/gorilla/mux"
 	"github.com/oracle/oci-go-sdk/common"
+	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/ref"
-	v1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
-
-	"encoding/json"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/namespace"
+	"github.com/sirupsen/logrus"
 )
 
 type Credentials struct {
@@ -42,34 +39,34 @@ var requiredDataFields = map[string]string{
 	"privateKeyContents": "ocicredentialConfig-privateKeyContents",
 }
 
-type Handler struct {
+type handler struct {
 	Action        string
 	schemas       *types.Schemas
 	secretsLister v1.SecretLister
 }
 
 func NewOCIHandler(scaledContext *config.ScaledContext) http.Handler {
-	return &Handler{
+	return &handler{
 		schemas:       scaledContext.Schemas,
 		secretsLister: scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
 	}
 }
 
-func (handler *Handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+func (handler *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 	writer.Header().Set("Content-Type", "application/json")
 
-	// New credential every call
+	// New credential every invocation
 	creds := Credentials{}
-	errCode, err := handler.extractCreds(writer, req, &creds)
+	errCode, err := handler.extractCreds(req, &creds)
 	if err != nil {
-		util.ReturnHTTPError(writer, req, errCode.Status, err.Error())
+		util.ReturnHTTPError(writer, req, errCode, err.Error())
 		return
 	}
 
 	err = handler.validateCreds(&creds)
 	if err != nil {
-		util.ReturnHTTPError(writer, req, httperror.ServerError.Status, err.Error())
+		util.ReturnHTTPError(writer, req, httperror.InvalidBodyContent.Status, err.Error())
 		return
 	}
 
@@ -84,49 +81,49 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 	case "vcns":
 		if serialized, errCode, err = processVcns(provider, creds.Compartment); err != nil {
 			logrus.Debugf("[oci-handler] error processing VCNs: %v", err)
-			util.ReturnHTTPError(writer, req, errCode.Status, err.Error())
+			util.ReturnHTTPError(writer, req, errCode, err.Error())
 			return
 		}
 		writer.Write(serialized)
 	case "okeVersions":
 		if serialized, errCode, err = processOkeVersions(provider); err != nil {
 			logrus.Debugf("[oci-handler] error processing OKE versions: %v", err)
-			util.ReturnHTTPError(writer, req, errCode.Status, err.Error())
+			util.ReturnHTTPError(writer, req, errCode, err.Error())
 			return
 		}
 		writer.Write(serialized)
 	case "availabilityDomains":
 		if serialized, errCode, err = processAvailabilityDomains(provider, creds.Compartment); err != nil {
 			logrus.Debugf("[oci-handler] error processing ADs: %v", err)
-			util.ReturnHTTPError(writer, req, errCode.Status, err.Error())
+			util.ReturnHTTPError(writer, req, errCode, err.Error())
 			return
 		}
 		writer.Write(serialized)
 	case "regions":
 		if serialized, errCode, err = processRegions(provider, creds.Tenancy); err != nil {
 			logrus.Debugf("[oci-handler] error processing regions: %v", err)
-			util.ReturnHTTPError(writer, req, errCode.Status, err.Error())
+			util.ReturnHTTPError(writer, req, errCode, err.Error())
 			return
 		}
 		writer.Write(serialized)
 	case "nodeShapes":
 		if serialized, errCode, err = processNodeShapes(provider, creds.Compartment); err != nil {
 			logrus.Debugf("[oci-handler] error processing node shapes: %v", err)
-			util.ReturnHTTPError(writer, req, errCode.Status, err.Error())
+			util.ReturnHTTPError(writer, req, errCode, err.Error())
 			return
 		}
 		writer.Write(serialized)
 	case "nodeImages":
 		if serialized, errCode, err = processImages(provider, creds.Compartment); err != nil {
 			logrus.Debugf("[oci-handler] error processing images: %v", err)
-			util.ReturnHTTPError(writer, req, errCode.Status, err.Error())
+			util.ReturnHTTPError(writer, req, errCode, err.Error())
 			return
 		}
 		writer.Write(serialized)
 	case "nodeOkeImages":
 		if serialized, errCode, err = processNodeOkeImages(provider); err != nil {
 			logrus.Debugf("[oci-handler] error processing OKE images: %v", err)
-			util.ReturnHTTPError(writer, req, errCode.Status, err.Error())
+			util.ReturnHTTPError(writer, req, errCode, err.Error())
 			return
 		}
 		writer.Write(serialized)
@@ -136,29 +133,29 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 }
 
 // extractCreds attempts to extract the credentials from a given request either from the body or cloud credentials.
-func (handler *Handler) extractCreds(writer http.ResponseWriter, req *http.Request, creds *Credentials) (httperror.ErrorCode, error) {
+func (handler *handler) extractCreds(req *http.Request, creds *Credentials) (int, error) {
 
 	if credID := req.URL.Query().Get("cloudCredentialId"); credID != "" {
 		ns, name := ref.Parse(credID)
 		if ns == "" || name == "" {
 			logrus.Debugf("[oci-handler] invalid cloud credential ID %s", credID)
-			return httperror.InvalidBodyContent, fmt.Errorf("invalid cloud credential ID %s", credID)
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("invalid cloud credential ID %s", credID)
 		}
 
 		var accessCred client.CloudCredential //var to check access
 		if err := access.ByID(handler.generateAPIContext(req), &schema.Version, client.CloudCredentialType, credID, &accessCred); err != nil {
 			if apiError, ok := err.(*httperror.APIError); ok {
 				if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
-					return httperror.NotFound, fmt.Errorf("cloud credential not found")
+					return httperror.NotFound.Status, fmt.Errorf("cloud credential not found")
 				}
 			}
-			return httperror.NotFound, err
+			return httperror.NotFound.Status, err
 		}
 
 		cc, err := handler.secretsLister.Get(namespace.GlobalNamespace, name)
 		if err != nil {
 			logrus.Debugf("[oci-handler] error accessing cloud credential %s", credID)
-			return httperror.InvalidBodyContent, fmt.Errorf("error accessing cloud credential %s", credID)
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("error accessing cloud credential %s", credID)
 		}
 
 		creds.Tenancy = string(cc.Data[requiredDataFields["tenancyId"]])
@@ -179,23 +176,23 @@ func (handler *Handler) extractCreds(writer http.ResponseWriter, req *http.Reque
 		raw, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			logrus.Debugf("[oci-handler] cannot read request body: " + err.Error())
-			return httperror.InvalidBodyContent, fmt.Errorf("cannot read request body: " + err.Error())
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cannot read request body: " + err.Error())
 		}
 
 		err = json.Unmarshal(raw, &creds)
 		if err != nil {
 			logrus.Debugf("[oci-handler] cannot parse request body: " + err.Error())
-			return httperror.InvalidBodyContent, fmt.Errorf("cannot parse request body: " + err.Error())
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cannot parse request body: " + err.Error())
 		}
 	} else {
-		return httperror.Unauthorized, fmt.Errorf("cannot access OCI API without credentials to authenticate")
+		return httperror.Unauthorized.Status, fmt.Errorf("cannot access OCI API without credentials to authenticate")
 	}
 
-	return httperror.ErrorCode{}, nil
+	return http.StatusOK, nil
 }
 
 // validateCreds validates that all the required credential fields are populated. Optional values may be defaulted.
-func (handler *Handler) validateCreds(creds *Credentials) error {
+func (handler *handler) validateCreds(creds *Credentials) error {
 
 	// We can default these two if missing
 	if creds.Compartment == "" {
@@ -228,7 +225,7 @@ func (handler *Handler) validateCreds(creds *Credentials) error {
 	return nil
 }
 
-func (handler *Handler) generateAPIContext(req *http.Request) *types.APIContext {
+func (handler *handler) generateAPIContext(req *http.Request) *types.APIContext {
 	return &types.APIContext{
 		Method:  req.Method,
 		Request: req,
