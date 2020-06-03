@@ -1,4 +1,4 @@
-// Copyright 2015 Brett Vickers.
+// Copyright 2015-2019 Brett Vickers.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -10,46 +10,74 @@ import (
 )
 
 /*
-A Path is an object that represents an optimized version of an
-XPath-like search string.  Although path strings are XPath-like,
-only the following limited syntax is supported:
+A Path is a string that represents a search path through an etree starting
+from the document root or an arbitrary element. Paths are used with the
+Element object's Find* methods to locate and return desired elements.
 
-    .               Selects the current element
-    ..              Selects the parent of the current element
-    *               Selects all child elements
-    //              Selects all descendants of the current element
-    tag             Selects all child elements with the given tag
-    [#]             Selects the element of the given index (1-based,
-                      negative starts from the end)
-    [@attrib]       Selects all elements with the given attribute
-    [@attrib='val'] Selects all elements with the given attribute set to val
-    [tag]           Selects all elements with a child element named tag
-    [tag='val']     Selects all elements with a child element named tag
-                      and text matching val
-    [text()]        Selects all elements with non-empty text
-    [text()='val']  Selects all elements whose text matches val
+A Path consists of a series of slash-separated "selectors", each of which may
+be modified by one or more bracket-enclosed "filters". Selectors are used to
+traverse the etree from element to element, while filters are used to narrow
+the list of candidate elements at each node.
 
-Examples:
+Although etree Path strings are similar to XPath strings
+(https://www.w3.org/TR/1999/REC-xpath-19991116/), they have a more limited set
+of selectors and filtering options.
 
-Select the title elements of all descendant book elements having a
-'category' attribute of 'WEB':
+The following selectors are supported by etree Path strings:
+
+    .               Select the current element.
+    ..              Select the parent of the current element.
+    *               Select all child elements of the current element.
+    /               Select the root element when used at the start of a path.
+    //              Select all descendants of the current element.
+    tag             Select all child elements with a name matching the tag.
+
+The following basic filters are supported by etree Path strings:
+
+    [@attrib]       Keep elements with an attribute named attrib.
+    [@attrib='val'] Keep elements with an attribute named attrib and value matching val.
+    [tag]           Keep elements with a child element named tag.
+    [tag='val']     Keep elements with a child element named tag and text matching val.
+    [n]             Keep the n-th element, where n is a numeric index starting from 1.
+
+The following function filters are also supported:
+
+    [text()]                    Keep elements with non-empty text.
+    [text()='val']              Keep elements whose text matches val.
+    [local-name()='val']        Keep elements whose un-prefixed tag matches val.
+    [name()='val']              Keep elements whose full tag exactly matches val.
+    [namespace-prefix()='val']  Keep elements whose namespace prefix matches val.
+    [namespace-uri()='val']     Keep elements whose namespace URI matches val.
+
+Here are some examples of Path strings:
+
+- Select the bookstore child element of the root element:
+    /bookstore
+
+- Beginning from the root element, select the title elements of all
+descendant book elements having a 'category' attribute of 'WEB':
     //book[@category='WEB']/title
 
-Select the first book element with a title child containing the text
-'Great Expectations':
+- Beginning from the current element, select the first descendant
+book element with a title child element containing the text 'Great
+Expectations':
     .//book[title='Great Expectations'][1]
 
-Starting from the current element, select all children of book elements
-with an attribute 'language' set to 'english':
+- Beginning from the current element, select all child elements of
+book elements with an attribute 'language' set to 'english':
     ./book/*[@language='english']
 
-Starting from the current element, select all children of book elements
-containing the text 'special':
+- Beginning from the current element, select all child elements of
+book elements containing the text 'special':
     ./book/*[text()='special']
 
-Select all descendant book elements whose title element has an attribute
-'language' set to 'french':
-    //book/title[@language='french']/..
+- Beginning from the current element, select all descendant book
+elements whose title child element has a 'language' attribute of 'french':
+    .//book/title[@language='french']/..
+
+- Beginning from the current element, select all book elements
+belonging to the http://www.w3.org/TR/html4/ namespace:
+	.//book[namespace-uri()='http://www.w3.org/TR/html4/']
 
 */
 type Path struct {
@@ -180,22 +208,20 @@ type compiler struct {
 // through an element tree and returns a slice of segment
 // descriptors.
 func (c *compiler) parsePath(path string) []segment {
-	// If path starts or ends with //, fix it
-	if strings.HasPrefix(path, "//") {
-		path = "." + path
-	}
+	// If path ends with //, fix it
 	if strings.HasSuffix(path, "//") {
 		path = path + "*"
 	}
 
-	// Paths cannot be absolute
+	var segments []segment
+
+	// Check for an absolute path
 	if strings.HasPrefix(path, "/") {
-		c.err = ErrPath("paths cannot be absolute.")
-		return nil
+		segments = append(segments, segment{new(selectRoot), []filter{}})
+		path = path[1:]
 	}
 
-	// Split path into segment objects
-	var segments []segment
+	// Split path into segments
 	for _, s := range splitPath(path) {
 		segments = append(segments, c.parseSegment(s))
 		if c.err != ErrPath("") {
@@ -225,7 +251,7 @@ func (c *compiler) parseSegment(path string) segment {
 	pieces := strings.Split(path, "[")
 	seg := segment{
 		sel:     c.parseSelector(pieces[0]),
-		filters: make([]filter, 0),
+		filters: []filter{},
 	}
 	for i := 1; i < len(pieces); i++ {
 		fpath := pieces[i]
@@ -254,6 +280,17 @@ func (c *compiler) parseSelector(path string) selector {
 	}
 }
 
+var fnTable = map[string]struct {
+	hasFn    func(e *Element) bool
+	getValFn func(e *Element) string
+}{
+	"local-name":       {nil, (*Element).name},
+	"name":             {nil, (*Element).FullTag},
+	"namespace-prefix": {nil, (*Element).namespacePrefix},
+	"namespace-uri":    {nil, (*Element).NamespaceURI},
+	"text":             {(*Element).hasText, (*Element).Text},
+}
+
 // parseFilter parses a path filter contained within [brackets].
 func (c *compiler) parseFilter(path string) filter {
 	if len(path) == 0 {
@@ -261,7 +298,7 @@ func (c *compiler) parseFilter(path string) filter {
 		return nil
 	}
 
-	// Filter contains [@attr='val'], [text()='val'], or [tag='val']?
+	// Filter contains [@attr='val'], [fn()='val'], or [tag='val']?
 	eqindex := strings.Index(path, "='")
 	if eqindex >= 0 {
 		rindex := nextIndex(path, "'", eqindex+2)
@@ -269,22 +306,36 @@ func (c *compiler) parseFilter(path string) filter {
 			c.err = ErrPath("path has mismatched filter quotes.")
 			return nil
 		}
+
+		key := path[:eqindex]
+		value := path[eqindex+2 : rindex]
+
 		switch {
-		case path[0] == '@':
-			return newFilterAttrVal(path[1:eqindex], path[eqindex+2:rindex])
-		case strings.HasPrefix(path, "text()"):
-			return newFilterTextVal(path[eqindex+2 : rindex])
+		case key[0] == '@':
+			return newFilterAttrVal(key[1:], value)
+		case strings.HasSuffix(key, "()"):
+			fn := key[:len(key)-2]
+			if t, ok := fnTable[fn]; ok && t.getValFn != nil {
+				return newFilterFuncVal(t.getValFn, value)
+			}
+			c.err = ErrPath("path has unknown function " + fn)
+			return nil
 		default:
-			return newFilterChildText(path[:eqindex], path[eqindex+2:rindex])
+			return newFilterChildText(key, value)
 		}
 	}
 
-	// Filter contains [@attr], [N], [tag] or [text()]
+	// Filter contains [@attr], [N], [tag] or [fn()]
 	switch {
 	case path[0] == '@':
 		return newFilterAttr(path[1:])
-	case path == "text()":
-		return newFilterText()
+	case strings.HasSuffix(path, "()"):
+		fn := path[:len(path)-2]
+		if t, ok := fnTable[fn]; ok && t.hasFn != nil {
+			return newFilterFunc(t.hasFn)
+		}
+		c.err = ErrPath("path has unknown function " + fn)
+		return nil
 	case isInteger(path):
 		pos, _ := strconv.Atoi(path)
 		switch {
@@ -303,6 +354,17 @@ type selectSelf struct{}
 
 func (s *selectSelf) apply(e *Element, p *pather) {
 	p.candidates = append(p.candidates, e)
+}
+
+// selectRoot selects the element's root node.
+type selectRoot struct{}
+
+func (s *selectRoot) apply(e *Element, p *pather) {
+	root := e
+	for root.parent != nil {
+		root = root.parent
+	}
+	p.candidates = append(p.candidates, root)
 }
 
 // selectParent selects the element's parent into the candidate list.
@@ -431,35 +493,39 @@ func (f *filterAttrVal) apply(p *pather) {
 	p.candidates, p.scratch = p.scratch, p.candidates[0:0]
 }
 
-// filterText filters the candidate list for elements having text.
-type filterText struct{}
-
-func newFilterText() *filterText {
-	return &filterText{}
+// filterFunc filters the candidate list for elements satisfying a custom
+// boolean function.
+type filterFunc struct {
+	fn func(e *Element) bool
 }
 
-func (f *filterText) apply(p *pather) {
+func newFilterFunc(fn func(e *Element) bool) *filterFunc {
+	return &filterFunc{fn}
+}
+
+func (f *filterFunc) apply(p *pather) {
 	for _, c := range p.candidates {
-		if c.Text() != "" {
+		if f.fn(c) {
 			p.scratch = append(p.scratch, c)
 		}
 	}
 	p.candidates, p.scratch = p.scratch, p.candidates[0:0]
 }
 
-// filterTextVal filters the candidate list for elements having
-// text equal to the specified value.
-type filterTextVal struct {
+// filterFuncVal filters the candidate list for elements containing a value
+// matching the result of a custom function.
+type filterFuncVal struct {
+	fn  func(e *Element) string
 	val string
 }
 
-func newFilterTextVal(value string) *filterTextVal {
-	return &filterTextVal{value}
+func newFilterFuncVal(fn func(e *Element) string, value string) *filterFuncVal {
+	return &filterFuncVal{fn, value}
 }
 
-func (f *filterTextVal) apply(p *pather) {
+func (f *filterFuncVal) apply(p *pather) {
 	for _, c := range p.candidates {
-		if c.Text() == f.val {
+		if f.fn(c) == f.val {
 			p.scratch = append(p.scratch, c)
 		}
 	}

@@ -59,31 +59,51 @@ func childPath(space, tag string) string {
 	}
 }
 
-// The RemoveElement method on etree.Element isn't recursive...
-func recursivelyRemoveElement(tree, el *etree.Element) bool {
-	if tree.RemoveChild(el) != nil {
-		return true
+func mapPathToElement(tree, el *etree.Element) []int {
+	for i, child := range tree.Child {
+		if child == el {
+			return []int{i}
+		}
 	}
 
-	for _, child := range tree.Child {
+	for i, child := range tree.Child {
 		if childElement, ok := child.(*etree.Element); ok {
-			if recursivelyRemoveElement(childElement, el) {
-				return true
+			childPath := mapPathToElement(childElement, el)
+			if childElement != nil {
+				return append([]int{i}, childPath...)
 			}
 		}
 	}
 
-	return false
+	return nil
 }
 
-// transform applies the passed set of transforms to the specified root element.
+func removeElementAtPath(el *etree.Element, path []int) bool {
+	if len(path) == 0 {
+		return false
+	}
+
+	if len(el.Child) <= path[0] {
+		return false
+	}
+
+	childElement, ok := el.Child[path[0]].(*etree.Element)
+	if !ok {
+		return false
+	}
+
+	if len(path) == 1 {
+		el.RemoveChild(childElement)
+		return true
+	}
+
+	return removeElementAtPath(childElement, path[1:])
+}
+
+// Transform returns a new element equivalent to the passed root el, but with
+// the set of transformations described by the ref applied.
 //
 // The functionality of transform is currently very limited and purpose-specific.
-//
-// NOTE(russell_h): Ideally this wouldn't mutate the root passed to it, and would
-// instead return a copy. Unfortunately copying the tree makes it difficult to
-// correctly locate the signature. I'm opting, for now, to simply mutate the root
-// parameter.
 func (ctx *ValidationContext) transform(
 	el *etree.Element,
 	sig *types.Signature,
@@ -94,6 +114,14 @@ func (ctx *ValidationContext) transform(
 		return nil, nil, errors.New("Expected Enveloped and C14N transforms")
 	}
 
+	// map the path to the passed signature relative to the passed root, in
+	// order to enable removal of the signature by an enveloped signature
+	// transform
+	signaturePath := mapPathToElement(el, sig.UnderlyingElement())
+
+	// make a copy of the passed root
+	el = el.Copy()
+
 	var canonicalizer Canonicalizer
 
 	for _, transform := range transforms {
@@ -101,7 +129,7 @@ func (ctx *ValidationContext) transform(
 
 		switch AlgorithmID(algo) {
 		case EnvelopedSignatureAltorithmId:
-			if !recursivelyRemoveElement(el, sig.UnderlyingElement()) {
+			if !removeElementAtPath(el, signaturePath) {
 				return nil, nil, errors.New("Error applying canonicalization transform: Signature not found")
 			}
 
@@ -157,7 +185,16 @@ func (ctx *ValidationContext) digest(el *etree.Element, digestAlgorithmId string
 func (ctx *ValidationContext) verifySignedInfo(sig *types.Signature, canonicalizer Canonicalizer, signatureMethodId string, cert *x509.Certificate, decodedSignature []byte) error {
 	signatureElement := sig.UnderlyingElement()
 
-	signedInfo := signatureElement.FindElement(childPath(signatureElement.Space, SignedInfoTag))
+	nsCtx, err := etreeutils.NSBuildParentContext(signatureElement)
+	if err != nil {
+		return err
+	}
+
+	signedInfo, err := etreeutils.NSFindOneChildCtx(nsCtx, signatureElement, Namespace, SignedInfoTag)
+	if err != nil {
+		return err
+	}
+
 	if signedInfo == nil {
 		return errors.New("Missing SignedInfo")
 	}
@@ -272,19 +309,18 @@ func (ctx *ValidationContext) findSignature(el *etree.Element) (*types.Signature
 	err := etreeutils.NSFindIterate(el, Namespace, SignatureTag, func(ctx etreeutils.NSContext, el *etree.Element) error {
 
 		found := false
-		err := etreeutils.NSFindIterateCtx(ctx, el, Namespace, SignedInfoTag,
+		err := etreeutils.NSFindChildrenIterateCtx(ctx, el, Namespace, SignedInfoTag,
 			func(ctx etreeutils.NSContext, signedInfo *etree.Element) error {
-				// Ignore any SignedInfo that isn't an immediate descendent of Signature.
-				if signedInfo.Parent() != el {
-					return nil
-				}
-
 				detachedSignedInfo, err := etreeutils.NSDetatch(ctx, signedInfo)
 				if err != nil {
 					return err
 				}
 
-				c14NMethod := detachedSignedInfo.FindElement(childPath(detachedSignedInfo.Space, CanonicalizationMethodTag))
+				c14NMethod, err := etreeutils.NSFindOneChildCtx(ctx, detachedSignedInfo, Namespace, CanonicalizationMethodTag)
+				if err != nil {
+					return err
+				}
+
 				if c14NMethod == nil {
 					return errors.New("missing CanonicalizationMethod on Signature")
 				}
