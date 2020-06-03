@@ -9,6 +9,8 @@ DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
 RANCHER_REGION = os.environ.get("AWS_REGION")
 RANCHER_VPC_ID = os.environ.get("AWS_VPC")
 RANCHER_SUBNETS = os.environ.get("AWS_SUBNET")
+RANCHER_AWS_SG = os.environ.get("AWS_SG")
+RANCHER_AVAILABILITY_ZONE = os.environ.get("AWS_AVAILABILITY_ZONE")
 RANCHER_AWS_AMI = os.environ.get("AWS_AMI", "")
 RANCHER_AWS_USER = os.environ.get("AWS_USER", "ubuntu")
 AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME", "")
@@ -120,6 +122,8 @@ def create_multiple_control_cluster():
                    variables={'region': RANCHER_REGION,
                               'vpc_id': RANCHER_VPC_ID,
                               'subnets': RANCHER_SUBNETS,
+                              'sg_id': RANCHER_AWS_SG,
+                              'availability_zone': RANCHER_AVAILABILITY_ZONE,
                               'aws_ami': RANCHER_AWS_AMI,
                               'aws_user': RANCHER_AWS_USER,
                               'resource_name': RANCHER_RESOURCE_NAME,
@@ -147,6 +151,8 @@ def create_multiple_control_cluster():
                    variables={'region': RANCHER_REGION,
                               'vpc_id': RANCHER_VPC_ID,
                               'subnets': RANCHER_SUBNETS,
+                              'sg_id': RANCHER_AWS_SG,
+                              'availability_zone': RANCHER_AVAILABILITY_ZONE,
                               'aws_ami': RANCHER_AWS_AMI,
                               'aws_user': RANCHER_AWS_USER,
                               'ec2_instance_class': RANCHER_EC2_INSTANCE_CLASS,

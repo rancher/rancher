@@ -24,6 +24,9 @@ resource "aws_instance" "master" {
     host        = self.public_ip
     private_key = "${file(var.access_key)}"
   }
+  subnet_id = var.subnets
+  availability_zone = var.availability_zone
+  vpc_security_group_ids = ["${var.sg_id}"]
   key_name = "jenkins-rke-validation"
   tags = {
     Name = "${var.resource_name}-multinode-server"
@@ -56,6 +59,9 @@ resource "aws_instance" "master2-ha" {
     host        = self.public_ip
     private_key = "${file(var.access_key)}"
   }
+  subnet_id = var.subnets
+  availability_zone = var.availability_zone
+  vpc_security_group_ids = ["${var.sg_id}"]
   key_name = "jenkins-rke-validation"
   tags = {
     Name = "${var.resource_name}-multinode-servers"
