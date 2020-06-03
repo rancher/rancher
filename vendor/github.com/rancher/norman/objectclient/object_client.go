@@ -221,6 +221,14 @@ func (p *ObjectClient) Delete(name string, opts *metav1.DeleteOptions) error {
 func (p *ObjectClient) List(opts metav1.ListOptions) (runtime.Object, error) {
 	result := p.Factory.List()
 	logrus.Tracef("REST LIST %s/%s/%s/%s/%s", p.getAPIPrefix(), p.gvk.Group, p.gvk.Version, p.ns, p.resource.Name)
+
+	// If ResourceVersion is set to 0 then the Limit is ignored on the API side. Usually
+	// that's not a problem, but with very large counts of a single object type the client will
+	// hit it's connection timeout
+	if opts.ResourceVersion == "0" {
+		opts.ResourceVersion = ""
+	}
+
 	return result, p.restClient.Get().
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
 		NamespaceIfScoped(p.ns, p.resource.Namespaced).
@@ -233,6 +241,11 @@ func (p *ObjectClient) List(opts metav1.ListOptions) (runtime.Object, error) {
 func (p *ObjectClient) ListNamespaced(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
 	result := p.Factory.List()
 	logrus.Tracef("REST LIST %s/%s/%s/%s/%s", p.getAPIPrefix(), p.gvk.Group, p.gvk.Version, namespace, p.resource.Name)
+
+	if opts.ResourceVersion == "0" {
+		opts.ResourceVersion = ""
+	}
+
 	return result, p.restClient.Get().
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
 		NamespaceIfScoped(namespace, p.resource.Namespaced).
