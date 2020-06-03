@@ -9,3 +9,5 @@ variable "k3s_version" {}
 variable "no_of_worker_nodes" {}
 variable "worker_flags" {}
 variable "ec2_instance_class" {}
+variable "availability_zone" {}
+variable "sg_id" {}
