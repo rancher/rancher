@@ -16,7 +16,7 @@ quay.io/coreos/prometheus-config-reloader rancher/coreos-prometheus-config-reloa
 quay.io/coreos/kube-state-metrics rancher/coreos-kube-state-metrics v1.9.5
 plugins/docker rancher/plugins-docker 18.09
 minio/minio rancher/minio-minio RELEASE.2020-02-07T23-28-16Z
-grafana/grafana rancher/grafana-grafana 6.7.3
+grafana/grafana rancher/grafana-grafana 6.7.4
 prom/prometheus rancher/prom-prometheus v2.17.2
 prom/alertmanager rancher/prom-alertmanager v0.20.0
 prom/node-exporter rancher/prom-node-exporter v0.18.1
