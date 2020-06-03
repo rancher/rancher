@@ -2654,38 +2654,17 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
 def configure_cis_requirements(aws_nodes, profile, node_roles, client,
                                cluster):
     i = 0
-    if profile == 'rke-cis-1.4':
-        for aws_node in aws_nodes:
-            aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-            aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-            aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
-            if node_roles[i] == ["etcd"]:
-                aws_node.execute_command("sudo useradd etcd")
-            docker_run_cmd = \
-                get_custom_host_registration_cmd(client,
-                                                 cluster,
-                                                 node_roles[i],
-                                                 aws_node)
-            aws_node.execute_command(docker_run_cmd)
-            i += 1
-    elif profile == 'rke-cis-1.5':
-        for aws_node in aws_nodes:
-            aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-            aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-            aws_node.execute_command("sudo sysctl -w vm.panic_on_oom=0")
-            aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
-            aws_node.execute_command("sudo sysctl -w "
-                                     "kernel.keys.root_maxbytes=25000000")
-            if node_roles[i] == ["etcd"]:
-                aws_node.execute_command("sudo groupadd -g 52034 etcd")
-                aws_node.execute_command("sudo useradd -u 52034 -g 52034 etcd")
-            docker_run_cmd = \
-                get_custom_host_registration_cmd(client,
-                                                 cluster,
-                                                 node_roles[i],
-                                                 aws_node)
-            aws_node.execute_command(docker_run_cmd)
-            i += 1
+    for aws_node in aws_nodes:
+        apply_node_sysctl_settings_for_cis(aws_node, profile)
+        if node_roles[i] == ["etcd"]:
+            apply_node_etcd_user_permissions_for_cis(aws_node, profile)
+        docker_run_cmd = \
+            get_custom_host_registration_cmd(client,
+                                             cluster,
+                                             node_roles[i],
+                                             aws_node)
+        aws_node.execute_command(docker_run_cmd)
+        i += 1
     time.sleep(5)
     cluster = validate_cluster_state(client, cluster)
 
@@ -2700,6 +2679,28 @@ def configure_cis_requirements(aws_nodes, profile, node_roles, client,
             execute_kubectl_cmd("apply -f {0} -n {1}".
                                 format(network_policy_file, ns))
     return cluster
+
+
+def apply_node_sysctl_settings_for_cis(node, profile):
+    if profile == 'rke-cis-1.4':
+        node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
+        node.execute_command("sudo sysctl -w kernel.panic=10")
+        node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
+    elif profile == 'rke-cis-1.5':
+        node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
+        node.execute_command("sudo sysctl -w kernel.panic=10")
+        node.execute_command("sudo sysctl -w vm.panic_on_oom=0")
+        node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
+        node.execute_command("sudo sysctl -w "
+                             "kernel.keys.root_maxbytes=25000000")
+
+
+def apply_node_etcd_user_permissions_for_cis(node, profile):
+    if profile == 'rke-cis-1.4':
+        node.execute_command("sudo useradd etcd")
+    elif profile == 'rke-cis-1.5':
+        node.execute_command("sudo groupadd -g 52034 etcd")
+        node.execute_command("sudo useradd -u 52034 -g 52034 etcd")
 
 
 def get_node_details(cluster, client):

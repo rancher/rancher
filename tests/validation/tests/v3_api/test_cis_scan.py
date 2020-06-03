@@ -3,10 +3,13 @@ import requests
 import time
 from rancher import ApiError
 from lib.aws import AmazonWebServices
-from .common import CLUSTER_MEMBER, configure_cis_requirements
+from .common import CLUSTER_MEMBER
 from .common import CLUSTER_OWNER
 from .common import CIS_SCAN_PROFILE
+from .common import apply_node_etcd_user_permissions_for_cis
+from .common import apply_node_sysctl_settings_for_cis
 from .common import cluster_cleanup
+from .common import configure_cis_requirements
 from .common import get_user_client
 from .common import get_user_client_and_cluster
 from .common import get_custom_host_registration_cmd
@@ -24,6 +27,8 @@ from .common import validate_cluster_state
 from .common import wait_for_cluster_node_count
 from .test_rke_cluster_provisioning import HOST_NAME, \
     POD_SECURITY_POLICY_TEMPLATE, get_cis_rke_config  # NOQA
+
+project_rbac_roles = [PROJECT_OWNER, PROJECT_MEMBER, PROJECT_READ_ONLY]
 
 scan_results = {
     "rke-cis-1.4": {
@@ -82,7 +87,7 @@ def test_cis_scan_run_scan_hardened_15():
 
 
 def test_cis_scan_run_scan_permissive_14():
-    client, cluster = get_user_client_and_cluster()
+    cluster = cluster_detail["cluster_14"]
     scan_detail = run_scan(cluster, USER_TOKEN, "permissive")
     report_link = scan_detail["links"]["report"]
     test_total, tests_passed, tests_skipped, tests_failed, tests_na = \
@@ -102,7 +107,7 @@ def test_cis_scan_run_scan_permissive_15():
         This will fail because of 1 tests which fails - 5.1.5
         :return:
         """
-    client, cluster = get_user_client_and_cluster()
+    cluster = cluster_detail["cluster_15"]
     scan_detail = run_scan(cluster, USER_TOKEN, "permissive",
                            scan_tool_version="rke-cis-1.5")
     report_link = scan_detail["links"]["report"]
@@ -120,20 +125,13 @@ def test_cis_scan_run_scan_permissive_15():
 
 def test_cis_scan_skip_test_ui():
     client = get_user_client()
-    cluster = cluster_detail["cluster_14"]
-    # run security scan
-    scan_detail = run_scan(cluster, USER_TOKEN, "hardened")
-    report_link = scan_detail["links"]["report"]
+    cluster = None
+    if CIS_SCAN_PROFILE == 'rke-cis-1.5':
+        cluster = cluster_detail["cluster_15"]
+    elif CIS_SCAN_PROFILE == 'rke-cis-1.4':
+        cluster = cluster_detail["cluster_14"]
     test_total, tests_passed, tests_skipped, tests_failed, tests_na = \
-        get_scan_results("rke-cis-1.4", "hardened")
-    verify_cis_scan_report(
-        report_link, token=USER_TOKEN,
-        test_total=test_total,
-        tests_passed=tests_passed,
-        tests_skipped=tests_skipped,
-        tests_failed=tests_failed,
-        tests_na=tests_na
-    )
+        verify_results_from_scan_detail(cluster)
 
     # get system project
     system_project = cluster.projects(name="System")["data"][0]
@@ -158,7 +156,22 @@ def test_cis_scan_skip_test_ui():
     if len(security_scan_config["data"]) != 0:
         p_client.delete(security_scan_config["data"][0])
     # skip action as on UI
-    cm_data = {"config.json": "{\"skip\":{\"rke-cis-1.4\":[\"1.1.2\"]}}"}
+    cm_data = None
+    skip_test = None
+    config_json_value = '{{"skip":{{"{0}":["{1}"]}}}}'
+    if CIS_SCAN_PROFILE == 'rke-cis-1.5':
+        skip_test = "1.1.11"
+        cm_data = {
+            "config.json": config_json_value.format(CIS_SCAN_PROFILE,
+                                                    skip_test)
+        }
+    elif CIS_SCAN_PROFILE == 'rke-cis-1.4':
+        skip_test = "1.1.2"
+        cm_data = {
+            "config.json": config_json_value.format(CIS_SCAN_PROFILE,
+                                                    skip_test)
+        }
+    assert cm_data is not None
     p_client.create_configMap(projectId=system_project_id,
                               name="security-scan-cfg",
                               namespaceId="security-scan",
@@ -176,8 +189,10 @@ def test_cis_scan_skip_test_ui():
         tests_failed=tests_failed,
         tests_na=tests_na
     )
-    print(report["results"][0]["checks"][0]["state"])
-    assert report["results"][0]["checks"][0]["state"] == "skip", \
+    skipped_test = [test for test
+                    in report["results"][0]["checks"]
+                    if test["id"] == skip_test]
+    assert skipped_test[0]["state"] == "skip", \
         "State of the test is not as expected"
 
     """As part of clean up
@@ -195,25 +210,22 @@ def test_cis_scan_skip_test_ui():
 
 def test_cis_scan_skip_test_api():
     client = get_user_client()
-    cluster = cluster_detail["cluster_14"]
-    # run security scan
-    scan_detail = run_scan(cluster, USER_TOKEN, "hardened")
-    report_link = scan_detail["links"]["report"]
+    cluster = None
+    if CIS_SCAN_PROFILE == 'rke-cis-1.4':
+        cluster = cluster_detail["cluster_14"]
+    elif CIS_SCAN_PROFILE == 'rke-cis-1.5':
+        cluster = cluster_detail["cluster_15"]
     test_total, tests_passed, tests_skipped, tests_failed, tests_na = \
-        get_scan_results("rke-cis-1.4", "hardened")
-    verify_cis_scan_report(
-        report_link, token=USER_TOKEN,
-        test_total=test_total,
-        tests_passed=tests_passed,
-        tests_skipped=tests_skipped,
-        tests_failed=tests_failed,
-        tests_na=tests_na
-    )
-
-    # skip test 1.1.3
-    cluster.runSecurityScan(overrideSkip=["1.1.3"],
+        verify_results_from_scan_detail(cluster)
+    override_skip = None
+    if CIS_SCAN_PROFILE == 'rke-cis-1.5':
+        override_skip = ["1.1.12"]
+    elif CIS_SCAN_PROFILE == 'rke-cis-1.4':
+        override_skip = ["1.1.3"]
+    assert override_skip is not None
+    cluster.runSecurityScan(overrideSkip=override_skip,
                             profile="hardened",
-                            overrideBenchmarkVersion="rke-cis-1.4")
+                            overrideBenchmarkVersion=CIS_SCAN_PROFILE)
     cluster = client.reload(cluster)
     cluster_scan_report_id = cluster["currentCisRunName"]
     print(cluster_scan_report_id)
@@ -228,20 +240,30 @@ def test_cis_scan_skip_test_api():
         tests_failed=tests_failed,
         tests_na=tests_na
     )
-    assert report["results"][0]["checks"][1]["state"] == "skip", \
+    skipped_test = [test for test
+                    in report["results"][0]["checks"]
+                    if test["id"] == override_skip[0]]
+    assert skipped_test[0]["state"] == "skip", \
         "State of the test is not as expected"
 
 
 def test_cis_scan_edit_cluster():
-    aws_nodes = cluster_detail["nodes_14"]
+    aws_nodes = None
+    if CIS_SCAN_PROFILE == 'rke-cis-1.4':
+        aws_nodes = cluster_detail["nodes_14"]
+    elif CIS_SCAN_PROFILE == 'rke-cis-1.5':
+        aws_nodes = cluster_detail["nodes_15"]
     client = get_user_client()
-    cluster = cluster_detail["cluster_14"]
+    cluster = None
+    if CIS_SCAN_PROFILE == 'rke-cis-1.4':
+        cluster = cluster_detail["cluster_14"]
+    elif CIS_SCAN_PROFILE == 'rke-cis-1.5':
+        cluster = cluster_detail["cluster_15"]
+    assert cluster is not None
+    assert aws_nodes is not None
     # Add 2 etcd nodes to the cluster
-    for i in range(0, 2):
-        aws_node = aws_nodes[3 + i]
-        aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-        aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-        aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
+    for aws_node in aws_nodes[3:]:
+        apply_node_sysctl_settings_for_cis(aws_node, CIS_SCAN_PROFILE)
         docker_run_cmd = get_custom_host_registration_cmd(client,
                                                           cluster,
                                                           ["etcd"],
@@ -255,7 +277,7 @@ def test_cis_scan_edit_cluster():
     scan_detail = run_scan(cluster, USER_TOKEN, "hardened")
     report_link = scan_detail["links"]["report"]
     test_total, tests_passed, tests_skipped, tests_failed, tests_na = \
-        get_scan_results("rke-cis-1.4", "hardened")
+        get_scan_results(CIS_SCAN_PROFILE, "hardened")
     report = verify_cis_scan_report(
         report_link, token=USER_TOKEN,
         test_total=test_total,
@@ -264,13 +286,16 @@ def test_cis_scan_edit_cluster():
         tests_failed=tests_failed + 2,
         tests_na=tests_na
     )
-    print(report["results"][3]["checks"][18])
-    assert report["results"][3]["checks"][18]["state"] == "mixed"
+    if CIS_SCAN_PROFILE == 'rke-cis-1.4':
+        print(report["results"][3]["checks"][18])
+        assert report["results"][3]["checks"][18]["state"] == "mixed"
+    elif CIS_SCAN_PROFILE == 'rke-cis-1.5':
+        print(report["results"][0]["checks"][-1])
+        assert report["results"][0]["checks"][-1]["state"] == "mixed"
 
     # edit nodes and run command
-    for i in range(0, 2):
-        aws_node = aws_nodes[3 + i]
-        aws_node.execute_command("sudo useradd etcd")
+    for aws_node in aws_nodes[3:]:
+        apply_node_etcd_user_permissions_for_cis(aws_node, CIS_SCAN_PROFILE)
 
     # run CIS Scan
     scan_detail = run_scan(cluster, USER_TOKEN, "hardened")
@@ -283,8 +308,12 @@ def test_cis_scan_edit_cluster():
         tests_failed=tests_failed,
         tests_na=tests_na
     )
-    print(report["results"][3]["checks"][18]["state"])
-    assert report["results"][3]["checks"][18]["state"] == "pass"
+    if CIS_SCAN_PROFILE == 'rke-cis-1.4':
+        print(report["results"][3]["checks"][18]["state"])
+        assert report["results"][3]["checks"][18]["state"] == "pass"
+    elif CIS_SCAN_PROFILE == 'rke-cis-1.5':
+        print(report["results"][0]["checks"][-1]["state"])
+        assert report["results"][0]["checks"][-1]["state"] == "pass"
 
 
 @if_test_rbac
@@ -314,43 +343,53 @@ def test_rbac_run_scan_cluster_member():
 
 
 @if_test_rbac
-def test_rbac_run_scan_project_owner():
+@pytest.mark.parametrize("role", project_rbac_roles)
+def test_rbac_run_scan_project_owner(role):
     client, cluster = get_user_client_and_cluster()
-    user_token = rbac_get_user_token_by_role(PROJECT_OWNER)
-    run_scan(cluster, user_token, can_run_scan=False)
-
-
-@if_test_rbac
-def test_rbac_run_scan_project_member():
-    client, cluster = get_user_client_and_cluster()
-    user_token = rbac_get_user_token_by_role(PROJECT_MEMBER)
-    run_scan(cluster, user_token, can_run_scan=False)
-
-
-@if_test_rbac
-def test_rbac_run_scan_project_read_only():
-    client, cluster = get_user_client_and_cluster()
-    user_token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    user_token = rbac_get_user_token_by_role(role)
     run_scan(cluster, user_token, can_run_scan=False)
 
 
 @pytest.fixture(scope='module', autouse="True")
-def create_project_client(request):
+def create_project_client(request, get_all_tests):
     client = get_user_client()
-    # create cluster for running rke-cis-1.4
-    cluster_14, aws_nodes_14 = create_cluster_cis()
-    cluster_detail["cluster_14"] = cluster_14
-    cluster_detail["nodes_14"] = aws_nodes_14
+    tests = [test for test in get_all_tests
+             if "test_cis_scan_run_scan_" in test.name]
+    cluster_14 = None
+    cluster_15 = None
+    aws_nodes_14 = None
+    aws_nodes_15 = None
+    if len(tests) > 0:
+        # create cluster for running rke-cis-1.4
+        cluster_14, aws_nodes_14 = create_cluster_cis(get_all_tests)
+        cluster_detail["cluster_14"] = cluster_14
+        cluster_detail["nodes_14"] = aws_nodes_14
 
-    # create cluster for running rke-cis-1.5
-    cluster_15, aws_nodes_15 = create_cluster_cis("rke-cis-1.5")
-    cluster_detail["cluster_15"] = cluster_15
-    cluster_detail["nodes_15"] = aws_nodes_15
+        # create cluster for running rke-cis-1.5
+        cluster_15, aws_nodes_15 = create_cluster_cis(get_all_tests,
+                                                      "rke-cis-1.5")
+        cluster_detail["cluster_15"] = cluster_15
+        cluster_detail["nodes_15"] = aws_nodes_15
+    else:
+        if CIS_SCAN_PROFILE == "rke-cis-1.5":
+            cluster_15, aws_nodes_15 = create_cluster_cis(get_all_tests,
+                                                          "rke-cis-1.5")
+            cluster_detail["cluster_15"] = cluster_15
+            cluster_detail["nodes_15"] = aws_nodes_15
+        elif CIS_SCAN_PROFILE == "rke-cis-1.4":
+            cluster_14, aws_nodes_14 = create_cluster_cis(get_all_tests)
+            cluster_detail["cluster_14"] = cluster_14
+            cluster_detail["nodes_14"] = aws_nodes_14
 
     def fin():
-        cluster_cleanup(client, cluster_14, aws_nodes_14)
-        cluster_cleanup(client, cluster_15, aws_nodes_15)
-
+        if len(tests) > 0:
+            cluster_cleanup(client, cluster_14, aws_nodes_14)
+            cluster_cleanup(client, cluster_15, aws_nodes_15)
+        else:
+            if cluster_14:
+                cluster_cleanup(client, cluster_14, aws_nodes_14)
+            elif cluster_15:
+                cluster_cleanup(client, cluster_15, aws_nodes_15)
     request.addfinalizer(fin)
 
 
@@ -434,10 +473,14 @@ def wait_for_cis_pod_remove(cluster,
         time.sleep(.5)
 
 
-def create_cluster_cis(scan_tool_version="rke-cis-1.4"):
+def create_cluster_cis(get_all_tests, scan_tool_version="rke-cis-1.4"):
+    test_items = [test_item.name for test_item in get_all_tests]
+    total_nodes = 5 if 'test_cis_scan_edit_cluster' in test_items \
+                       and CIS_SCAN_PROFILE == scan_tool_version else 3
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
-            5, random_test_name(HOST_NAME))
+            total_nodes, random_test_name(HOST_NAME))
+    cluster_detail["nodes"] = aws_nodes
     node_roles = [
         ["controlplane"], ["etcd"], ["worker"]
     ]
@@ -467,3 +510,21 @@ def get_scan_results(scan_tool_version, profile):
            scan_results[scan_tool_version][profile]["skip"], \
            scan_results[scan_tool_version]["fail"], \
            scan_results[scan_tool_version]["not_applicable"]
+
+
+def verify_results_from_scan_detail(cluster, scan_type='hardened'):
+    assert cluster is not None
+    # run security scan
+    scan_detail = run_scan(cluster, USER_TOKEN, scan_type)
+    report_link = scan_detail["links"]["report"]
+    test_total, tests_passed, tests_skipped, tests_failed, tests_na = \
+        get_scan_results(CIS_SCAN_PROFILE, scan_type)
+    verify_cis_scan_report(
+        report_link, token=USER_TOKEN,
+        test_total=test_total,
+        tests_passed=tests_passed,
+        tests_skipped=tests_skipped,
+        tests_failed=tests_failed,
+        tests_na=tests_na
+    )
+    return test_total, tests_passed, tests_skipped, tests_failed, tests_na

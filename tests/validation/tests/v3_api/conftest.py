@@ -45,3 +45,10 @@ def remove_resource(request):
         request.addfinalizer(clean)
 
     return _cleanup
+
+
+@pytest.fixture(scope="session")
+def get_all_tests(request):
+    print("Retrieved list of pytest collected tests")
+    session = request.node
+    return session.items
