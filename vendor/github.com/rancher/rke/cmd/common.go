@@ -54,9 +54,8 @@ func setOptionsFromCLI(c *cli.Context, rkeConfig *v3.RancherKubernetesEngineConf
 		rkeConfig.SSHAgentAuth = c.Bool("ssh-agent-auth")
 	}
 
-	if c.Bool("ignore-docker-version") {
-		rkeConfig.IgnoreDockerVersion = c.Bool("ignore-docker-version")
-	}
+	ignoreDockerVersion := c.Bool("ignore-docker-version")
+	rkeConfig.IgnoreDockerVersion = &ignoreDockerVersion
 
 	if c.Bool("s3") {
 		if rkeConfig.Services.Etcd.BackupConfig == nil {

@@ -286,7 +286,7 @@ func TestSlack(url, channel, msg string, cfg *v3.HTTPClientConfig, dialer dialer
 	return nil
 }
 
-func TestEmail(ctx context.Context, host, password, username string, port int, requireTLS bool, title, content, receiver, sender string, dialer dialer.Dialer) error {
+func TestEmail(ctx context.Context, host, password, username string, port int, requireTLS *bool, title, content, receiver, sender string, dialer dialer.Dialer) error {
 	if content == "" {
 		content = "Alert Name: Test SMTP setting"
 	}
@@ -364,9 +364,9 @@ func dialerWithTLSConfig(dialer dialer.Dialer, host, smartHost string) dialer.Di
 	}
 }
 
-func smtpPrepare(c *smtp.Client, host, password, username string, port int, requireTLS bool) error {
+func smtpPrepare(c *smtp.Client, host, password, username string, port int, requireTLS *bool) error {
 	smartHost := host + ":" + strconv.Itoa(port)
-	if requireTLS {
+	if *requireTLS {
 		if ok, _ := c.Extension("STARTTLS"); !ok {
 			return fmt.Errorf("Require TLS but %q does not advertise the STARTTLS extension", smartHost)
 		}

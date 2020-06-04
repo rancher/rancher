@@ -722,8 +722,9 @@ func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
 		if oldDrainInput != nil {
 			nodeDrainInput = oldDrainInput
 		} else {
+			ignoreDaemonSets := true
 			nodeDrainInput = &v3.NodeDrainInput{
-				IgnoreDaemonSets: true,
+				IgnoreDaemonSets: &ignoreDaemonSets,
 				GracePeriod:      -1,
 				Timeout:          120,
 			}
