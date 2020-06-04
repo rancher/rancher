@@ -374,7 +374,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200520181341-ab75acb55410
+# github.com/rancher/norman v0.0.0-20200604210352-562ffc5920a6
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -528,7 +528,7 @@ github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
-# github.com/rancher/wrangler v0.5.4-0.20200520040055-b8d49179cfc8
+# github.com/rancher/wrangler v0.5.4-0.20200604212251-fc9dde4243fc
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/broadcast

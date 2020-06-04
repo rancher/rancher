@@ -88,7 +88,15 @@ type genericController struct {
 func NewGenericController(name string, genericClient Backend) GenericController {
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc:  genericClient.List,
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				// If ResourceVersion is set to 0 then the Limit is ignored on the API side. Usually
+				// that's not a problem, but with very large counts of a single object type the client will
+				// hit it's connection timeout
+				if options.ResourceVersion == "0" {
+					options.ResourceVersion = ""
+				}
+				return genericClient.List(options)
+			},
 			WatchFunc: genericClient.Watch,
 		},
 		genericClient.ObjectFactory().Object(), resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
