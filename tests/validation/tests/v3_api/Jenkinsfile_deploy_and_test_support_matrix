@@ -13,7 +13,6 @@ node {
 
   def setupResultsOut = "setup-results.xml"
   def clusterSetupResultsOut = "cluster-setup-results.xml"
-  def testResultsOut = "results.xml"
   def deleteResultsOut = "delete-results.xml"
   def imageName = "rancher-validation-${JOB_NAME}${env.BUILD_NUMBER}"
   def testsDir = "tests/v3_api/"
@@ -116,25 +115,26 @@ node {
                       "&& pytest -v -s --junit-xml=${clusterSetupResultsOut} " +
                     "${deployClusterPytestOptions} ${testsDir}\'"
 
+                  CLUSTERS_CREATED = true
                   // copy file containing RANCHER_CLUSTER_NAMES and load into environment variables
                   sh "docker cp ${clusterSetupContainer}:${rootPath}${testsDir}${rancherConfig} ."
                   load rancherConfig
                }
                else {
                   echo "Given clusters: ${env.RANCHER_CLUSTER_NAMES}"
+                  CLUSTERS_CREATED = false
                }
             } catch(err) {
               echo "Error: " + err
+              CLUSTERS_CREATED = true
+              sh "docker cp ${clusterSetupContainer}:${rootPath}${testsDir}${rancherConfig} ."
+              load rancherConfig
+              currentBuild.result = 'UNSTABLE'
             }
           }
 
           stage('Run Validation Tests in Parallel') {
             try {
-                echo "Running validation tests. Environment:"
-                sh "docker run --rm --name testEnvironmentCheck -t --env-file ${envFile} " +
-                   "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
-                   "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
-                   "&& export RANCHER_CLUSTER_NAMES=${env.RANCHER_CLUSTER_NAMES} " + "&& printenv\'"
                 jobs = [:]
                 cluster_arr = env.RANCHER_CLUSTER_NAMES.split(",")
                 cluster_count = cluster_arr.size()
@@ -145,6 +145,9 @@ node {
                     string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
                     string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}"),
                     string(name: 'PYTEST_OPTIONS', value: "${PYTEST_OPTIONS}"),
+                    string(name: 'RANCHER_UPGRADE_CHECK', value: "${RANCHER_UPGRADE_CHECK}"),
+                    string(name: 'RANCHER_VALIDATE_RESOURCES_PREFIX', value: "${RANCHER_VALIDATE_RESOURCES_PREFIX}"),
+                    string(name: 'RANCHER_CREATE_RESOURCES_PREFIX', value: "${RANCHER_CREATE_RESOURCES_PREFIX}"),
                   ]
                   echo "Params are: ${params}"
                   jobs["test-${i}"] = { build job: 'rancher-v3_needs_cluster', parameters: params }
@@ -152,6 +155,7 @@ node {
                 parallel jobs
             } catch(err) {
                 echo "Error: " + err
+                currentBuild.result = 'UNSTABLE'
             }
           }
 
@@ -170,7 +174,7 @@ node {
                 step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut}"])
               }
               else {
-                echo "Rancher server not deployed, skipping delete."
+                echo "Skipping Rancher server deletion."
               }
             } catch(err) {
               echo "Error: " + err
@@ -180,19 +184,25 @@ node {
 
           stage('Test Report') {
             // copy and archive test results
-            sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
-            sh "docker cp ${clusterSetupContainer}:${rootPath}${clusterSetupResultsOut} ."
-            step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
-            step([$class: 'JUnitResultArchiver', testResults: "**/${clusterSetupResultsOut}"])
+            if (env.CATTLE_TEST_URL == "" && env.ADMIN_TOKEN == "" && env.USER_TOKEN == "") {
+              sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
+              sh "docker stop ${setupContainer}"
+              sh "docker rm -v ${setupContainer}"
+              step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
+            }
+
+            if (CLUSTERS_CREATED) {
+              sh "docker cp ${clusterSetupContainer}:${rootPath}${clusterSetupResultsOut} ."
+              sh "docker stop ${clusterSetupContainer}"
+              sh "docker rm -v ${clusterSetupContainer}"
+              step([$class: 'JUnitResultArchiver', testResults: "**/${clusterSetupResultsOut}"])
+            }
           }
 
-          sh "docker stop ${setupContainer}"
-          sh "docker stop ${clusterSetupContainer}"
-          sh "docker stop ${deleteContainer}"
-
-          sh "docker rm -v ${setupContainer}"
-          sh "docker rm -v ${clusterSetupContainer}"
-          sh "docker rm -v ${deleteContainer}"
+          if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
+            sh "docker stop ${deleteContainer}"
+            sh "docker rm -v ${deleteContainer}"
+          }
 
           sh "docker rmi ${imageName}"
         } // finally
