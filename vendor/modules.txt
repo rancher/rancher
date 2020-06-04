@@ -85,7 +85,7 @@ github.com/aws/aws-sdk-go/service/eks
 github.com/aws/aws-sdk-go/service/iam
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
-# github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1
+# github.com/beevik/etree v1.1.0
 github.com/beevik/etree
 # github.com/beorn7/perks v1.0.0
 github.com/beorn7/perks/quantile
@@ -93,7 +93,7 @@ github.com/beorn7/perks/quantile
 github.com/bep/debounce
 # github.com/blang/semver v3.5.1+incompatible
 github.com/blang/semver
-# github.com/containerd/containerd v1.3.0
+# github.com/containerd/containerd v1.3.0-beta.0.0.20190808172034-23faecfb66ab
 github.com/containerd/containerd/errdefs
 # github.com/coreos/etcd v3.3.17+incompatible
 github.com/coreos/etcd/client
@@ -109,7 +109,7 @@ github.com/coreos/prometheus-operator/pkg/apis/monitoring
 github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1
 # github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9 => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
+# github.com/crewjam/saml v0.0.0-00010101000000-000000000000 => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
 github.com/crewjam/saml
 github.com/crewjam/saml/logger
 github.com/crewjam/saml/samlsp
@@ -152,7 +152,7 @@ github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.4.0
 github.com/docker/go-units
-# github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c
+# github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
 # github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
@@ -424,6 +424,31 @@ github.com/rancher/norman/types/set
 github.com/rancher/norman/types/slice
 github.com/rancher/norman/types/values
 github.com/rancher/norman/urlbuilder
+# github.com/rancher/rancher/pkg/auth v0.0.0 => ./pkg/auth
+github.com/rancher/rancher/pkg/auth/api
+github.com/rancher/rancher/pkg/auth/api/secrets
+github.com/rancher/rancher/pkg/auth/api/user
+github.com/rancher/rancher/pkg/auth/audit
+github.com/rancher/rancher/pkg/auth/data
+github.com/rancher/rancher/pkg/auth/principals
+github.com/rancher/rancher/pkg/auth/providerrefresh
+github.com/rancher/rancher/pkg/auth/providers
+github.com/rancher/rancher/pkg/auth/providers/activedirectory
+github.com/rancher/rancher/pkg/auth/providers/azure
+github.com/rancher/rancher/pkg/auth/providers/common
+github.com/rancher/rancher/pkg/auth/providers/common/ldap
+github.com/rancher/rancher/pkg/auth/providers/github
+github.com/rancher/rancher/pkg/auth/providers/googleoauth
+github.com/rancher/rancher/pkg/auth/providers/ldap
+github.com/rancher/rancher/pkg/auth/providers/local
+github.com/rancher/rancher/pkg/auth/providers/publicapi
+github.com/rancher/rancher/pkg/auth/providers/saml
+github.com/rancher/rancher/pkg/auth/requests
+github.com/rancher/rancher/pkg/auth/requests/sar
+github.com/rancher/rancher/pkg/auth/settings
+github.com/rancher/rancher/pkg/auth/tokens
+github.com/rancher/rancher/pkg/auth/util
+github.com/rancher/rancher/pkg/auth/webhook
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
@@ -583,7 +608,7 @@ github.com/rancher/wrangler-api/pkg/generated/controllers/rbac
 github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1
 # github.com/robfig/cron v1.1.0
 github.com/robfig/cron
-# github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2
+# github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7
 github.com/russellhaering/goxmldsig
 github.com/russellhaering/goxmldsig/etreeutils
 github.com/russellhaering/goxmldsig/types
@@ -809,7 +834,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175
+# gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d
 gopkg.in/asn1-ber.v1
 # gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 gopkg.in/check.v1
@@ -817,7 +842,7 @@ gopkg.in/check.v1
 gopkg.in/inf.v0
 # gopkg.in/ini.v1 v1.51.0
 gopkg.in/ini.v1
-# gopkg.in/ldap.v2 v2.5.0
+# gopkg.in/ldap.v2 v2.5.1
 gopkg.in/ldap.v2
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
