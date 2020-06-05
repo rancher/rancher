@@ -33,7 +33,7 @@ resource "aws_instance" "master" {
   }
   provisioner "remote-exec" {
     inline = [
-              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='${data.template_file.test.rendered}'",
+              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='${data.template_file.test.rendered}' --node-external-ip=${self.public_ip}",
               "sudo cat /var/lib/rancher/k3s/server/node-token >/tmp/multinode_nodetoken",
               "sudo cat /etc/rancher/k3s/k3s.yaml >/tmp/multinode_kubeconfig",
     ]
@@ -68,7 +68,7 @@ resource "aws_instance" "master2-ha" {
   }
   provisioner "remote-exec" {
     inline = [
-              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='${data.template_file.test.rendered}'",
+              "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='${data.template_file.test.rendered}' --node-external-ip=${self.public_ip}",
     ]
   }
 }
