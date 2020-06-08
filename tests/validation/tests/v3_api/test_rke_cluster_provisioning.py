@@ -1005,7 +1005,7 @@ def node_template_ec2():
         amazonec2credentialConfig=ec2_cloud_credential_config
     )
     amazonec2Config = {
-        "instanceType": "t2.medium",
+        "instanceType": "t3.medium",
         "region": AWS_REGION,
         "rootSize": "16",
         "securityGroup": [AWS_SG],
@@ -1039,7 +1039,7 @@ def node_template_ec2_with_provider():
         amazonec2credentialConfig=ec2_cloud_credential_config
     )
     amazonec2Config = {
-        "instanceType": "t2.medium",
+        "instanceType": "t3a.medium",
         "region": AWS_REGION,
         "rootSize": "16",
         "securityGroup": [AWS_SG],
