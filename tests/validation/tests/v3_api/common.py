@@ -282,6 +282,8 @@ def random_name():
 
 def get_setting_value_by_name(name):
     settings_url = CATTLE_API_URL + "/settings/" + name
+    print("settings_url: " + settings_url )
+    print("admin_token:" + ADMIN_TOKEN)
     head = {'Authorization': 'Bearer ' + ADMIN_TOKEN}
     response = requests.get(settings_url, verify=False, headers=head)
     return response.json()["value"]

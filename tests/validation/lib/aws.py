@@ -78,6 +78,7 @@ class AmazonWebServices(CloudProviderBase):
                     key_name=None, wait_for_ready=True):
         volume_size = AWS_VOLUME_SIZE
         instance_type = AWS_INSTANCE_TYPE
+
         if ssh_user == "Administrator":
             volume_size = AWS_WINDOWS_VOLUME_SIZE
             instance_type = AWS_WINDOWS_INSTANCE_TYPE
@@ -88,17 +89,20 @@ class AmazonWebServices(CloudProviderBase):
                 ssh_private_key_name = key_name
                 ssh_private_key = self.get_ssh_key(key_name)
                 ssh_private_key_path = self.get_ssh_key_path(key_name)
+
             else:
                 # get private key
                 ssh_private_key_name = key_name.replace('.pub', '')
                 ssh_private_key = self.get_ssh_key(ssh_private_key_name)
                 ssh_private_key_path = self.get_ssh_key_path(
                     ssh_private_key_name)
+
         else:
             key_name = AWS_SSH_KEY_NAME.replace('.pem', '')
             ssh_private_key_name = key_name
             ssh_private_key = self.master_ssh_key
             ssh_private_key_path = self.master_ssh_key_path
+
 
         args = {"ImageId": ami,
                 "InstanceType": instance_type,
@@ -124,7 +128,6 @@ class AmazonWebServices(CloudProviderBase):
                       "Ebs": {"VolumeSize": int(volume_size)}
                       }]
                 }
-
         if len(AWS_IAM_PROFILE) > 0:
             args["IamInstanceProfile"] = {'Name': AWS_IAM_PROFILE}
 
@@ -138,7 +141,6 @@ class AmazonWebServices(CloudProviderBase):
             ssh_key=ssh_private_key,
             docker_version=self.DOCKER_VERSION,
             docker_installed=self.DOCKER_INSTALLED)
-
         # mark for clean up at the end
         self.created_node.append(node.provider_node_id)
 
