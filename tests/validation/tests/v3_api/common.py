@@ -56,6 +56,7 @@ env_file = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
     "rancher_env.config")
 
+AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME")
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.environ.get("AWS_REGION")
@@ -188,6 +189,13 @@ if_test_group_rbac = pytest.mark.skipif(
            'Required AUTH env variables '
            'have not been set.'
 )
+
+# -----------------------------------------------------------------------------
+# global variables from test_create_ha.py
+test_run_id = "test" + str(random.randint(10000, 99999))
+RANCHER_HOSTNAME_PREFIX = os.environ.get("RANCHER_HOSTNAME_PREFIX",
+                                         test_run_id)
+# -----------------------------------------------------------------------------
 
 
 def is_windows(os_type=TEST_OS):
@@ -818,6 +826,18 @@ def wait_until_ok(url, timeout=120, headers={}):
             raise Exception(
                 'Timed out waiting for {0} to become ok'.format(url)
             )
+    return
+
+
+def wait_for_status_code(url, expected_code=200, timeout=DEFAULT_TIMEOUT):
+    start = time.time()
+    r = requests.get(url, verify=False)
+    while r.status_code != expected_code:
+        time.sleep(1)
+        r = requests.get(url, verify=False)
+        if time.time() - start > timeout:
+            raise Exception(
+                'Timed out waiting for status code{0}'.format(expected_code))
     return
 
 
@@ -2000,11 +2020,11 @@ def readDataFile(data_dir, name):
         return f.read()
 
 
-def set_url_password_token(RANCHER_SERVER_URL):
+def set_url_password_token(server_url):
     """Returns a ManagementContext for the default global admin user."""
-    CATTLE_AUTH_URL = \
-        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
-    r = requests.post(CATTLE_AUTH_URL, json={
+    auth_url = \
+        server_url + "/v3-public/localproviders/local?action=login"
+    r = requests.post(auth_url, json={
         'username': 'admin',
         'password': 'admin',
         'responseType': 'json',
@@ -2013,14 +2033,14 @@ def set_url_password_token(RANCHER_SERVER_URL):
     token = r.json()['token']
     print(token)
     # Change admin password
-    client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
+    client = rancher.Client(url=server_url + "/v3",
                             token=token, verify=False)
     admin_user = client.list_user(username="admin").data
     admin_user[0].setpassword(newPassword=ADMIN_PASSWORD)
 
     # Set server-url settings
     serverurl = client.list_setting(name="server-url").data
-    client.update(serverurl[0], value=RANCHER_SERVER_URL)
+    client.update(serverurl[0], value=server_url)
     return token
 
 
