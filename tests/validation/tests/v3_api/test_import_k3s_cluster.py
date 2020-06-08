@@ -25,8 +25,7 @@ RANCHER_K3S_NO_OF_WORKER_NODES = \
 RANCHER_K3S_SERVER_FLAGS = os.environ.get("RANCHER_K3S_SERVER_FLAGS", "server")
 RANCHER_K3S_WORKER_FLAGS = os.environ.get("RANCHER_K3S_WORKER_FLAGS", "agent")
 RANCHER_QA_SPACE = os.environ.get("RANCHER_QA_SPACE", "")
-RANCHER_EC2_INSTANCE_CLASS = os.environ.get("RANCHER_EC2_INSTANCE_CLASS",
-                                            "t3a.medium")
+RANCHER_EC2_INSTANCE_CLASS = os.environ.get("RANCHER_EC2_INSTANCE_CLASS", "t3.medium")
 
 RANCHER_EXTERNAL_DB = os.environ.get("RANCHER_EXTERNAL_DB")
 RANCHER_EXTERNAL_DB_VERSION = os.environ.get("RANCHER_EXTERNAL_DB_VERSION")
@@ -37,6 +36,8 @@ RANCHER_DB_USERNAME = os.environ.get("RANCHER_DB_USERNAME", "")
 RANCHER_DB_PASSWORD = os.environ.get("RANCHER_DB_PASSWORD", "")
 RANCHER_K3S_KUBECONFIG_PATH = DATA_SUBDIR + "/k3s_kubeconfig.yaml"
 RANCHER_DB_TYPE = os.environ.get("RANCHER_DB_TYPE")
+
+RANCHER_K3S_UPGRADE_VERSION = os.environ.get("RANCHER_K3S_UPGRADE_VERSION")
 
 def test_create_k3s_single_control_cluster():
     aws_nodes, client, k3s_clusterfilepath = create_single_control_cluster()
@@ -60,6 +61,55 @@ def test_import_k3s_multiple_control_cluster():
 
 def test_delete_k3s():
     delete_resource_in_AWS_by_prefix(RANCHER_RESOURCE_NAME)
+
+
+def test_upgrade_k3s_cluster():
+    k3s_clusterfilepath, master_info, worker_info = create_multiple_control_cluster()
+
+    master_ips = ', '.join(master_info['master_ips']['value'])
+    print(master_ips)
+    print("\n")
+
+    worker_ips = worker_info['worker_ips']['value']
+    print(worker_ips)
+    print("\n")
+
+    master_upgrade_cmd = master_info['master_cmd']['value'].replace(master_info['master_cmd']['value'].split("|")[1].split(" ")[1].split("=")[1], RANCHER_K3S_UPGRADE_VERSION)
+    print("\n")
+
+    worker_upgrade_cmd = worker_info['worker_cmd']['value'].replace(worker_info['worker_cmd']['value'].split("|")[1].split(" ")[1].split("=")[1], RANCHER_K3S_UPGRADE_VERSION)
+
+    print("\n")
+
+    cmd = "sudo k3s -v"
+
+    # Run preupgrade
+
+    for master in master_ips.split(","):
+        print(master)
+
+        res = exec_shell_command(master, 22, cmd, "", user="ubuntu",sshKey="/Users/shylajadevadiga/Shylaja.pem")
+        print(res)
+
+        res = exec_shell_command(master, 22, master_upgrade_cmd, "", user="ubuntu",sshKey="/Users/shylajadevadiga/Shylaja.pem")
+        print(res)
+
+        res = exec_shell_command(master, 22, cmd, "", user="ubuntu",sshKey="/Users/shylajadevadiga/Shylaja.pem")
+        print(res)
+
+    for worker in worker_ips.split(","):
+        print(worker)
+
+        res = exec_shell_command(master, 22, cmd, "", user="ubuntu",sshKey="/Users/shylajadevadiga/Shylaja.pem")
+        print(res)
+
+        res = exec_shell_command(worker, 22, worker_upgrade_cmd, "", user="ubuntu",sshKey="/Users/shylajadevadiga/Shylaja.pem")
+        print(res)
+
+        res = exec_shell_command(worker, 22, cmd, "", user="ubuntu",sshKey="/Users/shylajadevadiga/Shylaja.pem")
+        print(res)
+
+    # Run postupgrade
 
 
 def create_single_control_cluster():
@@ -147,6 +197,7 @@ def create_multiple_control_cluster():
     print("\n\n")
     print(tf.apply("--auto-approve"))
     print("\n\n")
+    master_info = tf.output()
     tf_dir = DATA_SUBDIR + "/" + "terraform/worker"
     tf = Terraform(working_dir=tf_dir,
                    variables={'region': RANCHER_REGION,
@@ -169,6 +220,7 @@ def create_multiple_control_cluster():
     print("\n\n")
     print(tf.apply("--auto-approve"))
     print("\n\n")
+    worker_info = tf.output()
     cmd = "cp /tmp/multinode_kubeconfig1 " + k3s_clusterfilepath
     os.system(cmd)
     is_file = os.path.isfile(k3s_clusterfilepath)
@@ -177,8 +229,7 @@ def create_multiple_control_cluster():
     with open(k3s_clusterfilepath, 'r') as f:
         print(f.read())
     print("K3s Cluster Created")
-    return k3s_clusterfilepath
-
+    return k3s_clusterfilepath, master_info, worker_info
 
 def create_rancher_cluster(client, k3s_clusterfilepath):
     clustername = random_test_name("testcustom-k3s")
