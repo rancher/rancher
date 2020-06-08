@@ -1,45 +1,17 @@
-import base64
-import os
-import pytest
-import rancher
-import time
-
-from .common import create_user
-from .common import create_config_file
-from .common import get_custom_host_registration_cmd
-from .common import get_cluster_by_name
-from .common import random_test_name
-from .common import random_name
-from .common import readDataFile
-from .common import run_command_with_stderr
-from .common import set_url_password_token
-from .common import validate_cluster
-from .common import validate_cluster_state
-from .common import wait_until_active
-from .common import delete_cluster
-from .common import CATTLE_TEST_URL
-from .common import get_user_token
-from .common import ADMIN_PASSWORD
-from .common import get_client_for_token
-from .common import delete_resource_in_AWS_by_prefix
-from lib.aws import AmazonWebServices
+from .common import *  # NOQA
+from .test_import_k3s_cluster import create_multiple_control_cluster
 from .test_rke_cluster_provisioning import rke_config
 
-DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                           'resource')
-
-RANCHER_CHART_VERSION = os.environ.get("RANCHER_CHART_VERSION")
-test_run_id = random_test_name("auto")
-# if hostname is not provided, generate one ( to support onTag )
-RANCHER_HOSTNAME_PREFIX = os.environ.get("RANCHER_HOSTNAME_PREFIX",
-                                         test_run_id)
-# RANCHER_HA_HOSTNAME is provided when installing Rancher into a k3s setup
+# RANCHER_HA_KUBECONFIG and RANCHER_HA_HOSTNAME are provided
+# when installing Rancher into a k3s setup
+RANCHER_HA_KUBECONFIG = os.environ.get("RANCHER_HA_KUBECONFIG")
 RANCHER_HA_HOSTNAME = os.environ.get(
     "RANCHER_HA_HOSTNAME", RANCHER_HOSTNAME_PREFIX + ".qa.rancher.space")
 resource_prefix = RANCHER_HA_HOSTNAME.split(".qa.rancher.space")[0]
-
-RANCHER_IMAGE_TAG = os.environ.get("RANCHER_IMAGE_TAG")
 RANCHER_SERVER_URL = "https://" + RANCHER_HA_HOSTNAME
+
+RANCHER_CHART_VERSION = os.environ.get("RANCHER_CHART_VERSION")
+RANCHER_IMAGE_TAG = os.environ.get("RANCHER_IMAGE_TAG")
 RANCHER_HELM_REPO = os.environ.get("RANCHER_HELM_REPO", "latest")
 RANCHER_LETSENCRYPT_EMAIL = os.environ.get("RANCHER_LETSENCRYPT_EMAIL")
 # Here is the list of cert types for HA install
@@ -51,10 +23,14 @@ RANCHER_VALID_TLS_KEY = os.environ.get("RANCHER_VALID_TLS_KEY")
 RANCHER_BYO_TLS_CERT = os.environ.get("RANCHER_BYO_TLS_CERT")
 RANCHER_BYO_TLS_KEY = os.environ.get("RANCHER_BYO_TLS_KEY")
 RANCHER_PRIVATE_CA_CERT = os.environ.get("RANCHER_PRIVATE_CA_CERT")
-RANCHER_HA_KUBECONFIG = os.environ.get("RANCHER_HA_KUBECONFIG")
-AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME")
+
+RANCHER_LOCAL_CLUSTER_TYPE = os.environ.get("RANCHER_LOCAL_CLUSTER_TYPE")
+RANCHER_ADD_CUSTOM_CLUSTER = os.environ.get("RANCHER_ADD_CUSTOM_CLUSTER",
+                                            "True")
+
 kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
 export_cmd = "export KUBECONFIG=" + kubeconfig_path
+
 
 
 def test_remove_rancher_ha():
@@ -85,27 +61,52 @@ def test_install_rancher_ha(precheck_certificate_options):
     # prepare an RKE cluster and other resources
     # if no kubeconfig file is provided
     if RANCHER_HA_KUBECONFIG is None:
-        nodes = create_resources()
-        config_path = create_rke_cluster_config(nodes)
-        create_rke_cluster(config_path)
+        if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
+            print("RKE cluster is provisioning for the local cluster")
+            nodes = create_resources()
+            config_path = create_rke_cluster_config(nodes)
+            create_rke_cluster(config_path)
+        elif RANCHER_LOCAL_CLUSTER_TYPE == "K3S":
+            print("K3S cluster is provisioning for the local cluster")
+            k3s_kubeconfig_path = \
+                create_multiple_control_cluster()
+            cmd = "cp {0} {1}".format(k3s_kubeconfig_path, kubeconfig_path)
+            run_command_with_stderr(cmd)
     else:
         write_kubeconfig()
+
+    # wait until the cluster is ready
+    def valid_response():
+        output = run_command_with_stderr(export_cmd + " && kubectl get nodes")
+        return "Ready" in output.decode()
+
+    try:
+        wait_for(valid_response)
+    except Exception as e:
+        print("Error: {0}".format(e))
+        assert False, "check the logs in console for details"
 
     if cm_install:
         install_cert_manager()
     add_repo_create_namespace()
     install_rancher()
-    wait_until_active(url=RANCHER_SERVER_URL)
+    wait_for_status_code(url=RANCHER_SERVER_URL + "/v3", expected_code=401)
     print_kubeconfig()
-    admin_client = set_url_and_password()
+    auth_url = \
+        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
+    wait_for_status_code(url=auth_url, expected_code=200)
+    admin_client = set_url_and_password(RANCHER_SERVER_URL)
     cluster = get_cluster_by_name(admin_client, "local")
     validate_cluster_state(admin_client, cluster, False)
-    create_custom_cluster(admin_client)
+    if RANCHER_ADD_CUSTOM_CLUSTER.upper() == "TRUE":
+        print("creating an custom cluster")
+        create_custom_cluster(admin_client)
 
 
 def create_custom_cluster(admin_client):
     auth_url = RANCHER_SERVER_URL + \
         "/v3-public/localproviders/local?action=login"
+    wait_for_status_code(url=auth_url, expected_code=200)
     user, user_token = create_user(admin_client, auth_url)
 
     aws_nodes = \
@@ -180,34 +181,31 @@ def create_resources():
 
 
 def install_cert_manager():
-    helm_certmanager_cmd = \
-        export_cmd + " && " + \
-        "kubectl apply -f " + \
-        "https://raw.githubusercontent.com/jetstack/cert-manager/" + \
-        "release-0.12/deploy/manifests/00-crds.yaml && " + \
-        "kubectl create namespace cert-manager && " + \
-        "helm_v3 repo add jetstack https://charts.jetstack.io && " + \
-        "helm_v3 repo update && " + \
-        "helm_v3 install cert-manager jetstack/cert-manager " + \
-        "--namespace cert-manager --version v0.12.0"
+    manifests = "https://github.com/jetstack/cert-manager/releases/download/" \
+                "v0.15.0/cert-manager.crds.yaml"
+    cm_repo = "https://charts.jetstack.io"
 
-    run_command_with_stderr(helm_certmanager_cmd)
+    run_command_with_stderr(export_cmd + " && kubectl apply -f " + manifests)
+    run_command_with_stderr("helm_v3 repo add jetstack " + cm_repo)
+    run_command_with_stderr("helm_v3 repo update")
+    run_command_with_stderr(export_cmd + " && " +
+                            "kubectl create namespace cert-manager")
+    run_command_with_stderr(export_cmd + " && " +
+                            "helm_v3 install cert-manager "
+                            "jetstack/cert-manager "
+                            "--namespace cert-manager "
+                            "--version v0.15.0")
     time.sleep(120)
 
 
 def add_repo_create_namespace(repo=RANCHER_HELM_REPO):
-    helm_repo_cmd = \
-        export_cmd + " && helm_v3 repo add rancher-" + repo + \
-        " https://releases.rancher.com/server-charts/" + repo + " && " + \
-        "helm_v3 repo update"
+    repo_name = "rancher-" + repo
+    repo_url = "https://releases.rancher.com/server-charts/" + repo
 
-    run_command_with_stderr(helm_repo_cmd)
-
-    helm_init_cmd = \
-        export_cmd + \
-        " && kubectl create namespace cattle-system"
-
-    run_command_with_stderr(helm_init_cmd)
+    run_command_with_stderr("helm_v3 repo add " + repo_name + " " + repo_url)
+    run_command_with_stderr("helm_v3 repo update")
+    run_command_with_stderr(export_cmd + " && " +
+                            "kubectl create namespace cattle-system")
 
 
 def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
@@ -294,15 +292,13 @@ def write_kubeconfig():
     file.close()
 
 
-def set_url_and_password():
-    admin_token = set_url_password_token(RANCHER_SERVER_URL)
-    admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
+def set_url_and_password(server_url):
+    admin_token = set_url_password_token(server_url)
+    admin_client = rancher.Client(url=server_url + "/v3",
                                   token=admin_token, verify=False)
-    auth_url = \
-        RANCHER_SERVER_URL + \
-        "/v3-public/localproviders/local?action=login"
+    auth_url = server_url + "/v3-public/localproviders/local?action=login"
     user, user_token = create_user(admin_client, auth_url)
-    env_details = "env.CATTLE_TEST_URL='" + RANCHER_SERVER_URL + "'\n"
+    env_details = "env.CATTLE_TEST_URL='" + server_url + "'\n"
     env_details += "env.ADMIN_TOKEN='" + admin_token + "'\n"
     env_details += "env.USER_TOKEN='" + user_token + "'\n"
     create_config_file(env_details)

@@ -1,11 +1,6 @@
-import os
+from python_terraform import * # NOQA
 from .common import *  # NOQA
-from lib.aws import AmazonWebServices
-from python_terraform import *
 
-
-DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                           'resource')
 RANCHER_REGION = os.environ.get("AWS_REGION")
 RANCHER_VPC_ID = os.environ.get("AWS_VPC")
 RANCHER_SUBNETS = os.environ.get("AWS_SUBNET")
@@ -13,10 +8,8 @@ RANCHER_AWS_SG = os.environ.get("AWS_SG")
 RANCHER_AVAILABILITY_ZONE = os.environ.get("AWS_AVAILABILITY_ZONE")
 RANCHER_AWS_AMI = os.environ.get("AWS_AMI", "")
 RANCHER_AWS_USER = os.environ.get("AWS_USER", "ubuntu")
-AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME", "")
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
 
-RANCHER_RESOURCE_NAME = os.environ.get("RANCHER_RESOURCE_NAME", "")
 RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
 RANCHER_K3S_NO_OF_SERVER_NODES = \
     os.environ.get("RANCHER_K3S_NO_OF_SERVER_NODES", 2)
@@ -24,19 +17,20 @@ RANCHER_K3S_NO_OF_WORKER_NODES = \
     os.environ.get("RANCHER_K3S_NO_OF_WORKER_NODES", 0)
 RANCHER_K3S_SERVER_FLAGS = os.environ.get("RANCHER_K3S_SERVER_FLAGS", "server")
 RANCHER_K3S_WORKER_FLAGS = os.environ.get("RANCHER_K3S_WORKER_FLAGS", "agent")
-RANCHER_QA_SPACE = os.environ.get("RANCHER_QA_SPACE", "")
+RANCHER_QA_SPACE = os.environ.get("RANCHER_QA_SPACE", "qa.rancher.space.")
 RANCHER_EC2_INSTANCE_CLASS = os.environ.get("RANCHER_EC2_INSTANCE_CLASS",
                                             "t3a.medium")
 
-RANCHER_EXTERNAL_DB = os.environ.get("RANCHER_EXTERNAL_DB")
+RANCHER_EXTERNAL_DB = os.environ.get("RANCHER_EXTERNAL_DB", "mysql")
+RANCHER_DB_TYPE = os.environ.get("RANCHER_DB_TYPE")
 RANCHER_EXTERNAL_DB_VERSION = os.environ.get("RANCHER_EXTERNAL_DB_VERSION")
 RANCHER_DB_GROUP_NAME = os.environ.get("RANCHER_DB_GROUP_NAME")
 
-RANCHER_INSTANCE_CLASS = os.environ.get("RANCHER_INSTANCE_CLASS", "db.t2.micro")
-RANCHER_DB_USERNAME = os.environ.get("RANCHER_DB_USERNAME", "")
+RANCHER_INSTANCE_CLASS = os.environ.get("RANCHER_INSTANCE_CLASS",
+                                        "db.t2.micro")
+RANCHER_DB_USERNAME = os.environ.get("RANCHER_DB_USERNAME", "adminuser")
 RANCHER_DB_PASSWORD = os.environ.get("RANCHER_DB_PASSWORD", "")
 RANCHER_K3S_KUBECONFIG_PATH = DATA_SUBDIR + "/k3s_kubeconfig.yaml"
-RANCHER_DB_TYPE = os.environ.get("RANCHER_DB_TYPE")
 
 def test_create_k3s_single_control_cluster():
     aws_nodes, client, k3s_clusterfilepath = create_single_control_cluster()
@@ -59,7 +53,7 @@ def test_import_k3s_multiple_control_cluster():
 
 
 def test_delete_k3s():
-    delete_resource_in_AWS_by_prefix(RANCHER_RESOURCE_NAME)
+    delete_resource_in_AWS_by_prefix(RANCHER_HOSTNAME_PREFIX)
 
 
 def create_single_control_cluster():
@@ -95,7 +89,7 @@ def create_single_control_cluster():
 
 
 def create_multiple_control_cluster():
-    global RANCHER_EXTERNAL_DB_VERSION 
+    global RANCHER_EXTERNAL_DB_VERSION
     global RANCHER_DB_GROUP_NAME
     k3s_kubeconfig_file = "k3s_kubeconfig.yaml"
     k3s_clusterfilepath = DATA_SUBDIR + "/" + k3s_kubeconfig_file
@@ -127,7 +121,7 @@ def create_multiple_control_cluster():
                               'availability_zone': RANCHER_AVAILABILITY_ZONE,
                               'aws_ami': RANCHER_AWS_AMI,
                               'aws_user': RANCHER_AWS_USER,
-                              'resource_name': RANCHER_RESOURCE_NAME,
+                              'resource_name': RANCHER_HOSTNAME_PREFIX,
                               'access_key': keyPath,
                               'external_db': RANCHER_EXTERNAL_DB,
                               'external_db_version': RANCHER_EXTERNAL_DB_VERSION,
@@ -147,28 +141,30 @@ def create_multiple_control_cluster():
     print("\n\n")
     print(tf.apply("--auto-approve"))
     print("\n\n")
-    tf_dir = DATA_SUBDIR + "/" + "terraform/worker"
-    tf = Terraform(working_dir=tf_dir,
-                   variables={'region': RANCHER_REGION,
-                              'vpc_id': RANCHER_VPC_ID,
-                              'subnets': RANCHER_SUBNETS,
-                              'sg_id': RANCHER_AWS_SG,
-                              'availability_zone': RANCHER_AVAILABILITY_ZONE,
-                              'aws_ami': RANCHER_AWS_AMI,
-                              'aws_user': RANCHER_AWS_USER,
-                              'ec2_instance_class': RANCHER_EC2_INSTANCE_CLASS,
-                              'resource_name': RANCHER_RESOURCE_NAME,
-                              'access_key': keyPath,
-                              'k3s_version': RANCHER_K3S_VERSION,
-                              'no_of_worker_nodes': int(RANCHER_K3S_NO_OF_WORKER_NODES),
-                              'worker_flags': RANCHER_K3S_WORKER_FLAGS})
+    if int(RANCHER_K3S_NO_OF_WORKER_NODES) > 0:
+        tf_dir = DATA_SUBDIR + "/" + "terraform/worker"
+        tf = Terraform(working_dir=tf_dir,
+                       variables={'region': RANCHER_REGION,
+                                  'vpc_id': RANCHER_VPC_ID,
+                                  'subnets': RANCHER_SUBNETS,
+                                  'sg_id': RANCHER_AWS_SG,
+                                  'availability_zone': RANCHER_AVAILABILITY_ZONE,
+                                  'aws_ami': RANCHER_AWS_AMI,
+                                  'aws_user': RANCHER_AWS_USER,
+                                  'ec2_instance_class': RANCHER_EC2_INSTANCE_CLASS,
+                                  'resource_name': RANCHER_HOSTNAME_PREFIX,
+                                  'access_key': keyPath,
+                                  'k3s_version': RANCHER_K3S_VERSION,
+                                  'no_of_worker_nodes': int(RANCHER_K3S_NO_OF_WORKER_NODES),
+                                  'worker_flags': RANCHER_K3S_WORKER_FLAGS})
 
-    print("Joining worker nodes")
-    tf.init()
-    print(tf.plan(out="plan_worker.out"))
-    print("\n\n")
-    print(tf.apply("--auto-approve"))
-    print("\n\n")
+        print("Joining worker nodes")
+        tf.init()
+        print(tf.plan(out="plan_worker.out"))
+        print("\n\n")
+        print(tf.apply("--auto-approve"))
+        print("\n\n")
+
     cmd = "cp /tmp/multinode_kubeconfig1 " + k3s_clusterfilepath
     os.system(cmd)
     is_file = os.path.isfile(k3s_clusterfilepath)
