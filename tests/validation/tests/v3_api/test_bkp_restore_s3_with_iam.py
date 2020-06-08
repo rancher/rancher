@@ -75,7 +75,7 @@ def node_template_ec2_iam():
     )
     amazonec2Config = {
         "iamInstanceProfile": AWS_IAM_PROFILE,
-        "instanceType": "t2.medium",
+        "instanceType": "t3a.medium",
         "region": AWS_REGION,
         "rootSize": "16",
         "securityGroup": [AWS_SG],

@@ -41,7 +41,7 @@ AWS_ACCESS_KEY_ID no default, your AWS access key id
 AWS_SECRET_ACCESS_KEY no default, your AWS secret access key
 AWS_SSH_KEY_NAME no default, the filename of the private key, e.i. jenkins-rke-validation.pem
 AWS_CICD_INSTANCE_TAG defaults to 'rancher-validation', Tags the instance with CICD=AWS_CICD_INSTANCE_TAG
-AWS_INSTANCE_TYPE defaults to 't2.medium', selects the instance type and size
+AWS_INSTANCE_TYPE defaults to 't3a.medium', selects the instance type and size
 AWS_REGION no default, the region for your ec2 instances
 AWS_SUBNET no default, the subnet for your ec2 instances
 AWS_VPC no default, the VPC for your ec2 instances

@@ -106,7 +106,7 @@ def node_template_ec2_with_encryption(client):
         amazonec2credentialConfig=ec2_cloud_credential_config
     )
     amazonec2Config = {
-        "instanceType": "t2.medium",
+        "instanceType": "t3a.medium",
         "region": AWS_REGION,
         "rootSize": "16",
         "securityGroup": [AWS_SG],
