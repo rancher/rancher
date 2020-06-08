@@ -22,3 +22,9 @@ manifests:
       architecture: amd64
       os: windows
       version: 1903
+  -
+    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}-windows-1909
+    platform:
+      architecture: amd64
+      os: windows
+      version: 1909

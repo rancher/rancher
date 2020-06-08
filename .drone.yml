@@ -8,7 +8,7 @@ platform:
 
 steps:
 - name: build
-  image: rancher/dapper:v0.4.1
+  image: rancher/dapper:v0.5.2
   commands:
   - dapper ci
   privileged: true
@@ -22,7 +22,7 @@ steps:
     - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.4.1
+  image: rancher/dapper:v0.5.2
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -186,7 +186,7 @@ platform:
 
 steps:
 - name: build
-  image: rancher/dapper:v0.4.1
+  image: rancher/dapper:v0.5.2
   commands:
   - dapper ci
   privileged: true
@@ -200,7 +200,7 @@ steps:
     - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.4.1
+  image: rancher/dapper:v0.5.2
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -329,7 +329,7 @@ platform:
 steps:
   - name: build
     pull: always
-    image: maiwj/dapper:windows-1809
+    image: rancher/dapper:v0.5.2
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -342,7 +342,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: maiwj/dapper:windows-1809
+    image: rancher/dapper:v0.5.2
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -437,7 +437,7 @@ platform:
 steps:
   - name: build
     pull: always
-    image: maiwj/dapper:windows-1903
+    image: rancher/dapper:v0.5.2
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -450,7 +450,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: maiwj/dapper:windows-1903
+    image: rancher/dapper:v0.5.2
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -533,19 +533,129 @@ trigger:
   event:
     exclude:
       - promote
+
+---
+kind: pipeline
+name: default-windows-1909
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1909
+
+steps:
+  - name: build
+    pull: always
+    image: rancher/dapper:v0.5.2
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - push
+        - pull_request
+        - tag
+
+  - name: stage-binaries
+    image: rancher/dapper:v0.5.2
+    commands:
+      - "cp -r ./bin/* ./package/windows/"
+    when:
+      event:
+        - push
+        - tag
+
+  - name: docker-publish-head-agent
+    image: plugins/docker:windows-1909-amd64
+    settings:
+      build_args:
+        - SERVERCORE_VERSION=1909
+        - ARCH=amd64
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: ${DRONE_BRANCH/release\//}-head-windows-1909
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+      event:
+        - push
+
+  - name: docker-publish-agent
+    image: plugins/docker:windows-1909-amd64
+    settings:
+      build_args:
+        - SERVERCORE_VERSION=1909
+        - ARCH=amd64
+        - "VERSION=${DRONE_TAG}"
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: "${DRONE_TAG}-windows-1909"
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - tag
+
+  - name: slack_notify
+    image: plugins/slack
+    settings:
+      template: "Build {{build.link}} failed to publish an image/artifact.\n"
+      username: Drone_Publish
+      webhook:
+        from_secret: slack_webhook
+    when:
+      event:
+        exclude:
+          - pull_request
+      instance:
+        - drone-publish.rancher.io
+      status:
+        - failure
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+      - promote
+
 ---
 kind: pipeline
 name: manifest
 
 steps:
 - name: push-head-agent-manifest
-  image: ibuildthecloud/manifest:v1.2.3-patch1
+  image: plugins/manifest
   settings:
+    username:
+      from_secret: docker_username
     password:
       from_secret: docker_password
     spec: manifest-agent-head.tmpl
-    username:
-      from_secret: docker_username
   when:
     ref:
       include:
@@ -555,13 +665,13 @@ steps:
     - push
 
 - name: push-head-manifest
-  image: ibuildthecloud/manifest:v1.2.3-patch1
+  image: plugins/manifest
   settings:
+    username:
+      from_secret: docker_username
     password:
       from_secret: docker_password
     spec: manifest.tmpl
-    username:
-      from_secret: docker_username
   when:
     ref:
       include:
@@ -571,13 +681,13 @@ steps:
     - push
 
 - name: push-build-number-agent-manifest
-  image: ibuildthecloud/manifest:v1.2.3-patch1
+  image: plugins/manifest
   settings:
+    username:
+      from_secret: docker_username
     password:
       from_secret: docker_password
     spec: manifest-agent.tmpl
-    username:
-      from_secret: docker_username
   when:
     ref:
       include:
@@ -587,7 +697,7 @@ steps:
     - push
 
 - name: push-agent-manifest
-  image: ibuildthecloud/manifest:v1.2.3-patch1
+  image: plugins/manifest
   settings:
     username:
       from_secret: docker_username
@@ -599,7 +709,7 @@ steps:
     - tag
 
 - name: push-manifest
-  image: ibuildthecloud/manifest:v1.2.3-patch1
+  image: plugins/manifest
   settings:
     username:
       from_secret: docker_username
@@ -611,7 +721,7 @@ steps:
     - tag
 
 - name: build-chart
-  image: rancher/dapper:v0.4.1
+  image: rancher/dapper:v0.5.2
   commands:
   - dapper chart/ci
   privileged: true
@@ -669,6 +779,7 @@ depends_on:
 - default-linux-arm64
 - default-windows-1809
 - default-windows-1903
+- default-windows-1909
 ---
 kind: pipeline
 name: publish
@@ -679,7 +790,7 @@ platform:
 
 steps:
 - name: chart-promote
-  image: rancher/dapper:v0.4.1
+  image: rancher/dapper:v0.5.2
   commands:
   - dapper chart/copy
   volumes:
