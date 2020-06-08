@@ -339,6 +339,10 @@ def create_rke_cluster_config(aws_nodes):
     rkeconfig = rkeconfig.replace("$internalIp3",
                                   aws_nodes[2].private_ip_address)
 
+    rkeconfig = rkeconfig.replace("$user1", aws_nodes[0].ssh_user)
+    rkeconfig = rkeconfig.replace("$user2", aws_nodes[1].ssh_user)
+    rkeconfig = rkeconfig.replace("$user3", aws_nodes[2].ssh_user)
+
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
     print("cluster-ha-filled.yml: \n" + rkeconfig + "\n")
 
