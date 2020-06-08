@@ -22,7 +22,7 @@ def test_upgrade_1(test_name, cloud_provider, rke_client, kubectl):
 
     rke_template = 'cluster_upgrade_1_1.yml.j2'
     all_nodes = cloud_provider.create_multiple_nodes(3, test_name)
-
+    time.sleep(30)
     rke_config = create_rke_cluster(
         rke_client, kubectl, all_nodes, rke_template,
         k8_rancher_image=K8S_PREUPGRADE_IMAGE)
