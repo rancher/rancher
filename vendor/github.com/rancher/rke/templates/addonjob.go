@@ -42,7 +42,7 @@ spec:
             image: {{$image}}
             {{- if eq .DeleteJob "true" }}
             command: ["/bin/sh"]
-            args: ["-c" ,"kubectl get --ignore-not-found=true -f /etc/config/{{$addonName}}.yaml -o custom-columns=NAME:.metadata.name,NAMESPACE:.metadata.namespace,KIND:.kind --no-headers | while read name namespace kind; do if [ "x${namespace}" = "x<none>" ]; then echo kubectl delete $kind $name; else echo kubectl -n $namespace delete $kind $name; fi; done"]
+            args: ["-c" ,"kubectl get --ignore-not-found=true -f /etc/config/{{$addonName}}.yaml -o custom-columns=NAME:.metadata.name,NAMESPACE:.metadata.namespace,KIND:.kind --no-headers | while read name namespace kind; do if [ \"x${namespace}\" = \"x<none>\" ]; then kubectl delete $kind $name; else kubectl -n $namespace delete $kind $name; fi; done"]
             {{- else }}
             command: [ "kubectl", "apply", "-f" , "/etc/config/{{$addonName}}.yaml"]
             {{- end }}
