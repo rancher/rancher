@@ -106,7 +106,9 @@ type DockerInfo struct {
 	OSType             string
 	Architecture       string
 	IndexServerAddress string
+	InitBinary         string
 	DockerRootDir      string
+	SecurityOptions    []string
 	HTTPProxy          string
 	HTTPSProxy         string
 	NoProxy            string

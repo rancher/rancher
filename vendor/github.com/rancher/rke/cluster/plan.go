@@ -525,6 +525,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, servi
 		"/var/lib/calico:/var/lib/calico:z",
 		"/etc/resolv.conf:/etc/resolv.conf",
 		"/sys:/sys:rprivate",
+		host.DockerInfo.DockerRootDir + ":" + host.DockerInfo.DockerRootDir + ":rw,rslave,z",
 		fmt.Sprintf("%s:%s:shared,z", path.Join(prefixPath, "/var/lib/kubelet"), path.Join(prefixPath, "/var/lib/kubelet")),
 		"/var/lib/rancher:/var/lib/rancher:shared,z",
 		"/var/run:/var/run:rw,rprivate",
@@ -536,12 +537,6 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, servi
 		"/usr:/host/usr:ro",
 		"/etc:/host/etc:ro",
 	}
-	BindDockerRootDir := fmt.Sprintf("%s:%s:rw,rslave,z", host.DockerInfo.DockerRootDir, host.DockerInfo.DockerRootDir)
-	if hosts.IsEnterpriseLinuxHost(host) && hosts.IsDockerSELinuxEnabled(host) && !hosts.IsEnterpriseLinuxDocker(host) {
-		// Avoid relabing on Enterprise Linux with Docker SELinux and upstream Docker
-		BindDockerRootDir = strings.TrimSuffix(BindDockerRootDir, ",z")
-	}
-	Binds = append(Binds, BindDockerRootDir)
 	// Special case to simplify using flex volumes
 	if path.Join(prefixPath, "/var/lib/kubelet") != "/var/lib/kubelet" {
 		Binds = append(Binds, "/var/lib/kubelet/volumeplugins:/var/lib/kubelet/volumeplugins:shared,z")

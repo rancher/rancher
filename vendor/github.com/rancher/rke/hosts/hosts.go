@@ -408,7 +408,7 @@ func IsDockerSELinuxEnabled(host *Host) bool {
 
 func IsEnterpriseLinuxHost(host *Host) bool {
 	operatingSystem := strings.ToLower(host.DockerInfo.OperatingSystem)
-	if strings.Contains(operatingSystem, "centos") || strings.Contains(operatingSystem, "red hat") {
+	if strings.Contains(operatingSystem, "centos") || strings.Contains(operatingSystem, "enterprise linux") || strings.Contains(operatingSystem, "oracle linux") {
 		logrus.Debugf("Host [%s] with OperatingSystem [%s] is Enterprise Linux", host.Address, operatingSystem)
 		return true
 	}
