@@ -73,7 +73,7 @@ require (
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200508010131-226462dc5558
 	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200517050325-f53cae161640
+	github.com/rancher/norman v0.0.0-20200609220258-00d350370ee8
 	github.com/rancher/rancher/pkg/auth v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
