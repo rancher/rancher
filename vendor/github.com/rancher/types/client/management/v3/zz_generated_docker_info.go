@@ -11,6 +11,7 @@ const (
 	DockerInfoFieldHTTPProxy          = "httpProxy"
 	DockerInfoFieldHTTPSProxy         = "httpsProxy"
 	DockerInfoFieldIndexServerAddress = "indexServerAddress"
+	DockerInfoFieldInitBinary         = "initBinary"
 	DockerInfoFieldKernelVersion      = "kernelVersion"
 	DockerInfoFieldLabels             = "labels"
 	DockerInfoFieldLoggingDriver      = "loggingDriver"
@@ -18,6 +19,7 @@ const (
 	DockerInfoFieldNoProxy            = "noProxy"
 	DockerInfoFieldOSType             = "osType"
 	DockerInfoFieldOperatingSystem    = "operatingSystem"
+	DockerInfoFieldSecurityOptions    = "securityOptions"
 	DockerInfoFieldServerVersion      = "serverVersion"
 )
 
@@ -31,6 +33,7 @@ type DockerInfo struct {
 	HTTPProxy          string   `json:"httpProxy,omitempty" yaml:"httpProxy,omitempty"`
 	HTTPSProxy         string   `json:"httpsProxy,omitempty" yaml:"httpsProxy,omitempty"`
 	IndexServerAddress string   `json:"indexServerAddress,omitempty" yaml:"indexServerAddress,omitempty"`
+	InitBinary         string   `json:"initBinary,omitempty" yaml:"initBinary,omitempty"`
 	KernelVersion      string   `json:"kernelVersion,omitempty" yaml:"kernelVersion,omitempty"`
 	Labels             []string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LoggingDriver      string   `json:"loggingDriver,omitempty" yaml:"loggingDriver,omitempty"`
@@ -38,5 +41,6 @@ type DockerInfo struct {
 	NoProxy            string   `json:"noProxy,omitempty" yaml:"noProxy,omitempty"`
 	OSType             string   `json:"osType,omitempty" yaml:"osType,omitempty"`
 	OperatingSystem    string   `json:"operatingSystem,omitempty" yaml:"operatingSystem,omitempty"`
+	SecurityOptions    []string `json:"securityOptions,omitempty" yaml:"securityOptions,omitempty"`
 	ServerVersion      string   `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
 }
