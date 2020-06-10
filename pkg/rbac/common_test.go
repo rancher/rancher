@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
 )
@@ -81,6 +82,40 @@ func Test_BuildSubjectFromRTB(t *testing.T) {
 			t.Errorf("roletemplatebinding %v should return error", tcase.from)
 		} else if !tcase.iserr && !reflect.DeepEqual(tcase.to, output) {
 			t.Errorf("the subject %v from roletemplatebinding %v is mismatched, expect %v", output, tcase.from, tcase.to)
+		}
+	}
+}
+
+func Test_TypeFromContext(t *testing.T) {
+	type testCase struct {
+		apiContext   *types.APIContext
+		resource     *types.RawResource
+		expectedType string
+	}
+
+	testCases := []testCase{
+		{
+			apiContext: &types.APIContext{
+				Type: "catalog",
+			},
+			resource:     nil,
+			expectedType: "catalog",
+		},
+		{
+			apiContext: &types.APIContext{
+				Type: "subscribe",
+			},
+			resource: &types.RawResource{
+				Type: "catalog",
+			},
+			expectedType: "catalog",
+		},
+	}
+
+	for _, tcase := range testCases {
+		outputType := TypeFromContext(tcase.apiContext, tcase.resource)
+		if tcase.expectedType != outputType {
+			t.Errorf("resource type %s is mismatched, expect %s", outputType, tcase.expectedType)
 		}
 	}
 }

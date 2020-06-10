@@ -135,3 +135,10 @@ func ObjFromContext(apiContext *types.APIContext, resource *types.RawResource) m
 	}
 	return obj
 }
+
+func TypeFromContext(apiContext *types.APIContext, resource *types.RawResource) string {
+	if resource == nil {
+		return apiContext.Type
+	}
+	return resource.Type
+}
