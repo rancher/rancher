@@ -13,6 +13,7 @@ from .common import validate_cluster
 from .test_rke_cluster_provisioning import HOST_NAME
 from .test_rke_cluster_provisioning import random_name
 from .test_rke_cluster_provisioning import rke_config
+from .test_rke_cluster_provisioning import K8S_VERSION
 from .test_rke_cluster_provisioning import random_test_name
 from .test_rke_cluster_provisioning import get_custom_host_registration_cmd
 
@@ -39,13 +40,16 @@ def test_clusters_for_kdm():
     and add to the cluster
     """
     rancher_version = get_setting_value_by_name('server-version')
-    if str(rancher_version).startswith('v2.2'):
-        k8s_v = get_setting_value_by_name('k8s-version-to-images')
-        default_k8s_versions = json.loads(k8s_v).keys()
+    if K8S_VERSION == "":
+        if str(rancher_version).startswith('v2.2'):
+            k8s_v = get_setting_value_by_name('k8s-version-to-images')
+            default_k8s_versions = json.loads(k8s_v).keys()
+        else:
+            k8s_v = get_setting_value_by_name('k8s-versions-current')
+            default_k8s_versions = k8s_v.split(",")
+
     else:
-        k8s_v = get_setting_value_by_name('k8s-versions-current')
-        default_k8s_versions = k8s_v.split(",")
-    # default_k8s_versions = ["v1.17.2-rancher1-1"]
+        default_k8s_versions = [K8S_VERSION]
     list_process = []
     plugin = PLUGIN
     print("default_k8s_versions: ", default_k8s_versions)
