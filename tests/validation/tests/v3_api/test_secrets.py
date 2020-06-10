@@ -490,7 +490,7 @@ def test_rbac_secret_list_cluster_member(remove_resource):
 
 
 @if_test_rbac
-def test_rbac_secret_list_project_readonly(remove_resource):
+def test_rbac_secret_list_project_readonly():
 
     """
     Verify read-only user cannot list secret
@@ -510,7 +510,6 @@ def test_rbac_secret_list_project_readonly(remove_resource):
     secretdata = secretdict.get('data')
     assert len(secretdata) == 0
     cluster_owner_p_client.delete(secret)
-    remove_resource(project)
 
 
 def rbac_secret_create(p_client, ns):
