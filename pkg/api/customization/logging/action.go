@@ -321,7 +321,7 @@ func addCertPrefixPath(certDir, file string) string {
 
 func canPerformLoggingAction(apiContext *types.APIContext, resource *types.RawResource, ns string) bool {
 	var groupName, resourceName string
-	switch apiContext.Type {
+	switch rbac.TypeFromContext(apiContext, resource) {
 	case mgmtv3client.ClusterLoggingType:
 		groupName, resourceName = mgmtv3.ClusterLoggingGroupVersionKind.Group, mgmtv3.ClusterLoggingResource.Name
 	case mgmtv3client.ProjectLoggingType:

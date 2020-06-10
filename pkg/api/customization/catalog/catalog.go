@@ -232,7 +232,7 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 
 func canUpdateCatalog(apiContext *types.APIContext, resource *types.RawResource) bool {
 	var groupName, resourceName string
-	switch apiContext.Type {
+	switch rbac.TypeFromContext(apiContext, resource) {
 	case client.CatalogType:
 		groupName, resourceName = v3.CatalogGroupVersionKind.Group, v3.CatalogResource.Name
 	case client.ClusterCatalogType:
