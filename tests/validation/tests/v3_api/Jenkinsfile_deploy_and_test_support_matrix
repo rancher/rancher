@@ -83,7 +83,8 @@ node {
 
           stage('Deploy Rancher Server') {
             try {
-              if (env.CATTLE_TEST_URL == "" && env.ADMIN_TOKEN == "" && env.USER_TOKEN == "") {
+              if (!env.CATTLE_TEST_URL || !env.ADMIN_TOKEN || !env.USER_TOKEN ||
+              (env.CATTLE_TEST_URL == "" && env.ADMIN_TOKEN == "" && env.USER_TOKEN == "")) {
                 // deploy rancher server
                 sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
                   "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${setupResultsOut} " +
@@ -107,7 +108,7 @@ node {
 
           stage('Deploy Clusters') {
             try {
-              if (env.RANCHER_CLUSTER_NAMES == "") {
+              if (!env.RANCHER_CLUSTER_NAMES || env.RANCHER_CLUSTER_NAMES == "") {
                   // deploy clusters of different versions
                   sh "docker run --name ${clusterSetupContainer} -t --env-file ${envFile} " +
                       "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
@@ -138,6 +139,15 @@ node {
                 jobs = [:]
                 cluster_arr = env.RANCHER_CLUSTER_NAMES.split(",")
                 cluster_count = cluster_arr.size()
+                if (!env.RANCHER_UPGRADE_CHECK || env.RANCHER_UPGRADE_CHECK == "") {
+                    RANCHER_UPGRADE_CHECK = "preupgrade"
+                }
+                if (!env.RANCHER_VALIDATE_RESOURCES_PREFIX || env.RANCHER_VALIDATE_RESOURCES_PREFIX == "") {
+                    RANCHER_VALIDATE_RESOURCES_PREFIX = "mystep1"
+                }
+                if (!env.RANCHER_CREATE_RESOURCES_PREFIX || env.RANCHER_CREATE_RESOURCES_PREFIX == "") {
+                    RANCHER_CREATE_RESOURCES_PREFIX = "mystep1"
+                }
                 for (int i = 0; i < cluster_count; i++) {
                   def params = [
                     string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
@@ -184,7 +194,7 @@ node {
 
           stage('Test Report') {
             // copy and archive test results
-            if (env.CATTLE_TEST_URL == "" && env.ADMIN_TOKEN == "" && env.USER_TOKEN == "") {
+            if (RANCHER_DEPLOYED) {
               sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
               sh "docker stop ${setupContainer}"
               sh "docker rm -v ${setupContainer}"
