@@ -21,17 +21,17 @@ docker manifest annotate rancher/coreos-etcd:v3.2.24-rancher1 rancher/coreos-etc
 docker manifest annotate rancher/coreos-etcd:v3.2.24-rancher1 rancher/coreos-etcd:v3.2.24-arm64 --arch arm64
 docker manifest push -p rancher/coreos-etcd:v3.2.24-rancher1
 
-# quay.io/coreos/flannel:v0.10.0
-docker pull quay.io/coreos/flannel:v0.10.0
-docker tag quay.io/coreos/flannel:v0.10.0 rancher/coreos-flannel:v0.10.0-amd64
-docker pull quay.io/coreos/flannel:v0.10.0-arm64
-docker tag quay.io/coreos/flannel:v0.10.0-arm64 rancher/coreos-flannel:v0.10.0-arm64
-docker push rancher/coreos-flannel:v0.10.0-amd64
-docker push rancher/coreos-flannel:v0.10.0-arm64
-docker manifest create rancher/coreos-flannel:v0.10.0-rancher1 rancher/coreos-flannel:v0.10.0-amd64 rancher/coreos-flannel:v0.10.0-arm64
-docker manifest annotate rancher/coreos-flannel:v0.10.0-rancher1 rancher/coreos-flannel:v0.10.0-amd64 --arch amd64
-docker manifest annotate rancher/coreos-flannel:v0.10.0-rancher1 rancher/coreos-flannel:v0.10.0-arm64 --arch arm64
-docker manifest push -p rancher/coreos-flannel:v0.10.0-rancher1
+# quay.io/coreos/flannel:v0.12.0
+docker pull quay.io/coreos/flannel:v0.12.0
+docker tag quay.io/coreos/flannel:v0.12.0 rancher/coreos-flannel:v0.12.0-amd64
+docker pull quay.io/coreos/flannel:v0.12.0-arm64
+docker tag quay.io/coreos/flannel:v0.12.0-arm64 rancher/coreos-flannel:v0.12.0-arm64
+docker push rancher/coreos-flannel:v0.12.0-amd64
+docker push rancher/coreos-flannel:v0.12.0-arm64
+docker manifest create rancher/coreos-flannel:v0.12.0-rancher1 rancher/coreos-flannel:v0.12.0-amd64 rancher/coreos-flannel:v0.12.0-arm64
+docker manifest annotate rancher/coreos-flannel:v0.12.0-rancher1 rancher/coreos-flannel:v0.12.0-amd64 --arch amd64
+docker manifest annotate rancher/coreos-flannel:v0.12.0-rancher1 rancher/coreos-flannel:v0.12.0-arm64 --arch arm64
+docker manifest push -p rancher/coreos-flannel:v0.12.0-rancher1
 
 # k8s.gcr.io/defaultbackend-amd64:1.4
 docker pull k8s.gcr.io/defaultbackend-amd64:1.4
