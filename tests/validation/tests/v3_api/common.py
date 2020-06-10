@@ -880,6 +880,8 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
     if hasattr(cluster, 'rancherKubernetesEngineConfig'):
         check_cluster_state(len(get_role_nodes(cluster, "etcd", client)))
     # check all workloads under the system project are active
+    # wait for workloads to be active
+    time.sleep(DEFAULT_TIMEOUT)
     print("checking if workloads under the system project are active")
     sys_project = client.list_project(name='System',
                                       clusterId=cluster.id).data[0]
