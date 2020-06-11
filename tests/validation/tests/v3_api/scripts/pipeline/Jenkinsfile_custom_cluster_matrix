@@ -101,6 +101,7 @@ node {
                 def name = items[0].trim()
                 def ami  = items[1].trim()
                 def user = items[2].trim()
+                def docker_installed = items[3].trim()
                 def params = [
                       string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
                       string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
@@ -108,7 +109,7 @@ node {
                       string(name: 'BRANCH', value: branch),
                       string(name: 'AWS_AMI', value: "${ami}"),
                       string(name: 'AWS_USER', value: "${user}"),
-                      string(name: 'DOCKER_INSTALLED', value: "${DOCKER_INSTALLED}"),
+                      string(name: 'DOCKER_INSTALLED', value: "${docker_installed}"),
                       string(name: 'RANCHER_K8S_VERSION', value: "${env.RANCHER_K8S_VERSION}")
                       ]
                 println "parameters: ${params}"
