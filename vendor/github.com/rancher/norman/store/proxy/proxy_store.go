@@ -296,7 +296,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 		ResourceVersion: "0",
 	}, metav1.ParameterCodec)
 
-	body, err := req.Stream(apiContext.Request.Context())
+	body, err := req.Stream(s.close)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +305,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 	decoder := streaming.NewDecoder(framer, &unstructuredDecoder{})
 	watcher := watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, &unstructuredDecoder{}), &errorReporter{})
 
-	watchingContext, cancelWatchingContext := context.WithCancel(apiContext.Request.Context())
+	watchingContext, cancelWatchingContext := context.WithCancel(s.close)
 	go func() {
 		<-watchingContext.Done()
 		logrus.Tracef("stopping watcher for %s", schema.ID)
