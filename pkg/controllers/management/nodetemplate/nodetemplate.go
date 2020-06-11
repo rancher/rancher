@@ -100,8 +100,8 @@ func (nt *nodeTemplateController) sync(key string, nodeTemplate *v3.NodeTemplate
 	}
 
 	// Create Role and RBs if they do not exist
-	if err := rbac.CreateRoleAndRoleBinding(rbac.NodeTemplateResource, nodeTemplate.Name, namespace.NodeTemplateGlobalNamespace,
-		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIVersion},
+	if err := rbac.CreateRoleAndRoleBinding(rbac.NodeTemplateResource, v3.NodeTemplateGroupVersionKind.Kind, nodeTemplate.Name, namespace.NodeTemplateGlobalNamespace,
+		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIGroup},
 		nodeTemplate.UID,
 		[]v3.Member{}, nt.mgmtCtx); err != nil {
 		return nil, err
