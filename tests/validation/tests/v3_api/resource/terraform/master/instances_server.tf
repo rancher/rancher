@@ -77,6 +77,10 @@ data "template_file" "test" {
   template = (var.db == "mysql" ? "mysql://${aws_db_instance.db.username}:${aws_db_instance.db.password}@tcp(${aws_db_instance.db.endpoint})/${aws_db_instance.db.name}": "postgres://${aws_db_instance.db.username}:${aws_db_instance.db.password}@${aws_db_instance.db.endpoint}/${aws_db_instance.db.name}")
 }
 
+data "template_file" "cmd" {
+   template = "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='${data.template_file.test.rendered}'"
+}
+
 resource "aws_lb_target_group" "aws_tg_80" {
   port             = 80
   protocol         = "TCP"
@@ -257,7 +261,17 @@ output "hostnames" {
   description = "List of DNS records"
 }
 
-output "public_ip" {
-  value = "${aws_instance.master.*.public_ip}"
-  description = "The public IP of the AWS node"
+output "master_ips" {
+  value = "${
+      formatlist(
+        "%s,%s",
+        aws_instance.master.*.public_ip,
+        aws_instance.master2-ha.*.public_ip,
+      )
+    }"
+}
+
+output "master_cmd" {
+  value = "${data.template_file.cmd.template}"
+  description = "Command to install k3s"
 }

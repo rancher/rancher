@@ -1,4 +1,4 @@
-resource "aws_instance" "mysql-worker" {
+resource "aws_instance" "worker" {
   ami           = "${var.aws_ami}"
   instance_type = "${var.ec2_instance_class}"
   count         = var.no_of_worker_nodes
@@ -20,6 +20,10 @@ resource "aws_instance" "mysql-worker" {
               "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.worker_flags} sh -s -  --server https://${local.master_ip}:6443 --token ${local.node_token} --node-external-ip=${self.public_ip}"
     ]
   }
+}
+
+data "template_file" "cmd" {
+   template = "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.worker_flags} sh -s -  --server https://${local.master_ip}:6443 --token ${local.node_token}"
 }
 
 data "local_file" "master_ip" {
@@ -46,7 +50,13 @@ output "node_token" {
   value = "${data.local_file.token.content}"
 }
 
-output "public_ip" {
-  value = "${aws_instance.mysql-worker.*.public_ip}"
+output "worker_ips" {
+  value = join(",", aws_instance.worker.*.public_ip)
   description = "The public IP of the AWS node"
 }
+
+output "worker_cmd" {
+  value = "${data.template_file.cmd.template}"
+  description = "Command to install k3s worker node"
+}
+
