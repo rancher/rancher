@@ -28,7 +28,11 @@ def test_add_custom_host():
             additional_options = " --address " + aws_node.public_ip_address + \
                                  " --internal-address " + \
                                  aws_node.private_ip_address
-            agent_cmd = AGENT_REG_CMD + additional_options
+            if 'Administrator' == aws_node.ssh_user:
+                agent_cmd_temp = AGENT_REG_CMD.replace('| iex', ' ' + additional_options + ' | iex ')
+                agent_cmd = agent_cmd_temp + additional_options
+            else:
+                agent_cmd = AGENT_REG_CMD + additional_options
             aws_node.execute_command(agent_cmd)
             print("Nodes: " + aws_node.public_ip_address)
 
