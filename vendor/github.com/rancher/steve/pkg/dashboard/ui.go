@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/rancher/steve/pkg/responsewriter"
-	"github.com/rancher/steve/pkg/schemaserver/parse"
+	"github.com/rancher/apiserver/pkg/middleware"
+	"github.com/rancher/apiserver/pkg/parse"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,15 +28,17 @@ func content(uiSetting func() string) http.Handler {
 }
 
 func Route(next http.Handler, uiSetting func() string) http.Handler {
-	uiContent := responsewriter.NewMiddlewareChain(responsewriter.Gzip,
-		responsewriter.DenyFrameOptions,
-		responsewriter.CacheMiddleware("json", "js", "css")).Handler(content(uiSetting))
+	uiContent := middleware.NewMiddlewareChain(middleware.Gzip,
+		middleware.DenyFrameOptions,
+		middleware.CacheMiddleware("json", "js", "css")).Handler(content(uiSetting))
 
 	root := mux.NewRouter()
 	root.UseEncodedPath()
+	root.Path("/").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		http.Redirect(rw, req, "/dashboard/", http.StatusFound)
+	})
 	root.Path("/dashboard").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		rw.Header().Add("Location", "/dashboard/")
-		rw.WriteHeader(http.StatusFound)
+		http.Redirect(rw, req, "/dashboard/", http.StatusFound)
 	})
 	root.PathPrefix("/dashboard/assets").Handler(uiContent)
 	root.PathPrefix("/dashboard/translations").Handler(uiContent)

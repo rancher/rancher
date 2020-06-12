@@ -1,8 +1,8 @@
 package table
 
 import (
+	types2 "github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/attributes"
-	types2 "github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/wrangler/pkg/data"
 	types "github.com/rancher/wrangler/pkg/schemas"
 	"github.com/rancher/wrangler/pkg/schemas/mappers"

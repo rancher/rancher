@@ -49,7 +49,7 @@ require (
 	github.com/coreos/prometheus-operator v0.36.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker v1.4.2-0.20190924003213-a8608b5b67c7
+	github.com/docker/docker v1.4.2-0.20200203170920-46ec8731fbce
 	github.com/docker/go-connections v0.4.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/ghodss/yaml v1.0.0
@@ -69,6 +69,7 @@ require (
 	github.com/prometheus/client_golang v1.4.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.9.1
+	github.com/rancher/apiserver v0.0.0-20200612043804-70900e7dfb94
 	github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200508010131-226462dc5558
 	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
@@ -79,7 +80,7 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
 	github.com/rancher/rke v1.2.0-rc1.0.20200609181351-f33dc1da6c7e
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200518163824-9e4ed62a470a
+	github.com/rancher/steve v0.0.0-20200612045119-d1a7dbb0b9c6
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
 	github.com/rancher/types v0.0.0-20200609171939-d21f6b7b59e8
 	github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f
@@ -88,7 +89,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
@@ -97,11 +98,11 @@ require (
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
-	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
+	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/api v0.14.0
-	google.golang.org/grpc v1.26.0
+	google.golang.org/grpc v1.27.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.18.0

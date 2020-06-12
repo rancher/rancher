@@ -100,13 +100,14 @@ var genericMap = map[string]interface{}{
 	"date_modify":      dateModify,
 	"dateInZone":       dateInZone,
 	"dateModify":       dateModify,
+	"duration":         duration,
 	"durationRound":    durationRound,
 	"htmlDate":         htmlDate,
 	"htmlDateInZone":   htmlDateInZone,
 	"must_date_modify": mustDateModify,
 	"mustDateModify":   mustDateModify,
 	"mustToDate":       mustToDate,
-	"now":              func() time.Time { return time.Now() },
+	"now":              time.Now,
 	"toDate":           toDate,
 	"unixEpoch":        unixEpoch,
 
@@ -162,6 +163,7 @@ var genericMap = map[string]interface{}{
 	"int64":     toInt64,
 	"int":       toInt,
 	"float64":   toFloat64,
+	"seq":       seq,
 	"toDecimal": toDecimal,
 
 	//"gt": func(a, b int) bool {return a > b},
@@ -235,8 +237,8 @@ var genericMap = map[string]interface{}{
 	"deepEqual":  reflect.DeepEqual,
 
 	// OS:
-	"env":       func(s string) string { return os.Getenv(s) },
-	"expandenv": func(s string) string { return os.ExpandEnv(s) },
+	"env":       os.Getenv,
+	"expandenv": os.ExpandEnv,
 
 	// Network:
 	"getHostByName": getHostByName,
@@ -297,6 +299,7 @@ var genericMap = map[string]interface{}{
 	"concat":      concat,
 
 	// Crypto:
+	"htpasswd":          htpasswd,
 	"genPrivateKey":     generatePrivateKey,
 	"derivePassword":    derivePassword,
 	"buildCustomCert":   buildCustomCertificate,

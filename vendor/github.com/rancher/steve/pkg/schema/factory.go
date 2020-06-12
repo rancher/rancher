@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rancher/apiserver/pkg/builtin"
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
-	"github.com/rancher/steve/pkg/schemaserver/builtin"
-	"github.com/rancher/steve/pkg/schemaserver/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 

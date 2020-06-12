@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/attributes"
-	"github.com/rancher/steve/pkg/schemaserver/types"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 )
@@ -43,7 +44,6 @@ func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 	clientCfg := rest.CopyConfig(cfg)
 	clientCfg.QPS = 10000
 	clientCfg.Burst = 100
-	clientCfg.AcceptContentTypes = "application/json;as=Table;v=v1;g=meta.k8s.io"
 
 	watchClientCfg := rest.CopyConfig(clientCfg)
 	watchClientCfg.Timeout = 30 * time.Minute
@@ -59,8 +59,10 @@ func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 
 	tableClientCfg := rest.CopyConfig(clientCfg)
 	tableClientCfg.Wrap(setTable)
+	tableClientCfg.AcceptContentTypes = "application/json;as=Table;v=v1;g=meta.k8s.io"
 	tableWatchClientCfg := rest.CopyConfig(watchClientCfg)
 	tableWatchClientCfg.Wrap(setTable)
+	tableWatchClientCfg.AcceptContentTypes = "application/json;as=Table;v=v1;g=meta.k8s.io"
 
 	md, err := metadata.NewForConfig(cfg)
 	if err != nil {
@@ -90,6 +92,23 @@ func (p *Factory) MetadataClient() metadata.Interface {
 
 func (p *Factory) DynamicClient() dynamic.Interface {
 	return p.dynamic
+}
+
+func (p *Factory) IsImpersonating() bool {
+	return p.impersonate
+}
+
+func (p *Factory) K8sInterface(ctx *types.APIRequest) (kubernetes.Interface, error) {
+	cfg, err := setupConfig(ctx, p.clientCfg, p.impersonate)
+	if err != nil {
+		return nil, err
+	}
+
+	return kubernetes.NewForConfig(cfg)
+}
+
+func (p *Factory) AdminK8sInterface() (kubernetes.Interface, error) {
+	return kubernetes.NewForConfig(p.clientCfg)
 }
 
 func (p *Factory) Client(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
@@ -136,7 +155,7 @@ func (p *Factory) TableAdminClientForWatch(ctx *types.APIRequest, s *types.APISc
 	return p.AdminClientForWatch(ctx, s, namespace)
 }
 
-func newClient(ctx *types.APIRequest, cfg *rest.Config, s *types.APISchema, namespace string, impersonate bool) (dynamic.ResourceInterface, error) {
+func setupConfig(ctx *types.APIRequest, cfg *rest.Config, impersonate bool) (*rest.Config, error) {
 	if impersonate {
 		user, ok := request.UserFrom(ctx.Context())
 		if !ok {
@@ -146,6 +165,14 @@ func newClient(ctx *types.APIRequest, cfg *rest.Config, s *types.APISchema, name
 		cfg.Impersonate.UserName = user.GetName()
 		cfg.Impersonate.Groups = user.GetGroups()
 		cfg.Impersonate.Extra = user.GetExtra()
+	}
+	return cfg, nil
+}
+
+func newClient(ctx *types.APIRequest, cfg *rest.Config, s *types.APISchema, namespace string, impersonate bool) (dynamic.ResourceInterface, error) {
+	cfg, err := setupConfig(ctx, cfg, impersonate)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := dynamic.NewForConfig(cfg)

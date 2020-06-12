@@ -3,8 +3,8 @@ package accesscontrol
 import (
 	"sort"
 
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/attributes"
-	"github.com/rancher/steve/pkg/schemaserver/types"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )

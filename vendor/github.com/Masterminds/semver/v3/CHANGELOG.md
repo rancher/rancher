@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.1.0 (2020-04-15)
+
+### Added
+
+- #131: Add support for serializing/deserializing SQL (thanks @ryancurrah)
+
+### Changed
+
+- #148: More accurate validation messages on constraints
+
+## 3.0.3 (2019-12-13)
+
+### Fixed
+
+- #141: Fixed issue with <= comparison
+
+## 3.0.2 (2019-11-14)
+
+### Fixed
+
+- #134: Fixed broken constraint checking with ^0.0 (thanks @krmichelos)
+
 ## 3.0.1 (2019-09-13)
 
 ### Fixed

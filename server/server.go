@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	"github.com/rancher/rancher/pkg/api"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/vsphere"
@@ -32,7 +33,6 @@ import (
 	"github.com/rancher/rancher/server/ui"
 	"github.com/rancher/rancher/server/whitelist"
 	"github.com/rancher/steve/pkg/auth"
-	"github.com/rancher/steve/pkg/responsewriter"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
 )

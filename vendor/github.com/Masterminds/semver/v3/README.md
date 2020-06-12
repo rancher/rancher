@@ -9,7 +9,9 @@ The `semver` package provides the ability to work with [Semantic Versions](http:
 
 [![Stability:
 Active](https://masterminds.github.io/stability/active.svg)](https://masterminds.github.io/stability/active.html)
-[![Build Status](https://travis-ci.org/Masterminds/semver.svg)](https://travis-ci.org/Masterminds/semver) [![Build status](https://ci.appveyor.com/api/projects/status/jfk66lib7hb985k8/branch/master?svg=true&passingText=windows%20build%20passing&failingText=windows%20build%20failing)](https://ci.appveyor.com/project/mattfarina/semver/branch/master) [![GoDoc](https://godoc.org/github.com/Masterminds/semver?status.svg)](https://godoc.org/github.com/Masterminds/semver) [![Go Report Card](https://goreportcard.com/badge/github.com/Masterminds/semver)](https://goreportcard.com/report/github.com/Masterminds/semver)
+[![](https://github.com/Masterminds/semver/workflows/Tests/badge.svg)](https://github.com/Masterminds/semver/actions)
+[![GoDoc](https://img.shields.io/static/v1?label=godoc&message=reference&color=blue)](https://pkg.go.dev/github.com/Masterminds/semver/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Masterminds/semver)](https://goreportcard.com/report/github.com/Masterminds/semver)
 
 If you are looking for a command line tool for version comparisons please see
 [vert](https://github.com/Masterminds/vert) which uses this library.
@@ -219,7 +221,7 @@ if err != nil {
     // Handle constraint not being parseable.
 }
 
-v, _ := semver.NewVersion("1.3")
+v, err := semver.NewVersion("1.3")
 if err != nil {
     // Handle version not being parseable.
 }

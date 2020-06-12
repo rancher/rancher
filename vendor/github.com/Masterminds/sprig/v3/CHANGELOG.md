@@ -1,5 +1,41 @@
 # Changelog
 
+## Release 3.1.0 (2020-04-16)
+
+NOTE: The dependency github.com/imdario/mergo made a behavior change in 0.3.9
+that impacts sprig functionality. Do not use sprig with a version newer than 0.3.8.
+
+### Added
+
+- #225: Added support for generating htpasswd hash (thanks @rustycl0ck)
+- #224: Added duration filter (thanks @frebib)
+- #205: Added `seq` function (thanks @thadc23)
+
+### Changed
+
+- #203: Unlambda functions with correct signature (thanks @muesli)
+- #236: Updated the license formatting for GitHub display purposes
+- #238: Updated package dependency versions. Note, mergo not updated to 0.3.9
+        as it causes a breaking change for sprig. That issue is tracked at
+        https://github.com/imdario/mergo/issues/139
+
+### Fixed
+
+- #229: Fix `seq` example in docs (thanks @kalmant)
+
+## Release 3.0.2 (2019-12-13)
+
+### Fixed
+
+- #220: Updating to semver v3.0.3 to fix issue with <= ranges
+- #218: fix typo elyptical->elliptic in ecdsa key description (thanks @laverya)
+
+## Release 3.0.1 (2019-12-08)
+
+### Fixed
+
+- #212: Updated semver fixing broken constraint checking with ^0.0
+
 ## Release 3.0.0 (2019-10-02)
 
 ### Added

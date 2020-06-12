@@ -3,7 +3,7 @@ package attributes
 import (
 	"fmt"
 
-	"github.com/rancher/steve/pkg/schemaserver/types"
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"

@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/rancher/steve/pkg/schemaserver/types"
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/wrangler/pkg/kv"
 )
 

@@ -81,6 +81,19 @@ func dateAgo(date interface{}) string {
 	return duration.String()
 }
 
+func duration(sec interface{}) string {
+	var n int64
+	switch value := sec.(type) {
+	default:
+		n = 0
+	case string:
+		n, _ = strconv.ParseInt(value, 10, 64)
+	case int64:
+		n = value
+	}
+	return (time.Duration(n) * time.Second).String()
+}
+
 func durationRound(duration interface{}) string {
 	var d time.Duration
 	switch duration := duration.(type) {

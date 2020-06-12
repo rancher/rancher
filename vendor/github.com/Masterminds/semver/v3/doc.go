@@ -21,7 +21,7 @@ that can be sorted, compared, and used in constraints.
 When parsing a version an optional error can be returned if there is an issue
 parsing the version. For example,
 
-    v, err := semver.NewVersion("1.2.3-beta.1+build345")
+    v, err := semver.NewVersion("1.2.3-beta.1+b345")
 
 The version object has methods to get the parts of the version, compare it to
 other versions, convert the version back into a string, and get the original

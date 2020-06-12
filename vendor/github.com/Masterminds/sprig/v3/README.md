@@ -1,7 +1,9 @@
-# Sprig: Template functions for Go templates [![GoDoc](https://godoc.org/github.com/Masterminds/sprig?status.svg)](https://godoc.org/github.com/Masterminds/sprig) [![Go Report Card](https://goreportcard.com/badge/github.com/Masterminds/sprig)](https://goreportcard.com/report/github.com/Masterminds/sprig)
+# Sprig: Template functions for Go templates
 
+[![GoDoc](https://img.shields.io/static/v1?label=godoc&message=reference&color=blue)](https://pkg.go.dev/github.com/Masterminds/sprig/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Masterminds/sprig)](https://goreportcard.com/report/github.com/Masterminds/sprig)
 [![Stability: Sustained](https://masterminds.github.io/stability/sustained.svg)](https://masterminds.github.io/stability/sustained.html)
-[![Build Status](https://travis-ci.org/Masterminds/sprig.svg?branch=master)](https://travis-ci.org/Masterminds/sprig)
+[![](https://github.com/Masterminds/sprig/workflows/Tests/badge.svg)](https://github.com/Masterminds/sprig/actions)
 
 The Go language comes with a [built-in template
 language](http://golang.org/pkg/text/template/), but not
@@ -11,6 +13,14 @@ used template functions.
 It is inspired by the template functions found in
 [Twig](http://twig.sensiolabs.org/documentation) and in various
 JavaScript libraries, such as [underscore.js](http://underscorejs.org/).
+
+## IMPORTANT NOTES
+
+Sprig leverages [mergo](https://github.com/imdario/mergo) to handle merges. In
+its v0.3.9 release there was a behavior change that impacts merging template
+functions in sprig. It is currently recommended to use v0.3.8 of that package.
+Using v0.3.9 will cause sprig tests to fail. The issue in mergo is tracked at
+https://github.com/imdario/mergo/issues/139.
 
 ## Package Versions
 

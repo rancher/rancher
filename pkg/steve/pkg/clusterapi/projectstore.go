@@ -3,8 +3,8 @@ package clusterapi
 import (
 	"net/http"
 
-	"github.com/rancher/steve/pkg/schemaserver/types"
-	"github.com/rancher/steve/pkg/server/store/proxy"
+	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
