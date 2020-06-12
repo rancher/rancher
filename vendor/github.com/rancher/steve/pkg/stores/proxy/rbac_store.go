@@ -49,6 +49,8 @@ type rbacPartitioner struct {
 
 func (p *rbacPartitioner) Lookup(apiOp *types.APIRequest, schema *types.APISchema, verb, id string) (partition.Partition, error) {
 	switch verb {
+	case "create":
+		fallthrough
 	case "get":
 		fallthrough
 	case "update":
@@ -56,7 +58,7 @@ func (p *rbacPartitioner) Lookup(apiOp *types.APIRequest, schema *types.APISchem
 	case "delete":
 		return passthroughPartitions[0], nil
 	default:
-		return nil, fmt.Errorf("invalid verb %s", verb)
+		return nil, fmt.Errorf("partition list: invalid verb %s", verb)
 	}
 }
 
@@ -74,7 +76,7 @@ func (p *rbacPartitioner) All(apiOp *types.APIRequest, schema *types.APISchema, 
 		})
 		return partitions, nil
 	default:
-		return nil, fmt.Errorf("invalid verb %s", verb)
+		return nil, fmt.Errorf("parition all: invalid verb %s", verb)
 	}
 }
 
