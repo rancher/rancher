@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/huandu/xstrings.svg?branch=master)](https://travis-ci.org/huandu/xstrings)
 [![GoDoc](https://godoc.org/github.com/huandu/xstrings?status.svg)](https://godoc.org/github.com/huandu/xstrings)
+[![Go Report](https://goreportcard.com/badge/github.com/huandu/xstrings)](https://goreportcard.com/report/github.com/huandu/xstrings)
+[![Coverage Status](https://coveralls.io/repos/github/huandu/xstrings/badge.svg?branch=master)](https://coveralls.io/github/huandu/xstrings?branch=master)
 
 Go package [xstrings](https://godoc.org/github.com/huandu/xstrings) is a collection of string functions, which are widely used in other languages but absent in Go package [strings](http://golang.org/pkg/strings).
 
@@ -15,7 +17,7 @@ Please review [contributing guideline](CONTRIBUTING.md) and [create new issue](h
 
 Use `go get` to install this library.
 
-	go get github.com/huandu/xstrings
+    go get github.com/huandu/xstrings
 
 ## API document ##
 

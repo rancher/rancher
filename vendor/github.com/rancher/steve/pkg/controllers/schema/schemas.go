@@ -6,11 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/attributes"
+	"github.com/rancher/steve/pkg/resources/common"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schema/converter"
-	"github.com/rancher/steve/pkg/schemaserver/types"
-	"github.com/rancher/steve/pkg/server/resources/common"
 	apiextcontrollerv1beta1 "github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
 	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	"github.com/sirupsen/logrus"

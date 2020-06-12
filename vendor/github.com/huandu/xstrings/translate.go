@@ -26,7 +26,7 @@ type runeMap map[rune]rune
 // If a from/to pattern pair needs to be used more than once, it's recommended
 // to create a Translator and reuse it.
 type Translator struct {
-	quickDict  *runeDict       // A quick dictionary to look up rune by index. Only availabe for latin runes.
+	quickDict  *runeDict       // A quick dictionary to look up rune by index. Only available for latin runes.
 	runeMap    runeMap         // Rune map for translation.
 	ranges     []*runeRangeMap // Ranges of runes.
 	mappedRune rune            // If mappedRune >= 0, all matched runes are translated to the mappedRune.

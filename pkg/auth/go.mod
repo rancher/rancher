@@ -42,11 +42,11 @@ require (
 	github.com/crewjam/saml v0.0.0-00010101000000-000000000000
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gorilla/mux v1.7.3
-	github.com/gorilla/websocket v1.4.1 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.9.1 // indirect
+	github.com/rancher/apiserver v0.0.0-20200612043804-70900e7dfb94
 	github.com/rancher/norman v0.0.0-20200517050325-f53cae161640
 	github.com/rancher/steve v0.0.0-20200518163824-9e4ed62a470a
 	github.com/rancher/types v0.0.0-20200529180020-29fa023a5bd8

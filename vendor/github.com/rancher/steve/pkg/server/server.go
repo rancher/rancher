@@ -5,18 +5,18 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/clustercache"
 	schemacontroller "github.com/rancher/steve/pkg/controllers/schema"
 	"github.com/rancher/steve/pkg/dashboard"
+	"github.com/rancher/steve/pkg/resources"
+	"github.com/rancher/steve/pkg/resources/common"
+	"github.com/rancher/steve/pkg/resources/schemas"
 	"github.com/rancher/steve/pkg/schema"
-	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/steve/pkg/server/handler"
-	"github.com/rancher/steve/pkg/server/resources"
-	"github.com/rancher/steve/pkg/server/resources/common"
-	"github.com/rancher/steve/pkg/server/resources/schemas"
 )
 
 var ErrConfigRequired = errors.New("rest config is required")
@@ -67,7 +67,11 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 
 	ccache := clustercache.NewClusterCache(ctx, cf.DynamicClient())
 
-	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, ccache, cf)
+	server.BaseSchemas, err = resources.DefaultSchemas(ctx, server.BaseSchemas, ccache, cf)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf, asl, server.K8s.Discovery())...)
 
 	cols, err := common.NewDynamicColumns(server.RestConfig)

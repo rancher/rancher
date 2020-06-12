@@ -27,7 +27,10 @@ import (
 	"net"
 	"time"
 
+	"strings"
+
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -44,6 +47,17 @@ func sha1sum(input string) string {
 func adler32sum(input string) string {
 	hash := adler32.Checksum([]byte(input))
 	return fmt.Sprintf("%d", hash)
+}
+
+func htpasswd(username string, password string) string {
+	if strings.Contains(username, ":") {
+		return fmt.Sprintf("invalid username: %s", username)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Sprintf("failed to create htpasswd: %s", err)
+	}
+	return fmt.Sprintf("%s:%s", username, hash)
 }
 
 // uuidv4 provides a safe and secure UUID v4 implementation

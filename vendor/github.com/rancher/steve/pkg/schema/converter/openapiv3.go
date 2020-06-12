@@ -1,7 +1,7 @@
 package converter
 
 import (
-	"github.com/rancher/steve/pkg/schemaserver/types"
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/wrangler/pkg/schemas"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )

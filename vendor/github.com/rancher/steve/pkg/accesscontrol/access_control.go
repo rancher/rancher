@@ -1,10 +1,9 @@
 package accesscontrol
 
 import (
-	"fmt"
-
-	"github.com/rancher/steve/pkg/schemaserver/server"
-	"github.com/rancher/steve/pkg/schemaserver/types"
+	"github.com/rancher/apiserver/pkg/server"
+	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/steve/pkg/attributes"
 )
 
 type AccessControl struct {
@@ -16,9 +15,11 @@ func NewAccessControl() *AccessControl {
 }
 
 func (a *AccessControl) CanWatch(apiOp *types.APIRequest, schema *types.APISchema) error {
-	access := GetAccessListMap(schema)
-	if _, ok := access["watch"]; ok {
-		return nil
+	if attributes.GVK(schema).Kind != "" {
+		access := GetAccessListMap(schema)
+		if _, ok := access["watch"]; ok {
+			return nil
+		}
 	}
-	return fmt.Errorf("watch not allowed")
+	return a.SchemaBasedAccess.CanWatch(apiOp, schema)
 }

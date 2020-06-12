@@ -3,13 +3,13 @@ package handler
 import (
 	"net/http"
 
+	"github.com/rancher/apiserver/pkg/server"
+	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/apiserver/pkg/urlbuilder"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/auth"
 	k8sproxy "github.com/rancher/steve/pkg/proxy"
 	"github.com/rancher/steve/pkg/schema"
-	"github.com/rancher/steve/pkg/schemaserver/server"
-	"github.com/rancher/steve/pkg/schemaserver/types"
-	"github.com/rancher/steve/pkg/schemaserver/urlbuilder"
 	"github.com/rancher/steve/pkg/server/router"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiserver/pkg/endpoints/request"
