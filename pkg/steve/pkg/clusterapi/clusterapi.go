@@ -5,15 +5,15 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rancher/apiserver/pkg/server"
+	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/schema"
-	"github.com/rancher/steve/pkg/schemaserver/server"
-	"github.com/rancher/steve/pkg/schemaserver/types"
 	steveserver "github.com/rancher/steve/pkg/server"
-	"github.com/rancher/steve/pkg/server/store/proxy"
+	"github.com/rancher/steve/pkg/stores/proxy"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 )
