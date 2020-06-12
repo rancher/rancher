@@ -4053,6 +4053,39 @@
    "metricsServer": "rancher/metrics-server:v0.3.4",
    "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
   },
+  "v1.16.10-rancher2-2": {
+   "etcd": "rancher/coreos-etcd:v3.3.15-rancher1",
+   "alpine": "rancher/rke-tools:v0.1.58",
+   "nginxProxy": "rancher/rke-tools:v0.1.58",
+   "certDownloader": "rancher/rke-tools:v0.1.58",
+   "kubernetesServicesSidecar": "rancher/rke-tools:v0.1.58",
+   "kubedns": "rancher/k8s-dns-kube-dns:1.15.0",
+   "dnsmasq": "rancher/k8s-dns-dnsmasq-nanny:1.15.0",
+   "kubednsSidecar": "rancher/k8s-dns-sidecar:1.15.0",
+   "kubednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "coredns": "rancher/coredns-coredns:1.6.2",
+   "corednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "nodelocal": "rancher/k8s-dns-node-cache:1.15.7",
+   "kubernetes": "rancher/hyperkube:v1.16.10-rancher2",
+   "flannel": "rancher/coreos-flannel:v0.12.0",
+   "flannelCni": "rancher/flannel-cni:v0.3.0-rancher6",
+   "calicoNode": "rancher/calico-node:v3.13.4",
+   "calicoCni": "rancher/calico-cni:v3.13.4",
+   "calicoControllers": "rancher/calico-kube-controllers:v3.13.4",
+   "calicoCtl": "rancher/calico-ctl:v3.13.4",
+   "calicoFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.4",
+   "canalNode": "rancher/calico-node:v3.13.4",
+   "canalCni": "rancher/calico-cni:v3.13.4",
+   "canalFlannel": "rancher/coreos-flannel:v0.12.0",
+   "canalFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.4",
+   "weaveNode": "weaveworks/weave-kube:2.6.4",
+   "weaveCni": "weaveworks/weave-npc:2.6.4",
+   "podInfraContainer": "rancher/pause:3.1",
+   "ingress": "rancher/nginx-ingress-controller:nginx-0.32.0-rancher1",
+   "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
+   "metricsServer": "rancher/metrics-server:v0.3.4",
+   "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.4"
+  },
   "v1.16.2-rancher1-1": {
    "etcd": "rancher/coreos-etcd:v3.3.15-rancher1",
    "alpine": "rancher/rke-tools:v0.1.50",
@@ -4656,6 +4689,39 @@
    "metricsServer": "rancher/metrics-server:v0.3.6",
    "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
   },
+  "v1.17.6-rancher2-2": {
+   "etcd": "rancher/coreos-etcd:v3.4.3-rancher1",
+   "alpine": "rancher/rke-tools:v0.1.58",
+   "nginxProxy": "rancher/rke-tools:v0.1.58",
+   "certDownloader": "rancher/rke-tools:v0.1.58",
+   "kubernetesServicesSidecar": "rancher/rke-tools:v0.1.58",
+   "kubedns": "rancher/k8s-dns-kube-dns:1.15.0",
+   "dnsmasq": "rancher/k8s-dns-dnsmasq-nanny:1.15.0",
+   "kubednsSidecar": "rancher/k8s-dns-sidecar:1.15.0",
+   "kubednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "coredns": "rancher/coredns-coredns:1.6.5",
+   "corednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "nodelocal": "rancher/k8s-dns-node-cache:1.15.7",
+   "kubernetes": "rancher/hyperkube:v1.17.6-rancher2",
+   "flannel": "rancher/coreos-flannel:v0.12.0",
+   "flannelCni": "rancher/flannel-cni:v0.3.0-rancher6",
+   "calicoNode": "rancher/calico-node:v3.13.4",
+   "calicoCni": "rancher/calico-cni:v3.13.4",
+   "calicoControllers": "rancher/calico-kube-controllers:v3.13.4",
+   "calicoCtl": "rancher/calico-ctl:v3.13.4",
+   "calicoFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.4",
+   "canalNode": "rancher/calico-node:v3.13.4",
+   "canalCni": "rancher/calico-cni:v3.13.4",
+   "canalFlannel": "rancher/coreos-flannel:v0.12.0",
+   "canalFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.4",
+   "weaveNode": "weaveworks/weave-kube:2.6.4",
+   "weaveCni": "weaveworks/weave-npc:2.6.4",
+   "podInfraContainer": "rancher/pause:3.1",
+   "ingress": "rancher/nginx-ingress-controller:nginx-0.32.0-rancher1",
+   "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
+   "metricsServer": "rancher/metrics-server:v0.3.6",
+   "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.4"
+  },
   "v1.18.3-rancher2-1": {
    "etcd": "rancher/coreos-etcd:v3.4.3-rancher1",
    "alpine": "rancher/rke-tools:v0.1.56",
@@ -4688,6 +4754,39 @@
    "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
    "metricsServer": "rancher/metrics-server:v0.3.6",
    "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.3"
+  },
+  "v1.18.3-rancher2-2": {
+   "etcd": "rancher/coreos-etcd:v3.4.3-rancher1",
+   "alpine": "rancher/rke-tools:v0.1.58",
+   "nginxProxy": "rancher/rke-tools:v0.1.58",
+   "certDownloader": "rancher/rke-tools:v0.1.58",
+   "kubernetesServicesSidecar": "rancher/rke-tools:v0.1.58",
+   "kubedns": "rancher/k8s-dns-kube-dns:1.15.2",
+   "dnsmasq": "rancher/k8s-dns-dnsmasq-nanny:1.15.2",
+   "kubednsSidecar": "rancher/k8s-dns-sidecar:1.15.2",
+   "kubednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "coredns": "rancher/coredns-coredns:1.6.9",
+   "corednsAutoscaler": "rancher/cluster-proportional-autoscaler:1.7.1",
+   "nodelocal": "rancher/k8s-dns-node-cache:1.15.7",
+   "kubernetes": "rancher/hyperkube:v1.18.3-rancher2",
+   "flannel": "rancher/coreos-flannel:v0.12.0",
+   "flannelCni": "rancher/flannel-cni:v0.3.0-rancher6",
+   "calicoNode": "rancher/calico-node:v3.13.4",
+   "calicoCni": "rancher/calico-cni:v3.13.4",
+   "calicoControllers": "rancher/calico-kube-controllers:v3.13.4",
+   "calicoCtl": "rancher/calico-ctl:v3.13.4",
+   "calicoFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.4",
+   "canalNode": "rancher/calico-node:v3.13.4",
+   "canalCni": "rancher/calico-cni:v3.13.4",
+   "canalFlannel": "rancher/coreos-flannel:v0.12.0",
+   "canalFlexVol": "rancher/calico-pod2daemon-flexvol:v3.13.4",
+   "weaveNode": "weaveworks/weave-kube:2.6.4",
+   "weaveCni": "weaveworks/weave-npc:2.6.4",
+   "podInfraContainer": "rancher/pause:3.1",
+   "ingress": "rancher/nginx-ingress-controller:nginx-0.32.0-rancher1",
+   "ingressBackend": "rancher/nginx-ingress-controller-defaultbackend:1.5-rancher1",
+   "metricsServer": "rancher/metrics-server:v0.3.6",
+   "windowsPodInfraContainer": "rancher/kubelet-pause:v0.1.4"
   },
   "v1.8.11-rancher2-1": {
    "etcd": "rancher/coreos-etcd:v3.0.17",
@@ -4952,6 +5051,10 @@
    "minRKEVersion": "1.1.2-rc0",
    "minRancherVersion": "2.4.4-rc0"
   },
+  "v1.16.10-rancher2-2": {
+   "minRKEVersion": "1.1.3-rc0",
+   "minRancherVersion": "2.4.5-rc0"
+  },
   "v1.16.8-rancher1-1": {
    "minRKEVersion": "1.0.0",
    "minRancherVersion": "2.3.3"
@@ -4980,7 +5083,15 @@
    "minRKEVersion": "1.1.2-rc0",
    "minRancherVersion": "2.4.4-rc0"
   },
+  "v1.17.6-rancher2-2": {
+   "minRKEVersion": "1.1.3-rc0",
+   "minRancherVersion": "2.4.5-rc0"
+  },
   "v1.18.3-rancher2-1": {
+   "minRKEVersion": "1.1.3-rc0",
+   "minRancherVersion": "2.4.5-rc0"
+  },
+  "v1.18.3-rancher2-2": {
    "minRKEVersion": "1.1.3-rc0",
    "minRancherVersion": "2.4.5-rc0"
   },
@@ -5022,7 +5133,7 @@
  },
  "RKEDefaultK8sVersions": {
   "0.3": "v1.16.3-rancher1-1",
-  "default": "v1.18.3-rancher2-1"
+  "default": "v1.18.3-rancher2-2"
  },
  "K8sVersionDockerInfo": {
   "1.10": [
