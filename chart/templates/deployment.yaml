@@ -55,6 +55,9 @@ spec:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
         name: {{ template "rancher.name" . }}
+        capabilities:
+          add:
+            - MKNOD
         ports:
         - containerPort: 80
           protocol: TCP
