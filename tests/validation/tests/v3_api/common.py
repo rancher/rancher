@@ -1805,15 +1805,20 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
     chart = chart_prefix + "-" + chart_suffix
     app_name = parameters[len(parameters) - 2].split("=")[1]
     workloads = proj_client.list_workload(namespaceId=ns).data
+
+    # For longhorn app, only active state of workloads is verified as longhorn
+    # workloads do not have the field workloadLabels
+    # For all other apps active state of workloads & chart version are verified
+
     for wl in workloads:
         print("Workload {} , state - {}".format(wl.id, wl.state))
         assert wl.state == "active"
-        chart_deployed = get_chart_info(wl.workloadLabels)
-        print("Chart detail of app - {}".format(chart_deployed))
-        # '-' check is to make sure chart has both app name and version.
-        if app_name in chart_deployed and '-' in chart_deployed:
-            assert chart_deployed == chart, "the chart version is wrong"
-
+        if "longhorn" not in app.externalId:
+            chart_deployed = get_chart_info(wl.workloadLabels)
+            print("Chart detail of app - {}".format(chart_deployed))
+            # '-' check is to make sure chart has both app name and version.
+            if app_name in chart_deployed and '-' in chart_deployed:
+                assert chart_deployed == chart, "the chart version is wrong"
     # Validate_app_answers
     assert len(answers.items() - app["answers"].items()) == 0, \
         "Answers are not same as the original catalog answers"

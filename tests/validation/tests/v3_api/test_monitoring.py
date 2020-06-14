@@ -2,6 +2,7 @@ import pytest
 import copy
 from .common import *  # NOQA
 
+
 namespace = {
     "cluster": None,
     "project": None,
@@ -86,7 +87,9 @@ name_mapping = {
     "workload": workload_graph_list,
     "node": node_graph_list,
 }
+STORAGE_CLASS = "longhorn"
 
+# Longhorn is provided as the persistence storage class
 C_MONITORING_ANSWERS = {"operator-init.enabled": "true",
                         "exporter-node.enabled": "true",
                         "exporter-node.ports.metrics.port": "9796",
@@ -95,10 +98,10 @@ C_MONITORING_ANSWERS = {"operator-init.enabled": "true",
                         "exporter-node.resources.limits.memory": "200Mi",
                         "operator.resources.limits.memory": "500Mi",
                         "prometheus.retention": "12h",
-                        "grafana.persistence.enabled": "false",
-                        "prometheus.persistence.enabled": "false",
-                        "prometheus.persistence.storageClass": "default",
-                        "grafana.persistence.storageClass": "default",
+                        "grafana.persistence.enabled": "true",
+                        "prometheus.persistence.enabled": "true",
+                        "prometheus.persistence.storageClass": STORAGE_CLASS,
+                        "grafana.persistence.storageClass": STORAGE_CLASS,
                         "grafana.persistence.size": "10Gi",
                         "prometheus.persistence.size": "50Gi",
                         "prometheus.resources.core.requests.cpu": "750m",
@@ -127,6 +130,7 @@ MONITORING_OPERATOR_APP = "monitoring-operator"
 PROJECT_MONITORING_APP = "project-monitoring"
 GRAFANA_PROJECT_MONITORING = "grafana-project-monitoring"
 PROMETHEUS_PROJECT_MONITORING = "prometheus-project-monitoring"
+LONGHORN_APP_VERSION = os.environ.get('RANCHER_LONGHORN_VERSION', "1.0.0")
 
 
 def test_monitoring_cluster_graph():
@@ -450,7 +454,11 @@ def test_rbac_cluster_owner_control_cluster_monitoring():
 
 
 @pytest.fixture(scope="module", autouse="True")
-def create_project_client(request):
+def setup_monitoring(request):
+    '''
+    Initialize projects, clients, install longhorn app and enable monitoring
+    with persistence storageClass set to longhorn
+    '''
     global MONITORING_VERSION
     rancher_client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
@@ -459,28 +467,49 @@ def create_project_client(request):
     system_project = rancher_client.list_project(clusterId=cluster.id,
                                                  name="System").data[0]
     sys_proj_client = get_project_client_for_token(system_project, USER_TOKEN)
+    cluster_client = get_cluster_client_for_token(cluster, USER_TOKEN)
     namespace["cluster"] = cluster
     namespace["project"] = project
     namespace["system_project"] = system_project
     namespace["system_project_client"] = sys_proj_client
+    namespace["cluster_client"] = cluster_client
+
+    # Deploy Longhorn app from the library catalog
+    app_name = "longhorn"
+    ns = create_ns(cluster_client, cluster, project, "longhorn-system")
+    app_ext_id = create_catalog_external_id('library', app_name,
+                                            LONGHORN_APP_VERSION)
+    answer = get_defaut_question_answers(rancher_client, app_ext_id)
+    project_client = get_project_client_for_token(project, USER_TOKEN)
+    try:
+        app = project_client.create_app(
+            externalId=app_ext_id,
+            targetNamespace=ns.name,
+            projectId=ns.projectId,
+            answers=answer)
+        print(app)
+        validate_catalog_app(project_client, app, app_ext_id, answer)
+    except (AssertionError, RuntimeError):
+        assert False, "App {} deployment/Validation failed.".format(app_name)
 
     monitoring_template = rancher_client.list_template(
         id=MONITORING_TEMPLATE_ID).data[0]
     if MONITORING_VERSION == "":
         MONITORING_VERSION = monitoring_template.defaultVersion
     print("MONITORING_VERSION=" + MONITORING_VERSION)
-    # enable the cluster monitoring
+    # Enable cluster monitoring
     if cluster["enableClusterMonitoring"] is False:
         rancher_client.action(cluster, "enableMonitoring",
                               answers=C_MONITORING_ANSWERS,
                               version=MONITORING_VERSION)
     validate_cluster_monitoring_apps()
 
-    # wait 2 minute for all graphs to be available
-    time.sleep(60 * 2)
+    # Wait 3 minutes for all graphs to be available
+    time.sleep(60 * 3)
 
     def fin():
         rancher_client.delete(project)
+        # Disable monitoring
         cluster = rancher_client.reload(namespace["cluster"])
         if cluster["enableClusterMonitoring"] is True:
             rancher_client.action(cluster, "disableMonitoring")
