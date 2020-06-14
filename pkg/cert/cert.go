@@ -102,7 +102,7 @@ func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 		certInfo.ExpiresAt = cert.NotAfter
 		certInfo.IssuedAt = cert.NotBefore
 		certInfo.Issuer = cert.Issuer.CommonName
-		certInfo.KeySize = size
+		certInfo.KeySize = size * 8
 		certInfo.SerialNumber = cert.SerialNumber.String()
 		certInfo.Version = cert.Version
 
