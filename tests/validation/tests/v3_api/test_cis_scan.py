@@ -12,6 +12,7 @@ from .common import get_user_client_and_cluster
 from .common import get_custom_host_registration_cmd
 from .common import get_project_client_for_token
 from .common import get_client_for_token
+from .common import get_cluster_by_name
 from .common import if_test_rbac
 from .common import PROJECT_OWNER
 from .common import PROJECT_MEMBER
@@ -38,7 +39,8 @@ scan_results = {
 }
 DEFAULT_TIMEOUT = 120
 cluster_detail = {
-    "cluster_14": None, "nodes": None, "name": None, "cluster_15": None
+    "cluster_14": None, "nodes_14": None, "name": None,
+    "cluster_15": None, "nodes_15": None
 }
 
 
@@ -231,7 +233,7 @@ def test_cis_scan_skip_test_api():
 
 
 def test_cis_scan_edit_cluster():
-    aws_nodes = cluster_detail["nodes"]
+    aws_nodes = cluster_detail["nodes_14"]
     client = get_user_client()
     cluster = cluster_detail["cluster_14"]
     # Add 2 etcd nodes to the cluster
@@ -338,10 +340,12 @@ def create_project_client(request):
     # create cluster for running rke-cis-1.4
     cluster_14, aws_nodes_14 = create_cluster_cis()
     cluster_detail["cluster_14"] = cluster_14
+    cluster_detail["nodes_14"] = aws_nodes_14
 
     # create cluster for running rke-cis-1.5
     cluster_15, aws_nodes_15 = create_cluster_cis("rke-cis-1.5")
     cluster_detail["cluster_15"] = cluster_15
+    cluster_detail["nodes_15"] = aws_nodes_15
 
     def fin():
         cluster_cleanup(client, cluster_14, aws_nodes_14)
@@ -373,6 +377,7 @@ def verify_cis_scan_report(
 def run_scan(cluster, user_token, profile="permissive",
              can_run_scan=True, scan_tool_version=CIS_SCAN_PROFILE):
     client = get_client_for_token(user_token)
+    cluster = get_cluster_by_name(client, cluster.name)
     if can_run_scan:
         cluster.runSecurityScan(profile=profile,
                                 overrideBenchmarkVersion=scan_tool_version)
@@ -433,7 +438,6 @@ def create_cluster_cis(scan_tool_version="rke-cis-1.4"):
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
             5, random_test_name(HOST_NAME))
-    cluster_detail["nodes"] = aws_nodes
     node_roles = [
         ["controlplane"], ["etcd"], ["worker"]
     ]
