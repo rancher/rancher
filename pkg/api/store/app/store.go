@@ -110,6 +110,10 @@ func (s *Store) checkAccessToTemplateVersion(apiContext *types.APIContext, data 
 	if err != nil {
 		return err
 	}
+	if templateVersionID == "" && ns == "" {
+		// all users can use a local template to create apps
+		return nil
+	}
 	if ns == namespace.GlobalNamespace {
 		// all users have read access to global catalogs, and can use their template versions to create apps
 		return nil
@@ -133,8 +137,8 @@ func (s *Store) verifyAppExternalIDMatchesProject(data map[string]interface{}, i
 	if err != nil {
 		return err
 	}
-	if catalogNs == namespace.GlobalNamespace {
-		// apps from global catalog can be launched in any clusters
+	if catalogNs == namespace.GlobalNamespace || catalogNs == "" {
+		// apps from global catalog or local template can be launched in any cluster
 		return nil
 	}
 
