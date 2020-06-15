@@ -1611,6 +1611,24 @@ def wait_for_app_to_active(client, app_id,
     return application
 
 
+def wait_for_app_to_remove(client, app_id,
+                           timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
+    start = time.time()
+    app_data = client.list_app(id=app_id).data
+    if len(app_data) == 0:
+        return
+    application = app_data[0]
+    while application.state == "removing" or application.state == "active":
+        if time.time() - start > timeout / 10:
+            raise AssertionError(
+                "Timed out waiting for app to not be installed")
+        time.sleep(.2)
+        app_data = client.list_app(id=app_id).data
+        if len(app_data) == 0:
+            break
+        application = app_data[0]
+
+
 def validate_response_app_endpoint(p_client, appId,
                                    timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
     ingress_list = p_client.list_ingress(namespaceId=appId).data
