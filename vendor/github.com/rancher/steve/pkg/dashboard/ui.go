@@ -34,9 +34,6 @@ func Route(next http.Handler, uiSetting func() string) http.Handler {
 
 	root := mux.NewRouter()
 	root.UseEncodedPath()
-	root.Path("/").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		http.Redirect(rw, req, "/dashboard/", http.StatusFound)
-	})
 	root.Path("/dashboard").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		http.Redirect(rw, req, "/dashboard/", http.StatusFound)
 	})

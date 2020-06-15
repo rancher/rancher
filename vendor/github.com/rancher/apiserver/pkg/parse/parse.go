@@ -104,7 +104,7 @@ func Parse(apiOp *types.APIRequest, urlParser URLParser) error {
 		apiOp.Schema = apiOp.Schemas.LookupSchema(apiOp.Type)
 	}
 
-	if apiOp.Schema != nil && apiOp.Type == "" {
+	if apiOp.Schema != nil {
 		apiOp.Type = apiOp.Schema.ID
 	}
 
