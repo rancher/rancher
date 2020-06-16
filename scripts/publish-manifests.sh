@@ -133,17 +133,17 @@ docker manifest annotate rancher/k8s-dns-kube-dns:1.15.0 rancher/k8s-dns-kube-dn
 docker manifest annotate rancher/k8s-dns-kube-dns:1.15.0 rancher/k8s-dns-kube-dns:1.15.0-arm64 --arch arm64
 docker manifest push -p rancher/k8s-dns-kube-dns:1.15.0
 
-#gcr.io/google_containers/k8s-dns-dnsmasq-nanny:1.15.0
-docker pull gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.15.0
-docker tag gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.15.0 rancher/k8s-dns-dnsmasq-nanny:1.15.0-amd64
-docker pull gcr.io/google_containers/k8s-dns-dnsmasq-nanny-arm64:1.15.0
-docker tag gcr.io/google_containers/k8s-dns-dnsmasq-nanny-arm64:1.15.0 rancher/k8s-dns-dnsmasq-nanny:1.15.0-arm64
-docker push rancher/k8s-dns-dnsmasq-nanny:1.15.0-amd64
-docker push rancher/k8s-dns-dnsmasq-nanny:1.15.0-arm64
-docker manifest create rancher/k8s-dns-dnsmasq-nanny:1.15.0 rancher/k8s-dns-dnsmasq-nanny:1.15.0-amd64 rancher/k8s-dns-dnsmasq-nanny:1.15.0-arm64
-docker manifest annotate rancher/k8s-dns-dnsmasq-nanny:1.15.0 rancher/k8s-dns-dnsmasq-nanny:1.15.0-amd64 --arch amd64
-docker manifest annotate rancher/k8s-dns-dnsmasq-nanny:1.15.0 rancher/k8s-dns-dnsmasq-nanny:1.15.0-arm64 --arch arm64
-docker manifest push -p rancher/k8s-dns-dnsmasq-nanny:1.15.0
+#gcr.io/google_containers/k8s-dns-dnsmasq-nanny:1.15.2
+docker pull gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.15.2
+docker tag gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.15.2 rancher/k8s-dns-dnsmasq-nanny:1.15.2-amd64
+docker pull gcr.io/google_containers/k8s-dns-dnsmasq-nanny-arm64:1.15.2
+docker tag gcr.io/google_containers/k8s-dns-dnsmasq-nanny-arm64:1.15.2 rancher/k8s-dns-dnsmasq-nanny:1.15.2-arm64
+docker push rancher/k8s-dns-dnsmasq-nanny:1.15.2-amd64
+docker push rancher/k8s-dns-dnsmasq-nanny:1.15.2-arm64
+docker manifest create rancher/k8s-dns-dnsmasq-nanny:1.15.2 rancher/k8s-dns-dnsmasq-nanny:1.15.2-amd64 rancher/k8s-dns-dnsmasq-nanny:1.15.2-arm64
+docker manifest annotate rancher/k8s-dns-dnsmasq-nanny:1.15.2 rancher/k8s-dns-dnsmasq-nanny:1.15.2-amd64 --arch amd64
+docker manifest annotate rancher/k8s-dns-dnsmasq-nanny:1.15.2 rancher/k8s-dns-dnsmasq-nanny:1.15.2-arm64 --arch arm64
+docker manifest push -p rancher/k8s-dns-dnsmasq-nanny:1.15.2
 
 #gcr.io/google_containers/k8s-dns-sidecar:1.15.0
 docker pull gcr.io/google_containers/k8s-dns-sidecar-amd64:1.15.0
