@@ -69,6 +69,7 @@ func newRouter(h *handler, localSupport bool) http.Handler {
 	if localSupport {
 		mux.NotFoundHandler = h.Steve
 	} else {
+		mux.PathPrefix("/v1/cluster").Handler(h.Steve)
 		mux.PathPrefix("/v1/schemas").Handler(h.Steve)
 		mux.PathPrefix("/v1/userpreference").Handler(h.Steve)
 		mux.PathPrefix("/v1/management.cattle.io").Methods(http.MethodGet).Handler(h.Steve)
