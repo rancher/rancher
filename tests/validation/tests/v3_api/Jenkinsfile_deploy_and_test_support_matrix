@@ -174,7 +174,7 @@ node {
         } finally {
           stage('Delete Rancher Server') {
             try {
-              if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
+              if (RANCHER_DEPLOYED && env.RANCHER_DELETE_SERVER && env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
                 sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
                 "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
                 "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} && "+
@@ -209,7 +209,7 @@ node {
             }
           }
 
-          if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
+          if (RANCHER_DEPLOYED && env.RANCHER_DELETE_SERVER && env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
             sh "docker stop ${deleteContainer}"
             sh "docker rm -v ${deleteContainer}"
           }
