@@ -78,7 +78,7 @@ require (
 	github.com/rancher/rancher/pkg/auth v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
-	github.com/rancher/rke v1.2.0-rc2.0.20200617000741-c25b2563342c
+	github.com/rancher/rke v1.2.0-rc2.0.20200617185447-84082186085a
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200612212358-02b060294531
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
