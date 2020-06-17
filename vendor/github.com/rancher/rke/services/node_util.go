@@ -50,7 +50,7 @@ func cordonAndDrainNode(kubeClient *kubernetes.Clientset, host *hosts.Host, drai
 
 func getDrainHelper(kubeClient *kubernetes.Clientset, upgradeStrategy v3.NodeUpgradeStrategy) drain.Helper {
 	var ignoreDaemonSets bool
-	if upgradeStrategy.DrainInput == nil || *upgradeStrategy.DrainInput.IgnoreDaemonSets {
+	if upgradeStrategy.DrainInput == nil || upgradeStrategy.DrainInput.IgnoreDaemonSets == nil || *upgradeStrategy.DrainInput.IgnoreDaemonSets {
 		ignoreDaemonSets = true
 	}
 	drainHelper := drain.Helper{
