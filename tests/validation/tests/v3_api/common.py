@@ -901,13 +901,15 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
         check_cluster_state(len(get_role_nodes(cluster, "etcd", client)))
     # check all workloads under the system project are active
     # wait for workloads to be active
-    time.sleep(DEFAULT_TIMEOUT)
+    # time.sleep(DEFAULT_TIMEOUT)
     print("checking if workloads under the system project are active")
     sys_project = client.list_project(name='System',
                                       clusterId=cluster.id).data[0]
     sys_p_client = get_project_client_for_token(sys_project, userToken)
     for wl in sys_p_client.list_workload().data:
-        wait_for_wl_to_active(sys_p_client, wl)
+        """to  help run KDM job faster (when there are many clusters), 
+        timeout=300 is set"""
+        wait_for_wl_to_active(sys_p_client, wl, timeout=300)
     # Create Daemon set workload and have an Ingress with Workload
     # rule pointing to this daemonSet
     project, ns = create_project_and_ns(userToken, cluster)
