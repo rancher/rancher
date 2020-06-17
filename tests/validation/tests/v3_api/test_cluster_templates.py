@@ -698,8 +698,8 @@ def test_cluster_template_create_with_monitoring():
         standard_user_client.list_project(clusterId=cluster.id,
                                           name="System").data[0]
     sys_proj_client = get_project_client_for_token(system_project, USER_TOKEN)
-    wait_for_app_to_active(sys_proj_client, CLUSTER_MONITORING_APP, 1000)
-    wait_for_app_to_active(sys_proj_client, MONITORING_OPERATOR_APP, 1000)
+    wait_for_app_to_active(sys_proj_client, CLUSTER_MONITORING_APP, 1200)
+    wait_for_app_to_active(sys_proj_client, MONITORING_OPERATOR_APP, 1200)
     # wait for all graphs to be available
     time.sleep(60 * 3)
     cluster_monitoring_obj = standard_user_client.list_clusterMonitorGraph()
