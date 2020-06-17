@@ -49,10 +49,14 @@ func cordonAndDrainNode(kubeClient *kubernetes.Clientset, host *hosts.Host, drai
 }
 
 func getDrainHelper(kubeClient *kubernetes.Clientset, upgradeStrategy v3.NodeUpgradeStrategy) drain.Helper {
+	var ignoreDaemonSets bool
+	if upgradeStrategy.DrainInput == nil || *upgradeStrategy.DrainInput.IgnoreDaemonSets {
+		ignoreDaemonSets = true
+	}
 	drainHelper := drain.Helper{
 		Client:              kubeClient,
 		Force:               upgradeStrategy.DrainInput.Force,
-		IgnoreAllDaemonSets: *upgradeStrategy.DrainInput.IgnoreDaemonSets,
+		IgnoreAllDaemonSets: ignoreDaemonSets,
 		DeleteLocalData:     upgradeStrategy.DrainInput.DeleteLocalData,
 		GracePeriodSeconds:  upgradeStrategy.DrainInput.GracePeriod,
 		Timeout:             time.Second * time.Duration(upgradeStrategy.DrainInput.Timeout),
