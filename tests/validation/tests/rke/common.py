@@ -37,7 +37,6 @@ def create_rke_cluster(
     """
     Creates a cluster and returns the rke config as a python dictionary
     """
-
     # create rke cluster yml
     config_yml, nodes = rke_client.build_rke_template(
         rke_template, nodes, **rke_template_kwargs)
@@ -47,7 +46,8 @@ def create_rke_cluster(
 
     # validate k8s reachable
     kubectl.kube_config_path = rke_client.kube_config_path()
-
+    print("create rke cluster: ")
+    print(rke_client.convert_to_dict(config_yml))
     return rke_client.convert_to_dict(config_yml)
 
 

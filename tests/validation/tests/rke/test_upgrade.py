@@ -5,9 +5,9 @@ from .common import *  # NOQA
 import pytest
 
 K8S_PREUPGRADE_IMAGE = os.environ.get(
-    'RANCHER_K8S_PREUPGRADE_IMAGE', 'v1.16.8-rancher1-3')
+    'RANCHER_K8S_PREUPGRADE_IMAGE', 'v1.16.10-rancher2-1')
 K8S_UPGRADE_IMAGE = os.environ.get(
-    'RANCHER_K8S_UPGRADE_IMAGE', 'v1.17.4-rancher1-3')
+    'RANCHER_K8S_UPGRADE_IMAGE', 'v1.17.6-rancher2-1')
 
 
 def test_upgrade_1(test_name, cloud_provider, rke_client, kubectl):
@@ -17,16 +17,21 @@ def test_upgrade_1(test_name, cloud_provider, rke_client, kubectl):
     node1 - worker
     node2 - worker
     """
-    print(K8S_UPGRADE_IMAGE)
-    print(K8S_PREUPGRADE_IMAGE)
-
+    print("upgrade parameters")
+    print(test_name)
+    print(cloud_provider)
+    print(rke_client)
+    print(kubectl)
     rke_template = 'cluster_upgrade_1_1.yml.j2'
+    # creates nodes
     all_nodes = cloud_provider.create_multiple_nodes(3, test_name)
     time.sleep(30)
+
+    #creates rke cluster
     rke_config = create_rke_cluster(
         rke_client, kubectl, all_nodes, rke_template,
         k8_rancher_image=K8S_PREUPGRADE_IMAGE)
-
+    #validation check 1: Node roles, intercommunication btwn pods, dns service discovery
     network, dns_discovery = validate_rke_cluster(
         rke_client, kubectl, all_nodes, 'beforeupgrade')
 
@@ -62,7 +67,9 @@ def test_upgrade_2(test_name, cloud_provider, rke_client, kubectl):
     node3 - worker
     """
     rke_template = 'cluster_upgrade_2_1.yml.j2'
+    #create 4 nodes
     all_nodes = cloud_provider.create_multiple_nodes(4, test_name)
+    #all but last node
     before_upgrade_nodes = all_nodes[0:-1]
     rke_config = create_rke_cluster(
         rke_client, kubectl, before_upgrade_nodes, rke_template,

@@ -63,7 +63,7 @@ class KubectlClient(object):
         return command_options
 
     def execute_kubectl_cmd(self, cmd, json_out=True):
-        command = '/usr/local/bin/kubectl --kubeconfig {0} {1}'.format(
+        command = '/usr/local/bin/kubectl  --kubeconfig {0} {1}'.format(
             self.kube_config_path, cmd)
         if json_out:
             command += ' -o json'

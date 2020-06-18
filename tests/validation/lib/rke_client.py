@@ -38,13 +38,13 @@ class RKEClient(object):
         yml_name = config if config else DEFAULT_CONFIG_NAME
         self._save_cluster_yml(yml_name, config_yml)
         cli_args = '' if config is None else ' --config {0}'.format(config)
-        result = self._run("/Users/tiffanymao/rancher/tests/validation/tests/rke/rke up {0}".format(cli_args))
+        result = self._run("/usr/local/bin/rke up {0}".format(cli_args))
         print(
             "RKE kube_config:\n{0}".format(self.get_kube_config_for_config()))
         return result
 
     def remove(self, config=None):
-        result = self._run("/Users/tiffanymao/rancher/tests/validation/tests/rke/rke remove --force")
+        result = self._run("/usr/local/bin/rke remove --force")
         return result
 
     def build_rke_template(self, template, nodes, **kwargs):
@@ -52,6 +52,7 @@ class RKEClient(object):
             This method builds RKE cluster.yml from a template,
             and updates the list of nodes in update_nodes
         """
+        print(template)
         render_dict = {
             'master_ssh_key_path': self.master_ssh_key_path,
             'network_plugin': DEFAULT_NETWORK_PLUGIN}
