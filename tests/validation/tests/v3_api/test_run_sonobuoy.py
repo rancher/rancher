@@ -8,6 +8,7 @@ RANCHER_K8S_VERSION = os.environ.get("RANCHER_K8S_VERSION", "v1.18.2")
 RANCHER_SONOBUOY_MODE = os.environ.get("RANCHER_SONOBUOY_MODE",
                                        "certified-conformance")
 RANCHER_KUBECONFIG = os.environ.get("RANCHER_KUBECONFIG")
+RANCHER_FAILED_TEST = os.environ.get("RANCHER_FAILED_TEST")
 DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            'resource')
 
@@ -25,7 +26,10 @@ def test_sonobuoy_results():
 
 
 def run_sonobuoy_test(kubeconfig):
-    cmd = "sonobuoy run --mode={0} --kube-conformance-image-version={1} --kubeconfig={2}".format(RANCHER_SONOBUOY_MODE, RANCHER_K8S_VERSION, kubeconfig)
+    if not RANCHER_FAILED_TEST:
+        cmd = "sonobuoy run --mode={0} --kube-conformance-image-version={1} --kubeconfig={2}".format(RANCHER_SONOBUOY_MODE, RANCHER_K8S_VERSION, kubeconfig)
+    else:
+       cmd = "sonobuoy run {0} --kube-conformance-image-version={1} --kubeconfig={2}".format(RANCHER_FAILED_TEST, RANCHER_K8S_VERSION, kubeconfig)
     status = run_command(cmd)
     time.sleep(60)
 
