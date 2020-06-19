@@ -760,6 +760,28 @@ def test_app_externalid_target_project_verification(admin_mc,
     p1_client.update(app, update_data)
 
 
+def test_local_app_can_deploy(admin_pc, admin_mc, remove_resource):
+    """Test that an app without an externalId can be deployed
+    successfully to simulate a local app deployed through cli"""
+    app_client = admin_pc.client
+    app_name = random_str()
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+
+    # create app without the externalId value set
+    app = app_client.create_app(
+        name=app_name,
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(app)
+    wait_for(lambda: app_client.by_id_app(app.id) is not None,
+             fail_handler=lambda:
+             "app could not be found")
+
+
 def wait_for_workload(client, ns, timeout=60, count=0):
     start = time.time()
     interval = 0.5
