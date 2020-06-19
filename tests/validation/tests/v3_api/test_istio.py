@@ -973,9 +973,13 @@ def create_project_client(request):
     answers = {"global.rancher.clusterId": p.clusterId}
     DEFAULT_ANSWERS.update(answers)
 
+    monitoring_answers = copy.deepcopy(C_MONITORING_ANSWERS)
+    monitoring_answers["prometheus.persistence.enabled"] = "false"
+    monitoring_answers["grafana.persistence.enabled"] = "false"
+
     if cluster["enableClusterMonitoring"] is False:
         client.action(cluster, "enableMonitoring",
-                      answers=C_MONITORING_ANSWERS)
+                      answers=monitoring_answers)
 
     if cluster["istioEnabled"] is False:
         verify_admission_webhook()
