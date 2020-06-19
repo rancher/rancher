@@ -88,6 +88,9 @@ name_mapping = {
     "node": node_graph_list,
 }
 STORAGE_CLASS = "longhorn"
+ENABLE_STORAGE = os.environ.get('RANCHER_ENABLE_STORAGE_FOR_MONITORING',
+                                "false")
+ENABLE_STORAGE = ENABLE_STORAGE.lower()
 
 # Longhorn is provided as the persistence storage class
 C_MONITORING_ANSWERS = {"operator-init.enabled": "true",
@@ -98,8 +101,8 @@ C_MONITORING_ANSWERS = {"operator-init.enabled": "true",
                         "exporter-node.resources.limits.memory": "200Mi",
                         "operator.resources.limits.memory": "500Mi",
                         "prometheus.retention": "12h",
-                        "grafana.persistence.enabled": "true",
-                        "prometheus.persistence.enabled": "true",
+                        "grafana.persistence.enabled": ENABLE_STORAGE,
+                        "prometheus.persistence.enabled": ENABLE_STORAGE,
                         "prometheus.persistence.storageClass": STORAGE_CLASS,
                         "grafana.persistence.storageClass": STORAGE_CLASS,
                         "grafana.persistence.size": "10Gi",
