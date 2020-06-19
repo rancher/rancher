@@ -556,7 +556,7 @@ def kubernetes_api_client(rancher_client, cluster_name):
 
 def protect_response(r):
     if r.status_code >= 300:
-        message = 'Server responded with {r.status_code}\nbody:\n{r.text}'
+        message = f'Server responded with {r.status_code}\nbody:\n{r.text}'
         raise ValueError(message)
 
 
