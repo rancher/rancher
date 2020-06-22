@@ -141,6 +141,9 @@ func getLocalPrincipalID(user *v3.User) string {
 			principalID = p
 		}
 	}
+	if principalID == "" {
+		return Name + "://" + user.Name
+	}
 	return principalID
 }
 
