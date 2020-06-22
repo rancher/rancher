@@ -71,6 +71,7 @@ resource "aws_instance" "master2-ha" {
               "sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${var.k3s_version} INSTALL_K3S_EXEC=${var.server_flags} sh -s - --datastore-endpoint='${data.template_file.test.rendered}' --node-external-ip=${self.public_ip}",
     ]
   }
+  depends_on       = ["aws_instance.master"]
 }
 
 data "template_file" "test" {
@@ -85,7 +86,7 @@ resource "aws_lb_target_group" "aws_tg_80" {
   health_check {
         protocol = "HTTP"
         port = "traffic-port"
-        path = "/healthz"
+        path = "/ping"
         interval = 10
         timeout = 6
         healthy_threshold = 3
@@ -118,7 +119,7 @@ resource "aws_lb_target_group" "aws_tg_443" {
   health_check {
         protocol = "HTTP"
         port = 80
-        path = "/healthz"
+        path = "/ping"
         interval = 10
         timeout = 6
         healthy_threshold = 3
