@@ -619,7 +619,18 @@ func userByPrincipal(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 
-	return u.PrincipalIDs, nil
+	match := false
+	for _, id := range u.PrincipalIDs {
+		if strings.HasPrefix(id, "local://") {
+			match = true
+			break
+		}
+	}
+
+	if match {
+		return u.PrincipalIDs, nil
+	}
+	return append(u.PrincipalIDs, "local://"+u.Name), nil
 }
 
 func crtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
