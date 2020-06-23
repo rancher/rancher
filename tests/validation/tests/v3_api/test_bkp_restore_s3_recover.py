@@ -14,14 +14,16 @@ backup_info = {"backupname": None, "backup_id": None, "workload": None,
 def test_bkp_restore_s3_recover_validate():
     """
     - This test create 1 cluster with s3 backups enabled
-        - 1 ControlPlane/Worker Node
+        - 1 ControlPlane/worker node
+        - 2 worker nodes
         - 3 etcd nodes
     - Creates an Ingress pointing to a workload
     - Snapshots the cluster and checks the backup is in S3
     - Stops the etcd nodes in ec2
     - Waits for the cluster to go into unavailable state
     - Removes all 3 etcd nodes
-    - Creates 3 new etcd nodes and waits until the cluster asks to restore from backup.
+    - Creates 3 new etcd nodes and waits until the cluster
+      asks to restore from backup.
     - Restores from S3 backup
     - Cluster is validated after it gets in Active state.
     - Checks the Ingress created before the backup is functional after restore.
@@ -51,11 +53,11 @@ def test_bkp_restore_s3_recover_validate():
                               if node.private_ip_address != ip_to_remove]
     ips_to_remove.clear()
     cluster = client.reload(cluster)
-    wait_for_cluster_node_count(client, cluster, 1)
+    wait_for_cluster_node_count(client, cluster, 3)
     # Add completely new etcd nodes to the cluster
     cluster = add_new_etcd_nodes(client, cluster)
     cluster = client.reload(cluster)
-    wait_for_cluster_node_count(client, cluster, 4)
+    wait_for_cluster_node_count(client, cluster, 6)
     # This message is expected to appear after we add new etcd nodes
     # The cluster will require the user to perform a backup to recover
     # this is appears in the cluster object in cluster.transitioningMessage
@@ -76,6 +78,7 @@ def create_project_client_and_cluster_s3_three_etcd(request):
     node_roles = [
         ["controlplane", "worker"],
         ["etcd"], ["etcd"], ["etcd"],
+        ["worker"], ["worker"]
     ]
     rke_config["services"]["etcd"]["backupConfig"] = {
         "enabled": "true",
@@ -92,7 +95,10 @@ def create_project_client_and_cluster_s3_three_etcd(request):
             "endpoint": "s3.amazonaws.com"
         }
     }
-    cluster, aws_nodes = create_and_validate_custom_host(node_roles)
+    cluster, aws_nodes = create_and_validate_custom_host(
+        node_roles,
+        random_cluster_name=True
+    )
     client = get_user_client()
     namespace["nodes"].extend(aws_nodes)
 
