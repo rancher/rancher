@@ -91,6 +91,8 @@ STORAGE_CLASS = "longhorn"
 ENABLE_STORAGE = os.environ.get('RANCHER_ENABLE_STORAGE_FOR_MONITORING',
                                 "false")
 ENABLE_STORAGE = ENABLE_STORAGE.lower()
+if ENABLE_STORAGE == "false":
+    STORAGE_CLASS = "default"
 
 # Longhorn is provided as the persistence storage class
 C_MONITORING_ANSWERS = {"operator-init.enabled": "true",
@@ -477,23 +479,25 @@ def setup_monitoring(request):
     namespace["system_project_client"] = sys_proj_client
     namespace["cluster_client"] = cluster_client
 
-    # Deploy Longhorn app from the library catalog
-    app_name = "longhorn"
-    ns = create_ns(cluster_client, cluster, project, "longhorn-system")
-    app_ext_id = create_catalog_external_id('library', app_name,
-                                            LONGHORN_APP_VERSION)
-    answer = get_defaut_question_answers(rancher_client, app_ext_id)
-    project_client = get_project_client_for_token(project, USER_TOKEN)
-    try:
-        app = project_client.create_app(
-            externalId=app_ext_id,
-            targetNamespace=ns.name,
-            projectId=ns.projectId,
-            answers=answer)
-        print(app)
-        validate_catalog_app(project_client, app, app_ext_id, answer)
-    except (AssertionError, RuntimeError):
-        assert False, "App {} deployment/Validation failed.".format(app_name)
+    if ENABLE_STORAGE == "true":
+        # Deploy Longhorn app from the library catalog
+        app_name = "longhorn"
+        ns = create_ns(cluster_client, cluster, project, "longhorn-system")
+        app_ext_id = create_catalog_external_id('library', app_name,
+                                                LONGHORN_APP_VERSION)
+        answer = get_defaut_question_answers(rancher_client, app_ext_id)
+        project_client = get_project_client_for_token(project, USER_TOKEN)
+        try:
+            app = project_client.create_app(
+                externalId=app_ext_id,
+                targetNamespace=ns.name,
+                projectId=ns.projectId,
+                answers=answer)
+            print(app)
+            validate_catalog_app(project_client, app, app_ext_id, answer)
+        except (AssertionError, RuntimeError):
+            assert False, "App {} deployment/Validation failed."\
+                .format(app_name)
 
     monitoring_template = rancher_client.list_template(
         id=MONITORING_TEMPLATE_ID).data[0]
@@ -548,11 +552,11 @@ def check_data(source, target_list):
     res.sort()
     target_copy.sort()
     extra.sort()
-    print("target graphs : {}".format(target_list))
-    print("actual graphs : {}".format(res))
-    print("missing graphs: {}".format(target_copy))
-    print("extra graphs  : {}".format(extra))
     if len(target_copy) != 0 or len(extra) != 0:
+        print("target graphs : {}".format(target_list))
+        print("actual graphs : {}".format(res))
+        print("missing graphs: {}".format(target_copy))
+        print("extra graphs  : {}".format(extra))
         return False
     return True
 
@@ -567,6 +571,17 @@ def validate_cluster_graph(action_query, resource_type, timeout=10):
         if len(nodes) == 1:
             target_graph_list.remove("etcd-peer-traffic")
     start = time.time()
+
+    if resource_type == "kube-component":
+        cluster = namespace["cluster"]
+        k8s_version = cluster.appliedSpec["rancherKubernetesEngineConfig"][
+            "kubernetesVersion"]
+        # the following two graphs are available only in k8s 1.15 and 1.16
+        if not k8s_version[0:5] in ["v1.15", "v1.16"]:
+            target_graph_list.remove("apiserver-request-latency")
+            target_graph_list.remove(
+                "scheduler-e-2-e-scheduling-latency-seconds-quantile")
+
     while True:
         res = rancher_client.action(**action_query)
         if check_data(res, target_graph_list):
