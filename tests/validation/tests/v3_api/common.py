@@ -1810,11 +1810,14 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
     # For longhorn app, only active state of workloads is verified as longhorn
     # workloads do not have the field workloadLabels
     # For all other apps active state of workloads & chart version are verified
-
-    for wl in workloads:
-        print("Workload {} , state - {}".format(wl.id, wl.state))
-        assert wl.state == "active"
-        if "longhorn" not in app.externalId:
+    if "longhorn" in app.externalId:
+        print("validating the Longhorn app, it may take longer than others")
+        for wl in workloads:
+            wait_for_wl_to_active(proj_client, wl)
+    else:
+        for wl in workloads:
+            print("Workload {} , state - {}".format(wl.id, wl.state))
+            assert wl.state == "active"
             chart_deployed = get_chart_info(wl.workloadLabels)
             print("Chart detail of app - {}".format(chart_deployed))
             # '-' check is to make sure chart has both app name and version.
