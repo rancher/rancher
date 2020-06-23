@@ -228,7 +228,7 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 	obj = obj.DeepCopy()
 	var err error
-	if !v3.AppConditionInstalled.IsUnknown(obj) {
+	if v3.AppConditionInstalled.IsTrue(obj) {
 		v3.AppConditionInstalled.Unknown(obj)
 		// update status in the UI
 		obj, err = l.AppGetter.Apps("").Update(obj)
