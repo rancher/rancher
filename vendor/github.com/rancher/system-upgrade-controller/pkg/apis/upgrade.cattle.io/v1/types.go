@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/system-upgrade-controller/pkg/condition"
 	"github.com/rancher/wrangler/pkg/genericcondition"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,10 +39,12 @@ type PlanSpec struct {
 	Version string       `json:"version,omitempty"`
 	Secrets []SecretSpec `json:"secrets,omitempty"`
 
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
 	Prepare *ContainerSpec `json:"prepare,omitempty"`
 	Cordon  bool           `json:"cordon,omitempty"`
 	Drain   *DrainSpec     `json:"drain,omitempty"`
-	Upgrade *ContainerSpec `json:"upgrade,omitempty"`
+	Upgrade *ContainerSpec `json:"upgrade,omitempty" wrangler:"required"`
 }
 
 // PlanStatus represents the resulting state from processing Plan events.
@@ -61,11 +64,13 @@ type ContainerSpec struct {
 
 // DrainSpec encapsulates `kubectl drain` parameters minus node/pod selectors.
 type DrainSpec struct {
-	Timeout          *time.Duration `json:"timeout,omitempty"`
-	GracePeriod      *int32         `json:"gracePeriod,omitempty"`
-	DeleteLocalData  *bool          `json:"deleteLocalData,omitempty"`
-	IgnoreDaemonSets *bool          `json:"ignoreDaemonSets,omitempty"`
-	Force            bool           `json:"force,omitempty"`
+	Timeout                  *time.Duration `json:"timeout,omitempty"`
+	GracePeriod              *int32         `json:"gracePeriod,omitempty"`
+	DeleteLocalData          *bool          `json:"deleteLocalData,omitempty"`
+	IgnoreDaemonSets         *bool          `json:"ignoreDaemonSets,omitempty"`
+	Force                    bool           `json:"force,omitempty"`
+	DisableEviction          bool           `json:"disableEviction,omitempty"`
+	SkipWaitForDeleteTimeout int            `json:"skipWaitForDeleteTimeout,omitempty"`
 }
 
 // SecretSpec describes a secret to be mounted for prepare/upgrade containers.

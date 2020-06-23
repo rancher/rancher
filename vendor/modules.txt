@@ -497,7 +497,7 @@ github.com/rancher/steve/pkg/stores/selector
 github.com/rancher/steve/pkg/stores/switchschema
 github.com/rancher/steve/pkg/stores/switchstore
 github.com/rancher/steve/pkg/summarycache
-# github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
+# github.com/rancher/system-upgrade-controller v0.6.2
 github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io
 github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1
 github.com/rancher/system-upgrade-controller/pkg/condition
