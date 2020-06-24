@@ -21,8 +21,8 @@ def test_cluster_upgrade():
     else:
         k8s_v = get_setting_value_by_name('k8s-versions-current')
         default_k8s_versions = k8s_v.split(",")
-    # print(default_k8s_versions) #['v1.15.12-rancher2-2', 'v1.16.10-rancher2-1', 'v1.17.6-rancher2-1']
-    # Create clusters
+    #default_k8s_versions = ['v1.15.12-rancher2-2', 'v1.16.10-rancher2-1', 'v1.17.6-rancher2-1']
+    # Create cluster
     preupgrade_k8s = default_k8s_versions[0]
     postupgrade_k8s = default_k8s_versions[1]
     zero_node_roles = [["etcd"], ["etcd"], ["controlplane"], ["controlplane"],
@@ -38,9 +38,7 @@ def test_cluster_upgrade():
     cluster, workload, ingress, p_client = validate_cluster_and_ingress(client, cluster,
                                                               check_intermediate_state=False,
                                                               k8s_version=preupgrade_k8s)
-    #cluster, aws_nodes = create_and_validate_custom_host(
-    #     node_roles, random_cluster_name=False, version=preupgrade_k8s)
-    #ingresses = client.list_ingress(uuid=ingress.uuid).data
+    #Update Cluster to k8 version + upgrade strategy maxUnavailable worker
     cluster = client.update_by_id_cluster(
         id=cluster.id,
         name="test1",
@@ -48,11 +46,12 @@ def test_cluster_upgrade():
             "kubernetesVersion": postupgrade_k8s,
             "upgradeStrategy": {
                 'drain': False,
-                'maxUnavailableControlplane': '2',
-                'maxUnavailableWorker': '10%',
+                'maxUnavailableControlplane': '1',
+                'maxUnavailableWorker': '20%',
                 'type': '/v3/schemas/nodeUpgradeStrategy'}}
     )
     nodes = client.list_node(clusterId=cluster.id).data
+    #Go through each node for k8 version upgrade and ensure ingress is still up
     for node in nodes:
         wait_for_node_status(client, node, "active")
         print("node: ", node)
@@ -60,7 +59,7 @@ def test_cluster_upgrade():
         wait_for_kubelet_version(node, client, node_ver)
         validate_ingress(p_client, cluster, [workload], host, path)
     # wait_for_k8_upgrade(cluster, cluster.id, client, postupgrade_k8s)
-    # check_cluster_version(cluster, postupgrade_k8s)
+    check_cluster_version(cluster, postupgrade_k8s)
     print("Success!")
 
 
@@ -130,8 +129,6 @@ def validate_cluster_and_ingress(client, cluster, intermediate_state="provisioni
     print("pods: ", pods)
     print("workload: ", workload)
     scale = len(pods)
-    # test service discovery
-    #validate_service_discovery(workload, scale, p_client, ns, pods)
     rule = {"host": host,
             "paths":
                 [{"workloadIds": [workload.id], "targetPort": "80"}]}
