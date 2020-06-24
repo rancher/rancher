@@ -502,7 +502,11 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 		NodeTemplateLister: ntl,
 	}
 	schema.Formatter = f.Formatter
-	schema.Validator = nodepool.Validator
+
+	nodepoolValidator := nodepool.Validator{
+		NodePoolLister: management.Management.NodePools("").Controller().Lister(),
+	}
+	schema.Validator = nodepoolValidator.Validator
 	return nil
 }
 
