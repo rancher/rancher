@@ -1,6 +1,7 @@
 package configsyncer
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/url"
@@ -36,7 +37,26 @@ var (
 	eventGroupInterval  = 1
 	eventGroupWait      = 1
 	eventRepeatInterval = 525600
+	webhookReceiverURL  = "http://webhook-receiver.cattle-prometheus.svc:9094/"
+	DingTalk            = "DINGTALK"
+	MicrosoftTeams      = "MICROSOFT_TEAMS"
 )
+
+type WebhookReceiverConfig struct {
+	Providers map[string]*Provider `json:"providers" yaml:"providers"`
+	Receivers map[string]*Receiver `json:"receivers" yaml:"receivers"`
+}
+
+type Provider struct {
+	Type       string `json:"type,omitempty" yaml:"type,omitempty"`
+	WebHookURL string `json:"webhook_url,omitempty" yaml:"webhook_url,omitempty"`
+	Secret     string `json:"secret,omitempty" yaml:"secret,omitempty"`
+	ProxyURL   string `json:"proxy_url,omitempty" yaml:"proxy_url,omitempty"`
+}
+
+type Receiver struct {
+	Provider string `yaml:"provider"`
+}
 
 func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
 	return &ConfigSyncer{
@@ -231,6 +251,10 @@ func (d *ConfigSyncer) sync() error {
 
 	} else {
 		logrus.Debug("The config stay the same, will not update the secret")
+	}
+
+	if err := d.syncReceiver(notifiers, cAlertGroupsMap, pAlertGroupsMap); err != nil {
+		return errors.Wrapf(err, "Update Webhook Receiver Config")
 	}
 
 	return nil
@@ -521,6 +545,26 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				receiver.WechatConfigs = append(receiver.WechatConfigs, wechat)
 				receiverExist = true
 
+			} else if notifier.Spec.DingtalkConfig != nil {
+				webhookURL := webhookReceiverURL + r.NotifierName
+				dingtalk := &alertconfig.WebhookConfig{
+					NotifierConfig: commonNotifierConfig,
+					URL:            webhookURL,
+				}
+
+				receiver.WebhookConfigs = append(receiver.WebhookConfigs, dingtalk)
+				receiverExist = true
+
+			} else if notifier.Spec.MSTeamsConfig != nil {
+				webhookURL := webhookReceiverURL + r.NotifierName
+				msTeams := &alertconfig.WebhookConfig{
+					NotifierConfig: commonNotifierConfig,
+					URL:            webhookURL,
+				}
+
+				receiver.WebhookConfigs = append(receiver.WebhookConfigs, msTeams)
+				receiverExist = true
+
 			} else if notifier.Spec.WebhookConfig != nil {
 				webhook := &alertconfig.WebhookConfig{
 					NotifierConfig: commonNotifierConfig,
@@ -657,4 +701,84 @@ func toAlertManagerURL(urlStr string) (*alertconfig.URL, error) {
 		return nil, err
 	}
 	return &alertconfig.URL{URL: url}, nil
+}
+
+func (d *ConfigSyncer) syncReceiver(notifiers []*v3.Notifier, cAlertGroupsMap map[string]*v3.ClusterAlertGroup, pAlertGroupsMap map[string]*v3.ProjectAlertGroup) error {
+	var recipients []v3.Recipient
+	for _, group := range cAlertGroupsMap {
+		recipients = append(recipients, group.Spec.Recipients...)
+	}
+
+	for _, group := range pAlertGroupsMap {
+		recipients = append(recipients, group.Spec.Recipients...)
+	}
+
+	webhookSecreteName, altermanagerAppNamespace := monitorutil.SecretWebhook()
+	secretClient := d.secretsGetter.Secrets(altermanagerAppNamespace)
+	configSecret, err := secretClient.Get(webhookSecreteName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "Get secret")
+	}
+
+	oldConfig := configSecret.Data["config.yaml"]
+
+	providers := make(map[string]*Provider)
+	receivers := make(map[string]*Receiver)
+	for _, r := range recipients {
+		if r.NotifierName != "" {
+			notifier := d.getNotifier(r.NotifierName, notifiers)
+			if notifier == nil {
+				logrus.Debugf("Can not find the notifier %s", r.NotifierName)
+				continue
+			}
+			if notifier.Spec.DingtalkConfig != nil {
+				provider := &Provider{
+					Type:       DingTalk,
+					WebHookURL: notifier.Spec.DingtalkConfig.URL,
+				}
+				if notifier.Spec.DingtalkConfig.Secret != "" {
+					provider.Secret = notifier.Spec.DingtalkConfig.Secret
+				}
+				if notifierutil.IsHTTPClientConfigSet(notifier.Spec.DingtalkConfig.HTTPClientConfig) {
+					provider.ProxyURL = notifier.Spec.DingtalkConfig.HTTPClientConfig.ProxyURL
+				}
+				receiver := &Receiver{
+					Provider: r.NotifierName,
+				}
+				providers[r.NotifierName] = provider
+				receivers[r.NotifierName] = receiver
+			} else if notifier.Spec.MSTeamsConfig != nil {
+				provider := &Provider{
+					Type:       MicrosoftTeams,
+					WebHookURL: notifier.Spec.MSTeamsConfig.URL,
+				}
+				if notifierutil.IsHTTPClientConfigSet(notifier.Spec.MSTeamsConfig.HTTPClientConfig) {
+					provider.ProxyURL = notifier.Spec.MSTeamsConfig.HTTPClientConfig.ProxyURL
+				}
+				receiver := &Receiver{
+					Provider: r.NotifierName,
+				}
+				providers[r.NotifierName] = provider
+				receivers[r.NotifierName] = receiver
+			}
+		}
+	}
+
+	config := WebhookReceiverConfig{
+		Providers: providers,
+		Receivers: receivers,
+	}
+
+	newConfig, err := yaml.Marshal(config)
+	if err != nil {
+		return errors.Wrapf(err, "Marshal secrets")
+	}
+	if !bytes.Equal(oldConfig, newConfig) {
+		configSecret.Data["config.yaml"] = newConfig
+		if _, err = secretClient.Update(configSecret); err != nil {
+			return errors.Wrapf(err, "Update secret")
+		}
+	}
+
+	return nil
 }

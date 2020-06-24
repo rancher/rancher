@@ -2,8 +2,10 @@ package notifiers
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,6 +42,11 @@ type wechatResponse struct {
 	Error string `json:"error"`
 }
 
+type dingtalkResponse struct {
+	Errcode int    `json:"errcode"`
+	Errmsg  string `json:"errmsg"`
+}
+
 func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer dialer.Dialer) error {
 	if notifier.Spec.SlackConfig != nil {
 		if recipient == "" {
@@ -71,6 +78,14 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer d
 
 	if notifier.Spec.WebhookConfig != nil {
 		return TestWebhook(notifier.Spec.WebhookConfig.URL, msg.Content, notifier.Spec.WebhookConfig.HTTPClientConfig, dialer)
+	}
+
+	if notifier.Spec.DingtalkConfig != nil {
+		return TestDingtalk(notifier.Spec.DingtalkConfig.URL, notifier.Spec.DingtalkConfig.Secret, msg.Content, notifier.Spec.DingtalkConfig.HTTPClientConfig, dialer)
+	}
+
+	if notifier.Spec.MSTeamsConfig != nil {
+		return TestMicrosoftTeams(notifier.Spec.MSTeamsConfig.URL, msg.Content, notifier.Spec.MSTeamsConfig.HTTPClientConfig, dialer)
 	}
 
 	return errors.New("Notifier not configured")
@@ -201,6 +216,87 @@ func TestWechat(secret, agent, corp, receiverType, receiver, msg string, cfg *v3
 
 	if weResp.Code != 0 {
 		return fmt.Errorf("Failed to send Wechat message. %s", weResp.Error)
+	}
+
+	return nil
+}
+
+func TestDingtalk(url, secret, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+	if msg == "" {
+		msg = "Dingtalk setting validated"
+	}
+
+	content := `{"msgtype": "text",
+		"text": {"content": "` + msg + `"},
+		"at": {"isAtAll": true}
+	}`
+
+	url = getDingtalkURL(url, secret)
+
+	client, err := NewClientFromConfig(cfg, dialer)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, strings.NewReader(content))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", contentTypeJSON)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
+	}
+
+	respBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var dtResp dingtalkResponse
+	if err := json.Unmarshal(respBytes, &dtResp); err != nil {
+		return err
+	}
+
+	if dtResp.Errcode != 0 {
+		return fmt.Errorf("Failed to send Dingtalk message. %s", dtResp.Errmsg)
+	}
+
+	return nil
+}
+
+func TestMicrosoftTeams(url, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+	if msg == "" {
+		msg = "MicrosoftTeams setting validated"
+	}
+
+	content := `{"text":"` + msg + `"}`
+
+	client, err := NewClientFromConfig(cfg, dialer)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, strings.NewReader(content))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", contentTypeJSON)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
 	}
 
 	return nil
@@ -544,4 +640,22 @@ func IsHTTPClientConfigSet(cfg *v3.HTTPClientConfig) bool {
 		return true
 	}
 	return false
+}
+
+func getDingtalkURL(webhook, secret string) string {
+	if secret != "" {
+		timestamp := time.Now().UnixNano() / 1e6
+
+		stringToSign := fmt.Sprintf("%d\n%s", timestamp, secret)
+
+		key := []byte(secret)
+		h := hmac.New(sha256.New, key)
+		h.Write([]byte(stringToSign))
+
+		signData := base64.StdEncoding.EncodeToString(h.Sum(nil))
+		sign := url.QueryEscape(signData)
+		webhook = fmt.Sprintf("%s&timestamp=%d&sign=%s", webhook, timestamp, sign)
+	}
+
+	return webhook
 }
