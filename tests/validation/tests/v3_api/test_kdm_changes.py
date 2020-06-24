@@ -22,7 +22,8 @@ import multiprocessing
 
 
 K8S_VERSION_URL = "/settings/k8s-versions-current"
-PLUGIN = ["calico", "canal", "flannel", "weave"]
+NETWORK_PLUGINS = ["calico", "canal", "flannel", "weave"]
+DNS_PROVIDERS = ["coredns", "kube-dns"]
 CLUSTER_LIST = []
 NODE_COUNT_KDM_CLUSTER = \
     int(os.environ.get("RANCHER_NODE_COUNT_KDM_CLUSTER", 4))
@@ -32,7 +33,7 @@ def test_clusters_for_kdm():
     """
     This fuction is used to check the KDM changes.
     It deploys all the different types of k8s clusters - default_k8s_versions,
-    across all the network provider types - PLUGIN
+    across all the network provider types - NETWORK_PLUGINS, and all dns provider types - DNS_PROVIDERS
     It then deploys a workload on each cluster,
     checks service discovery - DNS resolution and
     checks the ingress when enabled
@@ -51,36 +52,46 @@ def test_clusters_for_kdm():
     else:
         default_k8s_versions = [K8S_VERSION]
     list_process = []
-    plugin = PLUGIN
+    network_plugins = NETWORK_PLUGINS
+    dns_providers = DNS_PROVIDERS
     print("default_k8s_versions: ", default_k8s_versions)
     for k8s_version in default_k8s_versions:
         rke_config_new = deepcopy(rke_config)
         rke_config_new["kubernetesVersion"] = k8s_version
-        node_count = NODE_COUNT_KDM_CLUSTER * len(plugin)
+        node_count = NODE_COUNT_KDM_CLUSTER * len(network_plugins) * len(dns_providers) * 2
         aws_nodes = \
             AmazonWebServices().create_multiple_nodes(
                 node_count, random_test_name(HOST_NAME))
         i = 0
-        for plug in plugin:
-            if plug == "calico" or plug == "canal" or plug == "weave":
-                rke_config_new["network"]["options"] = \
-                    {"flannel_backend_type": "vxlan"}
-            rke_config_new["network"] = {"type": "networkConfig",
-                                         "plugin": plug}
-            client = get_user_client()
-            cluster_name = random_test_name(plug)
-            cluster = client.create_cluster(name=cluster_name,
-                                            driver="rancherKubernetesEngine",
-                                            rancherKubernetesEngineConfig=
-                                            rke_config_new)
-            p1 = multiprocessing.Process(target=validate_custom_cluster_kdm,
-                                         args=(cluster,
-                                               aws_nodes
-                                               [i:i+NODE_COUNT_KDM_CLUSTER]))
-            CLUSTER_LIST.append(cluster)
-            list_process.append(p1)
-            p1.start()
-            i = i + NODE_COUNT_KDM_CLUSTER
+        for network_plugin in network_plugins:
+            for dns_provider in dns_providers:
+                for nodelocaldns in True, False:
+                    if network_plugin == "calico" or network_plugin == "canal" or network_plugin == "weave":
+                        rke_config_new["network"]["options"] = \
+                            {"flannel_backend_type": "vxlan"}
+                    rke_config_new["network"] = {"type": "networkConfig",
+                                                 "plugin": network_plugin}
+                    rke_config_new["dns"] = {"type": "dnsConfig",
+                                                 "provider": dns_provider}
+                    cluster_options = network_plugin + "-" + dns_provider
+                    if nodelocaldns:
+                        rke_config_new["dns"]["nodelocal"] = \
+                            {"type": "nodelocal", "ipAddress": "169.254.20.10"}
+                        cluster_options += "-nodelocaldns"
+                    client = get_user_client()
+                    cluster_name = random_test_name(cluster_options)
+                    cluster = client.create_cluster(name=cluster_name,
+                                                    driver="rancherKubernetesEngine",
+                                                    rancherKubernetesEngineConfig=
+                                                    rke_config_new)
+                    p1 = multiprocessing.Process(target=validate_custom_cluster_kdm,
+                                                 args=(cluster,
+                                                       aws_nodes
+                                                       [i:i+NODE_COUNT_KDM_CLUSTER]))
+                    CLUSTER_LIST.append(cluster)
+                    list_process.append(p1)
+                    p1.start()
+                    i = i + NODE_COUNT_KDM_CLUSTER
     failed_cluster = {}
     passed_cluster = {}
     for process in list_process:
@@ -104,6 +115,11 @@ def test_clusters_for_kdm():
                 cluster["rancherKubernetesEngineConfig"]["kubernetesVersion"]
             passed_cluster[cluster.name]["network"] = \
                 cluster["rancherKubernetesEngineConfig"]["network"]["plugin"]
+            passed_cluster[cluster.name]["dns"] = \
+                cluster["rancherKubernetesEngineConfig"]["dns"]["provider"]
+            if "-nodelocaldns" in cluster.name:
+                passed_cluster[cluster.name]["nodelocaldns"] = \
+                    "enabled"
         except Exception as e:
             print("Issue in {}:\n{}".format(cluster.name, e))
             failed_cluster[cluster.name] = {}
@@ -111,6 +127,12 @@ def test_clusters_for_kdm():
                 cluster["rancherKubernetesEngineConfig"]["kubernetesVersion"]
             failed_cluster[cluster.name]["network"] = \
                 cluster["rancherKubernetesEngineConfig"]["network"]["plugin"]
+            failed_cluster[cluster.name]["dns"] = \
+                cluster["rancherKubernetesEngineConfig"]["dns"]["provider"]
+            if not "-nodelocaldns" in cluster.name:
+                passed_cluster[cluster.name]["nodelocaldns"] = \
+                    "disabled"
+
     print("--------------Passed Cluster information--------------'\n")
     for key, value in passed_cluster.items():
         print(key + "-->" + str(value) + "\n")
