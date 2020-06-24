@@ -2,16 +2,12 @@ from .common import *
 import pytest
 import time
 
-from .test_rke_cluster_provisioning import create_and_validate_custom_host
-
-# def validate_cluster(...):
-# check_cluster_version(cluster, version):
-# def cluster_template_create_edit(userToken):
-# def check_cluster_version(cluster, version):
-# node = wait_for_node_status(client, node, "active")
-# @pytest.fixture(scope='module', autouse="True")
+from .test_rke_cluster_provisioning import create_and_validate_custom_host, create_custom_host_from_nodes
 
 CLUSTER_NAME = "test1"
+HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testZeroDT")
+host = "test" + str(random_int(10000, 99999)) + ".com"
+path = "/name.html"
 
 
 def test_cluster_upgrade():
@@ -32,11 +28,19 @@ def test_cluster_upgrade():
     zero_node_roles = [["etcd"], ["etcd"], ["controlplane"], ["controlplane"],
                        ["etcd"], ["worker"], ["worker"]]
     node_roles = [["etcd"], ["controlplane"], ["worker"]]
-    cluster, aws_nodes = create_and_validate_custom_host(
-        node_roles, random_cluster_name=False, version=preupgrade_k8s)
-    cluster_id = cluster["id"]
-    print(cluster["id"])
-    cluster = client.by_id_cluster(cluster_id)
+    aws_nodes = \
+        AmazonWebServices().create_multiple_nodes(
+            len(node_roles), random_test_name(HOST_NAME))
+    cluster, nodes = create_custom_host_from_nodes(aws_nodes, node_roles,
+                                                   random_cluster_name=False,
+                                                   version=preupgrade_k8s)
+    print("cluster: ", cluster)
+    cluster, workload, ingress, p_client = validate_cluster_and_ingress(client, cluster,
+                                                              check_intermediate_state=False,
+                                                              k8s_version=preupgrade_k8s)
+    #cluster, aws_nodes = create_and_validate_custom_host(
+    #     node_roles, random_cluster_name=False, version=preupgrade_k8s)
+    #ingresses = client.list_ingress(uuid=ingress.uuid).data
     cluster = client.update_by_id_cluster(
         id=cluster.id,
         name="test1",
@@ -54,12 +58,13 @@ def test_cluster_upgrade():
         print("node: ", node)
         node_ver = postupgrade_k8s.split("-")[0]
         wait_for_kubelet_version(node, client, node_ver)
-    wait_for_k8_upgrade(cluster, cluster_id, client, postupgrade_k8s)
-    check_cluster_version(cluster, postupgrade_k8s)
+        validate_ingress(p_client, cluster, [workload], host, path)
+    # wait_for_k8_upgrade(cluster, cluster.id, client, postupgrade_k8s)
+    # check_cluster_version(cluster, postupgrade_k8s)
     print("Success!")
 
 
-def wait_for_kubelet_version(node, client, k8_Version, timeout=1200):
+def wait_for_kubelet_version(node, client, k8_Version, timeout=2000):
     uuid = node.uuid
     start = time.time()
     nodes = client.list_node(uuid=uuid).data
@@ -76,7 +81,7 @@ def wait_for_kubelet_version(node, client, k8_Version, timeout=1200):
     assert nodes[0]["info"]["kubernetes"]["kubeletVersion"] == k8_Version
 
 
-def wait_for_k8_upgrade(cluster, cluster_id, client, k8_Version, timeout=1200):
+def wait_for_k8_upgrade(cluster, cluster_id, client, k8_Version, timeout=1800):
     cluster_k8s_version = \
         cluster.appliedSpec["rancherKubernetesEngineConfig"][
             "kubernetesVersion"]
@@ -91,3 +96,48 @@ def wait_for_k8_upgrade(cluster, cluster_id, client, k8_Version, timeout=1200):
     assert cluster_k8s_version == k8_Version, \
         "cluster_k8s_version: " + cluster_k8s_version + \
         " Expected: " + k8_Version
+
+
+def validate_cluster_and_ingress(client, cluster, intermediate_state="provisioning",
+                                 check_intermediate_state=True,
+                                 nodes_not_in_active_state=[], k8s_version="",
+                                 userToken=USER_TOKEN):
+    time.sleep(5)
+    cluster = validate_cluster_state(
+        client, cluster,
+        check_intermediate_state=check_intermediate_state,
+        intermediate_state=intermediate_state,
+        nodes_not_in_active_state=nodes_not_in_active_state)
+    print("cluster: ", cluster)
+    create_kubeconfig(cluster)
+    if k8s_version != "":
+        check_cluster_version(cluster, k8s_version)
+    if hasattr(cluster, 'rancherKubernetesEngineConfig'):
+        check_cluster_state(len(get_role_nodes(cluster, "etcd", client)))
+    project, ns = create_project_and_ns(userToken, cluster)
+    p_client = get_project_client_for_token(project, userToken)
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name,
+                                        containers=con,
+                                        namespaceId=ns.id,
+                                        daemonSetConfig={})
+    validate_workload(p_client, workload, "daemonSet", ns.name,
+                      len(get_schedulable_nodes(cluster, client)))
+    pods = p_client.list_pod(workloadId=workload["id"]).data
+    print("cluster: ", cluster)
+    print("pods: ", pods)
+    print("workload: ", workload)
+    scale = len(pods)
+    # test service discovery
+    #validate_service_discovery(workload, scale, p_client, ns, pods)
+    rule = {"host": host,
+            "paths":
+                [{"workloadIds": [workload.id], "targetPort": "80"}]}
+    ingress = p_client.create_ingress(name=name,
+                                      namespaceId=ns.id,
+                                      rules=[rule])
+    wait_for_ingress_to_active(p_client, ingress)
+    validate_ingress(p_client, cluster, [workload], host, path)
+    return cluster, workload, ingress, p_client
