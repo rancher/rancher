@@ -1,0 +1,16 @@
+ignore_docker_version: true
+ssh_key_path: {{ master_ssh_key_path }}
+network:
+  plugin: {{ network_plugin }}
+  {{ network_plugin_options }}
+nodes:
+  - address: {{ ip_address_0 }}
+    user: {{ ssh_user_0 }}
+    role: [controlplane]
+  - address: {{ ip_address_1 }}
+    user: {{ ssh_user_1 }}
+    role: [etcd]
+  - address: {{ ip_address_2 }}
+    user: {{ ssh_user_2 }}
+    role: [worker]
+kubernetes_version: {{ k8s_version }}

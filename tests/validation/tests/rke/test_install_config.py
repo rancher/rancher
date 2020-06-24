@@ -6,7 +6,7 @@ def test_install_config_1(test_name, cloud_provider, rke_client, kubectl):
     """
     Node Address specified as just IP and using only this in the node spec
     """
-    rke_template = 'cluster_install_config_1.yml.j2'
+    rke_template = 'cluster_install_config_11.yml.j2'
     nodes = cloud_provider.create_multiple_nodes(3, test_name)
     create_and_validate(
         cloud_provider, rke_client, kubectl, rke_template, nodes,
