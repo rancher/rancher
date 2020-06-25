@@ -32,20 +32,23 @@ kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
 export_cmd = "export KUBECONFIG=" + kubeconfig_path
 
 
-
 def test_remove_rancher_ha():
     assert CATTLE_TEST_URL.endswith(".qa.rancher.space"), \
         "the CATTLE_TEST_URL need to end with .qa.rancher.space"
-    admin_token = get_user_token("admin", ADMIN_PASSWORD)
-    client = get_client_for_token(admin_token)
+    if not check_if_ok(CATTLE_TEST_URL):
+        print("skip deleting clusters within the setup")
+    else:
+        print("the CATTLE_TEST_URL is accessible")
+        admin_token = get_user_token("admin", ADMIN_PASSWORD)
+        client = get_client_for_token(admin_token)
 
-    # delete clusters except the local cluster
-    clusters = client.list_cluster(id_ne="local").data
-    print("deleting the following clusters: {}"
-          .format([cluster.name for cluster in clusters]))
-    for cluster in clusters:
-        print("deleting the following cluster : {}".format(cluster.name))
-        delete_cluster(client, cluster)
+        # delete clusters except the local cluster
+        clusters = client.list_cluster(id_ne="local").data
+        print("deleting the following clusters: {}"
+              .format([cluster.name for cluster in clusters]))
+        for cluster in clusters:
+            print("deleting the following cluster : {}".format(cluster.name))
+            delete_cluster(client, cluster)
 
     resource_prefix = \
         CATTLE_TEST_URL.split(".qa.rancher.space")[0].split("//")[1]
