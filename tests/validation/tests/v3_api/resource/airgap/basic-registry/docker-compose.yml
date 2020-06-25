@@ -1,0 +1,16 @@
+web:
+  image: nginx
+  ports:
+    - 443:443
+
+  links:
+    - registry:registry
+  volumes:
+    - ./nginx_config:/etc/nginx/conf.d/
+
+registry:
+  # v2.6 is needed to support Windoes images in the registry, otherwise will get 500 Internal Server Error
+  image: registry:2.6
+  ports:
+   - 127.0.0.1:5000:5000
+

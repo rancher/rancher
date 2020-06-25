@@ -75,7 +75,7 @@ class AmazonWebServices(CloudProviderBase):
         self.created_keys = []
 
     def create_node(self, node_name, ami=AWS_AMI, ssh_user=AWS_USER,
-                    key_name=None, wait_for_ready=True):
+                    key_name=None, wait_for_ready=True, public_ip=True):
         volume_size = AWS_VOLUME_SIZE
         instance_type = AWS_INSTANCE_TYPE
         if ssh_user == "Administrator":
@@ -114,7 +114,7 @@ class AmazonWebServices(CloudProviderBase):
                 "KeyName": key_name,
                 "NetworkInterfaces": [
                     {'DeviceIndex': 0,
-                     'AssociatePublicIpAddress': True,
+                     'AssociatePublicIpAddress': public_ip,
                      'Groups': [AWS_SECURITY_GROUP]
                      }
                 ],
@@ -144,19 +144,24 @@ class AmazonWebServices(CloudProviderBase):
 
         if wait_for_ready:
             node = self.wait_for_node_state(node)
-            node.ready_node()
+            if public_ip:
+                node.ready_node()
+            else:
+                time.sleep(60)
         return node
 
     def create_multiple_nodes(self, number_of_nodes, node_name_prefix,
                               ami=AWS_AMI, ssh_user=AWS_USER,
-                              key_name=None, wait_for_ready=True):
+                              key_name=None, wait_for_ready=True,
+                              public_ip=True):
         nodes = []
         for i in range(number_of_nodes):
             node_name = "{}-{}".format(node_name_prefix, i)
             nodes.append(self.create_node(node_name,
                                           ami=ami, ssh_user=ssh_user,
                                           key_name=key_name,
-                                          wait_for_ready=False))
+                                          wait_for_ready=False,
+                                          public_ip=public_ip))
 
         if wait_for_ready:
             nodes = self.wait_for_nodes_state(nodes)
@@ -167,12 +172,15 @@ class AmazonWebServices(CloudProviderBase):
                     node.ssh_password = \
                         self.decrypt_windows_password(node.provider_node_id)
 
-            for node in nodes:
-                node.ready_node()
+            if public_ip:
+                for node in nodes:
+                    node.ready_node()
+            else:
+                time.sleep(60)
 
         return nodes
 
-    def get_node(self, provider_id):
+    def get_node(self, provider_id, ssh_access=False):
         node_filter = [{
             'Name': 'instance-id', 'Values': [provider_id]}]
         try:
@@ -189,6 +197,11 @@ class AmazonWebServices(CloudProviderBase):
                 public_ip_address=aws_node.get('PublicIpAddress'),
                 private_ip_address=aws_node.get('PrivateIpAddress'),
                 state=aws_node['State']['Name'])
+            if ssh_access:
+                node.ssh_user = AWS_USER
+                node.ssh_key_name = AWS_SSH_KEY_NAME.replace('.pem', '')
+                node.ssh_key_path = self.master_ssh_key_path
+                node.ssh_key = self.master_ssh_key
             return node
         except Boto3Error as e:
             msg = "Failed while querying instance '{}' state!: {}".format(
@@ -373,9 +386,9 @@ class AmazonWebServices(CloudProviderBase):
                 TargetGroupArn=target_group_arn,
                 Targets=targets)
 
-    def create_network_lb(self, name):
+    def create_network_lb(self, name, scheme='internet-facing'):
         return self._elbv2_client.create_load_balancer(
-            Name=name, Subnets=[AWS_SUBNET], Type='network'
+            Name=name, Subnets=[AWS_SUBNET], Scheme=scheme, Type='network'
         )
 
     def delete_lb(self, loadBalancerARN):
