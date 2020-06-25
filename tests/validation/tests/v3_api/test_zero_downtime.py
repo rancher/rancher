@@ -21,7 +21,7 @@ def test_cluster_upgrade():
     else:
         k8s_v = get_setting_value_by_name('k8s-versions-current')
         default_k8s_versions = k8s_v.split(",")
-    #default_k8s_versions = ['v1.15.12-rancher2-2', 'v1.16.10-rancher2-1', 'v1.17.6-rancher2-1']
+    # default_k8s_versions = ['v1.15.12-rancher2-2', 'v1.16.10-rancher2-1', 'v1.17.6-rancher2-1']
     # Create cluster
     preupgrade_k8s = default_k8s_versions[0]
     postupgrade_k8s = default_k8s_versions[1]
@@ -36,9 +36,9 @@ def test_cluster_upgrade():
                                                    version=preupgrade_k8s)
     print("cluster: ", cluster)
     cluster, workload, ingress, p_client = validate_cluster_and_ingress(client, cluster,
-                                                              check_intermediate_state=False,
-                                                              k8s_version=preupgrade_k8s)
-    #Update Cluster to k8 version + upgrade strategy maxUnavailable worker
+                                                                        check_intermediate_state=False,
+                                                                        k8s_version=preupgrade_k8s)
+    # Update Cluster to k8 version + upgrade strategy maxUnavailable worker
     cluster = client.update_by_id_cluster(
         id=cluster.id,
         name="test1",
@@ -51,15 +51,13 @@ def test_cluster_upgrade():
                 'type': '/v3/schemas/nodeUpgradeStrategy'}}
     )
     nodes = client.list_node(clusterId=cluster.id).data
-    #Go through each node for k8 version upgrade and ensure ingress is still up
+    # Go through each node for k8 version upgrade and ensure ingress is still up
     for node in nodes:
         wait_for_node_status(client, node, "active")
         print("node: ", node)
         node_ver = postupgrade_k8s.split("-")[0]
         wait_for_kubelet_version(node, client, node_ver)
         validate_ingress(p_client, cluster, [workload], host, path)
-    # wait_for_k8_upgrade(cluster, cluster.id, client, postupgrade_k8s)
-    check_cluster_version(cluster, postupgrade_k8s)
     print("Success!")
 
 
@@ -125,10 +123,6 @@ def validate_cluster_and_ingress(client, cluster, intermediate_state="provisioni
     validate_workload(p_client, workload, "daemonSet", ns.name,
                       len(get_schedulable_nodes(cluster, client)))
     pods = p_client.list_pod(workloadId=workload["id"]).data
-    print("cluster: ", cluster)
-    print("pods: ", pods)
-    print("workload: ", workload)
-    scale = len(pods)
     rule = {"host": host,
             "paths":
                 [{"workloadIds": [workload.id], "targetPort": "80"}]}
