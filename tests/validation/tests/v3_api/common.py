@@ -2643,14 +2643,14 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
 
     # delete rds
     db_name = resource_prefix + "-multinode-db"
-    print("deleting the database: {}".format(db_name))
+    print("deleting the database (if it exists): {}".format(db_name))
     AmazonWebServices().delete_db(db_name)
 
     # delete the route 53 record
     route53_names = [resource_prefix + ".qa.rancher.space.",
                      resource_prefix + "-internal.qa.rancher.space."]
     for name in route53_names:
-        print("deleting the route53 record: {}".format(name))
+        print("deleting the route53 record (if it exists): {}".format(name))
         AmazonWebServices().delete_route_53_record(name)
 
     print("deletion is done")

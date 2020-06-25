@@ -368,7 +368,7 @@ def create_nlb_and_add_targets(aws_nodes):
     public_dns = lb["LoadBalancers"][0]["DNSName"]
     # Create internal nlb and grab ARN & dns name
     internal_lb = AmazonWebServices().create_network_lb(
-        name=HOST_NAME + "internal-nlb", scheme='internal')
+        name=HOST_NAME + "-internal-nlb", scheme='internal')
     internal_lb_arn = internal_lb["LoadBalancers"][0]["LoadBalancerArn"]
     internal_lb_dns = internal_lb["LoadBalancers"][0]["DNSName"]
 
@@ -389,9 +389,9 @@ def create_nlb_and_add_targets(aws_nodes):
     tg443_arn = tg443["TargetGroups"][0]["TargetGroupArn"]
     # Create the internal target groups
     internal_tg80 = AmazonWebServices(). \
-        create_ha_target_group(80, HOST_NAME + "internal-tg-80")
+        create_ha_target_group(80, HOST_NAME + "-internal-tg-80")
     internal_tg443 = AmazonWebServices(). \
-        create_ha_target_group(443, HOST_NAME + "internal-tg-443")
+        create_ha_target_group(443, HOST_NAME + "-internal-tg-443")
     internal_tg80_arn = internal_tg80["TargetGroups"][0]["TargetGroupArn"]
     internal_tg443_arn = internal_tg443["TargetGroups"][0]["TargetGroupArn"]
 
