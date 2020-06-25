@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -132,25 +134,32 @@ func (ac *azureClient) marshalTokenJSON() ([]byte, error) {
 
 // parseJWTforField will parse the claims in a token for the field requested
 func parseJWTforField(tokenString string, fieldID string) (string, error) {
+	logrus.Infof("Obtained token: %v", tokenString)
+	logrus.Infof("Splitting Azure AD access token")
 	pieces := strings.Split(tokenString, ".")
 	if len(pieces) != 3 {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		logrus.Errorf("Incorrect Azure AD token length")
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "incorrect azure AD token length")
 	}
-
-	decoded, err := base64.RawStdEncoding.DecodeString(pieces[1])
+	logrus.Infof("Decoding token part %v", pieces[1])
+	logrus.Infof("Decoding Azure AD access token")
+	decoded, err := base64.RawURLEncoding.DecodeString(pieces[1])
 	if err != nil {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		logrus.Errorf("Error decoding Azure AD token: %v", err)
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "error decoding azure AD token")
 	}
 
 	var dat map[string]interface{}
-
+	logrus.Infof("Unmarshaling decoded Azure AD access token %v", decoded)
 	err = json.Unmarshal([]byte(decoded), &dat)
 	if err != nil {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		logrus.Errorf("Error unmarshaling Azure AD decoded token: %v", err)
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "error unmarshaling azure AD token")
 	}
-
+	logrus.Infof("Retrieved field oid after unmarshal from: %v", dat)
 	if _, ok := dat[fieldID]; !ok {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		logrus.Errorf("No value for oid passed in token")
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "error retrieving oid from azure AD token")
 	}
 	return dat[fieldID].(string), nil
 }
