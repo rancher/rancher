@@ -20,9 +20,10 @@ RANCHER_ELASTIC_SEARCH_ENDPOINT = os.environ.get(
     'RANCHER_ELASTIC_SEARCH_ENDPOINT', "")
 K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 
+
 def test_add_custom_host():
     aws_nodes = AmazonWebServices().create_multiple_nodes(
-        HOST_COUNT, random_test_name("testsa"+HOST_NAME))
+        HOST_COUNT, random_test_name("testsa" + HOST_NAME))
     if AGENT_REG_CMD != "":
         for aws_node in aws_nodes:
             additional_options = " --address " + aws_node.public_ip_address + \
@@ -48,7 +49,7 @@ def test_deploy_rancher_server():
         'rancher/rancher'
     RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION
     aws_nodes = AmazonWebServices().create_multiple_nodes(
-        1, random_test_name("testsa"+HOST_NAME))
+        1, random_test_name("testsa" + HOST_NAME))
     aws_nodes[0].execute_command(RANCHER_SERVER_CMD)
     time.sleep(120)
     RANCHER_SERVER_URL = "https://" + aws_nodes[0].public_ip_address
@@ -65,14 +66,14 @@ def test_deploy_rancher_server():
 
     if AUTH_PROVIDER == "activeDirectory":
         enable_url = RANCHER_SERVER_URL + "/v3/" + AUTH_PROVIDER + \
-            "Configs/" + AUTH_PROVIDER.lower() + "?action=testAndApply"
+                     "Configs/" + AUTH_PROVIDER.lower() + "?action=testAndApply"
         auth_admin_user = load_setup_data()["admin_user"]
         enable_ad(auth_admin_user, token, enable_url=enable_url,
                   password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
 
         auth_user_login_url = RANCHER_SERVER_URL + "/v3-public/" \
-            + AUTH_PROVIDER + "Providers/" \
-            + AUTH_PROVIDER.lower() + "?action=login"
+                              + AUTH_PROVIDER + "Providers/" \
+                              + AUTH_PROVIDER.lower() + "?action=login"
         user_token = login_as_auth_user(load_setup_data()["standard_user"],
                                         AUTH_USER_PASSWORD,
                                         login_url=auth_user_login_url)["token"]
@@ -91,7 +92,7 @@ def test_deploy_rancher_server():
                 5, random_test_name("testcustom"))
         node_roles = [["controlplane"], ["etcd"],
                       ["worker"], ["worker"], ["worker"]]
-        client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
+        client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                 token=user_token, verify=False)
         if K8S_VERSION != "":
             rke_config["kubernetesVersion"] = K8S_VERSION

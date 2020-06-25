@@ -2625,7 +2625,8 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
     lb_list = []
     lb_names = [resource_prefix + '-nlb',
                 resource_prefix + '-multinode-nlb',
-                resource_prefix + '-k3s-nlb']
+                resource_prefix + '-k3s-nlb',
+                resource_prefix + '-internal-nlb']
     for name in lb_names:
         lb_arn = AmazonWebServices().get_lb(name)
         if lb_arn is not None:
@@ -2646,9 +2647,11 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
     AmazonWebServices().delete_db(db_name)
 
     # delete the route 53 record
-    record_name = resource_prefix + ".qa.rancher.space."
-    print("deleting the route53 record: {}".format(record_name))
-    AmazonWebServices().delete_route_53_record(record_name)
+    route53_names = [resource_prefix + ".qa.rancher.space.",
+                     resource_prefix + "-internal.qa.rancher.space."]
+    for name in route53_names:
+        print("deleting the route53 record: {}".format(name))
+        AmazonWebServices().delete_route_53_record(name)
 
     print("deletion is done")
     return None
