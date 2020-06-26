@@ -85,6 +85,12 @@ func persistentVolumeTypes(schemas *types.Schemas) *types.Schemas {
 			Description string `json:"description"`
 		}{}).
 		MustImportAndCustomize(&Version, v1.PersistentVolume{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("name", func(field types.Field) types.Field {
+				field.Type = "hostname"
+				field.Nullable = false
+				field.Required = true
+				return field
+			})
 			schema.MustCustomizeField("volumeMode", func(field types.Field) types.Field {
 				field.Update = false
 				return field

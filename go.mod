@@ -82,7 +82,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200612212358-02b060294531
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
-	github.com/rancher/types v0.0.0-20200609171939-d21f6b7b59e8
+	github.com/rancher/types v0.0.0-20200625174156-fe03f32597d2
 	github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f
 	github.com/rancher/wrangler-api v0.6.1-0.20200515193802-dcf70881b087
 	github.com/robfig/cron v1.1.0
