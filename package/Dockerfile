@@ -1,5 +1,5 @@
-FROM ubuntu:18.04
-RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils && \
+FROM oraclelinux:8-slim
+RUN microdnf update && microdnf install git curl ca-certificates unzip tar && \
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin

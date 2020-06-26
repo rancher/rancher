@@ -1,5 +1,4 @@
-FROM ubuntu:18.04
-# FROM arm=armhf/ubuntu:16.04 arm64=arm64v8/ubuntu:18.04
+FROM oraclelinux:8-slim
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
@@ -18,8 +17,8 @@ ENV KUSTOMIZE_VERSION v3.5.4
 # kontainer-driver-metadata branch to be set for specific branch, logic at rancher/rancher/pkg/settings/setting.go
 ENV RANCHER_METADATA_BRANCH=release-v2.4
 
-RUN apt-get update && \
-    apt-get install -y gcc ca-certificates git wget curl vim less file xz-utils unzip && \
+RUN microdnf update && \
+    microdnf install  gcc ca-certificates git wget curl vim less file unzip tar && \
     rm -f /bin/sh && ln -s /bin/bash /bin/sh
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
@@ -28,10 +27,6 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLAN
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
 RUN wget -O - https://storage.googleapis.com/golang/go1.13.4.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local
-
-RUN if [ "${ARCH}" == "amd64" ]; then \
-    curl -sL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.20.0; \
-    fi
 
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
     DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm \
@@ -76,7 +71,7 @@ RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
     helm plugin install https://github.com/rancher/helm-unittest
 
 # set up helm 3
-RUN mkdir /usr/tmp && \
+RUN mkdir -p /usr/tmp && \
     curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
     mv /usr/tmp/helm /usr/bin/helm_v3 && \
     chmod +x /usr/bin/kustomize
@@ -93,8 +88,11 @@ RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
 ENV KUBECTL_URL=https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/${ARCH}/kubectl
 RUN wget -O - ${KUBECTL_URL} > /usr/bin/kubectl && chmod +x /usr/bin/kubectl
 
-RUN apt-get update && \
-    apt-get install -y tox python3.7 python3-dev python3.7-dev libffi-dev libssl-dev
+RUN microdnf update && \
+    microdnf install libffi
+
+#RUN microdnf update && \
+#    microdnf install  tox python3.7 python3-dev python3.7-dev libffi-dev libssl-dev
 
 ENV HELM_HOME /root/.helm
 ENV DAPPER_ENV REPO TAG DRONE_TAG SYSTEM_CHART_DEFAULT_BRANCH
