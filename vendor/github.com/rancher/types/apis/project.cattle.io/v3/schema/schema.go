@@ -53,7 +53,14 @@ var (
 )
 
 func configMapTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.MustImport(&Version, v1.ConfigMap{}, projectOverride{})
+	return schemas.MustImportAndCustomize(&Version, v1.ConfigMap{}, func(schema *types.Schema) {
+		schema.MustCustomizeField("name", func(field types.Field) types.Field {
+			field.Type = "hostname"
+			field.Nullable = false
+			field.Required = true
+			return field
+		})
+	}, projectOverride{})
 }
 
 type DeploymentConfig struct {
@@ -775,7 +782,14 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 			VolumeName       string   `json:"volumeName,omitempty" norman:"type=reference[/v3/cluster/persistentVolume]"`
 			StorageClassName *string  `json:"storageClassName,omitempty" norman:"type=reference[/v3/cluster/storageClass]"`
 		}{}).
-		MustImport(&Version, v1.PersistentVolumeClaim{}, projectOverride{})
+		MustImportAndCustomize(&Version, v1.PersistentVolumeClaim{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("name", func(field types.Field) types.Field {
+				field.Type = "hostname"
+				field.Nullable = false
+				field.Required = true
+				return field
+			})
+		}, projectOverride{})
 }
 
 func appTypes(schema *types.Schemas) *types.Schemas {

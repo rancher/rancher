@@ -846,6 +846,8 @@ github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551b
 github.com/rancher/types v0.0.0-20200520205802-ee9c76e143bf/go.mod h1:J6XqSEmTbADDyC4Dp6LLiceNtnlYvyHEcV4o7zG/0hg=
 github.com/rancher/types v0.0.0-20200609171948-b18f4c194419 h1:UdhVgG4irjMaNVoZlJygXv1AD7eDYeS4srnLHjMezbg=
 github.com/rancher/types v0.0.0-20200609171948-b18f4c194419/go.mod h1:J6XqSEmTbADDyC4Dp6LLiceNtnlYvyHEcV4o7zG/0hg=
+github.com/rancher/types v0.0.0-20200626170100-34259a45e414 h1:Nbn+LuhYUvUGt3aQEtU7brzSc5IoWsZH6j3efJGhvn0=
+github.com/rancher/types v0.0.0-20200626170100-34259a45e414/go.mod h1:J6XqSEmTbADDyC4Dp6LLiceNtnlYvyHEcV4o7zG/0hg=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
 github.com/rancher/wrangler v0.5.4-0.20200520040055-b8d49179cfc8 h1:gyboq5L4bx+iWyz4xHHFRqt7wyoou8+akRczPgVlFaQ=
