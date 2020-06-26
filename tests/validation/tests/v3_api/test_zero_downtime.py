@@ -51,32 +51,37 @@ def test_cluster_upgrade():
                 'type': '/v3/schemas/nodeUpgradeStrategy'}}
     )
     nodes = client.list_node(clusterId=cluster.id).data
-    # Go through each node for k8 version upgrade and ensure ingress is still up
+    node_ver = postupgrade_k8s.split("-")[0]
+    # Check Ingress is up during update
+    check_upgrade(nodes, client, p_client, cluster, workload, node_ver)
+    # Validate update has went through
     for node in nodes:
-        wait_for_node_status(client, node, "active")
-        print("node: ", node)
-        node_ver = postupgrade_k8s.split("-")[0]
-        wait_for_kubelet_version(node, client, node_ver)
-        validate_ingress(p_client, cluster, [workload], host, path)
+        uuid = node.uuid
+        nodes = client.list_node(uuid=uuid).data
+        assert nodes[0]["info"]["kubernetes"]["kubeletVersion"] == node_ver
+    # Go through each node for k8 version upgrade and ensure ingress is still up
+    validate_ingress(p_client, cluster, [workload], host, path)
     print("Success!")
 
 
-def wait_for_kubelet_version(node, client, k8_Version, timeout=2000):
-    uuid = node.uuid
+def check_upgrade(nodes, client, p_client, cluster, workload, k8_version, timeout=2000):
     start = time.time()
-    nodes = client.list_node(uuid=uuid).data
+    upgrade_nodes = set()
     print("nodes: ", nodes)
-    node_k8 = nodes[0]["info"]["kubernetes"]["kubeletVersion"]
-    while node_k8 != k8_Version:
+    while len(upgrade_nodes) != len(nodes):
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for K8 update")
-        time.sleep(60)
-        nodes = client.list_node(uuid=uuid).data
-        node_k8 = nodes[0]["info"]["kubernetes"]["kubeletVersion"]
-        print("Node ver: ", node_k8)
-    assert nodes[0]["info"]["kubernetes"]["kubeletVersion"] == k8_Version
-
+        validate_ingress(p_client, cluster, [workload], host, path)
+        for node in nodes:
+            uuid = node.uuid
+            node = client.list_node(uuid=uuid).data
+            node_k8 = node[0]["info"]["kubernetes"]["kubeletVersion"]
+            if node_k8 == k8_version:
+                print("node: ", node, " is at ", node_k8)
+                upgrade_nodes.add(uuid)
+        time.sleep(10)
+    print("upgrade nodes: ", upgrade_nodes)
 
 def wait_for_k8_upgrade(cluster, cluster_id, client, k8_Version, timeout=1800):
     cluster_k8s_version = \
