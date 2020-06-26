@@ -6,6 +6,7 @@ from rancher import ApiError
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
 RBAC_ROLES = [CLUSTER_OWNER, PROJECT_MEMBER, PROJECT_OWNER,
               PROJECT_READ_ONLY, CLUSTER_MEMBER]
+WORKLOAD_TYPES = ["daemonSet", "statefulSet", "cronJob", "job"]
 
 if_check_lb = os.environ.get('RANCHER_CHECK_FOR_LB', "False")
 if_check_lb = pytest.mark.skipif(
@@ -860,57 +861,47 @@ def setup_project_by_role(role, remove_resource):
     else:
         return None, None, None, None
 
-# --------------------- rbac tests by workload type -----------------------
+# --------------------- rbac tests by workload types -----------------------
 
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
-def test_rbac_wl_daemonset_create(role, remove_resource):
-    p_client, project, ns = setup_daemonset_project_by_role(role)
+@pytest.mark.parametrize("config", WORKLOAD_TYPES)
+def test_rbac_wl_parametarize_create(role, config, remove_resource):
+    p_client, project, ns = setup_wl_project_by_role(role)
     cluster = namespace["cluster"]
     con = [{"name": "test1", "image": TEST_IMAGE}]
     name = random_test_name("default")
     if role != PROJECT_READ_ONLY:
-        workload = p_client.create_workload(name=name,
-                                            containers=con,
-                                            namespaceId=ns.id,
-                                            daemonSetConfig={})
+        workload = create_workload_by_type(p_client, name, con, ns, config)
         wait_for_wl_to_active(p_client, workload)
-        schedulable_node_count = len(get_schedulable_nodes(cluster))
-        validate_workload(p_client, workload, "daemonSet",
-                          ns.name, schedulable_node_count)
         remove_resource(workload)
         if role == CLUSTER_MEMBER:
             remove_resource(project)
         return None
     else:
         with pytest.raises(ApiError) as e:
-            workload = p_client.create_workload(name=name,
-                                                containers=con,
-                                                namespaceId=ns.id,
-                                                daemonSetConfig={})
+            workload = create_workload_by_type(p_client, name, con, ns, config)
         assert e.value.error.status == 403
         assert e.value.error.code == 'Forbidden'
 
 
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
-def test_rbac_wl_daemonset_negative(role, remove_resource):
+@pytest.mark.parametrize("config", WORKLOAD_TYPES)
+def test_rbac_wl_parametrize_create_negative(role, remove_resource, config):
     if role == CLUSTER_OWNER:
-        # cluster owner can deploy daemonsets in any project in the cluster
+        # cluster owner can deploy workloads in any project in the cluster
         user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
         p2 = rbac_get_unshared_project()
         p_client2 = get_project_client_for_token(p2, user_token)
         ns2 = rbac_get_unshared_ns()
         name = random_test_name("default")
         con = [{"name": "test1", "image": TEST_IMAGE}]
-        wl = p_client2.create_workload(name=name,
-                                       containers=con,
-                                       namespaceId=ns2.id,
-                                       daemonSetConfig={})
+        wl = create_workload_by_type(p_client2, name, con, ns2, config)
         wait_for_wl_to_active(p_client2, wl)
         remove_resource(wl)
     else:
-        # roles cannot deploy daemonsets in projects they cannot access
+        # roles cannot deploy workloads in projects they cannot access
         user_token = rbac_get_user_token_by_role(role)
         name = random_test_name("default")
         con = [{"name": "test1", "image": TEST_IMAGE}]
@@ -918,27 +909,22 @@ def test_rbac_wl_daemonset_negative(role, remove_resource):
             p2 = rbac_get_unshared_project()
             ns2 = rbac_get_unshared_ns()
             new_p_client = get_project_client_for_token(p2, user_token)
-            new_p_client.create_workload(name=name,
-                                         containers=con,
-                                         namespaceId=ns2.id,
-                                         daemonSetConfig={})
+            workload = create_workload_by_type(new_p_client, name, con, ns2, config)
         assert e.value.error.status == 403
         assert e.value.error.code == 'Forbidden'
 
 
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
-def test_rbac_wl_daemonset_list(role, remove_resource):
+@pytest.mark.parametrize("config", WORKLOAD_TYPES)
+def test_rbac_wl_parametrize_list(role, remove_resource, config):
     if role == CLUSTER_MEMBER:
-        p_client, project, ns = setup_daemonset_project_by_role(role)
+        p_client, project, ns = setup_wl_project_by_role(role)
     else:
-        p_client, project, ns = setup_daemonset_project_by_role(CLUSTER_OWNER)
+        p_client, project, ns = setup_wl_project_by_role(CLUSTER_OWNER)
     con = [{"name": "test1", "image": TEST_IMAGE}]
     name = random_test_name("default")
-    workload = p_client.create_workload(name=name,
-                                        containers=con,
-                                        namespaceId=ns.id,
-                                        daemonSetConfig={})
+    workload = create_workload_by_type(p_client, name, con, ns, config)
     wait_for_wl_to_active(p_client, workload)
     # switch to rbac role
     user_token = rbac_get_user_token_by_role(role)
@@ -947,10 +933,10 @@ def test_rbac_wl_daemonset_list(role, remove_resource):
     remove_resource(workload)
 
 
-
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
-def test_rbac_wl_daemonset_list_negative(role, remove_resource):
+@pytest.mark.parametrize("config", WORKLOAD_TYPES)
+def test_rbac_wl_parametrize_list_negative(role, remove_resource, config):
     unshared_project = rbac_get_unshared_project()
     ns = rbac_get_unshared_ns()
     user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
@@ -975,15 +961,16 @@ def test_rbac_wl_daemonset_list_negative(role, remove_resource):
 
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
-def test_rbac_wl_daemonset_update(role, remove_resource):
-    p_client, project, ns = setup_daemonset_project_by_role(role)
+@pytest.mark.parametrize("config", WORKLOAD_TYPES)
+def test_rbac_wl_parametrize_update(role, remove_resource, config):
+    # workloads of type job cannot be edited
+    if config == "job":
+        return
+    p_client, project, ns = setup_wl_project_by_role(role)
     con = [{"name": "test1", "image": TEST_IMAGE}]
     name = random_test_name("default")
     if role != PROJECT_READ_ONLY:
-        workload = p_client.create_workload(name=name,
-                                            containers=con,
-                                            namespaceId=ns.id,
-                                            daemonSetConfig={})
+        workload = create_workload_by_type(p_client, name, con, ns, config)
         wait_for_wl_to_active(p_client, workload)
         con = [{"name": "test1", "image": os.environ.get('RANCHER_TEST_IMAGE',
                                                          "nginx")}]
@@ -995,10 +982,7 @@ def test_rbac_wl_daemonset_update(role, remove_resource):
         user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
         p_client = get_project_client_for_token(project, user_token)
         ns = rbac_get_namespace()
-        workload = p_client.create_workload(name=name,
-                                            containers=con,
-                                            namespaceId=ns.id,
-                                            daemonSetConfig={})
+        workload = create_workload_by_type(p_client, name, con, ns, config)
         wait_for_wl_to_active(p_client, workload)
         with pytest.raises(ApiError) as e:
             user_token = rbac_get_user_token_by_role(role)
@@ -1006,6 +990,8 @@ def test_rbac_wl_daemonset_update(role, remove_resource):
             con = [{"name": "test1", "image": os.environ.get('RANCHER_TEST_IMAGE',
                                                          "nginx")}]
             p_client.update(workload, containers=con)
+            wait_for_pods_in_workload(p_client, workload)
+            validate_workload(p_client, workload, config, ns.name)
         assert e.value.error.status == 403
         assert e.value.error.code == 'Forbidden'
         remove_resource(workload)
@@ -1013,65 +999,53 @@ def test_rbac_wl_daemonset_update(role, remove_resource):
 
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
-def test_rbac_wl_daemonset_update_negative(role, remove_resource):
+@pytest.mark.parametrize("config", WORKLOAD_TYPES)
+def test_rbac_wl_parametrize_update_negative(role, remove_resource, config):
+    # workloads of type job cannot be edited
+    if config == "job":
+        return
     if role == CLUSTER_OWNER:
-        # cluster owner can edit daemonsets in any project in the cluster
-        project = rbac_get_project()
+        # cluster owner can edit workloads in any project in the cluster
         user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
-        p2 = rbac_get_unshared_project()
-        p_client = get_project_client_for_token(project, user_token)
-        p_client2 = get_project_client_for_token(p2, user_token)
-        ns2 = rbac_get_unshared_ns()
+        p_client, project, ns = setup_wl_project_by_role(role)
         name = random_test_name("default")
         con = [{"name": "test1", "image": TEST_IMAGE}]
-        workload = p_client2.create_workload(name=name,
-                                             containers=con,
-                                             namespaceId=ns2.id,
-                                             daemonSetConfig={})
-        wait_for_wl_to_active(p_client2, workload)
+        workload = create_workload_by_type(p_client, name, con, ns, config)
+        wait_for_wl_to_active(p_client, workload)
         con = [{"name": "test1", "image": "nginx"}]
         p_client.update(workload, containers=con)
         remove_resource(workload)
     else:
-        project = rbac_get_unshared_project()
-        # roles cannot edit daemonsets in projects they cannot access
+        project2 = rbac_get_unshared_project()
+        user_token = rbac_get_user_token_by_role(role)
+        # roles cannot edit workloads in projects they cannot access
         # deploy a workload as cluster owner
         cluster_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
         cluster_owner_p_client = get_project_client_for_token(
-                                project, cluster_owner_token)
-        ns = rbac_get_namespace()
+                                project2, cluster_owner_token)
+        ns = rbac_get_unshared_ns()
         con = [{"name": "test1", "image": TEST_IMAGE}]
         name = random_test_name("default")
-        workload = cluster_owner_p_client.create_workload(name=name,
-                                                          containers=con,
-                                                          namespaceId=ns.id,
-                                                          daemonSetConfig={})
-        # project read-only can NOT edit existing workload
+        workload = create_workload_by_type(cluster_owner_p_client,
+                                           name, con, ns, config)
         with pytest.raises(ApiError) as e:
-            user_token = rbac_get_user_token_by_role(role)
-            project2, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                            random_test_name("test-rbac"))
             p_client = get_project_client_for_token(project2, user_token)
             con = [{"name": "test1", "image": "nginx"}]
             p_client.update(workload, containers=con)
         assert e.value.error.status == 403
         assert e.value.error.code == 'Forbidden'
         remove_resource(workload)
-        if role == CLUSTER_MEMBER:
-            remove_resource(project)
 
 
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
-def test_rbac_wl_daemonset_delete(role, remove_resource):
-    p_client, project, ns = setup_daemonset_project_by_role(role)
+@pytest.mark.parametrize("config", WORKLOAD_TYPES)
+def test_rbac_wl_parametrize_delete(role, remove_resource, config):
+    p_client, project, ns = setup_wl_project_by_role(role)
     con = [{"name": "test1", "image": TEST_IMAGE}]
     name = random_test_name("default")
     if role != PROJECT_READ_ONLY:
-        workload = p_client.create_workload(name=name,
-                                            containers=con,
-                                            namespaceId=ns.id,
-                                            daemonSetConfig={})
+        workload = create_workload_by_type(p_client, name, con, ns, config)
         wait_for_wl_to_active(p_client, workload)
         p_client.delete(workload)
         assert len(p_client.list_workload(uuid=workload.uuid).data) == 0
@@ -1080,10 +1054,7 @@ def test_rbac_wl_daemonset_delete(role, remove_resource):
         user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
         p_client = get_project_client_for_token(project, user_token)
         ns = rbac_get_namespace()
-        workload = p_client.create_workload(name=name,
-                                            containers=con,
-                                            namespaceId=ns.id,
-                                            daemonSetConfig={})
+        workload = create_workload_by_type(p_client, name, con, ns, config)
         wait_for_wl_to_active(p_client, workload)
         user_token = rbac_get_user_token_by_role(role)
         p_client = get_project_client_for_token(project, user_token)
@@ -1098,51 +1069,40 @@ def test_rbac_wl_daemonset_delete(role, remove_resource):
 
 @if_test_rbac
 @pytest.mark.parametrize("role", RBAC_ROLES)
-def test_rbac_wl_daemonset_delete_negative(role, remove_resource):
+@pytest.mark.parametrize("config", WORKLOAD_TYPES)
+def test_rbac_wl_parametrize_delete_negative(role, remove_resource, config):
     if role == CLUSTER_OWNER:
-        # cluster owner can edit daemonsets in any project in the cluster
-        project = rbac_get_project()
+        # cluster owner can delete workloads in any project in the cluster
         user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
-        p2 = rbac_get_unshared_project()
+        project = rbac_get_unshared_project()
         p_client = get_project_client_for_token(project, user_token)
-        p_client2 = get_project_client_for_token(p2, user_token)
         ns = rbac_get_namespace()
         name = random_test_name("default")
         con = [{"name": "test1", "image": TEST_IMAGE}]
-        workload = p_client.create_workload(name=name,
-                                             containers=con,
-                                             namespaceId=ns.id,
-                                             daemonSetConfig={})
-        wait_for_wl_to_active(p_client, workload)
-        p_client2.delete(workload)
+        workload = create_workload_by_type(p_client, name, con, ns, config)
+        p_client.delete(workload)
     else:
         project = rbac_get_unshared_project()
         user_token = rbac_get_user_token_by_role(role)
-        # roles cannot delete daemonsets in projects they cannot access
+        # roles cannot delete workloads in projects they cannot access
         # deploy a workload as cluster owner
         cluster_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
         cluster_owner_p_client = get_project_client_for_token(
                                 project, cluster_owner_token)
-        ns = rbac_get_namespace()
+        ns = rbac_get_unshared_ns()
         con = [{"name": "test1", "image": TEST_IMAGE}]
         name = random_test_name("default")
-        workload = cluster_owner_p_client.create_workload(name=name,
-                                                          containers=con,
-                                                          namespaceId=ns.id,
-                                                          daemonSetConfig={})
+        workload = create_workload_by_type(cluster_owner_p_client,
+                                           name, con, ns, config)
+        p_client = get_project_client_for_token(project, user_token)
         with pytest.raises(ApiError) as e:
-            project2, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                            random_test_name("test-rbac"))
-            p_client = get_project_client_for_token(project2, user_token)
             p_client.delete(workload)
         assert e.value.error.status == 403
         assert e.value.error.code == 'Forbidden'
         remove_resource(workload)
-        if role == CLUSTER_MEMBER:
-            remove_resource(project)
 
 
-def setup_daemonset_project_by_role(role):
+def setup_wl_project_by_role(role):
     if role == CLUSTER_MEMBER:
         user_token = rbac_get_user_token_by_role(role)
         project, ns = create_project_and_ns(user_token, namespace["cluster"],
@@ -1155,3 +1115,29 @@ def setup_daemonset_project_by_role(role):
         p_client = get_project_client_for_token(project, user_token)
         ns = rbac_get_namespace()
         return p_client, project, ns
+
+def create_workload_by_type(client, name, con, ns, config):
+    if config == "daemonSet":
+        return client.create_workload(name=name,
+                                      containers=con,
+                                      namespaceId=ns.id,
+                                      daemonSetConfig={})
+    elif config == "statefulSet":
+        return client.create_workload(name=name,
+                                      containers=con,
+                                      namespaceId=ns.id,
+                                      statefulSetConfig={})
+    elif config == "cronJob":
+        return client.create_workload(name=name,
+                                      containers=con,
+                                      namespaceId=ns.id,
+                                      cronJobConfig={
+                                            "concurrencyPolicy": "Allow",
+                                            "failedJobsHistoryLimit": 10,
+                                            "schedule": "*/1 * * * *",
+                                            "successfulJobsHistoryLimit": 10})
+    elif config == "job":
+        return client.create_workload(name=name,
+                                      containers=con,
+                                      namespaceId=ns.id,
+                                      jobConfig={})
