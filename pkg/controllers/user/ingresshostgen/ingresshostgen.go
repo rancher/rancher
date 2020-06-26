@@ -7,7 +7,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
+	"github.com/rancher/rancher/pkg/controllers/user/ingress"
 	"github.com/rancher/rancher/pkg/settings"
 	v1beta12 "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/config"
@@ -60,16 +62,42 @@ func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) (runtime.Object,
 		}
 	}
 
-	if !changed {
+	ingressState := ingress.GetIngressState(obj)
+	requiredKeysUpdate := false
+	for _, rule := range obj.Spec.Rules {
+		if strings.HasSuffix(rule.Host, ipDomain) {
+			for _, path := range rule.HTTP.Paths {
+				oldStateKey := ingress.GetStateKey(obj.Name, obj.Namespace, ipDomain, path.Path, convert.ToString(path.Backend.ServicePort.IntVal))
+				if _, ok := ingressState[oldStateKey]; ok {
+					requiredKeysUpdate = true
+					break
+				}
+			}
+		}
+	}
+
+	if !changed && !requiredKeysUpdate {
 		return nil, nil
 	}
 
 	obj = obj.DeepCopy()
 	for i, rule := range obj.Spec.Rules {
 		if strings.HasSuffix(rule.Host, ipDomain) {
+			for _, path := range rule.HTTP.Paths {
+				oldStateKey := ingress.GetStateKey(obj.Name, obj.Namespace, ipDomain, path.Path, convert.ToString(path.Backend.ServicePort.IntVal))
+				newStateKey := ingress.GetStateKey(obj.Name, obj.Namespace, xipHost, path.Path, convert.ToString(path.Backend.ServicePort.IntVal))
+				oldStateKeyValue, ok := ingressState[oldStateKey]
+				if ok && oldStateKey != newStateKey {
+					delete(ingressState, oldStateKey)
+					ingressState[newStateKey] = oldStateKeyValue
+				}
+			}
 			obj.Spec.Rules[i].Host = xipHost
 		}
 	}
 
+	if err := ingress.SetIngressState(obj, ingressState); err != nil {
+		return nil, err
+	}
 	return i.ingress.Update(obj)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
+	"github.com/rancher/rancher/pkg/settings"
 	v1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -94,8 +95,12 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) (runtime.Object, err
 
 func generateExpectedServices(state map[string]string, obj *v1beta1.Ingress) (map[string]ingressService, error) {
 	var err error
+	ipDomain := settings.IngressIPDomain.Get()
 	rtn := map[string]ingressService{}
 	for _, r := range obj.Spec.Rules {
+		if r.Host == ipDomain {
+			continue
+		}
 		host := r.Host
 		if r.HTTP == nil {
 			continue

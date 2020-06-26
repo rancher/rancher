@@ -8,7 +8,6 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -21,10 +20,6 @@ const (
 )
 
 func GetStateKey(name, namespace, host string, path string, port string) string {
-	ipDomain := settings.IngressIPDomain.Get()
-	if ipDomain != "" && strings.HasSuffix(host, ipDomain) {
-		host = ipDomain
-	}
 	key := fmt.Sprintf("%s/%s/%s/%s/%s", name, namespace, host, path, port)
 	return base64.URLEncoding.EncodeToString([]byte(key))
 }
@@ -39,6 +34,15 @@ func GetIngressState(obj *v1beta1.Ingress) map[string]string {
 		json.Unmarshal([]byte(convert.ToString(v)), &state)
 		return state
 	}
+	return nil
+}
+
+func SetIngressState(obj *v1beta1.Ingress, stateMap map[string]string) error {
+	content, err := json.Marshal(stateMap)
+	if err != nil {
+		return err
+	}
+	obj.Annotations[ingressStateAnnotation] = string(content)
 	return nil
 }
 
