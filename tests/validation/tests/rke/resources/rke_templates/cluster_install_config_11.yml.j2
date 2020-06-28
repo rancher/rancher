@@ -1,4 +1,5 @@
 ignore_docker_version: true
+kubernetes_version: {{ k8s_version }}
 ssh_key_path: {{ master_ssh_key_path }}
 network:
   plugin: {{ network_plugin }}
@@ -13,4 +14,3 @@ nodes:
   - address: {{ ip_address_2 }}
     user: {{ ssh_user_2 }}
     role: [worker]
-kubernetes_version: {{ k8s_version }}
