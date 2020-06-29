@@ -73,21 +73,26 @@ func (d *nodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) 
 		return nil, nil
 	}
 
+	nodeMapLock.Lock()
+	defer nodeMapLock.Unlock()
+
 	if obj.Spec.DesiredNodeUnschedulable == "drain" {
-		nodeMapLock.Lock()
 		if _, ok := d.nodesToContext[obj.Name]; ok {
-			nodeMapLock.Unlock()
 			return nil, nil
+		}
+		node, err := nodehelper.GetNodeForMachine(obj, d.nodeLister)
+		if err != nil {
+			return nil, err
+		}
+		if node == nil {
+			return nil, fmt.Errorf("nodeDrain: error finding node [%s]", obj.Spec.RequestedHostname)
 		}
 		ctx, cancel := context.WithCancel(d.ctx)
 		d.nodesToContext[obj.Name] = cancel
-		go d.drain(ctx, obj, cancel)
-		nodeMapLock.Unlock()
+		go d.drain(ctx, obj, node.Name, cancel)
 
 	} else if obj.Spec.DesiredNodeUnschedulable == "stopDrain" {
-		nodeMapLock.Lock()
 		cancelFunc, ok := d.nodesToContext[obj.Name]
-		nodeMapLock.Unlock()
 		if ok {
 			cancelFunc()
 		}
@@ -119,7 +124,7 @@ func (d *nodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, ori
 	return updatedObj, err
 }
 
-func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.CancelFunc) {
+func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, nodeName string, cancel context.CancelFunc) {
 	defer deleteFromContextMap(d.nodesToContext, obj.Name)
 
 	for {
@@ -130,7 +135,6 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 		}
 
 		stopped := false
-		nodeName := obj.Spec.RequestedHostname
 		updatedObj, err := v3.NodeConditionDrained.DoUntilTrue(obj, func() (runtime.Object, error) {
 			kubeConfig, err := d.getKubeConfig()
 			if err != nil {
@@ -166,7 +170,7 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 						obj.Spec.NodeDrainInput.Timeout))
 				} else {
 					// log before ignoring
-					logrus.Errorf("nodeDrain: kubectl error draining node [%s] in cluster [%s]: %v", nodeName,
+					logrus.Errorf("nodeDrain: kubectl error ignore draining node [%s] in cluster [%s]: %v", nodeName,
 						d.clusterName, kubeErr)
 				}
 				kubeErr = nil
