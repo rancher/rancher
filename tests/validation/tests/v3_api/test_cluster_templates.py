@@ -6,6 +6,12 @@ from rancher import ApiError
 from .common import *  # NOQA
 from .test_monitoring import cluster_query_template
 from .test_monitoring import validate_cluster_graph
+from .test_monitoring import C_MONITORING_ANSWERS
+from .test_monitoring import CLUSTER_MONITORING_APP
+from .test_monitoring import MONITORING_OPERATOR_APP
+from .test_monitoring import MONITORING_TEMPLATE_ID
+from .test_monitoring import MONITORING_VERSION
+from .test_monitoring import validate_cluster_monitoring_apps
 from .test_rbac import create_user
 from .test_rke_cluster_provisioning import engine_install_url
 
@@ -17,13 +23,10 @@ RANCHER_S3_ENDPOINT = os.environ.get('RANCHER_S3_ENDPOINT', "None")
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', "None")
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', "None")
 
+
 user_token = {"stduser_with_createrketemplate_role": {"user": None,
                                                       "token": None},
               "standard_user": {"user": None, "token": None}}
-
-CLUSTER_MONITORING_APP = "cluster-monitoring"
-MONITORING_OPERATOR_APP = "monitoring-operator"
-
 
 
 @pytest.fixture(scope='module', autouse="True")
@@ -714,6 +717,226 @@ def test_cluster_template_create_with_monitoring():
     cluster_cleanup(standard_user_client, cluster)
 
 
+def test_cluster_template_create_update_with_monitoring():
+
+    '''
+    Create an RKE template/revision T1/R1 with enable_cluster_monitoring:false
+    Create a cluster using revision R1.
+    Enable monitoring after cluster is active.
+    Create another revision R2 and update the cluster using R2 and setting
+    enableClusterMonitoring=false. The user will be able to upgrade the cluster
+    to this revision R2 but enable_cluster_monitoring flag from the template
+    should be ignored. Monitoring should continue to function in the cluster
+    '''
+    global MONITORING_VERSION
+
+    k8sversionlist = get_k8s_versionlist()
+    # Obtain cluster config with monitoring disabled enabled
+    cluster_config1 = get_cluster_config(k8sversionlist[0])
+    cluster_config2 = get_cluster_config(k8sversionlist[1])
+
+    standard_user_client = \
+        get_client_for_token(
+            user_token["stduser_with_createrketemplate_role"]["token"])
+    userToken = user_token["stduser_with_createrketemplate_role"]["token"]
+
+    # Create a cluster template
+    cluster_template = standard_user_client.\
+        create_cluster_template(name=random_test_name("template"),
+                                description="test-template")
+    revision_name1 = random_test_name("revision1")
+    revision_name2 = random_test_name("revision2")
+
+    # Create cluster template revision without enabling monitoring
+    cluster_template_revision1 = \
+        standard_user_client.create_cluster_template_revision(
+            name=revision_name1,
+            clusterConfig=cluster_config1,
+            clusterTemplateId=cluster_template.id)
+    time.sleep(2)
+    cluster_template_revision1 = standard_user_client.reload(
+        cluster_template_revision1)
+    cluster_name = random_test_name("test-auto")
+
+    # Create a cluster using the cluster template revision created
+    cluster = create_node_cluster(
+        standard_user_client, name=cluster_name, nodecount=3, nodesize="8gb",
+        clusterTemplateRevisionId=cluster_template_revision1.id,
+        userToken=userToken)
+    check_cluster_version(cluster, k8sversionlist[0])
+    assert cluster.clusterTemplateRevisionId == cluster_template_revision1.id
+
+    monitoring_template = standard_user_client.list_template(
+        id=MONITORING_TEMPLATE_ID).data[0]
+
+    if MONITORING_VERSION == "":
+        MONITORING_VERSION = monitoring_template.defaultVersion
+    print("MONITORING_VERSION=" + MONITORING_VERSION)
+
+    # Enable cluster monitoring using the standard user client
+    if cluster["enableClusterMonitoring"] is False:
+        standard_user_client.action(cluster, "enableMonitoring",
+                                    answers=C_MONITORING_ANSWERS,
+                                    version=MONITORING_VERSION)
+    system_project = standard_user_client.list_project(clusterId=cluster.id,
+                                                       name="System").data[0]
+    sys_proj_client = get_project_client_for_token(system_project, userToken)
+
+    # Validate Cluster Monitoring Apps
+    validate_cluster_monitoring_apps(client=sys_proj_client)
+
+    # Create another cluster template revision with K8s version v2 and having
+    # the default setting enableClusterMonitoring=false
+    cluster_template_revision2 = \
+        standard_user_client.create_cluster_template_revision(
+            name=revision_name2,
+            clusterConfig=cluster_config2,
+            clusterTemplateId=cluster_template.id)
+    time.sleep(2)
+    cluster_template_revision2 = standard_user_client.reload(
+        cluster_template_revision2)
+    # Update cluster with with Revision R2
+    cluster = \
+        standard_user_client.update(
+            cluster, name=cluster_name,
+            clusterTemplateRevisionId=cluster_template_revision2.id)
+    time.sleep(2)
+    cluster = standard_user_client.reload(cluster)
+
+    cluster = validate_cluster_with_template(standard_user_client,
+                                             cluster,
+                                             intermediate_state="updating",
+                                             userToken=userToken)
+    check_cluster_version(cluster, k8sversionlist[1])
+    assert cluster.clusterTemplateRevisionId == cluster_template_revision2.id
+    # Reload cluster object after an update
+    cluster = standard_user_client.reload(cluster)
+
+    # Validate Cluster Monitoring Apps
+    validate_cluster_monitoring_apps(client=sys_proj_client)
+
+    cluster_cleanup(standard_user_client, cluster)
+
+
+def test_clustertemplate_readonly_member_edit_delete():
+
+    # As an admin, create cluster template/revision and provide "user/read-only
+    #  access" to standard user. The user should not be able to edit/delete
+    # cluster template/revision
+
+    k8sversionlist = get_k8s_versionlist()
+    admin_client = get_admin_client()
+    cluster_config = get_cluster_config(k8sversionlist[0])
+
+    # Obtain the principal ID of the standard user
+    principalId = user_token["standard_user"]["user"]["principalIds"]
+
+    # Create a cluster template and provide standard user "user access" to the
+    # cluster template
+    members = [{"type": "member", "accessType": "read-only",
+                "userPrincipalId": principalId}]
+
+    cluster_template_name = random_test_name("template")
+    cluster_template = \
+        admin_client.create_cluster_template(name=cluster_template_name,
+                                             description="test-template",
+                                             members=members)
+    clusterTemplateId = cluster_template.id
+    # Create Cluster template revision
+    revision_name = random_test_name("revision")
+    cluster_template_revision = \
+        admin_client.create_cluster_template_revision(
+            name=revision_name,
+            clusterConfig=cluster_config,
+            clusterTemplateId=clusterTemplateId,
+            enabled="true")
+
+    standard_user_client = \
+        get_client_for_token(
+            user_token["standard_user"]["token"])
+
+    # Verify the standard user does not have permission to edit/update the
+    # template as he has only user access
+    members = [{"type": "member", "accessType": "read-only",
+                "userPrincipalId": principalId},
+               {"type": "member", "accessType": "read-only",
+                "groupPrincipalId": "*"}]
+    with pytest.raises(ApiError) as e:
+        standard_user_client.update(cluster_template,
+                                    name="sjtest",
+                                    description="test-template",
+                                    members=members)
+        assert e.value.error.status == 403
+        assert e.value.error.code == "PermissionDenied"
+
+    # Verify the standard user does not have permission to delete the
+    # revision as he has only user/read-only access
+    with pytest.raises(ApiError) as e:
+        standard_user_client.delete(cluster_template_revision)
+        assert e.value.error.status == 403
+        assert e.value.error.code == "PermissionDenied"
+
+    # Verify the standard user does not have permission to delete the
+    # template as he has only user access
+    with pytest.raises(ApiError) as e:
+        standard_user_client.delete(cluster_template)
+        assert e.value.error.status == 403
+        assert e.value.error.code == "PermissionDenied"
+
+
+def validate_cluster_with_template(client, cluster,
+                                   intermediate_state="provisioning",
+                                   check_intermediate_state=True,
+                                   nodes_not_in_active_state=[],
+                                   k8s_version="", userToken=USER_TOKEN):
+    '''
+    In this method, we are checking cluster state, verifying state of workloads
+    in system project. For user workloads, we are just checking the state. We
+    are skipping the kubectl verification for user workloads because of this
+    issue: https://github.com/rancher/rancher/issues/27788
+    Hence this method is introduced locally in test_cluster_templates.py and
+    we are not using validate_cluster method from common.py
+    '''
+
+    # Allow sometime for the "cluster_owner" CRTB to take effect
+    time.sleep(5)
+    cluster = validate_cluster_state(
+        client, cluster,
+        check_intermediate_state=check_intermediate_state,
+        intermediate_state=intermediate_state,
+        nodes_not_in_active_state=nodes_not_in_active_state)
+    create_kubeconfig(cluster)
+    if k8s_version != "":
+        check_cluster_version(cluster, k8s_version)
+    if hasattr(cluster, 'rancherKubernetesEngineConfig'):
+        check_cluster_state(len(get_role_nodes(cluster, "etcd", client)))
+    # check all workloads under the system project are active
+    # wait for workloads to be active
+    # time.sleep(DEFAULT_TIMEOUT)
+    print("checking if workloads under the system project are active")
+    sys_project = client.list_project(name='System',
+                                      clusterId=cluster.id).data[0]
+    sys_p_client = get_project_client_for_token(sys_project, userToken)
+    for wl in sys_p_client.list_workload().data:
+        wait_for_wl_to_active(sys_p_client, wl,
+                              timeout=DEFAULT_CLUSTER_STATE_TIMEOUT)
+    # Create Daemon set workload and have an Ingress with Workload
+    # rule pointing to this daemonSet
+    project, ns = create_project_and_ns(userToken, cluster)
+    p_client = get_project_client_for_token(project, userToken)
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name,
+                                        containers=con,
+                                        namespaceId=ns.id,
+                                        daemonSetConfig={})
+    workload = wait_for_wl_to_active(p_client, workload)
+    assert workload.state == "active"
+
+    return cluster
+
+
 def cluster_template_create_edit(userToken):
 
     # Method to create cluster template revisions R1, R2.
@@ -741,6 +964,7 @@ def cluster_template_create_edit(userToken):
         clusterTemplateRevisionId=cluster_template_revision1.id,
         userToken=userToken)
     check_cluster_version(cluster, k8sversionlist[0])
+    assert cluster.clusterTemplateRevisionId == cluster_template_revision1.id
 
     revision2_name = random_test_name("revision2")
     cluster_template_revision2 = client.create_cluster_template_revision(
@@ -754,11 +978,13 @@ def cluster_template_create_edit(userToken):
         client.update(
             cluster, name=cluster_name,
             clusterTemplateRevisionId=cluster_template_revision2.id)
-    cluster = validate_cluster(client,
-                               cluster,
-                               intermediate_state="updating",
-                               userToken=userToken)
+
+    cluster = validate_cluster_with_template(client,
+                                             cluster,
+                                             intermediate_state="updating",
+                                             userToken=userToken)
     check_cluster_version(cluster, k8sversionlist[1])
+    assert cluster.clusterTemplateRevisionId == cluster_template_revision2.id
     cluster_cleanup(client, cluster)
 
 

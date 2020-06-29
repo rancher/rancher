@@ -620,8 +620,11 @@ def wait_for_target_up(token, cluster, project, job):
         time.sleep(5)
 
 
-def validate_cluster_monitoring_apps():
-    sys_project_client = namespace["system_project_client"]
+def validate_cluster_monitoring_apps(client=None):
+    if client is None:
+        sys_project_client = namespace["system_project_client"]
+    else:
+        sys_project_client = client
     wait_for_app_to_active(sys_project_client, CLUSTER_MONITORING_APP)
     wait_for_app_to_active(sys_project_client, MONITORING_OPERATOR_APP)
 
