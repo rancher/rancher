@@ -83,6 +83,7 @@ def check_upgrade(nodes, client, p_client, cluster, workload, k8_version, timeou
         time.sleep(10)
     print("upgrade nodes: ", upgrade_nodes)
 
+
 def wait_for_k8_upgrade(cluster, cluster_id, client, k8_Version, timeout=1800):
     cluster_k8s_version = \
         cluster.appliedSpec["rancherKubernetesEngineConfig"][
