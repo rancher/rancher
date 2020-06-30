@@ -22,6 +22,7 @@ if [ -n "$DRONE_TAG" ]; then
 fi
 
 cp ../bin/rancher ../bin/agent ../bin/data.json .
+cp ../LICENSE ../README.md ../THIRD_PARTY_LICENSES.txt .
 
 IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
