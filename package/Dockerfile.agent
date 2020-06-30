@@ -26,4 +26,6 @@ ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY agent run.sh kubectl-shell.sh shell-setup.sh share-root.sh /usr/bin/
+RUN mkdir /license
+COPY LICENSE README.md THIRD_PARTY_LICENSES.txt /license/
 ENTRYPOINT ["run.sh"]
