@@ -675,6 +675,28 @@ def get_etcd_nodes(cluster, client=None):
     return etcd_nodes
 
 
+def get_cp_nodes(cluster, client=None):
+    if not client:
+        client = get_user_client()
+    nodes = client.list_node(clusterId=cluster.id).data
+    cp_nodes = []
+    for node in nodes:
+        if node.controlPlane:
+            cp_nodes.append(node)
+    return cp_nodes
+
+
+def get_worker_nodes(cluster, client=None):
+    if not client:
+        client = get_user_client()
+    nodes = client.list_node(clusterId=cluster.id).data
+    worker_nodes = []
+    for node in nodes:
+        if node.worker:
+            worker_nodes.append(node)
+    return worker_nodes
+
+
 def get_role_nodes(cluster, role, client=None):
     etcd_nodes = []
     control_nodes = []
