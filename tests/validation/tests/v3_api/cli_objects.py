@@ -1,3 +1,7 @@
+import os
+import subprocess
+from pathlib import Path
+
 from .common import get_user_client, random_test_name
 from .cli_common import DEFAULT_TIMEOUT, BaseCli
 
@@ -9,6 +13,8 @@ class RancherCli(BaseCli):
         self.apps = AppCli()
         self.mcapps = MultiClusterAppCli()
         self.catalogs = CatalogCli()
+        self.clusters = ClusterCli()
+        self.nodes = NodeCli()
         self.default_project = self.projects.create_project()
         self.default_namespace = self.projects.create_namespace(
             random_test_name("testdefault"))
@@ -24,9 +30,6 @@ class RancherCli(BaseCli):
 
 
 class ProjectCli(BaseCli):
-    def __init__(self):
-        self.initial_projects = self.get_current_projects()
-
     def create_project(self, name=None,
                        cluster_id=None, use_context=True):
         if name is None:
@@ -109,9 +112,12 @@ class AppCli(BaseCli):
         timeout = kwargs.get("timeout", DEFAULT_TIMEOUT)
         version = kwargs.get("version", None)
         context = kwargs.get("context", self.DEFAULT_CONTEXT)
+        values = kwargs.get("values", None)
         cmd = "apps install {} --no-prompt -n {}".format(app_name, namespace)
         if version is not None:
             cmd = cmd + " --version {}".format(version)
+        if values is not None:
+            cmd = cmd + " --values {}".format(values)
 
         self.switch_context(context)
         app = self.run_command(cmd)
@@ -119,6 +125,11 @@ class AppCli(BaseCli):
         self.log.info("App is: {}".format(app))
 
         self.log.info("Waiting for the app to be created")
+        # Wait for app to be "deploying"
+        self.wait_for_ready("apps ls --format '{{.App.Name}} {{.App.State}}' "
+                            "| grep deploying | awk '{print $1}'", app,
+                            timeout=timeout)
+        # Wait for app to be "active"
         created = self.wait_for_ready("apps ls --format '{{.App.Name}} "
                                       "{{.App.State}}' | grep active "
                                       "| awk '{print $1}'", app,
@@ -145,6 +156,10 @@ class AppCli(BaseCli):
         self.run_command("apps upgrade {} {}".format(app["name"], version))
 
         self.log.info("Waiting for the app to be upgraded")
+        # Wait for app to be "deploying"
+        self.wait_for_ready("apps ls --format '{{.App.Name}} {{.App.State}}' "
+                            "| grep deploying | awk '{print $1}'", app["name"])
+        # Wait for app to be "active"
         upgraded = self.wait_for_ready("apps ls --format '{{.App.Name}} "
                                        "{{.App.State}}' | grep active "
                                        "| awk '{print $1}'", app["name"])
@@ -163,6 +178,10 @@ class AppCli(BaseCli):
         self.run_command("apps rollback {} {}".format(app["name"], revision))
 
         self.log.info("Waiting for the app to be rolled back")
+        # Wait for app to be "deploying"
+        self.wait_for_ready("apps ls --format '{{.App.Name}} {{.App.State}}' "
+                            "| grep deploying | awk '{print $1}'", app["name"])
+        # Wait for app to be "active"
         rolled_back = self.wait_for_ready("apps ls --format '{{.App.Name}} "
                                           "{{.App.State}}' | grep active "
                                           "| awk '{print $1}'", app["name"])
@@ -201,7 +220,11 @@ class MultiClusterAppCli(BaseCli):
         app = self.run_command(cmd)
         app = app.split('"')[1]
         self.log.info("Multi-Cluster App is: {}".format(app))
-
+        # Wait for multi-cluster app to be "deploying"
+        self.wait_for_ready("mcapps ls --format '{{.App.Name}} {{.App.State}}'"
+                            " | grep deploying | awk '{print $1}'",
+                            app, timeout=timeout)
+        # Wait for multi-cluster app to be "active"
         self.log.info("Waiting for the multi-cluster app to be created")
         created = self.wait_for_ready("mcapps ls --format '{{.App.Name}} "
                                       "{{.App.State}}' | grep active "
@@ -245,6 +268,11 @@ class MultiClusterAppCli(BaseCli):
         self.run_command("mcapps upgrade {} {}".format(app["name"], version))
 
         self.log.info("Waiting for the multi-cluster app to be upgraded")
+        # Wait for multi-cluster app to be "deploying"
+        self.wait_for_ready("mcapps ls --format '{{.App.Name}} {{.App.State}}'"
+                            " | grep deploying | awk '{print $1}'",
+                            app["name"], timeout=timeout)
+        # Wait for multi-cluster app to be "active"
         upgraded = self.wait_for_ready("mcapps ls --format '{{.App.Name}} "
                                        "{{.App.State}}' | grep active "
                                        "| awk '{print $1}'", app["name"])
@@ -259,6 +287,11 @@ class MultiClusterAppCli(BaseCli):
         self.run_command("mcapps rollback {} {}".format(app_name, revision))
 
         self.log.info("Waiting for the multi-cluster app to be rolled back")
+        # Wait for multi-cluster app to be "deploying"
+        self.wait_for_ready("mcapps ls --format '{{.App.Name}} {{.App.State}}'"
+                            " | grep deploying | awk '{print $1}'",
+                            app_name, timeout=timeout)
+        # Wait for multi-cluster app to be "active"
         rolled_back = self.wait_for_ready("mcapps ls --format '{{.App.Name}} "
                                           "{{.App.State}}' | grep active "
                                           "| awk '{print $1}'", app_name)
@@ -310,3 +343,53 @@ class CatalogCli(BaseCli):
         catalog = catalog.split("|")
         return {"name": catalog[0], "id": catalog[1],
                 "url": catalog[2], "branch": catalog[3]}
+
+
+class ClusterCli(BaseCli):
+    def delete(self, c_id):
+        self.run_command("clusters delete {}".format(c_id))
+
+        self.log.info("Waiting for the cluster to be deleted")
+        deleted = self.wait_for_ready("cluster ls -q", c_id, condition_func=
+                                      lambda val, l: val not in l.splitlines())
+        return deleted
+
+
+class NodeCli(BaseCli):
+    def get(self):
+        result = self.run_command(
+            "nodes ls --format '{{.Name}}|{{.Node.IPAddress}}'").splitlines()
+        nodes = []
+        for n in result:
+            nodes.append({
+                "name": n.split("|")[0],
+                "ip": n.split("|")[1]
+            })
+        return nodes
+
+    def ssh(self, node, cmd, known=False, is_jenkins=False):
+        if is_jenkins:
+            home = str(Path.home())
+            tilde = home
+        else:
+            tilde = '~'
+        if not known:
+            self.log.debug("Determining if host is already known")
+            known_hosts = os.path.expanduser(
+                "{}/.ssh/known_hosts".format(tilde))
+            with open(known_hosts) as file:
+                for line in file:
+                    if node["ip"] in line:
+                        known = True
+                        break
+        if not known:
+            self.log.debug("Host is not known. Attempting to add it to file")
+            try:
+                self.log.debug("Storing ecdsa key in known hosts")
+                subprocess.run("ssh-keyscan -t ecdsa {} >> {}"
+                               "/.ssh/known_hosts".format(node["ip"], tilde),
+                               shell=True, stderr=subprocess.PIPE)
+            except subprocess.CalledProcessError as e:
+                self.log.info("Error storing ecdsa key! Result: %s", e.stderr)
+        ssh_result = self.run_command('ssh {} "{}"'.format(node["name"], cmd))
+        return ssh_result
