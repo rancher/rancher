@@ -52,6 +52,7 @@ from .common import run_command as run_command_common
 from .common import ADMIN_TOKEN
 from .common import USER_TOKEN
 from .common import validate_all_workload_image_from_rancher
+from .common import validate_app_deletion
 from .common import wait_for_condition
 from .common import wait_for_pod_to_running
 from .common import wait_for_pods_in_workload
@@ -1017,5 +1018,15 @@ def create_project_client(request):
 
     def fin():
         client = get_user_client()
+        # delete the istio app
+        app = p_client.delete(namespace["istio_app"])
+        validate_app_deletion(p_client, app.id)
+        # delete the istio ns
+        p_client.delete(namespace["system_ns"])
+        # disable the cluster monitoring
+        c = client.reload(cluster)
+        if c["enableClusterMonitoring"] is True:
+            client.action(c, "disableMonitoring")
+        # delete the istio testing project
         client.delete(istio_project)
     request.addfinalizer(fin)
