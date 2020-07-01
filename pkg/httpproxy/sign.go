@@ -13,11 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/norman/httperror"
-
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
+	"github.com/rancher/norman/httperror"
 	v1 "github.com/rancher/types/apis/core/v1"
+)
+
+const (
+	defaultAWSRegion = "us-east-1"
 )
 
 var requiredHeadersForAws = map[string]bool{"host": true,
@@ -101,9 +105,43 @@ func (a awsv4) sign(req *http.Request, secrets v1.SecretInterface, auth string) 
 }
 
 func (a awsv4) getServiceAndRegion(host string) (string, string) {
-	//format : service.region.*
-	parts := strings.Split(host, ".")
-	return parts[0], parts[1]
+	service := ""
+	region := ""
+	for _, partition := range endpoints.DefaultPartitions() {
+		service, region = partitionServiceAndRegion(partition, host)
+		// empty region is valid, but if one is found it should be assumed correct
+		if region != "" {
+			return service, region
+		}
+	}
+
+	// if no region is found, global endpoint is assumed. In this case us-east-1 should be used for signing:
+	// https://docs.aws.amazon.com/general/latest/gr/sigv4_elements.html
+	return service, defaultAWSRegion
+}
+
+func partitionServiceAndRegion(partition endpoints.Partition, host string) (string, string) {
+	service := ""
+	partitionServices := partition.Services()
+	for _, part := range strings.Split(host, ".") {
+		if id := partitionServices[part].ID(); id != "" {
+			service = id
+			break
+		}
+	}
+
+	if service == "" {
+		return "", ""
+	}
+
+	host = strings.Trim(host, service)
+	serviceRegions := partitionServices[service].Regions()
+	for _, part := range strings.Split(host, ".") {
+		if id := serviceRegions[part].ID(); id != "" {
+			return service, id
+		}
+	}
+	return service, ""
 }
 
 func (d digest) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
