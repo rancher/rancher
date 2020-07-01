@@ -139,6 +139,8 @@ ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY entrypoint.sh rancher /usr/bin/
 COPY kustomize.sh /usr/bin/
 COPY jailer.sh /usr/bin/
+RUN mkdir /license
+COPY LICENSE README.md THIRD_PARTY_LICENSES.txt /license/
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
 
