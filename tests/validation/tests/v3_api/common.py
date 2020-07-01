@@ -1355,6 +1355,7 @@ def validate_cluster_state(client, cluster,
                            check_intermediate_state=True,
                            intermediate_state="provisioning",
                            nodes_not_in_active_state=[]):
+    start_time = time.time()
     if check_intermediate_state:
         cluster = wait_for_condition(
             client, cluster,
@@ -1379,6 +1380,10 @@ def validate_cluster_state(client, cluster,
         if delta > timeout:
             msg = "Timeout waiting for K8s version to be synced"
             raise Exception(msg)
+    end_time = time.time()
+    diff = time.strftime("%H:%M:%S", time.gmtime(end_time - start_time))
+    print("The total time for provisioning/updating the cluster {} : {}".
+          format(cluster.name, diff))
     return cluster
 
 
