@@ -1773,9 +1773,10 @@ def validate_app_deletion(client, app_id,
             raise AssertionError(
                 "Timed out waiting for app to delete")
         time.sleep(.5)
-        app = client.list_app(id=app_id).data
-        if len(app) == 0:
+        app_data = client.list_app(id=app_id).data
+        if len(app_data) == 0:
             break
+        application = app_data[0]
 
 
 def validate_catalog_app(proj_client, app, external_id, answer=None):
