@@ -1,20 +1,5 @@
-from .common import create_catalog_external_id
-from .common import create_project_and_ns
-from .common import get_admin_client
-from .common import get_defaut_question_answers
-from .common import get_project_client_for_token
-from .common import get_user_client
-from .common import get_user_client_and_cluster
 from .test_rke_cluster_provisioning import create_and_validate_custom_host
-from .common import random_test_name
-from .common import random_name
-from .common import USER_TOKEN
-from .common import validate_app_deletion
-from .common import validate_response_app_endpoint
-from .common import wait_for_app_to_active
-from .common import wait_for_catalog_active
-from .common import wait_for_mcapp_to_active
-from .common import delete_node
+from .common import *
 import pytest
 import time
 
@@ -362,6 +347,70 @@ def test_multi_cluster_all_answer_override():
     client.delete(mcapp)
 
 
+@if_test_rbac
+@pytest.mark.parametrize("role", ["owner", "member", "read-only"])
+def test_rbac_multi_cluster_access_update(role):
+    admin_client = get_admin_client()
+    # adding targets
+    targets = list()
+    targets.append({"projectId": rbac_data["project"].id, "type": "target"})
+    user = get_user_by_role(role)
+    member = get_member_list(role, user)
+    print("member:", member)
+
+    answer_values = get_defaut_question_answers(
+        admin_client,
+        MYSQL_EXTERNALID_131
+    )
+    mcapp = create_mcapp_with_member(targets, answer_values, member)
+    admin_client.reload(mcapp)
+    time.sleep(5)
+    admin_client.reload(mcapp)
+    # verfiy rbac CLUSTER_OWNER can edit/upgrade the mcapp
+    new_user, token = create_user(admin_client)
+    mcapp = verify_rbac_multiclusterapp_update(
+        new_user,
+        rbac_get_user_token_by_role(CLUSTER_OWNER),
+        role,
+        mcapp,
+        answer_values
+    )
+    admin_client.delete(new_user)
+    admin_client.delete(mcapp)
+
+
+@if_test_rbac
+@pytest.mark.parametrize("role", ["owner", "member", "read-only"])
+def test_rbac_multi_cluster_access_add_member(role):
+    admin_client = get_admin_client()
+    # adding targets
+    targets = list()
+    targets.append({"projectId": rbac_data["project"].id, "type": "target"})
+    user = get_user_by_role(role)
+    member = get_member_list(role, user)
+    print("member:", member)
+
+    answer_values = get_defaut_question_answers(
+        admin_client,
+        MYSQL_EXTERNALID_131
+    )
+    mcapp = create_mcapp_with_member(targets, answer_values, member)
+    admin_client.reload(mcapp)
+    time.sleep(5)
+    admin_client.reload(mcapp)
+    # verfiy rbac CLUSTER_OWNER can edit/upgrade the mcapp
+    new_user, token = create_user(admin_client)
+    mcapp = verify_rbac_multiclusterapp_add_member(
+        new_user,
+        rbac_get_user_token_by_role(CLUSTER_OWNER),
+        role,
+        mcapp,
+        answer_values
+    )
+    admin_client.delete(new_user)
+    admin_client.delete(mcapp)
+
+
 @skip_test_rolling_update
 def test_multi_cluster_rolling_upgrade():
     assert_if_valid_cluster_count()
@@ -427,9 +476,11 @@ def create_project_client(request):
     node_roles = [["controlplane", "etcd", "worker"],
                   ["worker"], ["worker"]]
     cluster_list = []
-    cluster, aws_nodes = create_and_validate_custom_host(node_roles, True)
     client, cluster_existing = get_user_client_and_cluster()
+    cluster, aws_nodes = create_and_validate_custom_host(node_roles, True)
     admin_client = get_admin_client()
+    client = get_user_client()
+    # add clusters to cluster_list
     cluster_list.append(cluster_existing)
     cluster_list.append(cluster)
     if len(cluster_list) > 1:
@@ -602,3 +653,109 @@ def validate_answer_override(multiclusterapp, id,
             else:
                 assert app_answers.get("mysqlUser") == "admin", \
                     "answers should not have changed"
+
+
+def verify_rbac_multiclusterapp_update(new_user,
+                                       user_token,
+                                       user_role,
+                                       multiclusterapp,
+                                       answer_values):
+    client = get_client_for_token(user_token)
+    answer_values_new = \
+        answer_values["mysqlPassword"] = "test123"
+    member_list = multiclusterapp["members"]
+    print("Testing can_update")
+    if user_role == "owner" or user_role == "member":
+        update_mcapp_with_member(client, multiclusterapp, answer_values_new, member_list)
+    else:
+        try:
+            mcapp = client.update(multiclusterapp,
+                                  targets=multiclusterapp.targets,
+                                  roles=PROJECT_ROLE,
+                                  templateVersionId=MYSQL_TEMPLATE_VID_131,
+                                  answers=[{"values": answer_values_new}],
+                                  members=member_list)
+        except ApiError as e:
+            print("Error here: ", e)
+            assert e.error.status == 500
+            assert e.error.message == \
+                "read-only members cannot update multiclusterapp"
+    return mcapp
+
+
+def verify_rbac_multiclusterapp_add_member(new_user,
+                                           user_token,
+                                           user_role,
+                                           multiclusterapp,
+                                           answer_values):
+    client = get_client_for_token(user_token)
+    member_list_new = multiclusterapp["members"]
+    member = get_member_list("member", new_user)
+    member_list_new.append(member)
+    print("Testing can_add_user")
+    if user_role == "owner":
+        update_mcapp_with_member(
+            client, multiclusterapp, answer_values, member_list_new
+        )
+    else:
+        try:
+            mcapp = client.update(multiclusterapp,
+                                  targets=multiclusterapp.targets,
+                                  roles=PROJECT_ROLE,
+                                  templateVersionId=MYSQL_TEMPLATE_VID_131,
+                                  answers=[{"values": answer_values}],
+                                  members=member_list_new
+                                  )
+        except ApiError as e:
+            print("Error: ", e)
+            assert e.error.status == 500
+            if user_role == "member":
+                assert e.error.message == \
+                    "only members with owner access can update members"
+            elif user_role == "read_only":
+                assert e.error.message == \
+                    "read-only members cannot update multiclusterapp"
+    return mcapp
+
+
+def get_member_list(access, user):
+    member = dict()
+    member["accessType"] = access
+    member["displayName"] = user["username"]
+    member["displayType"] = user["type"]
+    member["displayType"] = "member"
+    member["userPrincipalId"] = user["principalIds"][0]
+    return member
+
+
+def get_user_by_role(role):
+    if role == "owner":
+        user = rbac_get_user_by_role(CLUSTER_OWNER)
+    elif role == "member":
+        user = rbac_get_user_by_role(PROJECT_OWNER)
+    elif role == "read-only":
+        user = rbac_get_user_by_role(PROJECT_MEMBER)
+    return user
+
+
+def create_mcapp_with_member(targets, answer_values, member):
+    admin_client = get_admin_client()
+    mcapp = admin_client.create_multiClusterApp(
+        templateVersionId=MYSQL_TEMPLATE_VID_131,
+        targets=targets,
+        roles=PROJECT_ROLE,
+        name=random_name(),
+        answers=[{"values": answer_values}],
+        members=[member])
+    mcapp = wait_for_mcapp_to_active(admin_client, mcapp)
+    return mcapp
+
+
+def update_mcapp_with_member(client, multiclusterapp, answer_values, member):
+    mcapp = client.update(multiclusterapp,
+                          roles=PROJECT_ROLE,
+                          templateVersionId=MYSQL_TEMPLATE_VID_131,
+                          answers=[{"values": answer_values}],
+                          members=member)
+    mcapp = wait_for_mcapp_to_active(client, mcapp)
+    return mcapp
