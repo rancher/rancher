@@ -59,7 +59,8 @@ def test_node_fields(admin_mc):
 def test_node_template_delete(admin_mc, remove_resource):
     """Test deleting a nodeTemplate that is in use by a nodePool.
     The nodeTemplate should not be deleted while in use, after the nodePool is
-    removed it should delete.
+    removed, the nodes referencing the nodeTemplate will be deleted
+    and the nodeTemplate should delete
     """
     client = admin_mc.client
     node_template, cloud_credential = create_node_template(client)
@@ -92,9 +93,15 @@ def test_node_template_delete(admin_mc, remove_resource):
 
     wait_for(_node_pool_reload)
 
-    node_template = client.reload(node_template)
-    assert 'remove' in node_template.links
-    # NodePool is gone, template should delete
+    def _wait_for_remove_link():
+        nt = client.reload(node_template)
+        if hasattr(nt.links, "remove"):
+            return True
+        return False
+
+    wait_for(_wait_for_remove_link)
+
+    # NodePool and Nodes are gone, template should delete
     client.delete(node_template)
 
     node_template = client.reload(node_template)
@@ -123,7 +130,7 @@ def test_cloud_credential_delete(admin_mc, remove_resource):
 
 def test_writing_config_to_disk(admin_mc, wait_remove_resource):
     """Test that userdata and other fields from node driver configs are being
-    writting to disk as expected.
+    written to disk as expected.
     """
     client = admin_mc.client
     tempdir = tempfile.gettempdir()
