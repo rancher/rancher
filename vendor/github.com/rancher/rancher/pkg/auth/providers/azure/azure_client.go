@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 type azureClient struct {
@@ -132,25 +133,26 @@ func (ac *azureClient) marshalTokenJSON() ([]byte, error) {
 
 // parseJWTforField will parse the claims in a token for the field requested
 func parseJWTforField(tokenString string, fieldID string) (string, error) {
+	logrus.Tracef("Received access token %v from Azure AD", tokenString)
 	pieces := strings.Split(tokenString, ".")
 	if len(pieces) != 3 {
 		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
 	}
-
-	decoded, err := base64.RawStdEncoding.DecodeString(pieces[1])
+	logrus.Debug("Decoding access token for Azure AD")
+	decoded, err := base64.RawURLEncoding.DecodeString(pieces[1])
 	if err != nil {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "error decoding token")
 	}
 
 	var dat map[string]interface{}
-
+	logrus.Debug("Unmarshaling access token for Azure AD")
 	err = json.Unmarshal([]byte(decoded), &dat)
 	if err != nil {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "error unmarshaling token")
 	}
-
+	logrus.Debug("Retrieving field oid from Azure AD token")
 	if _, ok := dat[fieldID]; !ok {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "missing field oid from token")
 	}
 	return dat[fieldID].(string), nil
 }
