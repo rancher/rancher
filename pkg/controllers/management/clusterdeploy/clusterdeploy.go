@@ -172,16 +172,16 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	repoChange := false
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
-			desiredRepo := util.GetPrivateRepo(cluster)
-			var appliedRepo *v3.PrivateRegistry
 			if len(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
-				appliedRepo = &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
-			}
-			if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
-				repoChange = true
-			}
-			if (desiredRepo == nil && appliedRepo != nil) || (desiredRepo != nil && appliedRepo == nil) {
-				repoChange = true
+				desiredRepo := util.GetPrivateRepo(cluster)
+				appliedRepo := &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
+
+				if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
+					repoChange = true
+				}
+				if (desiredRepo == nil && appliedRepo != nil) || (desiredRepo != nil && appliedRepo == nil) {
+					repoChange = true
+				}
 			}
 		}
 	}
