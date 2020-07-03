@@ -151,42 +151,56 @@ def check_node_upgrade(nodes, max_unavailable, client, p_client, cluster, worklo
     etcd_nodes = get_etcd_nodes(cluster, client)
     cp_nodes = get_cp_nodes(cluster, client)
     worker_nodes = get_worker_nodes(cluster, client)
-    upgrade_nodes = set()
+    upgrade_nodes = []
     print("nodes: ", nodes)
-    cp_nodes = validate_node_cordon(cp_nodes, k8_version, client, p_client, cluster, workload, "cordoned")
-    upgrade_nodes.add(cp_nodes)
-    etcd_nodes = validate_node_cordon(etcd_nodes, k8_version, client, p_client, cluster, workload, "cordoned")
-    upgrade_nodes.add(etcd_nodes)
-    worker_nodes = validate_node_drain(worker_nodes, k8_version, client, p_client, cluster, workload, "draining")
-    upgrade_nodes.add(worker_nodes)
+    print("cp nodes: ")
+    cp_nodes = validate_node_cordon(cp_nodes, k8_version,client, p_client, cluster, workload)
+    upgrade_nodes.append(cp_nodes)
+    print("upgrade nodes: ", upgrade_nodes)
+    print("etcd: ")
+    etcd_nodes = validate_node_cordon(etcd_nodes, k8_version,client, p_client, cluster, workload)
+    upgrade_nodes.append(etcd_nodes)
+    print("upgrade nodes: ", upgrade_nodes)
+    print("worker: ")
+    worker_nodes = validate_node_drain(worker_nodes, k8_version, client, p_client, cluster, workload,600,max_unavailable)
+    print("upgrade nodes: ", upgrade_nodes)
+    upgrade_nodes.append(worker_nodes)
     assert len(upgrade_nodes) == len(nodes), "Not all Nodes Upgraded"
 
 
-def validate_node_cordon(nodes, k8_version, p_client, cluster, workload, state, timeout=600):
+def validate_node_cordon(nodes, k8_version, client, p_client, cluster, workload, timeout=600):
     start = time.time()
     in_state = set()
     upgraded_nodes = set()
     for node in nodes:
         node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
-        while node_k8 != k8_version:
+        print(node_k8)
+        print(node.state)
+        while not(node_k8 == k8_version and node.state == "active"):
             print(node_k8)
+            print(node.state)
             if time.time() - start > timeout:
                 raise AssertionError(
                     "Timed out waiting for node upgrade")
             validate_ingress(p_client, cluster, [workload], host, path)
-            if node.state == state:
+            if node.state == "cordoned":
                 print("node state: ", node.state)
                 in_state.add(node.uuid)
-            if node_k8 == k8_version:
-                print("node: ", node, " is at ", node_k8)
-                upgraded_nodes.add(node.uuid)
             time.sleep(5)
+            node = client.reload(node)
             node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
+        if node_k8 == k8_version:
+            print("node: ", node, " is at ", node_k8)
+            upgraded_nodes.add(node.uuid)
+    print(node)
+    print(node_k8)
+    print(in_state)
+    print(upgraded_nodes)
     assert len(in_state) == len(nodes), "nodes failed to achieve desired state"
     return upgraded_nodes
 
 
-def validate_node_drain(nodes, k8_version, client, p_client, cluster, workload, state, timeout=600, max_unavailable=1):
+def validate_node_drain(nodes, k8_version, client, p_client, cluster, workload, timeout=600, max_unavailable=1):
     start = time.time()
     upgrade_nodes = set()
     print("nodes: ", nodes)
