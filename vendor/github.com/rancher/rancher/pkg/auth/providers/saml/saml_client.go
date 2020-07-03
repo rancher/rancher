@@ -155,6 +155,8 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	}
 	provider.clientState = &cookieStore
 
+	root.Use(responsewriter.ContentTypeOptions)
+
 	SamlProviders[name] = provider
 
 	switch name {
@@ -182,7 +184,6 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 
 func AuthHandler() http.Handler {
 	root = mux.NewRouter()
-	root.Use(responsewriter.ContentTypeOptions)
 
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
 	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
