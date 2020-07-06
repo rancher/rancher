@@ -26,6 +26,7 @@ import (
 var (
 	fluentdSystemWriteKeys = []string{
 		"fluentd.cluster.dockerRoot",
+		"fluentd.fluentd-linux.cluster.dockerRoot",
 		"fluentd.fluentd-windows.enabled",
 	}
 	windowNodeLabel = labels.Set(map[string]string{"beta.kubernetes.io/os": "windows"}).AsSelector()
