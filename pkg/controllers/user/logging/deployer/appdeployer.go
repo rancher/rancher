@@ -164,6 +164,7 @@ func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, docker
 
 				//new version
 				"fluentd.fluentd-linux.enabled":                     "true",
+				"fluentd.fluentd-linux.cluster.dockerRoot":          dockerRoot,
 				"log-aggregator.log-aggregator-linux.enabled":       "true",
 				"log-aggregator.log-aggregator-linux.flexVolumeDir": driverDir,
 			},
