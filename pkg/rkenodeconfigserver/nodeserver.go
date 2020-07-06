@@ -80,17 +80,17 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	if client.Node == nil {
-		rw.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	if client.Cluster.Status.Driver == "" {
 		rw.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
 
-	if client.Cluster.Status.Driver != v32.ClusterDriverRKE {
+	if client.Cluster.Status.Driver != v32.ClusterDriverRKE || client.Cluster != nil {
+		rw.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if client.Node == nil && client.Cluster == nil {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}

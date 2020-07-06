@@ -132,7 +132,7 @@ func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.
 		return nil, nil
 	}
 
-	if resp.StatusCode == http.StatusNotFound {
+	if resp.StatusCode == http.StatusNoContent {
 		return &rkeworker.NodeConfig{}, nil
 	}
 
