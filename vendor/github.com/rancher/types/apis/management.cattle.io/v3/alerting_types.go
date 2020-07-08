@@ -83,7 +83,7 @@ func (p *ProjectAlertSpec) ObjClusterName() string {
 type Recipient struct {
 	Recipient    string `json:"recipient,omitempty"`
 	NotifierName string `json:"notifierName,omitempty" norman:"required,type=reference[notifier]"`
-	NotifierType string `json:"notifierType,omitempty" norman:"required,options=slack|email|pagerduty|webhook|wechat"`
+	NotifierType string `json:"notifierType,omitempty" norman:"required,options=slack|email|pagerduty|webhook|wechat|dingtalk|msteams"`
 }
 
 type TargetNode struct {
@@ -337,6 +337,8 @@ type NotifierSpec struct {
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty"`
 	WebhookConfig   *WebhookConfig   `json:"webhookConfig,omitempty"`
 	WechatConfig    *WechatConfig    `json:"wechatConfig,omitempty"`
+	DingtalkConfig  *DingtalkConfig  `json:"dingtalkConfig,omitempty"`
+	MSTeamsConfig   *MSTeamsConfig   `json:"msteamsConfig,omitempty"`
 }
 
 func (n *NotifierSpec) ObjClusterName() string {
@@ -350,6 +352,8 @@ type Notification struct {
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty"`
 	WebhookConfig   *WebhookConfig   `json:"webhookConfig,omitempty"`
 	WechatConfig    *WechatConfig    `json:"wechatConfig,omitempty"`
+	DingtalkConfig  *DingtalkConfig  `json:"dingtalkConfig,omitempty"`
+	MSTeamsConfig   *MSTeamsConfig   `json:"msteamsConfig,omitempty"`
 }
 
 type SMTPConfig struct {
@@ -374,6 +378,17 @@ type PagerdutyConfig struct {
 }
 
 type WebhookConfig struct {
+	URL string `json:"url,omitempty" norman:"required"`
+	*HTTPClientConfig
+}
+
+type DingtalkConfig struct {
+	URL    string `json:"url,omitempty" norman:"required"`
+	Secret string `json:"secret,omitempty" norman:"type=password"`
+	*HTTPClientConfig
+}
+
+type MSTeamsConfig struct {
 	URL string `json:"url,omitempty" norman:"required"`
 	*HTTPClientConfig
 }
