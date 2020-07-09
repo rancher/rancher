@@ -28,7 +28,7 @@ node {
                       string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZURE_TENANT_ID'), 
                       string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
                       string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
-                      string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'RANCHER_AKS_SUBSCRIPTION_ID'),
+                      string(credentialsId: 'AZURE_AKS_SUBSCRIPTION_ID', variable: 'RANCHER_AKS_SUBSCRIPTION_ID'),
                       string(credentialsId: 'AZURE_TENANT_ID', variable: 'RANCHER_AKS_TENANT_ID'), 
                       string(credentialsId: 'AZURE_CLIENT_ID', variable: 'RANCHER_AKS_CLIENT_ID'),
                       string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'RANCHER_AKS_SECRET_KEY'),
