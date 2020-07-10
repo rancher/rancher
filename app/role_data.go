@@ -117,6 +117,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	// Cluster roles
 	rb.addRoleTemplate("Cluster Owner", "cluster-owner", "cluster", false, false, true).
 		addRule().apiGroups("*").resources("*").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("own").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRoleTemplate("Cluster Member", "cluster-member", "cluster", false, false, false).
@@ -214,6 +215,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("projects").verbs("own").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", false, false, false).
