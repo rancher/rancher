@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package types;
+
+service Driver {
+    rpc Create (CreateRequest) returns (ClusterInfo) {}
+    rpc Update(UpdateRequest) returns (ClusterInfo) {}
+    rpc PostCheck(ClusterInfo) returns (ClusterInfo) {}
+    rpc Remove (ClusterInfo) returns (Empty) {}
+    rpc GetDriverCreateOptions (Empty) returns (DriverFlags) {}
+    rpc GetDriverUpdateOptions (Empty) returns (DriverFlags) {}
+    rpc GetVersion (ClusterInfo) returns (KubernetesVersion) {}
+    rpc SetVersion (SetVersionRequest) returns (Empty) {}
+    rpc GetNodeCount (ClusterInfo) returns (NodeCount) {}
+    rpc SetNodeCount (SetNodeCountRequest) returns (Empty) {}
+
+    rpc GetCapabilities(Empty) returns (Capabilities) {}
+
+    rpc ETCDSave (SaveETCDSnapshotRequest) returns (Empty) {}
+    rpc ETCDRestore (RestoreETCDSnapshotRequest) returns (ClusterInfo) {}
+    rpc ETCDRemoveSnapshot (RemoveETCDSnapshotRequest) returns (Empty) {}
+
+    rpc GetK8sCapabilities (DriverOptions) returns (K8sCapabilities) {}
+    rpc RemoveLegacyServiceAccount(ClusterInfo) returns (Empty) {}
+}
+
+message Empty {
+}
+
+message DriverFlags {
+    map<string, Flag> options = 1;
+}
+
+message Flag {
+    string type = 1;
+
+    string usage = 2;
+
+    string value = 3;
+
+    Default default = 4;
+
+    bool password = 5;
+}
+
+message Default {
+    bool defaultBool = 1;
+
+    string defaultString = 2;
+
+    StringSlice defaultStringSlice = 3;
+
+    int64 defaultInt = 4;
+}
+
+message DriverOptions {
+    map<string, bool> bool_options = 1;
+
+    map<string, string> string_options = 2;
+
+    map<string, int64> int_options = 3;
+
+    map<string, StringSlice> string_slice_options = 4;
+}
+
+message StringSlice {
+    repeated string value = 1;
+}
+
+message ClusterInfo {
+    string version = 1;
+
+    string service_account_token = 2;
+
+    string endpoint = 3;
+
+    string username = 4;
+
+    string password = 5;
+
+    string root_ca_certificate = 6;
+
+    string client_certificate = 7;
+
+    string client_key = 8;
+
+    int64 node_count = 9;
+
+    map<string, string> metadata = 10;
+
+    string status = 11;
+
+    string create_error = 12;
+}
+
+message KubernetesVersion {
+    string version = 1;
+}
+
+message NodeCount {
+    int64 count = 1;
+}
+
+message Capabilities {
+    map<int64, bool> capabilities = 1;
+}
+
+message CreateRequest {
+    DriverOptions driver_options = 1;
+    ClusterInfo cluster_info = 2;
+}
+
+message UpdateRequest {
+    ClusterInfo cluster_info = 1;
+    DriverOptions driver_options = 2;
+}
+
+message SetVersionRequest {
+    ClusterInfo info = 1;
+    KubernetesVersion version = 2;
+}
+
+message SetNodeCountRequest {
+    ClusterInfo info = 1;
+    NodeCount count = 2;
+}
+
+message SaveETCDSnapshotRequest {
+	ClusterInfo  info = 1;
+	DriverOptions driver_options = 2;
+	string SnapshotName    = 3;
+}
+
+message RestoreETCDSnapshotRequest {
+	ClusterInfo  info = 1;
+	DriverOptions driver_options = 2;
+	string SnapshotName    = 3;
+}
+
+message RemoveETCDSnapshotRequest {
+	ClusterInfo  info = 1;
+	DriverOptions driver_options = 2;
+	string SnapshotName    = 3;
+}
+
+message K8sCapabilities {
+    LoadBalancerCapabilities L4LoadBalancer = 1;
+    repeated IngressCapabilities IngressControllers = 2;
+    bool NodePoolScalingSupported = 3;
+    string NodePortRange = 4;
+}
+
+message LoadBalancerCapabilities {
+    bool Enabled = 1;
+    string Provider = 2;
+    repeated string ProtocolsSupported = 3;
+    bool HealthCheckSupported = 4;
+}
+
+message IngressCapabilities {
+    string IngressProvider = 1;
+    bool CustomDefaultBackend = 2;
+}
