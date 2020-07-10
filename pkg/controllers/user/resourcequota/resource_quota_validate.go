@@ -3,8 +3,8 @@ package resourcequota
 import (
 	"fmt"
 
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"

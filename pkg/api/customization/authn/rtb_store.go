@@ -11,8 +11,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/clusterrouter"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 )

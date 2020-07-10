@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken/common"
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/client-go/tools/cache"
 )
 

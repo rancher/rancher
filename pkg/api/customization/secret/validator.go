@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v1 "github.com/rancher/types/apis/core/v1"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
 )
 
 func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	rkeCluster "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v1 "k8s.io/api/core/v1"
 )
 

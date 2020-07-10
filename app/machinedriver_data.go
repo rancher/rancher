@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

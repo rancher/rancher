@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	util "github.com/rancher/rancher/pkg/cluster"
@@ -18,10 +20,10 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
@@ -241,8 +243,8 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	return nc, nil
 }
 
-func FilterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
-	nodeList := make([]v3.RKEConfigNode, 0)
+func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node) {
+	nodeList := make([]rketypes.RKEConfigNode, 0)
 	for _, node := range spec.Nodes {
 		if IsNonWorker(node.Role) || node.NodeName == n.Status.NodeConfig.NodeName {
 			nodeList = append(nodeList, node)
@@ -251,8 +253,8 @@ func FilterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
 	spec.Nodes = nodeList
 }
 
-func AugmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool, nodeName string,
-	cluster *v3.Cluster) map[string]v3.Process {
+func AugmentProcesses(token string, processes map[string]rketypes.Process, worker, b2d bool, nodeName string,
+	cluster *v3.Cluster) map[string]rketypes.Process {
 	var shared []string
 
 	if b2d {
@@ -274,7 +276,7 @@ func AugmentProcesses(token string, processes map[string]v3.Process, worker, b2d
 		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
 		args = append(args, shared...)
 		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
-		processes["share-mnt"] = v3.Process{
+		processes["share-mnt"] = rketypes.Process{
 			Name:                    "share-mnt",
 			Args:                    args,
 			Image:                   image.ResolveWithCluster(agentImage, cluster),
@@ -292,7 +294,7 @@ func AugmentProcesses(token string, processes map[string]v3.Process, worker, b2d
 		delete(processes, "etcd")
 	} else {
 		if p, ok := processes["share-mnt"]; ok {
-			processes = map[string]v3.Process{
+			processes = map[string]rketypes.Process{
 				"share-mnt": p,
 			}
 		} else {
@@ -313,8 +315,8 @@ func AugmentProcesses(token string, processes map[string]v3.Process, worker, b2d
 	return processes
 }
 
-func EnhanceWindowsProcesses(processes map[string]v3.Process) map[string]v3.Process {
-	newProcesses := make(map[string]v3.Process, len(processes))
+func EnhanceWindowsProcesses(processes map[string]rketypes.Process) map[string]rketypes.Process {
+	newProcesses := make(map[string]rketypes.Process, len(processes))
 	for k, p := range processes {
 		p.Binds = append(p.Binds,
 			"//./pipe/rancher_wins://./pipe/rancher_wins",
@@ -325,7 +327,7 @@ func EnhanceWindowsProcesses(processes map[string]v3.Process) map[string]v3.Proc
 	return newProcesses
 }
 
-func AppendTaintsToKubeletArgs(processes map[string]v3.Process, nodeConfigTaints []v3.RKETaint) map[string]v3.Process {
+func AppendTaintsToKubeletArgs(processes map[string]rketypes.Process, nodeConfigTaints []rketypes.RKETaint) map[string]rketypes.Process {
 	if kubelet, ok := processes["kubelet"]; ok && len(nodeConfigTaints) != 0 {
 		initialTaints := taints.GetTaintsFromStrings(taints.GetStringsFromRKETaint(nodeConfigTaints))
 		var currentTaints []v1.Taint

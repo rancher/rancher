@@ -8,8 +8,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rke/cloudprovider/aws"
 	"github.com/rancher/rke/cloudprovider/azure"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3/fakes"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

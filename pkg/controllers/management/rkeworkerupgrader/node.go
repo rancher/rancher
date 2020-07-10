@@ -6,8 +6,8 @@ import (
 
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	rkeservices "github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 

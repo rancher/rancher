@@ -1,7 +1,7 @@
 package nodepool
 
 import (
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 //implement natural sort of a slice of nodeHostnames

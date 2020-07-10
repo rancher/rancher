@@ -7,9 +7,9 @@ import (
 	"github.com/rancher/norman/httperror"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/taints"
-	fake1 "github.com/rancher/types/apis/core/v1/fakes"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	fake3 "github.com/rancher/types/apis/management.cattle.io/v3/fakes"
+	fake1 "github.com/rancher/rancher/pkg/types/apis/core/v1/fakes"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	fake3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/fakes"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/taints"
-	apicorev1 "github.com/rancher/types/apis/core/v1"
+	apicorev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"

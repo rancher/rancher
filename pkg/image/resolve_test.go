@@ -11,8 +11,8 @@ import (
 	"time"
 
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/kdm"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rke/types/kdm"
 	assertlib "github.com/stretchr/testify/assert"
 )
 

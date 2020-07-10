@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
-	"github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
 )
 
 func ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {

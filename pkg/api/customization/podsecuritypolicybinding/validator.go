@@ -3,8 +3,8 @@ package podsecuritypolicybinding
 import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 

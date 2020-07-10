@@ -1,11 +1,12 @@
 package clusterprovisioner
 
 import (
-	kontainerengine "github.com/rancher/kontainer-engine/drivers/rke"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/kdm"
-	"github.com/rancher/types/namespace"
+	kontainerengine "github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/namespace"
+	rketypes "github.com/rancher/rke/types"
+	"github.com/rancher/rke/types/kdm"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,7 +75,7 @@ func (a *rkeStore) GetAddonTemplates(k8sVersion string) (map[string]interface{},
 	return data, nil
 }
 
-func (a *rkeStore) GetServiceOptions(k8sVersion string) (map[string]*v3.KubernetesServicesOptions, error) {
+func (a *rkeStore) GetServiceOptions(k8sVersion string) (map[string]*rketypes.KubernetesServicesOptions, error) {
 	linuxSvcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, a.SvcOptionLister, a.SvcOptions, a.SystemImagesLister, a.SystemImages, kd.Linux)
 	if err != nil {
 		logrus.Errorf("getLinuxK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
@@ -87,7 +88,7 @@ func (a *rkeStore) GetServiceOptions(k8sVersion string) (map[string]*v3.Kubernet
 		return nil, err
 	}
 
-	return map[string]*v3.KubernetesServicesOptions{
+	return map[string]*rketypes.KubernetesServicesOptions{
 		"k8s-service-options":         linuxSvcOptions,
 		"k8s-windows-service-options": windowsSvcOptions,
 	}, nil

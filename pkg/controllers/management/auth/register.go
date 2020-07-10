@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {

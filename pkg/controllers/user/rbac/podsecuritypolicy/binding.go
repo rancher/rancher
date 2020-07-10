@@ -6,11 +6,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/policy/v1beta1"
-	v12 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/types/config"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/apis/policy/v1beta1"
+	v12 "github.com/rancher/rancher/pkg/types/apis/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v13 "k8s.io/api/core/v1"
 	v1beta13 "k8s.io/api/policy/v1beta1"

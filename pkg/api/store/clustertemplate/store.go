@@ -12,10 +12,10 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	managementv3 "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	mgmtSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	managementv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

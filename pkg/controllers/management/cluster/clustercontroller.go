@@ -8,19 +8,21 @@ import (
 	"strconv"
 	"strings"
 
+	rketypes "github.com/rancher/rke/types"
+
 	errorsutil "github.com/pkg/errors"
-	"github.com/rancher/kontainer-engine/service"
-	"github.com/rancher/kontainer-engine/types"
 	normantypes "github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/kontainer-engine/service"
+	"github.com/rancher/rancher/pkg/kontainer-engine/types"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	client "github.com/rancher/rancher/pkg/types/client/project/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rke/cloudprovider/aws"
 	"github.com/rancher/rke/cloudprovider/azure"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/project/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -191,7 +193,7 @@ func (c *controller) parseResourceInterface(key string, annoValue string) (inter
 	}
 }
 
-func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.RancherKubernetesEngineConfig, clusterName string) (v3.Capabilities, error) {
+func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig rketypes.RancherKubernetesEngineConfig, clusterName string) (v3.Capabilities, error) {
 	switch rkeConfig.CloudProvider.Name {
 	case aws.AWSCloudProviderName:
 		capabilities.LoadBalancerCapabilities = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)

@@ -20,9 +20,9 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/management/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
 )
 
 var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within"}

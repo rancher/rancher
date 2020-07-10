@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"context"
 
 	"fmt"
@@ -18,12 +20,11 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
-	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/pki/cert"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	k8sclientv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
@@ -65,7 +66,7 @@ func LoadLocal() (*Bundle, error) {
 	return NewBundle(certMap), nil
 }
 
-func Generate(config *v3.RancherKubernetesEngineConfig) (*Bundle, error) {
+func Generate(config *rketypes.RancherKubernetesEngineConfig) (*Bundle, error) {
 	certs, err := librke.New().GenerateCerts(config)
 	if err != nil {
 		return nil, err
@@ -90,14 +91,14 @@ func (b *Bundle) SafeMarshal() (string, error) {
 
 }
 
-func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
+func (b *Bundle) ForNode(config *rketypes.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
 	certs := librke.New().GenerateRKENodeCerts(context.Background(), *config, nodeAddress, b.certs)
 	return &Bundle{
 		certs: certs,
 	}
 }
 
-func (b *Bundle) ForWindowsNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
+func (b *Bundle) ForWindowsNode(config *rketypes.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
 	nb := b.ForNode(config, nodeAddress)
 
 	certs := make(map[string]pki.CertificatePKI, len(nb.certs))

@@ -11,8 +11,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/store/workload"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/types/client/management/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 

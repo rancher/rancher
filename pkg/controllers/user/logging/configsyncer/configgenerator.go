@@ -8,8 +8,8 @@ import (
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
 	"github.com/rancher/rancher/pkg/project"
-	v1 "github.com/rancher/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

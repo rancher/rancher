@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	appsv1 "github.com/rancher/types/apis/apps/v1"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	appsv1 "github.com/rancher/rancher/pkg/types/apis/apps/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

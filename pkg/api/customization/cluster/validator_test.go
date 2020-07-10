@@ -2,9 +2,10 @@ package cluster
 
 import (
 	"encoding/json"
-	mgmtclient "github.com/rancher/types/client/management/v3"
-	"github.com/sirupsen/logrus"
 	"testing"
+
+	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/sirupsen/logrus"
 )
 
 const clusterSpecJSON = `

@@ -7,7 +7,7 @@ import (
 
 	ncondition "github.com/rancher/norman/condition"
 	"github.com/rancher/norman/controller"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )

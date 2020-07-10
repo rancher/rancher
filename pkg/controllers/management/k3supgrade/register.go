@@ -6,11 +6,11 @@ import (
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerv3 "github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io/v3"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

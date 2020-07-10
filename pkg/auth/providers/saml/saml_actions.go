@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 func (s *Provider) formatter(apiContext *types.APIContext, resource *types.RawResource) {

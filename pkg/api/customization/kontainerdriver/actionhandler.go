@@ -17,9 +17,10 @@ import (
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
+	img "github.com/rancher/rke/types/image"
 	"github.com/rancher/rke/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	img "github.com/rancher/types/image"
 )
 
 const (
@@ -108,7 +109,7 @@ func (a ActionHandler) setDriverActiveStatus(apiContext *types.APIContext, statu
 
 func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	k8sCurr := strings.Split(settings.KubernetesVersionsCurrent.Get(), ",")
-	rkeSysImages := map[string]v3.RKESystemImages{}
+	rkeSysImages := map[string]rketypes.RKESystemImages{}
 	if apiContext.ID != linuxImages && apiContext.ID != windowsImages {
 		return httperror.NewAPIError(httperror.NotFound, "link does not exist")
 	}
@@ -129,7 +130,7 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 			if mVersion.Compare(majorVersion, "v1.13", "<=") {
 				continue
 			}
-			windowsSysImages := v3.RKESystemImages{
+			windowsSysImages := rketypes.RKESystemImages{
 				Kubernetes:                rkeSysImg.Kubernetes,
 				WindowsPodInfraContainer:  rkeSysImg.WindowsPodInfraContainer,
 				NginxProxy:                rkeSysImg.NginxProxy,

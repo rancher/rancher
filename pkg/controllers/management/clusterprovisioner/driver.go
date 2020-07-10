@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rancher/kontainer-engine/service"
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
+	"github.com/rancher/rancher/pkg/kontainer-engine/service"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -161,7 +163,7 @@ func cleanRKE(spec v3.ClusterSpec) v3.ClusterSpec {
 
 	result := spec.DeepCopy()
 
-	var filteredNodes []v3.RKEConfigNode
+	var filteredNodes []rketypes.RKEConfigNode
 	for _, node := range spec.RancherKubernetesEngineConfig.Nodes {
 		if len(node.Role) == 1 && node.Role[0] == services.WorkerRole {
 			continue

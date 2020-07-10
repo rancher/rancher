@@ -2,7 +2,7 @@ package monitoring
 
 import (
 	"github.com/pkg/errors"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

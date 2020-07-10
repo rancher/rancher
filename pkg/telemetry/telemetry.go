@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/ticker"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 )

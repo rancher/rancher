@@ -5,8 +5,8 @@ import (
 	"sort"
 
 	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken/common"
-	clusterv3 "github.com/rancher/types/apis/cluster.cattle.io/v3"
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	clusterv3 "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3"
+	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

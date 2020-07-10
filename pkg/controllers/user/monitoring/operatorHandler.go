@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/monitoring"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

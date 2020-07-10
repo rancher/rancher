@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"

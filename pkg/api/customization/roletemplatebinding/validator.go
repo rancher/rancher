@@ -6,9 +6,9 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func NewPRTBValidator(management *config.ScaledContext) types.Validator {

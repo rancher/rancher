@@ -15,9 +15,9 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/compose"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/compose"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

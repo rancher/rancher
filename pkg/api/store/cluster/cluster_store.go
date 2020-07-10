@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
@@ -31,13 +33,13 @@ import (
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	managementv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	rkedefaults "github.com/rancher/rke/cluster"
 	rkeservices "github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	managementv3 "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -691,7 +693,7 @@ func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
 		if oldUpgradeStrategy != nil {
 			upgradeStrategy = oldUpgradeStrategy
 		} else {
-			upgradeStrategy = &v3.NodeUpgradeStrategy{
+			upgradeStrategy = &rketypes.NodeUpgradeStrategy{
 				MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
 				MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
 				Drain:                      false,
@@ -762,7 +764,7 @@ func enableLocalBackup(data map[string]interface{}) {
 
 		if backupConfig == nil {
 			enabled := true
-			backupConfig = &v3.BackupConfig{
+			backupConfig = &rketypes.BackupConfig{
 				Enabled:       &enabled,
 				IntervalHours: DefaultBackupIntervalHours,
 				Retention:     DefaultBackupRetention,
@@ -865,7 +867,7 @@ func validateS3Credentials(data map[string]interface{}) error {
 		return nil
 	}
 	configMap := convert.ToMapInterface(s3BackupConfig)
-	sbc := &v3.S3BackupConfig{
+	sbc := &rketypes.S3BackupConfig{
 		AccessKey: convert.ToString(configMap["accessKey"]),
 		SecretKey: convert.ToString(configMap["secretKey"]),
 		Endpoint:  convert.ToString(configMap["endpoint"]),
@@ -1000,7 +1002,7 @@ func (r *Store) validateUnavailableNodes(data, existingData map[string]interface
 	return canUpgrade(nodes, spec.UpgradeStrategy)
 }
 
-func getRkeConfig(data map[string]interface{}) (*v3.RancherKubernetesEngineConfig, error) {
+func getRkeConfig(data map[string]interface{}) (*rketypes.RancherKubernetesEngineConfig, error) {
 	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
 	if rkeConfig == nil {
 		return nil, nil
@@ -1009,14 +1011,14 @@ func getRkeConfig(data map[string]interface{}) (*v3.RancherKubernetesEngineConfi
 	if err != nil {
 		return nil, errors.Wrapf(err, "error marshaling rkeConfig")
 	}
-	var spec *v3.RancherKubernetesEngineConfig
+	var spec *rketypes.RancherKubernetesEngineConfig
 	if err := json.Unmarshal([]byte(config), &spec); err != nil {
 		return nil, errors.Wrapf(err, "error reading rkeConfig")
 	}
 	return spec, nil
 }
 
-func canUpgrade(nodes []*v3.Node, upgradeStrategy *v3.NodeUpgradeStrategy) error {
+func canUpgrade(nodes []*v3.Node, upgradeStrategy *rketypes.NodeUpgradeStrategy) error {
 	var (
 		controlReady, controlNotReady, workerOnlyReady, workerOnlyNotReady int
 	)

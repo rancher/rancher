@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v3client "github.com/rancher/types/client/management/v3"
+	v3client "github.com/rancher/rancher/pkg/types/client/management/v3"
 )
 
 func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {

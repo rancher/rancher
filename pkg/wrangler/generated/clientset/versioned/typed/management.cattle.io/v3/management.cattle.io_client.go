@@ -19,8 +19,8 @@ limitations under the License.
 package v3
 
 import (
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler/generated/clientset/versioned/scheme"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	rest "k8s.io/client-go/rest"
 )
 

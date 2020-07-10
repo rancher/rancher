@@ -39,10 +39,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/windows"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	pkgmonitoring "github.com/rancher/rancher/pkg/monitoring"
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	projectclient "github.com/rancher/types/client/project/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/factory"
+	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	projectclient "github.com/rancher/rancher/pkg/types/client/project/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/factory"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {

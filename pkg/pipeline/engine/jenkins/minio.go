@@ -9,7 +9,7 @@ import (
 
 	"github.com/minio/minio-go"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

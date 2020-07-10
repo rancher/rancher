@@ -6,8 +6,8 @@ import (
 
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/settings"
-	rv1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/config"
+	rv1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"

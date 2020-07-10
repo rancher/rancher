@@ -7,6 +7,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/apiserver/pkg/server"
 	"github.com/rancher/apiserver/pkg/types"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/auth"
@@ -14,8 +16,6 @@ import (
 	"github.com/rancher/steve/pkg/schema"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/steve/pkg/stores/proxy"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 )
 
 type Server struct {

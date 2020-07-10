@@ -28,13 +28,13 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/telemetry"
+	managementSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/ui"
 	"github.com/rancher/rancher/server/whitelist"
 	"github.com/rancher/steve/pkg/auth"
-	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/types/config"
 )
 
 func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter, authz auth.Middleware) (auth.Middleware, http.Handler, error) {

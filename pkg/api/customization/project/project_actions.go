@@ -18,11 +18,11 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/compose"
-	"github.com/rancher/types/user"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/compose"
+	"github.com/rancher/rancher/pkg/types/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 

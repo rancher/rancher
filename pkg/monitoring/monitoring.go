@@ -10,8 +10,8 @@ import (
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	ns "github.com/rancher/types/namespace"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	ns "github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

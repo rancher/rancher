@@ -7,9 +7,9 @@ import (
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	mgmtclient "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/user"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/user"
 	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )

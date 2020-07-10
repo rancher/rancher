@@ -11,11 +11,11 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/ref"
-	v1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	corev1 "k8s.io/api/core/v1"
 )
 

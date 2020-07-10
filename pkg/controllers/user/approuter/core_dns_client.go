@@ -12,8 +12,8 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
 	"github.com/rancher/rdns-server/model"
-	v1 "github.com/rancher/types/apis/core/v1"
 	"github.com/sirupsen/logrus"
 	k8scorev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"

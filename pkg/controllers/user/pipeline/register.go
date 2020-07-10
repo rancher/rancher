@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipeline"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipelineexecution"
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/project"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {

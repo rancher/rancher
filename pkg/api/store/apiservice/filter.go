@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	apiregistrationv1 "github.com/rancher/types/apis/apiregistration.k8s.io/v1"
+	apiregistrationv1 "github.com/rancher/rancher/pkg/types/apis/apiregistration.k8s.io/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 

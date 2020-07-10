@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"sort"
 
-	clusterv3 "github.com/rancher/types/apis/cluster.cattle.io/v3"
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	clusterv3 "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3"
+	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )

@@ -9,8 +9,8 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
-	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	mv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 )

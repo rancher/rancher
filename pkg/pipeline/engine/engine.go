@@ -2,8 +2,8 @@ package engine
 
 import (
 	"github.com/rancher/rancher/pkg/pipeline/engine/jenkins"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 type PipelineEngine interface {

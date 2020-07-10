@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/common/model"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

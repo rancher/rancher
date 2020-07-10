@@ -4,8 +4,8 @@ import (
 	"regexp"
 
 	"github.com/pkg/errors"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/namespace"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )

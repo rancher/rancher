@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 
 	"strconv"

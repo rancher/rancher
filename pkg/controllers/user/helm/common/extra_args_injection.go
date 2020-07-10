@@ -6,7 +6,7 @@ import (
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 

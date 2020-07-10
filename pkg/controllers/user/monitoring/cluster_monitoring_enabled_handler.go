@@ -3,8 +3,8 @@ package monitoring
 import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/monitoring"
-	corev1 "github.com/rancher/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

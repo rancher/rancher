@@ -21,9 +21,9 @@ import (
 	"github.com/rancher/norman/controller"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/types/client/management/v3"
-	nsutil "github.com/rancher/types/namespace"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
+	nsutil "github.com/rancher/rancher/pkg/types/namespace"
 
 	"github.com/blang/semver"
 	"github.com/docker/docker/pkg/locker"

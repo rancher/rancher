@@ -3,7 +3,7 @@ package systemimage
 import (
 	"context"
 
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {

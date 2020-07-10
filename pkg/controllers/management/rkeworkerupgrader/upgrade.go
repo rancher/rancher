@@ -6,14 +6,16 @@ import (
 	"strings"
 	"time"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/docker/docker/pkg/locker"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	rkedefaults "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -213,9 +215,9 @@ func (uh *upgradeHandler) updateNodePlanVersion(node *v3.Node, cluster *v3.Clust
 
 }
 
-func (uh *upgradeHandler) getNodePlan(node *v3.Node, cluster *v3.Cluster) (*v3.RKEConfigNodePlan, error) {
+func (uh *upgradeHandler) getNodePlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
 	var (
-		nodePlan *v3.RKEConfigNodePlan
+		nodePlan *rketypes.RKEConfigNodePlan
 		err      error
 	)
 	if nodeserver.IsNonWorker(node.Status.NodeConfig.Role) {
@@ -248,7 +250,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 		if clusterCopy == nil {
 			clusterCopy = cluster.DeepCopy()
 		}
-		clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &v3.NodeUpgradeStrategy{
+		clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &rketypes.NodeUpgradeStrategy{
 			MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
 			MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
 			Drain:                      false,
@@ -338,7 +340,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to upgrade", clusterName, node.Name)
 	}
 
-	var nodeDrainInput *v3.NodeDrainInput
+	var nodeDrainInput *rketypes.NodeDrainInput
 	state := "cordon"
 	if toDrain {
 		nodeDrainInput = upgradeStrategy.DrainInput

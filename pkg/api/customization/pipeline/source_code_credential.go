@@ -9,8 +9,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	client "github.com/rancher/types/client/project/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/types/client/project/v3"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

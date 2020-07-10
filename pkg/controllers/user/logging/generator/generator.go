@@ -8,7 +8,7 @@ import (
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/project"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 
 	"github.com/pkg/errors"
 	k8scorev1 "k8s.io/api/core/v1"
