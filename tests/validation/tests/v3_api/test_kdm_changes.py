@@ -135,6 +135,7 @@ def test_clusters_for_kdm():
 
     # printing results
     print("--------------Passed Cluster information--------------'\n")
+    print("Clusters: " + ''.join('{0},'.format(key) for key, value in passed_cluster.items()))
     for key, value in passed_cluster.items():
         print(key + "-->" + str(value) + "\n")
     print("--------------Failed Cluster information--------------'\n")
