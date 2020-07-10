@@ -23,6 +23,9 @@ OPENEBS_CHART_VERSION_UPGRADE = '1.6.0'
 CHARTMUSEUM_CHART = 'chartmuseum'
 CHARTMUSEUM_CHART_VERSION = '2.3.1'
 APP_TIMEOUT = 120
+CATALOG_URL = "https://github.com/rancher/integration-test-charts.git"
+BRANCH = "validation-tests"
+CHARTMUSEUM_CHART_VERSION_CATALOG = 'latest'
 
 # Supplying default answers due to issue with multi-cluster app install:
 # https://github.com/rancher/rancher/issues/25514
@@ -172,6 +175,15 @@ def test_cli_app_delete(rancher_cli: RancherCli):
         timeout=APP_TIMEOUT)
     deleted = rancher_cli.apps.delete(initial_app)
     assert deleted
+
+
+def test_app_install_local_dir(remove_cli_resource, rancher_cli: RancherCli):
+    rancher_cli.log.info("Testing Installing of an App from Local directory")
+    initial_app = rancher_cli.apps.install_local_dir(
+        CATALOG_URL, BRANCH, CHARTMUSEUM_CHART,
+        version=CHARTMUSEUM_CHART_VERSION_CATALOG, timeout=APP_TIMEOUT)
+    remove_cli_resource("apps", initial_app["id"])
+    assert initial_app["state"] == "active"
 
 
 @if_test_multicluster

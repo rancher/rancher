@@ -1,8 +1,10 @@
 import os
+import time
 import subprocess
 from pathlib import Path
 
-from .common import get_user_client, random_test_name
+from .common import get_user_client, random_test_name, \
+    DATA_SUBDIR, run_command, random_str
 from .cli_common import DEFAULT_TIMEOUT, BaseCli
 
 
@@ -199,6 +201,35 @@ class AppCli(BaseCli):
                                       timeout=timeout, condition_func=
                                       lambda val, l: val not in l.splitlines())
         return deleted
+
+    def install_local_dir(self, catalog_url, branch, chart, **kwargs):
+        timeout = kwargs.get("timeout", DEFAULT_TIMEOUT)
+        context = kwargs.get("context", self.DEFAULT_CONTEXT)
+        version = kwargs.get("version", None)
+        os.chdir(DATA_SUBDIR)
+        get_charts_cmd = \
+            run_command("git clone -b {} {}".format(branch, catalog_url))
+        time.sleep(5)
+        os.chdir("{}/integration-test-charts/charts/{}/{}".
+                 format(DATA_SUBDIR, chart, version))
+        app_name = random_str()
+        self.switch_context(context)
+        app = self.run_command("apps install . {}".format(app_name))
+        app = app.split('"')[1].split(" ")[2]
+        self.log.info("App is: {}".format(app))
+        self.log.info("Waiting for the app to be created")
+        self.wait_for_ready("apps ls --format '{{.App.Name}} {{.App.State}}' "
+                            "| grep deploying | awk '{print $1}'", app,
+                            timeout=timeout)
+        # Wait for app to be "active"
+        created = self.wait_for_ready("apps ls --format '{{.App.Name}} "
+                                      "{{.App.State}}' | grep active "
+                                      "| awk '{print $1}'", app,
+                                      timeout=timeout)
+        if not created:
+            self.log.warn("Failed to install app {} within timeout of {} "
+                          "seconds.".format(app_name, timeout))
+        return self.get(app)
 
 
 class MultiClusterAppCli(BaseCli):
