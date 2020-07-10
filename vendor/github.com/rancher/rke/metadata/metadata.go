@@ -15,8 +15,8 @@ import (
 
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/rke/data"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/kdm"
+	v3 "github.com/rancher/rke/types"
+	"github.com/rancher/rke/types/kdm"
 )
 
 const (

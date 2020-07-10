@@ -1,6 +1,6 @@
 package custom
 
-import "github.com/rancher/types/apis/management.cattle.io/v3"
+import v3 "github.com/rancher/rke/types"
 
 type CloudProvider struct {
 	Name   string
