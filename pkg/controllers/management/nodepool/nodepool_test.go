@@ -3,8 +3,9 @@ package nodepool
 import (
 	"testing"
 
-	"github.com/rancher/rke/services"
 	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +60,7 @@ func Test_roleUpdate(t *testing.T) {
 			name: "all roles; nodepool & node",
 			node: &v3.Node{
 				Status: v3.NodeStatus{
-					NodeConfig: &v3.RKEConfigNode{
+					NodeConfig: &rketypes.RKEConfigNode{
 						Role: []string{services.ETCDRole, services.ControlRole, services.WorkerRole},
 					},
 				},
@@ -79,7 +80,7 @@ func Test_roleUpdate(t *testing.T) {
 			name: "worker only",
 			node: &v3.Node{
 				Status: v3.NodeStatus{
-					NodeConfig: &v3.RKEConfigNode{
+					NodeConfig: &rketypes.RKEConfigNode{
 						Role: []string{services.WorkerRole},
 					},
 				},
@@ -98,7 +99,7 @@ func Test_roleUpdate(t *testing.T) {
 			name: "worker => controlplane ",
 			node: &v3.Node{
 				Status: v3.NodeStatus{
-					NodeConfig: &v3.RKEConfigNode{
+					NodeConfig: &rketypes.RKEConfigNode{
 						Role: []string{services.WorkerRole},
 					},
 				},
@@ -113,7 +114,7 @@ func Test_roleUpdate(t *testing.T) {
 			want: true,
 			nodeAfterUpdate: &v3.Node{
 				Status: v3.NodeStatus{
-					NodeConfig: &v3.RKEConfigNode{
+					NodeConfig: &rketypes.RKEConfigNode{
 						// order matters here
 						Role: []string{services.ControlRole, services.ETCDRole, services.WorkerRole},
 					},
@@ -124,7 +125,7 @@ func Test_roleUpdate(t *testing.T) {
 			name: "controlplane => worker",
 			node: &v3.Node{
 				Status: v3.NodeStatus{
-					NodeConfig: &v3.RKEConfigNode{
+					NodeConfig: &rketypes.RKEConfigNode{
 						Role: []string{services.WorkerRole, services.ETCDRole, services.ControlRole},
 					},
 				},
@@ -139,7 +140,7 @@ func Test_roleUpdate(t *testing.T) {
 			want: true,
 			nodeAfterUpdate: &v3.Node{
 				Status: v3.NodeStatus{
-					NodeConfig: &v3.RKEConfigNode{
+					NodeConfig: &rketypes.RKEConfigNode{
 						// order matters here
 						Role: []string{services.WorkerRole},
 					},

@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,7 @@ func TestIsNodeForNode(t *testing.T) {
 			},
 			machine: &v3.Node{
 				Status: v3.NodeStatus{
-					NodeConfig: &v3.RKEConfigNode{},
+					NodeConfig: &rketypes.RKEConfigNode{},
 					NodeName:   "",
 				},
 			},
@@ -64,7 +65,7 @@ func TestIsNodeForNode(t *testing.T) {
 				Status: v3.NodeStatus{
 					NodeName:   "NotNode1",
 					Conditions: nil,
-					NodeConfig: &v3.RKEConfigNode{
+					NodeConfig: &rketypes.RKEConfigNode{
 						Address:         "1.2.3.4.5",
 						Port:            "",
 						InternalAddress: "",
@@ -93,7 +94,7 @@ func TestIsNodeForNode(t *testing.T) {
 				Spec:       v3.NodeSpec{},
 				Status: v3.NodeStatus{
 					NodeName: "NotNode1",
-					NodeConfig: &v3.RKEConfigNode{
+					NodeConfig: &rketypes.RKEConfigNode{
 						Address:         "1.2.3.4.5",
 						Port:            "",
 						InternalAddress: "",

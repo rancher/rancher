@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rke/cloudprovider/aws"
-	"github.com/rancher/rke/cloudprovider/azure"
 	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/fakes"
+	"github.com/rancher/rke/cloudprovider/aws"
+	"github.com/rancher/rke/cloudprovider/azure"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/pointer"
@@ -37,9 +37,9 @@ func TestSetNodePortRange(t *testing.T) {
 			Name: "testCluster",
 		},
 	}
-	testCluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{
-		Services: v3.RKEConfigServices{
-			KubeAPI: v3.KubeAPIService{
+	testCluster.Spec.RancherKubernetesEngineConfig = &rketypes.RancherKubernetesEngineConfig{
+		Services: rketypes.RKEConfigServices{
+			KubeAPI: rketypes.KubeAPIService{
 				ServiceNodePortRange: testServiceNodePortRange,
 			},
 		},
@@ -58,13 +58,13 @@ func TestLoadBalancerCapability(t *testing.T) {
 			Name: "testCluster",
 		},
 	}
-	testCluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{}
+	testCluster.Spec.RancherKubernetesEngineConfig = &rketypes.RancherKubernetesEngineConfig{}
 
 	// map of cloud provider name to expected lb capability
-	cloudProviderLBCapabilityMap := map[v3.CloudProvider]*bool{
-		v3.CloudProvider{}: nil,
-		v3.CloudProvider{Name: aws.AWSCloudProviderName}:     &lbCap,
-		v3.CloudProvider{Name: azure.AzureCloudProviderName}: &lbCap,
+	cloudProviderLBCapabilityMap := map[rketypes.CloudProvider]*bool{
+		rketypes.CloudProvider{}:                                   nil,
+		rketypes.CloudProvider{Name: aws.AWSCloudProviderName}:     &lbCap,
+		rketypes.CloudProvider{Name: azure.AzureCloudProviderName}: &lbCap,
 	}
 	for cloudProvider, expectedLB := range cloudProviderLBCapabilityMap {
 		testCluster.Spec.RancherKubernetesEngineConfig.CloudProvider = cloudProvider
@@ -79,8 +79,8 @@ func TestIngressCapability(t *testing.T) {
 	c := initializeController()
 	rkeSpec := v3.ClusterSpec{
 		ClusterSpecBase: v3.ClusterSpecBase{
-			RancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
-				Ingress: v3.IngressConfig{
+			RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+				Ingress: rketypes.IngressConfig{
 					Provider: NginxIngressProvider,
 				},
 			},

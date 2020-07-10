@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
-	v3 "github.com/rancher/rke/types"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/check.v1"
 )

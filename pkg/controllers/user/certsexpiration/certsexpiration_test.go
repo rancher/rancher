@@ -1,17 +1,19 @@
 package certsexpiration
 
 import (
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDeleteUnusedCerts(t *testing.T) {
 	tests := []struct {
 		name                          string
 		certs                         map[string]v3.CertExpiration
-		rancherKubernetesEngineConfig *v3.RancherKubernetesEngineConfig
+		rancherKubernetesEngineConfig *rketypes.RancherKubernetesEngineConfig
 		expectNewCerts                map[string]v3.CertExpiration
 	}{
 		{
@@ -24,13 +26,13 @@ func TestDeleteUnusedCerts(t *testing.T) {
 				"kube-apiserver":       v3.CertExpiration{},
 				"kube-proxy":           v3.CertExpiration{},
 			},
-			rancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
-				Services: v3.RKEConfigServices{
-					Kubelet: v3.KubeletService{
+			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+				Services: rketypes.RKEConfigServices{
+					Kubelet: rketypes.KubeletService{
 						GenerateServingCertificate: true,
 					},
 				},
-				Nodes: []v3.RKEConfigNode{
+				Nodes: []rketypes.RKEConfigNode{
 					{
 						Address: "172.17.0.3",
 						Role: []string{
@@ -71,13 +73,13 @@ func TestDeleteUnusedCerts(t *testing.T) {
 				"kube-apiserver":          v3.CertExpiration{},
 				"kube-proxy":              v3.CertExpiration{},
 			},
-			rancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
-				Services: v3.RKEConfigServices{
-					Kubelet: v3.KubeletService{
+			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+				Services: rketypes.RKEConfigServices{
+					Kubelet: rketypes.KubeletService{
 						GenerateServingCertificate: true,
 					},
 				},
-				Nodes: []v3.RKEConfigNode{
+				Nodes: []rketypes.RKEConfigNode{
 					{
 						Address: "172.17.0.3",
 						Role: []string{
@@ -120,13 +122,13 @@ func TestDeleteUnusedCerts(t *testing.T) {
 				"kube-apiserver":          v3.CertExpiration{},
 				"kube-proxy":              v3.CertExpiration{},
 			},
-			rancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
-				Services: v3.RKEConfigServices{
-					Kubelet: v3.KubeletService{
+			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+				Services: rketypes.RKEConfigServices{
+					Kubelet: rketypes.KubeletService{
 						GenerateServingCertificate: true,
 					},
 				},
-				Nodes: []v3.RKEConfigNode{
+				Nodes: []rketypes.RKEConfigNode{
 					{
 						Address: "172.17.0.5",
 						Role: []string{
@@ -162,13 +164,13 @@ func TestDeleteUnusedCerts(t *testing.T) {
 				"kube-apiserver":          v3.CertExpiration{},
 				"kube-proxy":              v3.CertExpiration{},
 			},
-			rancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
-				Services: v3.RKEConfigServices{
-					Kubelet: v3.KubeletService{
+			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+				Services: rketypes.RKEConfigServices{
+					Kubelet: rketypes.KubeletService{
 						GenerateServingCertificate: true,
 					},
 				},
-				Nodes: []v3.RKEConfigNode{
+				Nodes: []rketypes.RKEConfigNode{
 					{
 						Address: "172.17.0.3",
 						Role: []string{
@@ -203,13 +205,13 @@ func TestDeleteUnusedCerts(t *testing.T) {
 				"kube-apiserver":          v3.CertExpiration{},
 				"kube-proxy":              v3.CertExpiration{},
 			},
-			rancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
-				Services: v3.RKEConfigServices{
-					Kubelet: v3.KubeletService{
+			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+				Services: rketypes.RKEConfigServices{
+					Kubelet: rketypes.KubeletService{
 						GenerateServingCertificate: false,
 					},
 				},
-				Nodes: []v3.RKEConfigNode{
+				Nodes: []rketypes.RKEConfigNode{
 					{
 						Address: "172.17.0.3",
 						Role: []string{

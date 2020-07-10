@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/taints"
 	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 )
@@ -14,20 +15,20 @@ func TestAppendKubeletArgs(t *testing.T) {
 	type testCase struct {
 		name             string
 		currentCommand   []string
-		taints           []v3.RKETaint
+		taints           []rketypes.RKETaint
 		expectedTaintSet map[string]struct{}
 	}
 	testCases := []testCase{
 		testCase{
 			name:           "taints args not exists",
 			currentCommand: []string{"kubelet", "--register-node"},
-			taints: []v3.RKETaint{
-				v3.RKETaint{
+			taints: []rketypes.RKETaint{
+				rketypes.RKETaint{
 					Key:    "test1",
 					Value:  "value1",
 					Effect: v1.TaintEffectNoSchedule,
 				},
-				v3.RKETaint{
+				rketypes.RKETaint{
 					Key:    "test2",
 					Value:  "value2",
 					Effect: v1.TaintEffectNoSchedule,
@@ -41,8 +42,8 @@ func TestAppendKubeletArgs(t *testing.T) {
 		testCase{
 			name:           "taints args exists",
 			currentCommand: []string{"kubelet", "--register-node", "--register-with-taints=node-role.kubernetes.io/controlplane=true:NoSchedule"},
-			taints: []v3.RKETaint{
-				v3.RKETaint{
+			taints: []rketypes.RKETaint{
+				rketypes.RKETaint{
 					Key:    "test1",
 					Value:  "value1",
 					Effect: v1.TaintEffectNoSchedule,
@@ -70,21 +71,21 @@ func TestShareMntArgs(t *testing.T) {
 	assert.Equal(t, 5, len(args), "args count for share-mnt should be the same")
 }
 
-func getKubeletProcess(commands []string) map[string]v3.Process {
-	return map[string]v3.Process{
-		"kubelet": v3.Process{
+func getKubeletProcess(commands []string) map[string]rketypes.Process {
+	return map[string]rketypes.Process{
+		"kubelet": rketypes.Process{
 			Name:    "kubelet",
 			Command: commands,
 		},
 	}
 }
 
-func getAugmentedKubeletProcesses() map[string]v3.Process {
+func getAugmentedKubeletProcesses() map[string]rketypes.Process {
 	var cluster v3.Cluster
 	command := []string{"dummy"}
 	binds := []string{"/var/lib/kubelet:/var/lib/kubelet:shared,z", "/var/lib/rancher:/var/lib/rancher:shared,z"}
-	processes := map[string]v3.Process{
-		"kubelet": v3.Process{
+	processes := map[string]rketypes.Process{
+		"kubelet": rketypes.Process{
 			Name:    "kubelet",
 			Command: command,
 			Binds:   binds,
@@ -94,7 +95,7 @@ func getAugmentedKubeletProcesses() map[string]v3.Process {
 	return AugmentProcesses("token", processes, true, false, "dummynode", &cluster)
 }
 
-func getCommandFromProcesses(processes map[string]v3.Process) map[string]struct{} {
+func getCommandFromProcesses(processes map[string]rketypes.Process) map[string]struct{} {
 	kubelet, ok := processes["kubelet"]
 	if !ok {
 		return nil
