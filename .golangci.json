@@ -19,6 +19,8 @@
         "skip-dirs": [
             "vendor",
             "tests",
+            "pkg/types/client",
+            "pkg/types/apis",
             "pkg/wrangler/generated"
         ],
         "tests": false,
