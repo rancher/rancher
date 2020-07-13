@@ -489,6 +489,15 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 
 		data = clusterUpdate
+
+		//keep monitoring and alerting flags on the cluster as is, no turning off these flags from templaterevision.
+		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterMonitoring {
+			data[managementv3.ClusterSpecFieldEnableClusterMonitoring] = existingCluster[managementv3.ClusterSpecFieldEnableClusterMonitoring]
+		}
+		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterAlerting {
+			data[managementv3.ClusterSpecFieldEnableClusterAlerting] = existingCluster[managementv3.ClusterSpecFieldEnableClusterAlerting]
+		}
+
 	} else if existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] != nil {
 		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "ClusterTemplateRevision", "this cluster is created from a clusterTemplateRevision, please pass the clusterTemplateRevision")
 	}
