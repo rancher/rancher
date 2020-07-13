@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/remote/github"
 	"github.com/rancher/rancher/pkg/pipeline/remote/gitlab"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 )
 
 func New(config interface{}) (model.Remote, error) {

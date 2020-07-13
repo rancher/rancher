@@ -10,9 +10,9 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/api/customization/namespacedresource"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/namespace"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

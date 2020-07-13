@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/ticker"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/namespace"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 )
 

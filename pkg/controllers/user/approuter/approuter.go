@@ -3,7 +3,7 @@ package approuter
 import (
 	"context"
 
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 // This controller is responsible for watching all the ingress resources in the cluster and creates the following DNS entries

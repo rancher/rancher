@@ -9,9 +9,9 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/ref"
+	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
-	corev1 "github.com/rancher/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

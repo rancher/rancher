@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+set -e -x
+
+cd $(dirname $0)/..
+pwd
+
+# clean local home directory
+# Remove home directory from previous run
+if [ -e ./.home ]; then
+            rm -r ./.home
+fi
+
+# removing existing binary if it exists
+if [ -e kontainer-engine ]
+then
+    rm kontainer-engine
+fi
+
+# build binary
+go build
+
+# Set home to current directory so test clusters don't pollute dev workstation or CI server
+mkdir .home
+chmod 755 .home
+HOME=./.home
+
+# collect test file paths
+TESTS=$(find integration-tests/ -name *.bats)
+
+# start mock services
+hoverctl start webserver > /dev/null 2>&1
+hoverctl import ./integration-tests/aks/azure-api.json > /dev/null 2>&1
+
+# run tests
+bats $TESTS || hoverctl stop > /dev/null 2>&1
+
+hoverctl stop > /dev/null 2>&1

@@ -10,21 +10,23 @@ import (
 	"strings"
 	"time"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/mitchellh/mapstructure"
-	"github.com/rancher/kontainer-engine/drivers/rke"
-	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/norman/types/values"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
+	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -375,7 +377,7 @@ func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
 	if driver != cluster.Status.Driver {
 		cluster.Status.Driver = driver
 		if driver == v3.ClusterDriverRKE && cluster.Spec.RancherKubernetesEngineConfig == nil {
-			cluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{}
+			cluster.Spec.RancherKubernetesEngineConfig = &rketypes.RancherKubernetesEngineConfig{}
 		}
 		return p.Clusters.Update(cluster)
 	}
@@ -594,10 +596,10 @@ func resetRkeConfigFlags(cluster *v3.Cluster, updateTriggered bool) {
 			cluster.Annotations[RkeRestoreAnnotation] = "true"
 			cluster.Status.NodeVersion++
 		}
-		cluster.Spec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
+		cluster.Spec.RancherKubernetesEngineConfig.Restore = rketypes.RestoreConfig{}
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
 			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.RotateCertificates = nil
-			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
+			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Restore = rketypes.RestoreConfig{}
 		}
 		if !updateTriggered {
 			return
@@ -766,7 +768,7 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 	return newDriver, nil
 }
 
-func (p *Provisioner) getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
+func (p *Provisioner) getSystemImages(spec v3.ClusterSpec) (*rketypes.RKESystemImages, error) {
 	// fetch system images from settings
 	version := spec.RancherKubernetesEngineConfig.Version
 	systemImages, err := kd.GetRKESystemImages(version, p.RKESystemImagesLister, p.RKESystemImages)
@@ -830,7 +832,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	return newSpec, err
 }
 
-func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode, error) {
+func (p *Provisioner) reconcileRKENodes(clusterName string) ([]rketypes.RKEConfigNode, error) {
 	machines, err := p.NodeLister.List(clusterName, labels.Everything())
 	if err != nil {
 		return nil, err
@@ -838,7 +840,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 
 	etcd := false
 	controlplane := false
-	var nodes []v3.RKEConfigNode
+	var nodes []rketypes.RKEConfigNode
 	for _, machine := range machines {
 		if machine.DeletionTimestamp != nil {
 			continue

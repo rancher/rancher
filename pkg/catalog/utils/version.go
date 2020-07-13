@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/catalog/utils/version"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 func VersionBetween(a, b, c string) bool {

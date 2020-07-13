@@ -13,8 +13,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/k3supgrade"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
-	"github.com/rancher/types/image"
-	"github.com/rancher/types/kdm"
+	"github.com/rancher/rke/types/image"
+	"github.com/rancher/rke/types/kdm"
 	"github.com/sirupsen/logrus"
 )
 

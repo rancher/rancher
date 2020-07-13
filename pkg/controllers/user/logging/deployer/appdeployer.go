@@ -7,8 +7,8 @@ import (
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/ref"
-	v1 "github.com/rancher/types/apis/core/v1"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 
 	"github.com/pkg/errors"
 	k8scorev1 "k8s.io/api/core/v1"

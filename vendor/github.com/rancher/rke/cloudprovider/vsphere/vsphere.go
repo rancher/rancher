@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rke/templates"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rke/types"
 )
 
 const (

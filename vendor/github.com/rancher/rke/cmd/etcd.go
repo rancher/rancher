@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -65,7 +65,20 @@ func EtcdCommand() cli.Command {
 			Usage: "Specify s3 folder name",
 		},
 	}
-	snapshotFlags = append(snapshotFlags, commonFlags...)
+
+	snapshotSaveFlags := append(snapshotFlags, commonFlags...)
+
+	snapshotRestoreFlags := []cli.Flag{
+		cli.StringFlag{
+			Name:  "cert-dir",
+			Usage: "Specify a certificate dir path",
+		},
+		cli.BoolFlag{
+			Name:  "custom-certs",
+			Usage: "Use custom certificates from a cert dir",
+		},
+	}
+	snapshotRestoreFlags = append(append(snapshotFlags, snapshotRestoreFlags...), commonFlags...)
 
 	return cli.Command{
 		Name:  "etcd",
@@ -74,13 +87,13 @@ func EtcdCommand() cli.Command {
 			{
 				Name:   "snapshot-save",
 				Usage:  "Take snapshot on all etcd hosts",
-				Flags:  snapshotFlags,
+				Flags:  snapshotSaveFlags,
 				Action: SnapshotSaveEtcdHostsFromCli,
 			},
 			{
 				Name:   "snapshot-restore",
 				Usage:  "Restore existing snapshot",
-				Flags:  snapshotFlags,
+				Flags:  snapshotRestoreFlags,
 				Action: RestoreEtcdSnapshotFromCli,
 			},
 		},
@@ -275,6 +288,9 @@ func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 	}
 	// setting up the flags
 	flags := cluster.GetExternalFlags(false, false, false, "", filePath)
+	// Custom certificates and certificate dir flags
+	flags.CertificateDir = ctx.String("cert-dir")
+	flags.CustomCerts = ctx.Bool("custom-certs")
 
 	_, _, _, _, _, err = RestoreEtcdSnapshot(context.Background(), rkeConfig, hosts.DialersOptions{}, flags, map[string]interface{}{}, etcdSnapshotName)
 	return err

@@ -5,8 +5,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v12 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/config"
+	v12 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )

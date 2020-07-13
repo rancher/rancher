@@ -25,11 +25,11 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/storageclass"
 	"github.com/rancher/rancher/pkg/api/store/workload"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	clusterschema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
-	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	clusterClient "github.com/rancher/types/client/cluster/v3"
-	client "github.com/rancher/types/client/project/v3"
-	"github.com/rancher/types/config"
+	clusterschema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
+	"github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	clusterClient "github.com/rancher/rancher/pkg/types/client/cluster/v3"
+	client "github.com/rancher/rancher/pkg/types/client/project/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) error {

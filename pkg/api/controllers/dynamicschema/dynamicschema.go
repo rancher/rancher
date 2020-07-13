@@ -6,9 +6,9 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	managementSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

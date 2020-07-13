@@ -9,9 +9,9 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/providers/gitlab"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
-	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/project/v3"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	client "github.com/rancher/rancher/pkg/types/client/project/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/client-go/tools/cache"
 )
 

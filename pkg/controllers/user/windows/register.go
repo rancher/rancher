@@ -3,8 +3,8 @@ package windows
 import (
 	"context"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func Register(ctx context.Context, cluster *v3.Cluster, userContext *config.UserContext) {

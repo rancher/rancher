@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 	assertlib "github.com/stretchr/testify/assert"
 	restclient "k8s.io/client-go/rest"
 )

@@ -20,12 +20,12 @@ import (
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	"github.com/rancher/types/apis/management.cattle.io/v3public/schema"
-	client "github.com/rancher/types/client/management/v3public"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
+	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public/schema"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3public"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
 )
 

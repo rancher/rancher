@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 	"gopkg.in/check.v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"

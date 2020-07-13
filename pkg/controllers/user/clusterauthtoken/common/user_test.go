@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 func getToken() managementv3.Token {

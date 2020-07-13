@@ -68,12 +68,12 @@ import (
 	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/management/v3"
-	projectclient "github.com/rancher/types/client/project/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
+	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	projectschema "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	projectclient "github.com/rancher/rancher/pkg/types/client/project/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/namespace"
 )
 
 func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager,

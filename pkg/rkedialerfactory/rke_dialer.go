@@ -9,9 +9,9 @@ import (
 
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rke/hosts"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config/dialer"
+	rketypes "github.com/rancher/rke/types"
 	"k8s.io/client-go/transport"
 )
 
@@ -49,7 +49,7 @@ func (t *RKEDialerFactory) Build(h *hosts.Host) (func(network, address string) (
 	}, nil
 }
 
-func (t *RKEDialerFactory) WrapTransport(config *v3.RancherKubernetesEngineConfig) transport.WrapperFunc {
+func (t *RKEDialerFactory) WrapTransport(config *rketypes.RancherKubernetesEngineConfig) transport.WrapperFunc {
 	translateAddress := map[string]string{}
 
 	for _, node := range config.Nodes {

@@ -5,23 +5,24 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/norman/types/convert"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
 )
 
 type rke struct {
 }
 
-func (*rke) GenerateRKENodeCerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, nodeAddress string, certBundle map[string]pki.CertificatePKI) map[string]pki.CertificatePKI {
+func (*rke) GenerateRKENodeCerts(ctx context.Context, rkeConfig rketypes.RancherKubernetesEngineConfig, nodeAddress string, certBundle map[string]pki.CertificatePKI) map[string]pki.CertificatePKI {
 	return pki.GenerateRKENodeCerts(ctx, rkeConfig, nodeAddress, certBundle)
 }
 
-func (*rke) GenerateCerts(config *v3.RancherKubernetesEngineConfig) (map[string]pki.CertificatePKI, error) {
+func (*rke) GenerateCerts(config *rketypes.RancherKubernetesEngineConfig) (map[string]pki.CertificatePKI, error) {
 	return pki.GenerateRKECerts(context.Background(), *config, "", "")
 }
 
-func (*rke) GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerInfo map[string]types.Info, data map[string]interface{}) (v3.RKEPlan, error) {
+func (*rke) GeneratePlan(ctx context.Context, rkeConfig *rketypes.RancherKubernetesEngineConfig, dockerInfo map[string]types.Info, data map[string]interface{}) (rketypes.RKEPlan, error) {
 	return cluster.GeneratePlan(ctx, rkeConfig.DeepCopy(), dockerInfo, data)
 }
 

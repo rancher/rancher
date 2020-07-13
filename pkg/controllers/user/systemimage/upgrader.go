@@ -1,7 +1,7 @@
 package systemimage
 
 import (
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 type SystemService interface {

@@ -6,16 +6,18 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rancher/kontainer-engine/cluster"
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/rkecerts"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	rkecluster "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -140,7 +142,7 @@ func (c Controller) getCertsFromUserCluster() (map[string]pki.CertificatePKI, er
 }
 
 //deleteUnusedCerts removes unused certs and cleans up kubelet certs when GenerateServingCertificate is disabled
-func deleteUnusedCerts(certsExpInfo map[string]v3.CertExpiration, rancherKubernetesEngineConfig *v3.RancherKubernetesEngineConfig) {
+func deleteUnusedCerts(certsExpInfo map[string]v3.CertExpiration, rancherKubernetesEngineConfig *rketypes.RancherKubernetesEngineConfig) {
 	unusedCerts := make(map[string]bool)
 	for k := range certsExpInfo {
 		if strings.HasPrefix(k, pki.EtcdCertName) || strings.HasPrefix(k, pki.KubeletCertName) {

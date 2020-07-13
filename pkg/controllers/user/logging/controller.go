@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/watcher"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/ticker"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 	authV1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"

@@ -6,11 +6,13 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/types/client/management/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -50,7 +52,7 @@ func (a ActionHandler) RotateCertificates(actionName string, action *types.Actio
 		return errors.Wrap(err, "unmarshaling input error")
 	}
 
-	rotateCerts := &mgmtv3.RotateCertificates{
+	rotateCerts := &rketypes.RotateCertificates{
 		CACertificates: input.CACertificates,
 		Services:       []string{input.Services},
 	}

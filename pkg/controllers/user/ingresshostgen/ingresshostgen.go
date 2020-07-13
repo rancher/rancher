@@ -9,8 +9,8 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
 	"github.com/rancher/rancher/pkg/settings"
-	v1beta12 "github.com/rancher/types/apis/extensions/v1beta1"
-	"github.com/rancher/types/config"
+	v1beta12 "github.com/rancher/rancher/pkg/types/apis/extensions/v1beta1"
+	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/api/extensions/v1beta1"
 )
 

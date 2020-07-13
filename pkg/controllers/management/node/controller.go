@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
@@ -24,10 +26,10 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
-	corev1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
+	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
@@ -97,7 +99,7 @@ type Lifecycle struct {
 }
 
 func (m *Lifecycle) setupCustom(obj *v3.Node) {
-	obj.Status.NodeConfig = &v3.RKEConfigNode{
+	obj.Status.NodeConfig = &rketypes.RKEConfigNode{
 		NodeName:         obj.Namespace + ":" + obj.Name,
 		HostnameOverride: obj.Spec.RequestedHostname,
 		Address:          obj.Spec.CustomConfig.Address,
@@ -508,7 +510,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
-	obj.Status.NodeConfig = &v3.RKEConfigNode{
+	obj.Status.NodeConfig = &rketypes.RKEConfigNode{
 		NodeName:         obj.Namespace + ":" + obj.Name,
 		Address:          ip,
 		InternalAddress:  interalAddress,

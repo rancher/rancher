@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/user/cis"
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

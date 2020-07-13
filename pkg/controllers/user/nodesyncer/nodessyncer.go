@@ -7,15 +7,17 @@ import (
 	"sort"
 	"strings"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/librke"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -175,7 +177,7 @@ func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *v3.Node) (*corev
 	return node, obj, nil
 }
 
-func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan v3.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
+func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
 	finalMap, changed := computeDelta(node.Labels, nodePlan.Labels, obj.Spec.MetadataUpdate.Labels, onlyKubeLabels)
 	if !changed {
 		return node, obj, nil
@@ -216,7 +218,7 @@ func computePlanDelta(planValues map[string]string, delta v3.MapDelta) (map[stri
 
 }
 
-func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePlan v3.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
+func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
 	finalMap, changed := computeDelta(node.Annotations, nodePlan.Annotations, obj.Spec.MetadataUpdate.Annotations, allowAllPolicy)
 	if !changed {
 		return node, obj, nil
@@ -298,28 +300,28 @@ func computeDelta(currentState map[string]string, planValues map[string]string, 
 	return result, changed
 }
 
-func (m *nodesSyncer) getNodePlan(node *v3.Node) (v3.RKEConfigNodePlan, error) {
+func (m *nodesSyncer) getNodePlan(node *v3.Node) (rketypes.RKEConfigNodePlan, error) {
 	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
-		return v3.RKEConfigNodePlan{}, err
+		return rketypes.RKEConfigNodePlan{}, err
 	}
 
 	if cluster.Status.Driver != v3.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
-		return v3.RKEConfigNodePlan{}, nil
+		return rketypes.RKEConfigNodePlan{}, nil
 	}
 
 	if node.Status.NodeConfig == nil {
-		return v3.RKEConfigNodePlan{}, nil
+		return rketypes.RKEConfigNodePlan{}, nil
 	}
 
 	dockerInfo, err := librke.GetDockerInfo(node)
 	if err != nil {
-		return v3.RKEConfigNodePlan{}, err
+		return rketypes.RKEConfigNodePlan{}, err
 	}
 
 	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo, map[string]interface{}{})
 	if err != nil {
-		return v3.RKEConfigNodePlan{}, err
+		return rketypes.RKEConfigNodePlan{}, err
 	}
 
 	for _, nodePlan := range plan.Nodes {
@@ -328,7 +330,7 @@ func (m *nodesSyncer) getNodePlan(node *v3.Node) (v3.RKEConfigNodePlan, error) {
 		}
 	}
 
-	return v3.RKEConfigNodePlan{}, nil
+	return rketypes.RKEConfigNodePlan{}, nil
 }
 
 func (m *nodesSyncer) reconcileAll() error {

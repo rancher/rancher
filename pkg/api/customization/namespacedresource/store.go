@@ -7,9 +7,9 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	v1 "github.com/rancher/types/apis/core/v1"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/namespace"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/namespace"
 )
 
 //NamespacedStore makes sure that the namespaced resources are assigned to a given namespace

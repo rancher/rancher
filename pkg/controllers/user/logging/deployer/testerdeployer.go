@@ -6,13 +6,13 @@ import (
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	v1 "github.com/rancher/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/types/namespace"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )

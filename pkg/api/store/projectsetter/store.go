@@ -6,8 +6,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/project"
-	v1 "github.com/rancher/types/apis/core/v1"
-	client "github.com/rancher/types/client/cluster/v3"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	client "github.com/rancher/rancher/pkg/types/client/cluster/v3"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )

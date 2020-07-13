@@ -21,8 +21,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config/dialer"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 )
 
 const contentTypeJSON = "application/json"

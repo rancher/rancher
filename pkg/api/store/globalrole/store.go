@@ -3,7 +3,7 @@ package globalrole
 import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 type store struct {

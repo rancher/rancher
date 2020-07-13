@@ -3,7 +3,7 @@ package istio
 import (
 	"context"
 
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/rancher/norman/store/crd"
-	clusterSchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/cluster/v3"
-	"github.com/rancher/types/config"
+	clusterSchema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
+	client "github.com/rancher/rancher/pkg/types/client/cluster/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func CRDSetup(ctx context.Context, apiContext *config.UserOnlyContext) error {

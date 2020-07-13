@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rancher/kontainer-engine/drivers/gke"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"

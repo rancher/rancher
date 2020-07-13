@@ -7,7 +7,7 @@ replace (
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v12.2.0+incompatible
 	github.com/crewjam/saml => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
-	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
+	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
 
 	github.com/rancher/rancher/pkg/auth => ./pkg/auth
@@ -40,6 +40,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v36.1.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.9.6
 	github.com/Azure/go-autorest/autorest/adal v0.8.2
+	github.com/Azure/go-autorest/autorest/to v0.3.1-0.20191028180845-3492b2aff503
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/aws/aws-sdk-go v1.28.2
 	github.com/bep/debounce v1.2.0
@@ -53,12 +54,15 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/ghodss/yaml v1.0.0
+	github.com/golang/protobuf v1.3.2
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
+	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
+	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
 	github.com/mattn/go-colorable v0.1.2
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
@@ -71,18 +75,16 @@ require (
 	github.com/prometheus/common v0.9.1
 	github.com/rancher/apiserver v0.0.0-20200612212259-10457317eb0b
 	github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234
-	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200508010131-226462dc5558
 	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200609220258-00d350370ee8
+	github.com/rancher/norman v0.0.0-20200712070704-9bd3c4fd35e8
 	github.com/rancher/rancher/pkg/auth v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
-	github.com/rancher/rke v1.2.0-rc2.0.20200617185447-84082186085a
+	github.com/rancher/rke v1.2.0-rc2.0.20200712062933-4c1d3db2b0c1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200612212358-02b060294531
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
-	github.com/rancher/types v0.0.0-20200625174156-fe03f32597d2
 	github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f
 	github.com/rancher/wrangler-api v0.6.1-0.20200515193802-dcf70881b087
 	github.com/robfig/cron v1.1.0
@@ -98,9 +100,10 @@ require (
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
-	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/net v0.0.0-20200625001655-4c5254603344
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	google.golang.org/api v0.14.0
 	google.golang.org/grpc v1.27.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
@@ -111,6 +114,8 @@ require (
 	k8s.io/apiserver v0.18.0
 	k8s.io/cli-runtime v0.18.0
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/gengo v0.0.0-20200710205751-c0d492a0f3ca
+	k8s.io/kube-aggregator v0.18.0
 	k8s.io/kubectl v0.18.0
 	k8s.io/kubernetes v1.18.0
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89

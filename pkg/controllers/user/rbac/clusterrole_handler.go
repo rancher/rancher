@@ -1,8 +1,8 @@
 package rbac
 
 import (
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	typesrbacv1 "github.com/rancher/rancher/pkg/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

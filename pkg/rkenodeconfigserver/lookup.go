@@ -3,13 +3,13 @@ package rkenodeconfigserver
 import (
 	"fmt"
 
-	"github.com/rancher/kontainer-engine/cluster"
-	kecerts "github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
+	kecerts "github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/rancher/pkg/rkecerts"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rke/pki"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 type BundleLookup struct {

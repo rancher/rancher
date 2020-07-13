@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"

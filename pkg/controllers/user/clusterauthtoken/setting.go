@@ -2,8 +2,8 @@ package clusterauthtoken
 
 import (
 	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken/common"
-	corev1 "github.com/rancher/types/apis/core/v1"
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

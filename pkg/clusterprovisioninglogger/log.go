@@ -5,9 +5,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/rancher/kontainer-engine/logstream"
 	"github.com/rancher/norman/condition"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainer-engine/logstream"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

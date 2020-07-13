@@ -19,10 +19,10 @@ import (
 	"github.com/rancher/rancher/pkg/api/server/managementstored"
 	"github.com/rancher/rancher/pkg/api/server/userstored"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	clusterSchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
-	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	"github.com/rancher/types/config"
+	clusterSchema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
+	managementSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	projectSchema "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager,

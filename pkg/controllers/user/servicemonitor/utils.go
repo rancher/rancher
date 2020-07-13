@@ -9,8 +9,8 @@ import (
 
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	rmonitoringv1 "github.com/rancher/types/apis/monitoring.coreos.com/v1"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	rmonitoringv1 "github.com/rancher/rancher/pkg/types/apis/monitoring.coreos.com/v1"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

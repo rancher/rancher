@@ -11,8 +11,9 @@ import (
 	"time"
 
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/kdm"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
+	"github.com/rancher/rke/types/kdm"
 	assertlib "github.com/stretchr/testify/assert"
 )
 
@@ -98,7 +99,7 @@ func TestFetchImagesFromSystem(t *testing.T) {
 
 	testCases := []struct {
 		caseName               string
-		inputRkeSystemImages   map[string]v3.RKESystemImages
+		inputRkeSystemImages   map[string]rketypes.RKESystemImages
 		inputOsType            OSType
 		outputShouldContain    []string
 		outputShouldNotContain []string
@@ -209,7 +210,7 @@ func TestGetImages(t *testing.T) {
 		caseName               string
 		inputSystemChartPath   string
 		inputImagesFromArgs    []string
-		inputRkeSystemImages   map[string]v3.RKESystemImages
+		inputRkeSystemImages   map[string]rketypes.RKESystemImages
 		inputOsType            OSType
 		outputShouldContain    []string
 		outputShouldNotContain []string
@@ -324,9 +325,9 @@ func flatStringSlice(slices ...[]string) []string {
 	return ret
 }
 
-func selectFirstEntry(rkeSystemImages map[string]v3.RKESystemImages) v3.RKESystemImages {
+func selectFirstEntry(rkeSystemImages map[string]rketypes.RKESystemImages) rketypes.RKESystemImages {
 	for _, rkeSystemImage := range rkeSystemImages {
 		return rkeSystemImage
 	}
-	return v3.RKESystemImages{}
+	return rketypes.RKESystemImages{}
 }

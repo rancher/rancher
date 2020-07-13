@@ -8,8 +8,8 @@ import (
 
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/settings"
+	managementv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"github.com/rancher/rke/services"
-	managementv3 "github.com/rancher/types/client/management/v3"
 )
 
 const (

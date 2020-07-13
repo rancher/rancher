@@ -8,8 +8,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	managementv3 "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/namespace"
+	managementv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/namespace"
 )
 
 func ProviderWrap(store types.Store) types.Store {

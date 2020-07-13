@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/machine/libmachine/drivers/plugin/localbinary"
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	cli "github.com/rancher/machine/libmachine/mcnflag"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 

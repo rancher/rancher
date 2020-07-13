@@ -3,7 +3,7 @@ package utils
 import (
 	"path/filepath"
 
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 )
 
 func MatchAll(cs *v3.Constraints, execution *v3.PipelineExecution) bool {

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -15,11 +14,12 @@ import (
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/controllers/management/k3supgrade"
 	"github.com/rancher/rancher/pkg/controllers/user/cis"
+	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	mgmtclient "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/namespace"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	mgmtSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
+	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/robfig/cron"
 )
 

@@ -7,9 +7,9 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 	"github.com/rancher/rancher/pkg/ticker"
-	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/config/dialer"
+	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

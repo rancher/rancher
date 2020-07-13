@@ -3,7 +3,7 @@ package requests
 import (
 	"net/http"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 func Chain(auths ...Authenticator) Authenticator {

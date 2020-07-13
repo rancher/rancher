@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -9,8 +9,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/api/store/cert"
-	client "github.com/rancher/types/client/project/v3"
-	"github.com/rancher/types/config"
+	client "github.com/rancher/rancher/pkg/types/client/project/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 )
 

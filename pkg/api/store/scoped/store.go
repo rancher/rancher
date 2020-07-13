@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	client "github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/types/client/management/v3"
 )
 
 type Store struct {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/namespace"
+	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	"github.com/rancher/rancher/pkg/types/namespace"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
