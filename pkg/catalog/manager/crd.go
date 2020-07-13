@@ -88,6 +88,7 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 				TemplateNameLabel: template.Name,
 			}
 			toCreate.Spec = templateVersion.Spec
+			toCreate.Status = v3.TemplateVersionStatus{HelmVersion: template.Status.HelmVersion}
 			logrus.Debugf("Creating templateVersion %v", toCreate.Name)
 			if _, err := m.templateVersionClient.Create(toCreate); err != nil {
 				return err
