@@ -685,7 +685,6 @@ def get_cp_nodes(cluster, client=None):
             cp_nodes.append(node)
     return cp_nodes
 
-
 def get_worker_nodes(cluster, client=None):
     if not client:
         client = get_user_client()

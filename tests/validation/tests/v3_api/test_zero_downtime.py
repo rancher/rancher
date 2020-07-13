@@ -174,11 +174,12 @@ def validate_node_cordon(nodes, k8_version, client, p_client, cluster, workload,
     upgraded_nodes = set()
     for node in nodes:
         node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
-        print(node_k8)
-        print(node.state)
+        print("node: ", node.uuid)
+        print("node version: ", node_k8)
+        print("node state: ", node.state)
         while not(node_k8 == k8_version and node.state == "active"):
-            print(node_k8)
-            print(node.state)
+            print("node version: ", node_k8)
+            print("node state: ", node.state)
             if time.time() - start > timeout:
                 raise AssertionError(
                     "Timed out waiting for node upgrade")
@@ -186,16 +187,18 @@ def validate_node_cordon(nodes, k8_version, client, p_client, cluster, workload,
             if node.state == "cordoned":
                 print("node state: ", node.state)
                 in_state.add(node.uuid)
-            time.sleep(5)
+                print("added to in-state")
+            time.sleep(1)
             node = client.reload(node)
             node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
         if node_k8 == k8_version:
             print("node: ", node, " is at ", node_k8)
             upgraded_nodes.add(node.uuid)
-    print(node)
-    print(node_k8)
-    print(in_state)
-    print(upgraded_nodes)
+            print("added to upgrade nodes")
+        print("node: ", node)
+        print(node_k8)
+    print("final instate: ", in_state)
+    print("final upgrade: ", upgraded_nodes)
     assert len(in_state) == len(nodes), "nodes failed to achieve desired state"
     return upgraded_nodes
 
