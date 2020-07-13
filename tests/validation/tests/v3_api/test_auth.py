@@ -24,9 +24,10 @@ Prerequisite:
 
 # Config Fields
 HOSTNAME_OR_IP_ADDRESS = os.environ.get("RANCHER_HOSTNAME_OR_IP_ADDRESS")
-PORT = os.environ.get("RANCHER_PORT", 636)
+PORT = os.environ.get("RANCHER_PORT", "")
 CA_CERTIFICATE = os.environ.get("RANCHER_CA_CERTIFICATE", "")
 OPENLDAP_CA_CERTIFICATE = os.environ.get("RANCHER_OPENLDAP_CA_CERTIFICATE", "")
+FREEIPA_CA_CERTIFICATE = os.environ.get("RANCHER_FREEIPA_CA_CERTIFICATE", "")
 CONNECTION_TIMEOUT = os.environ.get("RANCHER_CONNECTION_TIMEOUT", 5000)
 SERVICE_ACCOUNT_NAME = os.environ.get("RANCHER_SERVICE_ACCOUNT_NAME")
 SERVICE_ACCOUNT_PASSWORD = os.environ.get("RANCHER_SERVICE_ACCOUNT_PASSWORD")
@@ -48,12 +49,26 @@ OPENLDAP_USER_SEARCH_BASE = os.environ.get("RANCHER_OPENLDAP_USER_SEARCH_BASE")
 OPENLDAP_AUTH_USER_PASSWORD = \
     os.environ.get("RANCHER_OPENLDAP_AUTH_USER_PASSWORD")
 
+FREEIPA_HOSTNAME_OR_IP_ADDRESS = \
+    os.environ.get("RANCHER_FREEIPA_HOSTNAME_OR_IP_ADDRESS")
+FREEIPA_SERVICE_ACCOUNT_NAME = \
+    os.environ.get("RANCHER_FREEIPA_SERVICE_ACCOUNT_NAME")
+FREEIPA_SERVICE_ACCOUNT_PASSWORD = \
+    os.environ.get("RANCHER_FREEIPA_SERVICE_ACCOUNT_PASSWORD")
+FREEIPA_USER_SEARCH_BASE = os.environ.get("RANCHER_FREEIPA_USER_SEARCH_BASE")
+FREEIPA_GROUP_SEARCH_BASE = os.environ.get("RANCHER_FREEIPA_GROUP_SEARCH_BASE")
+
+FREEIPA_AUTH_USER_PASSWORD = \
+    os.environ.get("RANCHER_FREEIPA_AUTH_USER_PASSWORD")
+
 PASSWORD = ""
 
 if AUTH_PROVIDER == "activeDirectory":
     PASSWORD = AUTH_USER_PASSWORD
 elif AUTH_PROVIDER == "openLdap":
     PASSWORD = OPENLDAP_AUTH_USER_PASSWORD
+elif AUTH_PROVIDER == "freeIpa":
+    PASSWORD = FREEIPA_AUTH_USER_PASSWORD
 
 CATTLE_AUTH_URL = \
     CATTLE_TEST_URL + \
@@ -637,13 +652,13 @@ def disable_ad(username, token, expected_status=200):
 
 
 def enable_freeipa(username, token, enable_url=CATTLE_AUTH_ENABLE_URL,
-                   password=AUTH_USER_PASSWORD, nested=False,
+                   password=PASSWORD, nested=False,
                    expected_status=200):
     headers = {'Authorization': 'Bearer ' + token}
     r = requests.post(enable_url, json={
         "ldapConfig": {
             "accessMode": "unrestricted",
-            "certificate": CA_CERTIFICATE,
+            "certificate": FREEIPA_CA_CERTIFICATE,
             "connectionTimeout": CONNECTION_TIMEOUT,
             "groupDNAttribute": "entrydn",
             "groupMemberMappingAttribute": "member",
@@ -651,27 +666,26 @@ def enable_freeipa(username, token, enable_url=CATTLE_AUTH_ENABLE_URL,
             "groupNameAttribute": "cn",
             "groupObjectClass": "groupofnames",
             "groupSearchAttribute": "cn",
-            "groupSearchBase": GROUP_SEARCH_BASE,
+            "groupSearchBase": FREEIPA_GROUP_SEARCH_BASE,
             "enabled": True,
             "nestedGroupMembershipEnabled": nested,
             "port": PORT,
-            "servers": [
-                HOSTNAME_OR_IP_ADDRESS
-            ],
-            "serviceAccountDistinguishedName": SERVICE_ACCOUNT_NAME,
-            "tls": get_tls(CA_CERTIFICATE),
+            "servers": [FREEIPA_HOSTNAME_OR_IP_ADDRESS],
+            "serviceAccountDistinguishedName": FREEIPA_SERVICE_ACCOUNT_NAME,
+            "tls": get_tls(FREEIPA_CA_CERTIFICATE),
             "userDisabledBitMask": 0,
             "userLoginAttribute": "uid",
             "userMemberAttribute": "memberOf",
             "userNameAttribute": "givenName",
             "userObjectClass": "inetorgperson",
             "userSearchAttribute": "uid|sn|givenName",
-            "userSearchBase": USER_SEARCH_BASE,
-            "serviceAccountPassword": SERVICE_ACCOUNT_PASSWORD
+            "userSearchBase": FREEIPA_USER_SEARCH_BASE,
+            "serviceAccountPassword": FREEIPA_SERVICE_ACCOUNT_PASSWORD
         },
         "username": username,
         "password": password
     }, verify=False, headers=headers)
+
     print("Enable freeIpa request for " +
           username + " " + str(expected_status))
     assert r.status_code == expected_status
@@ -747,6 +761,12 @@ def delete_existing_users_in_project(client, project):
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
 
+    '''
+    This method enables auth on the Rancher server setup. Two clusters are
+    required in the setup. If two clusters are not present, it will create
+    the clusters.
+    '''
+
     if AUTH_PROVIDER not in ("activeDirectory", "openLdap", "freeIpa"):
         assert False, "Auth Provider set is not supported"
     setup["auth_setup_data"] = load_setup_data()
@@ -757,8 +777,10 @@ def create_project_client(request):
         admin_user = auth_setup_data["admin_user"]
         if AUTH_PROVIDER == 'activeDirectory':
             enable_ad(admin_user, ADMIN_TOKEN)
-        if AUTH_PROVIDER == 'openLdap':
+        elif AUTH_PROVIDER == 'openLdap':
             enable_openldap(admin_user, ADMIN_TOKEN)
+        elif AUTH_PROVIDER == 'freeIpa':
+            enable_freeipa(admin_user, ADMIN_TOKEN)
 
     cluster_total = len(client.list_cluster().data)
     node_roles = [["controlplane", "etcd", "worker"]]
