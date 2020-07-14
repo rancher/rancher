@@ -18,7 +18,17 @@ type Options struct {
 	Boilerplate   string
 }
 
+type Type struct {
+	Version string
+	Package string
+	Name    string
+}
+
 type Group struct {
+	// Types is a slice of the following types
+	// Instance of any struct: used for reflection to describe the type
+	// string: a directory that will be listed (non-recursively) for types
+	// Type: a description of a type
 	Types         []interface{}
 	GenerateTypes bool
 	// Generate clientsets

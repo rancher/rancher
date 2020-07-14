@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,7 +17,9 @@ import (
 	"github.com/rancher/steve/pkg/stores/partition"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
+	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,17 +47,23 @@ type ClientGetter interface {
 	TableAdminClientForWatch(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
 }
 
-type Store struct {
-	clientGetter ClientGetter
+type RelationshipNotifier interface {
+	OnInboundRelationshipChange(ctx context.Context, schema *types.APISchema, namespace string) <-chan *summary.Relationship
 }
 
-func NewProxyStore(clientGetter ClientGetter, lookup accesscontrol.AccessSetLookup) types.Store {
+type Store struct {
+	clientGetter ClientGetter
+	notifier     RelationshipNotifier
+}
+
+func NewProxyStore(clientGetter ClientGetter, notifier RelationshipNotifier, lookup accesscontrol.AccessSetLookup) types.Store {
 	return &errorStore{
 		Store: &WatchRefresh{
 			Store: &partition.Store{
 				Partitioner: &rbacPartitioner{
 					proxyStore: &Store{
 						clientGetter: clientGetter,
+						notifier:     notifier,
 					},
 				},
 			},
@@ -278,6 +287,7 @@ func (s *Store) listAndWatch(apiOp *types.APIRequest, k8sClient dynamic.Resource
 		Watch:           true,
 		TimeoutSeconds:  &timeout,
 		ResourceVersion: rev,
+		LabelSelector:   w.Selector,
 	})
 	if err != nil {
 		returnErr(errors.Wrapf(err, "stopping watch for %s: %v", schema.ID, err), result)
@@ -286,17 +296,37 @@ func (s *Store) listAndWatch(apiOp *types.APIRequest, k8sClient dynamic.Resource
 	defer watcher.Stop()
 	logrus.Debugf("opening watcher for %s", schema.ID)
 
+	eg, ctx := errgroup.WithContext(apiOp.Context())
+
 	go func() {
-		<-apiOp.Request.Context().Done()
+		<-ctx.Done()
 		watcher.Stop()
 	}()
 
-	for event := range watcher.ResultChan() {
-		if event.Type == watch.Error {
-			continue
-		}
-		result <- s.toAPIEvent(apiOp, schema, event.Type, event.Object)
+	if s.notifier != nil {
+		eg.Go(func() error {
+			for rel := range s.notifier.OnInboundRelationshipChange(ctx, schema, apiOp.Namespace) {
+				obj, err := s.byID(apiOp, schema, rel.Name)
+				if err == nil {
+					result <- s.toAPIEvent(apiOp, schema, watch.Modified, obj)
+				}
+			}
+			return fmt.Errorf("closed")
+		})
 	}
+
+	eg.Go(func() error {
+		for event := range watcher.ResultChan() {
+			if event.Type == watch.Error {
+				continue
+				result <- s.toAPIEvent(apiOp, schema, event.Type, event.Object)
+			}
+		}
+		return fmt.Errorf("closed")
+	})
+
+	_ = eg.Wait()
+	return
 }
 
 func (s *Store) WatchNames(apiOp *types.APIRequest, schema *types.APISchema, w types.WatchRequest, names sets.String) (chan types.APIEvent, error) {

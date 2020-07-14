@@ -107,11 +107,10 @@ func (s *shell) proxyRequest(rw http.ResponseWriter, req *http.Request, pod *v1.
 		Name(pod.Name).
 		SubResource("attach").
 		VersionedParams(&v1.PodAttachOptions{
-			TypeMeta:  metav1.TypeMeta{},
-			Stdin:     false,
-			Stdout:    false,
-			Stderr:    false,
-			TTY:       false,
+			Stdin:     true,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       true,
 			Container: "shell",
 		}, scheme.ParameterCodec).URL()
 

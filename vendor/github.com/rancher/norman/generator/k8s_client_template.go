@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	{{.importPackage}}
 )
 
 type Interface interface {
@@ -20,10 +21,9 @@ type Client struct {
 	clientFactory     client.SharedClientFactory
 }
 
-{{ if not .external }}
 func NewForConfig(cfg rest.Config) (Interface, error) {
 	scheme := runtime.NewScheme()
-	if err := AddToScheme(scheme); err != nil {
+	if err := {{.prefix}}AddToScheme(scheme); err != nil {
 		return nil, err
 	}
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&cfg, scheme)
@@ -32,7 +32,6 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	}
 	return NewFromControllerFactory(controllerFactory)
 }
-{{ end }}
 
 func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
 	return &Client{
