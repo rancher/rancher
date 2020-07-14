@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 

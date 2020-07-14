@@ -11,7 +11,7 @@ import (
 	yaml2 "github.com/ghodss/yaml"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/sirupsen/logrus"
 	authV1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"

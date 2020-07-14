@@ -15,16 +15,18 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rketypes "github.com/rancher/rke/types"
 
 	minio "github.com/minio/minio-go"
 	"github.com/minio/minio-go/pkg/credentials"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/ticker"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -489,7 +491,7 @@ func shouldBackup(cluster *v3.Cluster) bool {
 		return false
 	}
 	// we only work with ready clusters
-	if !v3.ClusterConditionReady.IsTrue(cluster) {
+	if !v32.ClusterConditionReady.IsTrue(cluster) {
 		return false
 	}
 

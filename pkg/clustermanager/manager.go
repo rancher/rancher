@@ -13,19 +13,21 @@ import (
 	"sync"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/steve/pkg/accesscontrol"
-	rbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
+	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -105,8 +107,8 @@ func (m *Manager) RESTConfig(cluster *v3.Cluster) (rest.Config, error) {
 
 func (m *Manager) markUnavailable(clusterName string) {
 	if cluster, err := m.clusters.Get(clusterName, v1.GetOptions{}); err == nil {
-		if !v3.ClusterConditionReady.IsFalse(cluster) {
-			v3.ClusterConditionReady.False(cluster)
+		if !v32.ClusterConditionReady.IsFalse(cluster) {
+			v32.ClusterConditionReady.False(cluster)
 			m.clusters.Update(cluster)
 		}
 		m.Stop(cluster)
@@ -258,7 +260,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		return nil, nil
 	}
 
-	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, nil
 	}
 
@@ -278,7 +280,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 	}
 
 	var tlsDialer func(string, string) (net.Conn, error)
-	if cluster.Status.Driver == v3.ClusterDriverRKE {
+	if cluster.Status.Driver == v32.ClusterDriverRKE {
 		tlsDialer, err = nameIgnoringTLSDialer(clusterDialer, caBytes)
 		if err != nil {
 			return nil, err

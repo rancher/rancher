@@ -3,6 +3,8 @@ package healthsyncer
 import (
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"context"
 
 	"reflect"
@@ -11,9 +13,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ticker"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -73,7 +75,7 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	if err != nil {
 		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
 	}
-	cluster.Status.ComponentStatuses = []v3.ClusterComponentStatus{}
+	cluster.Status.ComponentStatuses = []v32.ClusterComponentStatus{}
 	for _, cs := range cses.Items {
 		clusterCS := convertToClusterComponentStatus(&cs)
 		cluster.Status.ComponentStatuses = append(cluster.Status.ComponentStatuses, *clusterCS)
@@ -90,12 +92,12 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return err
 	}
 	cluster := oldCluster.DeepCopy()
-	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Debugf("Skip updating cluster health - cluster [%s] not provisioned yet", h.clusterName)
 		return nil
 	}
 
-	newObj, err := v3.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
+	newObj, err := v32.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
 		for i := 0; ; i++ {
 			err := h.getComponentStatus(cluster)
 			if err == nil || i > 1 {
@@ -110,8 +112,8 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	})
 
 	if err == nil {
-		v3.ClusterConditionWaiting.True(newObj)
-		v3.ClusterConditionWaiting.Message(newObj, "")
+		v32.ClusterConditionWaiting.True(newObj)
+		v32.ClusterConditionWaiting.Message(newObj, "")
 	}
 
 	if !reflect.DeepEqual(oldCluster, newObj) {
@@ -129,8 +131,8 @@ func (h *HealthSyncer) getCluster() (*v3.Cluster, error) {
 	return h.clusterLister.Get("", h.clusterName)
 }
 
-func convertToClusterComponentStatus(cs *v1.ComponentStatus) *v3.ClusterComponentStatus {
-	return &v3.ClusterComponentStatus{
+func convertToClusterComponentStatus(cs *v1.ComponentStatus) *v32.ClusterComponentStatus {
+	return &v32.ClusterComponentStatus{
 		Name:       cs.Name,
 		Conditions: cs.Conditions,
 	}

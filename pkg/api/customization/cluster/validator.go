@@ -12,13 +12,14 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/k3supgrade"
 	"github.com/rancher/rancher/pkg/controllers/user/cis"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
+	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	mgmtSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/robfig/cron"
 )
@@ -37,7 +38,7 @@ type Validator struct {
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	var clusterSpec v3.ClusterSpec
+	var clusterSpec v32.ClusterSpec
 	var clientClusterSpec mgmtclient.Cluster
 	if err := convert.ToObj(data, &clusterSpec); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Cluster spec conversion error")
@@ -104,8 +105,8 @@ func validateScheduledClusterScan(spec *mgmtclient.Cluster) error {
 	if spec.ScheduledClusterScan.ScanConfig != nil &&
 		spec.ScheduledClusterScan.ScanConfig.CisScanConfig != nil {
 		profile := spec.ScheduledClusterScan.ScanConfig.CisScanConfig.Profile
-		if profile != string(v3.CisScanProfileTypePermissive) &&
-			profile != string(v3.CisScanProfileTypeHardened) {
+		if profile != string(v32.CisScanProfileTypePermissive) &&
+			profile != string(v32.CisScanProfileTypeHardened) {
 			return httperror.NewFieldAPIError(httperror.InvalidOption, "ScheduledClusterScan.ScanConfig.CisScanConfig.Profile", "profile can be either permissive or hardened")
 		}
 	}
@@ -134,7 +135,7 @@ func validateScheduledClusterScan(spec *mgmtclient.Cluster) error {
 	return nil
 }
 
-func (v *Validator) validateLocalClusterAuthEndpoint(request *types.APIContext, spec *v3.ClusterSpec) error {
+func (v *Validator) validateLocalClusterAuthEndpoint(request *types.APIContext, spec *v32.ClusterSpec) error {
 	if !spec.LocalClusterAuthEndpoint.Enabled {
 		return nil
 	}
@@ -148,8 +149,8 @@ func (v *Validator) validateLocalClusterAuthEndpoint(request *types.APIContext, 
 			return err
 		}
 		isValidCluster = cluster.Status.Driver == "" ||
-			cluster.Status.Driver == v3.ClusterDriverRKE ||
-			cluster.Status.Driver == v3.ClusterDriverImported
+			cluster.Status.Driver == v32.ClusterDriverRKE ||
+			cluster.Status.Driver == v32.ClusterDriverImported
 	}
 	if !isValidCluster {
 		return httperror.NewFieldAPIError(httperror.InvalidState, "LocalClusterAuthEndpoint.Enabled", "Can only enable LocalClusterAuthEndpoint with RKE")
@@ -212,7 +213,7 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 
 // TODO: test validator
 // prevents downgrades, no-ops, and upgrading before versions have been set
-func (v *Validator) validateK3sVersionUpgrade(request *types.APIContext, spec *v3.ClusterSpec) error {
+func (v *Validator) validateK3sVersionUpgrade(request *types.APIContext, spec *v32.ClusterSpec) error {
 	upgradeNotReadyErr := httperror.NewAPIError(httperror.Conflict, "k3s version upgrade is not ready, try again later")
 
 	if request.Method == http.MethodPost {
@@ -293,7 +294,7 @@ func (v *Validator) accessTemplate(request *types.APIContext, spec *mgmtclient.C
 }
 
 // validateGenericEngineConfig allows for additional validation of clusters that depend on Kontainer Engine or Rancher Machine driver
-func (v *Validator) validateGenericEngineConfig(request *types.APIContext, spec *v3.ClusterSpec) error {
+func (v *Validator) validateGenericEngineConfig(request *types.APIContext, spec *v32.ClusterSpec) error {
 
 	if request.Method == http.MethodPost {
 		return nil

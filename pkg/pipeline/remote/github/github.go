@@ -13,13 +13,15 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/google/go-github/github"
 	"github.com/rancher/norman/httperror"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/tomnomnom/linkheader"
 	"golang.org/x/oauth2"
@@ -50,7 +52,7 @@ var defaultClient = &client{
 	API:    defaultGithubAPI,
 }
 
-func New(config *v3.GithubPipelineConfig) (model.Remote, error) {
+func New(config *v32.GithubPipelineConfig) (model.Remote, error) {
 	if config == nil {
 		return defaultClient, nil
 	}

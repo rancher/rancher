@@ -3,10 +3,12 @@ package networkpolicy
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +36,7 @@ based on cluster.Annotations[netPolAnnotation] and sets status if successful
 func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil ||
 		cluster.Name != ch.clusterNamespace ||
-		!v3.ClusterConditionReady.IsTrue(cluster) {
+		!v32.ClusterConditionReady.IsTrue(cluster) {
 		return nil, nil
 	}
 

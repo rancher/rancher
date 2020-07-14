@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/slice"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -316,7 +318,7 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 }
 
 // CheckAccessToUpdateMembers checks if the request is updating members list, and if the caller has permission to do so
-func CheckAccessToUpdateMembers(members []v3.Member, data map[string]interface{}, ownerAccess bool) error {
+func CheckAccessToUpdateMembers(members []v32.Member, data map[string]interface{}, ownerAccess bool) error {
 	var requestUpdatesMembers bool
 	// Check if members are being updated, if yes, make sure only member with owner permission is making this update request
 	newMembers := convert.ToMapSlice(data[client.GlobalDnsFieldMembers])
@@ -377,7 +379,7 @@ func CheckAccessToUpdateMembers(members []v3.Member, data map[string]interface{}
 	return nil
 }
 
-func (ma *MemberAccess) GetAccessTypeOfCaller(callerID, creatorID, name string, members []v3.Member) (string, error) {
+func (ma *MemberAccess) GetAccessTypeOfCaller(callerID, creatorID, name string, members []v32.Member) (string, error) {
 	var username string
 	isAdmin, err := ma.IsAdmin(callerID)
 	if err != nil {

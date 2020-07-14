@@ -6,18 +6,20 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/project/v3"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -88,7 +90,7 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	runPipelineInput := v3.RunPipelineInput{}
+	runPipelineInput := v32.RunPipelineInput{}
 	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
@@ -145,7 +147,7 @@ func (h *Handler) pushConfig(apiContext *types.APIContext) error {
 		return err
 	}
 
-	pushConfigInput := v3.PushPipelineConfigInput{}
+	pushConfigInput := v32.PushPipelineConfigInput{}
 	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
@@ -309,7 +311,7 @@ func (h *Handler) getPipelineConfigJSON(apiContext *types.APIContext) error {
 
 func (h *Handler) getPipelineConfigYAML(apiContext *types.APIContext) error {
 	yamlMap := map[string]interface{}{}
-	m := map[string]*v3.PipelineConfig{}
+	m := map[string]*v32.PipelineConfig{}
 
 	branch := apiContext.Request.URL.Query().Get(queryBranch)
 	configs := apiContext.Request.URL.Query().Get(queryConfigs)
@@ -390,7 +392,7 @@ func (h *Handler) updatePipelineConfigYaml(apiContext *types.APIContext) error {
 		return err
 	}
 	//check yaml
-	config := &v3.PipelineConfig{}
+	config := &v32.PipelineConfig{}
 	if err := yaml.Unmarshal(content, config); err != nil {
 		return err
 	}
@@ -435,7 +437,7 @@ func (h *Handler) updatePipelineConfigYaml(apiContext *types.APIContext) error {
 	return nil
 }
 
-func (h *Handler) getPipelineConfigs(pipeline *v3.Pipeline, branch string) (map[string]*v3.PipelineConfig, error) {
+func (h *Handler) getPipelineConfigs(pipeline *v3.Pipeline, branch string) (map[string]*v32.PipelineConfig, error) {
 	var scpConfig interface{}
 	var cred *v3.SourceCodeCredential
 	var err error
@@ -462,7 +464,7 @@ func (h *Handler) getPipelineConfigs(pipeline *v3.Pipeline, branch string) (map[
 		return nil, err
 	}
 
-	m := map[string]*v3.PipelineConfig{}
+	m := map[string]*v32.PipelineConfig{}
 
 	if branch != "" {
 		content, err := remote.GetPipelineFileInRepo(pipeline.Spec.RepositoryURL, branch, accessToken)

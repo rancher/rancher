@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/fakes"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rke/cloudprovider/aws"
 	"github.com/rancher/rke/cloudprovider/azure"
 	rketypes "github.com/rancher/rke/types"
@@ -44,7 +45,7 @@ func TestSetNodePortRange(t *testing.T) {
 			},
 		},
 	}
-	caps := v3.Capabilities{}
+	caps := v32.Capabilities{}
 	caps, err := c.RKECapabilities(caps, *testCluster.Spec.RancherKubernetesEngineConfig, testCluster.Name)
 	assert.Nil(t, err)
 	assert.Equal(t, testServiceNodePortRange, caps.NodePortRange)
@@ -68,7 +69,7 @@ func TestLoadBalancerCapability(t *testing.T) {
 	}
 	for cloudProvider, expectedLB := range cloudProviderLBCapabilityMap {
 		testCluster.Spec.RancherKubernetesEngineConfig.CloudProvider = cloudProvider
-		caps := v3.Capabilities{}
+		caps := v32.Capabilities{}
 		caps, err := c.RKECapabilities(caps, *testCluster.Spec.RancherKubernetesEngineConfig, testCluster.Name)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedLB, caps.LoadBalancerCapabilities.Enabled)
@@ -77,8 +78,8 @@ func TestLoadBalancerCapability(t *testing.T) {
 
 func TestIngressCapability(t *testing.T) {
 	c := initializeController()
-	rkeSpec := v3.ClusterSpec{
-		ClusterSpecBase: v3.ClusterSpecBase{
+	rkeSpec := v32.ClusterSpec{
+		ClusterSpecBase: v32.ClusterSpecBase{
 			RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
 				Ingress: rketypes.IngressConfig{
 					Provider: NginxIngressProvider,
@@ -104,7 +105,7 @@ func TestIngressCapability(t *testing.T) {
 	testClusters[1].Spec.RancherKubernetesEngineConfig.Ingress.Provider = ""
 
 	for _, testCluster := range testClusters {
-		caps := v3.Capabilities{}
+		caps := v32.Capabilities{}
 		caps, err := c.RKECapabilities(caps, *testCluster.Spec.RancherKubernetesEngineConfig, testCluster.Name)
 		assert.Nil(t, err)
 		assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Ingress.Provider, caps.IngressCapabilities[0].IngressProvider)
@@ -113,8 +114,8 @@ func TestIngressCapability(t *testing.T) {
 
 type capabilitiesTestCase struct {
 	annotations  map[string]string
-	capabilities v3.Capabilities
-	result       v3.Capabilities
+	capabilities v32.Capabilities
+	result       v32.Capabilities
 	errMsg       string
 }
 
@@ -139,8 +140,8 @@ func TestOverrideCapabilities(t *testing.T) {
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "pspEnabled"): "true",
 			},
-			capabilities: v3.Capabilities{},
-			result: v3.Capabilities{
+			capabilities: v32.Capabilities{},
+			result: v32.Capabilities{
 				PspEnabled: true,
 			},
 		},
@@ -148,8 +149,8 @@ func TestOverrideCapabilities(t *testing.T) {
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "nodePortRange"): "9999",
 			},
-			capabilities: v3.Capabilities{},
-			result: v3.Capabilities{
+			capabilities: v32.Capabilities{},
+			result: v32.Capabilities{
 				NodePortRange: "9999",
 			},
 		},
@@ -157,9 +158,9 @@ func TestOverrideCapabilities(t *testing.T) {
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "ingressCapabilities"): "[{\"customDefaultBackend\":true,\"ingressProvider\":\"asdf\"}]",
 			},
-			capabilities: v3.Capabilities{},
-			result: v3.Capabilities{
-				IngressCapabilities: []v3.IngressCapabilities{
+			capabilities: v32.Capabilities{},
+			result: v32.Capabilities{
+				IngressCapabilities: []v32.IngressCapabilities{
 					{
 						CustomDefaultBackend: pointer.BoolPtr(true),
 						IngressProvider:      "asdf",
@@ -171,14 +172,14 @@ func TestOverrideCapabilities(t *testing.T) {
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "notarealcapability"): "something",
 			},
-			capabilities: v3.Capabilities{},
+			capabilities: v32.Capabilities{},
 			errMsg:       "resource field [notarealcapability] from capabillities annotation not found",
 		},
 		{
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "pspEnabled"): "5",
 			},
-			capabilities: v3.Capabilities{},
+			capabilities: v32.Capabilities{},
 			errMsg:       "strconv.ParseBool: parsing \"5\": invalid syntax",
 		},
 	}

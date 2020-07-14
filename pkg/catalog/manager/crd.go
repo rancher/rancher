@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"reflect"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/utils"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +25,7 @@ func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalo
 	template.Labels = labels.Merge(template.Labels, map[string]string{
 		CatalogNameLabel: catalog.Name,
 	})
-	versionFiles := make([]v3.TemplateVersionSpec, len(template.Spec.Versions))
+	versionFiles := make([]v32.TemplateVersionSpec, len(template.Spec.Versions))
 	copy(versionFiles, template.Spec.Versions)
 	for i := range template.Spec.Versions {
 		template.Spec.Versions[i].Files = nil
@@ -88,7 +90,7 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 				TemplateNameLabel: template.Name,
 			}
 			toCreate.Spec = templateVersion.Spec
-			toCreate.Status = v3.TemplateVersionStatus{HelmVersion: template.Status.HelmVersion}
+			toCreate.Status = v32.TemplateVersionStatus{HelmVersion: template.Status.HelmVersion}
 			logrus.Debugf("Creating templateVersion %v", toCreate.Name)
 			if _, err := m.templateVersionClient.Create(toCreate); err != nil {
 				return err
@@ -164,11 +166,11 @@ func (m *Manager) getTemplateVersion(templateName string, namespace string) (map
 	return tVersion, nil
 }
 
-func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.TemplateVersionSpec, template *v3.CatalogTemplate) error {
+func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v32.TemplateVersionSpec, template *v3.CatalogTemplate) error {
 	for _, spec := range versionsSpec {
 		templateVersion := &v3.CatalogTemplateVersion{}
 		templateVersion.Spec = spec
-		templateVersion.Status = v3.TemplateVersionStatus{HelmVersion: template.Status.HelmVersion}
+		templateVersion.Status = v32.TemplateVersionStatus{HelmVersion: template.Status.HelmVersion}
 		templateVersion.Name = getValidTemplateNameWithVersion(template.Name, spec.Version)
 		templateVersion.Namespace = template.Namespace
 		templateVersion.Labels = map[string]string{

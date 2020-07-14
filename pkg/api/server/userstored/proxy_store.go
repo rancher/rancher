@@ -6,8 +6,8 @@ import (
 
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
-	clusterSchema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
-	"github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
+	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 

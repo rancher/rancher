@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,8 +16,8 @@ import (
 )
 
 func hasAllUpdates(catalog *v3.Catalog) bool {
-	upgraded := v3.CatalogConditionUpgraded.IsTrue(catalog)
-	diskCached := v3.CatalogConditionDiskCached.IsTrue(catalog)
+	upgraded := v32.CatalogConditionUpgraded.IsTrue(catalog)
+	diskCached := v32.CatalogConditionDiskCached.IsTrue(catalog)
 	return upgraded && diskCached
 }
 
@@ -27,18 +29,18 @@ func isUpToDate(commit string, catalog *v3.Catalog) bool {
 
 func setRefreshed(catalog *v3.Catalog) bool {
 	logrus.Debugf("Catalog %s is already up to date", catalog.Name)
-	if !v3.CatalogConditionRefreshed.IsTrue(catalog) {
-		v3.CatalogConditionRefreshed.True(catalog)
-		v3.CatalogConditionRefreshed.Reason(catalog, "")
-		v3.CatalogConditionRefreshed.Message(catalog, "")
+	if !v32.CatalogConditionRefreshed.IsTrue(catalog) {
+		v32.CatalogConditionRefreshed.True(catalog)
+		v32.CatalogConditionRefreshed.Reason(catalog, "")
+		v32.CatalogConditionRefreshed.Message(catalog, "")
 		return true
 	}
 	return false
 }
 
 func setRefreshedError(catalog *v3.Catalog, err error) {
-	v3.CatalogConditionRefreshed.False(catalog)
-	v3.CatalogConditionRefreshed.ReasonAndMessageFromError(catalog, err)
+	v32.CatalogConditionRefreshed.False(catalog)
+	v32.CatalogConditionRefreshed.ReasonAndMessageFromError(catalog, err)
 }
 
 func (m *Manager) deleteTemplates(key string, namespace string) error {
@@ -103,11 +105,11 @@ func (m *Manager) updateCatalogInfo(cmt *CatalogInfo, catalogType string, templa
 		default:
 			return cmt, fmt.Errorf("incorrect catalog type")
 		}
-		v3.CatalogConditionRefreshed.Unknown(obj)
+		v32.CatalogConditionRefreshed.Unknown(obj)
 		if templateName != "" {
-			v3.CatalogConditionRefreshed.Message(obj, fmt.Sprintf("syncing catalog %v", cmt.catalog.Name))
+			v32.CatalogConditionRefreshed.Message(obj, fmt.Sprintf("syncing catalog %v", cmt.catalog.Name))
 		} else {
-			v3.CatalogConditionRefreshed.Message(obj, fmt.Sprintf(""))
+			v32.CatalogConditionRefreshed.Message(obj, fmt.Sprintf(""))
 		}
 	}
 
@@ -166,20 +168,20 @@ func (m *Manager) updateCatalogInfo(cmt *CatalogInfo, catalogType string, templa
 }
 
 func setCatalogErrorState(cmt *CatalogInfo, catalog *v3.Catalog, projectCatalog *v3.ProjectCatalog, clusterCatalog *v3.ClusterCatalog) {
-	v3.CatalogConditionRefreshed.False(catalog)
-	v3.CatalogConditionRefreshed.Message(catalog, fmt.Sprintf("Error syncing catalog %v", catalog.Name))
-	v3.CatalogConditionProcessed.True(catalog)
+	v32.CatalogConditionRefreshed.False(catalog)
+	v32.CatalogConditionRefreshed.Message(catalog, fmt.Sprintf("Error syncing catalog %v", catalog.Name))
+	v32.CatalogConditionProcessed.True(catalog)
 	cmt.catalog = catalog
 	cmt.projectCatalog = projectCatalog
 	cmt.clusterCatalog = clusterCatalog
 }
 
 func setCatalogIgnoreErrorState(commit string, cmt *CatalogInfo, catalog *v3.Catalog, projectCatalog *v3.ProjectCatalog, clusterCatalog *v3.ClusterCatalog, message string) {
-	v3.CatalogConditionProcessed.False(catalog)
-	v3.CatalogConditionProcessed.Message(catalog, message)
-	v3.CatalogConditionRefreshed.Message(catalog, "")
-	v3.CatalogConditionProcessed.ReasonAndMessageFromError(catalog, errors.New(message))
-	v3.CatalogConditionRefreshed.True(catalog)
+	v32.CatalogConditionProcessed.False(catalog)
+	v32.CatalogConditionProcessed.Message(catalog, message)
+	v32.CatalogConditionRefreshed.Message(catalog, "")
+	v32.CatalogConditionProcessed.ReasonAndMessageFromError(catalog, errors.New(message))
+	v32.CatalogConditionRefreshed.True(catalog)
 	catalog.Status.Commit = commit
 	if projectCatalog != nil {
 		projectCatalog.Catalog = *catalog
@@ -192,11 +194,11 @@ func setCatalogIgnoreErrorState(commit string, cmt *CatalogInfo, catalog *v3.Cat
 }
 
 func setTraverseCompleted(catalog *v3.Catalog) {
-	v3.CatalogConditionUpgraded.True(catalog)
-	v3.CatalogConditionDiskCached.True(catalog)
-	v3.CatalogConditionProcessed.True(catalog)
-	v3.CatalogConditionProcessed.Message(catalog, "")
-	v3.CatalogConditionProcessed.Reason(catalog, "")
+	v32.CatalogConditionUpgraded.True(catalog)
+	v32.CatalogConditionDiskCached.True(catalog)
+	v32.CatalogConditionProcessed.True(catalog)
+	v32.CatalogConditionProcessed.Message(catalog, "")
+	v32.CatalogConditionProcessed.Reason(catalog, "")
 }
 
 // Using Helm standards to make a qualified name to be used for template name, see link below

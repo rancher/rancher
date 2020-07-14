@@ -4,10 +4,10 @@ import (
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/project"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	client "github.com/rancher/rancher/pkg/types/client/cluster/v3"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )

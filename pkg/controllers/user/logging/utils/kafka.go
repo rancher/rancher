@@ -8,8 +8,9 @@ import (
 	"net/url"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	kafka "github.com/segmentio/kafka-go"
 )
@@ -19,7 +20,7 @@ const (
 )
 
 type kafkaTestWrap struct {
-	*v3.KafkaConfig
+	*v32.KafkaConfig
 }
 
 func getKafkaTestData() kafka.Message {

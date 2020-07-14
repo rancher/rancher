@@ -7,8 +7,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	typescorev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"

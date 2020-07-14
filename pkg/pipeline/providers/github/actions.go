@@ -6,18 +6,19 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	mclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
-	mv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	mclient "github.com/rancher/rancher/pkg/types/client/management/v3"
-	client "github.com/rancher/rancher/pkg/types/client/project/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -81,7 +82,7 @@ func githubRedirectURL(hostname, clientID string, tls bool) string {
 }
 
 func (g *GhProvider) testAndApply(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	applyInput := &v3.GithubApplyInput{}
+	applyInput := &v32.GithubApplyInput{}
 
 	if err := json.NewDecoder(apiContext.Request.Body).Decode(applyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -93,7 +94,7 @@ func (g *GhProvider) testAndApply(actionName string, action *types.Action, apiCo
 	if err != nil {
 		return err
 	}
-	storedGithubPipelineConfig, ok := pConfig.(*v3.GithubPipelineConfig)
+	storedGithubPipelineConfig, ok := pConfig.(*v32.GithubPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get github provider config")
 	}
@@ -141,7 +142,7 @@ func (g *GhProvider) testAndApply(actionName string, action *types.Action, apiCo
 }
 
 func (g *GhProvider) authuser(apiContext *types.APIContext) error {
-	authUserInput := v3.AuthUserInput{}
+	authUserInput := v32.AuthUserInput{}
 	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
@@ -155,7 +156,7 @@ func (g *GhProvider) authuser(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	config, ok := pConfig.(*v3.GithubPipelineConfig)
+	config, ok := pConfig.(*v32.GithubPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get github provider config")
 	}
@@ -182,7 +183,7 @@ func (g *GhProvider) authuser(apiContext *types.APIContext) error {
 	return nil
 }
 
-func (g *GhProvider) getGithubConfigCR() (*mv3.GithubConfig, error) {
+func (g *GhProvider) getGithubConfigCR() (*v33.GithubConfig, error) {
 	authConfigObj, err := g.AuthConfigs.ObjectClient().UnstructuredClient().Get(model.GithubType, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve GithubConfig, error: %v", err)
@@ -194,7 +195,7 @@ func (g *GhProvider) getGithubConfigCR() (*mv3.GithubConfig, error) {
 	}
 	storedGithubConfigMap := u.UnstructuredContent()
 
-	storedGithubConfig := &mv3.GithubConfig{}
+	storedGithubConfig := &v33.GithubConfig{}
 	if err := mapstructure.Decode(storedGithubConfigMap, storedGithubConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}

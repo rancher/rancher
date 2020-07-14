@@ -5,7 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -73,10 +74,10 @@ func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
 				ObjectMeta: v1.ObjectMeta{
 					Name: f.name,
 				},
-				Spec: v3.FeatureSpec{
+				Spec: v32.FeatureSpec{
 					Value: nil,
 				},
-				Status: v3.FeatureStatus{
+				Status: v32.FeatureStatus{
 					Default:     f.def,
 					Dynamic:     f.dynamic,
 					Description: f.description,

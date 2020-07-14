@@ -3,17 +3,18 @@ package namespace
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	clusterclient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/resourcequota"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	mgmtschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	clusterclient "github.com/rancher/rancher/pkg/types/client/cluster/v3"
-	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
+	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 )
 
 const quotaField = "resourceQuota"
@@ -130,7 +131,7 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 	mu.Lock()
 	defer mu.Unlock()
 
-	var nsLimits []*v3.ResourceQuotaLimit
+	var nsLimits []*v32.ResourceQuotaLimit
 	var namespaces []clusterclient.Namespace
 	options := &types.QueryOptions{
 		Conditions: []*types.QueryCondition{
@@ -168,14 +169,14 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds projectLimit on fields: %s", msg))
 }
 
-func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
-	var to v3.ResourceQuotaLimit
+func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v32.ResourceQuotaLimit, error) {
+	var to v32.ResourceQuotaLimit
 	err := convert.ToObj(from, &to)
 	return &to, err
 }
 
-func limitToLimitCluster(from *clusterclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
-	var to v3.ResourceQuotaLimit
+func limitToLimitCluster(from *clusterclient.ResourceQuotaLimit) (*v32.ResourceQuotaLimit, error) {
+	var to v32.ResourceQuotaLimit
 	err := convert.ToObj(from, &to)
 	return &to, err
 }

@@ -13,7 +13,7 @@ import (
 	alertconfig "github.com/rancher/rancher/pkg/controllers/user/alert/config"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/sirupsen/logrus"

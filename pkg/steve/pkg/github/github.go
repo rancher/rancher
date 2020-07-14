@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 

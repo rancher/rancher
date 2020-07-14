@@ -2,16 +2,17 @@ package deployer
 
 import (
 	"github.com/rancher/norman/controller"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 
@@ -219,7 +220,7 @@ func (d *Deployer) isAllLoggingDisable() (bool, error) {
 
 func getDriverDir(driverName string) string {
 	switch driverName {
-	case mgmtv3.ClusterDriverRKE:
+	case v32.ClusterDriverRKE:
 		return "/var/lib/kubelet/volumeplugins"
 	case loggingconfig.GoogleKubernetesEngine:
 		return "/home/kubernetes/flexvolume"

@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/types/convert"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/cache"
@@ -28,7 +29,7 @@ func GetProjectLock(projectID string) *sync.Mutex {
 	return mu
 }
 
-func IsQuotaFit(nsLimit *v3.ResourceQuotaLimit, nsLimits []*v3.ResourceQuotaLimit, projectLimit *v3.ResourceQuotaLimit) (bool, string, error) {
+func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, string, error) {
 	nssResourceList := api.ResourceList{}
 	nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 	if err != nil {
@@ -57,7 +58,7 @@ func IsQuotaFit(nsLimit *v3.ResourceQuotaLimit, nsLimits []*v3.ResourceQuotaLimi
 	return false, prettyPrint(failedHard), nil
 }
 
-func ConvertLimitToResourceList(limit *v3.ResourceQuotaLimit) (api.ResourceList, error) {
+func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList, error) {
 	toReturn := api.ResourceList{}
 	converted, err := convert.EncodeToMap(limit)
 	if err != nil {

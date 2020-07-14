@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
+	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/sirupsen/logrus"
 )
 

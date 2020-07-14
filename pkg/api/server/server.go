@@ -19,9 +19,9 @@ import (
 	"github.com/rancher/rancher/pkg/api/server/managementstored"
 	"github.com/rancher/rancher/pkg/api/server/userstored"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	clusterSchema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
-	managementSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	projectSchema "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
+	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 

@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"

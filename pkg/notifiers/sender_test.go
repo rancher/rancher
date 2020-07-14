@@ -3,25 +3,26 @@ package notifiers
 import (
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIsHTTPClientConfigSet(t *testing.T) {
 	type testCase struct {
-		httpConfig *v3.HTTPClientConfig
+		httpConfig *v32.HTTPClientConfig
 		want       bool
 	}
 
 	testCases := []testCase{
 		testCase{
-			httpConfig: &v3.HTTPClientConfig{
+			httpConfig: &v32.HTTPClientConfig{
 				ProxyURL: "test",
 			},
 			want: true,
 		},
 		testCase{
-			httpConfig: &v3.HTTPClientConfig{
+			httpConfig: &v32.HTTPClientConfig{
 				ProxyURL: "",
 			},
 			want: false,

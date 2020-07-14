@@ -7,8 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 

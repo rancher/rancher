@@ -12,9 +12,10 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/vmihailenco/msgpack"
 )
@@ -25,7 +26,7 @@ var (
 )
 
 type fluentForwarderTestWrap struct {
-	*v3.FluentForwarderConfig
+	*v32.FluentForwarderConfig
 }
 
 type heloOption struct {

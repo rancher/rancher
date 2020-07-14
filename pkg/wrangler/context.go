@@ -5,8 +5,8 @@ import (
 
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io"
-	managementv3 "github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
+	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/server"

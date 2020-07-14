@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipelineexecution"
+	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	appsv1 "github.com/rancher/rancher/pkg/types/apis/apps/v1"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,9 +46,9 @@ func (l *PipelineService) Init(cluster *config.UserContext) {
 
 func (l *PipelineService) Version() (string, error) {
 	raw := fmt.Sprintf("%s-%s-%s",
-		v3.ToolsSystemImages.PipelineSystemImages.Jenkins,
-		v3.ToolsSystemImages.PipelineSystemImages.Registry,
-		v3.ToolsSystemImages.PipelineSystemImages.Minio)
+		v32.ToolsSystemImages.PipelineSystemImages.Jenkins,
+		v32.ToolsSystemImages.PipelineSystemImages.Registry,
+		v32.ToolsSystemImages.PipelineSystemImages.Minio)
 	return getDefaultVersion(raw)
 }
 
@@ -102,7 +103,7 @@ func (l *PipelineService) upgradeComponents(ns string) error {
 		return err
 	}
 	toUpdateRegistry := registryDeployment.DeepCopy()
-	toUpdateRegistry.Spec.Template.Spec.Containers[0].Image = images.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Registry)
+	toUpdateRegistry.Spec.Template.Spec.Containers[0].Image = images.Resolve(v32.ToolsSystemImages.PipelineSystemImages.Registry)
 	if _, err := l.deployments.Update(toUpdateRegistry); err != nil {
 		return err
 	}
@@ -114,7 +115,7 @@ func (l *PipelineService) upgradeComponents(ns string) error {
 		return err
 	}
 	toUpdateMinio := minioDeployment.DeepCopy()
-	toUpdateMinio.Spec.Template.Spec.Containers[0].Image = images.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Minio)
+	toUpdateMinio.Spec.Template.Spec.Containers[0].Image = images.Resolve(v32.ToolsSystemImages.PipelineSystemImages.Minio)
 	if _, err := l.deployments.Update(toUpdateMinio); err != nil {
 		return err
 	}

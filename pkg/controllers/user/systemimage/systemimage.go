@@ -9,8 +9,8 @@ import (
 	alerting "github.com/rancher/rancher/pkg/controllers/user/alert/deployer"
 	logging "github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	pipeline "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )

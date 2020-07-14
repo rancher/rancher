@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"net/http"
 
 	"fmt"
@@ -15,7 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -43,7 +45,7 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
 
-	input := &v3.SearchPrincipalsInput{}
+	input := &v32.SearchPrincipalsInput{}
 	if err := json.NewDecoder(apiContext.Request.Body).Decode(input); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Failed to parse body: %v", err))
 	}

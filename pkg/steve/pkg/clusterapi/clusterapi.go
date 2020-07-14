@@ -7,8 +7,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/apiserver/pkg/server"
 	"github.com/rancher/apiserver/pkg/types"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/auth"
@@ -45,7 +45,7 @@ func (s *Server) Setup(ctx context.Context, server *steveserver.Server) error {
 }
 
 func (s *Server) newSchemas() *types.APISchemas {
-	store := proxy.NewProxyStore(s.cf, s.asl)
+	store := proxy.NewProxyStore(s.cf, nil, s.asl)
 	schemas := types.EmptyAPISchemas()
 
 	schemas.MustImportAndCustomize(v3.Project{}, func(schema *types.APISchema) {

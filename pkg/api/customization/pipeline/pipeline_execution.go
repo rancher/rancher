@@ -8,12 +8,12 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/project/v3"
 )
 
 const (

@@ -1,7 +1,7 @@
 package project
 
 import (
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/labels"

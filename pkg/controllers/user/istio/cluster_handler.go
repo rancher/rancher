@@ -2,9 +2,10 @@ package istio
 
 import (
 	"github.com/rancher/norman/controller"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -20,7 +21,7 @@ func (h *clusterHandler) sync(key string, obj *mgmtv3.Cluster) (runtime.Object, 
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != h.clusterName {
 		return obj, nil
 	}
-	if !mgmtv3.ClusterConditionconditionSystemProjectCreated.IsTrue(obj) {
+	if !v32.ClusterConditionconditionSystemProjectCreated.IsTrue(obj) {
 		return obj, nil
 	}
 	enabled, err := h.getIstioAppEnabled()

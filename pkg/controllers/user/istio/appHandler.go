@@ -4,13 +4,15 @@ import (
 	"net/url"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -58,7 +60,7 @@ func isIstioApp(obj *v3.App) bool {
 }
 
 func isIstioMetricExpressionDeployed(clusterName string, istioClusterGraphClient mgmtv3.ClusterMonitorGraphInterface, istioMetricsClient mgmtv3.MonitorMetricInterface, obj *v3.App) error {
-	_, err := v3.IstioConditionMetricExpressionDeployed.DoUntilTrue(obj, func() (runtime.Object, error) {
+	_, err := v32.IstioConditionMetricExpressionDeployed.DoUntilTrue(obj, func() (runtime.Object, error) {
 		for _, metric := range preDefinedIstioMetrics {
 			newObj := metric.DeepCopy()
 			newObj.Namespace = clusterName
@@ -136,7 +138,7 @@ func (ah *appHandler) sync(key string, obj *v3.App) (runtime.Object, error) {
 		return obj, err
 	}
 
-	if v3.AppConditionInstalled.IsFalse(obj) {
+	if v32.AppConditionInstalled.IsFalse(obj) {
 		return obj, errors.Errorf("waiting for the app %s to be installed", obj.Name)
 	}
 

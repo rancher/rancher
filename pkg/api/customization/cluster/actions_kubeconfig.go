@@ -5,8 +5,8 @@ import (
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
+	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/kubeconfig"
-	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
 )
 
 func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

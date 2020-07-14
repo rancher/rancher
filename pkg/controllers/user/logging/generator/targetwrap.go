@@ -6,11 +6,11 @@ import (
 	"net/url"
 	"strings"
 
-	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
-	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/pkg/errors"
+	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 )
 
 type LoggingTargetTemplateWrap struct {
@@ -26,7 +26,7 @@ type LoggingTargetTemplateWrap struct {
 type ClusterLoggingTemplateWrap struct {
 	ExcludeNamespace string
 
-	v3.LoggingCommonField
+	v32.LoggingCommonField
 	LoggingTargetTemplateWrap
 	IncludeRke              bool
 	CertFilePrefix          string
@@ -41,7 +41,7 @@ type ClusterLoggingTemplateWrap struct {
 type ProjectLoggingTemplateWrap struct {
 	ContainerSourcePath string
 
-	v3.LoggingCommonField
+	v32.LoggingCommonField
 	LoggingTargetTemplateWrap
 	IncludeRke              bool
 	CertFilePrefix          string
@@ -53,7 +53,7 @@ type ProjectLoggingTemplateWrap struct {
 	RkeLogPosFilename       string
 }
 
-func newWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace, certDir string) (*ClusterLoggingTemplateWrap, error) {
+func newWrapClusterLogging(logging v32.ClusterLoggingSpec, excludeNamespace, certDir string) (*ClusterLoggingTemplateWrap, error) {
 	wrap, err := NewLoggingTargetTemplateWrap(logging.LoggingTargets)
 	if err != nil {
 		return nil, errors.Wrapf(err, "wrapper logging target failed")
@@ -88,7 +88,7 @@ func newWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace, cert
 	}, nil
 }
 
-func newWrapProjectLogging(logging v3.ProjectLoggingSpec, containerSourcePath, certDir string, isSystemProject bool) (*ProjectLoggingTemplateWrap, error) {
+func newWrapProjectLogging(logging v32.ProjectLoggingSpec, containerSourcePath, certDir string, isSystemProject bool) (*ProjectLoggingTemplateWrap, error) {
 	wrap, err := NewLoggingTargetTemplateWrap(logging.LoggingTargets)
 	if err != nil {
 		return nil, errors.Wrapf(err, "wrapper logging target failed")
@@ -121,35 +121,35 @@ func newWrapProjectLogging(logging v3.ProjectLoggingSpec, containerSourcePath, c
 }
 
 type ElasticsearchTemplateWrap struct {
-	v3.ElasticsearchConfig
+	v32.ElasticsearchConfig
 	DateFormat string
 	Host       string
 	Scheme     string
 }
 
 type SplunkTemplateWrap struct {
-	v3.SplunkConfig
+	v32.SplunkConfig
 	Host   string
 	Port   string
 	Scheme string
 }
 
 type KafkaTemplateWrap struct {
-	v3.KafkaConfig
+	v32.KafkaConfig
 	Brokers   string
 	Zookeeper string
 	IsSSL     bool
 }
 
 type SyslogTemplateWrap struct {
-	v3.SyslogConfig
+	v32.SyslogConfig
 	Host         string
 	Port         string
 	WrapSeverity string
 }
 
 type FluentForwarderTemplateWrap struct {
-	v3.FluentForwarderConfig
+	v32.FluentForwarderConfig
 	EnableShareKey bool
 	FluentServers  []FluentServer
 }
@@ -157,14 +157,14 @@ type FluentForwarderTemplateWrap struct {
 type FluentServer struct {
 	Host string
 	Port string
-	v3.FluentServer
+	v32.FluentServer
 }
 
 type CustomTargetWrap struct {
-	v3.CustomTargetConfig
+	v32.CustomTargetConfig
 }
 
-func NewLoggingTargetTemplateWrap(loggingTagets v3.LoggingTargets) (wrapLogging *LoggingTargetTemplateWrap, err error) {
+func NewLoggingTargetTemplateWrap(loggingTagets v32.LoggingTargets) (wrapLogging *LoggingTargetTemplateWrap, err error) {
 	wp := &LoggingTargetTemplateWrap{}
 	if loggingTagets.ElasticsearchConfig != nil {
 
@@ -227,7 +227,7 @@ func NewLoggingTargetTemplateWrap(loggingTagets v3.LoggingTargets) (wrapLogging 
 	return nil, nil
 }
 
-func newElasticsearchTemplateWrap(elasticsearchConfig *v3.ElasticsearchConfig) (*ElasticsearchTemplateWrap, error) {
+func newElasticsearchTemplateWrap(elasticsearchConfig *v32.ElasticsearchConfig) (*ElasticsearchTemplateWrap, error) {
 	h, s, err := parseEndpoint(elasticsearchConfig.Endpoint)
 	if err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func newElasticsearchTemplateWrap(elasticsearchConfig *v3.ElasticsearchConfig) (
 	}, nil
 }
 
-func newSplunkTemplateWrap(splunkConfig *v3.SplunkConfig) (*SplunkTemplateWrap, error) {
+func newSplunkTemplateWrap(splunkConfig *v32.SplunkConfig) (*SplunkTemplateWrap, error) {
 	h, s, err := parseEndpoint(splunkConfig.Endpoint)
 	if err != nil {
 		return nil, err
@@ -258,7 +258,7 @@ func newSplunkTemplateWrap(splunkConfig *v3.SplunkConfig) (*SplunkTemplateWrap, 
 	}, nil
 }
 
-func newSyslogTemplateWrap(syslogConfig *v3.SyslogConfig) (*SyslogTemplateWrap, error) {
+func newSyslogTemplateWrap(syslogConfig *v32.SyslogConfig) (*SyslogTemplateWrap, error) {
 	host, port, err := net.SplitHostPort(syslogConfig.Endpoint)
 	if err != nil {
 		return nil, err
@@ -272,7 +272,7 @@ func newSyslogTemplateWrap(syslogConfig *v3.SyslogConfig) (*SyslogTemplateWrap, 
 	}, nil
 }
 
-func newKafkaTemplateWrap(kafkaConfig *v3.KafkaConfig) (*KafkaTemplateWrap, error) {
+func newKafkaTemplateWrap(kafkaConfig *v32.KafkaConfig) (*KafkaTemplateWrap, error) {
 	wrap := &KafkaTemplateWrap{
 		KafkaConfig: *kafkaConfig,
 	}
@@ -305,7 +305,7 @@ func newKafkaTemplateWrap(kafkaConfig *v3.KafkaConfig) (*KafkaTemplateWrap, erro
 	return wrap, nil
 }
 
-func newFluentForwarderTemplateWrap(fluentForwarderConfig *v3.FluentForwarderConfig) (*FluentForwarderTemplateWrap, error) {
+func newFluentForwarderTemplateWrap(fluentForwarderConfig *v32.FluentForwarderConfig) (*FluentForwarderTemplateWrap, error) {
 	var enableShareKey bool
 	var fss []FluentServer
 	for _, v := range fluentForwarderConfig.FluentServers {

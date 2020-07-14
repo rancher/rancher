@@ -7,15 +7,17 @@ import (
 	"regexp"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -54,22 +56,22 @@ func (l *Lifecycle) Create(obj *v3.KontainerDriver) (runtime.Object, error) {
 	// return early if driver is not active
 	// set driver to a non-transitioning state
 	if !obj.Spec.Active {
-		v3.KontainerDriverConditionInactive.True(obj)
+		v32.KontainerDriverConditionInactive.True(obj)
 		return obj, nil
 	}
 
 	if obj.Spec.BuiltIn {
-		v3.KontainerDriverConditionDownloaded.True(obj)
-		v3.KontainerDriverConditionInstalled.True(obj)
+		v32.KontainerDriverConditionDownloaded.True(obj)
+		v32.KontainerDriverConditionInstalled.True(obj)
 	} else {
-		v3.KontainerDriverConditionDownloaded.Unknown(obj)
-		v3.KontainerDriverConditionInstalled.Unknown(obj)
+		v32.KontainerDriverConditionDownloaded.Unknown(obj)
+		v32.KontainerDriverConditionInstalled.Unknown(obj)
 	}
 
 	if hasStaticSchema(obj) {
-		v3.KontainerDriverConditionActive.True(obj)
+		v32.KontainerDriverConditionActive.True(obj)
 	} else {
-		v3.KontainerDriverConditionActive.Unknown(obj)
+		v32.KontainerDriverConditionActive.Unknown(obj)
 	}
 
 	return obj, nil
@@ -86,14 +88,14 @@ func (l *Lifecycle) download(obj *v3.KontainerDriver) (*v3.KontainerDriver, erro
 		return nil, err
 	}
 
-	v3.KontainerDriverConditionDownloaded.True(obj)
+	v32.KontainerDriverConditionDownloaded.True(obj)
 
 	path, err := driver.Install()
 	if err != nil {
 		return nil, err
 	}
 
-	v3.KontainerDriverConditionInstalled.True(obj)
+	v32.KontainerDriverConditionInstalled.True(obj)
 
 	obj.Status.ExecutablePath = path
 	matches := kontainerDriverName.FindStringSubmatch(path)
@@ -116,7 +118,7 @@ func (l *Lifecycle) createDynamicSchema(obj *v3.KontainerDriver) error {
 	}
 
 	dynamicSchema := &v3.DynamicSchema{
-		Spec: v3.DynamicSchemaSpec{
+		Spec: v32.DynamicSchemaSpec{
 			SchemaName:     getDynamicTypeName(obj),
 			ResourceFields: resourceFields,
 		},
@@ -173,12 +175,12 @@ func (l *Lifecycle) updateDynamicSchema(dynamicSchema *v3.DynamicSchema, obj *v3
 	return l.createOrUpdateKontainerDriverTypes(obj)
 }
 
-func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Field, error) {
+func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v32.Field, error) {
 	driver := service.NewEngineService(
 		clusterprovisioner.NewPersistentStore(l.namespaces, l.coreV1),
 	)
-	flags, err := driver.GetDriverCreateOptions(context.Background(), obj.Name, obj, v3.ClusterSpec{
-		GenericEngineConfig: &v3.MapStringInterface{
+	flags, err := driver.GetDriverCreateOptions(context.Background(), obj.Name, obj, v32.ClusterSpec{
+		GenericEngineConfig: &v32.MapStringInterface{
 			clusterprovisioner.DriverNameField: obj.Status.DisplayName,
 		},
 	})
@@ -186,7 +188,7 @@ func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Fi
 		return nil, err
 	}
 
-	resourceFields := map[string]v3.Field{}
+	resourceFields := map[string]v32.Field{}
 	for key, flag := range flags.Options {
 		formattedName, field, err := toResourceField(key, flag)
 		if err != nil {
@@ -197,11 +199,11 @@ func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Fi
 	}
 
 	// all drivers need a driverName field so kontainer-engine knows what type they are
-	resourceFields[clusterprovisioner.DriverNameField] = v3.Field{
+	resourceFields[clusterprovisioner.DriverNameField] = v32.Field{
 		Create: true,
 		Update: true,
 		Type:   "string",
-		Default: v3.Values{
+		Default: v32.Values{
 			StringValue: obj.Name,
 		},
 	}
@@ -220,8 +222,8 @@ func (l *Lifecycle) createOrUpdateKontainerDriverTypes(obj *v3.KontainerDriver) 
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
-		resourceField := map[string]v3.Field{}
-		resourceField[fieldName] = v3.Field{
+		resourceField := map[string]v32.Field{}
+		resourceField[fieldName] = v32.Field{
 			Create:   true,
 			Nullable: true,
 			Update:   true,
@@ -245,11 +247,11 @@ func (l *Lifecycle) createOrUpdateKontainerDriverTypes(obj *v3.KontainerDriver) 
 	shouldUpdate := false
 
 	if clusterSchema.Spec.ResourceFields == nil {
-		clusterSchema.Spec.ResourceFields = map[string]v3.Field{}
+		clusterSchema.Spec.ResourceFields = map[string]v32.Field{}
 	}
 	if _, ok := clusterSchema.Spec.ResourceFields[fieldName]; !ok {
 		// if embedded we add the type to schema
-		clusterSchema.Spec.ResourceFields[fieldName] = v3.Field{
+		clusterSchema.Spec.ResourceFields[fieldName] = v32.Field{
 			Create:   true,
 			Nullable: true,
 			Update:   true,
@@ -268,8 +270,8 @@ func (l *Lifecycle) createOrUpdateKontainerDriverTypes(obj *v3.KontainerDriver) 
 	return nil
 }
 
-func toResourceField(name string, flag *types.Flag) (string, v3.Field, error) {
-	field := v3.Field{
+func toResourceField(name string, flag *types.Flag) (string, v32.Field, error) {
+	field := v32.Field{
 		Create: true,
 		Update: true,
 		Type:   "string",
@@ -334,7 +336,7 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	if obj.Spec.BuiltIn && v3.KontainerDriverConditionActive.IsTrue(obj) {
+	if obj.Spec.BuiltIn && v32.KontainerDriverConditionActive.IsTrue(obj) {
 		// Builtin drivers can still have their schema change during Rancher upgrades so we need to try
 		return obj, l.createOrUpdateDynamicSchema(obj)
 	}
@@ -343,11 +345,11 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 	var tmpObj runtime.Object
 	switch { // dealing with deactivate action
 	case !obj.Spec.Active && l.DynamicSchemaExists(obj):
-		v3.KontainerDriverConditionInactive.Unknown(obj)
+		v32.KontainerDriverConditionInactive.Unknown(obj)
 		// delete the active condition
 		var i int
 		for _, con := range obj.Status.Conditions {
-			if con.Type != string(v3.KontainerDriverConditionActive) {
+			if con.Type != string(v32.KontainerDriverConditionActive) {
 				obj.Status.Conditions[i] = con
 				i++
 			}
@@ -356,7 +358,7 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 		// we don't need to show the Inactivating state so we don't need to store the Inactivate condition
 		fallthrough
 	case !obj.Spec.Active:
-		tmpObj, err = v3.KontainerDriverConditionInactive.DoUntilTrue(obj, func() (runtime.Object, error) {
+		tmpObj, err = v32.KontainerDriverConditionInactive.DoUntilTrue(obj, func() (runtime.Object, error) {
 			if err = l.dynamicSchemas.Delete(getDynamicTypeName(obj), &v13.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 				return nil, fmt.Errorf("error deleting schema: %v", err)
 			}
@@ -371,34 +373,34 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 	// redownload file if active AND url changed or not downloaded
 	// prevents downloading on air-gapped installations
 	// and update the Downloaded condition to Unknown to show the downloading state
-	case !v3.KontainerDriverConditionDownloaded.IsUnknown(obj) &&
+	case !v32.KontainerDriverConditionDownloaded.IsUnknown(obj) &&
 		(obj.Spec.URL != obj.Status.ActualURL ||
-			v3.KontainerDriverConditionDownloaded.IsFalse(obj) ||
+			v32.KontainerDriverConditionDownloaded.IsFalse(obj) ||
 			!l.driverExists(obj)):
-		v3.KontainerDriverConditionDownloaded.Unknown(obj)
+		v32.KontainerDriverConditionDownloaded.Unknown(obj)
 
 	// if it is a buildin driver, set true without downloading
-	case obj.Spec.BuiltIn && !v3.KontainerDriverConditionDownloaded.IsTrue(obj):
-		v3.KontainerDriverConditionDownloaded.True(obj)
-		v3.KontainerDriverConditionInstalled.True(obj)
+	case obj.Spec.BuiltIn && !v32.KontainerDriverConditionDownloaded.IsTrue(obj):
+		v32.KontainerDriverConditionDownloaded.True(obj)
+		v32.KontainerDriverConditionInstalled.True(obj)
 
 	// handling download process
-	case !obj.Spec.BuiltIn && !v3.KontainerDriverConditionDownloaded.IsTrue(obj):
+	case !obj.Spec.BuiltIn && !v32.KontainerDriverConditionDownloaded.IsTrue(obj):
 		obj, err = l.download(obj)
 		if err != nil {
 			return obj, err
 		}
 
 		// Force create/update of schemas
-		v3.KontainerDriverConditionActive.Unknown(obj)
+		v32.KontainerDriverConditionActive.Unknown(obj)
 
 	// set active status to unknown to show the activating state
-	case !l.DynamicSchemaExists(obj) && !v3.KontainerDriverConditionActive.IsUnknown(obj):
-		v3.KontainerDriverConditionActive.Unknown(obj)
+	case !l.DynamicSchemaExists(obj) && !v32.KontainerDriverConditionActive.IsUnknown(obj):
+		v32.KontainerDriverConditionActive.Unknown(obj)
 
 	// create schema and set active status to true
 	default:
-		tmpObj, err = v3.KontainerDriverConditionActive.DoUntilTrue(obj, func() (runtime.Object, error) {
+		tmpObj, err = v32.KontainerDriverConditionActive.DoUntilTrue(obj, func() (runtime.Object, error) {
 			return obj, l.createOrUpdateDynamicSchema(obj)
 		})
 		obj = tmpObj.(*v3.KontainerDriver)

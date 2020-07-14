@@ -3,10 +3,11 @@ package utils
 import (
 	"path/filepath"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 )
 
-func MatchAll(cs *v3.Constraints, execution *v3.PipelineExecution) bool {
+func MatchAll(cs *v32.Constraints, execution *v3.PipelineExecution) bool {
 	if cs == nil {
 		return true
 	}
@@ -17,7 +18,7 @@ func MatchAll(cs *v3.Constraints, execution *v3.PipelineExecution) bool {
 		Match(cs.Event, m[EnvEvent])
 }
 
-func Match(c *v3.Constraint, v string) bool {
+func Match(c *v32.Constraint, v string) bool {
 	if c == nil {
 		return true
 	}
@@ -35,7 +36,7 @@ func Match(c *v3.Constraint, v string) bool {
 }
 
 // Includes returns true if the string matches the include patterns.
-func Includes(c *v3.Constraint, v string) bool {
+func Includes(c *v32.Constraint, v string) bool {
 	for _, pattern := range c.Include {
 		if ok, _ := filepath.Match(pattern, v); ok {
 			return true
@@ -45,7 +46,7 @@ func Includes(c *v3.Constraint, v string) bool {
 }
 
 // Excludes returns true if the string matches the exclude patterns.
-func Excludes(c *v3.Constraint, v string) bool {
+func Excludes(c *v32.Constraint, v string) bool {
 	for _, pattern := range c.Exclude {
 		if ok, _ := filepath.Match(pattern, v); ok {
 			return true

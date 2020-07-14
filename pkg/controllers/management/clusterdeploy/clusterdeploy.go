@@ -10,17 +10,19 @@ import (
 	"sync"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -82,7 +84,7 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 	original := cluster
 	cluster = original.DeepCopy()
 
-	if cluster.Status.Driver == v3.ClusterDriverRKE {
+	if cluster.Status.Driver == v32.ClusterDriverRKE {
 		if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509|webhook"
 		} else {
@@ -106,7 +108,7 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	logrus.Tracef("clusterDeploy: doSync called for cluster [%s]", cluster.Name)
 
-	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
 		return nil
 	}
@@ -120,7 +122,7 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	_, err = v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	_, err = v32.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		logrus.Tracef("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
@@ -163,7 +165,7 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 
 func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
-	if !v3.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
 	}
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
@@ -247,7 +249,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return err
 	}
 
-	if _, err = v3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
+	if _, err = v32.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
 		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures)
 		if err != nil {
 			return cluster, err
@@ -268,7 +270,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		if err != nil {
 			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Error while applying agent YAML, it will be retried automatically")
 		}
-		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AuthImage != "" {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
@@ -281,7 +283,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			}
 			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
-		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	}); err != nil {
 		return err

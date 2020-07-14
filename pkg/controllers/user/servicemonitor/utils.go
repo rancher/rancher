@@ -7,10 +7,11 @@ import (
 	"sort"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	rmonitoringv1 "github.com/rancher/rancher/pkg/types/apis/monitoring.coreos.com/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	rmonitoringv1 "github.com/rancher/rancher/pkg/generated/norman/monitoring.coreos.com/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,12 +39,12 @@ func getWorkloadOwnerReference(w *util.Workload) metav1.OwnerReference {
 	}
 }
 
-func getMetricsFromWorkload(w *util.Workload) ([]v3.WorkloadMetric, error) {
+func getMetricsFromWorkload(w *util.Workload) ([]v32.WorkloadMetric, error) {
 	data, ok := w.TemplateSpec.Annotations[metricsAnnotation]
 	if !ok {
 		return nil, nil
 	}
-	var metrics []v3.WorkloadMetric
+	var metrics []v32.WorkloadMetric
 	if err := json.Unmarshal([]byte(data), &metrics); err != nil {
 		return nil, err
 	}

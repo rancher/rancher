@@ -1,8 +1,8 @@
 package engine
 
 import (
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/engine/jenkins"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 

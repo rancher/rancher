@@ -5,18 +5,21 @@ import (
 	"reflect"
 	"time"
 
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/norman/controller"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
+	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	projectutil "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	appsv1 "github.com/rancher/rancher/pkg/types/apis/apps/v1"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 
@@ -152,7 +155,7 @@ func (d *Deployer) sync() error {
 		if d.alertManager.IsDeploy, err = d.appDeployer.cleanup(appName, appTargetNamespace, systemProjectID); err != nil {
 			return fmt.Errorf("clean up alertmanager failed, %v", err)
 		}
-		mgmtv3.ClusterConditionAlertingEnabled.False(newCluster)
+		v32.ClusterConditionAlertingEnabled.False(newCluster)
 	}
 
 	if !reflect.DeepEqual(cluster, newCluster) {
@@ -205,7 +208,7 @@ func (d *Deployer) needDeploy() (bool, error) {
 }
 
 func (d *appDeployer) isDeploySuccess(cluster *mgmtv3.Cluster, appName, appTargetNamespace string) error {
-	_, err := mgmtv3.ClusterConditionAlertingEnabled.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	_, err := v32.ClusterConditionAlertingEnabled.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		_, err := d.statefulsets.GetNamespaced(appTargetNamespace, appName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -320,7 +323,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 			Name:      appName,
 			Namespace: systemProjectName,
 		},
-		Spec: projectv3.AppSpec{
+		Spec: v33.AppSpec{
 			Answers: map[string]string{
 				"alertmanager.enabled":                "true",
 				"alertmanager.serviceMonitor.enabled": "true",

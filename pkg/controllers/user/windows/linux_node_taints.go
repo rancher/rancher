@@ -3,8 +3,8 @@ package windows
 import (
 	"fmt"
 
+	apicorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/taints"
-	apicorev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"

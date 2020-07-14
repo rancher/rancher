@@ -6,16 +6,17 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
-	v3client "github.com/rancher/rancher/pkg/types/client/management/v3"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3public"
+	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -73,7 +74,7 @@ func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) 
 }
 
 func (p *adProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v3public.BasicLogin)
+	login, ok := input.(*v32.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
@@ -150,7 +151,7 @@ func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 	return false
 }
 
-func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
+func (p *adProvider) getActiveDirectoryConfig() (*v32.ActiveDirectoryConfig, *x509.CertPool, error) {
 	// TODO See if this can be simplified. also, this makes an api call everytime. find a better way
 	authConfigObj, err := p.authConfigs.ObjectClient().UnstructuredClient().Get("activedirectory", metav1.GetOptions{})
 	if err != nil {
@@ -163,7 +164,7 @@ func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x50
 	}
 	storedADConfigMap := u.UnstructuredContent()
 
-	storedADConfig := &v3.ActiveDirectoryConfig{}
+	storedADConfig := &v32.ActiveDirectoryConfig{}
 	mapstructure.Decode(storedADConfigMap, storedADConfig)
 
 	metadataMap, ok := storedADConfigMap["metadata"].(map[string]interface{})

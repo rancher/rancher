@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	clusterv3 "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3"
-	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
+	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

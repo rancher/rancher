@@ -9,8 +9,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
 var ReadOnlySettings = []string{

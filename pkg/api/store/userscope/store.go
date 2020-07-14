@@ -6,8 +6,8 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

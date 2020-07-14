@@ -8,13 +8,15 @@ import (
 	"sync"
 	"time"
 
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/metrics"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	tpeermanager "github.com/rancher/rancher/pkg/types/peermanager"
 	"github.com/sirupsen/logrus"
@@ -124,7 +126,7 @@ func (u *userControllersController) peersSync() error {
 	)
 
 	for _, cluster := range clusters {
-		if cluster.DeletionTimestamp != nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		if cluster.DeletionTimestamp != nil || !v33.ClusterConditionProvisioned.IsTrue(cluster) {
 			u.manager.Stop(cluster)
 		} else {
 			amOwner := u.amOwner(u.peers, cluster)

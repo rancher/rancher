@@ -8,8 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
+	v1beta12 "github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
 	"github.com/rancher/rancher/pkg/settings"
-	v1beta12 "github.com/rancher/rancher/pkg/types/apis/extensions/v1beta1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/api/extensions/v1beta1"
 )

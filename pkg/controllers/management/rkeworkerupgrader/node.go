@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"sort"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	rkeservices "github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
 )
@@ -32,7 +34,7 @@ type upgradeStatus struct {
 	upgrading int
 }
 
-func (uh *upgradeHandler) prepareNode(node *v3.Node, toDrain bool, nodeDrainInput *v3.NodeDrainInput) error {
+func (uh *upgradeHandler) prepareNode(node *v3.Node, toDrain bool, nodeDrainInput *v32.NodeDrainInput) error {
 	var nodeCopy *v3.Node
 	if toDrain {
 		if node.Spec.DesiredNodeUnschedulable == "drain" {
@@ -67,8 +69,8 @@ func (uh *upgradeHandler) setNodePlan(node *v3.Node, cluster *v3.Cluster, upgrad
 
 	if upgrade {
 		nodeCopy.Status.NodePlan.AgentCheckInterval = nodeserver.AgentCheckIntervalDuringUpgrade
-		v3.NodeConditionUpgraded.Unknown(nodeCopy)
-		v3.NodeConditionUpgraded.Message(nodeCopy, "upgrading")
+		v32.NodeConditionUpgraded.Unknown(nodeCopy)
+		v32.NodeConditionUpgraded.Message(nodeCopy, "upgrading")
 	}
 
 	if _, err := uh.nodes.Update(nodeCopy); err != nil {
@@ -80,8 +82,8 @@ func (uh *upgradeHandler) setNodePlan(node *v3.Node, cluster *v3.Cluster, upgrad
 
 func (uh *upgradeHandler) updateNodeActive(node *v3.Node) error {
 	nodeCopy := node.DeepCopy()
-	v3.NodeConditionUpgraded.True(nodeCopy)
-	v3.NodeConditionUpgraded.Message(nodeCopy, "")
+	v32.NodeConditionUpgraded.True(nodeCopy)
+	v32.NodeConditionUpgraded.Message(nodeCopy, "")
 
 	// reset the node
 	nodeCopy.Spec.DesiredNodeUnschedulable = "false"
@@ -112,13 +114,13 @@ func skipNode(node *v3.Node) bool {
 	}
 
 	// skip provisioning nodes
-	if !v3.NodeConditionProvisioned.IsTrue(node) {
+	if !v32.NodeConditionProvisioned.IsTrue(node) {
 		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not provisioned", clusterName, node.Name)
 		return true
 	}
 
 	// skip registering nodes
-	if !v3.NodeConditionRegistered.IsTrue(node) {
+	if !v32.NodeConditionRegistered.IsTrue(node) {
 		logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not registered", clusterName, node.Name)
 		return true
 	}
@@ -139,7 +141,7 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int, dra
 		// check for nodeConditionReady
 		if !nodehelper.IsMachineReady(node) {
 			// update plan for nodes that were attempted for upgrade
-			if v3.NodeConditionUpgraded.IsUnknown(node) {
+			if v32.NodeConditionUpgraded.IsUnknown(node) {
 				status.upgrading++
 				status.toProcess = append(status.toProcess, node)
 			} else {
@@ -150,7 +152,7 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int, dra
 		}
 
 		if node.Status.AppliedNodeVersion == expectedVersion {
-			if v3.NodeConditionUpgraded.IsUnknown(node) {
+			if v32.NodeConditionUpgraded.IsUnknown(node) {
 				status.upgraded = append(status.upgraded, node)
 			}
 			if !node.Spec.InternalNodeSpec.Unschedulable {
@@ -201,7 +203,7 @@ func preparingNode(node *v3.Node, drain bool) bool {
 
 func preparedNode(node *v3.Node, drain bool) bool {
 	if drain {
-		return v3.NodeConditionDrained.IsTrue(node)
+		return v32.NodeConditionDrained.IsTrue(node)
 	}
 	return node.Spec.InternalNodeSpec.Unschedulable
 }

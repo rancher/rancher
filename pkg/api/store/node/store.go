@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
@@ -11,8 +13,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/store/workload"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -93,7 +94,7 @@ func (n nodeStore) Update(apiContext *types.APIContext, schema *types.Schema, da
 		return nil, err
 	}
 
-	changed := v3.MetadataUpdate{
+	changed := v32.MetadataUpdate{
 		Labels:      diff(convert.ToMapInterface(data["labels"]), node.Labels),
 		Annotations: diff(convert.ToMapInterface(data["annotations"]), node.Annotations),
 	}
@@ -104,7 +105,7 @@ func (n nodeStore) Update(apiContext *types.APIContext, schema *types.Schema, da
 	return n.Store.Update(apiContext, schema, data, id)
 }
 
-func diff(desired map[string]interface{}, actual map[string]string) (result v3.MapDelta) {
+func diff(desired map[string]interface{}, actual map[string]string) (result v32.MapDelta) {
 	if len(desired) == 0 {
 		return
 	}

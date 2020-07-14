@@ -1,8 +1,9 @@
 package app
 
 import (
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -15,19 +16,19 @@ func addLocalCluster(embedded bool, adminName string, management *config.Managem
 				"field.cattle.io/creatorId": adminName,
 			},
 		},
-		Spec: v3.ClusterSpec{
+		Spec: v32.ClusterSpec{
 			Internal:    true,
 			DisplayName: "local",
-			ClusterSpecBase: v3.ClusterSpecBase{
+			ClusterSpecBase: v32.ClusterSpecBase{
 				DockerRootDir: settings.InitialDockerRootDir.Get(),
 			},
 		},
-		Status: v3.ClusterStatus{
-			Driver: v3.ClusterDriverImported,
+		Status: v32.ClusterStatus{
+			Driver: v32.ClusterDriverImported,
 		},
 	}
 	if embedded {
-		c.Status.Driver = v3.ClusterDriverLocal
+		c.Status.Driver = v32.ClusterDriverLocal
 	}
 
 	// Ignore error

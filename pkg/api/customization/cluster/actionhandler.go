@@ -3,12 +3,14 @@ package cluster
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/user"
 	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -57,47 +59,47 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	}
 
 	switch actionName {
-	case v3.ClusterActionGenerateKubeconfig:
+	case v32.ClusterActionGenerateKubeconfig:
 		return a.GenerateKubeconfigActionHandler(actionName, action, apiContext)
-	case v3.ClusterActionImportYaml:
+	case v32.ClusterActionImportYaml:
 		return a.ImportYamlHandler(actionName, action, apiContext)
-	case v3.ClusterActionExportYaml:
+	case v32.ClusterActionExportYaml:
 		return a.ExportYamlHandler(actionName, action, apiContext)
-	case v3.ClusterActionViewMonitoring:
+	case v32.ClusterActionViewMonitoring:
 		return a.viewMonitoring(actionName, action, apiContext)
-	case v3.ClusterActionEditMonitoring:
+	case v32.ClusterActionEditMonitoring:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.editMonitoring(actionName, action, apiContext)
-	case v3.ClusterActionEnableMonitoring:
+	case v32.ClusterActionEnableMonitoring:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.enableMonitoring(actionName, action, apiContext)
-	case v3.ClusterActionDisableMonitoring:
+	case v32.ClusterActionDisableMonitoring:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.disableMonitoring(actionName, action, apiContext)
-	case v3.ClusterActionBackupEtcd:
+	case v32.ClusterActionBackupEtcd:
 		if !canBackupEtcd() {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not backup etcd")
 		}
 		return a.BackupEtcdHandler(actionName, action, apiContext)
-	case v3.ClusterActionRestoreFromEtcdBackup:
+	case v32.ClusterActionRestoreFromEtcdBackup:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not restore etcd backup")
 		}
 		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
-	case v3.ClusterActionRotateCertificates:
+	case v32.ClusterActionRotateCertificates:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate certificates")
 		}
 		return a.RotateCertificates(actionName, action, apiContext)
-	case v3.ClusterActionRunSecurityScan:
+	case v32.ClusterActionRunSecurityScan:
 		return a.runCisScan(actionName, action, apiContext)
-	case v3.ClusterActionSaveAsTemplate:
+	case v32.ClusterActionSaveAsTemplate:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not save the cluster as an RKETemplate")
 		}

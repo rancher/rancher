@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	v1coreRancher "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v1beta1Rancher "github.com/rancher/rancher/pkg/types/apis/extensions/v1beta1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v1coreRancher "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v1beta1Rancher "github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"

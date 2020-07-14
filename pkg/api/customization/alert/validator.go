@@ -3,13 +3,14 @@ package alert
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3client "github.com/rancher/rancher/pkg/types/client/management/v3"
 )
 
 const monitoringEnabled = "MonitoringEnabled"
@@ -25,7 +26,7 @@ func ClusterAlertRuleValidator(resquest *types.APIContext, schema *types.Schema,
 			return fmt.Errorf("cluster id is empty")
 		}
 	}
-	var spec v3.ClusterAlertRuleSpec
+	var spec v32.ClusterAlertRuleSpec
 	if err := convert.ToObj(data, &spec); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
@@ -52,7 +53,7 @@ func ClusterAlertRuleValidator(resquest *types.APIContext, schema *types.Schema,
 func ProjectAlertRuleValidator(resquest *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	projectID := data["projectId"].(string)
 
-	var spec v3.ProjectAlertRuleSpec
+	var spec v32.ProjectAlertRuleSpec
 	if err := convert.ToObj(data, &spec); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}

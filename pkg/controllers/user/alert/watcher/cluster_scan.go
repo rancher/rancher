@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/hashicorp/go-multierror"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,15 +54,15 @@ func (csw *ClusterScanWatcher) Sync(_ string, cs *v3.ClusterScan) (runtime.Objec
 		return cs, nil
 	}
 	// Start with Unknown, True if there is/are a matching alert rule(s), else False
-	if !(v3.ClusterScanConditionAlerted.IsUnknown(cs) &&
-		v3.ClusterScanConditionCompleted.IsTrue(cs)) {
+	if !(v32.ClusterScanConditionAlerted.IsUnknown(cs) &&
+		v32.ClusterScanConditionCompleted.IsTrue(cs)) {
 		return cs, nil
 	}
 	var err error
 	if csw.alertManager.IsDeploy == false {
 		logrus.Debugf("ClusterScanWatcher: Sync: alert manager not deployed")
-		v3.ClusterScanConditionAlerted.False(cs)
-		v3.ClusterScanConditionAlerted.Message(cs, MsgAlertManagerNotDeployed)
+		v32.ClusterScanConditionAlerted.False(cs)
+		v32.ClusterScanConditionAlerted.Message(cs, MsgAlertManagerNotDeployed)
 		return cs, nil
 	}
 	clusterAlertRules, err := csw.clusterAlertRuleLister.List("", labels.NewSelector())
@@ -81,8 +83,8 @@ func (csw *ClusterScanWatcher) Sync(_ string, cs *v3.ClusterScan) (runtime.Objec
 	}
 	logrus.Debugf("ClusterScanWatcher: Sync: matchingAlertRules: %+v", matchingAlertRules)
 	if !match {
-		v3.ClusterScanConditionAlerted.False(cs)
-		v3.ClusterScanConditionAlerted.Message(cs, MsgNoMatchingAlertRule)
+		v32.ClusterScanConditionAlerted.False(cs)
+		v32.ClusterScanConditionAlerted.Message(cs, MsgNoMatchingAlertRule)
 		return cs, nil
 	}
 
@@ -97,7 +99,7 @@ func (csw *ClusterScanWatcher) Sync(_ string, cs *v3.ClusterScan) (runtime.Objec
 	if !alertSuccessful {
 		return cs, err
 	}
-	v3.ClusterScanConditionAlerted.True(cs)
+	v32.ClusterScanConditionAlerted.True(cs)
 	return cs, nil
 }
 

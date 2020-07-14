@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/notifiers"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -47,7 +49,7 @@ func (h *Handler) testNotifier(ctx context.Context, actionName string, action *t
 	}
 	input := &struct {
 		Message string
-		v3.NotifierSpec
+		v32.NotifierSpec
 	}{}
 	clientNotifier := &struct {
 		client.NotifierSpec

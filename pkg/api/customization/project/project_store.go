@@ -11,11 +11,12 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/resourcequota"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	mgmtschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
+	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -160,10 +161,10 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data 
 	return s.isQuotaFit(apiContext, nsQuotaLimit, projectQuotaLimit, id)
 }
 
-func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3.ResourceQuotaLimit,
-	projectQuotaLimit *v3.ResourceQuotaLimit, id string) error {
+func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v32.ResourceQuotaLimit,
+	projectQuotaLimit *v32.ResourceQuotaLimit, id string) error {
 	// check that namespace default quota is within project quota
-	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v3.ResourceQuotaLimit{}, projectQuotaLimit)
+	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
@@ -225,7 +226,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if err != nil {
 		return err
 	}
-	isFit, msg, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v3.ResourceQuotaLimit{}, projectQuotaLimit)
+	isFit, msg, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
@@ -255,12 +256,12 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if err != nil {
 		return err
 	}
-	var nsLimits []*v3.ResourceQuotaLimit
+	var nsLimits []*v32.ResourceQuotaLimit
 	for i := 0; i < namespacesCount; i++ {
 		nsLimits = append(nsLimits, converted)
 	}
 
-	isFit, msg, err = resourcequota.IsQuotaFit(&v3.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
+	isFit, msg, err = resourcequota.IsQuotaFit(&v32.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
@@ -305,8 +306,8 @@ func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project 
 	return count, nil
 }
 
-func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v3.ResourceQuotaLimit, error) {
-	var to v3.ResourceQuotaLimit
+func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v32.ResourceQuotaLimit, error) {
+	var to v32.ResourceQuotaLimit
 	err := convert.ToObj(from, &to)
 	return &to, err
 }

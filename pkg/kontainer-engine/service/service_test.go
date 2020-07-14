@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/check.v1"
 )
@@ -43,7 +44,7 @@ func newTestCase(input string, expectedVal string, isErr bool) testCase {
 }
 
 func (s *StubTestSuite) TestFlatten(c *check.C) {
-	config := v3.MapStringInterface{
+	config := v32.MapStringInterface{
 		"projectId":  "test",
 		"zone":       "test",
 		"diskSizeGb": 50,

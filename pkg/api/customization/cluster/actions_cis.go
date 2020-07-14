@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/cis"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +42,7 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 		return errors.Wrap(err, "reading request body error")
 	}
 
-	cisScanConfig := &v3.CisScanConfig{}
+	cisScanConfig := &v32.CisScanConfig{}
 	if err = json.Unmarshal(data, cisScanConfig); err != nil {
 		return errors.Wrap(err, "unmarshaling input error")
 	}
@@ -59,7 +61,7 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 		return httperror.NewAPIError(httperror.InvalidType,
 			fmt.Sprintf("cluster with id %v is being deleted", apiContext.ID))
 	}
-	if !v3.ClusterConditionReady.IsTrue(cluster) {
+	if !v32.ClusterConditionReady.IsTrue(cluster) {
 		return httperror.WrapAPIError(err, httperror.ClusterUnavailable,
 			fmt.Sprintf("cluster not ready"))
 	}

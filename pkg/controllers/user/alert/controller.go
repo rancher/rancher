@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 
 	"github.com/rancher/norman/controller"
@@ -12,8 +13,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/statesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/watcher"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +26,7 @@ var (
 	SeverityInfo       = "info"
 	SeverityCritical   = "critical"
 	SeverityWarning    = "warning"
-	defaultTimingField = v3.TimingField{
+	defaultTimingField = v32.TimingField{
 		GroupWaitSeconds:      180,
 		GroupIntervalSeconds:  180,
 		RepeatIntervalSeconds: 3600,

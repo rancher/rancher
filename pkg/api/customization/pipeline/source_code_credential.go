@@ -7,10 +7,10 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/project/v3"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

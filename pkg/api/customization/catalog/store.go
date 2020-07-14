@@ -9,11 +9,11 @@ import (
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 

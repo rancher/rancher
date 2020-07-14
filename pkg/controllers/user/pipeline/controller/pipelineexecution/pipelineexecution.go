@@ -10,20 +10,22 @@ import (
 	"text/template"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
+	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	networkv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/notifiers"
 	"github.com/rancher/rancher/pkg/pipeline/engine"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	appsv1 "github.com/rancher/rancher/pkg/types/apis/apps/v1"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	networkv1 "github.com/rancher/rancher/pkg/types/apis/networking.k8s.io/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/sirupsen/logrus"
@@ -212,7 +214,7 @@ func (l *Lifecycle) Sync(obj *v3.PipelineExecution) (runtime.Object, error) {
 	}
 
 	//doIfRunning
-	if v3.PipelineExecutionConditionInitialized.GetStatus(obj) != "" {
+	if v32.PipelineExecutionConditionInitialized.GetStatus(obj) != "" {
 		return obj, nil
 	}
 
@@ -238,14 +240,14 @@ func (l *Lifecycle) Sync(obj *v3.PipelineExecution) (runtime.Object, error) {
 	if err := l.newExecutionUpdateLastRunState(obj); err != nil {
 		return obj, err
 	}
-	v3.PipelineExecutionConditionInitialized.CreateUnknownIfNotExists(obj)
+	v32.PipelineExecutionConditionInitialized.CreateUnknownIfNotExists(obj)
 	obj.Labels[utils.PipelineFinishLabel] = "false"
 
 	if err := l.deploy(obj.Spec.ProjectName); err != nil {
 		obj.Labels[utils.PipelineFinishLabel] = "true"
 		obj.Status.ExecutionState = utils.StateFailed
-		v3.PipelineExecutionConditionInitialized.False(obj)
-		v3.PipelineExecutionConditionInitialized.ReasonAndMessageFromError(obj, err)
+		v32.PipelineExecutionConditionInitialized.False(obj)
+		v32.PipelineExecutionConditionInitialized.ReasonAndMessageFromError(obj, err)
 	}
 
 	if err := l.markLocalRegistryPort(obj); err != nil {
@@ -265,7 +267,7 @@ func (l *Lifecycle) doFinish(obj *v3.PipelineExecution) (*v3.PipelineExecution, 
 		return obj, err
 	}
 	if shouldNotify {
-		newObj, err := v3.PipelineExecutionConditionNotified.Once(obj, func() (runtime.Object, error) {
+		newObj, err := v32.PipelineExecutionConditionNotified.Once(obj, func() (runtime.Object, error) {
 			return l.doNotify(obj)
 		})
 		if err != nil {
@@ -377,7 +379,7 @@ func (l *Lifecycle) exceedQuota(obj *v3.PipelineExecution) (bool, error) {
 }
 
 func (l *Lifecycle) doStop(obj *v3.PipelineExecution) error {
-	if v3.PipelineExecutionConditionInitialized.IsTrue(obj) {
+	if v32.PipelineExecutionConditionInitialized.IsTrue(obj) {
 		if err := l.pipelineEngine.StopExecution(obj); err != nil {
 			return err
 		}
@@ -385,7 +387,7 @@ func (l *Lifecycle) doStop(obj *v3.PipelineExecution) error {
 			return err
 		}
 	}
-	v3.PipelineExecutionConditionBuilt.Message(obj, "aborted by user")
+	v32.PipelineExecutionConditionBuilt.Message(obj, "aborted by user")
 	for i := range obj.Status.Stages {
 		if obj.Status.Stages[i].State == utils.StateBuilding {
 			obj.Status.Stages[i].State = utils.StateAborted
@@ -598,8 +600,8 @@ Message: {{.Message}}
 		execution.Spec.Run,
 	)
 	builtMessage := "Success"
-	if v3.PipelineExecutionConditionBuilt.IsFalse(execution) {
-		builtMessage = v3.PipelineExecutionConditionBuilt.GetMessage(execution)
+	if v32.PipelineExecutionConditionBuilt.IsFalse(execution) {
+		builtMessage = v32.PipelineExecutionConditionBuilt.GetMessage(execution)
 	}
 	buf := &bytes.Buffer{}
 	data := executionSummary{

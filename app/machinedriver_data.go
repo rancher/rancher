@@ -6,7 +6,9 @@ import (
 	"reflect"
 	"strings"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -178,7 +180,7 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, act
 			Name:        name,
 			Annotations: annotations,
 		},
-		Spec: v3.NodeDriverSpec{
+		Spec: v32.NodeDriverSpec{
 			Active:           active,
 			Builtin:          builtin,
 			URL:              url,

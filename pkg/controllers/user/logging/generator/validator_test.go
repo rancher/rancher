@@ -5,21 +5,22 @@ import (
 	"strings"
 	"testing"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 func TestValidateFragments(t *testing.T) {
 
 	projectWrap := ProjectLoggingTemplateWrap{
 		ContainerLogSourceTag: loggingconfig.ProjectLevel,
-		LoggingCommonField:    v3.LoggingCommonField{},
+		LoggingCommonField:    v32.LoggingCommonField{},
 	}
 
 	clusterWrap := ClusterLoggingTemplateWrap{
 		ContainerLogSourceTag: loggingconfig.ClusterLevel,
-		LoggingCommonField:    v3.LoggingCommonField{},
+		LoggingCommonField:    v32.LoggingCommonField{},
 	}
 	// case:
 	// 1. custom tags key include valid custom key value, expected validate success

@@ -5,7 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	k8scorev1 "k8s.io/api/core/v1"

@@ -8,10 +8,12 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -184,7 +186,7 @@ func doAddCatalogs(management *config.ManagementContext, name, url, branch, helm
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
-			Spec: v3.CatalogSpec{
+			Spec: v32.CatalogSpec{
 				URL:         url,
 				CatalogKind: kind,
 				Branch:      branch,

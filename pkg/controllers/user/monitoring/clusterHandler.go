@@ -7,16 +7,19 @@ import (
 	"sort"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	kcluster "github.com/rancher/rancher/pkg/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rke/pki"
 	k8scorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -52,7 +55,7 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 		return cluster, nil
 	}
 
-	if !mgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return cluster, nil
 	}
 
@@ -79,8 +82,8 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 	if cluster.Spec.EnableClusterMonitoring {
 		appProjectName, err := ch.ensureAppProjectName(cluster.Name, appTargetNamespace)
 		if err != nil {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to ensure monitoring project name")
 		}
 
@@ -88,68 +91,68 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 		var systemComponentMap map[string][]string
 		if isRkeCluster(cluster) {
 			if etcdTLSConfigs, err = ch.deployEtcdCert(cluster.Name, appTargetNamespace); err != nil {
-				mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-				mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+				v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+				v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 				return errors.Wrap(err, "failed to deploy etcd cert")
 			}
 			if systemComponentMap, err = ch.getExporterEndpoint(); err != nil {
-				mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-				mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+				v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+				v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 				return errors.Wrap(err, "failed to get exporter endpoint")
 			}
 		}
 
 		_, err = ch.deployApp(appName, appTargetNamespace, appProjectName, cluster, etcdTLSConfigs, systemComponentMap)
 		if err != nil {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to deploy monitoring")
 		}
 
 		if cluster.Status.MonitoringStatus == nil {
-			cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{}
+			cluster.Status.MonitoringStatus = &v32.MonitoringStatus{}
 		}
 
 		isReady, err := ch.isPrometheusReady(cluster)
 		if err != nil {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return err
 		}
 		if !isReady {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "prometheus is not ready")
+			v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			v32.ClusterConditionMonitoringEnabled.Message(cluster, "prometheus is not ready")
 			return nil
 		}
 
 		cluster.Status.MonitoringStatus.GrafanaEndpoint = fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/services/http:access-grafana:80/proxy/", cluster.Name, appTargetNamespace)
 
-		_, err = ConditionMetricExpressionDeployed.DoUntilTrue(cluster.Status.MonitoringStatus, func() (status *mgmtv3.MonitoringStatus, e error) {
+		_, err = ConditionMetricExpressionDeployed.DoUntilTrue(cluster.Status.MonitoringStatus, func() (status *v32.MonitoringStatus, e error) {
 			return status, ch.deployMetrics(cluster)
 		})
 		if err != nil {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to deploy monitoring metrics")
 		}
 
-		mgmtv3.ClusterConditionMonitoringEnabled.True(cluster)
-		mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "")
-	} else if enabledStatus := mgmtv3.ClusterConditionMonitoringEnabled.GetStatus(cluster); enabledStatus != "" && enabledStatus != "False" {
+		v32.ClusterConditionMonitoringEnabled.True(cluster)
+		v32.ClusterConditionMonitoringEnabled.Message(cluster, "")
+	} else if enabledStatus := v32.ClusterConditionMonitoringEnabled.GetStatus(cluster); enabledStatus != "" && enabledStatus != "False" {
 		if err := ch.app.withdrawApp(cluster.Name, appName, appTargetNamespace); err != nil {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to withdraw monitoring")
 		}
 
 		if err := ch.withdrawMetrics(cluster); err != nil {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to withdraw monitoring metrics")
 		}
 
-		mgmtv3.ClusterConditionMonitoringEnabled.False(cluster)
-		mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "")
+		v32.ClusterConditionMonitoringEnabled.False(cluster)
+		v32.ClusterConditionMonitoringEnabled.Message(cluster, "")
 
 		cluster.Status.MonitoringStatus = nil
 	}
@@ -411,7 +414,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 			Name:        appName,
 			Namespace:   appDeployProjectID,
 		},
-		Spec: v3.AppSpec{
+		Spec: v33.AppSpec{
 			Answers:         appAnswers,
 			Description:     "Rancher Cluster Monitoring",
 			ExternalID:      appCatalogID,
@@ -443,7 +446,7 @@ func getClusterTag(cluster *mgmtv3.Cluster) string {
 }
 
 func isRkeCluster(cluster *mgmtv3.Cluster) bool {
-	return cluster.Status.Driver == mgmtv3.ClusterDriverRKE
+	return cluster.Status.Driver == v32.ClusterDriverRKE
 }
 
 func getSecretPath(secretName, name string) string {

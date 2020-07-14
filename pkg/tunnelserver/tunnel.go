@@ -11,11 +11,13 @@ import (
 	"reflect"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/types/convert"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	provisioner "github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/taints"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
@@ -225,7 +227,7 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 			Name:      name,
 			Namespace: cluster.Name,
 		},
-		Spec: v3.NodeSpec{
+		Spec: v32.NodeSpec{
 			Etcd:              inNode.Etcd,
 			ControlPlane:      inNode.ControlPlane,
 			Worker:            inNode.Worker,
@@ -243,7 +245,7 @@ func (t *Authorizer) updateDockerInfo(machine *v3.Node, inNode *client.Node) (*v
 		return machine, nil
 	}
 
-	dockerInfo := &v3.DockerInfo{}
+	dockerInfo := &v32.DockerInfo{}
 	err := convert.ToObj(inNode.DockerInfo, dockerInfo)
 	if err != nil {
 		return nil, err
@@ -273,7 +275,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		err error
 	)
 
-	if cluster.Status.Driver != v3.ClusterDriverImported && cluster.Status.Driver != "" {
+	if cluster.Status.Driver != v32.ClusterDriverImported && cluster.Status.Driver != "" {
 		return cluster, true, nil
 	}
 
@@ -285,7 +287,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	}
 	if driver == "" {
 		logrus.Tracef("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
-		cluster.Status.Driver = v3.ClusterDriverImported
+		cluster.Status.Driver = v32.ClusterDriverImported
 		changed = true
 	}
 
@@ -293,7 +295,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	token := inCluster.Token
 	caCert := inCluster.CACert
 
-	if cluster.Status.Driver == v3.ClusterDriverImported {
+	if cluster.Status.Driver == v32.ClusterDriverImported {
 		if cluster.Status.APIEndpoint != apiEndpoint ||
 			cluster.Status.ServiceAccountToken != token ||
 			cluster.Status.CACert != caCert {
@@ -378,12 +380,12 @@ func (t *Authorizer) nodeIndex(obj interface{}) ([]string, error) {
 	return []string{fmt.Sprintf("%s/%s", node.Namespace, node.Status.NodeName)}, nil
 }
 
-func (t *Authorizer) toCustomConfig(machine *client.Node) *v3.CustomConfig {
+func (t *Authorizer) toCustomConfig(machine *client.Node) *v32.CustomConfig {
 	if machine == nil || machine.CustomConfig == nil {
 		return nil
 	}
 
-	result := &v3.CustomConfig{}
+	result := &v32.CustomConfig{}
 	if err := convert.ToObj(machine.CustomConfig, result); err != nil {
 		return nil
 	}

@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,14 +119,14 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 }
 
 func (p *pLifecycle) ensureDefaultNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
-	_, err := v3.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
+	_, err := v32.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.Default)
 	})
 	return err
 }
 
 func (p *pLifecycle) ensureSystemNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
-	_, err := v3.ClusterConditionSystemNamespacesAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
+	_, err := v32.ClusterConditionSystemNamespacesAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.System)
 	})
 	return err

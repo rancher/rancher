@@ -9,19 +9,21 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/generated/compose"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
-	"github.com/rancher/rancher/pkg/types/compose"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -174,7 +176,7 @@ func (h *Handler) editMonitoring(actionName string, action *types.Action, apiCon
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}
-	var input v3.MonitoringInput
+	var input v32.MonitoringInput
 	if err = json.Unmarshal(data, &input); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}
@@ -210,7 +212,7 @@ func (h *Handler) enableMonitoring(actionName string, action *types.Action, apiC
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}
-	var input v3.MonitoringInput
+	var input v32.MonitoringInput
 	if err = json.Unmarshal(data, &input); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}

@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkeworker"
@@ -20,7 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
@@ -88,7 +90,7 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	if client.Cluster.Status.Driver != v3.ClusterDriverRKE {
+	if client.Cluster.Status.Driver != v32.ClusterDriverRKE {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -228,7 +230,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		if nodePlan.Version == cluster.Status.NodeVersion {
 			nc.NodeVersion = cluster.Status.NodeVersion
 			logrus.Infof("cluster [%s] worker-upgrade: sending node-version for node [%s] version %v", cluster.Name, node.Status.NodeName, nc.NodeVersion)
-		} else if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+		} else if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
 			if nc.AgentCheckInterval != AgentCheckIntervalDuringUpgrade {
 				nodeCopy := node.DeepCopy()
 				nodeCopy.Status.NodePlan.AgentCheckInterval = AgentCheckIntervalDuringUpgrade

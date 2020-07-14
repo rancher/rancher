@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/rke/types/kdm"
 	assertlib "github.com/stretchr/testify/assert"
@@ -84,7 +84,7 @@ func TestFetchImagesFromSystem(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	toolsSystemImages := v3.ToolsSystemImages
+	toolsSystemImages := v32.ToolsSystemImages
 
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy,
@@ -188,7 +188,7 @@ func TestGetImages(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	toolsSystemImages := v3.ToolsSystemImages
+	toolsSystemImages := v32.ToolsSystemImages
 
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy, // from system

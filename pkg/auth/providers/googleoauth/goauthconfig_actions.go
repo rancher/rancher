@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -40,7 +40,7 @@ func (g *googleOauthProvider) actionHandler(actionName string, action *types.Act
 }
 
 func (g *googleOauthProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
-	goauthConfig := &v3.GoogleOauthConfig{}
+	goauthConfig := &v32.GoogleOauthConfig{}
 	if err := json.NewDecoder(request.Request.Body).Decode(goauthConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("[Google OAuth] configureTest: Failed to parse body: %v", err))
@@ -60,15 +60,15 @@ func (g *googleOauthProvider) configureTest(actionName string, action *types.Act
 }
 
 func (g *googleOauthProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
-	var googleOAuthConfig v3.GoogleOauthConfig
-	googleOAuthConfigApplyInput := &v3.GoogleOauthConfigApplyInput{}
+	var googleOAuthConfig v32.GoogleOauthConfig
+	googleOAuthConfigApplyInput := &v32.GoogleOauthConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(googleOAuthConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("[Google OAuth] testAndApply: Failed to parse body: %v", err))
 	}
 
 	googleOAuthConfig = googleOAuthConfigApplyInput.GoogleOauthConfig
-	googleLogin := &v3public.GoogleOauthLogin{
+	googleLogin := &v32.GoogleOauthLogin{
 		Code: googleOAuthConfigApplyInput.Code,
 	}
 
@@ -114,7 +114,7 @@ func (g *googleOauthProvider) testAndApply(actionName string, action *types.Acti
 
 }
 
-func (g *googleOauthProvider) formGoogleOAuthRedirectURL(goauthConfig *v3.GoogleOauthConfig) (string, error) {
+func (g *googleOauthProvider) formGoogleOAuthRedirectURL(goauthConfig *v32.GoogleOauthConfig) (string, error) {
 	return g.getRedirectURL([]byte(goauthConfig.OauthCredential))
 }
 

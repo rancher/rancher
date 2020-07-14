@@ -3,23 +3,24 @@ package monitoring
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
-	appsv1 "github.com/rancher/rancher/pkg/types/apis/apps/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
-	ConditionGrafanaDeployed          = condition(mgmtv3.MonitoringConditionGrafanaDeployed)
-	ConditionPrometheusDeployed       = condition(mgmtv3.MonitoringConditionPrometheusDeployed)
-	ConditionMetricExpressionDeployed = condition(mgmtv3.MonitoringConditionMetricExpressionDeployed)
+	ConditionGrafanaDeployed          = condition(v32.MonitoringConditionGrafanaDeployed)
+	ConditionPrometheusDeployed       = condition(v32.MonitoringConditionPrometheusDeployed)
+	ConditionMetricExpressionDeployed = condition(v32.MonitoringConditionMetricExpressionDeployed)
 )
 
 // All component names base on rancher-monitoring chart
 
-func isGrafanaDeployed(agentDeploymentClient appsv1.DeploymentInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus, clusterName string) error {
-	_, err := ConditionGrafanaDeployed.DoUntilTrue(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
+func isGrafanaDeployed(agentDeploymentClient appsv1.DeploymentInterface, appNamespace, appNameSuffix string, monitoringStatus *v32.MonitoringStatus, clusterName string) error {
+	_, err := ConditionGrafanaDeployed.DoUntilTrue(monitoringStatus, func() (*v32.MonitoringStatus, error) {
 		obj, err := agentDeploymentClient.GetNamespaced(appNamespace, "grafana-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -42,8 +43,8 @@ func isGrafanaDeployed(agentDeploymentClient appsv1.DeploymentInterface, appName
 	return err
 }
 
-func isGrafanaWithdrew(agentDeploymentClient appsv1.DeploymentInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
-	_, err := ConditionGrafanaDeployed.DoUntilFalse(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
+func isGrafanaWithdrew(agentDeploymentClient appsv1.DeploymentInterface, appNamespace, appNameSuffix string, monitoringStatus *v32.MonitoringStatus) error {
+	_, err := ConditionGrafanaDeployed.DoUntilFalse(monitoringStatus, func() (*v32.MonitoringStatus, error) {
 		_, err := agentDeploymentClient.GetNamespaced(appNamespace, "grafana-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -60,8 +61,8 @@ func isGrafanaWithdrew(agentDeploymentClient appsv1.DeploymentInterface, appName
 	return err
 }
 
-func isPrometheusDeployed(agentStatefulSetClient appsv1.StatefulSetInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
-	_, err := ConditionPrometheusDeployed.DoUntilTrue(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
+func isPrometheusDeployed(agentStatefulSetClient appsv1.StatefulSetInterface, appNamespace, appNameSuffix string, monitoringStatus *v32.MonitoringStatus) error {
+	_, err := ConditionPrometheusDeployed.DoUntilTrue(monitoringStatus, func() (*v32.MonitoringStatus, error) {
 		obj, err := agentStatefulSetClient.GetNamespaced(appNamespace, "prometheus-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -81,8 +82,8 @@ func isPrometheusDeployed(agentStatefulSetClient appsv1.StatefulSetInterface, ap
 	return err
 }
 
-func isPrometheusWithdrew(agentStatefulSetClient appsv1.StatefulSetInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
-	_, err := ConditionPrometheusDeployed.DoUntilFalse(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
+func isPrometheusWithdrew(agentStatefulSetClient appsv1.StatefulSetInterface, appNamespace, appNameSuffix string, monitoringStatus *v32.MonitoringStatus) error {
+	_, err := ConditionPrometheusDeployed.DoUntilFalse(monitoringStatus, func() (*v32.MonitoringStatus, error) {
 		_, err := agentStatefulSetClient.GetNamespaced(appNamespace, "prometheus-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {

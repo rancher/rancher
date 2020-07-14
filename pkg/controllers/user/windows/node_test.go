@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	apicorev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	fakes1 "github.com/rancher/rancher/pkg/types/apis/core/v1/fakes"
+	apicorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	fakes1 "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

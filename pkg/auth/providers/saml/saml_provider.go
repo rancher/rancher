@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/mitchellh/mapstructure"
@@ -15,11 +17,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
-	publicclient "github.com/rancher/rancher/pkg/types/client/management/v3public"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -105,7 +106,7 @@ func (s *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 
 func PerformSamlLogin(name string, apiContext *types.APIContext, input interface{}) error {
 	//input will contain the FINAL redirect URL
-	login, ok := input.(*v3public.SamlLoginInput)
+	login, ok := input.(*v32.SamlLoginInput)
 	if !ok {
 		return errors.New("unexpected input type")
 	}
@@ -130,7 +131,7 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 	return nil
 }
 
-func (s *Provider) getSamlConfig() (*v3.SamlConfig, error) {
+func (s *Provider) getSamlConfig() (*v32.SamlConfig, error) {
 	authConfigObj, err := s.authConfigs.ObjectClient().UnstructuredClient().Get(s.name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("SAML: failed to retrieve SamlConfig, error: %v", err)
@@ -142,7 +143,7 @@ func (s *Provider) getSamlConfig() (*v3.SamlConfig, error) {
 	}
 	storedSamlConfigMap := u.UnstructuredContent()
 
-	storedSamlConfig := &v3.SamlConfig{}
+	storedSamlConfig := &v32.SamlConfig{}
 	mapstructure.Decode(storedSamlConfigMap, storedSamlConfig)
 
 	if enabled, ok := storedSamlConfigMap["enabled"].(bool); ok {
@@ -170,7 +171,7 @@ func (s *Provider) getSamlConfig() (*v3.SamlConfig, error) {
 	return storedSamlConfig, nil
 }
 
-func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
+func (s *Provider) saveSamlConfig(config *v32.SamlConfig) error {
 	var configType string
 
 	storedSamlConfig, err := s.getSamlConfig()
@@ -339,7 +340,7 @@ func splitPrincipalID(principalID string) (string, string) {
 	return externalID, parts[0]
 }
 
-func (s *Provider) combineSamlAndLdapConfig(config *v3.SamlConfig) runtime.Object {
+func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) runtime.Object {
 	// if errors we might not want to turn on ldap
 	ldapConfig, _, err := ldap.GetLDAPConfig(s.ldapProvider)
 
@@ -360,12 +361,12 @@ func (s *Provider) combineSamlAndLdapConfig(config *v3.SamlConfig) runtime.Objec
 	}
 
 	var fullConfig runtime.Object
-	samlConfig := v3.SamlConfig{}
+	samlConfig := v32.SamlConfig{}
 	config.DeepCopyInto(&samlConfig)
 
 	switch s.name {
 	case ShibbolethName:
-		fullConfig = &v3.ShibbolethConfig{
+		fullConfig = &v32.ShibbolethConfig{
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}

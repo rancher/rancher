@@ -6,18 +6,19 @@ import (
 	"reflect"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	ldapv2 "gopkg.in/ldap.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool, testServiceAccountBind bool) (v3.Principal, []v3.Principal, error) {
+func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveDirectoryConfig, caPool *x509.CertPool, testServiceAccountBind bool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := adCredential.Username
@@ -149,7 +150,7 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	return groupPrincipals, err
 }
 
-func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) (v3.Principal, []v3.Principal, error) {
+func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, config *v32.ActiveDirectoryConfig, lConn *ldapv2.Conn) (v3.Principal, []v3.Principal, error) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 
@@ -255,7 +256,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	return userPrincipal, groupPrincipals, nil
 }
 
-func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter string, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn,
+func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter string, config *v32.ActiveDirectoryConfig, lConn *ldapv2.Conn,
 	groupDN []string) ([]v3.Principal, error) {
 	var groupPrincipals []v3.Principal
 	var nilPrincipal []v3.Principal
@@ -307,7 +308,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 	return groupPrincipals, nil
 }
 
-func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
+func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v32.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
 	var search *ldapv2.SearchRequest
 	var filter string
 	if !slice.ContainsString(scopes, scope) {
@@ -409,7 +410,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	return principal, nil
 }
 
-func (p *adProvider) searchPrincipals(name, principalType string, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
+func (p *adProvider) searchPrincipals(name, principalType string, config *v32.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
 	name = ldapv2.EscapeFilter(name)
 
 	var principals []v3.Principal
@@ -433,7 +434,7 @@ func (p *adProvider) searchPrincipals(name, principalType string, config *v3.Act
 	return principals, nil
 }
 
-func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
+func (p *adProvider) searchUser(name string, config *v32.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
 	srchAttributes := strings.Split(config.UserSearchAttribute, "|")
 	query := fmt.Sprintf("(&(%v=%v)", ObjectClass, config.UserObjectClass)
 	srchAttrs := "(|"
@@ -446,14 +447,14 @@ func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, l
 	return p.searchLdap(query, UserScope, config, lConn)
 }
 
-func (p *adProvider) searchGroup(name string, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
+func (p *adProvider) searchGroup(name string, config *v32.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
 	// GroupSearchFilter should be follow AD search filter syntax, enclosed by parentheses
 	query := "(&(" + ObjectClass + "=" + config.GroupObjectClass + ")(" + config.GroupSearchAttribute + "=" + name + "*)" + config.GroupSearchFilter + ")"
 	logrus.Debugf("LDAPProvider searchGroup query: %s", query)
 	return p.searchLdap(query, GroupScope, config, lConn)
 }
 
-func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
+func (p *adProvider) searchLdap(query string, scope string, config *v32.ActiveDirectoryConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var search *ldapv2.SearchRequest
 
@@ -501,14 +502,14 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 	return principals, nil
 }
 
-func (p *adProvider) ldapConnection(config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*ldapv2.Conn, error) {
+func (p *adProvider) ldapConnection(config *v32.ActiveDirectoryConfig, caPool *x509.CertPool) (*ldapv2.Conn, error) {
 	servers := config.Servers
 	TLS := config.TLS
 	port := config.Port
 	connectionTimeout := config.ConnectionTimeout
 	return ldap.NewLDAPConn(servers, TLS, port, connectionTimeout, caPool)
 }
-func (p *adProvider) permissionCheck(attributes []*ldapv2.EntryAttribute, config *v3.ActiveDirectoryConfig) bool {
+func (p *adProvider) permissionCheck(attributes []*ldapv2.EntryAttribute, config *v32.ActiveDirectoryConfig) bool {
 	userObjectClass := config.UserObjectClass
 	userEnabledAttribute := config.UserEnabledAttribute
 	userDisabledBitMask := config.UserDisabledBitMask

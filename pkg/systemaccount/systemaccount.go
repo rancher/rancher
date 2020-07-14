@@ -3,8 +3,10 @@ package systemaccount
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/rancher/wrangler/pkg/randomtoken"
@@ -96,10 +98,10 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 				Name:      "system",
 				Namespace: clusterName,
 			},
-			Spec: v3.ClusterRegistrationTokenSpec{
+			Spec: v32.ClusterRegistrationTokenSpec{
 				ClusterName: clusterName,
 			},
-			Status: v3.ClusterRegistrationTokenStatus{
+			Status: v32.ClusterRegistrationTokenStatus{
 				Token: token,
 			},
 		}

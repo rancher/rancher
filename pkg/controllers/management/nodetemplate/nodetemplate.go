@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
@@ -103,7 +104,7 @@ func (nt *nodeTemplateController) sync(key string, nodeTemplate *v3.NodeTemplate
 	if err := rbac.CreateRoleAndRoleBinding(rbac.NodeTemplateResource, v3.NodeTemplateGroupVersionKind.Kind, nodeTemplate.Name, namespace.NodeTemplateGlobalNamespace,
 		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIGroup},
 		nodeTemplate.UID,
-		[]v3.Member{}, nt.mgmtCtx); err != nil {
+		[]v32.Member{}, nt.mgmtCtx); err != nil {
 		return nil, err
 	}
 

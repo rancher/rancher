@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"reflect"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
@@ -12,15 +14,15 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	clusterv3 "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	projectv3 "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	clusterschema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	projectschema "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
-	clusterv3 "github.com/rancher/rancher/pkg/types/client/cluster/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/client/project/v3"
+	clusterschema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
+	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -145,7 +147,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		}
 		obj.Spec.ExternalID = externalID
 		if convert.ToBool(forceUpgrade) {
-			pv3.AppConditionForceUpgrade.Unknown(obj)
+			v32.AppConditionForceUpgrade.Unknown(obj)
 		}
 		if creatorNotFound {
 			obj.Annotations[creatorIDAnno] = w.UserManager.GetUser(apiContext)
@@ -168,7 +170,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			obj.Spec.ValuesYaml = ""
 		}
 		// indicate this a user driven action
-		pv3.AppConditionUserTriggeredAction.True(obj)
+		v32.AppConditionUserTriggeredAction.True(obj)
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
@@ -201,14 +203,14 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		obj.Spec.ExternalID = appRevision.Status.ExternalID
 		obj.Spec.ValuesYaml = appRevision.Status.ValuesYaml
 		if convert.ToBool(forceUpgrade) {
-			pv3.AppConditionForceUpgrade.Unknown(obj)
+			v32.AppConditionForceUpgrade.Unknown(obj)
 		}
 		if creatorNotFound {
 			obj.Annotations[creatorIDAnno] = w.UserManager.GetUser(apiContext)
 		}
 		obj.Spec.Files = appRevision.Status.Files
 		// indicate this a user driven action
-		pv3.AppConditionUserTriggeredAction.True(obj)
+		v32.AppConditionUserTriggeredAction.True(obj)
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}

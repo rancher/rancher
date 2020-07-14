@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/clustermanager"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -146,7 +148,7 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 	// creatorIDAnn indicates it was created through the API, create the new
 	// user bindings and add the annotation UserConditionInitialRolesPopulated
 	if user.ObjectMeta.Annotations[creatorIDAnn] != "" {
-		u, err := v3.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
+		u, err := v32.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
 			err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 			if err != nil {
 				return nil, err

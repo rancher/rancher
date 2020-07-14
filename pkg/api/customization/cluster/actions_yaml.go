@@ -8,20 +8,21 @@ import (
 	"net/http"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	clusterclient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rancher/pkg/generated/compose"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	clusterclient "github.com/rancher/rancher/pkg/types/client/cluster/v3"
-	mgmtclient "github.com/rancher/rancher/pkg/types/client/management/v3"
-	"github.com/rancher/rancher/pkg/types/compose"
+	schema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -87,7 +88,7 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 		return err
 	}
 
-	if cluster.Status.Driver != v3.ClusterDriverRKE {
+	if cluster.Status.Driver != v32.ClusterDriverRKE {
 		return fmt.Errorf("cluster %v does not support being exported", cluster.Name)
 	}
 
@@ -101,7 +102,7 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 	topkey.Clusters[cluster.Spec.DisplayName] = c
 
 	// if driver is rancherKubernetesEngine, add any nodePool if found
-	if cluster.Status.Driver == v3.ClusterDriverRKE {
+	if cluster.Status.Driver == v32.ClusterDriverRKE {
 		nodepools, err := a.NodepoolGetter.NodePools(cluster.Name).List(v1.ListOptions{})
 		if err != nil {
 			return err
@@ -148,7 +149,7 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 		http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
 		return nil
 	}
-	r := v3.ExportOutput{
+	r := v32.ExportOutput{
 		YAMLOutput: string(buf),
 	}
 	jsonOutput, err := json.Marshal(r)

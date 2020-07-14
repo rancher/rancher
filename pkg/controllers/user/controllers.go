@@ -6,6 +6,7 @@ import (
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/types"
+	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert"
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
@@ -38,9 +39,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/windows"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
+	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgmonitoring "github.com/rancher/rancher/pkg/monitoring"
-	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectclient "github.com/rancher/rancher/pkg/types/client/project/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/factory"
 )

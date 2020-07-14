@@ -5,9 +5,11 @@ import (
 	"reflect"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ticker"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 
@@ -116,13 +118,13 @@ func (e *endpointWatcher) checkProjectTarget(ctx context.Context) error {
 func setProjectLoggingErrMsg(obj *mgmtv3.ProjectLogging, err error) *mgmtv3.ProjectLogging {
 	updatedObj := obj.DeepCopy()
 	if err != nil {
-		mgmtv3.LoggingConditionUpdated.False(updatedObj)
-		mgmtv3.LoggingConditionUpdated.Message(updatedObj, err.Error())
+		v32.LoggingConditionUpdated.False(updatedObj)
+		v32.LoggingConditionUpdated.Message(updatedObj, err.Error())
 		return updatedObj
 	}
 
-	mgmtv3.LoggingConditionUpdated.True(updatedObj)
-	mgmtv3.LoggingConditionUpdated.Message(updatedObj, "")
+	v32.LoggingConditionUpdated.True(updatedObj)
+	v32.LoggingConditionUpdated.Message(updatedObj, "")
 	return updatedObj
 }
 
@@ -130,15 +132,15 @@ func setClusterLoggingErrMsg(obj *mgmtv3.ClusterLogging, err error) *mgmtv3.Clus
 	updatedObj := obj.DeepCopy()
 	if err != nil {
 		updatedObj.Status.FailedSpec = &obj.Spec
-		mgmtv3.LoggingConditionUpdated.False(updatedObj)
-		mgmtv3.LoggingConditionUpdated.Message(updatedObj, err.Error())
+		v32.LoggingConditionUpdated.False(updatedObj)
+		v32.LoggingConditionUpdated.Message(updatedObj, err.Error())
 		return updatedObj
 	}
 
 	updatedObj.Status.FailedSpec = nil
 	updatedObj.Status.AppliedSpec = obj.Spec
 
-	mgmtv3.LoggingConditionUpdated.True(updatedObj)
-	mgmtv3.LoggingConditionUpdated.Message(updatedObj, "")
+	v32.LoggingConditionUpdated.True(updatedObj)
+	v32.LoggingConditionUpdated.Message(updatedObj, "")
 	return updatedObj
 }

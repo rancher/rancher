@@ -3,8 +3,10 @@ package manager
 import (
 	"testing"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,11 +30,11 @@ func Test_Set_Catalog_Error_State(t *testing.T) {
 			catalog: v3.Catalog{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "testCatalog"},
-				Status: v3.CatalogStatus{
+				Status: v32.CatalogStatus{
 					LastRefreshTimestamp: "",
 					Commit:               "",
 					HelmVersionCommits:   nil,
-					Conditions: []v3.CatalogCondition{
+					Conditions: []v32.CatalogCondition{
 						{
 							Type:    "Refreshed",
 							Status:  "True",
@@ -63,7 +65,7 @@ func Test_Set_Catalog_Error_State(t *testing.T) {
 			catalog: v3.Catalog{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "testCatalog"},
-				Status: v3.CatalogStatus{
+				Status: v32.CatalogStatus{
 					LastRefreshTimestamp: "",
 					Commit:               "",
 					HelmVersionCommits:   nil,
@@ -91,11 +93,11 @@ func Test_Set_Catalog_Error_State(t *testing.T) {
 			catalog: v3.Catalog{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "testCatalog"},
-				Status: v3.CatalogStatus{
+				Status: v32.CatalogStatus{
 					LastRefreshTimestamp: "",
 					Commit:               "",
 					HelmVersionCommits:   nil,
-					Conditions: []v3.CatalogCondition{
+					Conditions: []v32.CatalogCondition{
 						{
 							Type: "Refreshed",
 						},
@@ -124,11 +126,11 @@ func Test_Set_Catalog_Error_State(t *testing.T) {
 			catalog: v3.Catalog{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "testCatalog"},
-				Status: v3.CatalogStatus{
+				Status: v32.CatalogStatus{
 					LastRefreshTimestamp: "",
 					Commit:               "",
 					HelmVersionCommits:   nil,
-					Conditions: []v3.CatalogCondition{
+					Conditions: []v32.CatalogCondition{
 						{
 							Type:    "Refreshed",
 							Status:  "False",
@@ -159,11 +161,11 @@ func Test_Set_Catalog_Error_State(t *testing.T) {
 			catalog: v3.Catalog{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "testCatalog"},
-				Status: v3.CatalogStatus{
+				Status: v32.CatalogStatus{
 					LastRefreshTimestamp: "",
 					Commit:               "",
 					HelmVersionCommits:   nil,
-					Conditions: []v3.CatalogCondition{
+					Conditions: []v32.CatalogCondition{
 						{
 							Type:    "Refreshed",
 							Status:  "thisisnotanormalstatus",
@@ -188,7 +190,7 @@ func Test_Set_Catalog_Error_State(t *testing.T) {
 
 	for _, c := range testcases {
 		setCatalogErrorState(&c.catalogInfo, &c.catalog, &c.projectCatalog, &c.clusterCatalog)
-		assert.True(t, v3.CatalogConditionRefreshed.IsFalse(&c.catalog))
-		assert.Equal(t, "Error syncing catalog testCatalog", v3.CatalogConditionRefreshed.GetMessage(&c.catalog))
+		assert.True(t, v32.CatalogConditionRefreshed.IsFalse(&c.catalog))
+		assert.Equal(t, "Error syncing catalog testCatalog", v32.CatalogConditionRefreshed.GetMessage(&c.catalog))
 	}
 }

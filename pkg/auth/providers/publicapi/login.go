@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -20,10 +22,9 @@ import (
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3public"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -97,7 +98,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
-	generic := &v3public.GenericLogin{}
+	generic := &v32.GenericLogin{}
 	err = json.Unmarshal(bytes, generic)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
@@ -116,40 +117,40 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	var providerName string
 	switch request.Type {
 	case client.LocalProviderType:
-		input = &v3public.BasicLogin{}
+		input = &v32.BasicLogin{}
 		providerName = local.Name
 	case client.GithubProviderType:
-		input = &v3public.GithubLogin{}
+		input = &v32.GithubLogin{}
 		providerName = github.Name
 	case client.ActiveDirectoryProviderType:
-		input = &v3public.BasicLogin{}
+		input = &v32.BasicLogin{}
 		providerName = activedirectory.Name
 	case client.AzureADProviderType:
-		input = &v3public.AzureADLogin{}
+		input = &v32.AzureADLogin{}
 		providerName = azure.Name
 	case client.OpenLdapProviderType:
-		input = &v3public.BasicLogin{}
+		input = &v32.BasicLogin{}
 		providerName = ldap.OpenLdapName
 	case client.FreeIpaProviderType:
-		input = &v3public.BasicLogin{}
+		input = &v32.BasicLogin{}
 		providerName = ldap.FreeIpaName
 	case client.PingProviderType:
-		input = &v3public.SamlLoginInput{}
+		input = &v32.SamlLoginInput{}
 		providerName = saml.PingName
 	case client.ADFSProviderType:
-		input = &v3public.SamlLoginInput{}
+		input = &v32.SamlLoginInput{}
 		providerName = saml.ADFSName
 	case client.KeyCloakProviderType:
-		input = &v3public.SamlLoginInput{}
+		input = &v32.SamlLoginInput{}
 		providerName = saml.KeyCloakName
 	case client.OKTAProviderType:
-		input = &v3public.SamlLoginInput{}
+		input = &v32.SamlLoginInput{}
 		providerName = saml.OKTAName
 	case client.ShibbolethProviderType:
-		input = &v3public.SamlLoginInput{}
+		input = &v32.SamlLoginInput{}
 		providerName = saml.ShibbolethName
 	case client.GoogleOAuthProviderType:
-		input = &v3public.GoogleOauthLogin{}
+		input = &v32.GoogleOauthLogin{}
 		providerName = googleoauth.Name
 	default:
 		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")

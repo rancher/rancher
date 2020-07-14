@@ -6,12 +6,14 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodeHelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ticker"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -141,7 +143,7 @@ func (w *NodeWatcher) checkNodeCondition(alert *v3.ClusterAlertRule, machine *v3
 }
 
 func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlertRule, machine *v3.Node) {
-	if v3.NodeConditionProvisioned.IsTrue(machine) {
+	if v32.NodeConditionProvisioned.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Memory()
 		used := machine.Status.Requested.Memory()
 
@@ -170,7 +172,7 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlertRule, machine *v3.
 }
 
 func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlertRule, machine *v3.Node) {
-	if v3.NodeConditionProvisioned.IsTrue(machine) {
+	if v32.NodeConditionProvisioned.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Cpu()
 		used := machine.Status.Requested.Cpu()
 		if used.MilliValue()*100.0/total.MilliValue() > int64(alert.Spec.NodeRule.CPUThreshold) {

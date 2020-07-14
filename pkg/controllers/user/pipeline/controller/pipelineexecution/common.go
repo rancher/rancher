@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rke/pki/cert"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"

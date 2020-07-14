@@ -5,8 +5,10 @@ import (
 	"os"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/kontainerdriver"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -131,12 +133,12 @@ func (c *driverCreator) add(name string) error {
 					Name:      strings.ToLower(name),
 					Namespace: "",
 				},
-				Spec: v3.KontainerDriverSpec{
+				Spec: v32.KontainerDriverSpec{
 					URL:     "",
 					BuiltIn: true,
 					Active:  true,
 				},
-				Status: v3.KontainerDriverStatus{
+				Status: v32.KontainerDriverStatus{
 					DisplayName: name,
 				},
 			})
@@ -167,7 +169,7 @@ func (c *driverCreator) addCustomDriver(name, url, checksum, uiURL string, activ
 				ObjectMeta: v1.ObjectMeta{
 					Name: strings.ToLower(name),
 				},
-				Spec: v3.KontainerDriverSpec{
+				Spec: v32.KontainerDriverSpec{
 					URL:              url,
 					BuiltIn:          false,
 					Active:           active,
@@ -175,7 +177,7 @@ func (c *driverCreator) addCustomDriver(name, url, checksum, uiURL string, activ
 					UIURL:            uiURL,
 					WhitelistDomains: domains,
 				},
-				Status: v3.KontainerDriverStatus{
+				Status: v32.KontainerDriverStatus{
 					DisplayName: name,
 				},
 			})

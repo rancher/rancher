@@ -6,13 +6,15 @@ import (
 	"reflect"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/types/convert"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -258,7 +260,7 @@ func getDefaultQuotaSpec() (*corev1.ResourceQuotaSpec, error) {
 	return convertResourceLimitResourceQuotaSpec(defaultResourceLimit)
 }
 
-var defaultResourceLimit = &v3.ResourceQuotaLimit{
+var defaultResourceLimit = &v32.ResourceQuotaLimit{
 	Pods:                   "0",
 	Services:               "0",
 	ReplicationControllers: "0",
@@ -338,7 +340,7 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 	if err != nil {
 		return false, updatedNs, err
 	}
-	var nsLimits []*v3.ResourceQuotaLimit
+	var nsLimits []*v32.ResourceQuotaLimit
 	for _, o := range objects {
 		other := o.(*corev1.Namespace)
 		// skip itself
@@ -393,11 +395,11 @@ func (c *SyncController) getResourceQuotaToUpdate(ns *corev1.Namespace) (string,
 	// rework after api framework change is done
 	// when annotation field is passed as null, the annotation should be removed
 	// instead of being updated with the null value
-	var updatedQuota *v3.NamespaceResourceQuota
+	var updatedQuota *v32.NamespaceResourceQuota
 	if quota != "" && quota != "null" {
 		// check if fields need to be removed or set
 		// based on the default quota
-		var existingQuota v3.NamespaceResourceQuota
+		var existingQuota v32.NamespaceResourceQuota
 		err := json.Unmarshal([]byte(convert.ToString(quota)), &existingQuota)
 		if err != nil {
 			return "", err
@@ -434,7 +436,7 @@ func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*corev1
 	// rework after api framework change is done
 	// when annotation field is passed as null, the annotation should be removed
 	// instead of being updated with the null value
-	var updatedLimit *v3.ContainerResourceLimit
+	var updatedLimit *v32.ContainerResourceLimit
 	if nsLimit != nil {
 		// check if fields need to be removed or set
 		// based on the default quota
@@ -453,7 +455,7 @@ func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*corev1
 	return nil, nil
 }
 
-func completeQuota(existingQuota *v3.NamespaceResourceQuota, defaultQuota *v3.NamespaceResourceQuota) (*v3.NamespaceResourceQuota, error) {
+func completeQuota(existingQuota *v32.NamespaceResourceQuota, defaultQuota *v32.NamespaceResourceQuota) (*v32.NamespaceResourceQuota, error) {
 	if defaultQuota == nil {
 		return nil, nil
 	}
@@ -476,7 +478,7 @@ func completeQuota(existingQuota *v3.NamespaceResourceQuota, defaultQuota *v3.Na
 	}
 
 	toReturn := existingQuota.DeepCopy()
-	newLimit := v3.ResourceQuotaLimit{}
+	newLimit := v32.ResourceQuotaLimit{}
 	if err := mapstructure.Decode(newLimitMap, &newLimit); err != nil {
 		return nil, err
 	}
@@ -484,7 +486,7 @@ func completeQuota(existingQuota *v3.NamespaceResourceQuota, defaultQuota *v3.Na
 	return toReturn, nil
 }
 
-func completeLimit(existingLimit *v3.ContainerResourceLimit, defaultLimit *v3.ContainerResourceLimit) (*v3.ContainerResourceLimit, error) {
+func completeLimit(existingLimit *v32.ContainerResourceLimit, defaultLimit *v32.ContainerResourceLimit) (*v32.ContainerResourceLimit, error) {
 	if defaultLimit == nil {
 		return nil, nil
 	}
@@ -506,7 +508,7 @@ func completeLimit(existingLimit *v3.ContainerResourceLimit, defaultLimit *v3.Co
 		return nil, nil
 	}
 
-	newLimit := v3.ContainerResourceLimit{}
+	newLimit := v32.ContainerResourceLimit{}
 	if err := mapstructure.Decode(newLimitMap, &newLimit); err != nil {
 		return nil, err
 	}

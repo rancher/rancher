@@ -8,14 +8,16 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	systemimage "github.com/rancher/rancher/pkg/controllers/user/systemimage"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	rrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	rrbacv1 "github.com/rancher/rancher/pkg/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
@@ -233,11 +235,11 @@ type mgr struct {
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.Default, v3.ClusterConditionconditionDefaultProjectCreated, obj, defaultProjectLabels, defaultProjects)
+	return m.createProject(project.Default, v32.ClusterConditionconditionDefaultProjectCreated, obj, defaultProjectLabels, defaultProjects)
 }
 
 func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.System, v3.ClusterConditionconditionSystemProjectCreated, obj, systemProjectLabels, systemProjects)
+	return m.createProject(project.System, v32.ClusterConditionconditionSystemProjectCreated, obj, systemProjectLabels, systemProjects)
 }
 
 func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set, projectMap map[string]bool) (runtime.Object, error) {
@@ -288,7 +290,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 				Annotations:  annotation,
 				Labels:       labels,
 			},
-			Spec: v3.ProjectSpec{
+			Spec: v32.ProjectSpec{
 				DisplayName: name,
 				Description: fmt.Sprintf("%s project created for the cluster", name),
 				ClusterName: metaAccessor.GetName(),
@@ -308,7 +310,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 }
 
 func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
-	return v3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
+	return v32.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
 			return obj, err
@@ -329,7 +331,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 		case v3.ProjectGroupVersionKind.Kind:
 			project := obj.(*v3.Project)
 
-			if v3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
+			if v32.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 				// The projectRoleBindings are already completed, no need to check
 				break
 			}
@@ -388,7 +390,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			project.Annotations[roleTemplatesRequired] = string(d)
 
 			if reflect.DeepEqual(roleMap["required"], createdRoles) {
-				v3.ProjectConditionInitialRolesPopulated.True(project)
+				v32.ProjectConditionInitialRolesPopulated.True(project)
 				logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ctrbMGMTController, project.Name)
 			}
 			if _, err := m.mgmt.Management.Projects("").Update(project); err != nil {
@@ -398,7 +400,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 		case v3.ClusterGroupVersionKind.Kind:
 			cluster := obj.(*v3.Cluster)
 
-			if v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+			if v32.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
 				// The clusterRoleBindings are already completed, no need to check
 				break
 			}
@@ -484,7 +486,7 @@ func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 }
 
 func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string) (runtime.Object, error) {
-	return v3.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
+	return v32.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
 		o, err := meta.Accessor(obj)
 		if err != nil {
 			return obj, condition.Error("MissingMetadata", err)
@@ -571,7 +573,7 @@ func (m *mgr) updateClusterAnnotationandCondition(cluster *v3.Cluster, anno stri
 		c.Annotations[roleTemplatesRequired] = anno
 
 		if updateCondition {
-			v3.ClusterConditionInitialRolesPopulated.True(c)
+			v32.ClusterConditionInitialRolesPopulated.True(c)
 		}
 		_, err = m.mgmt.Management.Clusters("").Update(c)
 		if err != nil {

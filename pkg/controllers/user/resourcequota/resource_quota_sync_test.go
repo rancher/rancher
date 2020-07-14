@@ -4,7 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -58,18 +59,18 @@ func TestSemanticDeepEqual(t *testing.T) {
 	tests := []struct {
 		name     string
 		method   func(x, y interface{}) bool
-		src      *v3.ResourceQuotaLimit
-		dst      *v3.ResourceQuotaLimit
+		src      *v32.ResourceQuotaLimit
+		dst      *v32.ResourceQuotaLimit
 		expected bool
 	}{
 		{
 			name:   "compare ResourceQuota using reflect.DeepEqual",
 			method: reflect.DeepEqual,
-			src: &v3.ResourceQuotaLimit{
+			src: &v32.ResourceQuotaLimit{
 				Pods:        "30",
 				RequestsCPU: "1000m",
 			},
-			dst: &v3.ResourceQuotaLimit{
+			dst: &v32.ResourceQuotaLimit{
 				Pods:        "30",
 				RequestsCPU: "1",
 			},
@@ -78,11 +79,11 @@ func TestSemanticDeepEqual(t *testing.T) {
 		{
 			name:   "compare ResourceQuota using semantic.DeepEqual",
 			method: apiequality.Semantic.DeepEqual,
-			src: &v3.ResourceQuotaLimit{
+			src: &v32.ResourceQuotaLimit{
 				Pods:        "30",
 				RequestsCPU: "1000m",
 			},
-			dst: &v3.ResourceQuotaLimit{
+			dst: &v32.ResourceQuotaLimit{
 				Pods:        "30",
 				RequestsCPU: "1",
 			},

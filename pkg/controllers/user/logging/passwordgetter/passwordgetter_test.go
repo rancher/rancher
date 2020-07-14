@@ -4,12 +4,13 @@ import (
 	"reflect"
 	"testing"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	fake1 "github.com/rancher/rancher/pkg/types/apis/core/v1/fakes"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	fake1 "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 )
 
 const (
@@ -26,8 +27,8 @@ var (
 )
 
 var tests = []struct {
-	in  mgmtv3.LoggingTargets
-	out mgmtv3.LoggingTargets
+	in  v32.LoggingTargets
+	out v32.LoggingTargets
 }{
 	{in: elasticTarget(passwordWrapValue), out: elasticTarget(passwordSecretValue)},
 	{in: fluentdTarget(passwordWrapValue), out: fluentdTarget(passwordSecretValue)},
@@ -72,9 +73,9 @@ func TestReadFromSecret(t *testing.T) {
 	}
 }
 
-func elasticTarget(password string) mgmtv3.LoggingTargets {
-	return mgmtv3.LoggingTargets{
-		ElasticsearchConfig: &mgmtv3.ElasticsearchConfig{
+func elasticTarget(password string) v32.LoggingTargets {
+	return v32.LoggingTargets{
+		ElasticsearchConfig: &v32.ElasticsearchConfig{
 			Endpoint:     esEndpoint,
 			AuthUserName: userName,
 			AuthPassword: password,
@@ -82,10 +83,10 @@ func elasticTarget(password string) mgmtv3.LoggingTargets {
 	}
 }
 
-func fluentdTarget(password string) mgmtv3.LoggingTargets {
-	return mgmtv3.LoggingTargets{
-		FluentForwarderConfig: &mgmtv3.FluentForwarderConfig{
-			FluentServers: []mgmtv3.FluentServer{
+func fluentdTarget(password string) v32.LoggingTargets {
+	return v32.LoggingTargets{
+		FluentForwarderConfig: &v32.FluentForwarderConfig{
+			FluentServers: []v32.FluentServer{
 				{
 					Endpoint: fluentdEndpoint,
 					Username: userName,

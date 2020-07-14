@@ -1,14 +1,15 @@
 package deployer
 
 import (
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/pkg/errors"
@@ -43,7 +44,7 @@ func NewTesterDeployer(mgmtCtx *config.ManagementContext, appsGetter projectv3.A
 	}
 }
 
-func (d *TesterDeployer) Deploy(level, clusterName, projectID string, loggingTarget mgmtv3.LoggingTargets) error {
+func (d *TesterDeployer) Deploy(level, clusterName, projectID string, loggingTarget v32.LoggingTargets) error {
 	systemProject, err := project.GetSystemProject(clusterName, d.projectLister)
 	if err != nil {
 		return err
@@ -63,7 +64,7 @@ func (d *TesterDeployer) Deploy(level, clusterName, projectID string, loggingTar
 	return d.isLoggingTesterDeploySuccess()
 }
 
-func (d *TesterDeployer) deployLoggingTester(systemProjectID, appCreator, level, clusterName, projectID string, loggingTarget mgmtv3.LoggingTargets) error {
+func (d *TesterDeployer) deployLoggingTester(systemProjectID, appCreator, level, clusterName, projectID string, loggingTarget v32.LoggingTargets) error {
 	templateVersionID := loggingconfig.RancherLoggingTemplateID()
 	template, err := d.templateLister.Get(namespace.GlobalNamespace, templateVersionID)
 	if err != nil {
@@ -74,7 +75,7 @@ func (d *TesterDeployer) deployLoggingTester(systemProjectID, appCreator, level,
 
 	var clusterSecret, projectSecret string
 	if level == loggingconfig.ClusterLevel {
-		spec := mgmtv3.ClusterLoggingSpec{
+		spec := v32.ClusterLoggingSpec{
 			LoggingTargets: loggingTarget,
 			ClusterName:    clusterName,
 		}
@@ -98,7 +99,7 @@ func (d *TesterDeployer) deployLoggingTester(systemProjectID, appCreator, level,
 		}
 
 		new := &mgmtv3.ProjectLogging{
-			Spec: mgmtv3.ProjectLoggingSpec{
+			Spec: v32.ProjectLoggingSpec{
 				LoggingTargets: loggingTarget,
 				ProjectName:    projectID,
 			},

@@ -4,13 +4,15 @@ import (
 	"net/http"
 	"strconv"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,13 +35,13 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 		completed := false
 		runCompleted := false
 		for _, cond := range convert.ToMapSlice(status["conditions"]) {
-			if cond["type"] == string(mgmtv3.ClusterScanConditionCompleted) && cond["status"] == "True" {
+			if cond["type"] == string(v32.ClusterScanConditionCompleted) && cond["status"] == "True" {
 				completed = true
 			}
-			if cond["type"] == string(mgmtv3.ClusterScanConditionFailed) && cond["status"] == "True" {
+			if cond["type"] == string(v32.ClusterScanConditionFailed) && cond["status"] == "True" {
 				failed = true
 			}
-			if cond["type"] == string(mgmtv3.ClusterScanConditionRunCompleted) && cond["status"] == "True" {
+			if cond["type"] == string(v32.ClusterScanConditionRunCompleted) && cond["status"] == "True" {
 				runCompleted = true
 			}
 		}
@@ -93,12 +95,12 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 		return err
 	}
 
-	cm, err := clusterContext.Core.ConfigMaps(mgmtv3.DefaultNamespaceForCis).Get(clusterScanID, metav1.GetOptions{})
+	cm, err := clusterContext.Core.ConfigMaps(v32.DefaultNamespaceForCis).Get(clusterScanID, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	reportJSON, err := report.GetJSONBytes([]byte(cm.Data[mgmtv3.DefaultScanOutputFileName]))
+	reportJSON, err := report.GetJSONBytes([]byte(cm.Data[v32.DefaultScanOutputFileName]))
 	if err != nil {
 		return err
 	}

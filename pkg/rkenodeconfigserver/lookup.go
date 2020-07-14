@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
 	kecerts "github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/rancher/pkg/rkecerts"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rke/pki"
 )
 
