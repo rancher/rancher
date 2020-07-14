@@ -289,6 +289,8 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 
 		"exporter-fluentd.enabled": "true",
 
+		"prometheus-adapter.enabled": "false",
+
 		"grafana.persistence.enabled": "false",
 
 		"prometheus.persistence.enabled": "false",
@@ -323,6 +325,8 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		"grafana.enabled":            "true",
 		"grafana.apiGroup":           monitoring.APIVersion.Group,
 		"grafana.serviceAccountName": appName,
+
+		"prometheus-adapter.serviceAccountName": appName,
 
 		"prometheus.enabled":                        "true",
 		"prometheus.apiGroup":                       monitoring.APIVersion.Group,
