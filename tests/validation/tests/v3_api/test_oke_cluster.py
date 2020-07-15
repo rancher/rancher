@@ -29,7 +29,7 @@ def test_error_get_oke_latest_versions_missing_key():
     assert response.content is not None
     json_response = json.loads(response.content)
     print(json_response)
-    assert response.status_code == 500
+    assert response.status_code == 422
     assert json_response['message'] == "OCI API private key is required"
 
 
@@ -45,7 +45,7 @@ def test_error_get_oke_images_missing_tenancy():
     assert response.content is not None
     json_response = json.loads(response.content)
     print(json_response)
-    assert response.status_code == 500
+    assert response.status_code == 422
     assert json_response['message'] == "OCI tenancy is required"
 
 
@@ -106,18 +106,19 @@ def create_and_validate_oke_cluster(name):
     else:
         region = OCI_REGION
     # Get the node shape
-    if OCI_NODE_SHAPE is None:
+    if OKE_NODE_SHAPE is None:
         response = get_oci_meta_response("/meta/oci/nodeShapes", oci_cred_body)
+        print(response.content)
         assert response.status_code == 200
         assert response.content is not None
         json_response = json.loads(response.content)
         print(json_response)
         shape = json_response[-1]
     else:
-        shape = OCI_NODE_SHAPE
+        shape = OKE_NODE_SHAPE
 
     # Get the node image
-    if OCI_NODE_IMAGE is None:
+    if OKE_NODE_IMAGE is None:
         response = get_oci_meta_response("/meta/oci/nodeOkeImages", oci_cred_body)
         assert response.status_code == 200
         assert response.content is not None
@@ -125,10 +126,10 @@ def create_and_validate_oke_cluster(name):
         print(json_response)
         latest_oke_image = json_response[-1]
     else:
-        latest_oke_image = OCI_NODE_IMAGE
+        latest_oke_image = OKE_NODE_IMAGE
 
     # Get the OKE version
-    if OCI_VERSION is None:
+    if OKE_VERSION is None:
         response = get_oci_meta_response("/meta/oci/okeVersions", oci_cred_body)
         assert response.status_code == 200
         assert response.content is not None
@@ -136,7 +137,7 @@ def create_and_validate_oke_cluster(name):
         print(json_response)
         latest_oke_version = json_response[-1]
     else:
-        latest_oke_version = OCI_VERSION
+        latest_oke_version = OKE_VERSION
 
     cluster = client.create_cluster(
         name=name,
