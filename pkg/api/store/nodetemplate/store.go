@@ -23,6 +23,7 @@ import (
 type nodeTemplateStore struct {
 	types.Store
 	NodePoolLister        v3.NodePoolLister
+	NodeLister            v3.NodeLister
 	CloudCredentialLister corev1.SecretLister
 }
 
@@ -39,7 +40,7 @@ type nodeTemplateIDs struct {
 	migratedNs     string
 }
 
-func Wrap(store types.Store, npLister v3.NodePoolLister, secretLister corev1.SecretLister, ntClient v3.NodeTemplateInterface) types.Store {
+func Wrap(store types.Store, npLister v3.NodePoolLister, nodeLister v3.NodeLister, secretLister corev1.SecretLister, ntClient v3.NodeTemplateInterface) types.Store {
 	t := &transformer{
 		NodeTemplateClient: ntClient,
 	}
@@ -50,6 +51,7 @@ func Wrap(store types.Store, npLister v3.NodePoolLister, secretLister corev1.Sec
 	return &nodeTemplateStore{
 		Store:                 s,
 		NodePoolLister:        npLister,
+		NodeLister:            nodeLister,
 		CloudCredentialLister: secretLister,
 	}
 }
@@ -118,9 +120,21 @@ func (s *nodeTemplateStore) Delete(apiContext *types.APIContext, schema *types.S
 	}
 	for _, pool := range pools {
 		if pool.Spec.NodeTemplateName == ids.fullMigratedID {
+			logrus.Debugf("nodeTemplateStore: NodeTemplateName [%v] is in use by node pool [%s]", pool.Spec.NodeTemplateName, ids.fullMigratedID)
 			return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "Template is in use by a node pool.")
 		}
 	}
+	nodes, err := s.NodeLister.List("", labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	for _, node := range nodes {
+		if node.Spec.NodeTemplateName == ids.fullMigratedID {
+			logrus.Debugf("nodeTemplateStore: NodeTemplateName [%v] is in use by node [%s]", node.Spec.NodeTemplateName, ids.fullMigratedID)
+			return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "Template is in use by a node.")
+		}
+	}
+
 	data, err := s.Store.Delete(apiContext, schema, ids.fullMigratedID)
 	if err != nil {
 		return nil, replaceIDInError(err, ids.migratedID, ids.originalID, ids.migratedNs, ids.originalNs)
