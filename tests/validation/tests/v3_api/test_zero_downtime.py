@@ -101,7 +101,7 @@ def test_drain_upgrade():
         rancherKubernetesEngineConfig={
             "kubernetesVersion": postupgrade_k8s,
             "upgradeStrategy": {
-                'drain': False,
+                'drain': True,
                 'maxUnavailableWorker': '10%',
                 'type': '/v3/schemas/nodeUpgradeStrategy'}}
     )
@@ -175,21 +175,19 @@ def validate_node_cordon(nodes, k8_version, client, p_client, cluster, workload,
     for node in nodes:
         node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
         print("node: ", node.uuid)
-        print("node version: ", node_k8)
-        print("node state: ", node.state)
         while not(node_k8 == k8_version and node.state == "active"):
             print("node version: ", node_k8)
             print("node state: ", node.state)
             if time.time() - start > timeout:
                 raise AssertionError(
                     "Timed out waiting for node upgrade")
-            validate_ingress(p_client, cluster, [workload], host, path)
             if node.state == "cordoned":
                 print("node state: ", node.state)
                 in_state.add(node.uuid)
                 print("added to in-state")
             time.sleep(1)
             node = client.reload(node)
+            validate_ingress(p_client, cluster, [workload], host, path)
             node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
         if node_k8 == k8_version:
             print("node: ", node, " is at ", node_k8)
@@ -206,6 +204,7 @@ def validate_node_cordon(nodes, k8_version, client, p_client, cluster, workload,
 def validate_node_drain(nodes, k8_version, client, p_client, cluster, workload, timeout=600, max_unavailable=1):
     start = time.time()
     upgrade_nodes = set()
+    in_state = set()
     print("nodes: ", nodes)
     while len(upgrade_nodes) != len(nodes):
         if time.time() - start > timeout:
@@ -213,18 +212,23 @@ def validate_node_drain(nodes, k8_version, client, p_client, cluster, workload, 
                 "Timed out waiting for worker nodes to upgrade")
         validate_ingress(p_client, cluster, [workload], host, path)
         for node in nodes:
-            uuid = node.uuid
-            node = client.list_node(uuid=uuid).data
-            node_k8 = node[0]["info"]["kubernetes"]["kubeletVersion"]
+            node = client.reload(node)
+            node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
+            if node.state == "draining":
+                print("node: ", node, " is draining")
+                in_state.add(node.uuid)
             if node_k8 == k8_version:
                 print("node: ", node, " is at ", node_k8)
-                upgrade_nodes.add(uuid)
+                upgrade_nodes.add(node.uuid)
         unavailable = set()
         for node in nodes:
             if node.state == "draining":
                 unavailable.add(node.uuid)
         assert len(unavailable) <= max_unavailable, "Too many nodes unavailable"
-        time.sleep(10)
+        time.sleep(1)
+    print("final instate: ", in_state)
+    print("final upgrade: ", upgrade_nodes)
+    assert len(in_state) == len(nodes)
     return upgrade_nodes
 
 
