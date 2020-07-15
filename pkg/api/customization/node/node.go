@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/api/handler"
@@ -19,10 +21,10 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/encryptedstore"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 )
 
 var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within"}
@@ -130,14 +132,14 @@ func drainNode(actionName string, apiContext *types.APIContext, stop bool) error
 	return updateNode(apiContext, node, schema, actionName)
 }
 
-func validate(apiContext *types.APIContext) (*v3.NodeDrainInput, error) {
+func validate(apiContext *types.APIContext) (*v32.NodeDrainInput, error) {
 	input, err := handler.ParseAndValidateActionBody(apiContext, apiContext.Schemas.Schema(&managementschema.Version,
 		client.NodeDrainInputType))
 	if err != nil {
 		return nil, httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse action body: %v", err))
 	}
-	drainInput := &v3.NodeDrainInput{}
+	drainInput := &v32.NodeDrainInput{}
 	if err := mapstructure.Decode(input, drainInput); err != nil {
 		return nil, httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))

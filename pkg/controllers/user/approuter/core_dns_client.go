@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rdns-server/model"
 	"github.com/sirupsen/logrus"
 	k8scorev1 "k8s.io/api/core/v1"

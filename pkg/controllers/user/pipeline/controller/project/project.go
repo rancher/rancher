@@ -4,14 +4,14 @@ import (
 	"context"
 	"strings"
 
+	pclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	pclient "github.com/rancher/rancher/pkg/types/client/project/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

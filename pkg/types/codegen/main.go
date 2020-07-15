@@ -1,15 +1,22 @@
 package main
 
 import (
-	monitoring "github.com/coreos/prometheus-operator/pkg/apis/monitoring"
+	"os"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	controllergen "github.com/rancher/wrangler/pkg/controller-gen"
+
+	"github.com/coreos/prometheus-operator/pkg/apis/monitoring"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
-	clusterSchema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
-	managementSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	publicSchema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public/schema"
-	projectSchema "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
+	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	publicSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
+	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/generator"
 
+	"github.com/rancher/wrangler/pkg/controller-gen/args"
 	appsv1 "k8s.io/api/apps/v1"
 	scalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -25,11 +32,46 @@ import (
 )
 
 func main() {
+	os.Unsetenv("GOPATH")
+
+	controllergen.Run(args.Options{
+		OutputPackage: "github.com/rancher/rancher/pkg/generated",
+		Boilerplate:   "scripts/boilerplate.go.txt",
+		Groups: map[string]args.Group{
+			"management.cattle.io": {
+				PackageName: "management.cattle.io",
+				Types: []interface{}{
+					// All structs with an embedded ObjectMeta field will be picked up
+					"./pkg/apis/management.cattle.io/v3",
+					v3.ProjectCatalog{},
+					v3.ClusterCatalog{},
+				},
+				GenerateTypes: true,
+			},
+			"cluster.cattle.io": {
+				PackageName: "cluster.cattle.io",
+				Types: []interface{}{
+					// All structs with an embedded ObjectMeta field will be picked up
+					"./pkg/apis/cluster.cattle.io/v3",
+				},
+				GenerateTypes: true,
+			},
+			"project.cattle.io": {
+				PackageName: "project.cattle.io",
+				Types: []interface{}{
+					// All structs with an embedded ObjectMeta field will be picked up
+					"./pkg/apis/project.cattle.io/v3",
+				},
+				GenerateTypes: true,
+			},
+		},
+	})
+
 	generator.GenerateComposeType(projectSchema.Schemas, managementSchema.Schemas, clusterSchema.Schemas)
 	generator.Generate(managementSchema.Schemas, map[string]bool{
 		"userAttribute": true,
 	})
-	generator.Generate(publicSchema.PublicSchemas, nil)
+	generator.GenerateClient(publicSchema.PublicSchemas, nil)
 	generator.Generate(clusterSchema.Schemas, map[string]bool{
 		"clusterUserAttribute": true,
 		"clusterAuthToken":     true,

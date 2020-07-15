@@ -144,15 +144,11 @@ func copyGoPathToModules(customArgs *cgargs.CustomArgs) error {
 
 		return filepath.Walk(pkg, func(path string, info os.FileInfo, err error) error {
 			newPath := strings.Replace(path, pkg, ".", 1)
-			if _, err := os.Stat(newPath); os.IsNotExist(err) {
-				if info.IsDir() {
-					return os.Mkdir(newPath, info.Mode())
-				}
-
-				return copyFile(path, newPath)
+			if info.IsDir() {
+				return os.MkdirAll(newPath, info.Mode())
 			}
 
-			return err
+			return copyFile(path, newPath)
 		})
 	}
 
@@ -375,7 +371,10 @@ func parseTypes(customArgs *cgargs.CustomArgs) []string {
 	}
 
 	for groupName, group := range customArgs.Options.Groups {
-		cgargs.ObjectsToGroupVersion(groupName, group.Types, customArgs.TypesByGroup)
+		if err := cgargs.ObjectsToGroupVersion(groupName, group.Types, customArgs.TypesByGroup); err != nil {
+			// sorry, should really handle this better
+			panic(err)
+		}
 	}
 
 	var inputDirs []string

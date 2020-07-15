@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	"github.com/rancher/rancher/pkg/types/apis/extensions/v1beta1"
-	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
+	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -85,7 +86,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		return err
 	}
 	// get ingress endpoint group by service
-	serviceToIngressEndpoints := make(map[string][]v3.PublicEndpoint)
+	serviceToIngressEndpoints := make(map[string][]v32.PublicEndpoint)
 	for _, ingress := range ingresses {
 		epsMap := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE)
 		for k, v := range epsMap {
@@ -95,7 +96,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 
 	for _, w := range workloads {
 		// 1. Get endpoints from services
-		var newPublicEps []v3.PublicEndpoint
+		var newPublicEps []v32.PublicEndpoint
 		for _, svc := range services {
 			set := labels.Set{}
 			for key, val := range svc.Spec.Selector {

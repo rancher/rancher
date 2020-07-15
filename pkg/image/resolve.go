@@ -9,13 +9,15 @@ import (
 	"sort"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
 	util "github.com/rancher/rancher/pkg/cluster"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	img "github.com/rancher/rke/types/image"
 	"gopkg.in/yaml.v2"
 )
@@ -200,7 +202,7 @@ func fetchImagesFromSystem(rkeSystemImages map[string]rketypes.RKESystemImages, 
 	}
 	switch osType {
 	case Linux:
-		collectionImagesList = append(collectionImagesList, v3.ToolsSystemImages)
+		collectionImagesList = append(collectionImagesList, v32.ToolsSystemImages)
 	}
 
 	return flatImagesFromCollections(collectionImagesList...)

@@ -24,11 +24,11 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/service"
 	"github.com/rancher/rancher/pkg/api/store/storageclass"
 	"github.com/rancher/rancher/pkg/api/store/workload"
+	clusterClient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	clusterschema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
-	"github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
-	clusterClient "github.com/rancher/rancher/pkg/types/client/cluster/v3"
-	client "github.com/rancher/rancher/pkg/types/client/project/v3"
+	clusterschema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
+	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 

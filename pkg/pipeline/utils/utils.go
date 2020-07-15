@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"
@@ -18,7 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func initExecution(p *v3.Pipeline, config *v3.PipelineConfig) *v3.PipelineExecution {
+func initExecution(p *v3.Pipeline, config *v32.PipelineConfig) *v3.PipelineExecution {
 	//add Clone stage/step at the start
 
 	toRunConfig := configWithCloneStage(config)
@@ -28,7 +29,7 @@ func initExecution(p *v3.Pipeline, config *v3.PipelineConfig) *v3.PipelineExecut
 			Namespace: p.Namespace,
 			Labels:    map[string]string{PipelineFinishLabel: ""},
 		},
-		Spec: v3.PipelineExecutionSpec{
+		Spec: v32.PipelineExecutionSpec{
 			ProjectName:    p.Spec.ProjectName,
 			PipelineName:   p.Namespace + ":" + p.Name,
 			RepositoryURL:  p.Spec.RepositoryURL,
@@ -38,13 +39,13 @@ func initExecution(p *v3.Pipeline, config *v3.PipelineConfig) *v3.PipelineExecut
 	}
 	execution.Status.ExecutionState = StateWaiting
 	execution.Status.Started = time.Now().Format(time.RFC3339)
-	execution.Status.Stages = make([]v3.StageStatus, len(toRunConfig.Stages))
+	execution.Status.Stages = make([]v32.StageStatus, len(toRunConfig.Stages))
 
 	for i := 0; i < len(execution.Status.Stages); i++ {
 		stage := &execution.Status.Stages[i]
 		stage.State = StateWaiting
 		stepsize := len(toRunConfig.Stages[i].Steps)
-		stage.Steps = make([]v3.StepStatus, stepsize)
+		stage.Steps = make([]v32.StepStatus, stepsize)
 		for j := 0; j < stepsize; j++ {
 			step := &stage.Steps[j]
 			step.State = StateWaiting
@@ -53,17 +54,17 @@ func initExecution(p *v3.Pipeline, config *v3.PipelineConfig) *v3.PipelineExecut
 	return execution
 }
 
-func configWithCloneStage(config *v3.PipelineConfig) *v3.PipelineConfig {
+func configWithCloneStage(config *v32.PipelineConfig) *v32.PipelineConfig {
 	result := config.DeepCopy()
 	if len(config.Stages) > 0 && len(config.Stages[0].Steps) > 0 &&
 		config.Stages[0].Steps[0].SourceCodeConfig != nil {
 		return result
 	}
-	cloneStage := v3.Stage{
+	cloneStage := v32.Stage{
 		Name:  "Clone",
-		Steps: []v3.Step{{SourceCodeConfig: &v3.SourceCodeConfig{}}},
+		Steps: []v32.Step{{SourceCodeConfig: &v32.SourceCodeConfig{}}},
 	}
-	result.Stages = append([]v3.Stage{cloneStage}, result.Stages...)
+	result.Stages = append([]v32.Stage{cloneStage}, result.Stages...)
 	return result
 }
 
@@ -74,7 +75,7 @@ func GetNextExecutionName(p *v3.Pipeline) string {
 	return fmt.Sprintf("%s-%d", p.Name, p.Status.NextRun)
 }
 
-func IsStageSuccess(stage v3.StageStatus) bool {
+func IsStageSuccess(stage v32.StageStatus) bool {
 	if stage.State == StateSuccess {
 		return true
 	} else if stage.State == StateFailed || stage.State == StateDenied {
@@ -99,7 +100,7 @@ func IsFinishState(state string) bool {
 	return true
 }
 
-func GenerateExecution(executions v3.PipelineExecutionInterface, pipeline *v3.Pipeline, pipelineConfig *v3.PipelineConfig, info *model.BuildInfo) (*v3.PipelineExecution, error) {
+func GenerateExecution(executions v3.PipelineExecutionInterface, pipeline *v3.Pipeline, pipelineConfig *v32.PipelineConfig, info *model.BuildInfo) (*v3.PipelineExecution, error) {
 
 	//Generate a new pipeline execution
 	execution := initExecution(pipeline, pipelineConfig)
@@ -152,7 +153,7 @@ func SplitImageTag(image string) (string, string, string) {
 	return registry, repo, tag
 }
 
-func ValidPipelineConfig(config v3.PipelineConfig) error {
+func ValidPipelineConfig(config v32.PipelineConfig) error {
 	if len(config.Stages) < 1 ||
 		len(config.Stages[0].Steps) < 1 ||
 		config.Stages[0].Steps[0].SourceCodeConfig == nil {
@@ -211,7 +212,7 @@ func GetEnvVarMap(execution *v3.PipelineExecution) map[string]string {
 	return m
 }
 
-func PipelineConfigToYaml(pipelineConfig *v3.PipelineConfig) ([]byte, error) {
+func PipelineConfigToYaml(pipelineConfig *v32.PipelineConfig) ([]byte, error) {
 
 	content, err := yaml.Marshal(pipelineConfig)
 	if err != nil {
@@ -221,9 +222,9 @@ func PipelineConfigToYaml(pipelineConfig *v3.PipelineConfig) ([]byte, error) {
 	return content, nil
 }
 
-func PipelineConfigFromYaml(content []byte) (*v3.PipelineConfig, error) {
+func PipelineConfigFromYaml(content []byte) (*v32.PipelineConfig, error) {
 
-	out := &v3.PipelineConfig{}
+	out := &v32.PipelineConfig{}
 	err := yaml.Unmarshal(content, out)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to parse the pipeline file")

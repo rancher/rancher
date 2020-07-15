@@ -4,7 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,19 +13,19 @@ import (
 func TestDeleteUnusedCerts(t *testing.T) {
 	tests := []struct {
 		name                          string
-		certs                         map[string]v3.CertExpiration
+		certs                         map[string]v32.CertExpiration
 		rancherKubernetesEngineConfig *rketypes.RancherKubernetesEngineConfig
-		expectNewCerts                map[string]v3.CertExpiration
+		expectNewCerts                map[string]v32.CertExpiration
 	}{
 		{
 			name: "Keep valid etcd certs",
-			certs: map[string]v3.CertExpiration{
-				"kube-etcd-172-17-0-3": v3.CertExpiration{},
-				"kube-etcd-172-17-0-4": v3.CertExpiration{},
-				"kube-etcd-172-17-0-5": v3.CertExpiration{},
-				"kube-node":            v3.CertExpiration{},
-				"kube-apiserver":       v3.CertExpiration{},
-				"kube-proxy":           v3.CertExpiration{},
+			certs: map[string]v32.CertExpiration{
+				"kube-etcd-172-17-0-3": v32.CertExpiration{},
+				"kube-etcd-172-17-0-4": v32.CertExpiration{},
+				"kube-etcd-172-17-0-5": v32.CertExpiration{},
+				"kube-node":            v32.CertExpiration{},
+				"kube-apiserver":       v32.CertExpiration{},
+				"kube-proxy":           v32.CertExpiration{},
 			},
 			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
 				Services: rketypes.RKEConfigServices{
@@ -53,25 +54,25 @@ func TestDeleteUnusedCerts(t *testing.T) {
 					},
 				},
 			},
-			expectNewCerts: map[string]v3.CertExpiration{
-				"kube-etcd-172-17-0-3": v3.CertExpiration{},
-				"kube-etcd-172-17-0-4": v3.CertExpiration{},
-				"kube-etcd-172-17-0-5": v3.CertExpiration{},
-				"kube-node":            v3.CertExpiration{},
-				"kube-apiserver":       v3.CertExpiration{},
-				"kube-proxy":           v3.CertExpiration{},
+			expectNewCerts: map[string]v32.CertExpiration{
+				"kube-etcd-172-17-0-3": v32.CertExpiration{},
+				"kube-etcd-172-17-0-4": v32.CertExpiration{},
+				"kube-etcd-172-17-0-5": v32.CertExpiration{},
+				"kube-node":            v32.CertExpiration{},
+				"kube-apiserver":       v32.CertExpiration{},
+				"kube-proxy":           v32.CertExpiration{},
 			},
 		},
 		{
 			name: "Keep valid kubelet certs",
-			certs: map[string]v3.CertExpiration{
-				"kube-node":               v3.CertExpiration{},
-				"kube-kubelet-172-17-0-4": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-3": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-5": v3.CertExpiration{},
-				"kube-etcd-172-17-0-5":    v3.CertExpiration{},
-				"kube-apiserver":          v3.CertExpiration{},
-				"kube-proxy":              v3.CertExpiration{},
+			certs: map[string]v32.CertExpiration{
+				"kube-node":               v32.CertExpiration{},
+				"kube-kubelet-172-17-0-4": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-3": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-5": v32.CertExpiration{},
+				"kube-etcd-172-17-0-5":    v32.CertExpiration{},
+				"kube-apiserver":          v32.CertExpiration{},
+				"kube-proxy":              v32.CertExpiration{},
 			},
 			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
 				Services: rketypes.RKEConfigServices{
@@ -100,27 +101,27 @@ func TestDeleteUnusedCerts(t *testing.T) {
 					},
 				},
 			},
-			expectNewCerts: map[string]v3.CertExpiration{
-				"kube-node":               v3.CertExpiration{},
-				"kube-kubelet-172-17-0-4": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-3": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-5": v3.CertExpiration{},
-				"kube-etcd-172-17-0-5":    v3.CertExpiration{},
-				"kube-apiserver":          v3.CertExpiration{},
-				"kube-proxy":              v3.CertExpiration{},
+			expectNewCerts: map[string]v32.CertExpiration{
+				"kube-node":               v32.CertExpiration{},
+				"kube-kubelet-172-17-0-4": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-3": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-5": v32.CertExpiration{},
+				"kube-etcd-172-17-0-5":    v32.CertExpiration{},
+				"kube-apiserver":          v32.CertExpiration{},
+				"kube-proxy":              v32.CertExpiration{},
 			},
 		},
 		{
 			name: "Remove unused etcd certs",
-			certs: map[string]v3.CertExpiration{
-				"kube-etcd-172-17-0-3":    v3.CertExpiration{},
-				"kube-etcd-172-17-0-4":    v3.CertExpiration{},
-				"kube-etcd-172-17-0-5":    v3.CertExpiration{},
-				"kube-node":               v3.CertExpiration{},
-				"kube-kubelet-172-17-0-4": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-5": v3.CertExpiration{},
-				"kube-apiserver":          v3.CertExpiration{},
-				"kube-proxy":              v3.CertExpiration{},
+			certs: map[string]v32.CertExpiration{
+				"kube-etcd-172-17-0-3":    v32.CertExpiration{},
+				"kube-etcd-172-17-0-4":    v32.CertExpiration{},
+				"kube-etcd-172-17-0-5":    v32.CertExpiration{},
+				"kube-node":               v32.CertExpiration{},
+				"kube-kubelet-172-17-0-4": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-5": v32.CertExpiration{},
+				"kube-apiserver":          v32.CertExpiration{},
+				"kube-proxy":              v32.CertExpiration{},
 			},
 			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
 				Services: rketypes.RKEConfigServices{
@@ -144,25 +145,25 @@ func TestDeleteUnusedCerts(t *testing.T) {
 					},
 				},
 			},
-			expectNewCerts: map[string]v3.CertExpiration{
-				"kube-etcd-172-17-0-5":    v3.CertExpiration{},
-				"kube-node":               v3.CertExpiration{},
-				"kube-kubelet-172-17-0-4": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-5": v3.CertExpiration{},
-				"kube-apiserver":          v3.CertExpiration{},
-				"kube-proxy":              v3.CertExpiration{},
+			expectNewCerts: map[string]v32.CertExpiration{
+				"kube-etcd-172-17-0-5":    v32.CertExpiration{},
+				"kube-node":               v32.CertExpiration{},
+				"kube-kubelet-172-17-0-4": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-5": v32.CertExpiration{},
+				"kube-apiserver":          v32.CertExpiration{},
+				"kube-proxy":              v32.CertExpiration{},
 			},
 		},
 		{
 			name: "Remove unused kubelet certs",
-			certs: map[string]v3.CertExpiration{
-				"kube-kubelet-172-17-0-1": v3.CertExpiration{},
-				"kube-etcd-172-17-0-3":    v3.CertExpiration{},
-				"kube-node":               v3.CertExpiration{},
-				"kube-kubelet-172-17-0-3": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-4": v3.CertExpiration{},
-				"kube-apiserver":          v3.CertExpiration{},
-				"kube-proxy":              v3.CertExpiration{},
+			certs: map[string]v32.CertExpiration{
+				"kube-kubelet-172-17-0-1": v32.CertExpiration{},
+				"kube-etcd-172-17-0-3":    v32.CertExpiration{},
+				"kube-node":               v32.CertExpiration{},
+				"kube-kubelet-172-17-0-3": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-4": v32.CertExpiration{},
+				"kube-apiserver":          v32.CertExpiration{},
+				"kube-proxy":              v32.CertExpiration{},
 			},
 			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
 				Services: rketypes.RKEConfigServices{
@@ -186,24 +187,24 @@ func TestDeleteUnusedCerts(t *testing.T) {
 					},
 				},
 			},
-			expectNewCerts: map[string]v3.CertExpiration{
-				"kube-etcd-172-17-0-3":    v3.CertExpiration{},
-				"kube-node":               v3.CertExpiration{},
-				"kube-kubelet-172-17-0-3": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-4": v3.CertExpiration{},
-				"kube-apiserver":          v3.CertExpiration{},
-				"kube-proxy":              v3.CertExpiration{},
+			expectNewCerts: map[string]v32.CertExpiration{
+				"kube-etcd-172-17-0-3":    v32.CertExpiration{},
+				"kube-node":               v32.CertExpiration{},
+				"kube-kubelet-172-17-0-3": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-4": v32.CertExpiration{},
+				"kube-apiserver":          v32.CertExpiration{},
+				"kube-proxy":              v32.CertExpiration{},
 			},
 		},
 		{
 			name: "Clean up kubelet certs when GenerateServingCertificate is disabled",
-			certs: map[string]v3.CertExpiration{
-				"kube-etcd-172-17-0-3":    v3.CertExpiration{},
-				"kube-node":               v3.CertExpiration{},
-				"kube-kubelet-172-17-0-3": v3.CertExpiration{},
-				"kube-kubelet-172-17-0-4": v3.CertExpiration{},
-				"kube-apiserver":          v3.CertExpiration{},
-				"kube-proxy":              v3.CertExpiration{},
+			certs: map[string]v32.CertExpiration{
+				"kube-etcd-172-17-0-3":    v32.CertExpiration{},
+				"kube-node":               v32.CertExpiration{},
+				"kube-kubelet-172-17-0-3": v32.CertExpiration{},
+				"kube-kubelet-172-17-0-4": v32.CertExpiration{},
+				"kube-apiserver":          v32.CertExpiration{},
+				"kube-proxy":              v32.CertExpiration{},
 			},
 			rancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
 				Services: rketypes.RKEConfigServices{
@@ -227,11 +228,11 @@ func TestDeleteUnusedCerts(t *testing.T) {
 					},
 				},
 			},
-			expectNewCerts: map[string]v3.CertExpiration{
-				"kube-etcd-172-17-0-3": v3.CertExpiration{},
-				"kube-node":            v3.CertExpiration{},
-				"kube-apiserver":       v3.CertExpiration{},
-				"kube-proxy":           v3.CertExpiration{},
+			expectNewCerts: map[string]v32.CertExpiration{
+				"kube-etcd-172-17-0-3": v32.CertExpiration{},
+				"kube-node":            v32.CertExpiration{},
+				"kube-apiserver":       v32.CertExpiration{},
+				"kube-proxy":           v32.CertExpiration{},
 			},
 		},
 	}

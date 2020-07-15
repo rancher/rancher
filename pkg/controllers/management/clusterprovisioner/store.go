@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/rancher/rancher/pkg/encryptedstore"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
 	"github.com/sirupsen/logrus"
 )
 

@@ -3,9 +3,10 @@ package passwordgetter
 import (
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	passwordutil "github.com/rancher/rancher/pkg/api/store/password"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 )
 
 const (
@@ -22,7 +23,7 @@ type PasswordGetter struct {
 	secrets v1.SecretInterface
 }
 
-func (p *PasswordGetter) GetPasswordFromSecret(loggingTarget *mgmtv3.LoggingTargets) (err error) {
+func (p *PasswordGetter) GetPasswordFromSecret(loggingTarget *v32.LoggingTargets) (err error) {
 	if loggingTarget.ElasticsearchConfig != nil && loggingTarget.ElasticsearchConfig.AuthPassword != "" && strings.HasPrefix(loggingTarget.ElasticsearchConfig.AuthPassword, passwordSecretPrefix) {
 		if loggingTarget.ElasticsearchConfig.AuthPassword, err = passwordutil.GetValueForPasswordField(loggingTarget.ElasticsearchConfig.AuthPassword, p.secrets); err != nil {
 			return
@@ -48,7 +49,7 @@ func (p *PasswordGetter) GetPasswordFromSecret(loggingTarget *mgmtv3.LoggingTarg
 	}
 
 	if loggingTarget.FluentForwarderConfig != nil && len(loggingTarget.FluentForwarderConfig.FluentServers) != 0 {
-		var newFluentdServers []mgmtv3.FluentServer
+		var newFluentdServers []v32.FluentServer
 		for _, server := range loggingTarget.FluentForwarderConfig.FluentServers {
 			newServer := server
 			if server.SharedKey != "" && strings.HasPrefix(server.SharedKey, passwordSecretPrefix) {

@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -14,7 +16,7 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAuthToken *oauth2.Token, config *v3.GoogleOauthConfig, testAndEnableAction bool) (v3.Principal, []v3.Principal, error) {
+func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAuthToken *oauth2.Token, config *v32.GoogleOauthConfig, testAndEnableAction bool) (v3.Principal, []v3.Principal, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
 	// use the access token to make requests, get user info
@@ -57,7 +59,7 @@ func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAu
 	return userPrincipal, groupPrincipals, nil
 }
 
-func (g *googleOauthProvider) fetchParentGroups(config *v3.GoogleOauthConfig, groupPrincipals []v3.Principal, adminSvc *admin.Service, hostedDomain string) ([]v3.Principal, error) {
+func (g *googleOauthProvider) fetchParentGroups(config *v32.GoogleOauthConfig, groupPrincipals []v3.Principal, adminSvc *admin.Service, hostedDomain string) ([]v3.Principal, error) {
 	groupMap := make(map[string]bool)
 	var nestedGroupPrincipals []v3.Principal
 	for _, principal := range groupPrincipals {
@@ -73,7 +75,7 @@ func (g *googleOauthProvider) fetchParentGroups(config *v3.GoogleOauthConfig, gr
 	return groupPrincipals, nil
 }
 
-func (g *googleOauthProvider) getGroupsUserBelongsTo(adminSvc *admin.Service, userKey string, hostedDomain string, config *v3.GoogleOauthConfig) ([]v3.Principal, error) {
+func (g *googleOauthProvider) getGroupsUserBelongsTo(adminSvc *admin.Service, userKey string, hostedDomain string, config *v32.GoogleOauthConfig) ([]v3.Principal, error) {
 	var groupPrincipals []v3.Principal
 	_, groups, err := g.paginateResults(adminSvc, hostedDomain, userKey, "", "", groupType, false)
 	if err != nil {
@@ -97,7 +99,7 @@ func (g *googleOauthProvider) getGroupsUserBelongsTo(adminSvc *admin.Service, us
 	return groupPrincipals, nil
 }
 
-func (g *googleOauthProvider) searchPrincipals(adminSvc *admin.Service, searchKey, principalType string, config *v3.GoogleOauthConfig) ([]Account, error) {
+func (g *googleOauthProvider) searchPrincipals(adminSvc *admin.Service, searchKey, principalType string, config *v32.GoogleOauthConfig) ([]Account, error) {
 	var accounts []Account
 
 	if principalType == "" || principalType == "user" {
@@ -137,7 +139,7 @@ func (g *googleOauthProvider) searchPrincipals(adminSvc *admin.Service, searchKe
 	return accounts, nil
 }
 
-func (g *googleOauthProvider) searchUsers(adminSvc *admin.Service, searchKey string, config *v3.GoogleOauthConfig, viewPublic bool) ([]Account, error) {
+func (g *googleOauthProvider) searchUsers(adminSvc *admin.Service, searchKey string, config *v32.GoogleOauthConfig, viewPublic bool) ([]Account, error) {
 	var users []*admin.User
 	var accounts []Account
 	users, _, err := g.paginateResults(adminSvc, config.Hostname, "", searchKey, "", userType, viewPublic)
@@ -161,7 +163,7 @@ func (g *googleOauthProvider) searchUsers(adminSvc *admin.Service, searchKey str
 	return accounts, nil
 }
 
-func (g *googleOauthProvider) searchGroups(adminSvc *admin.Service, searchKey string, config *v3.GoogleOauthConfig) ([]Account, error) {
+func (g *googleOauthProvider) searchGroups(adminSvc *admin.Service, searchKey string, config *v32.GoogleOauthConfig) ([]Account, error) {
 	var accounts []Account
 	groupsMap := map[string]*admin.Group{}
 	for _, attr := range []string{"name", "email"} {
@@ -228,7 +230,7 @@ func (g *googleOauthProvider) paginateResults(adminSvc *admin.Service, hostedDom
 	}
 }
 
-func (g *googleOauthProvider) gatherParentGroups(groupPrincipal v3.Principal, adminSvc *admin.Service, config *v3.GoogleOauthConfig, hostedDomain string, groupMap map[string]bool) ([]v3.Principal, error) {
+func (g *googleOauthProvider) gatherParentGroups(groupPrincipal v3.Principal, adminSvc *admin.Service, config *v32.GoogleOauthConfig, hostedDomain string, groupMap map[string]bool) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	if groupMap[groupPrincipal.ObjectMeta.Name] {
 		return principals, nil
@@ -261,7 +263,7 @@ func (g *googleOauthProvider) gatherParentGroups(groupPrincipal v3.Principal, ad
 	return principals, nil
 }
 
-func (g *googleOauthProvider) getdirectoryServiceFromStoredToken(storedOauthToken string, config *v3.GoogleOauthConfig) (*admin.Service, error) {
+func (g *googleOauthProvider) getdirectoryServiceFromStoredToken(storedOauthToken string, config *v32.GoogleOauthConfig) (*admin.Service, error) {
 	var oauthToken oauth2.Token
 	if err := json.Unmarshal([]byte(storedOauthToken), &oauthToken); err != nil {
 		return nil, err

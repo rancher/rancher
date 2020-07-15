@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,16 +19,16 @@ type podHandler struct {
 }
 
 func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) {
-	if pod == nil || pod.DeletionTimestamp != nil || !strings.HasPrefix(pod.Name, v3.DefaultSonobuoyPodName) {
+	if pod == nil || pod.DeletionTimestamp != nil || !strings.HasPrefix(pod.Name, v32.DefaultSonobuoyPodName) {
 		return nil, nil
 	}
 	// Check the annotation to see if it's done processing
-	done, ok := pod.Annotations[v3.SonobuoyCompletionAnnotation]
+	done, ok := pod.Annotations[v32.SonobuoyCompletionAnnotation]
 	if !ok {
 		return nil, nil
 	}
 
-	owner, ok := pod.Annotations[v3.CisHelmChartOwner]
+	owner, ok := pod.Annotations[v32.CisHelmChartOwner]
 	if !ok {
 		return nil, nil
 	}
@@ -39,12 +41,12 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) 
 		return nil, nil
 	}
 
-	if !v3.ClusterScanConditionCompleted.IsTrue(cs) && v3.ClusterScanConditionRunCompleted.IsUnknown(cs) {
-		v3.ClusterScanConditionRunCompleted.True(cs)
+	if !v32.ClusterScanConditionCompleted.IsTrue(cs) && v32.ClusterScanConditionRunCompleted.IsUnknown(cs) {
+		v32.ClusterScanConditionRunCompleted.True(cs)
 		if done != "true" {
-			v3.ClusterScanConditionFailed.True(cs)
+			v32.ClusterScanConditionFailed.True(cs)
 			if done != "error" {
-				v3.ClusterScanConditionFailed.Message(cs, done)
+				v32.ClusterScanConditionFailed.Message(cs, done)
 			}
 		}
 		_, err = ph.clusterScanClient.Update(cs)

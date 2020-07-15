@@ -341,7 +341,7 @@ func describeStruct(ctx *ctx, typ reflect2.Type) *StructDescriptor {
 		if ctx.onlyTaggedField && !hastag && !field.Anonymous() {
 			continue
 		}
-		if tag == "-" || field.Name() == "_" {
+		if tag == "-" {
 			continue
 		}
 		tagParts := strings.Split(tag, ",")

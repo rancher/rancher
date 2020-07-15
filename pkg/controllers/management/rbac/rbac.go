@@ -5,8 +5,9 @@ import (
 	"reflect"
 	"sort"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/types/apis/rbac.authorization.k8s.io/v1"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +39,7 @@ var subjectWithAllUsers = k8srbacv1.Subject{
 	APIGroup: rbacv1.GroupName,
 }
 
-func CreateRoleAndRoleBinding(resource, kind, name, namespace, apiVersion, creatorID string, apiGroup []string, UID types.UID, members []v3.Member,
+func CreateRoleAndRoleBinding(resource, kind, name, namespace, apiVersion, creatorID string, apiGroup []string, UID types.UID, members []v32.Member,
 	mgmt *config.ManagementContext) error {
 	/* Create 3 Roles containing the CRD, and the current CR in resourceNames list
 	1. Role with owner verbs (Owner access, includes creator); name multiclusterapp.Name + "-ma" / (globalDNS.Name + "-ga")
@@ -262,7 +263,7 @@ func deleteRoleAndRoleBinding(roleName, namespace string, mgmt *config.Managemen
 	return nil
 }
 
-func buildSubjectForMember(member v3.Member, managementContext *config.ManagementContext) (k8srbacv1.Subject, error) {
+func buildSubjectForMember(member v32.Member, managementContext *config.ManagementContext) (k8srbacv1.Subject, error) {
 	var name, kind string
 	member, err := checkAndSetUserFields(member, managementContext)
 	if err != nil {
@@ -298,7 +299,7 @@ func buildSubjectForMember(member v3.Member, managementContext *config.Managemen
 	}, nil
 }
 
-func checkAndSetUserFields(m v3.Member, managementContext *config.ManagementContext) (v3.Member, error) {
+func checkAndSetUserFields(m v32.Member, managementContext *config.ManagementContext) (v32.Member, error) {
 	if m.GroupPrincipalName != "" || (m.UserPrincipalName != "" && m.UserName != "") {
 		return m, nil
 	}

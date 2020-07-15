@@ -8,13 +8,14 @@ import (
 	"os"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 )
 
 type syslogTestWrap struct {
-	*v3.SyslogConfig
+	*v32.SyslogConfig
 }
 
 func (w *syslogTestWrap) TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error {

@@ -8,21 +8,23 @@ import (
 	"path"
 	"strings"
 
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	mgmtv3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	mgmtv3client "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 
@@ -69,14 +71,14 @@ func CollectionFormatter(apiContext *types.APIContext, resource *types.GenericCo
 }
 
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	var target mgmtv3.LoggingTargets
+	var target v33.LoggingTargets
 	var clusterName, projectID, projectName, level, containerLogSourceTag string
 	var outputTags map[string]string
 
 	switch apiContext.Type {
 	case mgmtv3client.ClusterLoggingType:
 
-		var input mgmtv3.ClusterTestInput
+		var input v33.ClusterTestInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
 			return err
@@ -97,7 +99,7 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 
 	case mgmtv3client.ProjectLoggingType:
 
-		var input mgmtv3.ProjectTestInput
+		var input v33.ProjectTestInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
 			return err
@@ -147,7 +149,7 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 
 }
 
-func (h *Handler) testLoggingTarget(ctx context.Context, clusterName string, target mgmtv3.LoggingTargets) error {
+func (h *Handler) testLoggingTarget(ctx context.Context, clusterName string, target v33.LoggingTargets) error {
 	clusterDialer, err := h.dialerFactory.ClusterDialer(clusterName)
 	if err != nil {
 		return errors.Wrap(err, "get cluster dialer failed")
@@ -161,7 +163,7 @@ func (h *Handler) testLoggingTarget(ctx context.Context, clusterName string, tar
 	return wp.TestReachable(ctx, clusterDialer, true)
 }
 
-func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clusterName, projectID string, target mgmtv3.LoggingTargets) error {
+func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clusterName, projectID string, target v33.LoggingTargets) error {
 	context, err := h.clusterManager.UserContext(clusterName)
 	if err != nil {
 		return err
@@ -178,7 +180,7 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 	tmpCertDir := fmt.Sprintf("%s/%s", tmpCertDirPrefix, uuid.NewV4().String())
 	if level == loggingconfig.ClusterLevel {
 		clusterLogging := &mgmtv3.ClusterLogging{
-			Spec: mgmtv3.ClusterLoggingSpec{
+			Spec: v33.ClusterLoggingSpec{
 				LoggingTargets: target,
 				ClusterName:    clusterName,
 			},
@@ -192,7 +194,7 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 		certScretKeyName = clusterName
 	} else {
 		new := &mgmtv3.ProjectLogging{
-			Spec: mgmtv3.ProjectLoggingSpec{
+			Spec: v33.ProjectLoggingSpec{
 				LoggingTargets: target,
 				ProjectName:    projectID,
 			},

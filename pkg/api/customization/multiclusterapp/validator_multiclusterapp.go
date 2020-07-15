@@ -8,17 +8,19 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/values"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	pv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -185,7 +187,7 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 				if val, ok := app.Labels["mcapp"]; !ok || val != mcapp.Name {
 					return false, fmt.Errorf("app %s in %s missing multi cluster app label", t.AppName, projectNS)
 				}
-				pv3.AppConditionUserTriggeredAction.True(app)
+				v32.AppConditionUserTriggeredAction.True(app)
 				if _, err := w.Apps.Update(app); err != nil {
 					if apierrors.IsConflict(err) {
 						return false, nil

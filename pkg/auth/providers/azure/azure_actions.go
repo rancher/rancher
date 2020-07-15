@@ -6,15 +6,15 @@ import (
 	"net/http"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 )
 
 func (ap *azureProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -59,14 +59,14 @@ func (ap *azureProvider) configureTest(actionName string, action *types.Action, 
 }
 
 func (ap *azureProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
-	azureADConfigApplyInput := &v3.AzureADConfigApplyInput{}
+	azureADConfigApplyInput := &v32.AzureADConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(azureADConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
 
 	azureADConfig := azureADConfigApplyInput.Config
-	azureLogin := &v3public.AzureADLogin{
+	azureLogin := &v32.AzureADLogin{
 		Code: azureADConfigApplyInput.Code,
 	}
 

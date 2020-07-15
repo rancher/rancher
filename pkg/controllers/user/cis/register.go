@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
@@ -39,17 +41,17 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	projectLister := userContext.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister()
 
 	nsClient := userContext.Core.Namespaces(metav1.NamespaceAll)
-	cmClient := userContext.Core.ConfigMaps(v3.DefaultNamespaceForCis)
+	cmClient := userContext.Core.ConfigMaps(v32.DefaultNamespaceForCis)
 	cmLister := cmClient.Controller().Lister()
 	appClient := userContext.Management.Project.Apps(metav1.NamespaceAll)
 	catalogTemplateVersionLister := userContext.Management.Management.CatalogTemplateVersions(metav1.NamespaceAll).Controller().Lister()
 	systemAccountManager := systemaccount.NewManager(userContext.Management)
 
 	clusterScanClient := userContext.Management.Management.ClusterScans(clusterName)
-	podClient := userContext.Core.Pods(v3.DefaultNamespaceForCis)
+	podClient := userContext.Core.Pods(v32.DefaultNamespaceForCis)
 	podLister := podClient.Controller().Lister()
 
-	dsClient := userContext.Apps.DaemonSets(v3.DefaultNamespaceForCis)
+	dsClient := userContext.Apps.DaemonSets(v32.DefaultNamespaceForCis)
 	dsLister := dsClient.Controller().Lister()
 
 	cisConfig := userContext.Management.Management.CisConfigs(namespace.GlobalNamespace)

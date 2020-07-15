@@ -1,9 +1,9 @@
 package rbac
 
 import (
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	v12 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

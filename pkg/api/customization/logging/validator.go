@@ -3,17 +3,18 @@ package logging
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
 	loggingutils "github.com/rancher/rancher/pkg/controllers/user/logging/utils"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 func ClusterLoggingValidator(resquest *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	var spec v3.ClusterLoggingSpec
+	var spec v32.ClusterLoggingSpec
 	if err := convert.ToObj(data, &spec); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
@@ -22,7 +23,7 @@ func ClusterLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 }
 
 func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	var spec v3.ProjectLoggingSpec
+	var spec v32.ProjectLoggingSpec
 	if err := convert.ToObj(data, &spec); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
@@ -30,7 +31,7 @@ func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 	return validate(loggingconfig.ProjectLevel, spec.ProjectName, spec.LoggingTargets, spec.OutputTags)
 }
 
-func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTargets, outputTags map[string]string) error {
+func validate(level, containerLogSourceTag string, loggingTargets v32.LoggingTargets, outputTags map[string]string) error {
 	if loggingTargets.KafkaConfig != nil {
 		if err := validateKafka(loggingTargets.KafkaConfig); err != nil {
 			return err
@@ -46,7 +47,7 @@ func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTarg
 		return nil
 	}
 
-	loggingCommomFileds := v3.LoggingCommonField{
+	loggingCommomFileds := v32.LoggingCommonField{
 		OutputTags: outputTags,
 	}
 
@@ -84,7 +85,7 @@ func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTarg
 	return generator.ValidateCustomTarget(wrap)
 }
 
-func validateKafka(kafkaConfig *v3.KafkaConfig) error {
+func validateKafka(kafkaConfig *v32.KafkaConfig) error {
 	if kafkaConfig.SaslType == "plain" && kafkaConfig.ClientCert == "" && kafkaConfig.ClientKey == "" {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "Plain SASL authentication requires SSL is configured")
 	}

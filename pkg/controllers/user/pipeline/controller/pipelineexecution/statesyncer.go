@@ -4,12 +4,14 @@ import (
 	"context"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/norman/controller"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/engine"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/ticker"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -58,15 +60,15 @@ func (s *ExecutionStateSyncer) syncState() {
 	}
 
 	for _, execution := range executions {
-		if v3.PipelineExecutionConditionInitialized.IsUnknown(execution) {
+		if v32.PipelineExecutionConditionInitialized.IsUnknown(execution) {
 			s.checkAndRun(execution)
-		} else if v3.PipelineExecutionConditionInitialized.IsTrue(execution) {
+		} else if v32.PipelineExecutionConditionInitialized.IsTrue(execution) {
 			e := execution.DeepCopy()
 			updated, err := s.pipelineEngine.SyncExecution(e)
 			if err != nil {
 				logrus.Errorf("got error in syncExecution: %v", err)
-				v3.PipelineExecutionConditionBuilt.False(e)
-				v3.PipelineExecutionConditionBuilt.ReasonAndMessageFromError(e, err)
+				v32.PipelineExecutionConditionBuilt.False(e)
+				v32.PipelineExecutionConditionBuilt.ReasonAndMessageFromError(e, err)
 				e.Status.ExecutionState = utils.StateFailed
 				updated = true
 			}
@@ -90,8 +92,8 @@ func (s *ExecutionStateSyncer) checkAndRun(execution *v3.PipelineExecution) {
 	ready, err := s.pipelineEngine.PreCheck(execution)
 	if err != nil {
 		e := execution.DeepCopy()
-		v3.PipelineExecutionConditionBuilt.False(e)
-		v3.PipelineExecutionConditionBuilt.ReasonAndMessageFromError(e, err)
+		v32.PipelineExecutionConditionBuilt.False(e)
+		v32.PipelineExecutionConditionBuilt.ReasonAndMessageFromError(e, err)
 		e.Status.ExecutionState = utils.StateFailed
 		if err := s.updateExecutionAndLastRunState(e); err != nil {
 			logrus.Error(err)
@@ -100,24 +102,24 @@ func (s *ExecutionStateSyncer) checkAndRun(execution *v3.PipelineExecution) {
 	if ready {
 		e := execution.DeepCopy()
 		if err := s.pipelineEngine.RunPipelineExecution(e); err != nil {
-			v3.PipelineExecutionConditionProvisioned.False(e)
-			v3.PipelineExecutionConditionProvisioned.ReasonAndMessageFromError(e, err)
+			v32.PipelineExecutionConditionProvisioned.False(e)
+			v32.PipelineExecutionConditionProvisioned.ReasonAndMessageFromError(e, err)
 			e.Status.ExecutionState = utils.StateFailed
 			if err := s.updateExecutionAndLastRunState(e); err != nil {
 				logrus.Error(err)
 			}
 			return
 		}
-		v3.PipelineExecutionConditionInitialized.True(e)
-		v3.PipelineExecutionConditionProvisioned.CreateUnknownIfNotExists(e)
-		v3.PipelineExecutionConditionProvisioned.Message(e, "Assigning jobs to pipeline engine")
+		v32.PipelineExecutionConditionInitialized.True(e)
+		v32.PipelineExecutionConditionProvisioned.CreateUnknownIfNotExists(e)
+		v32.PipelineExecutionConditionProvisioned.Message(e, "Assigning jobs to pipeline engine")
 		if err := s.updateExecutionAndLastRunState(e); err != nil {
 			logrus.Error(err)
 		}
 	}
-	if v3.PipelineExecutionConditionInitialized.GetMessage(execution) == "" {
+	if v32.PipelineExecutionConditionInitialized.GetMessage(execution) == "" {
 		e := execution.DeepCopy()
-		v3.PipelineExecutionConditionInitialized.Message(e, "Setting up jenkins. If it is not deployed, this can take a few minutes.")
+		v32.PipelineExecutionConditionInitialized.Message(e, "Setting up jenkins. If it is not deployed, this can take a few minutes.")
 		if err := s.updateExecutionAndLastRunState(e); err != nil {
 			logrus.Error(err)
 		}
@@ -126,8 +128,8 @@ func (s *ExecutionStateSyncer) checkAndRun(execution *v3.PipelineExecution) {
 }
 
 func (s *ExecutionStateSyncer) updateExecutionAndLastRunState(execution *v3.PipelineExecution) error {
-	if v3.PipelineExecutionConditionInitialized.IsFalse(execution) || v3.PipelineExecutionConditionProvisioned.IsFalse(execution) ||
-		v3.PipelineExecutionConditionBuilt.IsFalse(execution) {
+	if v32.PipelineExecutionConditionInitialized.IsFalse(execution) || v32.PipelineExecutionConditionProvisioned.IsFalse(execution) ||
+		v32.PipelineExecutionConditionBuilt.IsFalse(execution) {
 		execution.Labels[utils.PipelineFinishLabel] = "true"
 
 		if execution.Status.Ended == "" {

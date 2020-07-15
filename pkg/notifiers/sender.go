@@ -19,9 +19,11 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 )
 
@@ -77,7 +79,7 @@ func SendMessage(ctx context.Context, notifier *v3.Notifier, recipient string, m
 	return errors.New("Notifier not configured")
 }
 
-func TestPagerduty(key, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+func TestPagerduty(key, msg string, cfg *v32.HTTPClientConfig, dialer dialer.Dialer) error {
 	if msg == "" {
 		msg = "Pagerduty setting validated"
 	}
@@ -117,7 +119,7 @@ func TestPagerduty(key, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dial
 	return nil
 }
 
-func TestWechat(secret, agent, corp, receiverType, receiver, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+func TestWechat(secret, agent, corp, receiverType, receiver, msg string, cfg *v32.HTTPClientConfig, dialer dialer.Dialer) error {
 	if msg == "" {
 		msg = "Wechat setting validated"
 	}
@@ -207,7 +209,7 @@ func TestWechat(secret, agent, corp, receiverType, receiver, msg string, cfg *v3
 	return nil
 }
 
-func TestWebhook(url, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+func TestWebhook(url, msg string, cfg *v32.HTTPClientConfig, dialer dialer.Dialer) error {
 	if msg == "" {
 		msg = "Webhook setting validated"
 	}
@@ -242,7 +244,7 @@ func TestWebhook(url, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer
 	return nil
 }
 
-func TestSlack(url, channel, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+func TestSlack(url, channel, msg string, cfg *v32.HTTPClientConfig, dialer dialer.Dialer) error {
 	if msg == "" {
 		msg = "Slack setting validated"
 	}
@@ -512,7 +514,7 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 
 // NewClientFromConfig returns a new HTTP client configured for the
 // given HTTPClientConfig.
-func NewClientFromConfig(cfg *v3.HTTPClientConfig, dialer dialer.Dialer) (*http.Client, error) {
+func NewClientFromConfig(cfg *v32.HTTPClientConfig, dialer dialer.Dialer) (*http.Client, error) {
 	client := http.Client{
 		Timeout: time.Second * 10,
 	}
@@ -540,7 +542,7 @@ func post(client *http.Client, url string, bodyType string, body io.Reader) (*ht
 	return client.Do(req)
 }
 
-func IsHTTPClientConfigSet(cfg *v3.HTTPClientConfig) bool {
+func IsHTTPClientConfigSet(cfg *v32.HTTPClientConfig) bool {
 	if cfg != nil && cfg.ProxyURL != "" {
 		return true
 	}

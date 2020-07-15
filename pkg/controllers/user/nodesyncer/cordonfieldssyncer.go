@@ -7,10 +7,12 @@ import (
 	"sync"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/types/convert"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubectl"
 	nodehelper "github.com/rancher/rancher/pkg/node"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,7 +133,7 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 
 		stopped := false
 		nodeName := obj.Spec.RequestedHostname
-		updatedObj, err := v3.NodeConditionDrained.DoUntilTrue(obj, func() (runtime.Object, error) {
+		updatedObj, err := v32.NodeConditionDrained.DoUntilTrue(obj, func() (runtime.Object, error) {
 			kubeConfig, err := d.getKubeConfig()
 			if err != nil {
 				logrus.Errorf("nodeDrain: error getting kubeConfig for node %s", obj.Name)
@@ -221,7 +223,7 @@ func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, error) {
 	return kubeConfig, nil
 }
 
-func getFlags(input *v3.NodeDrainInput) []string {
+func getFlags(input *v32.NodeDrainInput) []string {
 	return []string{
 		fmt.Sprintf("--delete-local-data=%v", input.DeleteLocalData),
 		fmt.Sprintf("--force=%v", input.Force),
@@ -270,7 +272,7 @@ func removeDrainCondition(obj *v3.Node) {
 		}
 	}
 	if exists {
-		var conditions []v3.NodeCondition
+		var conditions []v32.NodeCondition
 		for _, condition := range obj.Status.Conditions {
 			if condition.Type == "Drained" {
 				continue
@@ -301,17 +303,17 @@ func ignoreErr(msg string) (bool, bool) {
 }
 
 func setConditionDraining(node *v3.Node, err error, kubeErr error) {
-	v3.NodeConditionDrained.Unknown(node)
-	v3.NodeConditionDrained.Reason(node, "")
-	v3.NodeConditionDrained.Message(node, "")
+	v32.NodeConditionDrained.Unknown(node)
+	v32.NodeConditionDrained.Reason(node, "")
+	v32.NodeConditionDrained.Message(node, "")
 }
 
 func setConditionComplete(node *v3.Node, err error, kubeErr error) {
 	if err == nil {
-		v3.NodeConditionDrained.True(node)
+		v32.NodeConditionDrained.True(node)
 	} else {
-		v3.NodeConditionDrained.False(node)
-		v3.NodeConditionDrained.ReasonAndMessageFromError(node, err)
+		v32.NodeConditionDrained.False(node)
+		v32.NodeConditionDrained.ReasonAndMessageFromError(node, err)
 	}
 	if kubeErr == nil {
 		node.Spec.DesiredNodeUnschedulable = ""

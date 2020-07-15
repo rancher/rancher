@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"reflect"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/condition"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +55,7 @@ func (ps *projectSyncer) Sync(key string, p *v3.Project) (runtime.Object, error)
 }
 
 func (ps *projectSyncer) createDefaultNetworkPolicy(p *v3.Project) (*v3.Project, error) {
-	updated, err := v3.DefaultNetworkPolicyCreated.Do(p, func() (runtime.Object, error) {
+	updated, err := v32.DefaultNetworkPolicyCreated.Do(p, func() (runtime.Object, error) {
 		o, err := meta.Accessor(p)
 		if err != nil {
 			return p, condition.Error("MissingMetadata", err)
@@ -73,7 +75,7 @@ func (ps *projectSyncer) createDefaultNetworkPolicy(p *v3.Project) (*v3.Project,
 					Name:      defaultPolicyName,
 					Namespace: projectName,
 				},
-				Spec: v3.ProjectNetworkPolicySpec{
+				Spec: v32.ProjectNetworkPolicySpec{
 					Description: pnpDesc,
 					ProjectName: o.GetNamespace() + ":" + projectName,
 				},

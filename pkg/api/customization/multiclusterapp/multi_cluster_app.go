@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -16,9 +18,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -120,7 +121,7 @@ func (w Wrapper) addProjects(request *types.APIContext) error {
 			existingProjects[p] = true
 		}
 		for _, name := range inputProjects {
-			mcapp.Spec.Targets = append(mcapp.Spec.Targets, v3.Target{ProjectName: name})
+			mcapp.Spec.Targets = append(mcapp.Spec.Targets, v32.Target{ProjectName: name})
 		}
 		if len(inputAnswers) > 0 {
 			mcapp.Spec.Answers = append(mcapp.Spec.Answers, inputAnswers...)
@@ -159,7 +160,7 @@ func (w Wrapper) removeProjects(request *types.APIContext) error {
 			return false, err
 		}
 		toRemoveProjects := make(map[string]bool)
-		var finalTargets []v3.Target
+		var finalTargets []v32.Target
 		for _, p := range inputProjects {
 			toRemoveProjects[p] = true
 		}
@@ -189,13 +190,13 @@ func (w Wrapper) removeProjects(request *types.APIContext) error {
 	return nil
 }
 
-func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) ([]string, []v3.Answer, error) {
+func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) ([]string, []v32.Answer, error) {
 	split := strings.SplitN(request.ID, ":", 2)
 	if len(split) != 2 {
-		return []string{}, []v3.Answer{}, fmt.Errorf("incorrect multi cluster app ID %v", request.ID)
+		return []string{}, []v32.Answer{}, fmt.Errorf("incorrect multi cluster app ID %v", request.ID)
 	}
 	var inputProjects []string
-	var inputAnswers []v3.Answer
+	var inputAnswers []v32.Answer
 	mcapp, err := w.MultiClusterApps.GetNamespaced(split[0], split[1], v1.GetOptions{})
 	if err != nil {
 		return inputProjects, inputAnswers, err
@@ -249,7 +250,7 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) ([
 		}
 	}
 	for _, a := range updateMultiClusterAppTargetsInput.Answers {
-		inputAnswers = append(inputAnswers, v3.Answer{
+		inputAnswers = append(inputAnswers, v32.Answer{
 			ProjectName: a.ProjectID,
 			ClusterName: a.ClusterID,
 			Values:      a.Values,

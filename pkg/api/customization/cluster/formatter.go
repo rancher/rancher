@@ -3,13 +3,15 @@ package cluster
 import (
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -57,14 +59,14 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	shellLink = strings.Replace(shellLink, "http", "ws", 1)
 	shellLink = strings.Replace(shellLink, "/shell", "?shell=true", 1)
 	resource.Links["shell"] = shellLink
-	resource.AddAction(request, v3.ClusterActionGenerateKubeconfig)
-	resource.AddAction(request, v3.ClusterActionImportYaml)
+	resource.AddAction(request, v32.ClusterActionGenerateKubeconfig)
+	resource.AddAction(request, v32.ClusterActionImportYaml)
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
-		resource.AddAction(request, v3.ClusterActionExportYaml)
-		resource.AddAction(request, v3.ClusterActionRotateCertificates)
+		resource.AddAction(request, v32.ClusterActionExportYaml)
+		resource.AddAction(request, v32.ClusterActionRotateCertificates)
 		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
-			resource.AddAction(request, v3.ClusterActionBackupEtcd)
-			resource.AddAction(request, v3.ClusterActionRestoreFromEtcdBackup)
+			resource.AddAction(request, v32.ClusterActionBackupEtcd)
+			resource.AddAction(request, v32.ClusterActionRestoreFromEtcdBackup)
 		}
 		isActiveCluster := false
 		if resource.Values["state"] == "active" {
@@ -78,30 +80,30 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			canUpdateCluster := canUserUpdateCluster(request, resource)
 			logrus.Debugf("isActiveCluster: %v isWindowsCluster: %v user: %v, canUpdateCluster: %v", isActiveCluster, isWindowsCluster, request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
 			if canUpdateCluster {
-				resource.AddAction(request, v3.ClusterActionRunSecurityScan)
+				resource.AddAction(request, v32.ClusterActionRunSecurityScan)
 			}
 		}
 	}
 
 	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {
 		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-			resource.AddAction(request, v3.ClusterActionDisableMonitoring)
-			resource.AddAction(request, v3.ClusterActionEditMonitoring)
+			resource.AddAction(request, v32.ClusterActionDisableMonitoring)
+			resource.AddAction(request, v32.ClusterActionEditMonitoring)
 		} else {
-			resource.AddAction(request, v3.ClusterActionEnableMonitoring)
+			resource.AddAction(request, v32.ClusterActionEnableMonitoring)
 		}
 		if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
 				callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
 				if canCreateTemplates, _ := CanCreateRKETemplate(callerID, f.SubjectAccessReviewClient); canCreateTemplates {
-					resource.AddAction(request, v3.ClusterActionSaveAsTemplate)
+					resource.AddAction(request, v32.ClusterActionSaveAsTemplate)
 				}
 			}
 		}
 	}
 
 	if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-		resource.AddAction(request, v3.ClusterActionViewMonitoring)
+		resource.AddAction(request, v32.ClusterActionViewMonitoring)
 	}
 
 	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok {

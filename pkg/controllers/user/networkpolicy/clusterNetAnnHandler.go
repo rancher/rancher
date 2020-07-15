@@ -2,7 +2,8 @@ package networkpolicy
 
 import (
 	"github.com/rancher/norman/types/convert"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -21,7 +22,7 @@ type clusterNetAnnHandler struct {
 func (cn *clusterNetAnnHandler) Sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil ||
 		cluster.Name != cn.clusterNamespace ||
-		!v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		!v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, nil
 	}
 

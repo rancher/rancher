@@ -10,12 +10,13 @@ import (
 	"sort"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	workloadUtil "github.com/rancher/rancher/pkg/controllers/user/workload"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -75,7 +76,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", i.sync)
 }
 
-func areEqualEndpoints(one []v3.PublicEndpoint, two []v3.PublicEndpoint) bool {
+func areEqualEndpoints(one []v32.PublicEndpoint, two []v32.PublicEndpoint) bool {
 	oneMap := map[string]bool{}
 	twoMap := map[string]bool{}
 	for _, value := range one {
@@ -87,7 +88,7 @@ func areEqualEndpoints(one []v3.PublicEndpoint, two []v3.PublicEndpoint) bool {
 	return reflect.DeepEqual(oneMap, twoMap)
 }
 
-func publicEndpointsToString(eps []v3.PublicEndpoint) (string, error) {
+func publicEndpointsToString(eps []v32.PublicEndpoint) (string, error) {
 	b, err := json.Marshal(eps)
 	if err != nil {
 		return "", err
@@ -95,8 +96,8 @@ func publicEndpointsToString(eps []v3.PublicEndpoint) (string, error) {
 	return string(b), nil
 }
 
-func getPublicEndpointsFromAnnotations(annotations map[string]string) []v3.PublicEndpoint {
-	var eps []v3.PublicEndpoint
+func getPublicEndpointsFromAnnotations(annotations map[string]string) []v32.PublicEndpoint {
+	var eps []v32.PublicEndpoint
 	if annotations == nil {
 		return eps
 	}
@@ -110,8 +111,8 @@ func getPublicEndpointsFromAnnotations(annotations map[string]string) []v3.Publi
 	return eps
 }
 
-func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, node *managementv3.Node, allNodesIP string) ([]v3.PublicEndpoint, error) {
-	var eps []v3.PublicEndpoint
+func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, node *managementv3.Node, allNodesIP string) ([]v32.PublicEndpoint, error) {
+	var eps []v32.PublicEndpoint
 	if svc.DeletionTimestamp != nil {
 		return eps, nil
 	}
@@ -135,7 +136,7 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, no
 			if port.NodePort == 0 {
 				continue
 			}
-			p := v3.PublicEndpoint{
+			p := v32.PublicEndpoint{
 				NodeName:    nodeName,
 				Port:        port.NodePort,
 				Addresses:   addresses,
@@ -160,7 +161,7 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, no
 		}
 		if len(addresses) > 0 {
 			for _, port := range svc.Spec.Ports {
-				p := v3.PublicEndpoint{
+				p := v32.PublicEndpoint{
 					NodeName:    "",
 					Addresses:   addresses,
 					Port:        port.Port,
@@ -176,8 +177,8 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, no
 	return eps, nil
 }
 
-func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *managementv3.Node) ([]v3.PublicEndpoint, error) {
-	var eps []v3.PublicEndpoint
+func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *managementv3.Node) ([]v32.PublicEndpoint, error) {
+	var eps []v32.PublicEndpoint
 	if pod.DeletionTimestamp != nil {
 		return eps, nil
 	}
@@ -198,7 +199,7 @@ func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *manage
 			} else {
 				address = nodehelper.GetEndpointNodeIP(node)
 			}
-			p := v3.PublicEndpoint{
+			p := v32.PublicEndpoint{
 				NodeName:  fmt.Sprintf("%s:%s", clusterName, node.Name),
 				Addresses: []string{address},
 				Port:      p.HostPort,
@@ -213,7 +214,7 @@ func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *manage
 	return eps, nil
 }
 
-func publicEndpointToString(p v3.PublicEndpoint) string {
+func publicEndpointToString(p v32.PublicEndpoint) string {
 	sort.Strings(p.Addresses)
 	return fmt.Sprintf("%s_%v_%v_%s_%s_%s_%s_%s_%s", p.NodeName, p.Addresses, p.Port, p.Protocol, p.ServiceName, p.PodName, p.IngressName, p.Hostname, p.Path)
 }
@@ -270,8 +271,8 @@ func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterN
 	return addresses[0], nil
 }
 
-func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool) map[string][]v3.PublicEndpoint {
-	epsMap := map[string][]v3.PublicEndpoint{}
+func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool) map[string][]v32.PublicEndpoint {
+	epsMap := map[string][]v32.PublicEndpoint{}
 	if len(obj.Status.LoadBalancer.Ingress) == 0 {
 		return epsMap
 	}
@@ -319,7 +320,7 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 						continue
 					}
 				}
-				p := v3.PublicEndpoint{
+				p := v32.PublicEndpoint{
 					Hostname:    rule.Host,
 					Path:        path.Path,
 					ServiceName: fmt.Sprintf("%s:%s", obj.Namespace, path.Backend.ServiceName),
@@ -336,9 +337,9 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 	return epsMap
 }
 
-func convertIngressToPublicEndpoints(obj *extensionsv1beta1.Ingress, isRKE bool) []v3.PublicEndpoint {
+func convertIngressToPublicEndpoints(obj *extensionsv1beta1.Ingress, isRKE bool) []v32.PublicEndpoint {
 	epsMap := convertIngressToServicePublicEndpointsMap(obj, isRKE)
-	var eps []v3.PublicEndpoint
+	var eps []v32.PublicEndpoint
 	for _, v := range epsMap {
 		eps = append(eps, v...)
 	}

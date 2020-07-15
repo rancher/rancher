@@ -3,10 +3,10 @@ package summary
 import (
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/rancher/wrangler/pkg/data"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type Summary struct {
@@ -14,6 +14,19 @@ type Summary struct {
 	Error         bool
 	Transitioning bool
 	Message       []string
+	Attributes    map[string]interface{}
+	Relationships []Relationship
+}
+
+type Relationship struct {
+	Name         string
+	Namespace    string
+	ControlledBy bool
+	Kind         string
+	APIVersion   string
+	Inbound      bool
+	Type         string
+	Selector     *metav1.LabelSelector
 }
 
 func (s Summary) String() string {

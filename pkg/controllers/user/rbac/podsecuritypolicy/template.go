@@ -7,9 +7,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v1beta12 "github.com/rancher/rancher/pkg/types/apis/policy/v1beta1"
-	v12 "github.com/rancher/rancher/pkg/types/apis/rbac.authorization.k8s.io/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v1beta12 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
+	v12 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"

@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -39,7 +42,7 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 		return mcapp, nil
 	}
 	mcappState := active
-	if v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) && v3.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
+	if v32.MultiClusterAppConditionInstalled.IsUnknown(mcapp) && v32.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
 		mcappState = ""
 	}
 	var toUpdate *v3.MultiClusterApp
@@ -67,12 +70,12 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 		if value, ok := app.Labels[MultiClusterAppIDSelector]; !ok || value != mcapp.Name {
 			return mcapp, fmt.Errorf("app %s missing label selector for %s", t.AppName, mcapp.Name)
 		}
-		if !pv3.AppConditionInstalled.IsTrue(app) {
+		if !v33.AppConditionInstalled.IsTrue(app) {
 			toUpdate = setAppState(toUpdate, ind, installing, mcapp)
 			if mcappState != "" {
 				mcappState = installing
 			}
-		} else if !pv3.AppConditionDeployed.IsTrue(app) {
+		} else if !v33.AppConditionDeployed.IsTrue(app) {
 			toUpdate = setAppState(toUpdate, ind, deploying, mcapp)
 			if mcappState == active {
 				mcappState = deploying
@@ -104,23 +107,23 @@ func setAppState(toUpdate *v3.MultiClusterApp, ind int, state string, mcapp *v3.
 }
 
 func setMcappStateActive(toUpdate *v3.MultiClusterApp, mcapp *v3.MultiClusterApp) *v3.MultiClusterApp {
-	if v3.MultiClusterAppConditionInstalled.IsTrue(mcapp) && v3.MultiClusterAppConditionDeployed.IsTrue(mcapp) {
+	if v32.MultiClusterAppConditionInstalled.IsTrue(mcapp) && v32.MultiClusterAppConditionDeployed.IsTrue(mcapp) {
 		return toUpdate
 	}
 	if toUpdate == nil {
 		toUpdate = mcapp.DeepCopy()
 	}
-	v3.MultiClusterAppConditionDeployed.True(toUpdate)
-	v3.MultiClusterAppConditionInstalled.True(toUpdate)
+	v32.MultiClusterAppConditionDeployed.True(toUpdate)
+	v32.MultiClusterAppConditionInstalled.True(toUpdate)
 	return toUpdate
 }
 
 func setMcAppStateUnknown(toUpdate *v3.MultiClusterApp, mcapp *v3.MultiClusterApp, state string) *v3.MultiClusterApp {
-	cond := v3.MultiClusterAppConditionInstalled
-	cleanCond := v3.MultiClusterAppConditionDeployed
+	cond := v32.MultiClusterAppConditionInstalled
+	cleanCond := v32.MultiClusterAppConditionDeployed
 	if state == deploying {
-		cond = v3.MultiClusterAppConditionDeployed
-		cleanCond = v3.MultiClusterAppConditionInstalled
+		cond = v32.MultiClusterAppConditionDeployed
+		cleanCond = v32.MultiClusterAppConditionInstalled
 	}
 	if !cond.IsUnknown(mcapp) {
 		if toUpdate == nil {

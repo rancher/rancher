@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 
 	"github.com/docker/docker/api/types"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	rketypes "github.com/rancher/rke/types"
 )
 

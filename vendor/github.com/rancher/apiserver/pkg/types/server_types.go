@@ -200,6 +200,8 @@ func DefaultByID(store Store, apiOp *APIRequest, schema *APISchema, id string) (
 
 type WatchRequest struct {
 	Revision string
+	ID       string
+	Selector string
 }
 
 var (
@@ -211,6 +213,8 @@ var (
 type APIEvent struct {
 	Name         string    `json:"name,omitempty"`
 	ResourceType string    `json:"resourceType,omitempty"`
+	ID           string    `json:"id,omitempty"`
+	Selector     string    `json:"selector,omitempty"`
 	Revision     string    `json:"revision,omitempty"`
 	Object       APIObject `json:"-"`
 	Error        error     `json:"-"`

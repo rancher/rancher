@@ -4,16 +4,17 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -44,7 +45,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 	if err != nil {
 		return err
 	}
-	configApplyInput := &v3.ActiveDirectoryTestAndApplyInput{}
+	configApplyInput := &v32.ActiveDirectoryTestAndApplyInput{}
 	if err := mapstructure.Decode(input, configApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
@@ -52,7 +53,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 
 	config := &configApplyInput.ActiveDirectoryConfig
 
-	login := &v3public.BasicLogin{
+	login := &v32.BasicLogin{
 		Username: configApplyInput.Username,
 		Password: configApplyInput.Password,
 	}
@@ -98,7 +99,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request)
 }
 
-func (p *adProvider) saveActiveDirectoryConfig(config *v3.ActiveDirectoryConfig) error {
+func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig) error {
 	storedConfig, _, err := p.getActiveDirectoryConfig()
 	if err != nil {
 		return err

@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	planClientset "github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	"github.com/sirupsen/logrus"
@@ -163,19 +165,19 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 
 	if masterPlan.Name == "" && workerPlan.Name == "" {
 		// enter upgrading state
-		if v3.ClusterConditionUpgraded.IsTrue(cluster) {
-			v3.ClusterConditionUpgraded.Unknown(cluster)
-			v3.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
+		if v32.ClusterConditionUpgraded.IsTrue(cluster) {
+			v32.ClusterConditionUpgraded.Unknown(cluster)
+			v32.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
 			return h.clusterClient.Update(cluster)
 		}
-		if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+		if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
 			// remain in upgrading state if we are passed empty plans
 			return cluster, nil
 		}
 	}
 
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
-		v3.ClusterConditionUpgraded.Unknown(cluster)
+		v32.ClusterConditionUpgraded.Unknown(cluster)
 		c := cluster.Spec.K3sConfig.ServerConcurrency
 		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded",
 			upgradingMessage(c, masterPlan.Status.Applying))
@@ -184,7 +186,7 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 	}
 
 	if workerPlan.Name != "" && len(workerPlan.Status.Applying) > 0 {
-		v3.ClusterConditionUpgraded.Unknown(cluster)
+		v32.ClusterConditionUpgraded.Unknown(cluster)
 		c := cluster.Spec.K3sConfig.WorkerConcurrency
 		workerPlanMessage := fmt.Sprintf("worker node [%s] being upgraded",
 			upgradingMessage(c, workerPlan.Status.Applying))
@@ -193,7 +195,7 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 
 	// if we made it this far nothing is applying
 	// see k3supgrade_handler also
-	v3.ClusterConditionUpgraded.True(cluster)
+	v32.ClusterConditionUpgraded.True(cluster)
 	return h.clusterClient.Update(cluster)
 
 }
@@ -211,13 +213,13 @@ func upgradingMessage(concurrency int, nodes []string) string {
 }
 
 func (h *handler) enqueueOrUpdate(cluster *v3.Cluster, upgradeMessage string) (*v3.Cluster, error) {
-	if v3.ClusterConditionUpgraded.GetMessage(cluster) == upgradeMessage {
+	if v32.ClusterConditionUpgraded.GetMessage(cluster) == upgradeMessage {
 		// update would be no op
 		h.clusterEnqueueAfter(cluster.Name, time.Second*5) // prevent controller from remaining in this state
 		return cluster, nil
 	}
 
-	v3.ClusterConditionUpgraded.Message(cluster, upgradeMessage)
+	v32.ClusterConditionUpgraded.Message(cluster, upgradeMessage)
 	return h.clusterClient.Update(cluster)
 
 }

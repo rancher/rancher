@@ -14,7 +14,13 @@ func main() {
 }
 
 func run() error {
-	return filepath.Walk("./pkg/types", func(path string, info os.FileInfo, err error) error {
+	if err := os.RemoveAll("./pkg/client/generated"); err != nil {
+		return err
+	}
+	if err := os.RemoveAll("./pkg/generated"); err != nil {
+		return err
+	}
+	return filepath.Walk("./pkg/apis", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

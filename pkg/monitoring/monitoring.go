@@ -6,11 +6,13 @@ import (
 	"regexp"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/types"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	ns "github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -285,7 +287,7 @@ func (tr *templateRegexp) translate(value string) *templateRegexpResult {
 func GetOverwroteAppAnswersAndVersion(annotations map[string]string) (map[string]string, string) {
 	overwritingAppAnswers := annotations[cattleOverwriteAppAnswersAnnotationKey]
 	if len(overwritingAppAnswers) != 0 {
-		var appOverwriteInput mgmtv3.MonitoringInput
+		var appOverwriteInput v32.MonitoringInput
 		err := json.Unmarshal([]byte(overwritingAppAnswers), &appOverwriteInput)
 		if err == nil {
 			return appOverwriteInput.Answers, appOverwriteInput.Version

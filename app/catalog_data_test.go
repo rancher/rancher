@@ -4,15 +4,17 @@ import (
 	"encoding/json"
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/fakes"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func NewCatalogClientMock(oldURL string, oldBranch string, annoURL string, annoBranch string) v3.CatalogInterface {
 	catalog := &v3.Catalog{
-		Spec: v3.CatalogSpec{
+		Spec: v32.CatalogSpec{
 			URL:    oldURL,
 			Branch: oldBranch,
 		},

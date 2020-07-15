@@ -6,17 +6,19 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/clientbase"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	clusterClient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	managementClient "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	projectClient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	clusterClient "github.com/rancher/rancher/pkg/types/client/cluster/v3"
-	managementClient "github.com/rancher/rancher/pkg/types/client/management/v3"
-	projectClient "github.com/rancher/rancher/pkg/types/client/project/v3"
-	"github.com/rancher/rancher/pkg/types/compose"
+	"github.com/rancher/rancher/pkg/generated/compose"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"gopkg.in/yaml.v2"
@@ -57,7 +59,7 @@ func (l Lifecycle) sync(key string, obj *v3.ComposeConfig) (runtime.Object, erro
 	if key == "" || obj == nil {
 		return nil, nil
 	}
-	newObj, err := v3.ComposeConditionExecuted.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v32.ComposeConditionExecuted.Once(obj, func() (runtime.Object, error) {
 		obj, err := l.Create(obj)
 		if err != nil {
 			return obj, &controller.ForgetError{
@@ -88,7 +90,7 @@ func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if err := up(token, l.HTTPSPortGetter.GetHTTPSPort(), config); err != nil {
 		return obj, err
 	}
-	v3.ComposeConditionExecuted.True(obj)
+	v32.ComposeConditionExecuted.True(obj)
 	return obj, nil
 }
 

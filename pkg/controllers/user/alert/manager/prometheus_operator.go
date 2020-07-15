@@ -7,11 +7,12 @@ import (
 	"sort"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	rmonitoringv1 "github.com/rancher/rancher/pkg/generated/norman/monitoring.coreos.com/v1"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	rmonitoringv1 "github.com/rancher/rancher/pkg/types/apis/monitoring.coreos.com/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -142,7 +143,7 @@ func (c *PromOperatorCRDManager) AddRule(ruleGroup *monitoringv1.RuleGroup, rule
 	ruleGroup.Rules = append(ruleGroup.Rules, rule)
 }
 
-func Metric2Rule(groupID, ruleID, serverity, displayName, clusterName, projectName string, metric *v3.MetricRule) monitoringv1.Rule {
+func Metric2Rule(groupID, ruleID, serverity, displayName, clusterName, projectName string, metric *v32.MetricRule) monitoringv1.Rule {
 	expr := getExpr(metric.Expression, metric.Comparison, metric.ThresholdValue)
 	comp := strings.Replace(metric.Comparison, "-", " ", -1)
 	labels := map[string]string{

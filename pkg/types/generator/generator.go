@@ -7,7 +7,6 @@ import (
 
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"text/template"
 
@@ -19,10 +18,10 @@ import (
 )
 
 var (
-	outputDir   = "./pkg/types"
-	basePackage = "github.com/rancher/rancher/pkg/types"
-	baseCattle  = "client"
-	baseK8s     = "apis"
+	outputDir   = "./pkg/generated"
+	basePackage = "github.com/rancher/rancher/pkg/apis"
+	baseCattle  = "../client/generated"
+	baseK8s     = "norman"
 	baseCompose = "compose"
 )
 
@@ -66,6 +65,17 @@ func Generate(schemas *types.Schemas, backendTypes map[string]bool) {
 	}
 }
 
+func GenerateClient(schemas *types.Schemas, backendTypes map[string]bool) {
+	version := getVersion(schemas)
+	group := strings.Split(version.Group, ".")[0]
+
+	cattleOutputPackage := path.Join(baseCattle, group, version.Version)
+
+	if err := generator.GenerateClient(schemas, backendTypes, outputDir, cattleOutputPackage); err != nil {
+		panic(err)
+	}
+}
+
 func GenerateComposeType(projectSchemas *types.Schemas, managementSchemas *types.Schemas, clusterSchemas *types.Schemas) {
 	if err := generateComposeType(filepath.Join(outputDir, baseCompose), projectSchemas, managementSchemas, clusterSchemas); err != nil {
 		panic(err)
@@ -98,18 +108,11 @@ func generateComposeType(baseCompose string, projectSchemas *types.Schemas, mana
 	}); err != nil {
 		return err
 	}
+	if err := output.Close(); err != nil {
+		return err
+	}
 
-	return gofmt(args.DefaultSourceTree(), baseCompose)
-}
-
-func gofmt(workDir, pkg string) error {
-	cmd := exec.Command("goimports", "-w", "-l", "./"+pkg)
-	fmt.Println(cmd.Args)
-	cmd.Dir = workDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+	return generator.Gofmt(args.DefaultSourceTree(), baseCompose)
 }
 
 func GenerateNativeTypes(gv schema.GroupVersion, nsObjs []interface{}, objs []interface{}) {

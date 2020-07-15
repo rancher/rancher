@@ -5,18 +5,21 @@ import (
 	"fmt"
 	"strings"
 
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/app/utils"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
+	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	rcorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	appsv1 "github.com/rancher/rancher/pkg/types/apis/apps/v1"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	rcorev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -98,12 +101,12 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	if err != nil {
 		return cs, fmt.Errorf("cisScanHandler: Create: error listing cluster %v: %v", cs.ClusterName, err)
 	}
-	if !v3.ClusterConditionReady.IsTrue(cluster) {
+	if !v32.ClusterConditionReady.IsTrue(cluster) {
 		return cs, fmt.Errorf("cisScanHandler: Create: cluster %v not ready", cs.ClusterName)
 	}
 	if cluster.Spec.WindowsPreferedCluster {
-		v3.ClusterScanConditionFailed.True(cs)
-		v3.ClusterScanConditionFailed.Message(cs, "cannot run scan on a windows cluster")
+		v32.ClusterScanConditionFailed.True(cs)
+		v32.ClusterScanConditionFailed.Message(cs, "cannot run scan on a windows cluster")
 		return cs, nil
 	}
 
@@ -111,7 +114,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		return cs, fmt.Errorf("cisScanHandler: Create: %v, will retry", err)
 	}
 
-	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
+	if !v32.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
 		currentK8sVersion := cluster.Spec.RancherKubernetesEngineConfig.Version
 		overrideBenchmarkVersion := ""
@@ -147,7 +150,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		if bvManaged {
 			appInfo.notApplicableSkipConfigMapName = getNotApplicableConfigMapName(bv)
 			if cs.Spec.ScanConfig.CisScanConfig.Profile == "" ||
-				cs.Spec.ScanConfig.CisScanConfig.Profile == v3.CisScanProfileTypePermissive {
+				cs.Spec.ScanConfig.CisScanConfig.Profile == v32.CisScanProfileTypePermissive {
 				appInfo.defaultSkipConfigMapName = getDefaultSkipConfigMapName(bv)
 			}
 		}
@@ -157,8 +160,8 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 			// create the cm
 			skipDataBytes, err := getOverrideSkipInfoData(cs.Spec.ScanConfig.CisScanConfig.OverrideSkip)
 			if err != nil {
-				v3.ClusterScanConditionFailed.True(cs)
-				v3.ClusterScanConditionFailed.Message(cs, fmt.Sprintf("error getting overrideSkip: %v", err))
+				v32.ClusterScanConditionFailed.True(cs)
+				v32.ClusterScanConditionFailed.Message(cs, fmt.Sprintf("error getting overrideSkip: %v", err))
 				return cs, nil
 			}
 			cm = getConfigMapObject(getOverrideConfigMapName(cs), string(skipDataBytes))
@@ -168,7 +171,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		} else {
 			// Check if the configmap is populated
 			userSkipConfigMapName := getUserSkipConfigMapName()
-			cm, err = csh.cmLister.Get(v3.DefaultNamespaceForCis, userSkipConfigMapName)
+			cm, err = csh.cmLister.Get(v32.DefaultNamespaceForCis, userSkipConfigMapName)
 			if err != nil && !kerrors.IsNotFound(err) {
 				return cs, fmt.Errorf("cisScanHandler: Create: error fetching configmap %v: %v", err, userSkipConfigMapName)
 			}
@@ -181,8 +184,8 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		if err := csh.deployApp(appInfo); err != nil {
 			return cs, fmt.Errorf("cisScanHandler: Create: error deploying app: %v", err)
 		}
-		v3.ClusterScanConditionCreated.True(cs)
-		v3.ClusterScanConditionRunCompleted.Unknown(cs)
+		v32.ClusterScanConditionCreated.True(cs)
+		v32.ClusterScanConditionRunCompleted.Unknown(cs)
 	}
 	return cs, nil
 }
@@ -238,9 +241,9 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 
 func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 	logrus.Debugf("cisScanHandler: Updated: %+v", cs)
-	if v3.ClusterScanConditionCreated.IsTrue(cs) &&
-		!v3.ClusterScanConditionCompleted.IsTrue(cs) &&
-		!v3.ClusterScanConditionRunCompleted.IsUnknown(cs) {
+	if v32.ClusterScanConditionCreated.IsTrue(cs) &&
+		!v32.ClusterScanConditionCompleted.IsTrue(cs) &&
+		!v32.ClusterScanConditionRunCompleted.IsUnknown(cs) {
 		// Delete the system helm chart
 		appInfo := &appInfo{
 			appName:     cs.Name,
@@ -275,12 +278,12 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 			return nil, fmt.Errorf("cisScanHandler: Updated: failed to update cluster about CIS scan completion")
 		}
 
-		if !v3.ClusterScanConditionFailed.IsTrue(cs) {
+		if !v32.ClusterScanConditionFailed.IsTrue(cs) {
 			cm, err := csh.cmClient.Get(cs.Name, metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("cisScanHandler: Updated: error fetching configmap %v: %v", cs.Name, err)
 			}
-			r, err := report.Get([]byte(cm.Data[v3.DefaultScanOutputFileName]))
+			r, err := report.Get([]byte(cm.Data[v32.DefaultScanOutputFileName]))
 			if err != nil {
 				return nil, fmt.Errorf("cisScanHandler: Updated: error getting report from configmap %v: %v", cs.Name, err)
 			}
@@ -288,7 +291,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 				return nil, fmt.Errorf("cisScanHandler: Updated: error: got empty report from configmap %v", cs.Name)
 			}
 
-			cisScanStatus := &v3.CisScanStatus{
+			cisScanStatus := &v32.CisScanStatus{
 				Total:         r.Total,
 				Pass:          r.Pass,
 				Fail:          r.Fail,
@@ -298,8 +301,8 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 
 			cs.Status.CisScanStatus = cisScanStatus
 		}
-		v3.ClusterScanConditionCompleted.True(cs)
-		v3.ClusterScanConditionAlerted.Unknown(cs)
+		v32.ClusterScanConditionCompleted.True(cs)
+		v32.ClusterScanConditionAlerted.Unknown(cs)
 	}
 	return cs, nil
 }
@@ -322,7 +325,7 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 	if err != nil {
 		return err
 	}
-	appProjectName, err := utils.EnsureAppProjectName(csh.nsClient, appDeployProjectID, appInfo.clusterName, v3.DefaultNamespaceForCis, creator.Name)
+	appProjectName, err := utils.EnsureAppProjectName(csh.nsClient, appDeployProjectID, appInfo.clusterName, v32.DefaultNamespaceForCis, creator.Name)
 	if err != nil {
 		return err
 	}
@@ -350,12 +353,12 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 			Name:        appInfo.appName,
 			Namespace:   appDeployProjectID,
 		},
-		Spec: projv3.AppSpec{
+		Spec: v33.AppSpec{
 			Answers:         appAnswers,
 			Description:     "Rancher CIS Benchmark",
 			ExternalID:      appCatalogID,
 			ProjectName:     appProjectName,
-			TargetNamespace: v3.DefaultNamespaceForCis,
+			TargetNamespace: v32.DefaultNamespaceForCis,
 		},
 	}
 
@@ -414,7 +417,7 @@ func (csh *cisScanHandler) ensureCleanup(cs *v3.ClusterScan) error {
 	var err error
 
 	// Delete the dameonset
-	dss, e := csh.dsLister.List(v3.DefaultNamespaceForCis, labels.Everything())
+	dss, e := csh.dsLister.List(v32.DefaultNamespaceForCis, labels.Everything())
 	if e != nil {
 		err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error listing ds: %v", e))
 	} else {
@@ -432,7 +435,7 @@ func (csh *cisScanHandler) ensureCleanup(cs *v3.ClusterScan) error {
 	}
 
 	// Delete cms
-	cms, err := csh.cmLister.List(v3.DefaultNamespaceForCis, labels.Everything())
+	cms, err := csh.cmLister.List(v32.DefaultNamespaceForCis, labels.Everything())
 	if err != nil {
 		err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error listing cm: %v", e))
 	} else {

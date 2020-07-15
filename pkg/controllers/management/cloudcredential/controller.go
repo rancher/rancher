@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
-	typesv1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	typesv1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +43,7 @@ func (n *Controller) ccSync(key string, cloudCredential *v1.Secret) (runtime.Obj
 		return cloudCredential, fmt.Errorf("cloud credential %v has no creatorId annotation", cloudCredential.Name)
 	}
 	if err := rbac.CreateRoleAndRoleBinding(
-		rbac.CloudCredentialResource, typesv1.SecretResource.Kind, cloudCredential.Name, namespace.GlobalNamespace, "v1", creatorID, []string{"*"}, cloudCredential.UID, []v3.Member{},
+		rbac.CloudCredentialResource, typesv1.SecretResource.Kind, cloudCredential.Name, namespace.GlobalNamespace, "v1", creatorID, []string{"*"}, cloudCredential.UID, []v32.Member{},
 		n.managementContext); err != nil {
 		return nil, err
 	}

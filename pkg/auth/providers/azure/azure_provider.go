@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/mitchellh/mapstructure"
@@ -15,11 +17,10 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
-	publicclient "github.com/rancher/rancher/pkg/types/client/management/v3public"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -65,7 +66,7 @@ func (ap *azureProvider) GetName() string {
 func (ap *azureProvider) AuthenticateUser(
 	ctx context.Context, input interface{},
 ) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v3public.AzureADLogin)
+	login, ok := input.(*v32.AzureADLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
@@ -206,8 +207,8 @@ func (ap *azureProvider) TransformToAuthProvider(
 }
 
 func (ap *azureProvider) loginUser(
-	azureCredential *v3public.AzureADLogin,
-	config *v3.AzureADConfig,
+	azureCredential *v32.AzureADLogin,
+	config *v32.AzureADConfig,
 	test bool,
 ) (v3.Principal, []v3.Principal, string, error) {
 	var err error
@@ -355,7 +356,7 @@ func (ap *azureProvider) newAzureClient(secret string) (*azureClient, error) {
 	return client, nil
 }
 
-func (ap *azureProvider) saveAzureConfigK8s(config *v3.AzureADConfig) error {
+func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	storedAzureConfig, err := ap.getAzureConfigK8s()
 	if err != nil {
 		return err
@@ -380,7 +381,7 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v3.AzureADConfig) error {
 	return nil
 }
 
-func (ap *azureProvider) getAzureConfigK8s() (*v3.AzureADConfig, error) {
+func (ap *azureProvider) getAzureConfigK8s() (*v32.AzureADConfig, error) {
 	authConfigObj, err := ap.authConfigs.ObjectClient().UnstructuredClient().Get(Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve AzureADConfig, error: %v", err)
@@ -392,7 +393,7 @@ func (ap *azureProvider) getAzureConfigK8s() (*v3.AzureADConfig, error) {
 	}
 	storedAzureADConfigMap := u.UnstructuredContent()
 
-	storedAzureADConfig := &v3.AzureADConfig{}
+	storedAzureADConfig := &v32.AzureADConfig{}
 	mapstructure.Decode(storedAzureADConfigMap, storedAzureADConfig)
 
 	metadataMap, ok := storedAzureADConfigMap["metadata"].(map[string]interface{})

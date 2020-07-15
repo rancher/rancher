@@ -6,10 +6,10 @@ import (
 
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

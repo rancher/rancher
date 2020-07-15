@@ -4,10 +4,12 @@ import (
 	"reflect"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/taints"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,7 +20,7 @@ func (n *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, erro
 		return obj, nil
 	}
 
-	if !v3.NodeConditionRegistered.IsTrue(obj) {
+	if !v32.NodeConditionRegistered.IsTrue(obj) {
 		return obj, nil
 	}
 

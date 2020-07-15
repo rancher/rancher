@@ -5,12 +5,15 @@ import (
 	"reflect"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,10 +69,10 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 }
 
 func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) error {
-	if !mgmtv3.NamespaceBackedResource.IsTrue(project) && !mgmtv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
+	if !v32.NamespaceBackedResource.IsTrue(project) && !v32.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 		return nil
 	}
-	_, err := mgmtv3.ProjectConditionMetricExpressionDeployed.DoUntilTrue(project, func() (runtime.Object, error) {
+	_, err := v32.ProjectConditionMetricExpressionDeployed.DoUntilTrue(project, func() (runtime.Object, error) {
 		projectName := fmt.Sprintf("%s:%s", project.Spec.ClusterName, project.Name)
 
 		for _, graph := range preDefinedProjectGraph {
@@ -92,40 +95,40 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 	if project.Spec.EnableProjectMonitoring {
 		appProjectName, err := ph.ensureAppProjectName(appTargetNamespace, project)
 		if err != nil {
-			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
-			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
+			v32.ProjectConditionMonitoringEnabled.Unknown(project)
+			v32.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to ensure monitoring project name")
 		}
 
 		if err := ph.deployApp(appName, appTargetNamespace, appProjectName, project, clusterName); err != nil {
-			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
-			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
+			v32.ProjectConditionMonitoringEnabled.Unknown(project)
+			v32.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to deploy monitoring")
 		}
 
 		if err := ph.detectAppComponentsWhileInstall(appName, appTargetNamespace, project); err != nil {
-			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
-			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
+			v32.ProjectConditionMonitoringEnabled.Unknown(project)
+			v32.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to detect the installation status of monitoring components")
 		}
 
-		mgmtv3.ProjectConditionMonitoringEnabled.True(project)
-		mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "")
+		v32.ProjectConditionMonitoringEnabled.True(project)
+		v32.ProjectConditionMonitoringEnabled.Message(project, "")
 	} else if project.Status.MonitoringStatus != nil {
 		if err := ph.app.withdrawApp(project.Spec.ClusterName, appName, appTargetNamespace); err != nil {
-			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
-			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
+			v32.ProjectConditionMonitoringEnabled.Unknown(project)
+			v32.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to withdraw monitoring")
 		}
 
 		if err := ph.detectAppComponentsWhileUninstall(appName, appTargetNamespace, project); err != nil {
-			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
-			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
+			v32.ProjectConditionMonitoringEnabled.Unknown(project)
+			v32.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to detect the uninstallation status of monitoring components")
 		}
 
-		mgmtv3.ProjectConditionMonitoringEnabled.False(project)
-		mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "")
+		v32.ProjectConditionMonitoringEnabled.False(project)
+		v32.ProjectConditionMonitoringEnabled.Message(project, "")
 	}
 
 	return nil
@@ -223,7 +226,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 			Name:        appName,
 			Namespace:   appDeployProjectID,
 		},
-		Spec: v3.AppSpec{
+		Spec: v33.AppSpec{
 			Answers:         appAnswers,
 			Description:     "Rancher Project Monitoring",
 			ExternalID:      appCatalogID,
@@ -242,10 +245,10 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 
 func (ph *projectHandler) detectAppComponentsWhileInstall(appName, appTargetNamespace string, project *mgmtv3.Project) error {
 	if project.Status.MonitoringStatus == nil {
-		project.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
-			Conditions: []mgmtv3.MonitoringCondition{
-				{Type: mgmtv3.ClusterConditionType(ConditionPrometheusDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionGrafanaDeployed), Status: k8scorev1.ConditionFalse},
+		project.Status.MonitoringStatus = &v32.MonitoringStatus{
+			Conditions: []v32.MonitoringCondition{
+				{Type: v32.ClusterConditionType(ConditionPrometheusDeployed), Status: k8scorev1.ConditionFalse},
+				{Type: v32.ClusterConditionType(ConditionGrafanaDeployed), Status: k8scorev1.ConditionFalse},
 			},
 		}
 	}

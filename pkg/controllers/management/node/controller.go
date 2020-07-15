@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/pkg/errors"
@@ -21,13 +23,13 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/encryptedstore"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
@@ -130,14 +132,14 @@ func isCustom(obj *v3.Node) bool {
 }
 
 func (m *Lifecycle) setWaiting(node *v3.Node) {
-	v3.NodeConditionRegistered.IsUnknown(node)
-	v3.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
+	v32.NodeConditionRegistered.IsUnknown(node)
+	v32.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
 }
 
 func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
-		newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
+		newObj, err := v32.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
 			if err := validateCustomHost(obj); err != nil {
 				return obj, err
 			}
@@ -151,7 +153,7 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v32.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
 		logrus.Debugf("Called v3.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
 		// Ensure jail is created first, else the function `NewNodeConfig` will create the full jail path (including parent jail directory) and CreateJail will remove the directory as it does not contain a done file
 		if !m.devMode {
@@ -208,7 +210,7 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	newObj, err := v3.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
+	newObj, err := v32.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
 		found, err := m.isNodeInAppliedSpec(obj)
 		if err != nil {
 			return obj, err
@@ -431,7 +433,7 @@ outer:
 		}
 	}
 
-	newObj, saveError := v3.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
+	newObj, saveError := v32.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
 		return m.saveConfig(config, config.FullDir(), obj)
 	})
 	obj = newObj.(*v3.Node)
@@ -442,7 +444,7 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
-	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v32.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
 			return obj, nil
@@ -682,7 +684,7 @@ func roles(node *v3.Node) []string {
 	return roles
 }
 
-func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v3.Field, credID string) error {
+func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v32.Field, credID string) error {
 	splitID := strings.Split(credID, ":")
 	if len(splitID) != 2 {
 		return fmt.Errorf("invalid credential id %s", credID)

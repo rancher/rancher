@@ -8,8 +8,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/features"
-	managementv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/proxy"
 	authzv1 "k8s.io/api/authorization/v1"

@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,7 +19,7 @@ var (
 	InjectDefaults string
 
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
-	AuthImage                         = NewSetting("auth-image", v3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
+	AuthImage                         = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds  = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	CACerts                           = NewSetting("cacerts", "")

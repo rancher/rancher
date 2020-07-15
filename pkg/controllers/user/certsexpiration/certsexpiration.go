@@ -6,13 +6,15 @@ import (
 	"reflect"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/rkecerts"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	rkecluster "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
@@ -55,7 +57,7 @@ func (c Controller) sync(key string, cluster *v3.Cluster) (runtime.Object, error
 	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
 		return cluster, nil
 	}
-	certsExpInfo := map[string]v3.CertExpiration{}
+	certsExpInfo := map[string]v32.CertExpiration{}
 
 	cluster, err := c.ClusterLister.Get("", key)
 	if err != nil {
@@ -142,7 +144,7 @@ func (c Controller) getCertsFromUserCluster() (map[string]pki.CertificatePKI, er
 }
 
 //deleteUnusedCerts removes unused certs and cleans up kubelet certs when GenerateServingCertificate is disabled
-func deleteUnusedCerts(certsExpInfo map[string]v3.CertExpiration, rancherKubernetesEngineConfig *rketypes.RancherKubernetesEngineConfig) {
+func deleteUnusedCerts(certsExpInfo map[string]v32.CertExpiration, rancherKubernetesEngineConfig *rketypes.RancherKubernetesEngineConfig) {
 	unusedCerts := make(map[string]bool)
 	for k := range certsExpInfo {
 		if strings.HasPrefix(k, pki.EtcdCertName) || strings.HasPrefix(k, pki.KubeletCertName) {

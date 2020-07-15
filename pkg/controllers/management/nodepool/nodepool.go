@@ -10,8 +10,10 @@ import (
 	"sync"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
@@ -60,7 +62,7 @@ func (c *Controller) Create(nodePool *v3.NodePool) (runtime.Object, error) {
 }
 
 func (c *Controller) Updated(nodePool *v3.NodePool) (runtime.Object, error) {
-	obj, err := v3.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
+	obj, err := v32.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
 		return nodePool, c.reconcile(nodePool)
 	})
 	return obj.(*v3.NodePool), err
@@ -114,7 +116,7 @@ func (c *Controller) createNode(name string, nodePool *v3.NodePool, simulate boo
 			Labels:       nodePool.Labels,
 			Annotations:  nodePool.Annotations,
 		},
-		Spec: v3.NodeSpec{
+		Spec: v32.NodeSpec{
 			Etcd:              nodePool.Spec.Etcd,
 			ControlPlane:      nodePool.Spec.ControlPlane,
 			Worker:            nodePool.Spec.Worker,
@@ -212,7 +214,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 			continue
 		}
 
-		if v3.NodeConditionProvisioned.IsFalse(node) || v3.NodeConditionInitialized.IsFalse(node) || v3.NodeConditionConfigSaved.IsFalse(node) {
+		if v32.NodeConditionProvisioned.IsFalse(node) || v32.NodeConditionInitialized.IsFalse(node) || v32.NodeConditionConfigSaved.IsFalse(node) {
 			changed = true
 			if !simulate {
 				_ = c.deleteNode(node, 2*time.Minute)

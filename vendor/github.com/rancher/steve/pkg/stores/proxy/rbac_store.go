@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/stores/partition"
+	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -62,11 +63,22 @@ func (p *rbacPartitioner) Lookup(apiOp *types.APIRequest, schema *types.APISchem
 	}
 }
 
-func (p *rbacPartitioner) All(apiOp *types.APIRequest, schema *types.APISchema, verb string) ([]partition.Partition, error) {
+func (p *rbacPartitioner) All(apiOp *types.APIRequest, schema *types.APISchema, verb, id string) ([]partition.Partition, error) {
 	switch verb {
 	case "list":
 		fallthrough
 	case "watch":
+		if id != "" {
+			ns, name := kv.RSplit(id, "/")
+			return []partition.Partition{
+				Partition{
+					Namespace:   ns,
+					All:         false,
+					Passthrough: false,
+					Names:       sets.NewString(name),
+				},
+			}, nil
+		}
 		partitions, passthrough := isPassthrough(apiOp, schema, verb)
 		if passthrough {
 			return passthroughPartitions, nil

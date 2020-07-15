@@ -6,15 +6,18 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/norman/controller"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 
@@ -153,7 +156,7 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("get cluster %s failed, %v", l.clusterName, err)
 		}
-		if !v3.ClusterConditionReady.IsTrue(cluster) {
+		if !v32.ClusterConditionReady.IsTrue(cluster) {
 			return "", fmt.Errorf("cluster %v not ready", l.clusterName)
 		}
 
@@ -162,12 +165,12 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 			return "", fmt.Errorf("get catalog %s failed, %v", systemCatalogName, err)
 		}
 
-		if !v3.CatalogConditionUpgraded.IsTrue(systemCatalog) || !v3.CatalogConditionRefreshed.IsTrue(systemCatalog) || !v3.CatalogConditionDiskCached.IsTrue(systemCatalog) {
+		if !v32.CatalogConditionUpgraded.IsTrue(systemCatalog) || !v32.CatalogConditionRefreshed.IsTrue(systemCatalog) || !v32.CatalogConditionDiskCached.IsTrue(systemCatalog) {
 			return "", fmt.Errorf("catalog %v not ready", systemCatalogName)
 		}
 
 		// add force upgrade to handle chart compatibility in different version
-		projectv3.AppConditionForceUpgrade.Unknown(newApp)
+		v33.AppConditionForceUpgrade.Unknown(newApp)
 
 		if _, err = l.apps.Update(newApp); err != nil {
 			return "", fmt.Errorf("update app %s:%s failed, %v", app.Namespace, app.Name, err)
@@ -191,13 +194,13 @@ func (l *AlertService) migrateLegacyClusterAlert() error {
 				Name:      name,
 				Namespace: l.clusterName,
 			},
-			Spec: v3.ClusterAlertRuleSpec{
+			Spec: v32.ClusterAlertRuleSpec{
 				ClusterName: l.clusterName,
 				GroupName:   groupID,
-				CommonRuleField: v3.CommonRuleField{
+				CommonRuleField: v32.CommonRuleField{
 					DisplayName: v.Spec.DisplayName,
 					Severity:    v.Spec.Severity,
-					TimingField: v3.TimingField{
+					TimingField: v32.TimingField{
 						GroupWaitSeconds:      v.Spec.InitialWaitSeconds,
 						GroupIntervalSeconds:  defaultGroupIntervalSeconds,
 						RepeatIntervalSeconds: v.Spec.RepeatIntervalSeconds,
@@ -207,7 +210,7 @@ func (l *AlertService) migrateLegacyClusterAlert() error {
 		}
 
 		if v.Spec.TargetNode != nil {
-			newClusterRule.Spec.NodeRule = &v3.NodeRule{
+			newClusterRule.Spec.NodeRule = &v32.NodeRule{
 				NodeName:     v.Spec.TargetNode.NodeName,
 				Selector:     v.Spec.TargetNode.Selector,
 				Condition:    v.Spec.TargetNode.Condition,
@@ -217,14 +220,14 @@ func (l *AlertService) migrateLegacyClusterAlert() error {
 		}
 
 		if v.Spec.TargetEvent != nil {
-			newClusterRule.Spec.EventRule = &v3.EventRule{
+			newClusterRule.Spec.EventRule = &v32.EventRule{
 				EventType:    v.Spec.TargetEvent.EventType,
 				ResourceKind: v.Spec.TargetEvent.ResourceKind,
 			}
 		}
 
 		if v.Spec.TargetSystemService != nil {
-			newClusterRule.Spec.SystemServiceRule = &v3.SystemServiceRule{
+			newClusterRule.Spec.SystemServiceRule = &v32.SystemServiceRule{
 				Condition: v.Spec.TargetSystemService.Condition,
 			}
 		}
@@ -245,17 +248,17 @@ func (l *AlertService) migrateLegacyClusterAlert() error {
 				return fmt.Errorf("migrate %s:%s failed, update alert rule failed, %v", v.Namespace, v.Name, err)
 			}
 		}
-		legacyGroup := &v3.ClusterAlertGroup{
+		legacyGroup := &v32.ClusterAlertGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      migrationGroupName,
 				Namespace: l.clusterName,
 			},
-			Spec: v3.ClusterGroupSpec{
+			Spec: v32.ClusterGroupSpec{
 				ClusterName: l.clusterName,
-				CommonGroupField: v3.CommonGroupField{
+				CommonGroupField: v32.CommonGroupField{
 					DisplayName: "Migrate group",
 					Description: "Migrate alert from last version",
-					TimingField: v3.TimingField{
+					TimingField: v32.TimingField{
 						GroupWaitSeconds:      v.Spec.InitialWaitSeconds,
 						GroupIntervalSeconds:  defaultGroupIntervalSeconds,
 						RepeatIntervalSeconds: v.Spec.RepeatIntervalSeconds,
@@ -299,13 +302,13 @@ func (l *AlertService) migrateLegacyProjectAlert() error {
 					Name:      migrationRuleName,
 					Namespace: projectName,
 				},
-				Spec: v3.ProjectAlertRuleSpec{
+				Spec: v32.ProjectAlertRuleSpec{
 					ProjectName: projectID,
 					GroupName:   groupID,
-					CommonRuleField: v3.CommonRuleField{
+					CommonRuleField: v32.CommonRuleField{
 						DisplayName: v.Spec.DisplayName,
 						Severity:    v.Spec.Severity,
-						TimingField: v3.TimingField{
+						TimingField: v32.TimingField{
 							GroupWaitSeconds:      v.Spec.InitialWaitSeconds,
 							GroupIntervalSeconds:  defaultGroupIntervalSeconds,
 							RepeatIntervalSeconds: v.Spec.RepeatIntervalSeconds,
@@ -315,7 +318,7 @@ func (l *AlertService) migrateLegacyProjectAlert() error {
 			}
 
 			if v.Spec.TargetPod != nil {
-				newProjectRule.Spec.PodRule = &v3.PodRule{
+				newProjectRule.Spec.PodRule = &v32.PodRule{
 					PodName:                v.Spec.TargetPod.PodName,
 					Condition:              v.Spec.TargetPod.Condition,
 					RestartTimes:           v.Spec.TargetPod.RestartTimes,
@@ -324,7 +327,7 @@ func (l *AlertService) migrateLegacyProjectAlert() error {
 			}
 
 			if v.Spec.TargetWorkload != nil {
-				newProjectRule.Spec.WorkloadRule = &v3.WorkloadRule{
+				newProjectRule.Spec.WorkloadRule = &v32.WorkloadRule{
 					WorkloadID:          v.Spec.TargetWorkload.WorkloadID,
 					Selector:            v.Spec.TargetWorkload.Selector,
 					AvailablePercentage: v.Spec.TargetWorkload.AvailablePercentage,
@@ -353,12 +356,12 @@ func (l *AlertService) migrateLegacyProjectAlert() error {
 					Name:      migrationGroupName,
 					Namespace: projectName,
 				},
-				Spec: v3.ProjectGroupSpec{
+				Spec: v32.ProjectGroupSpec{
 					ProjectName: projectID,
-					CommonGroupField: v3.CommonGroupField{
+					CommonGroupField: v32.CommonGroupField{
 						DisplayName: "Migrate group",
 						Description: "Migrate alert from last version",
-						TimingField: v3.TimingField{
+						TimingField: v32.TimingField{
 							GroupWaitSeconds:      v.Spec.InitialWaitSeconds,
 							GroupIntervalSeconds:  defaultGroupIntervalSeconds,
 							RepeatIntervalSeconds: v.Spec.RepeatIntervalSeconds,

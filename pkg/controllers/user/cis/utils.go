@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
-	rcorev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	rcorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -36,7 +38,7 @@ func createConfigMapWithRetry(configMapsClient rcorev1.ConfigMapInterface, cm *v
 
 func isRunnerPodRemoved(podLister rcorev1.PodLister) error {
 	pods, err := podLister.List(
-		v3.DefaultNamespaceForCis,
+		v32.DefaultNamespaceForCis,
 		labels.Set(SonobuoyMasterLabel).AsSelector(),
 	)
 	if err != nil {
@@ -71,7 +73,7 @@ func getDefaultSkipConfigMapName(benchmarkVersion string) string {
 }
 
 func getUserSkipConfigMapName() string {
-	return v3.ConfigMapNameForUserConfig
+	return v32.ConfigMapNameForUserConfig
 }
 
 func createSecurityScanNamespace(nsClient rcorev1.NamespaceInterface, projectLister v3.ProjectLister, clusterName string) error {
@@ -80,7 +82,7 @@ func createSecurityScanNamespace(nsClient rcorev1.NamespaceInterface, projectLis
 		return err
 	}
 
-	nsName := v3.DefaultNamespaceForCis
+	nsName := v32.DefaultNamespaceForCis
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nsName,
@@ -102,7 +104,7 @@ func ValidateClusterBeforeLaunchingScan(cluster *v3.Cluster) error {
 	if cluster.DeletionTimestamp != nil {
 		return fmt.Errorf("cluster with id %v is being deleted", cluster.Name)
 	}
-	if !v3.ClusterConditionReady.IsTrue(cluster) {
+	if !v32.ClusterConditionReady.IsTrue(cluster) {
 		return fmt.Errorf("cluster not ready")
 	}
 	if cluster.Status.CurrentCisRunName != "" {

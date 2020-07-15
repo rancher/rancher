@@ -11,14 +11,16 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hCommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -88,8 +90,8 @@ type Lifecycle struct {
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
-	v3.AppConditionMigrated.True(obj)
-	v3.AppConditionUserTriggeredAction.Unknown(obj)
+	v32.AppConditionMigrated.True(obj)
+	v32.AppConditionUserTriggeredAction.Unknown(obj)
 	if obj.Spec.ExternalID != "" {
 		helmVersion, err := l.getHelmVersion(obj)
 		if err != nil {
@@ -121,7 +123,7 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 		return obj, err
 	}
 	// if app was created before 2.1, run migrate to install a no-op helm release
-	newObj, err := v3.AppConditionMigrated.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v32.AppConditionMigrated.Once(obj, func() (runtime.Object, error) {
 		return l.DeployApp(obj)
 	})
 	if err != nil {
@@ -143,10 +145,10 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 				* The force upgrade flag is set, where AppConditionForceUpgrade being unknown is equal to true.
 				* The user caused the action by way of clicking either upgrade or rollback
 		*/
-		if isSame(obj, currentRevision) && !v3.AppConditionForceUpgrade.IsUnknown(obj) &&
-			!v3.AppConditionUserTriggeredAction.IsTrue(obj) {
-			if !v3.AppConditionForceUpgrade.IsTrue(obj) {
-				v3.AppConditionForceUpgrade.True(obj)
+		if isSame(obj, currentRevision) && !v32.AppConditionForceUpgrade.IsUnknown(obj) &&
+			!v32.AppConditionUserTriggeredAction.IsTrue(obj) {
+			if !v32.AppConditionForceUpgrade.IsTrue(obj) {
+				v32.AppConditionForceUpgrade.True(obj)
 			}
 			logrus.Debugf("[helm-controller] App %v doesn't require update", obj.Name)
 			return obj, nil
@@ -187,8 +189,8 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 	if err != nil {
 		return result, err
 	}
-	if !v3.AppConditionForceUpgrade.IsTrue(obj) {
-		v3.AppConditionForceUpgrade.True(obj)
+	if !v32.AppConditionForceUpgrade.IsTrue(obj) {
+		v32.AppConditionForceUpgrade.True(obj)
 	}
 	ns, err := l.NsClient.Get(obj.Spec.TargetNamespace, metav1.GetOptions{})
 	if err != nil {
@@ -228,15 +230,15 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 	obj = obj.DeepCopy()
 	var err error
-	if v3.AppConditionInstalled.IsTrue(obj) {
-		v3.AppConditionInstalled.Unknown(obj)
+	if v32.AppConditionInstalled.IsTrue(obj) {
+		v32.AppConditionInstalled.Unknown(obj)
 		// update status in the UI
 		obj, err = l.AppGetter.Apps("").Update(obj)
 		if err != nil {
 			return obj, err
 		}
 	}
-	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
+	newObj, err := v32.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
 		template, tempDirs, err := l.generateTemplates(obj)
 		if err != nil {
 			return obj, err

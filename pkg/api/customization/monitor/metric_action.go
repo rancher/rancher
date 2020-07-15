@@ -9,10 +9,10 @@ import (
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 )
 
@@ -32,12 +32,12 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 	switch actionName {
 	case querycluster, queryproject:
 		var clusterName, projectName, appName, saNamespace string
-		var comm v3.CommonQueryMetricInput
+		var comm v32.CommonQueryMetricInput
 		var err error
 		var svcNamespace, svcName, svcPort string
 
 		if actionName == querycluster {
-			var queryMetricInput v3.QueryClusterMetricInput
+			var queryMetricInput v32.QueryClusterMetricInput
 			actionInput, err := parse.ReadBody(apiContext.Request)
 			if err != nil {
 				return err
@@ -56,7 +56,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 			appName, saNamespace = monitorutil.ClusterMonitoringInfo()
 			svcName, svcNamespace, svcPort = monitorutil.ClusterPrometheusEndpoint()
 		} else {
-			var queryMetricInput v3.QueryProjectMetricInput
+			var queryMetricInput v32.QueryProjectMetricInput
 			actionInput, err := parse.ReadBody(apiContext.Request)
 			if err != nil {
 				return err
@@ -123,7 +123,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		apiContext.Response.Write(res)
 
 	case listclustermetricname:
-		var input v3.ClusterMetricNamesInput
+		var input v32.ClusterMetricNamesInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
 			return err
@@ -169,7 +169,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		apiContext.WriteResponse(http.StatusOK, data)
 	case listprojectmetricname:
 		// project metric names need to merge cluster level and project level prometheus labels name list
-		var input v3.ProjectMetricNamesInput
+		var input v32.ProjectMetricNamesInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
 		if err != nil {
 			return err

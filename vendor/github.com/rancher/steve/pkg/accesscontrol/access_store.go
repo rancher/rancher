@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
 )

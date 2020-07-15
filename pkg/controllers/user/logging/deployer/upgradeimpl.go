@@ -6,14 +6,16 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
-	appsv1 "github.com/rancher/rancher/pkg/types/apis/apps/v1"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/pkg/errors"
@@ -87,7 +89,7 @@ func (l *LoggingService) Upgrade(currentVersion string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("get cluster %s failed, %v", l.clusterName, err)
 	}
-	if !v3.ClusterConditionReady.IsTrue(cluster) {
+	if !v32.ClusterConditionReady.IsTrue(cluster) {
 		return "", fmt.Errorf("cluster %v not ready", l.clusterName)
 	}
 
@@ -131,7 +133,7 @@ func (l *LoggingService) Upgrade(currentVersion string) (string, error) {
 		return "", fmt.Errorf("get catalog %s failed, %v", systemCatalogName, err)
 	}
 
-	if !v3.CatalogConditionUpgraded.IsTrue(systemCatalog) || !v3.CatalogConditionRefreshed.IsTrue(systemCatalog) || !v3.CatalogConditionDiskCached.IsTrue(systemCatalog) {
+	if !v32.CatalogConditionUpgraded.IsTrue(systemCatalog) || !v32.CatalogConditionRefreshed.IsTrue(systemCatalog) || !v32.CatalogConditionDiskCached.IsTrue(systemCatalog) {
 		return "", fmt.Errorf("catalog %v not ready", systemCatalogName)
 	}
 
@@ -140,7 +142,7 @@ func (l *LoggingService) Upgrade(currentVersion string) (string, error) {
 
 	if !reflect.DeepEqual(newApp, app) {
 		// add force upgrade to handle chart compatibility in different version
-		projectv3.AppConditionForceUpgrade.Unknown(newApp)
+		v33.AppConditionForceUpgrade.Unknown(newApp)
 
 		if _, err = l.appDeployer.AppsGetter.Apps(metav1.NamespaceAll).Update(newApp); err != nil {
 			return "", errors.Wrapf(err, "update app %s:%s failed", app.Namespace, app.Name)

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/blang/semver"
@@ -24,18 +26,18 @@ import (
 	"github.com/rancher/norman/types/values"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
+	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/cis"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	managementv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	rkedefaults "github.com/rancher/rke/cluster"
@@ -325,7 +327,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	}
 
 	//validate that the data loaded is valid clusterSpec
-	var spec v3.ClusterSpec
+	var spec v32.ClusterSpec
 	if err := convert.ToObj(dataFromTemplate, &spec); err != nil {
 		return nil, httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Invalid clusterTemplate, cannot convert to cluster spec")
 	}
@@ -413,15 +415,15 @@ func setInitialConditions(data map[string]interface{}) error {
 					[]map[string]interface{}{
 						{
 							"status": "True",
-							"type":   string(v3.ClusterConditionPending),
+							"type":   string(v32.ClusterConditionPending),
 						},
 						{
 							"status": "Unknown",
-							"type":   string(v3.ClusterConditionProvisioned),
+							"type":   string(v32.ClusterConditionProvisioned),
 						},
 						{
 							"status": "Unknown",
-							"type":   string(v3.ClusterConditionWaiting),
+							"type":   string(v32.ClusterConditionWaiting),
 						},
 					}...,
 				)
@@ -734,7 +736,7 @@ func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
 			nodeDrainInput = oldDrainInput
 		} else {
 			ignoreDaemonSets := true
-			nodeDrainInput = &v3.NodeDrainInput{
+			nodeDrainInput = &v32.NodeDrainInput{
 				IgnoreDaemonSets: &ignoreDaemonSets,
 				GracePeriod:      -1,
 				Timeout:          120,
@@ -806,7 +808,7 @@ func handleScheduleScanScanConfig(data map[string]interface{}) {
 	}
 	cisScanConfig := convert.ToMapInterface(cisScanConfigData)
 	if cisScanConfig["profile"] == "" {
-		values.PutValue(data, v3.CisScanProfileTypePermissive, "scheduledClusterScan", "scanConfig", "cisScanConfig", "profile")
+		values.PutValue(data, v32.CisScanProfileTypePermissive, "scheduledClusterScan", "scanConfig", "cisScanConfig", "profile")
 	}
 }
 
@@ -988,9 +990,9 @@ func (r *Store) validateUnavailableNodes(data, existingData map[string]interface
 		return fmt.Errorf("error getting cluster, try again %v", err)
 	}
 	// no need to validate if cluster's already provisioning or upgrading
-	if !v3.ClusterConditionProvisioned.IsTrue(cluster) ||
-		!v3.ClusterConditionUpdated.IsTrue(cluster) ||
-		v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+	if !v32.ClusterConditionProvisioned.IsTrue(cluster) ||
+		!v32.ClusterConditionUpdated.IsTrue(cluster) ||
+		v32.ClusterConditionUpgraded.IsUnknown(cluster) {
 		return nil
 	}
 	spec, err := getRkeConfig(data)

@@ -7,15 +7,17 @@ import (
 	"sort"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -193,13 +195,13 @@ func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan rke
 
 	node.Labels = finalMap
 
-	obj.Spec.MetadataUpdate.Labels = v3.MapDelta{}
+	obj.Spec.MetadataUpdate.Labels = v32.MapDelta{}
 
 	return m.updateNodeAndNode(node, obj)
 }
 
 // For any key that already exist in the plan, we should update or delete. For others, do not touch the plan.
-func computePlanDelta(planValues map[string]string, delta v3.MapDelta) (map[string]string, bool) {
+func computePlanDelta(planValues map[string]string, delta v32.MapDelta) (map[string]string, bool) {
 	update := false
 	for k, v := range delta.Add {
 		if planValues[k] != "" {
@@ -226,7 +228,7 @@ func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePla
 
 	node, obj = node.DeepCopy(), obj.DeepCopy()
 	node.Annotations = finalMap
-	obj.Spec.MetadataUpdate.Annotations = v3.MapDelta{}
+	obj.Spec.MetadataUpdate.Annotations = v32.MapDelta{}
 
 	return m.updateNodeAndNode(node, obj)
 }
@@ -265,7 +267,7 @@ func allowAllPolicy(_ string) bool {
 
 // computeDelta will return the final updated map to apply and a boolean indicating whether there are changes to be applied.
 // If the boolean is false, the caller need not take any action as the data is already in sync.
-func computeDelta(currentState map[string]string, planValues map[string]string, delta v3.MapDelta, canChangeValue canChangeValuePolicy) (map[string]string, bool) {
+func computeDelta(currentState map[string]string, planValues map[string]string, delta v32.MapDelta, canChangeValue canChangeValuePolicy) (map[string]string, bool) {
 	result := map[string]string{}
 	changed := false
 
@@ -306,7 +308,7 @@ func (m *nodesSyncer) getNodePlan(node *v3.Node) (rketypes.RKEConfigNodePlan, er
 		return rketypes.RKEConfigNodePlan{}, err
 	}
 
-	if cluster.Status.Driver != v3.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+	if cluster.Status.Driver != v32.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
 		return rketypes.RKEConfigNodePlan{}, nil
 	}
 
@@ -642,8 +644,8 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node,
 	var machine *v3.Node
 	if existing == nil {
 		machine = &v3.Node{
-			Spec:   v3.NodeSpec{},
-			Status: v3.NodeStatus{},
+			Spec:   v32.NodeSpec{},
+			Status: v32.NodeStatus{},
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "machine-"},
 		}
@@ -698,8 +700,8 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node,
 		machine.Labels = map[string]string{}
 	}
 	machine.Labels[nodehelper.LabelNodeName] = node.Name
-	v3.NodeConditionRegistered.True(machine)
-	v3.NodeConditionRegistered.Message(machine, "registered with kubernetes")
+	v32.NodeConditionRegistered.True(machine)
+	v32.NodeConditionRegistered.Message(machine, "registered with kubernetes")
 	return machine, nil
 }
 

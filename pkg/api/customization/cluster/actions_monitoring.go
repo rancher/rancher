@@ -5,11 +5,12 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/monitoring"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -61,7 +62,7 @@ func (a ActionHandler) editMonitoring(actionName string, action *types.Action, a
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}
-	var input v3.MonitoringInput
+	var input v32.MonitoringInput
 	if err = json.Unmarshal(data, &input); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}
@@ -96,7 +97,7 @@ func (a ActionHandler) enableMonitoring(actionName string, action *types.Action,
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}
-	var input v3.MonitoringInput
+	var input v32.MonitoringInput
 	if err = json.Unmarshal(data, &input); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}

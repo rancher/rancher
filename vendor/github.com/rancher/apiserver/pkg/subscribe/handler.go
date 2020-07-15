@@ -19,6 +19,12 @@ type Subscribe struct {
 	Stop            bool   `json:"stop,omitempty"`
 	ResourceType    string `json:"resourceType,omitempty"`
 	ResourceVersion string `json:"resourceVersion,omitempty"`
+	ID              string `json:"id,omitempty"`
+	Selector        string `json:"selector,omitempty"`
+}
+
+func (s *Subscribe) key() string {
+	return s.ResourceType + "/" + s.ID + "/" + s.Selector
 }
 
 func Handler(apiOp *types.APIRequest) (types.APIObjectList, error) {

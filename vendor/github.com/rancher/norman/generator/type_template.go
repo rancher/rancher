@@ -2,12 +2,21 @@ package generator
 
 var typeTemplate = `package client
 
-{{- if .schema | hasGet }}
+{{$intstr := false}}
+{{- range $key, $value := .structFields}}
+	{{if eq $value.Type "intstr.IntOrString" }}
+		{{$intstr = true}}
+	{{end}}
+{{end}}
+
 import (
+{{- if .schema | hasGet }}
 	"github.com/rancher/norman/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
-)
 {{- end}}
+	{{if $intstr  }}
+		"k8s.io/apimachinery/pkg/util/intstr"
+	{{end}}
+)
 
 const (
     {{.schema.CodeName}}Type = "{{.schema.ID}}"

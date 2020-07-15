@@ -7,17 +7,19 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/generated/compose"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
-	"github.com/rancher/rancher/pkg/types/compose"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -61,7 +63,7 @@ func (a ActionHandler) refreshCatalog(catalog *v3.Catalog) (err error) {
 		}
 
 		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
-		v3.CatalogConditionRefreshed.Unknown(catalog)
+		v32.CatalogConditionRefreshed.Unknown(catalog)
 		_, err = a.CatalogClient.Update(catalog)
 		if err == nil {
 			break
@@ -176,7 +178,7 @@ func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, act
 	var catalogNames []string
 	for _, catalog := range prjCatalogs {
 		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
-		v3.CatalogConditionRefreshed.Unknown(&catalog)
+		v32.CatalogConditionRefreshed.Unknown(&catalog)
 		if _, err := a.ProjectCatalogClient.Update(&catalog); err != nil {
 			return err
 		}
@@ -217,7 +219,7 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 	var catalogNames []string
 	for _, catalog := range clCatalogs {
 		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
-		v3.CatalogConditionRefreshed.Unknown(&catalog)
+		v32.CatalogConditionRefreshed.Unknown(&catalog)
 		if _, err := a.ClusterCatalogClient.Update(&catalog); err != nil {
 			return err
 		}

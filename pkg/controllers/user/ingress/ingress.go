@@ -7,7 +7,7 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"

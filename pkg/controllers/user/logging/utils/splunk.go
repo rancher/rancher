@@ -9,8 +9,9 @@ import (
 	"net/url"
 	"path"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 )
 
@@ -19,7 +20,7 @@ var (
 )
 
 type splunkTestWrap struct {
-	*v3.SplunkConfig
+	*v32.SplunkConfig
 }
 
 func (w *splunkTestWrap) TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error {

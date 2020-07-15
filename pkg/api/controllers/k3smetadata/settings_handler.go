@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/channelserver"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/pkg/data"
 	"k8s.io/apimachinery/pkg/runtime"

@@ -5,15 +5,17 @@ import (
 	"net/http"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"encoding/json"
 
 	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
-	"github.com/rancher/rancher/pkg/types/compose"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/generated/compose"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,11 +41,11 @@ func (h *DriverHandlers) ActionHandler(actionName string, action *types.Action, 
 	switch actionName {
 	case "activate":
 		m.Spec.Active = true
-		v3.NodeDriverConditionActive.Unknown(m)
+		v32.NodeDriverConditionActive.Unknown(m)
 	case "deactivate":
 		m.Spec.Active = false
-		v3.NodeDriverConditionInactive.Unknown(m)
-		var newConditions []v3.Condition
+		v32.NodeDriverConditionInactive.Unknown(m)
+		var newConditions []v32.Condition
 		for _, cond := range m.Status.Conditions {
 			// remove downloaded and installed conditions if stuck in unknown,
 			// this allows state to correctly show up as inactive vs downloading/installing

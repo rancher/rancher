@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/rancher/norman/store/crd"
-	clusterSchema "github.com/rancher/rancher/pkg/types/apis/cluster.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/cluster/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 

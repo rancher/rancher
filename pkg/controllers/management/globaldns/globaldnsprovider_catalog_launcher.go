@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/norman/types/convert"
 	passwordutil "github.com/rancher/rancher/pkg/api/store/password"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/rancher/rancher/pkg/types/user"
@@ -241,7 +243,7 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 				Namespace:       sysProject,
 				OwnerReferences: ownerRef,
 			},
-			Spec: pv3.AppSpec{
+			Spec: v32.AppSpec{
 				ProjectName:     localClusterName + ":" + sysProject,
 				TargetNamespace: namespace.GlobalNamespace,
 				ExternalID:      appCatalogID,

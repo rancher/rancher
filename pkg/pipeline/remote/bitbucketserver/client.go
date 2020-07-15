@@ -15,14 +15,16 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/mrjones/oauth"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,7 +42,7 @@ type client struct {
 	RedirectURL string
 }
 
-func New(config *v3.BitbucketServerPipelineConfig) (model.Remote, error) {
+func New(config *v32.BitbucketServerPipelineConfig) (model.Remote, error) {
 	if config == nil {
 		return nil, errors.New("empty bitbucket server config")
 	}

@@ -5,12 +5,14 @@ import (
 	"sort"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/controller"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/passwordgetter"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/pkg/errors"
@@ -220,7 +222,7 @@ func (s *ConfigSyncer) syncSSLCert(clusterLoggings []*mgmtv3.ClusterLogging, pro
 	return s.secretManager.updateSecret(secretname, namespace, sslConfig)
 }
 
-func GetSSLConfig(target mgmtv3.LoggingTargets) (string, string, string) {
+func GetSSLConfig(target v32.LoggingTargets) (string, string, string) {
 	var certificate, clientCert, clientKey string
 	if target.ElasticsearchConfig != nil {
 		certificate = target.ElasticsearchConfig.Certificate

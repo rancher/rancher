@@ -200,7 +200,6 @@ type stringModeStringEncoder struct {
 
 func (encoder *stringModeStringEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	tempStream := encoder.cfg.BorrowStream(nil)
-	tempStream.Attachment = stream.Attachment
 	defer encoder.cfg.ReturnStream(tempStream)
 	encoder.elemEncoder.Encode(ptr, tempStream)
 	stream.WriteString(string(tempStream.Buffer()))

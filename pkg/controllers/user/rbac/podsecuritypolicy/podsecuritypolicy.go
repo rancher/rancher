@@ -3,8 +3,8 @@ package podsecuritypolicy
 import (
 	"context"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v1beta12 "github.com/rancher/rancher/pkg/types/apis/policy/v1beta1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v1beta12 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/api/policy/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"

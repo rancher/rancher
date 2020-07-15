@@ -8,9 +8,9 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	projectschema "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/rancher/wrangler/pkg/randomtoken"

@@ -13,7 +13,8 @@ import (
 	"net/http"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 
 	"github.com/pkg/errors"
@@ -40,7 +41,7 @@ type LoggingTargetTestWrap interface {
 	TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error
 }
 
-func NewLoggingTargetTestWrap(loggingTargets v3.LoggingTargets) LoggingTargetTestWrap {
+func NewLoggingTargetTestWrap(loggingTargets v32.LoggingTargets) LoggingTargetTestWrap {
 	if loggingTargets.ElasticsearchConfig != nil {
 		return &elasticsearchTestWrap{loggingTargets.ElasticsearchConfig}
 	} else if loggingTargets.SplunkConfig != nil {

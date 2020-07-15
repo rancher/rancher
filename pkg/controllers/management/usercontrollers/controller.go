@@ -4,12 +4,14 @@ import (
 	"context"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	batchV1 "k8s.io/api/batch/v1"
@@ -69,9 +71,9 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 	var err error
 	if obj.Name == "local" && obj.Spec.Internal {
 		err = c.cleanupLocalCluster(obj)
-	} else if obj.Status.Driver == v3.ClusterDriverImported ||
-		obj.Status.Driver == v3.ClusterDriverK3s ||
-		obj.Status.Driver == v3.ClusterDriverK3os {
+	} else if obj.Status.Driver == v32.ClusterDriverImported ||
+		obj.Status.Driver == v32.ClusterDriverK3s ||
+		obj.Status.Driver == v32.ClusterDriverK3os {
 		err = c.cleanupImportedCluster(obj)
 	}
 	if err != nil {

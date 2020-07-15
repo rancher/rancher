@@ -8,18 +8,20 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	mgmtclientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	mgmtclientv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/sirupsen/logrus"
@@ -48,7 +50,7 @@ type ClusterGraphHandler struct {
 }
 
 func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	var queryGraphInput v3.QueryGraphInput
+	var queryGraphInput v32.QueryGraphInput
 	actionInput, err := parse.ReadBody(apiContext.Request)
 	if err != nil {
 		return err
@@ -136,11 +138,11 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 		return nil
 	}
 
-	collection := v3.QueryClusterGraphOutput{Type: "collection"}
+	collection := v32.QueryClusterGraphOutput{Type: "collection"}
 	for k, v := range seriesSlice {
 		graphName, resourceType, _ := parseID(k)
 		series := convertInstance(v, nodeMap, resourceType)
-		queryGraph := v3.QueryClusterGraph{
+		queryGraph := v32.QueryClusterGraph{
 			GraphName: graphName,
 			Series:    series,
 		}
@@ -265,8 +267,8 @@ func parseID(ref string) (graphName, resourceType, metricName string) {
 	return parts[0], parts[1], parts[1]
 }
 
-func convertInstance(seriesSlice []*TimeSeries, nodeMap map[string]string, resourceType string) []*v3.TimeSeries {
-	var series []*v3.TimeSeries
+func convertInstance(seriesSlice []*TimeSeries, nodeMap map[string]string, resourceType string) []*v32.TimeSeries {
+	var series []*v32.TimeSeries
 	for _, v := range seriesSlice {
 		name := v.Name
 
@@ -277,7 +279,7 @@ func convertInstance(seriesSlice []*TimeSeries, nodeMap map[string]string, resou
 			}
 		}
 
-		series = append(series, &v3.TimeSeries{
+		series = append(series, &v32.TimeSeries{
 			Name:   name,
 			Points: v.Points,
 		})

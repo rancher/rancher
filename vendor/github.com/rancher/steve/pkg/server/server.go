@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/steve/pkg/resources/schemas"
 	"github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/server/handler"
+	"github.com/rancher/steve/pkg/summarycache"
 )
 
 var ErrConfigRequired = errors.New("rest config is required")
@@ -72,14 +73,18 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 		return nil, nil, err
 	}
 
-	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf, asl, server.K8s.Discovery())...)
+	sf := schema.NewCollection(ctx, server.BaseSchemas, asl)
+	summaryCache := summarycache.New(sf)
+	ccache.OnAdd(ctx, summaryCache.OnAdd)
+	ccache.OnRemove(ctx, summaryCache.OnRemove)
+	ccache.OnChange(ctx, summaryCache.OnChange)
+
+	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf, summaryCache, asl, server.K8s.Discovery())...)
 
 	cols, err := common.NewDynamicColumns(server.RestConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	sf := schema.NewCollection(ctx, server.BaseSchemas, asl)
 
 	schemas.SetupWatcher(ctx, server.BaseSchemas, asl, sf)
 

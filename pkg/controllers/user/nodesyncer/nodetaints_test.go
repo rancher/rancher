@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"testing"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
+	fake1 "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	fake3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/taints"
-	fake1 "github.com/rancher/rancher/pkg/types/apis/core/v1/fakes"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	fake3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/fakes"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,16 +35,16 @@ func TestSyncNodeTaints(t *testing.T) {
 			nodeShouldUpdate:    false,
 			machine: v3.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "test1", Labels: map[string]string{nodehelper.LabelNodeName: "test1"}},
-				Status: v3.NodeStatus{
-					Conditions: []v3.NodeCondition{
-						v3.NodeCondition{
-							Type:   v3.NodeConditionRegistered,
+				Status: v32.NodeStatus{
+					Conditions: []v32.NodeCondition{
+						v32.NodeCondition{
+							Type:   v32.NodeConditionRegistered,
 							Status: v1.ConditionTrue,
 						},
 					},
 					NodeName: "test1",
 				},
-				Spec: v3.NodeSpec{
+				Spec: v32.NodeSpec{
 					DesiredNodeTaints: []v1.Taint{
 						v1.Taint{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
 					},
@@ -64,16 +66,16 @@ func TestSyncNodeTaints(t *testing.T) {
 			nodeShouldUpdate:    true,
 			machine: v3.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "test2", Labels: map[string]string{nodehelper.LabelNodeName: "test2"}},
-				Status: v3.NodeStatus{
-					Conditions: []v3.NodeCondition{
-						v3.NodeCondition{
-							Type:   v3.NodeConditionRegistered,
+				Status: v32.NodeStatus{
+					Conditions: []v32.NodeCondition{
+						v32.NodeCondition{
+							Type:   v32.NodeConditionRegistered,
 							Status: v1.ConditionTrue,
 						},
 					},
 					NodeName: "test2",
 				},
-				Spec: v3.NodeSpec{
+				Spec: v32.NodeSpec{
 					DesiredNodeTaints: []v1.Taint{
 						v1.Taint{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
 					},
@@ -91,16 +93,16 @@ func TestSyncNodeTaints(t *testing.T) {
 			nodeShouldUpdate:    true,
 			machine: v3.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "test3", Labels: map[string]string{nodehelper.LabelNodeName: "test3"}},
-				Status: v3.NodeStatus{
-					Conditions: []v3.NodeCondition{
-						v3.NodeCondition{
-							Type:   v3.NodeConditionRegistered,
+				Status: v32.NodeStatus{
+					Conditions: []v32.NodeCondition{
+						v32.NodeCondition{
+							Type:   v32.NodeConditionRegistered,
 							Status: v1.ConditionTrue,
 						},
 					},
 					NodeName: "test3",
 				},
-				Spec: v3.NodeSpec{
+				Spec: v32.NodeSpec{
 					UpdateTaintsFromAPI: &falseValue,
 				},
 			},

@@ -3,7 +3,8 @@ package nodepool
 import (
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
@@ -59,7 +60,7 @@ func Test_roleUpdate(t *testing.T) {
 		{
 			name: "all roles; nodepool & node",
 			node: &v3.Node{
-				Status: v3.NodeStatus{
+				Status: v32.NodeStatus{
 					NodeConfig: &rketypes.RKEConfigNode{
 						Role: []string{services.ETCDRole, services.ControlRole, services.WorkerRole},
 					},
@@ -67,7 +68,7 @@ func Test_roleUpdate(t *testing.T) {
 			},
 			nodepool: &v3.NodePool{
 				// per the types struct tags, these will always be defined and never be nil
-				Spec: v3.NodePoolSpec{
+				Spec: v32.NodePoolSpec{
 					Etcd:         true,
 					ControlPlane: true,
 					Worker:       true,
@@ -79,14 +80,14 @@ func Test_roleUpdate(t *testing.T) {
 		{
 			name: "worker only",
 			node: &v3.Node{
-				Status: v3.NodeStatus{
+				Status: v32.NodeStatus{
 					NodeConfig: &rketypes.RKEConfigNode{
 						Role: []string{services.WorkerRole},
 					},
 				},
 			},
 			nodepool: &v3.NodePool{
-				Spec: v3.NodePoolSpec{
+				Spec: v32.NodePoolSpec{
 					Etcd:         false,
 					ControlPlane: false,
 					Worker:       true,
@@ -98,14 +99,14 @@ func Test_roleUpdate(t *testing.T) {
 		{
 			name: "worker => controlplane ",
 			node: &v3.Node{
-				Status: v3.NodeStatus{
+				Status: v32.NodeStatus{
 					NodeConfig: &rketypes.RKEConfigNode{
 						Role: []string{services.WorkerRole},
 					},
 				},
 			},
 			nodepool: &v3.NodePool{
-				Spec: v3.NodePoolSpec{
+				Spec: v32.NodePoolSpec{
 					Etcd:         true,
 					ControlPlane: true,
 					Worker:       true,
@@ -113,7 +114,7 @@ func Test_roleUpdate(t *testing.T) {
 			},
 			want: true,
 			nodeAfterUpdate: &v3.Node{
-				Status: v3.NodeStatus{
+				Status: v32.NodeStatus{
 					NodeConfig: &rketypes.RKEConfigNode{
 						// order matters here
 						Role: []string{services.ControlRole, services.ETCDRole, services.WorkerRole},
@@ -124,14 +125,14 @@ func Test_roleUpdate(t *testing.T) {
 		{
 			name: "controlplane => worker",
 			node: &v3.Node{
-				Status: v3.NodeStatus{
+				Status: v32.NodeStatus{
 					NodeConfig: &rketypes.RKEConfigNode{
 						Role: []string{services.WorkerRole, services.ETCDRole, services.ControlRole},
 					},
 				},
 			},
 			nodepool: &v3.NodePool{
-				Spec: v3.NodePoolSpec{
+				Spec: v32.NodePoolSpec{
 					Etcd:         false,
 					ControlPlane: false,
 					Worker:       true,
@@ -139,7 +140,7 @@ func Test_roleUpdate(t *testing.T) {
 			},
 			want: true,
 			nodeAfterUpdate: &v3.Node{
-				Status: v3.NodeStatus{
+				Status: v32.NodeStatus{
 					NodeConfig: &rketypes.RKEConfigNode{
 						// order matters here
 						Role: []string{services.WorkerRole},

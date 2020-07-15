@@ -9,14 +9,16 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -30,7 +32,7 @@ type TemplateVerionFormatterWrapper struct {
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}
 
 type catalogYml struct {
-	Questions []v3.Question `yaml:"questions,omitempty"`
+	Questions []v32.Question `yaml:"questions,omitempty"`
 }
 
 func (t TemplateVerionFormatterWrapper) TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -149,7 +151,7 @@ func (t TemplateVerionFormatterWrapper) loadChart(templateVersion *client.Catalo
 		return nil, err
 	}
 
-	return helm.LoadChart(&v3.TemplateVersionSpec{
+	return helm.LoadChart(&v32.TemplateVersionSpec{
 		Version:     templateVersion.Version,
 		VersionName: templateVersion.VersionName,
 		VersionDir:  templateVersion.VersionDir,

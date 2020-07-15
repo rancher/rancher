@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/rancher/norman/httperror"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,7 +21,7 @@ type azureClient struct {
 }
 
 // newClientCode sets up the SPT, user and group client using a code
-func newClientCode(code string, config *v3.AzureADConfig) (*azureClient, error) {
+func newClientCode(code string, config *v32.AzureADConfig) (*azureClient, error) {
 	ac := &azureClient{}
 
 	oauthConfig, err := adal.NewOAuthConfig(config.Endpoint, config.TenantID)
@@ -75,7 +76,7 @@ func newClientCode(code string, config *v3.AzureADConfig) (*azureClient, error) 
 }
 
 // newClientToken sets up the SPT, user and group client using a current Token
-func newClientToken(config *v3.AzureADConfig, azureToken adal.Token) (*azureClient, error) {
+func newClientToken(config *v32.AzureADConfig, azureToken adal.Token) (*azureClient, error) {
 	ac := &azureClient{}
 
 	oauthConfig, err := adal.NewOAuthConfig(config.Endpoint, config.TenantID)

@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/coreos/go-semver/semver"
 	utils2 "github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/catalog/utils"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	v32 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/sirupsen/logrus"
@@ -25,7 +27,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	}
 
 	// only applies to k3s clusters
-	if cluster.Status.Driver != v3.ClusterDriverK3s {
+	if cluster.Status.Driver != v32.ClusterDriverK3s {
 		return cluster, nil
 	}
 
@@ -44,9 +46,9 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		}
 		if !needsUpgrade {
 			// if upgrade was in progress, make sure to set the state back
-			if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
-				v3.ClusterConditionUpgraded.True(cluster)
-				v3.ClusterConditionUpgraded.Message(cluster, "")
+			if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
+				v32.ClusterConditionUpgraded.True(cluster)
+				v32.ClusterConditionUpgraded.Message(cluster, "")
 				return h.clusterClient.Update(cluster)
 			}
 			return cluster, nil
@@ -121,7 +123,7 @@ func (h *handler) deployK3sUpgradeController(clusterName string) error {
 			return err
 		}
 
-		desiredApp := &v32.App{
+		desiredApp := &v33.App{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "rancher-k3s-upgrader",
 				Namespace: systemProjectName,
@@ -129,7 +131,7 @@ func (h *handler) deployK3sUpgradeController(clusterName string) error {
 					"field.cattle.io/creatorId": creator.Name,
 				},
 			},
-			Spec: v32.AppSpec{
+			Spec: v33.AppSpec{
 				Description:     "Upgrade controller for k3s clusters",
 				ExternalID:      latestVersionID,
 				ProjectName:     appProjectName,
@@ -143,8 +145,8 @@ func (h *handler) deployK3sUpgradeController(clusterName string) error {
 		}
 	} else {
 		if !checkDeployed(app) {
-			if !v32.AppConditionForceUpgrade.IsUnknown(app) {
-				v32.AppConditionForceUpgrade.Unknown(app)
+			if !v33.AppConditionForceUpgrade.IsUnknown(app) {
+				v33.AppConditionForceUpgrade.Unknown(app)
 			}
 			logrus.Warnln("force redeploying system-ugrade-controller")
 			if _, err = appClient.Update(app); err != nil {
@@ -212,9 +214,9 @@ func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster) (bool, error) {
 	return false, nil
 }
 
-func checkDeployed(app *v32.App) bool {
+func checkDeployed(app *v33.App) bool {
 
-	if v32.AppConditionDeployed.IsTrue(app) || v32.AppConditionInstalled.IsTrue(app) {
+	if v33.AppConditionDeployed.IsTrue(app) || v33.AppConditionInstalled.IsTrue(app) {
 		return true
 	}
 

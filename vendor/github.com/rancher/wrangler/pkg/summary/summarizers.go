@@ -7,6 +7,11 @@ import (
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	"github.com/rancher/wrangler/pkg/kv"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
+const (
+	kindSep = ", Kind="
 )
 
 var (
@@ -98,7 +103,33 @@ func init() {
 		checkInitializing,
 		checkRemoving,
 		checkLoadBalancer,
+		checkPod,
+		checkPodSelector,
+		checkOwner,
+		checkApplyOwned,
 	}
+}
+
+func checkOwner(obj data.Object, conditions []Condition, summary Summary) Summary {
+	ustr := &unstructured.Unstructured{
+		Object: obj,
+	}
+	for _, ownerref := range ustr.GetOwnerReferences() {
+		rel := Relationship{
+			Name:       ownerref.Name,
+			Kind:       ownerref.Kind,
+			APIVersion: ownerref.APIVersion,
+			Type:       "owner",
+			Inbound:    true,
+		}
+		if ownerref.Controller != nil && *ownerref.Controller {
+			rel.ControlledBy = true
+		}
+
+		summary.Relationships = append(summary.Relationships, rel)
+	}
+
+	return summary
 }
 
 func checkErrors(_ data.Object, conditions []Condition, summary Summary) Summary {
@@ -254,6 +285,71 @@ func checkLoadBalancer(obj data.Object, _ []Condition, summary Summary) Summary 
 			summary.Message = append(summary.Message, "Load balancer is being provisioned")
 		}
 	}
+
+	return summary
+}
+
+func isKind(obj data.Object, kind string, apiGroups ...string) bool {
+	if obj.String("kind") != kind {
+		return false
+	}
+
+	if len(apiGroups) == 0 {
+		return obj.String("apiVersion") == "v1"
+	}
+
+	if len(apiGroups) == 0 {
+		apiGroups = []string{""}
+	}
+
+	for _, group := range apiGroups {
+		switch {
+		case group == "":
+			if obj.String("apiVersion") == "v1" {
+				return true
+			}
+		case group[len(group)-1] == '/':
+			if strings.HasPrefix(obj.String("apiVersion"), group) {
+				return true
+			}
+		default:
+			if obj.String("apiVersion") != group {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func checkApplyOwned(obj data.Object, conditions []Condition, summary Summary) Summary {
+	if len(obj.Slice("metadata", "ownerReferences")) > 0 {
+		return summary
+	}
+
+	annotations := obj.Map("metadata", "annotations")
+	gvkString := convert.ToString(annotations["objectset.rio.cattle.io/owner-gvk"])
+	i := strings.Index(gvkString, kindSep)
+	if i <= 0 {
+		return summary
+	}
+
+	name := convert.ToString(annotations["objectset.rio.cattle.io/owner-name"])
+	namespace := convert.ToString(annotations["objectset.rio.cattle.io/owner-namespace"])
+
+	apiVersion := gvkString[:i]
+	kind := gvkString[i+len(kindSep):]
+
+	rel := Relationship{
+		Name:       name,
+		Namespace:  namespace,
+		Kind:       kind,
+		APIVersion: apiVersion,
+		Type:       "applies",
+		Inbound:    true,
+	}
+
+	summary.Relationships = append(summary.Relationships, rel)
 
 	return summary
 }

@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig, nameTmpl string, runType v3.ClusterScanRunType) *v3.ClusterScan {
+func NewCisScan(cluster *v3.Cluster, cisScanConfig *v32.CisScanConfig, nameTmpl string, runType v32.ClusterScanRunType) *v3.ClusterScan {
 	controller := true
 	name := fmt.Sprintf(nameTmpl, time.Now().UnixNano())
 	cs := &v3.ClusterScan{
@@ -27,32 +29,32 @@ func NewCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig, nameTmpl s
 				},
 			},
 		},
-		Spec: v3.ClusterScanSpec{
-			ScanType:  v3.ClusterScanTypeCis,
+		Spec: v32.ClusterScanSpec{
+			ScanType:  v32.ClusterScanTypeCis,
 			ClusterID: cluster.Name,
 			RunType:   runType,
-			ScanConfig: v3.ClusterScanConfig{
+			ScanConfig: v32.ClusterScanConfig{
 				CisScanConfig: cisScanConfig,
 			},
 		},
 	}
-	v3.ClusterScanConditionCreated.Unknown(cs)
+	v32.ClusterScanConditionCreated.Unknown(cs)
 	return cs
 }
 
-func NewManualCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig) *v3.ClusterScan {
+func NewManualCisScan(cluster *v3.Cluster, cisScanConfig *v32.CisScanConfig) *v3.ClusterScan {
 	nameTmpl := ManualScanPrefix + "%v"
-	return NewCisScan(cluster, cisScanConfig, nameTmpl, v3.ClusterScanRunTypeManual)
+	return NewCisScan(cluster, cisScanConfig, nameTmpl, v32.ClusterScanRunTypeManual)
 }
 
-func NewScheduledCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig) *v3.ClusterScan {
+func NewScheduledCisScan(cluster *v3.Cluster, cisScanConfig *v32.CisScanConfig) *v3.ClusterScan {
 	nameTmpl := ScheduledScanPrefix + "%v"
-	return NewCisScan(cluster, cisScanConfig, nameTmpl, v3.ClusterScanRunTypeScheduled)
+	return NewCisScan(cluster, cisScanConfig, nameTmpl, v32.ClusterScanRunTypeScheduled)
 }
 
 func LaunchScan(
 	manual bool,
-	cisScanConfig *v3.CisScanConfig,
+	cisScanConfig *v32.CisScanConfig,
 	cluster *v3.Cluster,
 	clusterClient v3.ClusterInterface,
 	clusterScanClient v3.ClusterScanInterface,

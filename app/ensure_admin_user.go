@@ -7,7 +7,7 @@ import (
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/api/user"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/urfave/cli"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"

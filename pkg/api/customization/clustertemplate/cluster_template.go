@@ -5,6 +5,8 @@ import (
 	"sort"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"encoding/json"
 	"fmt"
 
@@ -15,9 +17,9 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +36,7 @@ type Wrapper struct {
 	ClusterTemplateLister         v3.ClusterTemplateLister
 	ClusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
 	ClusterTemplateRevisions      v3.ClusterTemplateRevisionInterface
-	ClusterTemplateQuestions      []v3.Question
+	ClusterTemplateQuestions      []v32.Question
 }
 
 func (w Wrapper) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -172,7 +174,7 @@ func (w Wrapper) loadRevision(apiContext *types.APIContext) (*v3.ClusterTemplate
 }
 
 func (w Wrapper) listRevisionQuestions(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	questionsOutput := v3.ClusterTemplateQuestionsOutput{}
+	questionsOutput := v32.ClusterTemplateQuestionsOutput{}
 
 	if len(w.ClusterTemplateQuestions) == 0 {
 		w.ClusterTemplateQuestions = w.BuildQuestionsFromSchema(apiContext.Schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType), apiContext.Schemas, "")
@@ -187,8 +189,8 @@ func (w Wrapper) listRevisionQuestions(actionName string, action *types.Action, 
 	return nil
 }
 
-func (w Wrapper) BuildQuestionsFromSchema(schema *types.Schema, schemas *types.Schemas, pathTofield string) []v3.Question {
-	questions := []v3.Question{}
+func (w Wrapper) BuildQuestionsFromSchema(schema *types.Schema, schemas *types.Schemas, pathTofield string) []v32.Question {
+	questions := []v32.Question{}
 	for name, field := range schema.ResourceFields {
 		fieldType := field.Type
 		if strings.HasPrefix(fieldType, "array") {
@@ -207,7 +209,7 @@ func (w Wrapper) BuildQuestionsFromSchema(schema *types.Schema, schemas *types.S
 			}
 		} else {
 			//add a Question
-			newQuestion := v3.Question{}
+			newQuestion := v32.Question{}
 			if field.Type == "password" {
 				newQuestion.Group = "password"
 			}

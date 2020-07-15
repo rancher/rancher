@@ -9,13 +9,14 @@ import (
 	"strconv"
 	"time"
 
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	mv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/types/namespace"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/pki/cert"
@@ -449,7 +450,7 @@ func GetJenkinsDeployment(ns string) *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:  utils.JenkinsName,
-							Image: images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.Jenkins),
+							Image: images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.Jenkins),
 							Env: []corev1.EnvVar{
 								{
 									Name: "ADMIN_PASSWORD",
@@ -582,7 +583,7 @@ func GetRegistryDeployment(ns string) *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:            utils.RegistryName,
-							Image:           images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.Registry),
+							Image:           images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.Registry),
 							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{
@@ -778,7 +779,7 @@ func getProxyDaemonset() *appsv1.DaemonSet {
 					Containers: []corev1.Container{
 						{
 							Name:    utils.RegistryProxyName,
-							Image:   images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.RegistryProxy),
+							Image:   images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.RegistryProxy),
 							Command: []string{"nginx-proxy"},
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -862,7 +863,7 @@ func GetMinioDeployment(ns string) *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:            utils.MinioName,
-							Image:           images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.Minio),
+							Image:           images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.Minio),
 							ImagePullPolicy: corev1.PullAlways,
 							Args:            []string{"server", "/data"},
 							Env: []corev1.EnvVar{

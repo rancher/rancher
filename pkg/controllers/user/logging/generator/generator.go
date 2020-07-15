@@ -6,9 +6,11 @@ import (
 	"strings"
 	"text/template"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 
 	"github.com/pkg/errors"
 	k8scorev1 "k8s.io/api/core/v1"
@@ -32,7 +34,7 @@ func GenerateConfig(tempalteName string, conf interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces, certDir string) ([]byte, error) {
+func GenerateClusterConfig(logging v32.ClusterLoggingSpec, excludeNamespaces, certDir string) ([]byte, error) {
 	wl, err := newWrapClusterLogging(logging, excludeNamespaces, certDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "to wraper cluster logging failed")

@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
 //GClient implements a httpclient for google oauth
@@ -16,7 +16,7 @@ type GClient struct {
 	httpClient *http.Client
 }
 
-func (g *GClient) getUser(accessToken string, config *v3.GoogleOauthConfig) (*Account, error) {
+func (g *GClient) getUser(accessToken string, config *v32.GoogleOauthConfig) (*Account, error) {
 	// userinfo endpoint doesn't require viewType param, non-admins and admins both can query this endpoint
 	respBytes, _, err := g.getFromGoogle(accessToken, config.UserInfoEndpoint)
 	if err != nil {

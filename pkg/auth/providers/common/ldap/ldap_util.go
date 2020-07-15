@@ -10,7 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	ldapv2 "gopkg.in/ldap.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,7 +121,7 @@ func GetAttributeValuesByName(search []*ldapv2.EntryAttribute, attributeName str
 	return []string{}
 }
 
-func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v3.ActiveDirectoryConfig) []string {
+func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.ActiveDirectoryConfig) []string {
 	userSearchAttributes := []string{memberOfAttribute,
 		ObjectClass,
 		config.UserObjectClass,
@@ -130,7 +131,7 @@ func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v3.A
 	return userSearchAttributes
 }
 
-func GetGroupSearchAttributes(memberOfAttribute, ObjectClass string, config *v3.ActiveDirectoryConfig) []string {
+func GetGroupSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.ActiveDirectoryConfig) []string {
 	groupSeachAttributes := []string{memberOfAttribute,
 		ObjectClass,
 		config.GroupObjectClass,

@@ -5,10 +5,12 @@ import (
 	"reflect"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 
 	"github.com/pkg/errors"
 	k8scorev1 "k8s.io/api/core/v1"
@@ -154,7 +156,7 @@ func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, docker
 			Name:      appName,
 			Namespace: systemProjectName,
 		},
-		Spec: projectv3.AppSpec{
+		Spec: v32.AppSpec{
 			Answers: map[string]string{
 				//compatible with old version
 				"fluentd.enabled":              "true",
@@ -189,7 +191,7 @@ func loggingTesterApp(appCreator, systemProjectID, catalogID, clusterConfig, pro
 			Name:      appName,
 			Namespace: systemProjectName,
 		},
-		Spec: projectv3.AppSpec{
+		Spec: v32.AppSpec{
 			Answers: map[string]string{
 				"fluentd-tester.enabled": "true",
 			},

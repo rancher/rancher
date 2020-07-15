@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/rancher/norman/controller"
@@ -15,13 +17,13 @@ import (
 	alertconfig "github.com/rancher/rancher/pkg/controllers/user/alert/config"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/deployer"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	notifierutil "github.com/rancher/rancher/pkg/notifiers"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/sirupsen/logrus"
@@ -382,7 +384,7 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 				groupBy := getClusterAlertGroupBy(alert.Spec)
 
 				if alert.Spec.EventRule != nil {
-					timeFields := v3.TimingField{
+					timeFields := v32.TimingField{
 						GroupWaitSeconds:      eventGroupWait,
 						GroupIntervalSeconds:  eventGroupInterval,
 						RepeatIntervalSeconds: eventRepeatInterval,
@@ -404,7 +406,7 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 	return nil
 }
 
-func (d *ConfigSyncer) addRule(ruleID string, route *alertconfig.Route, comm v3.CommonRuleField, groupBy []model.LabelName) {
+func (d *ConfigSyncer) addRule(ruleID string, route *alertconfig.Route, comm v32.CommonRuleField, groupBy []model.LabelName) {
 	inherited := true
 	if comm.Inherited != nil {
 		inherited = *comm.Inherited
@@ -414,7 +416,7 @@ func (d *ConfigSyncer) addRule(ruleID string, route *alertconfig.Route, comm v3.
 	d.appendRoute(route, r2)
 }
 
-func (d *ConfigSyncer) newRoute(match map[string]string, inherited bool, timeFields v3.TimingField, groupBy []model.LabelName) *alertconfig.Route {
+func (d *ConfigSyncer) newRoute(match map[string]string, inherited bool, timeFields v32.TimingField, groupBy []model.LabelName) *alertconfig.Route {
 	route := &alertconfig.Route{
 		Continue: true,
 		Receiver: match["group_id"],
@@ -449,7 +451,7 @@ func (d *ConfigSyncer) appendRoute(route *alertconfig.Route, subRoute *alertconf
 	route.Routes = append(route.Routes, subRoute)
 }
 
-func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertconfig.Receiver, recipients []v3.Recipient) bool {
+func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertconfig.Receiver, recipients []v32.Recipient) bool {
 	receiverExist := false
 	for _, r := range recipients {
 		if r.NotifierName != "" {
@@ -625,7 +627,7 @@ func includeProjectMetrics(projectAlerts []*v3.ProjectAlertRule) bool {
 	return false
 }
 
-func getClusterAlertGroupBy(spec v3.ClusterAlertRuleSpec) []model.LabelName {
+func getClusterAlertGroupBy(spec v32.ClusterAlertRuleSpec) []model.LabelName {
 	if spec.EventRule != nil {
 		return []model.LabelName{"rule_id", "resource_kind", "target_namespace", "target_name", "event_message"}
 	} else if spec.SystemServiceRule != nil {
@@ -639,7 +641,7 @@ func getClusterAlertGroupBy(spec v3.ClusterAlertRuleSpec) []model.LabelName {
 	return nil
 }
 
-func getProjectAlertGroupBy(spec v3.ProjectAlertRuleSpec) []model.LabelName {
+func getProjectAlertGroupBy(spec v32.ProjectAlertRuleSpec) []model.LabelName {
 	if spec.PodRule != nil {
 		return []model.LabelName{"rule_id", "namespace", "pod_name", "alert_type"}
 	} else if spec.WorkloadRule != nil {

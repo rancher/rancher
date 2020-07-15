@@ -3,14 +3,16 @@ package bitbucketserver
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
-	v3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3/schema"
-	client "github.com/rancher/rancher/pkg/types/client/project/v3"
+	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -53,7 +55,7 @@ func (b *BsProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	}
 	storedBitbucketPipelineConfigMap := u.UnstructuredContent()
 
-	storedBitbucketPipelineConfig := &v3.BitbucketServerPipelineConfig{}
+	storedBitbucketPipelineConfig := &v32.BitbucketServerPipelineConfig{}
 	if err := mapstructure.Decode(storedBitbucketPipelineConfigMap, storedBitbucketPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}

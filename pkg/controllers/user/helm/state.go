@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -80,7 +83,7 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 	if app == nil || app.DeletionTimestamp != nil {
 		return nil, nil
 	}
-	if !pv3.AppConditionInstalled.IsTrue(app) {
+	if !v32.AppConditionInstalled.IsTrue(app) {
 		return app, nil
 	}
 	project, err := s.projectLister.Get(s.clusterName, app.Namespace)
@@ -97,20 +100,20 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 	updatingWorkloads := getUpdating(workloads)
 	toUpdate := app.DeepCopy()
 	if len(updatingWorkloads) == 0 {
-		if pv3.AppConditionDeployed.IsTrue(toUpdate) {
+		if v32.AppConditionDeployed.IsTrue(toUpdate) {
 			return app, nil
 		}
-		pv3.AppConditionDeployed.True(toUpdate)
-		pv3.AppConditionDeployed.Reason(toUpdate, "")
-		pv3.AppConditionDeployed.Message(toUpdate, "")
+		v32.AppConditionDeployed.True(toUpdate)
+		v32.AppConditionDeployed.Reason(toUpdate, "")
+		v32.AppConditionDeployed.Message(toUpdate, "")
 	} else {
-		existing := strings.Split(v3.MultiClusterAppConditionDeployed.GetMessage(toUpdate), ",")
+		existing := strings.Split(v33.MultiClusterAppConditionDeployed.GetMessage(toUpdate), ",")
 		if Equal(existing, updatingWorkloads) {
 			return app, nil
 		}
-		pv3.AppConditionDeployed.Unknown(toUpdate)
-		pv3.AppConditionDeployed.Message(toUpdate, GetMsg(updatingWorkloads))
-		pv3.AppConditionDeployed.Reason(toUpdate, "workloads are updating")
+		v32.AppConditionDeployed.Unknown(toUpdate)
+		v32.AppConditionDeployed.Message(toUpdate, GetMsg(updatingWorkloads))
+		v32.AppConditionDeployed.Reason(toUpdate, "workloads are updating")
 	}
 	return s.apps.Update(toUpdate)
 }

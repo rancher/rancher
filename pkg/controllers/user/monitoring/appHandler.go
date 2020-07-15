@@ -1,12 +1,12 @@
 package monitoring
 
 import (
+	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	appsv1 "github.com/rancher/rancher/pkg/types/apis/apps/v1"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
 )
 
 type appHandler struct {

@@ -18,11 +18,13 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/controller"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	mgmtv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
 	nsutil "github.com/rancher/rancher/pkg/types/namespace"
 
 	"github.com/blang/semver"
@@ -183,8 +185,8 @@ func (h *Helm) LoadIndex() (*RepoIndex, error) {
 	return helmRepoIndex, yaml.Unmarshal(body, helmRepoIndex.IndexFile)
 }
 
-func (h *Helm) fetchTgz(helmURL string) ([]v3.File, error) {
-	var files []v3.File
+func (h *Helm) fetchTgz(helmURL string) ([]v32.File, error) {
+	var files []v32.File
 	logrus.Debugf("Helm fetching file %s", helmURL)
 
 	resp, err := h.request(helmURL)
@@ -227,7 +229,7 @@ func (h *Helm) fetchTgz(helmURL string) ([]v3.File, error) {
 			if err != nil {
 				return nil, err
 			}
-			files = append(files, v3.File{
+			files = append(files, v32.File{
 				Name:     name,
 				Contents: string(contents),
 			})
@@ -237,7 +239,7 @@ func (h *Helm) fetchTgz(helmURL string) ([]v3.File, error) {
 	return files, nil
 }
 
-func (h *Helm) FetchLocalFiles(version *ChartVersion) ([]v3.File, error) {
+func (h *Helm) FetchLocalFiles(version *ChartVersion) ([]v32.File, error) {
 	err := h.lockAndVerifyCachePath()
 	defer h.unlock()
 	if err != nil {
@@ -248,7 +250,7 @@ func (h *Helm) FetchLocalFiles(version *ChartVersion) ([]v3.File, error) {
 		return nil, errors.New("No files or urls provided for helm fetch")
 	}
 
-	var files []v3.File
+	var files []v32.File
 	for _, file := range version.LocalFiles {
 		newFile, err := h.loadFile(version, file)
 		if err != nil {
@@ -287,7 +289,7 @@ func (h *Helm) loadChartFiles(versionDir, prefix string, filters []string) (map[
 	return filemap, err
 }
 
-func (h *Helm) LoadChart(templateVersion *v3.TemplateVersionSpec, filters []string) (map[string]string, error) {
+func (h *Helm) LoadChart(templateVersion *v32.TemplateVersionSpec, filters []string) (map[string]string, error) {
 	err := h.lockAndVerifyCachePath()
 	defer h.unlock()
 	if err != nil {
@@ -361,7 +363,7 @@ func filterMatch(match string, filters []string) bool {
 	return false
 }
 
-func (h *Helm) fetchURLs(urls []string) ([]v3.File, error) {
+func (h *Helm) fetchURLs(urls []string) ([]v32.File, error) {
 	var (
 		errs []error
 	)
@@ -375,7 +377,7 @@ func (h *Helm) fetchURLs(urls []string) ([]v3.File, error) {
 	return nil, errors.Errorf("Error fetching helm URLs: %v", errs)
 }
 
-func (h *Helm) loadFile(version *ChartVersion, filename string) (*v3.File, error) {
+func (h *Helm) loadFile(version *ChartVersion, filename string) (*v32.File, error) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -387,7 +389,7 @@ func (h *Helm) loadFile(version *ChartVersion, filename string) (*v3.File, error
 		return nil, err
 	}
 
-	return &v3.File{
+	return &v32.File{
 		Name:     path.Join(version.Name, filepath.ToSlash(relPath)),
 		Contents: string(data),
 	}, nil

@@ -48,6 +48,9 @@ func init() {
 	resource.Put({{.schema.CodeName}}GroupVersionResource)
 }
 
+// Deprecated use {{.prefix}}{{.schema.CodeName}} instead
+type {{.schema.CodeName}} = {{.prefix}}{{.schema.CodeName}}
+
 func New{{.schema.CodeName}}(namespace, name string, obj {{.prefix}}{{.schema.CodeName}}) *{{.prefix}}{{.schema.CodeName}} {
 	obj.APIVersion, obj.Kind = {{.schema.CodeName}}GroupVersionKind.ToAPIVersionAndKind()
 	obj.Name = name

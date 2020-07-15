@@ -10,13 +10,14 @@ import (
 	"path"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 )
 
 type elasticsearchTestWrap struct {
-	*v3.ElasticsearchConfig
+	*v32.ElasticsearchConfig
 }
 
 func (w *elasticsearchTestWrap) TestReachable(ctx context.Context, dial dialer.Dialer, includeSendTestLog bool) error {

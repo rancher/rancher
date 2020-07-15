@@ -6,11 +6,13 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,14 +28,14 @@ var (
 	defaultFrom        = "now-" + defaultQueryDuring
 )
 
-func newClusterGraphInputParser(input v3.QueryGraphInput) *clusterGraphInputParser {
+func newClusterGraphInputParser(input v32.QueryGraphInput) *clusterGraphInputParser {
 	return &clusterGraphInputParser{
 		Input: &input,
 	}
 }
 
 type clusterGraphInputParser struct {
-	Input       *v3.QueryGraphInput
+	Input       *v32.QueryGraphInput
 	ClusterName string
 	Start       time.Time
 	End         time.Time
@@ -71,14 +73,14 @@ func (p *clusterGraphInputParser) parseFilter() error {
 	return nil
 }
 
-func newProjectGraphInputParser(input v3.QueryGraphInput) *projectGraphInputParser {
+func newProjectGraphInputParser(input v32.QueryGraphInput) *projectGraphInputParser {
 	return &projectGraphInputParser{
 		Input: &input,
 	}
 }
 
 type projectGraphInputParser struct {
-	Input       *v3.QueryGraphInput
+	Input       *v32.QueryGraphInput
 	ProjectID   string
 	ClusterName string
 	Start       time.Time
@@ -123,12 +125,12 @@ func (p *projectGraphInputParser) parseFilter() error {
 
 type authChecker struct {
 	ProjectID          string
-	Input              *v3.QueryGraphInput
+	Input              *v32.QueryGraphInput
 	UserContext        *config.UserContext
 	WorkloadController workload.CommonController
 }
 
-func newAuthChecker(ctx context.Context, userContext *config.UserContext, input *v3.QueryGraphInput, projectID string) *authChecker {
+func newAuthChecker(ctx context.Context, userContext *config.UserContext, input *v32.QueryGraphInput, projectID string) *authChecker {
 	return &authChecker{
 		ProjectID:          projectID,
 		Input:              input,

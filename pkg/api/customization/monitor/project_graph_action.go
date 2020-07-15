@@ -6,18 +6,20 @@ import (
 	"fmt"
 	"net/http"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	mgmtclientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/rancher/pkg/types/apis/project.cattle.io/v3"
-	mgmtclientv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +42,7 @@ type ProjectGraphHandler struct {
 }
 
 func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	var queryGraphInput v3.QueryGraphInput
+	var queryGraphInput v32.QueryGraphInput
 	actionInput, err := parse.ReadBody(apiContext.Request)
 	if err != nil {
 		return err
@@ -144,10 +146,10 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 		return nil
 	}
 
-	collection := v3.QueryProjectGraphOutput{Type: "collection"}
+	collection := v32.QueryProjectGraphOutput{Type: "collection"}
 	for k, v := range seriesSlice {
 		graphName, _, _ := parseID(k)
-		queryGraph := v3.QueryProjectGraph{
+		queryGraph := v32.QueryProjectGraph{
 			GraphName: graphName,
 			Series:    parseResponse(v),
 		}
@@ -162,10 +164,10 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 	return nil
 }
 
-func parseResponse(seriesSlice []*TimeSeries) []*v3.TimeSeries {
-	var series []*v3.TimeSeries
+func parseResponse(seriesSlice []*TimeSeries) []*v32.TimeSeries {
+	var series []*v32.TimeSeries
 	for _, v := range seriesSlice {
-		series = append(series, &v3.TimeSeries{
+		series = append(series, &v32.TimeSeries{
 			Name:   v.Name,
 			Points: v.Points,
 		})

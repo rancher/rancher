@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	managementv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
+	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 )
 
 func Wrap(store types.Store) types.Store {

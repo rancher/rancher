@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/mitchellh/mapstructure"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -34,7 +34,7 @@ func newAuthProvider(apiContext *config.ScaledContext) *authProvider {
 }
 
 func (a *authProvider) sync(key string, config *v3.AuthConfig) (runtime.Object, error) {
-	samlConfig := &v3.SamlConfig{}
+	samlConfig := &v32.SamlConfig{}
 	if key == "" || config == nil {
 		return nil, nil
 	}

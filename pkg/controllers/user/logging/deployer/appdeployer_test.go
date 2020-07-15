@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
-	"github.com/rancher/rancher/pkg/types/apis/core/v1/fakes"
+	"github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 
 	"github.com/stretchr/testify/assert"
 	k8scorev1 "k8s.io/api/core/v1"

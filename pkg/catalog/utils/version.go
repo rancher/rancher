@@ -4,13 +4,15 @@ import (
 	"sort"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/blang/semver"
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/catalog/utils/version"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
 )
 
 func VersionBetween(a, b, c string) bool {
@@ -93,7 +95,7 @@ func ReleaseServerVersion(serverVersion string) bool {
 	return true
 }
 
-func LatestAvailableTemplateVersion(template *v3.CatalogTemplate) (*v3.TemplateVersionSpec, error) {
+func LatestAvailableTemplateVersion(template *v3.CatalogTemplate) (*v32.TemplateVersionSpec, error) {
 	versions := template.DeepCopy().Spec.Versions
 	if len(versions) == 0 {
 		return nil, errors.New("empty catalog template version list")

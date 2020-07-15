@@ -8,17 +8,18 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/rancher/pkg/types/client/management/v3"
-	publicclient "github.com/rancher/rancher/pkg/types/client/management/v3public"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/user"
 	"github.com/sirupsen/logrus"
@@ -68,7 +69,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 }
 
 func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v3public.GoogleOauthLogin)
+	login, ok := input.(*v32.GoogleOauthLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
 	}
@@ -77,7 +78,7 @@ func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, input interf
 
 // loginUser takes as input the code; gets access_token and refresh_token in exhange; uses access_token to get user info
 // and groups (if allowed); and returns the user and group principals and oauth token
-func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential *v3public.GoogleOauthLogin, config *v3.GoogleOauthConfig, testAndEnableAction bool) (v3.Principal, []v3.Principal, string, error) {
+func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential *v32.GoogleOauthLogin, config *v32.GoogleOauthConfig, testAndEnableAction bool) (v3.Principal, []v3.Principal, string, error) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 	var err error
@@ -293,7 +294,7 @@ func (g *googleOauthProvider) CanAccessWithGroupProviders(userPrincipalID string
 	return allowed, nil
 }
 
-func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*v3.GoogleOauthConfig, error) {
+func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*v32.GoogleOauthConfig, error) {
 	authConfigObj, err := g.authConfigs.ObjectClient().UnstructuredClient().Get(Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve GoogleOAuthConfig, error: %v", err)
@@ -304,7 +305,7 @@ func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*v3.GoogleOauthConfig, e
 	}
 	storedGoogleOAuthConfigMap := u.UnstructuredContent()
 
-	storedGoogleOAuthConfig := &v3.GoogleOauthConfig{}
+	storedGoogleOAuthConfig := &v32.GoogleOauthConfig{}
 	mapstructure.Decode(storedGoogleOAuthConfigMap, storedGoogleOAuthConfig)
 
 	metadataMap, ok := storedGoogleOAuthConfigMap["metadata"].(map[string]interface{})
@@ -333,7 +334,7 @@ func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*v3.GoogleOauthConfig, e
 	return storedGoogleOAuthConfig, nil
 }
 
-func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *v3.GoogleOauthConfig) error {
+func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *v32.GoogleOauthConfig) error {
 	storedGoogleOAuthConfig, err := g.getGoogleOAuthConfigCR()
 	if err != nil {
 		return err

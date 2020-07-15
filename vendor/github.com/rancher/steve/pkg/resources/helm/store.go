@@ -67,7 +67,7 @@ func (p *partitioner) Lookup(apiOp *types.APIRequest, schema *types.APISchema, v
 	return nil, validation.NotFound
 }
 
-func (p *partitioner) All(apiOp *types.APIRequest, schema *types.APISchema, verb string) ([]partition.Partition, error) {
+func (p *partitioner) All(apiOp *types.APIRequest, schema *types.APISchema, verb, id string) ([]partition.Partition, error) {
 	return all, nil
 }
 

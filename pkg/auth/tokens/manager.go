@@ -12,10 +12,11 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/util"
-	v1 "github.com/rancher/rancher/pkg/types/apis/core/v1"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
-	clientv3 "github.com/rancher/rancher/pkg/types/client/management/v3"
+	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
@@ -559,7 +560,7 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 				},
 			},
 		},
-		GroupPrincipals: map[string]v3.Principals{},
+		GroupPrincipals: map[string]v32.Principals{},
 		LastRefresh:     "",
 		NeedsRefresh:    false,
 	}
@@ -574,7 +575,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	}
 
 	if needCreate {
-		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
 		_, err := m.userAttributes.Create(attribs)
 		if err != nil {
 			return err
@@ -584,7 +585,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 
 	// Exists, just update if necessary
 	if m.UserAttributeChanged(attribs, provider, groupPrincipals) {
-		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
 		_, err := m.userAttributes.Update(attribs)
 		if err != nil {
 			return err
@@ -594,7 +595,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	return nil
 }
 
-func (m *Manager) UserAttributeChanged(attribs *v3.UserAttribute, provider string, groupPrincipals []v3.Principal) bool {
+func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider string, groupPrincipals []v32.Principal) bool {
 	oldSet := []string{}
 	newSet := []string{}
 	for _, principal := range attribs.GroupPrincipals[provider].Items {
@@ -626,7 +627,7 @@ var uaBackoff = wait.Backoff{
 	Steps:    5,
 }
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v32.Principal, groupPrincipals []v32.Principal, providerToken string, ttl int64, description string) (v3.Token, error) {
 	provider := userPrincipal.Provider
 	if (provider == "github" || provider == "azuread" || provider == "googleoauth") && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)

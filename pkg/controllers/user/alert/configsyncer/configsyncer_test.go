@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/prometheus/common/model"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
-	v3 "github.com/rancher/rancher/pkg/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -17,7 +18,7 @@ var (
 		caseName     string
 		in           map[string][]*v3.ClusterAlertRule
 		outGroupBy   []model.LabelName
-		outTimeField v3.TimingField
+		outTimeField v32.TimingField
 	}{
 		{"event alert", eventRulesMap, eventGroupBy, eventTimingField},
 		{"node alert", nodeRulesMap, nodeGroupBy, defaultTimingField},
@@ -74,7 +75,7 @@ var (
 		caseName     string
 		in           map[string]map[string][]*v3.ProjectAlertRule
 		outGroupBy   []model.LabelName
-		outTimeField v3.TimingField
+		outTimeField v32.TimingField
 	}{
 		{"pod alert", podRulesMap, podGroupBy, defaultTimingField},
 		{"workload alert", workloadRulesMap, workloadGroupBy, defaultTimingField},
@@ -136,33 +137,33 @@ var (
 	serverity   = "critical"
 	inherited   = false
 
-	defaultTimingField = v3.TimingField{
+	defaultTimingField = v32.TimingField{
 		GroupWaitSeconds:      30,
 		GroupIntervalSeconds:  180,
 		RepeatIntervalSeconds: 3600,
 	}
 
-	commonRuleField = v3.CommonRuleField{
+	commonRuleField = v32.CommonRuleField{
 		DisplayName: displayName,
 		Severity:    serverity,
 		Inherited:   &inherited,
 		TimingField: defaultTimingField,
 	}
 
-	alertStatus = v3.AlertStatus{
+	alertStatus = v32.AlertStatus{
 		AlertState: "active",
 	}
 )
 
 var (
-	commonGroupField = v3.CommonGroupField{
+	commonGroupField = v32.CommonGroupField{
 		DisplayName: displayName,
 		TimingField: defaultTimingField,
 	}
 
 	clusterGroupMap = map[string]*v3.ClusterAlertGroup{
 		groupID: &v3.ClusterAlertGroup{
-			Spec: v3.ClusterGroupSpec{
+			Spec: v32.ClusterGroupSpec{
 				ClusterName:      clusterName,
 				CommonGroupField: commonGroupField,
 				Recipients:       recipients,
@@ -173,7 +174,7 @@ var (
 
 	projectGroupMap = map[string]*v3.ProjectAlertGroup{
 		groupID: &v3.ProjectAlertGroup{
-			Spec: v3.ProjectGroupSpec{
+			Spec: v32.ProjectGroupSpec{
 				ProjectName:      projectID,
 				CommonGroupField: commonGroupField,
 				Recipients:       recipients,
@@ -193,10 +194,10 @@ var (
 				Name:      slack,
 				Namespace: namespace,
 			},
-			Spec: v3.NotifierSpec{
+			Spec: v32.NotifierSpec{
 				ClusterName: clusterName,
 				DisplayName: displayName,
-				SlackConfig: &v3.SlackConfig{
+				SlackConfig: &v32.SlackConfig{
 					DefaultRecipient: defaultChannel,
 					URL:              "www.slack.com",
 				},
@@ -204,7 +205,7 @@ var (
 		},
 	}
 
-	recipients = []v3.Recipient{
+	recipients = []v32.Recipient{
 		{
 			Recipient:    defaultChannel,
 			NotifierName: clusterName + ":" + slack,
@@ -217,18 +218,18 @@ var (
 var (
 	name = "eventRule"
 
-	podEventRule = v3.EventRule{
+	podEventRule = v32.EventRule{
 		EventType:    "normal",
 		ResourceKind: "Pod",
 	}
 
-	eventTimingField = v3.TimingField{
+	eventTimingField = v32.TimingField{
 		GroupWaitSeconds:      eventGroupWait,
 		GroupIntervalSeconds:  eventGroupInterval,
 		RepeatIntervalSeconds: eventRepeatInterval,
 	}
 
-	eventCommonRuleField = v3.CommonRuleField{
+	eventCommonRuleField = v32.CommonRuleField{
 		DisplayName: displayName,
 		Severity:    serverity,
 		Inherited:   &inherited,
@@ -240,7 +241,7 @@ var (
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: v3.ClusterAlertRuleSpec{
+		Spec: v32.ClusterAlertRuleSpec{
 			ClusterName:     clusterName,
 			GroupName:       groupID,
 			CommonRuleField: eventCommonRuleField,
@@ -260,7 +261,7 @@ var (
 
 //node
 var (
-	nodeRule = v3.NodeRule{
+	nodeRule = v32.NodeRule{
 		NodeName:  "node1",
 		Condition: "notready",
 	}
@@ -270,7 +271,7 @@ var (
 			Name:      "nodeRule",
 			Namespace: namespace,
 		},
-		Spec: v3.ClusterAlertRuleSpec{
+		Spec: v32.ClusterAlertRuleSpec{
 			ClusterName:     clusterName,
 			GroupName:       groupID,
 			CommonRuleField: commonRuleField,
@@ -290,7 +291,7 @@ var (
 
 //system service
 var (
-	systemServiceRule = v3.SystemServiceRule{
+	systemServiceRule = v32.SystemServiceRule{
 		Condition: "etcd",
 	}
 
@@ -299,7 +300,7 @@ var (
 			Name:      "systemServiceRule",
 			Namespace: namespace,
 		},
-		Spec: v3.ClusterAlertRuleSpec{
+		Spec: v32.ClusterAlertRuleSpec{
 			ClusterName:       clusterName,
 			GroupName:         groupID,
 			CommonRuleField:   commonRuleField,
@@ -319,7 +320,7 @@ var (
 
 //metric
 var (
-	metricRule = v3.MetricRule{
+	metricRule = v32.MetricRule{
 		Expression:     `sum(node_load5) by (instance) / count(node_cpu_seconds_total{mode="system"})`,
 		Duration:       "1m",
 		Comparison:     "equal",
@@ -331,7 +332,7 @@ var (
 			Name:      "metricRule",
 			Namespace: namespace,
 		},
-		Spec: v3.ClusterAlertRuleSpec{
+		Spec: v32.ClusterAlertRuleSpec{
 			ClusterName:     clusterName,
 			GroupName:       groupID,
 			CommonRuleField: commonRuleField,
@@ -351,7 +352,7 @@ var (
 
 //pod
 var (
-	podRule = v3.PodRule{
+	podRule = v32.PodRule{
 		PodName:   "pod1",
 		Condition: "notrunning",
 	}
@@ -361,7 +362,7 @@ var (
 			Name:      "podRule",
 			Namespace: projectName,
 		},
-		Spec: v3.ProjectAlertRuleSpec{
+		Spec: v32.ProjectAlertRuleSpec{
 			ProjectName:     projectID,
 			GroupName:       groupID,
 			CommonRuleField: commonRuleField,
@@ -383,7 +384,7 @@ var (
 
 //workload
 var (
-	workloadRule = v3.WorkloadRule{
+	workloadRule = v32.WorkloadRule{
 		WorkloadID:          "workloadID1",
 		AvailablePercentage: 50,
 	}
@@ -393,7 +394,7 @@ var (
 			Name:      "workloadRule",
 			Namespace: projectName,
 		},
-		Spec: v3.ProjectAlertRuleSpec{
+		Spec: v32.ProjectAlertRuleSpec{
 			ProjectName:     projectID,
 			GroupName:       groupID,
 			CommonRuleField: commonRuleField,
@@ -415,7 +416,7 @@ var (
 
 //metric
 var (
-	projectMetricRule = v3.MetricRule{
+	projectMetricRule = v32.MetricRule{
 		Expression: `sum(rate(container_cpu_user_seconds_total{container_name!="POD",namespace=~"cattle-alerting",pod_name=~"alert-manager",
 			container_name!=""}[5m])) by (container_name)`,
 		Duration:       "1m",
@@ -428,7 +429,7 @@ var (
 			Name:      "metricRule",
 			Namespace: projectName,
 		},
-		Spec: v3.ProjectAlertRuleSpec{
+		Spec: v32.ProjectAlertRuleSpec{
 			ProjectName:     projectID,
 			GroupName:       groupID,
 			CommonRuleField: commonRuleField,
