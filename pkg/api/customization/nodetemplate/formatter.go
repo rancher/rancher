@@ -12,6 +12,7 @@ import (
 
 type Formatter struct {
 	NodePoolLister v3.NodePoolLister
+	NodeLister     v3.NodeLister
 	UserLister     v3.UserLister
 }
 
@@ -26,6 +27,20 @@ func (ntf *Formatter) Formatter(request *types.APIContext, resource *types.RawRe
 		if pool.Spec.NodeTemplateName == resource.ID {
 			delete(resource.Links, "remove")
 			break
+		}
+	}
+	// Only check node references if remove link is still present
+	if _, ok := resource.Links["remove"]; ok {
+		nodes, err := ntf.NodeLister.List("", labels.Everything())
+		if err != nil {
+			logrus.Warnf("Failed to determine if Node Template is being used. Error: %v", err)
+			return
+		}
+		for _, node := range nodes {
+			if node.Spec.NodeTemplateName == resource.ID {
+				delete(resource.Links, "remove")
+				break
+			}
 		}
 	}
 
