@@ -43,11 +43,6 @@ var prtbClusterManagmentPlaneResources = map[string]string{
 	"catalogtemplateversions": "management.cattle.io",
 }
 
-var projectScopedAdminRoles = map[string]bool{
-	"project-owner": true,
-	"admin":         true,
-}
-
 type prtbLifecycle struct {
 	mgr           *manager
 	projectLister v3.ProjectLister
