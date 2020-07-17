@@ -2055,10 +2055,10 @@ def readDataFile(data_dir, name):
         return f.read()
 
 
-def set_url_password_token(server_url):
+def set_url_password_token(rancher_url, server_url=None):
     """Returns a ManagementContext for the default global admin user."""
     auth_url = \
-        server_url + "/v3-public/localproviders/local?action=login"
+        rancher_url + "/v3-public/localproviders/local?action=login"
     r = requests.post(auth_url, json={
         'username': 'admin',
         'password': 'admin',
@@ -2068,14 +2068,17 @@ def set_url_password_token(server_url):
     token = r.json()['token']
     print(token)
     # Change admin password
-    client = rancher.Client(url=server_url + "/v3",
+    client = rancher.Client(url=rancher_url + "/v3",
                             token=token, verify=False)
     admin_user = client.list_user(username="admin").data
     admin_user[0].setpassword(newPassword=ADMIN_PASSWORD)
 
     # Set server-url settings
     serverurl = client.list_setting(name="server-url").data
-    client.update(serverurl[0], value=server_url)
+    if server_url:
+        client.update(serverurl[0], value=server_url)
+    else:
+        client.update(serverurl[0], value=rancher_url)
     return token
 
 

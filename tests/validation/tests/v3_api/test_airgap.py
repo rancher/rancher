@@ -1,18 +1,22 @@
 import base64
 import os
 import pytest
+import re
 import time
 from lib.aws import AWS_USER
 from .common import (
-    AmazonWebServices, run_command,
-    TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE
+    AmazonWebServices, run_command, wait_for_status_code,
+    TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE, readDataFile,
+    DEFAULT_CLUSTER_STATE_TIMEOUT
 )
 from .test_custom_host_reg import (
     random_test_name, RANCHER_SERVER_VERSION, HOST_NAME, AGENT_REG_CMD
 )
 from .test_create_ha import (
+    set_url_and_password,
     RANCHER_HA_CERT_OPTION, RANCHER_VALID_TLS_CERT, RANCHER_VALID_TLS_KEY
 )
+from .test_import_k3s_cluster import (RANCHER_K3S_VERSION)
 
 PRIVATE_REGISTRY_USERNAME = os.environ.get("RANCHER_BASTION_USERNAME")
 PRIVATE_REGISTRY_PASSWORD = os.environ.get("RANCHER_BASTION_PASSWORD")
@@ -21,12 +25,19 @@ NUMBER_OF_INSTANCES = int(os.environ.get("RANCHER_AIRGAP_INSTANCE_COUNT", "1"))
 IMAGE_LIST = os.environ.get("RANCHER_IMAGE_LIST", ",".join(
     [TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE])).split(",")
 
-RANCHER_AG_INTERNAL_HOSTNAME = HOST_NAME + "-internal.qa.rancher.space"
-RANCHER_AG_HOSTNAME = HOST_NAME + ".qa.rancher.space"
+AG_HOST_NAME = random_test_name(HOST_NAME)
+print("Host Name: {}".format(AG_HOST_NAME))
+RANCHER_AG_INTERNAL_HOSTNAME = AG_HOST_NAME + "-internal.qa.rancher.space"
+RANCHER_AG_HOSTNAME = AG_HOST_NAME + ".qa.rancher.space"
 RESOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                             'resource')
 SSH_KEY_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            '.ssh')
+
+
+def test_deploy_bastion():
+    node = deploy_bastion_server()
+    assert node.public_ip_address is not None
 
 
 def test_deploy_airgap_rancher():
@@ -51,6 +62,27 @@ def test_deploy_airgap_rancher():
             bastion_node.ssh_key_name, AWS_USER, ag_node.private_ip_address,
             public_dns, RANCHER_AG_INTERNAL_HOSTNAME,
             bastion_node.host_name, PRIVATE_REGISTRY_USERNAME))
+    time.sleep(180)
+    setup_rancher_server()
+
+
+def test_prepare_airgap_nodes():
+    bastion_node = get_bastion_node(BASTION_ID)
+    ag_nodes = prepare_airgap_node(bastion_node, NUMBER_OF_INSTANCES)
+    assert len(ag_nodes) == NUMBER_OF_INSTANCES
+
+    print(
+        '{} airgapped instance(s) created.\n'
+        'Connect to these and run commands by connecting to bastion node, '
+        'then running the following command (with the quotes):\n'
+        'ssh -i {}.pem {}@NODE_PRIVATE_IP '
+        '"docker login {} -u {} -p {} && COMMANDS"'.format(
+            NUMBER_OF_INSTANCES, bastion_node.ssh_key_name, AWS_USER,
+            bastion_node.host_name, PRIVATE_REGISTRY_USERNAME,
+            PRIVATE_REGISTRY_PASSWORD))
+    for ag_node in ag_nodes:
+        assert ag_node.private_ip_address is not None
+        assert ag_node.public_ip_address is None
 
 
 def test_deploy_airgap_nodes():
@@ -71,7 +103,58 @@ def test_deploy_airgap_nodes():
         assert ag_node.private_ip_address is not None
         assert ag_node.public_ip_address is None
 
-    deploy_airgap_nodes(bastion_node, ag_nodes)
+    results = add_cluster_to_rancher(bastion_node, ag_nodes)
+    for result in results:
+        assert "Downloaded newer image for {}/rancher/rancher-agent".format(
+            bastion_node.host_name) in result[1]
+
+
+def test_deploy_airgap_k3s():
+    bastion_node = get_bastion_node(BASTION_ID)
+
+    failures = add_k3s_images_to_private_registry(bastion_node,
+                                                  RANCHER_K3S_VERSION)
+    assert failures == [], "Failed to add images: {}".format(failures)
+    ag_nodes = prepare_airgap_k3s(bastion_node, NUMBER_OF_INSTANCES)
+    assert len(ag_nodes) == NUMBER_OF_INSTANCES
+
+    print(
+        '{} airgapped k3s instance(s) created.\n'
+        'Connect to these and run commands by connecting to bastion node, '
+        'then connecting to these:\n'
+        'ssh -i {}.pem {}@NODE_PRIVATE_IP'.format(
+            NUMBER_OF_INSTANCES, bastion_node.ssh_key_name, AWS_USER))
+    for ag_node in ag_nodes:
+        assert ag_node.private_ip_address is not None
+        assert ag_node.public_ip_address is None
+
+    deploy_airgap_k3s_cluster(bastion_node, ag_nodes)
+
+    pods = run_command_on_airgap_node(
+        bastion_node, ag_nodes[0], "kubectl get pods -A")
+    pods_arr = pods[0].strip().split("\n")[1:]
+    start = time.time()
+    while pods_arr:
+        new_arr = []
+        if time.time() - start > DEFAULT_CLUSTER_STATE_TIMEOUT:
+            raise AssertionError(
+                "Timed out waiting for k3s cluster to be ready")
+        time.sleep(5)
+        pods = run_command_on_airgap_node(
+            bastion_node, ag_nodes[0], "kubectl get pods -A")
+        pods_arr = pods[0].strip().split("\n")[1:]
+        for pod in pods_arr:
+            if "Completed" not in pod and "Running" not in pod:
+                print("Problem pod: {}".format(pod))
+                new_arr.append(pod)
+        pods_arr = new_arr
+        print(pods_arr)
+
+    # Optionally add k3s cluster to Rancher server
+    if AGENT_REG_CMD:
+        results = add_cluster_to_rancher(bastion_node, [ag_nodes[0]])
+        for result in results:
+            assert "deployment.apps/cattle-cluster-agent created" in result[0]
 
 
 def test_add_rancher_images_to_private_registry():
@@ -98,8 +181,16 @@ def test_deploy_private_registry_without_image_push():
     assert load_res is None
 
 
+def setup_rancher_server():
+    base_url = "https://" + RANCHER_AG_HOSTNAME
+    wait_for_status_code(url=base_url + "/v3", expected_code=401)
+    auth_url = base_url + "/v3-public/localproviders/local?action=login"
+    wait_for_status_code(url=auth_url, expected_code=200)
+    set_url_and_password(base_url, "https://" + RANCHER_AG_INTERNAL_HOSTNAME)
+
+
 def deploy_bastion_server():
-    node_name = random_test_name(HOST_NAME + "-bastion")
+    node_name = AG_HOST_NAME + "-bastion"
     # Create Bastion Server in AWS
     bastion_node = AmazonWebServices().create_node(node_name)
 
@@ -215,6 +306,32 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
     return save_res, load_res
 
 
+def add_k3s_images_to_private_registry(bastion_node, k3s_version):
+    failures = []
+    # Get k3s files associated with the specified version
+    get_images_command = \
+        'wget -O k3s-images.txt https://github.com/rancher/k3s/' \
+        'releases/download/{0}/k3s-images.txt && ' \
+        'wget -O k3s-install.sh https://get.k3s.io/ && ' \
+        'wget -O k3s https://github.com/rancher/k3s/' \
+        'releases/download/{0}/k3s'.format(k3s_version)
+    bastion_node.execute_command(get_images_command)
+
+    images = bastion_node.execute_command(
+        'cat k3s-images.txt')[0].strip().split("\n")
+    assert images
+    for image in images:
+        pull_image(bastion_node, image)
+        cleaned_image = re.search(".*(rancher/.*)", image).group(1)
+        tag_image(bastion_node, cleaned_image)
+        push_image(bastion_node, cleaned_image)
+
+        validate_result = validate_image(bastion_node, cleaned_image)
+        if bastion_node.host_name not in validate_result[0]:
+            failures.append(image)
+    return failures
+
+
 def add_images_to_private_registry(bastion_node, image_list):
     failures = []
     for image in image_list:
@@ -254,7 +371,7 @@ def validate_image(bastion_node, image):
 
 
 def prepare_airgap_node(bastion_node, number_of_nodes):
-    node_name = random_test_name(HOST_NAME + "-airgap")
+    node_name = AG_HOST_NAME + "-airgap"
     # Create Airgap Node in AWS
     ag_nodes = AmazonWebServices().create_multiple_nodes(
         number_of_nodes, node_name, public_ip=False)
@@ -298,12 +415,82 @@ def prepare_airgap_node(bastion_node, number_of_nodes):
     return ag_nodes
 
 
-def deploy_airgap_nodes(bastion_node, ag_nodes):
+def prepare_airgap_k3s(bastion_node, number_of_nodes):
+    node_name = AG_HOST_NAME + "-k3s-airgap"
+    # Create Airgap Node in AWS
+    ag_nodes = AmazonWebServices().create_multiple_nodes(
+        number_of_nodes, node_name, public_ip=False)
+
+    for num, ag_node in enumerate(ag_nodes):
+        # Copy relevant k3s files to airgapped node
+        ag_node_copy_files = \
+            'scp -i "{0}.pem" -o StrictHostKeyChecking=no ./k3s-install.sh ' \
+            '{1}@{2}:~/install.sh && ' \
+            'scp -i "{0}.pem" -o StrictHostKeyChecking=no ./k3s ' \
+            '{1}@{2}:~/k3s && ' \
+            'scp -i "{0}.pem" -o StrictHostKeyChecking=no certs/* ' \
+            '{1}@{2}:~/'.format(
+                bastion_node.ssh_key_name, AWS_USER,
+                ag_node.private_ip_address, bastion_node.host_name)
+        bastion_node.execute_command(ag_node_copy_files)
+
+        ag_node_make_executable = \
+            'sudo mv ./k3s /usr/local/bin/k3s && ' \
+            'sudo chmod +x /usr/local/bin/k3s && sudo chmod +x install.sh'
+        run_command_on_airgap_node(bastion_node, ag_node,
+                                   ag_node_make_executable)
+
+        reg_file = readDataFile(RESOURCE_DIR, "airgap/registries.yaml")
+        reg_file = reg_file.replace("$PRIVATE_REG", bastion_node.host_name)
+        reg_file = reg_file.replace("$USERNAME", PRIVATE_REGISTRY_USERNAME)
+        reg_file = reg_file.replace("$PASSWORD", PRIVATE_REGISTRY_PASSWORD)
+
+        # Add registry file to node
+        ag_node_create_dir = \
+            'sudo mkdir -p /etc/rancher/k3s && ' \
+            'sudo chown {} /etc/rancher/k3s'.format(AWS_USER)
+        run_command_on_airgap_node(bastion_node, ag_node, ag_node_create_dir)
+
+        write_reg_file_command = \
+            "cat <<EOT >> /etc/rancher/k3s/registries.yaml\n{}\nEOT".format(
+                reg_file)
+        run_command_on_airgap_node(bastion_node, ag_node,
+                                   write_reg_file_command)
+
+        print("Airgapped K3S Instance Details:\nNAME: {}-{}\nPRIVATE IP: {}\n"
+              "".format(node_name, num, ag_node.private_ip_address))
+    return ag_nodes
+
+
+def add_cluster_to_rancher(bastion_node, ag_nodes):
+    results = []
     for ag_node in ag_nodes:
         deploy_result = run_command_on_airgap_node(bastion_node, ag_node,
                                                    AGENT_REG_CMD)
-        assert "Downloaded newer image for {}/rancher/rancher-agent".format(
-            bastion_node.host_name) in deploy_result[1]
+        results.append(deploy_result)
+    return results
+
+
+def deploy_airgap_k3s_cluster(bastion_node, ag_nodes):
+    token = ""
+    server_ip = ag_nodes[0].private_ip_address
+    for num, ag_node in enumerate(ag_nodes):
+        if num == 0:
+            # Install k3s server
+            install_k3s_server = \
+                'INSTALL_K3S_SKIP_DOWNLOAD=true ./install.sh && ' \
+                'sudo chmod 644 /etc/rancher/k3s/k3s.yaml'
+            run_command_on_airgap_node(bastion_node, ag_node,
+                                       install_k3s_server)
+            token_command = 'sudo cat /var/lib/rancher/k3s/server/node-token'
+            token = run_command_on_airgap_node(bastion_node, ag_node,
+                                               token_command)[0].strip()
+        else:
+            install_k3s_worker = \
+                'INSTALL_K3S_SKIP_DOWNLOAD=true K3S_URL=https://{}:6443 ' \
+                'K3S_TOKEN={} ./install.sh'.format(server_ip, token)
+            run_command_on_airgap_node(bastion_node, ag_node,
+                                       install_k3s_worker)
 
 
 def deploy_airgap_rancher(bastion_node):
@@ -343,7 +530,8 @@ def deploy_airgap_rancher(bastion_node):
     return ag_node
 
 
-def run_command_on_airgap_node(bastion_node, ag_node, cmd, log_out=False):
+def run_docker_command_on_airgap_node(bastion_node, ag_node, cmd,
+                                      log_out=False):
     docker_login_command = "docker login {} -u {} -p {}".format(
         bastion_node.host_name,
         PRIVATE_REGISTRY_USERNAME, PRIVATE_REGISTRY_PASSWORD)
@@ -361,14 +549,30 @@ def run_command_on_airgap_node(bastion_node, ag_node, cmd, log_out=False):
     return result
 
 
+def run_command_on_airgap_node(bastion_node, ag_node, cmd, log_out=False):
+    if cmd.startswith("docker") or cmd.startswith("sudo docker"):
+        return run_docker_command_on_airgap_node(
+            bastion_node, ag_node, cmd, log_out)
+    ag_command = \
+        'ssh -i "{}.pem" -o StrictHostKeyChecking=no {}@{} ' \
+        '"{}"'.format(
+            bastion_node.ssh_key_name, AWS_USER,
+            ag_node.private_ip_address, cmd)
+    result = bastion_node.execute_command(ag_command)
+    if log_out:
+        print("Running command: {}".format(ag_command))
+        print("Result: {}".format(result))
+    return result
+
+
 def create_nlb_and_add_targets(aws_nodes):
     # Create internet-facing nlb and grab ARN & dns name
-    lb = AmazonWebServices().create_network_lb(name=HOST_NAME + "-nlb")
+    lb = AmazonWebServices().create_network_lb(name=AG_HOST_NAME + "-nlb")
     lb_arn = lb["LoadBalancers"][0]["LoadBalancerArn"]
     public_dns = lb["LoadBalancers"][0]["DNSName"]
     # Create internal nlb and grab ARN & dns name
     internal_lb = AmazonWebServices().create_network_lb(
-        name=HOST_NAME + "-internal-nlb", scheme='internal')
+        name=AG_HOST_NAME + "-internal-nlb", scheme='internal')
     internal_lb_arn = internal_lb["LoadBalancers"][0]["LoadBalancerArn"]
     internal_lb_dns = internal_lb["LoadBalancers"][0]["DNSName"]
 
@@ -382,16 +586,16 @@ def create_nlb_and_add_targets(aws_nodes):
 
     # Create the target groups
     tg80 = AmazonWebServices(). \
-        create_ha_target_group(80, HOST_NAME + "-tg-80")
+        create_ha_target_group(80, AG_HOST_NAME + "-tg-80")
     tg443 = AmazonWebServices(). \
-        create_ha_target_group(443, HOST_NAME + "-tg-443")
+        create_ha_target_group(443, AG_HOST_NAME + "-tg-443")
     tg80_arn = tg80["TargetGroups"][0]["TargetGroupArn"]
     tg443_arn = tg443["TargetGroups"][0]["TargetGroupArn"]
     # Create the internal target groups
     internal_tg80 = AmazonWebServices(). \
-        create_ha_target_group(80, HOST_NAME + "-internal-tg-80")
+        create_ha_target_group(80, AG_HOST_NAME + "-internal-tg-80")
     internal_tg443 = AmazonWebServices(). \
-        create_ha_target_group(443, HOST_NAME + "-internal-tg-443")
+        create_ha_target_group(443, AG_HOST_NAME + "-internal-tg-443")
     internal_tg80_arn = internal_tg80["TargetGroups"][0]["TargetGroupArn"]
     internal_tg443_arn = internal_tg443["TargetGroups"][0]["TargetGroupArn"]
 
