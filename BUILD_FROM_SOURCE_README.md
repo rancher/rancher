@@ -24,5 +24,4 @@ docker tag rancher/rancher-agent:v2.4.3  ${DOCKER_REPO}/${DOCKER_NAMESPACE}/ranc
 
 docker push ${DOCKER_REPO}/${DOCKER_NAMESPACE}/rancher:${DOCKER_TAG}
 docker push ${DOCKER_REPO}/${DOCKER_NAMESPACE}/rancher/rancher-agent:${DOCKER_TAG}
-
 ```
