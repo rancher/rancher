@@ -8,6 +8,7 @@ var FilterTemplate = `
   <record>
     tag ${tag}
     log_type k8s_infrastructure_container 
+    host "#{ENV['K8S_NODE_NAME']}"
     driver rke
     component ${tag_suffix[6].split("_")[0]}
     container_id ${tag_suffix[6].split(".")[0]}
