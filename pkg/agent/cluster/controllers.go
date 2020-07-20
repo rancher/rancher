@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/agent/steve"
-	clusterController "github.com/rancher/rancher/pkg/controllers/user"
+	"github.com/rancher/rancher/pkg/controllers/managementagent"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
@@ -30,7 +30,7 @@ func RunControllers(namespace, token, url string) error {
 		return err
 	}
 
-	err = clusterController.RegisterUserOnly(context.Background(), userOnly)
+	err = managementagent.Register(context.Background(), userOnly)
 	if err != nil {
 		return err
 	}

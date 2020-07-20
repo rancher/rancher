@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/controllers/user/helm"
-	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/helm"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/sirupsen/logrus"

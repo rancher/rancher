@@ -8,9 +8,9 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
-	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
-	loggingutils "github.com/rancher/rancher/pkg/controllers/user/logging/utils"
+	loggingconfig "github.com/rancher/rancher/pkg/controllers/managementuser/logging/config"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/logging/generator"
+	loggingutils "github.com/rancher/rancher/pkg/controllers/managementuser/logging/utils"
 )
 
 func ClusterLoggingValidator(resquest *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
