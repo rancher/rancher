@@ -1,4 +1,4 @@
-package app
+package management
 
 import (
 	"context"
@@ -24,7 +24,7 @@ type userCleanup struct {
 	projectLister v3.ProjectLister
 }
 
-func cleanupOrphanedSystemUsers(ctx context.Context, management *config.ManagementContext) {
+func CleanupOrphanedSystemUsers(ctx context.Context, management *config.ManagementContext) {
 	u := userCleanup{
 		users:         management.Management.Users(""),
 		userLister:    management.Management.Users("").Controller().Lister(),

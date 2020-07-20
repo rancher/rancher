@@ -1,4 +1,4 @@
-package app
+package management
 
 import (
 	"github.com/pborman/uuid"

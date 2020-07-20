@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/app"
+	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/pkg/signals"
@@ -29,8 +30,8 @@ var (
 )
 
 func main() {
-	app.RegisterPasswordResetCommand()
-	app.RegisterEnsureDefaultAdminCommand()
+	management.RegisterPasswordResetCommand()
+	management.RegisterEnsureDefaultAdminCommand()
 	if reexec.Init() {
 		return
 	}

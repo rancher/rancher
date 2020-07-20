@@ -1,4 +1,4 @@
-package app
+package management
 
 import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
