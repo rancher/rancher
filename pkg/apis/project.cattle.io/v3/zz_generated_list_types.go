@@ -26,16 +26,16 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// SourceCodeCredentialList is a list of SourceCodeCredential resources
-type SourceCodeCredentialList struct {
+// AppList is a list of App resources
+type AppList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []SourceCodeCredential `json:"items"`
+	Items []App `json:"items"`
 }
 
-func NewSourceCodeCredential(namespace, name string, obj SourceCodeCredential) *SourceCodeCredential {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeCredential").ToAPIVersionAndKind()
+func NewApp(namespace, name string, obj App) *App {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("App").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -43,16 +43,16 @@ func NewSourceCodeCredential(namespace, name string, obj SourceCodeCredential) *
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PipelineList is a list of Pipeline resources
-type PipelineList struct {
+// AppRevisionList is a list of AppRevision resources
+type AppRevisionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []Pipeline `json:"items"`
+	Items []AppRevision `json:"items"`
 }
 
-func NewPipeline(namespace, name string, obj Pipeline) *Pipeline {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Pipeline").ToAPIVersionAndKind()
+func NewAppRevision(namespace, name string, obj AppRevision) *AppRevision {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("AppRevision").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -60,50 +60,16 @@ func NewPipeline(namespace, name string, obj Pipeline) *Pipeline {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WorkloadList is a list of Workload resources
-type WorkloadList struct {
+// BasicAuthList is a list of BasicAuth resources
+type BasicAuthList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []Workload `json:"items"`
+	Items []BasicAuth `json:"items"`
 }
 
-func NewWorkload(namespace, name string, obj Workload) *Workload {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Workload").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PipelineSettingList is a list of PipelineSetting resources
-type PipelineSettingList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []PipelineSetting `json:"items"`
-}
-
-func NewPipelineSetting(namespace, name string, obj PipelineSetting) *PipelineSetting {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PipelineSetting").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// SourceCodeProviderList is a list of SourceCodeProvider resources
-type SourceCodeProviderList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []SourceCodeProvider `json:"items"`
-}
-
-func NewSourceCodeProvider(namespace, name string, obj SourceCodeProvider) *SourceCodeProvider {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeProvider").ToAPIVersionAndKind()
+func NewBasicAuth(namespace, name string, obj BasicAuth) *BasicAuth {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("BasicAuth").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -128,16 +94,33 @@ func NewCertificate(namespace, name string, obj Certificate) *Certificate {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// SSHAuthList is a list of SSHAuth resources
-type SSHAuthList struct {
+// DockerCredentialList is a list of DockerCredential resources
+type DockerCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []SSHAuth `json:"items"`
+	Items []DockerCredential `json:"items"`
 }
 
-func NewSSHAuth(namespace, name string, obj SSHAuth) *SSHAuth {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SSHAuth").ToAPIVersionAndKind()
+func NewDockerCredential(namespace, name string, obj DockerCredential) *DockerCredential {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("DockerCredential").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NamespacedBasicAuthList is a list of NamespacedBasicAuth resources
+type NamespacedBasicAuthList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []NamespacedBasicAuth `json:"items"`
+}
+
+func NewNamespacedBasicAuth(namespace, name string, obj NamespacedBasicAuth) *NamespacedBasicAuth {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("NamespacedBasicAuth").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -155,23 +138,6 @@ type NamespacedCertificateList struct {
 
 func NewNamespacedCertificate(namespace, name string, obj NamespacedCertificate) *NamespacedCertificate {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("NamespacedCertificate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// BasicAuthList is a list of BasicAuth resources
-type BasicAuthList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []BasicAuth `json:"items"`
-}
-
-func NewBasicAuth(namespace, name string, obj BasicAuth) *BasicAuth {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("BasicAuth").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -213,40 +179,6 @@ func NewNamespacedSSHAuth(namespace, name string, obj NamespacedSSHAuth) *Namesp
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NamespacedBasicAuthList is a list of NamespacedBasicAuth resources
-type NamespacedBasicAuthList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []NamespacedBasicAuth `json:"items"`
-}
-
-func NewNamespacedBasicAuth(namespace, name string, obj NamespacedBasicAuth) *NamespacedBasicAuth {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("NamespacedBasicAuth").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// SourceCodeRepositoryList is a list of SourceCodeRepository resources
-type SourceCodeRepositoryList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []SourceCodeRepository `json:"items"`
-}
-
-func NewSourceCodeRepository(namespace, name string, obj SourceCodeRepository) *SourceCodeRepository {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeRepository").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NamespacedServiceAccountTokenList is a list of NamespacedServiceAccountToken resources
 type NamespacedServiceAccountTokenList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -264,33 +196,16 @@ func NewNamespacedServiceAccountToken(namespace, name string, obj NamespacedServ
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// DockerCredentialList is a list of DockerCredential resources
-type DockerCredentialList struct {
+// PipelineList is a list of Pipeline resources
+type PipelineList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []DockerCredential `json:"items"`
+	Items []Pipeline `json:"items"`
 }
 
-func NewDockerCredential(namespace, name string, obj DockerCredential) *DockerCredential {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("DockerCredential").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// AppList is a list of App resources
-type AppList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []App `json:"items"`
-}
-
-func NewApp(namespace, name string, obj App) *App {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("App").ToAPIVersionAndKind()
+func NewPipeline(namespace, name string, obj Pipeline) *Pipeline {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Pipeline").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -315,6 +230,40 @@ func NewPipelineExecution(namespace, name string, obj PipelineExecution) *Pipeli
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// PipelineSettingList is a list of PipelineSetting resources
+type PipelineSettingList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []PipelineSetting `json:"items"`
+}
+
+func NewPipelineSetting(namespace, name string, obj PipelineSetting) *PipelineSetting {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PipelineSetting").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SSHAuthList is a list of SSHAuth resources
+type SSHAuthList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []SSHAuth `json:"items"`
+}
+
+func NewSSHAuth(namespace, name string, obj SSHAuth) *SSHAuth {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SSHAuth").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ServiceAccountTokenList is a list of ServiceAccountToken resources
 type ServiceAccountTokenList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -332,16 +281,33 @@ func NewServiceAccountToken(namespace, name string, obj ServiceAccountToken) *Se
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AppRevisionList is a list of AppRevision resources
-type AppRevisionList struct {
+// SourceCodeCredentialList is a list of SourceCodeCredential resources
+type SourceCodeCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []AppRevision `json:"items"`
+	Items []SourceCodeCredential `json:"items"`
 }
 
-func NewAppRevision(namespace, name string, obj AppRevision) *AppRevision {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("AppRevision").ToAPIVersionAndKind()
+func NewSourceCodeCredential(namespace, name string, obj SourceCodeCredential) *SourceCodeCredential {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeCredential").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SourceCodeProviderList is a list of SourceCodeProvider resources
+type SourceCodeProviderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []SourceCodeProvider `json:"items"`
+}
+
+func NewSourceCodeProvider(namespace, name string, obj SourceCodeProvider) *SourceCodeProvider {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeProvider").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -359,6 +325,40 @@ type SourceCodeProviderConfigList struct {
 
 func NewSourceCodeProviderConfig(namespace, name string, obj SourceCodeProviderConfig) *SourceCodeProviderConfig {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeProviderConfig").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SourceCodeRepositoryList is a list of SourceCodeRepository resources
+type SourceCodeRepositoryList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []SourceCodeRepository `json:"items"`
+}
+
+func NewSourceCodeRepository(namespace, name string, obj SourceCodeRepository) *SourceCodeRepository {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeRepository").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// WorkloadList is a list of Workload resources
+type WorkloadList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []Workload `json:"items"`
+}
+
+func NewWorkload(namespace, name string, obj Workload) *Workload {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Workload").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

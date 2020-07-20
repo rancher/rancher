@@ -75,7 +75,7 @@ require (
 	github.com/prometheus/client_golang v1.4.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.9.1
-	github.com/rancher/apiserver v0.0.0-20200622174841-b4d1106a9883
+	github.com/rancher/apiserver v0.0.0-20200719204146-4fbd5346ffd2
 	github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9
 	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
 	github.com/rancher/machine v0.15.0-rancher25
@@ -84,9 +84,9 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
 	github.com/rancher/rke v1.2.0-rc2.0.20200712062933-4c1d3db2b0c1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200714202821-34e6de07fb2c
+	github.com/rancher/steve v0.0.0-20200719205634-ece0f7bce52c
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
-	github.com/rancher/wrangler v0.6.2-0.20200714200521-c61fae623942
+	github.com/rancher/wrangler v0.6.2-0.20200720053621-d4abf99e6583
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0
@@ -112,6 +112,7 @@ require (
 	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.8
+	helm.sh/helm/v3 v3.2.0
 	k8s.io/api v0.18.0
 	k8s.io/apiextensions-apiserver v0.18.0
 	k8s.io/apimachinery v0.18.5
@@ -119,8 +120,10 @@ require (
 	k8s.io/cli-runtime v0.18.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20200710205751-c0d492a0f3ca
+	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.18.0
 	k8s.io/kubectl v0.18.0
 	k8s.io/kubernetes v1.18.0
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
+	sigs.k8s.io/yaml v1.2.0
 )

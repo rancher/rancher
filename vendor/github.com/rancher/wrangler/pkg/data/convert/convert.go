@@ -259,3 +259,31 @@ func ToYAMLKey(str string) string {
 
 	return string(result)
 }
+
+func ToArgKey(str string) string {
+	var result []rune
+	cap := false
+
+	for i, r := range []rune(str) {
+		if i == 0 {
+			if unicode.IsUpper(r) {
+				cap = true
+			}
+			result = append(result, unicode.ToLower(r))
+			continue
+		}
+
+		if unicode.IsUpper(r) {
+			if cap {
+				result = append(result, unicode.ToLower(r))
+			} else {
+				result = append(result, '-', unicode.ToLower(r))
+			}
+		} else {
+			cap = false
+			result = append(result, r)
+		}
+	}
+
+	return "--" + string(result)
+}

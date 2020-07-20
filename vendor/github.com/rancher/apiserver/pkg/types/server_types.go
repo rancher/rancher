@@ -106,6 +106,7 @@ type APIRequest struct {
 	Query          url.Values
 	ResponseFormat string
 	ResponseWriter ResponseWriter
+	ErrorHandler   ErrorHandler
 	URLPrefix      string
 	URLBuilder     URLBuilder
 	AccessControl  AccessControl
@@ -159,6 +160,10 @@ func (r *APIRequest) WriteResponse(code int, obj APIObject) {
 
 func (r *APIRequest) WriteResponseList(code int, list APIObjectList) {
 	r.ResponseWriter.WriteList(r, code, list)
+}
+
+func (r *APIRequest) WriteError(err error) {
+	r.ErrorHandler(r, err)
 }
 
 type URLBuilder interface {

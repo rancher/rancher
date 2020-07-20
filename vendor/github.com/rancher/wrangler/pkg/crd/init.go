@@ -2,6 +2,7 @@ package crd
 
 import (
 	"context"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -172,6 +173,11 @@ func (c CRD) WithCategories(categories ...string) CRD {
 	return c
 }
 
+func (c CRD) WithGroup(group string) CRD {
+	c.GVK.Group = group
+	return c
+}
+
 func (c CRD) WithShortNames(shortNames ...string) CRD {
 	c.ShortNames = shortNames
 	return c
@@ -181,6 +187,16 @@ func (c CRD) ToCustomResourceDefinition() (apiext.CustomResourceDefinition, erro
 	if c.SchemaObject != nil && c.GVK.Kind == "" {
 		t := getType(c.SchemaObject)
 		c.GVK.Kind = t.Name()
+	}
+
+	if c.SchemaObject != nil && c.GVK.Version == "" {
+		t := getType(c.SchemaObject)
+		c.GVK.Version = filepath.Base(t.PkgPath())
+	}
+
+	if c.SchemaObject != nil && c.GVK.Group == "" {
+		t := getType(c.SchemaObject)
+		c.GVK.Group = filepath.Base(filepath.Dir(t.PkgPath()))
 	}
 
 	plural := c.PluralName

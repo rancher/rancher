@@ -36,7 +36,7 @@ func Run(ctx context.Context, namespace string) error {
 	}
 
 	s := server.Server{
-		RestConfig:     c,
+		RESTConfig:     c,
 		AuthMiddleware: auth.ToMiddleware(auth.AuthenticatorFunc(auth.Impersonation)),
 	}
 

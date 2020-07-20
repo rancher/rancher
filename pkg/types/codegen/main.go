@@ -64,6 +64,14 @@ func main() {
 				},
 				GenerateTypes: true,
 			},
+			"catalog.cattle.io": {
+				PackageName: "catalog.cattle.io",
+				Types: []interface{}{
+					// All structs with an embedded ObjectMeta field will be picked up
+					"./pkg/apis/catalog.cattle.io/v1",
+				},
+				GenerateTypes: true,
+			},
 		},
 	})
 

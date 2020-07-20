@@ -5,6 +5,8 @@ import (
 
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
+	catalogv1 "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/remotedialer"
@@ -19,9 +21,11 @@ import (
 type Context struct {
 	*server.Controllers
 
-	Apply        apply.Apply
-	Mgmt         managementv3.Interface
-	TunnelServer *remotedialer.Server
+	Apply             apply.Apply
+	Mgmt              managementv3.Interface
+	Catalog           catalogv1.Interface
+	TunnelServer      *remotedialer.Server
+	ControllerFactory controller.SharedControllerFactory
 
 	ASL      accesscontrol.AccessSetLookup
 	starters []start.Starter
@@ -54,16 +58,24 @@ func NewContext(ctx context.Context, restConfig *rest.Config, controllerFactory 
 		return nil, err
 	}
 
+	helm, err := catalog.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	asl := accesscontrol.NewAccessStore(ctx, features.Steve.Enabled(), steveControllers.RBAC)
 
 	return &Context{
-		Controllers:  steveControllers,
-		Apply:        apply,
-		Mgmt:         mgmt.Management().V3(),
-		TunnelServer: tunnelServer,
-		ASL:          asl,
+		Controllers:       steveControllers,
+		Apply:             apply,
+		Mgmt:              mgmt.Management().V3(),
+		Catalog:           helm.Catalog().V1(),
+		TunnelServer:      tunnelServer,
+		ControllerFactory: controllerFactory,
+		ASL:               asl,
 		starters: []start.Starter{
 			mgmt,
+			helm,
 		},
 	}, nil
 }
