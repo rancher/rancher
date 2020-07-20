@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+
 	"github.com/rancher/wrangler/pkg/generic"
 
 	prommonitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
@@ -66,6 +68,7 @@ var (
 		apiregistrationv12.AddToScheme,
 		prommonitoringv1.AddToScheme,
 		istiov1alpha3api.AddToScheme,
+		catalogv1.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()

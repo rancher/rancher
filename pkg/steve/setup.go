@@ -1,8 +1,11 @@
 package steve
 
 import (
+	"context"
 	"net/http"
 	"time"
+
+	"github.com/rancher/rancher/pkg/steve/pkg/catalog"
 
 	gmux "github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/settings"
@@ -49,7 +52,7 @@ func Setup(server *steve.Server, config *wrangler.Context, localSupport bool, ra
 	// wrap with UI
 	server.Next = dashboard.Route(server.Next, settings.DashboardIndex.Get)
 
-	return nil
+	return catalog.Register(context.TODO(), server, config.Core.Secret(), config.Core.ConfigMap(), config.Catalog)
 }
 
 type handler struct {
@@ -67,8 +70,12 @@ func newRouter(h *handler, localSupport bool) http.Handler {
 	mux.Path("/v1/clusters/{clusterID}").Queries("link", "shell").HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		vars := gmux.Vars(r)
 		cluster := vars["clusterID"]
-		if cluster == "local" && !localSupport {
-			mux.NotFoundHandler.ServeHTTP(rw, r)
+		if cluster == "local" {
+			if localSupport {
+				h.Steve.ServeHTTP(rw, r)
+			} else {
+				mux.NotFoundHandler.ServeHTTP(rw, r)
+			}
 			return
 		}
 		vars["prefix"] = "k8s/clusters/" + cluster

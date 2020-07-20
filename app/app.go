@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
+	"github.com/rancher/rancher/pkg/crds"
 	"github.com/rancher/rancher/pkg/cron"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/features"
@@ -89,6 +90,10 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 func initFeatures(ctx context.Context, scaledContext *config.ScaledContext, cfg *Config) error {
 	factory, err := crd.NewFactoryFromClient(&scaledContext.RESTConfig)
 	if err != nil {
+		return err
+	}
+
+	if err := crds.Create(ctx, &scaledContext.RESTConfig); err != nil {
 		return err
 	}
 
@@ -238,7 +243,10 @@ func (r *Rancher) Start(ctx context.Context) error {
 			panic(err)
 		}
 
-		managementController.RegisterWrangler(ctx, r.WranglerContext, management, r.ScaledContext.ClientGetter.(*clustermanager.Manager))
+		if err := managementController.RegisterWrangler(ctx, r.WranglerContext, management, r.ScaledContext.ClientGetter.(*clustermanager.Manager)); err != nil {
+			panic(err)
+		}
+
 		if err := r.WranglerContext.Start(ctx); err != nil {
 			panic(err)
 		}
@@ -325,7 +333,7 @@ func newSteve(ctx context.Context, rancher *Rancher) (http.Handler, error) {
 	cfg := steveserver.Server{
 		AccessSetLookup: rancher.AccessSetLookup,
 		Controllers:     rancher.WranglerContext.Controllers,
-		RestConfig:      steveserver.RestConfigDefaults(&rancher.ScaledContext.RESTConfig),
+		RESTConfig:      steveserver.RestConfigDefaults(&rancher.ScaledContext.RESTConfig),
 		AuthMiddleware:  rancher.Auth,
 		Next:            rancher.Handler,
 		StartHooks: []steveserver.StartHook{
