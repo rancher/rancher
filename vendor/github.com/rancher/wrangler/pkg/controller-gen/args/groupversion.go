@@ -3,6 +3,7 @@ package args
 import (
 	gotypes "go/types"
 	"reflect"
+	"sort"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -126,5 +127,8 @@ func ScanDirectory(pkgPath string) (result []Type, err error) {
 			}
 		}
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
 	return
 }

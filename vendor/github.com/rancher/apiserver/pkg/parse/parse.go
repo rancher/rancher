@@ -108,6 +108,10 @@ func Parse(apiOp *types.APIRequest, urlParser URLParser) error {
 		apiOp.Type = apiOp.Schema.ID
 	}
 
+	if apiOp.Schema != nil && apiOp.ErrorHandler != nil {
+		apiOp.ErrorHandler = apiOp.Schema.ErrorHandler
+	}
+
 	if err := ValidateMethod(apiOp); err != nil {
 		return err
 	}

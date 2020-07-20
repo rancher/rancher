@@ -94,7 +94,7 @@ func copyHandlers(m map[string]http.Handler) map[string]http.Handler {
 func (a *APISchema) DeepCopy() *APISchema {
 	r := *a
 	r.ActionHandlers = copyHandlers(a.ActionHandlers)
-	r.LinkHandlers = copyHandlers(a.ActionHandlers)
+	r.LinkHandlers = copyHandlers(a.LinkHandlers)
 	r.Schema = r.Schema.DeepCopy()
 	return &r
 }

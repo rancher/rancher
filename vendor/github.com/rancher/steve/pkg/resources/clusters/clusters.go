@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/apiserver/pkg/store/empty"
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/clustercache"
+	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/steve/pkg/stores/switchschema"
 	"github.com/rancher/steve/pkg/stores/switchstore"
@@ -45,8 +46,9 @@ func Register(ctx context.Context, schemas *types.APISchemas, cg proxy.ClientGet
 	}
 
 	shell := &shell{
-		cg:        cg,
-		namespace: "dashboard-shells",
+		cg:           cg,
+		namespace:    "dashboard-shells",
+		impersonator: podimpersonation.New("shell", cg, time.Hour),
 	}
 
 	picker := &picker{
@@ -54,9 +56,9 @@ func Register(ctx context.Context, schemas *types.APISchemas, cg proxy.ClientGet
 		discovery: k8s.Discovery(),
 	}
 
-	cluster.OnAdd(ctx, shell.PurgeOldShell)
+	cluster.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
 	cluster.OnChange(ctx, func(gvr schema.GroupVersionResource, key string, obj, oldObj runtime.Object) error {
-		return shell.PurgeOldShell(gvr, key, obj)
+		return shell.impersonator.PurgeOldRoles(gvr, key, obj)
 	})
 	schemas.MustImportAndCustomize(Cluster{}, func(schema *types.APISchema) {
 		schema.CollectionMethods = []string{http.MethodGet}

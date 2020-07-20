@@ -23,13 +23,13 @@ import (
 var ErrConfigRequired = errors.New("rest config is required")
 
 func setDefaults(server *Server) error {
-	if server.RestConfig == nil {
+	if server.RESTConfig == nil {
 		return ErrConfigRequired
 	}
 
 	if server.Controllers == nil {
 		var err error
-		server.Controllers, err = NewController(server.RestConfig, nil)
+		server.Controllers, err = NewController(server.RESTConfig, nil)
 		if err != nil {
 			return err
 		}
@@ -54,7 +54,7 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 
 	cf := server.ClientFactory
 	if cf == nil {
-		cf, err = client.NewFactory(server.RestConfig, server.AuthMiddleware != nil)
+		cf, err = client.NewFactory(server.RESTConfig, server.AuthMiddleware != nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -67,6 +67,7 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 	}
 
 	ccache := clustercache.NewClusterCache(ctx, cf.DynamicClient())
+	server.ClusterCache = ccache
 
 	server.BaseSchemas, err = resources.DefaultSchemas(ctx, server.BaseSchemas, ccache, cf)
 	if err != nil {
@@ -81,7 +82,7 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 
 	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf, summaryCache, asl, server.K8s.Discovery())...)
 
-	cols, err := common.NewDynamicColumns(server.RestConfig)
+	cols, err := common.NewDynamicColumns(server.RESTConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -97,7 +98,7 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 		ccache,
 		sf)
 
-	handler, err := handler.New(server.RestConfig, sf, server.AuthMiddleware, server.Next, server.Router)
+	handler, err := handler.New(server.RESTConfig, sf, server.AuthMiddleware, server.Next, server.Router)
 	if err != nil {
 		return nil, nil, err
 	}

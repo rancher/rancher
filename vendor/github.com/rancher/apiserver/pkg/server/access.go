@@ -53,7 +53,7 @@ func (a *SchemaBasedAccess) CanWatch(apiOp *types.APIRequest, schema *types.APIS
 }
 
 func (*SchemaBasedAccess) CanAction(apiOp *types.APIRequest, schema *types.APISchema, name string) error {
-	if _, ok := schema.ActionHandlers[name]; ok {
+	if _, ok := schema.ActionHandlers[name]; !ok {
 		return apierror.NewAPIError(validation.PermissionDenied, "no such action "+name)
 	}
 	return nil
