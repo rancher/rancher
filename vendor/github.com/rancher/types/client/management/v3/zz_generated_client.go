@@ -19,6 +19,7 @@ type Client struct {
 	PodSecurityPolicyTemplateProjectBinding PodSecurityPolicyTemplateProjectBindingOperations
 	ClusterRoleTemplateBinding              ClusterRoleTemplateBindingOperations
 	ProjectRoleTemplateBinding              ProjectRoleTemplateBindingOperations
+	SamlToken                               SamlTokenOperations
 	Cluster                                 ClusterOperations
 	ClusterRegistrationToken                ClusterRegistrationTokenOperations
 	Catalog                                 CatalogOperations
@@ -94,6 +95,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.PodSecurityPolicyTemplateProjectBinding = newPodSecurityPolicyTemplateProjectBindingClient(client)
 	client.ClusterRoleTemplateBinding = newClusterRoleTemplateBindingClient(client)
 	client.ProjectRoleTemplateBinding = newProjectRoleTemplateBindingClient(client)
+	client.SamlToken = newSamlTokenClient(client)
 	client.Cluster = newClusterClient(client)
 	client.ClusterRegistrationToken = newClusterRegistrationTokenClient(client)
 	client.Catalog = newCatalogClient(client)

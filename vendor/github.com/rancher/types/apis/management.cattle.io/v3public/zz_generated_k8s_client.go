@@ -20,6 +20,7 @@ type Interface interface {
 	RESTClient() rest.Interface
 	controller.Starter
 
+	AuthTokensGetter
 	AuthProvidersGetter
 }
 
@@ -28,6 +29,7 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
+	authTokenControllers    map[string]AuthTokenController
 	authProviderControllers map[string]AuthProviderController
 }
 
@@ -44,6 +46,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
+		authTokenControllers:    map[string]AuthTokenController{},
 		authProviderControllers: map[string]AuthProviderController{},
 	}, nil
 }
@@ -58,6 +61,19 @@ func (c *Client) Sync(ctx context.Context) error {
 
 func (c *Client) Start(ctx context.Context, threadiness int) error {
 	return controller.Start(ctx, threadiness, c.starters...)
+}
+
+type AuthTokensGetter interface {
+	AuthTokens(namespace string) AuthTokenInterface
+}
+
+func (c *Client) AuthTokens(namespace string) AuthTokenInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &AuthTokenResource, AuthTokenGroupVersionKind, authTokenFactory{})
+	return &authTokenClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
 }
 
 type AuthProvidersGetter interface {

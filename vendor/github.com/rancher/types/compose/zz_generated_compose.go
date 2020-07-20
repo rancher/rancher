@@ -22,6 +22,7 @@ type Config struct {
 	PodSecurityPolicyTemplateProjectBindings map[string]managementClient.PodSecurityPolicyTemplateProjectBinding `json:"podSecurityPolicyTemplateProjectBindings,omitempty" yaml:"podSecurityPolicyTemplateProjectBindings,omitempty"`
 	ClusterRoleTemplateBindings              map[string]managementClient.ClusterRoleTemplateBinding              `json:"clusterRoleTemplateBindings,omitempty" yaml:"clusterRoleTemplateBindings,omitempty"`
 	ProjectRoleTemplateBindings              map[string]managementClient.ProjectRoleTemplateBinding              `json:"projectRoleTemplateBindings,omitempty" yaml:"projectRoleTemplateBindings,omitempty"`
+	SamlTokens                               map[string]managementClient.SamlToken                               `json:"samlTokens,omitempty" yaml:"samlTokens,omitempty"`
 	Clusters                                 map[string]managementClient.Cluster                                 `json:"clusters,omitempty" yaml:"clusters,omitempty"`
 	ClusterRegistrationTokens                map[string]managementClient.ClusterRegistrationToken                `json:"clusterRegistrationTokens,omitempty" yaml:"clusterRegistrationTokens,omitempty"`
 	Catalogs                                 map[string]managementClient.Catalog                                 `json:"catalogs,omitempty" yaml:"catalogs,omitempty"`

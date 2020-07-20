@@ -32,6 +32,7 @@ type Interface interface {
 	PodSecurityPolicyTemplateProjectBindingsGetter
 	ClusterRoleTemplateBindingsGetter
 	ProjectRoleTemplateBindingsGetter
+	SamlTokensGetter
 	ClustersGetter
 	ClusterRegistrationTokensGetter
 	CatalogsGetter
@@ -102,6 +103,7 @@ type Client struct {
 	podSecurityPolicyTemplateProjectBindingControllers map[string]PodSecurityPolicyTemplateProjectBindingController
 	clusterRoleTemplateBindingControllers              map[string]ClusterRoleTemplateBindingController
 	projectRoleTemplateBindingControllers              map[string]ProjectRoleTemplateBindingController
+	samlTokenControllers                               map[string]SamlTokenController
 	clusterControllers                                 map[string]ClusterController
 	clusterRegistrationTokenControllers                map[string]ClusterRegistrationTokenController
 	catalogControllers                                 map[string]CatalogController
@@ -180,6 +182,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		podSecurityPolicyTemplateProjectBindingControllers: map[string]PodSecurityPolicyTemplateProjectBindingController{},
 		clusterRoleTemplateBindingControllers:              map[string]ClusterRoleTemplateBindingController{},
 		projectRoleTemplateBindingControllers:              map[string]ProjectRoleTemplateBindingController{},
+		samlTokenControllers:                               map[string]SamlTokenController{},
 		clusterControllers:                                 map[string]ClusterController{},
 		clusterRegistrationTokenControllers:                map[string]ClusterRegistrationTokenController{},
 		catalogControllers:                                 map[string]CatalogController{},
@@ -396,6 +399,19 @@ type ProjectRoleTemplateBindingsGetter interface {
 func (c *Client) ProjectRoleTemplateBindings(namespace string) ProjectRoleTemplateBindingInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ProjectRoleTemplateBindingResource, ProjectRoleTemplateBindingGroupVersionKind, projectRoleTemplateBindingFactory{})
 	return &projectRoleTemplateBindingClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type SamlTokensGetter interface {
+	SamlTokens(namespace string) SamlTokenInterface
+}
+
+func (c *Client) SamlTokens(namespace string) SamlTokenInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &SamlTokenResource, SamlTokenGroupVersionKind, samlTokenFactory{})
+	return &samlTokenClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

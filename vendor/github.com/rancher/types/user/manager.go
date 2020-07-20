@@ -16,4 +16,5 @@ type Manager interface {
 	SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error)
 	CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error
 	GetUserByPrincipalID(principalName string) (*v3.User, error)
+	GetToken(clusterName, tokenName, description, kind, userName string) (*v3.Token, error)
 }

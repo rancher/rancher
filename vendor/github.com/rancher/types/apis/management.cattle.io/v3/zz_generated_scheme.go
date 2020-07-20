@@ -58,6 +58,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterRoleTemplateBindingList{},
 		&ProjectRoleTemplateBinding{},
 		&ProjectRoleTemplateBindingList{},
+		&SamlToken{},
+		&SamlTokenList{},
 		&Cluster{},
 		&ClusterList{},
 		&ClusterRegistrationToken{},
