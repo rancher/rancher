@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/clusterapi"
 	"github.com/rancher/rancher/pkg/auth/audit"
-	"github.com/rancher/rancher/pkg/auth/data"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -18,6 +17,7 @@ import (
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/crds"
 	"github.com/rancher/rancher/pkg/cron"
+	managementdata "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/jailer"
@@ -251,7 +251,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 			panic(err)
 		}
 
-		if err := addData(management, r.Config); err != nil {
+		if err := managementdata.Add(management, localClusterEnabled(r.Config), r.Config.AddLocal == "false", r.Config.Embedded); err != nil {
 			panic(err)
 		}
 
@@ -261,7 +261,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 		tokens.StartPurgeDaemon(ctx, management)
 		providerrefresh.StartRefreshDaemon(ctx, r.ScaledContext, management)
-		cleanupOrphanedSystemUsers(ctx, management)
+		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		logrus.Infof("Rancher startup complete")
 
 		<-ctx.Done()
@@ -276,49 +276,6 @@ func (r *Rancher) Start(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func addData(management *config.ManagementContext, cfg Config) error {
-	adminName, err := addRoles(management)
-	if err != nil {
-		return err
-	}
-
-	if localClusterEnabled(cfg) {
-		if err := addLocalCluster(cfg.Embedded, adminName, management); err != nil {
-			return err
-		}
-	} else if cfg.AddLocal == "false" {
-		if err := removeLocalCluster(management); err != nil {
-			return err
-		}
-	}
-
-	if err := data.AuthConfigs(management); err != nil {
-		return err
-	}
-
-	if err := syncCatalogs(management); err != nil {
-		return err
-	}
-
-	if err := addSetting(); err != nil {
-		return err
-	}
-
-	if err := addDefaultPodSecurityPolicyTemplates(management); err != nil {
-		return err
-	}
-
-	if err := addKontainerDrivers(management); err != nil {
-		return err
-	}
-
-	if err := addCattleGlobalNamespaces(management); err != nil {
-		return err
-	}
-
-	return addMachineDrivers(management)
 }
 
 func localClusterEnabled(cfg Config) bool {
