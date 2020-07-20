@@ -758,8 +758,12 @@ func (m *manager) checkReferencedRoles(roleTemplateName string) (bool, error) {
 		return false, err
 	}
 
-	if projectScopedAdminRoles[roleTemplate.Name] || roleTemplate.Administrative {
-		return true, nil
+	for _, rule := range roleTemplate.Rules {
+		if slice.ContainsString(rule.Resources, projectResource) || slice.ContainsString(rule.Resources, clusterResource) {
+			if slice.ContainsString(rule.Verbs, "own") {
+				return true, nil
+			}
+		}
 	}
 	isOwnerRole := false
 	if len(roleTemplate.RoleTemplateNames) > 0 {
