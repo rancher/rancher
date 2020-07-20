@@ -81,6 +81,11 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		[]string{"objects-east.cloud.ca"}, false, false, management); err != nil {
 		return err
 	}
+	if err := addMachineDriver("cloudscale", "https://github.com/cloudscale-ch/docker-machine-driver-cloudscale/releases/download/v1.2.0/docker-machine-driver-cloudscale_v1.2.0_linux_amd64.tar.gz",
+		"https://objects.rma.cloudscale.ch/cloudscale-rancher-v2-ui-driver/component.js", "e33fbd6c2f87b1c470bcb653cc8aa50baf914a9d641a2f18f86a07c398cfb544",
+		[]string{"objects.rma.cloudscale.ch"}, false, false, management); err != nil {
+		return err
+	}
 	if err := addMachineDriver(DigitalOceandriver, "local://", "", "", []string{"api.digitalocean.com"}, true, true, management); err != nil {
 		return err
 	}
