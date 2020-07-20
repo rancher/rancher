@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/norman/types"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"

@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/user/helm"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/helm"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	schema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"

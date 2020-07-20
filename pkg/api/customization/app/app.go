@@ -17,7 +17,7 @@ import (
 	clusterv3 "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	projectv3 "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	hcommon "github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"

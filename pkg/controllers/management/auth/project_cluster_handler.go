@@ -12,7 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
-	systemimage "github.com/rancher/rancher/pkg/controllers/user/systemimage"
+	systemimage "github.com/rancher/rancher/pkg/controllers/managementuser/systemimage"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"

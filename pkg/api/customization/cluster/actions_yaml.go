@@ -17,7 +17,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	clusterclient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/generated/compose"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/kubectl"

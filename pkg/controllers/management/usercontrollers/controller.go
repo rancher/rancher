@@ -8,8 +8,8 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/user/helm"
-	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/helm"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
