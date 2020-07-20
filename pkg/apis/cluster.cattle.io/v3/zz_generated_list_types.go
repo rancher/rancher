@@ -26,23 +26,6 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterUserAttributeList is a list of ClusterUserAttribute resources
-type ClusterUserAttributeList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterUserAttribute `json:"items"`
-}
-
-func NewClusterUserAttribute(namespace, name string, obj ClusterUserAttribute) *ClusterUserAttribute {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterUserAttribute").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // ClusterAuthTokenList is a list of ClusterAuthToken resources
 type ClusterAuthTokenList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -53,6 +36,23 @@ type ClusterAuthTokenList struct {
 
 func NewClusterAuthToken(namespace, name string, obj ClusterAuthToken) *ClusterAuthToken {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterAuthToken").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterUserAttributeList is a list of ClusterUserAttribute resources
+type ClusterUserAttributeList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ClusterUserAttribute `json:"items"`
+}
+
+func NewClusterUserAttribute(namespace, name string, obj ClusterUserAttribute) *ClusterUserAttribute {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterUserAttribute").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
