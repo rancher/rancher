@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/rancher/norman/pkg/k8scheck"
+	"github.com/rancher/rancher/pkg/api/steve"
+	"github.com/rancher/rancher/pkg/api/steve/clusterapi"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/data"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
@@ -21,8 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/rancher/pkg/steve"
-	"github.com/rancher/rancher/pkg/steve/pkg/clusterapi"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/tunnelserver"

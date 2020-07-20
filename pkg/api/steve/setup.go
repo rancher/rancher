@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rancher/rancher/pkg/steve/pkg/catalog"
+	"github.com/rancher/rancher/pkg/api/steve/catalog"
 
 	gmux "github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/api/steve/github"
+	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/steve/pkg/github"
-	"github.com/rancher/rancher/pkg/steve/pkg/proxy"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/steve/pkg/dashboard"
 	steve "github.com/rancher/steve/pkg/server"

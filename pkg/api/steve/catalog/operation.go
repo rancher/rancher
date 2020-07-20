@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/rancher/pkg/api/steve/catalog/helmop"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/steve/pkg/catalog/helmop"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
