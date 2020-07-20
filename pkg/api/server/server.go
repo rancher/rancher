@@ -7,18 +7,10 @@ import (
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
 	rancherapi "github.com/rancher/rancher/pkg/api"
-	"github.com/rancher/rancher/pkg/api/controllers/catalog"
-	"github.com/rancher/rancher/pkg/api/controllers/dynamicschema"
-	"github.com/rancher/rancher/pkg/api/controllers/feature"
-	"github.com/rancher/rancher/pkg/api/controllers/k3smetadata"
-	"github.com/rancher/rancher/pkg/api/controllers/samlconfig"
-	"github.com/rancher/rancher/pkg/api/controllers/settings"
-	"github.com/rancher/rancher/pkg/api/controllers/usercontrollers"
-	whitelistproxyKontainerDriver "github.com/rancher/rancher/pkg/api/controllers/whitelistproxy/kontainerdriver"
-	whitelistproxyNodeDriver "github.com/rancher/rancher/pkg/api/controllers/whitelistproxy/nodedriver"
 	"github.com/rancher/rancher/pkg/api/server/managementstored"
 	"github.com/rancher/rancher/pkg/api/server/userstored"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/managementapi"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
@@ -46,15 +38,5 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 	}
 	server.AccessControl = scaledContext.AccessControl
 
-	catalog.Register(ctx, scaledContext)
-	dynamicschema.Register(ctx, scaledContext, server.Schemas)
-	feature.Register(ctx, scaledContext)
-	whitelistproxyNodeDriver.Register(ctx, scaledContext)
-	whitelistproxyKontainerDriver.Register(ctx, scaledContext)
-	samlconfig.Register(ctx, scaledContext)
-	k3smetadata.Register(ctx, scaledContext)
-	usercontrollers.Register(ctx, scaledContext, clusterManager)
-	err = settings.Register(scaledContext)
-
-	return server, err
+	return server, managementapi.Register(ctx, scaledContext, clusterManager, server)
 }
