@@ -12,7 +12,7 @@ import (
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"

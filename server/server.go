@@ -4,15 +4,16 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/api/customization/oci"
+	"github.com/rancher/rancher/pkg/api/norman"
+
+	"github.com/rancher/rancher/pkg/api/norman/customization/oci"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
-	"github.com/rancher/rancher/pkg/api"
-	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
-	"github.com/rancher/rancher/pkg/api/customization/vsphere"
-	managementapi "github.com/rancher/rancher/pkg/api/server"
+	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/norman/customization/vsphere"
+	managementapi "github.com/rancher/rancher/pkg/api/norman/server"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
@@ -40,12 +41,12 @@ import (
 )
 
 func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter, authz auth.Middleware) (auth.Middleware, http.Handler, error) {
-	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, api.ConfigureAPIUI)
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, api.ConfigureAPIUI)
+	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -8,7 +8,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/rancher/norman/types/convert"
-	passwordutil "github.com/rancher/rancher/pkg/api/store/password"
+	passwordutil "github.com/rancher/rancher/pkg/api/norman/store/password"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"

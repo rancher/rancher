@@ -5,7 +5,7 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
-	passwordutil "github.com/rancher/rancher/pkg/api/store/password"
+	passwordutil "github.com/rancher/rancher/pkg/api/norman/store/password"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 )
 

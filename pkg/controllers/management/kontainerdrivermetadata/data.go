@@ -12,7 +12,7 @@ import (
 	"github.com/blang/semver"
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/types/convert"
-	setting2 "github.com/rancher/rancher/pkg/api/store/setting"
+	setting2 "github.com/rancher/rancher/pkg/api/norman/store/setting"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/namespace"
