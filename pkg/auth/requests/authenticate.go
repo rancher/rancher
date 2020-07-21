@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/steve/pkg/auth"
@@ -126,14 +128,16 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 }
 
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {
+	logrus.Infof("req %#v", req)
+
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 	if tokenAuthValue == "" {
-		return nil, fmt.Errorf("must authenticate")
+		return nil, fmt.Errorf("ONE must authenticate")
 	}
 
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)
 	if tokenName == "" || tokenKey == "" {
-		return nil, fmt.Errorf("must authenticate")
+		return nil, fmt.Errorf("TWO must authenticate")
 	}
 
 	lookupUsingClient := false
@@ -153,7 +157,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 		storedToken, err = a.tokenClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				return nil, fmt.Errorf("must authenticate")
+				return nil, fmt.Errorf("THREE must authenticate")
 			}
 			return nil, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
 		}
@@ -162,11 +166,11 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 	}
 
 	if storedToken.Token != tokenKey || storedToken.ObjectMeta.Name != tokenName {
-		return nil, fmt.Errorf("must authenticate")
+		return nil, fmt.Errorf("FOUR must authenticate")
 	}
 
 	if tokens.IsExpired(*storedToken) {
-		return nil, fmt.Errorf("must authenticate")
+		return nil, fmt.Errorf("FIVEEE must authenticate")
 	}
 
 	return storedToken, nil

@@ -10,13 +10,17 @@ import (
 
 	"github.com/crewjam/saml"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
 // ServeHTTP is the handler for /saml/metadata and /saml/acs endpoints
 func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	logrus.Infof("r.URL.Path %s", r.URL.Path)
+
 	serviceProvider := s.serviceProvider
 	if r.URL.Path == serviceProvider.MetadataURL.Path {
+		logrus.Infof(" saml calling metadata")
 		buf, _ := xml.MarshalIndent(serviceProvider.Metadata(), "", "  ")
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 		w.Write(buf)
@@ -24,6 +28,7 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.URL.Path == serviceProvider.AcsURL.Path {
+		logrus.Infof("saml calling acs path")
 		r.ParseForm()
 		assertion, err := serviceProvider.ParseResponse(r, s.getPossibleRequestIDs(r))
 		if err != nil {
@@ -35,10 +40,12 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, redirectURL, http.StatusFound)
 			return
 		}
-
+		logrus.Infof("saml calling assertion %s", serviceProvider.AcsURL.Path)
 		s.HandleSamlAssertion(w, r, assertion)
 		return
 	}
+
+	logrus.Infof("we'll find handler here!")
 
 	http.NotFoundHandler().ServeHTTP(w, r)
 }
@@ -103,6 +110,9 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (stri
 
 	if binding == saml.HTTPRedirectBinding {
 		redirectURL := req.Redirect(relayState)
+		logrus.Infof("rawQuery %s", redirectURL.RawQuery)
+		logrus.Infof("rawPath %s", redirectURL.RawPath)
+		logrus.Infof("string %s", redirectURL.String())
 		return redirectURL.String(), nil
 	}
 	return "", nil

@@ -20,14 +20,19 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 		token string
 		err   error
 	)
+
 	endpointEnabled := cluster.LocalClusterAuthEndpoint != nil && cluster.LocalClusterAuthEndpoint.Enabled
-	if endpointEnabled {
-		token, err = a.getClusterToken(cluster.ID, apiContext)
-	} else {
-		token, err = a.getToken(apiContext)
-	}
-	if err != nil {
-		return err
+
+	if cluster.Name == "local" {
+		// expiring tokens for user clusters, existing logic for local cluster
+		if endpointEnabled {
+			token, err = a.getClusterToken(cluster.ID, apiContext)
+		} else {
+			token, err = a.getToken(apiContext)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	if endpointEnabled {

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -188,6 +189,14 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 
 	if user.Enabled != nil && !*user.Enabled {
 		return v3.Token{}, "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
+	}
+
+	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
+		token, err := tokens.GetKubeConfigToken(user.Name, responseType, h.userMGR)
+		if err != nil {
+			return v3.Token{}, "", err
+		}
+		return *token, responseType, nil
 	}
 
 	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
