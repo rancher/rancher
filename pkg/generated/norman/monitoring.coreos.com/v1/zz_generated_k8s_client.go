@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	v1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"

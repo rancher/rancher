@@ -25,7 +25,10 @@ import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/wrangler/pkg/apply"
+	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +58,7 @@ type ReleaseController interface {
 type ReleaseClient interface {
 	Create(*v1.Release) (*v1.Release, error)
 	Update(*v1.Release) (*v1.Release, error)
-
+	UpdateStatus(*v1.Release) (*v1.Release, error)
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Release, error)
 	List(namespace string, opts metav1.ListOptions) (*v1.ReleaseList, error)
@@ -184,6 +187,11 @@ func (c *releaseController) Update(obj *v1.Release) (*v1.Release, error) {
 	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
+func (c *releaseController) UpdateStatus(obj *v1.Release) (*v1.Release, error) {
+	result := &v1.Release{}
+	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
+}
+
 func (c *releaseController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
@@ -253,4 +261,104 @@ func (c *releaseCache) GetByIndex(indexName, key string) (result []*v1.Release, 
 		result = append(result, obj.(*v1.Release))
 	}
 	return result, nil
+}
+
+type ReleaseStatusHandler func(obj *v1.Release, status v1.ReleaseStatus) (v1.ReleaseStatus, error)
+
+type ReleaseGeneratingHandler func(obj *v1.Release, status v1.ReleaseStatus) ([]runtime.Object, v1.ReleaseStatus, error)
+
+func RegisterReleaseStatusHandler(ctx context.Context, controller ReleaseController, condition condition.Cond, name string, handler ReleaseStatusHandler) {
+	statusHandler := &releaseStatusHandler{
+		client:    controller,
+		condition: condition,
+		handler:   handler,
+	}
+	controller.AddGenericHandler(ctx, name, FromReleaseHandlerToHandler(statusHandler.sync))
+}
+
+func RegisterReleaseGeneratingHandler(ctx context.Context, controller ReleaseController, apply apply.Apply,
+	condition condition.Cond, name string, handler ReleaseGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
+	statusHandler := &releaseGeneratingHandler{
+		ReleaseGeneratingHandler: handler,
+		apply:                    apply,
+		name:                     name,
+		gvk:                      controller.GroupVersionKind(),
+	}
+	if opts != nil {
+		statusHandler.opts = *opts
+	}
+	controller.OnChange(ctx, name, statusHandler.Remove)
+	RegisterReleaseStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
+}
+
+type releaseStatusHandler struct {
+	client    ReleaseClient
+	condition condition.Cond
+	handler   ReleaseStatusHandler
+}
+
+func (a *releaseStatusHandler) sync(key string, obj *v1.Release) (*v1.Release, error) {
+	if obj == nil {
+		return obj, nil
+	}
+
+	origStatus := obj.Status.DeepCopy()
+	obj = obj.DeepCopy()
+	newStatus, err := a.handler(obj, obj.Status)
+	if err != nil {
+		// Revert to old status on error
+		newStatus = *origStatus.DeepCopy()
+	}
+
+	if a.condition != "" {
+		if errors.IsConflict(err) {
+			a.condition.SetError(&newStatus, "", nil)
+		} else {
+			a.condition.SetError(&newStatus, "", err)
+		}
+	}
+	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+		var newErr error
+		obj.Status = newStatus
+		obj, newErr = a.client.UpdateStatus(obj)
+		if err == nil {
+			err = newErr
+		}
+	}
+	return obj, err
+}
+
+type releaseGeneratingHandler struct {
+	ReleaseGeneratingHandler
+	apply apply.Apply
+	opts  generic.GeneratingHandlerOptions
+	gvk   schema.GroupVersionKind
+	name  string
+}
+
+func (a *releaseGeneratingHandler) Remove(key string, obj *v1.Release) (*v1.Release, error) {
+	if obj != nil {
+		return obj, nil
+	}
+
+	obj = &v1.Release{}
+	obj.Namespace, obj.Name = kv.RSplit(key, "/")
+	obj.SetGroupVersionKind(a.gvk)
+
+	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects()
+}
+
+func (a *releaseGeneratingHandler) Handle(obj *v1.Release, status v1.ReleaseStatus) (v1.ReleaseStatus, error) {
+	objs, newStatus, err := a.ReleaseGeneratingHandler(obj, status)
+	if err != nil {
+		return newStatus, err
+	}
+
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects(objs...)
 }

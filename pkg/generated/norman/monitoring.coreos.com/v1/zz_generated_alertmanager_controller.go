@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	v1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"
