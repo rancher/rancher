@@ -10,9 +10,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/set"
+	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/types/peermanager"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"

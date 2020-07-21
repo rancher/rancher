@@ -4,7 +4,7 @@ import (
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	kontainerengine "github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
-	"github.com/rancher/rancher/pkg/types/namespace"
+	"github.com/rancher/rancher/pkg/namespace"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/rke/types/kdm"
 	"github.com/sirupsen/logrus"

@@ -1,4 +1,4 @@
-package crds
+package dashboard
 
 import (
 	"context"

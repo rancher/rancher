@@ -14,8 +14,8 @@ import (
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/ticker"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 
-	nsutils "github.com/rancher/rancher/pkg/types/namespace"
+	nsutils "github.com/rancher/rancher/pkg/namespace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

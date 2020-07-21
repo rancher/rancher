@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/types/namespace"
+	"github.com/rancher/rancher/pkg/namespace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
