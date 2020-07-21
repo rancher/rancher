@@ -24,9 +24,11 @@ BASTION_ID = os.environ.get("RANCHER_BASTION_ID", "")
 NUMBER_OF_INSTANCES = int(os.environ.get("RANCHER_AIRGAP_INSTANCE_COUNT", "1"))
 IMAGE_LIST = os.environ.get("RANCHER_IMAGE_LIST", ",".join(
     [TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE])).split(",")
+ARCH = os.environ.get("RANCHER_ARCH", "amd64")
 
 AG_HOST_NAME = random_test_name(HOST_NAME)
 print("Host Name: {}".format(AG_HOST_NAME))
+assert len(AG_HOST_NAME) < 17, "Provide a hostname that is 16 chars or less"
 RANCHER_AG_INTERNAL_HOSTNAME = AG_HOST_NAME + "-internal.qa.rancher.space"
 RANCHER_AG_HOSTNAME = AG_HOST_NAME + ".qa.rancher.space"
 RESOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
@@ -109,13 +111,14 @@ def test_deploy_airgap_nodes():
             bastion_node.host_name) in result[1]
 
 
-def test_deploy_airgap_k3s():
+def test_deploy_airgap_k3s_private_registry():
     bastion_node = get_bastion_node(BASTION_ID)
 
     failures = add_k3s_images_to_private_registry(bastion_node,
                                                   RANCHER_K3S_VERSION)
     assert failures == [], "Failed to add images: {}".format(failures)
-    ag_nodes = prepare_airgap_k3s(bastion_node, NUMBER_OF_INSTANCES)
+    ag_nodes = prepare_airgap_k3s(bastion_node, NUMBER_OF_INSTANCES,
+                                  'private_registry')
     assert len(ag_nodes) == NUMBER_OF_INSTANCES
 
     print(
@@ -130,28 +133,47 @@ def test_deploy_airgap_k3s():
 
     deploy_airgap_k3s_cluster(bastion_node, ag_nodes)
 
-    pods = run_command_on_airgap_node(
-        bastion_node, ag_nodes[0], "kubectl get pods -A")
-    pods_arr = pods[0].strip().split("\n")[1:]
-    start = time.time()
-    while pods_arr:
-        new_arr = []
-        if time.time() - start > DEFAULT_CLUSTER_STATE_TIMEOUT:
-            raise AssertionError(
-                "Timed out waiting for k3s cluster to be ready")
-        time.sleep(5)
-        pods = run_command_on_airgap_node(
-            bastion_node, ag_nodes[0], "kubectl get pods -A")
-        pods_arr = pods[0].strip().split("\n")[1:]
-        for pod in pods_arr:
-            if "Completed" not in pod and "Running" not in pod:
-                print("Problem pod: {}".format(pod))
-                new_arr.append(pod)
-        pods_arr = new_arr
-        print(pods_arr)
+    wait_for_airgap_pods_ready(bastion_node, ag_nodes)
 
     # Optionally add k3s cluster to Rancher server
     if AGENT_REG_CMD:
+        print("Adding to rancher server")
+        results = add_cluster_to_rancher(bastion_node, [ag_nodes[0]])
+        for result in results:
+            assert "deployment.apps/cattle-cluster-agent created" in result[0]
+
+
+def test_deploy_airgap_k3s_tarball():
+    bastion_node = get_bastion_node(BASTION_ID)
+    add_k3s_tarball_to_bastion(bastion_node, RANCHER_K3S_VERSION)
+
+    ag_nodes = prepare_airgap_k3s(bastion_node, NUMBER_OF_INSTANCES, 'tarball')
+    assert len(ag_nodes) == NUMBER_OF_INSTANCES
+
+    print(
+        '{} airgapped k3s instance(s) created.\n'
+        'Connect to these and run commands by connecting to bastion node, '
+        'then connecting to these:\n'
+        'ssh -i {}.pem {}@NODE_PRIVATE_IP'.format(
+            NUMBER_OF_INSTANCES, bastion_node.ssh_key_name, AWS_USER))
+    for ag_node in ag_nodes:
+        assert ag_node.private_ip_address is not None
+        assert ag_node.public_ip_address is None
+
+    deploy_airgap_k3s_cluster(bastion_node, ag_nodes)
+
+    wait_for_airgap_pods_ready(bastion_node, ag_nodes)
+
+    # Optionally add k3s cluster to Rancher server
+    if AGENT_REG_CMD:
+        print("Adding to rancher server")
+        for num, ag_node in enumerate(ag_nodes):
+            prepare_private_registry_on_k3s_node(bastion_node, ag_node)
+            restart_k3s = 'sudo systemctl restart k3s-agent'
+            if num == 0:
+                restart_k3s = 'sudo systemctl restart k3s && ' \
+                          'sudo chmod 644 /etc/rancher/k3s/k3s.yaml'
+            run_command_on_airgap_node(bastion_node, ag_node, restart_k3s)
         results = add_cluster_to_rancher(bastion_node, [ag_nodes[0]])
         for result in results:
             assert "deployment.apps/cattle-cluster-agent created" in result[0]
@@ -306,15 +328,34 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
     return save_res, load_res
 
 
+def add_k3s_tarball_to_bastion(bastion_node, k3s_version):
+    # Get k3s files associated with the specified version
+    k3s_binary = 'k3s'
+    if ARCH == 'arm64':
+        k3s_binary = 'k3s-arm64'
+
+    get_tarball_command = \
+        'wget -O k3s-airgap-images-{1}.tar https://github.com/rancher/k3s/' \
+        'releases/download/{0}/k3s-airgap-images-{1}.tar && ' \
+        'wget -O k3s-install.sh https://get.k3s.io/ && ' \
+        'wget -O k3s https://github.com/rancher/k3s/' \
+        'releases/download/{0}/{2}'.format(k3s_version, ARCH, k3s_binary)
+    bastion_node.execute_command(get_tarball_command)
+
+
 def add_k3s_images_to_private_registry(bastion_node, k3s_version):
     failures = []
     # Get k3s files associated with the specified version
+    k3s_binary = 'k3s'
+    if ARCH == 'arm64':
+        k3s_binary = 'k3s-arm64'
+
     get_images_command = \
         'wget -O k3s-images.txt https://github.com/rancher/k3s/' \
         'releases/download/{0}/k3s-images.txt && ' \
         'wget -O k3s-install.sh https://get.k3s.io/ && ' \
         'wget -O k3s https://github.com/rancher/k3s/' \
-        'releases/download/{0}/k3s'.format(k3s_version)
+        'releases/download/{0}/{1}'.format(k3s_version, k3s_binary)
     bastion_node.execute_command(get_images_command)
 
     images = bastion_node.execute_command(
@@ -415,7 +456,26 @@ def prepare_airgap_node(bastion_node, number_of_nodes):
     return ag_nodes
 
 
-def prepare_airgap_k3s(bastion_node, number_of_nodes):
+def prepare_private_registry_on_k3s_node(bastion_node, ag_node):
+    # Ensure registry file has correct data
+    reg_file = readDataFile(RESOURCE_DIR, "airgap/registries.yaml")
+    reg_file = reg_file.replace("$PRIVATE_REG", bastion_node.host_name)
+    reg_file = reg_file.replace("$USERNAME", PRIVATE_REGISTRY_USERNAME)
+    reg_file = reg_file.replace("$PASSWORD", PRIVATE_REGISTRY_PASSWORD)
+    # Add registry file to node
+    ag_node_create_dir = \
+        'sudo mkdir -p /etc/rancher/k3s && ' \
+        'sudo chown {} /etc/rancher/k3s'.format(AWS_USER)
+    run_command_on_airgap_node(bastion_node, ag_node,
+                               ag_node_create_dir)
+    write_reg_file_command = \
+        "cat <<EOT >> /etc/rancher/k3s/registries.yaml\n{}\nEOT".format(
+            reg_file)
+    run_command_on_airgap_node(bastion_node, ag_node,
+                               write_reg_file_command)
+
+
+def prepare_airgap_k3s(bastion_node, number_of_nodes, method):
     node_name = AG_HOST_NAME + "-k3s-airgap"
     # Create Airgap Node in AWS
     ag_nodes = AmazonWebServices().create_multiple_nodes(
@@ -429,9 +489,8 @@ def prepare_airgap_k3s(bastion_node, number_of_nodes):
             'scp -i "{0}.pem" -o StrictHostKeyChecking=no ./k3s ' \
             '{1}@{2}:~/k3s && ' \
             'scp -i "{0}.pem" -o StrictHostKeyChecking=no certs/* ' \
-            '{1}@{2}:~/'.format(
-                bastion_node.ssh_key_name, AWS_USER,
-                ag_node.private_ip_address, bastion_node.host_name)
+            '{1}@{2}:~/'.format(bastion_node.ssh_key_name, AWS_USER,
+                                ag_node.private_ip_address)
         bastion_node.execute_command(ag_node_copy_files)
 
         ag_node_make_executable = \
@@ -440,22 +499,22 @@ def prepare_airgap_k3s(bastion_node, number_of_nodes):
         run_command_on_airgap_node(bastion_node, ag_node,
                                    ag_node_make_executable)
 
-        reg_file = readDataFile(RESOURCE_DIR, "airgap/registries.yaml")
-        reg_file = reg_file.replace("$PRIVATE_REG", bastion_node.host_name)
-        reg_file = reg_file.replace("$USERNAME", PRIVATE_REGISTRY_USERNAME)
-        reg_file = reg_file.replace("$PASSWORD", PRIVATE_REGISTRY_PASSWORD)
-
-        # Add registry file to node
-        ag_node_create_dir = \
-            'sudo mkdir -p /etc/rancher/k3s && ' \
-            'sudo chown {} /etc/rancher/k3s'.format(AWS_USER)
-        run_command_on_airgap_node(bastion_node, ag_node, ag_node_create_dir)
-
-        write_reg_file_command = \
-            "cat <<EOT >> /etc/rancher/k3s/registries.yaml\n{}\nEOT".format(
-                reg_file)
-        run_command_on_airgap_node(bastion_node, ag_node,
-                                   write_reg_file_command)
+        if method == 'private_registry':
+            prepare_private_registry_on_k3s_node(bastion_node, ag_node)
+        elif method == 'tarball':
+            ag_node_copy_tarball = \
+                'scp -i "{0}.pem" -o StrictHostKeyChecking=no ' \
+                './k3s-airgap-images-{3}.tar ' \
+                '{1}@{2}:~/k3s-airgap-images-{3}.tar'.format(
+                    bastion_node.ssh_key_name, AWS_USER,
+                    ag_node.private_ip_address, ARCH)
+            bastion_node.execute_command(ag_node_copy_tarball)
+            ag_node_add_tarball_to_dir = \
+                'sudo mkdir -p /var/lib/rancher/k3s/agent/images/ && ' \
+                'sudo cp ./k3s-airgap-images-{}.tar ' \
+                '/var/lib/rancher/k3s/agent/images/'.format(ARCH)
+            run_command_on_airgap_node(bastion_node, ag_node,
+                                       ag_node_add_tarball_to_dir)
 
         print("Airgapped K3S Instance Details:\nNAME: {}-{}\nPRIVATE IP: {}\n"
               "".format(node_name, num, ag_node.private_ip_address))
@@ -491,6 +550,7 @@ def deploy_airgap_k3s_cluster(bastion_node, ag_nodes):
                 'K3S_TOKEN={} ./install.sh'.format(server_ip, token)
             run_command_on_airgap_node(bastion_node, ag_node,
                                        install_k3s_worker)
+    time.sleep(10)
 
 
 def deploy_airgap_rancher(bastion_node):
@@ -563,6 +623,28 @@ def run_command_on_airgap_node(bastion_node, ag_node, cmd, log_out=False):
         print("Running command: {}".format(ag_command))
         print("Result: {}".format(result))
     return result
+
+
+def wait_for_airgap_pods_ready(bastion_node, ag_nodes):
+    start = time.time()
+    wait_for_pods_to_be_ready = True
+    while wait_for_pods_to_be_ready:
+        unready_pods = []
+        if time.time() - start > DEFAULT_CLUSTER_STATE_TIMEOUT:
+            raise AssertionError(
+                "Timed out waiting for k3s cluster to be ready")
+        time.sleep(5)
+        pods = run_command_on_airgap_node(
+            bastion_node, ag_nodes[0], "kubectl get pods -A")
+        pods_arr = pods[0].strip().split("\n")[1:]
+        for pod in pods_arr:
+            if "Completed" not in pod and "Running" not in pod:
+                print("Problem pod: {}".format(pod))
+                unready_pods.append(pod)
+        if unready_pods:
+            wait_for_pods_to_be_ready = True
+        else:
+            wait_for_pods_to_be_ready = False
 
 
 def create_nlb_and_add_targets(aws_nodes):
