@@ -52,7 +52,12 @@ func Setup(server *steve.Server, config *wrangler.Context, localSupport bool, ra
 	// wrap with UI
 	server.Next = dashboard.Route(server.Next, settings.DashboardIndex.Get)
 
-	return catalog.Register(context.TODO(), server, config.Core.Secret(), config.Core.ConfigMap(), config.Catalog)
+	return catalog.Register(context.TODO(),
+		server,
+		config.Core.Secret(),
+		config.Core.Pod(),
+		config.Core.ConfigMap(),
+		config.Catalog)
 }
 
 type handler struct {

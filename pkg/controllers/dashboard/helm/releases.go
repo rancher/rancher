@@ -3,6 +3,8 @@ package helm
 import (
 	"context"
 
+	"github.com/rancher/wrangler/pkg/relatedresource"
+
 	"github.com/rancher/lasso/pkg/client"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	catalogv1 "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
@@ -35,6 +37,42 @@ func RegisterReleases(ctx context.Context,
 	}
 	configMap.OnChange(ctx, "helm-release", r.OnConfigMapChange)
 	secrets.OnChange(ctx, "helm-release", r.OnSecretChange)
+	catalogv1.RegisterReleaseStatusHandler(ctx, releases, "", "helm-release-status", r.releaseStatus)
+	relatedresource.Watch(ctx, "helm-release",
+		relatedresource.OwnerResolver(true, "v1", "ConfigMap"),
+		configMap,
+		releases)
+	relatedresource.Watch(ctx, "helm-release",
+		relatedresource.OwnerResolver(true, "v1", "Secrets"),
+		secrets,
+		releases)
+}
+
+func (r *releaseHandler) releaseStatus(release *v1.Release, status v1.ReleaseStatus) (v1.ReleaseStatus, error) {
+	summary := v1.Summary{}
+	if release.Spec.Info != nil && release.Spec.Info.Status != v1.StatusUnknown {
+		summary.State = string(release.Spec.Info.Status)
+		switch release.Spec.Info.Status {
+		case v1.StatusDeployed:
+		case v1.StatusUninstalled:
+		case v1.StatusSuperseded:
+		case v1.StatusFailed:
+			summary.Error = true
+		case v1.StatusUninstalling:
+			summary.Transitioning = true
+		case v1.StatusPendingInstall:
+			summary.Transitioning = true
+		case v1.StatusPendingUpgrade:
+			summary.Transitioning = true
+		case v1.StatusPendingRollback:
+			summary.Transitioning = true
+		}
+	}
+
+	status.Summary = summary
+	status.ObservedGeneration = release.Generation
+
+	return status, nil
 }
 
 func (r *releaseHandler) OnConfigMapChange(key string, configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {

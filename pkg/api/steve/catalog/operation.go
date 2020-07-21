@@ -22,9 +22,10 @@ type operation struct {
 func newOperation(
 	cg proxy.ClientGetter,
 	catalog catalogcontrollers.Interface,
+	pods corev1controllers.PodClient,
 	secrets corev1controllers.SecretClient) *operation {
 	return &operation{
-		ops: helmop.NewOperations(cg, catalog, secrets),
+		ops: helmop.NewOperations(cg, catalog, pods, secrets),
 	}
 }
 
@@ -55,7 +56,10 @@ func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	case "uninstall":
 		op, err = o.ops.Uninstall(apiRequest.Context(), user,
 			apiRequest.Namespace, apiRequest.Name, req.Body)
-	case "log":
+	}
+
+	switch apiRequest.Link {
+	case "logs":
 		err = o.ops.Log(apiRequest.Response, apiRequest.Request,
 			apiRequest.Namespace, apiRequest.Name)
 	}

@@ -24,8 +24,8 @@ func List() []crd.CRD {
 		newCRD(&catalogv1.Operation{}, func(c crd.CRD) crd.CRD {
 			return c.
 				WithCategories("catalog").
-				WithColumn("Pod Name", ".status.podName").
-				WithColumn("Pod Namespace", ".status.podNamespace")
+				WithColumn("Target Namespace", ".status.podNamespace").
+				WithColumn("Command", ".status.command")
 		}),
 		newCRD(&catalogv1.Release{}, func(c crd.CRD) crd.CRD {
 			return c.

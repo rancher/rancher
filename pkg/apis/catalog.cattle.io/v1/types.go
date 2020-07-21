@@ -91,8 +91,16 @@ type Operation struct {
 }
 
 type OperationStatus struct {
-	Token        string   `json:"token,omitempty"`
-	Command      []string `json:"command,omitempty"`
-	PodName      string   `json:"podName,omitempty"`
-	PodNamespace string   `json:"podNamespace,omitempty"`
+	ObservedGeneration int64                               `json:"observedGeneration"`
+	Action             string                              `json:"action,omitempty"`
+	Chart              string                              `json:"chart,omitempty"`
+	Version            string                              `json:"version,omitempty"`
+	Release            string                              `json:"releaseName,omitempty"`
+	Namespace          string                              `json:"namespace,omitempty"`
+	Token              string                              `json:"token,omitempty"`
+	Command            string                              `json:"command,omitempty"`
+	PodName            string                              `json:"podName,omitempty"`
+	PodNamespace       string                              `json:"podNamespace,omitempty"`
+	PodCreated         bool                                `json:"podCreated,omitempty"`
+	Conditions         []genericcondition.GenericCondition `json:"conditions,omitempty"`
 }

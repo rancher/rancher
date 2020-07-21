@@ -13,7 +13,19 @@ type Release struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ReleaseSpec `json:"spec,omitempty"`
+	Spec   ReleaseSpec   `json:"spec,omitempty"`
+	Status ReleaseStatus `json:"status,omitempty"`
+}
+
+type ReleaseStatus struct {
+	Summary            Summary `json:"summary,omitempty"`
+	ObservedGeneration int64   `json:"observedGeneration"`
+}
+
+type Summary struct {
+	State         string `json:"state,omitempty"`
+	Transitioning bool   `json:"transitioning,omitempty"`
+	Error         bool   `json:"error,omitempty"`
 }
 
 type ReleaseSpec struct {

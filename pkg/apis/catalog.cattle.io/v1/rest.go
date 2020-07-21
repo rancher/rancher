@@ -20,7 +20,7 @@ type ChartInstallAction struct {
 	NameTemplate             string                `json:"nameTemplate,omitempty"`
 	Description              string                `json:"description,omitempty"`
 	SkipCRDs                 bool                  `json:"skipCRDs,omitempty"`
-	DisableOpenAPIValidation bool                  `json:"disableOpenapiValidation,omitempty"`
+	DisableOpenAPIValidation bool                  `json:"disableOpenAPIValidation,omitempty"`
 	Values                   v3.MapStringInterface `json:"values,omitempty"`
 }
 
@@ -36,7 +36,7 @@ type ChartUninstallAction struct {
 	DryRun       bool          `json:"dryRun,omitempty"`
 	KeepHistory  bool          `json:"keepHistory,omitempty"`
 	Timeout      time.Duration `json:"timeout,omitempty"`
-	Description  string        `json:"description"`
+	Description  string        `json:"description,omitempty"`
 }
 
 type ChartUpgradeAction struct {

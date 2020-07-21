@@ -16,10 +16,11 @@ import (
 
 func Register(ctx context.Context, server *steve.Server,
 	secrets v12.SecretClient,
+	pods v12.PodClient,
 	configMaps v12.ConfigMapClient,
 	catalog catalogcontrollers.Interface) error {
 
-	ops := newOperation(server.ClientFactory, catalog, secrets)
+	ops := newOperation(server.ClientFactory, catalog, pods, secrets)
 	server.ClusterCache.OnAdd(ctx, ops.OnAdd)
 	server.ClusterCache.OnChange(ctx, ops.OnChange)
 
@@ -34,6 +35,9 @@ func Register(ctx context.Context, server *steve.Server,
 }
 
 func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
+	server.BaseSchemas.MustImportAndCustomize(v1.ChartUninstallAction{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(v1.ChartUpgradeAction{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(v1.ChartRollbackAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(v1.ChartInstallAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(v1.ChartActionOutput{}, nil)
 
@@ -43,6 +47,11 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 		Customize: func(apiSchema *types.APISchema) {
 			apiSchema.LinkHandlers = map[string]http.Handler{
 				"logs": ops,
+			}
+			apiSchema.Formatter = func(request *types.APIRequest, resource *types.RawResource) {
+				if !resource.APIObject.Data().Bool("status", "podCreated") {
+					delete(resource.Links, "logs")
+				}
 			}
 		},
 	}
