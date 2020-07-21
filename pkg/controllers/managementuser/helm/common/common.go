@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
-	"github.com/rancher/rancher/pkg/types/namespace"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/sirupsen/logrus"
 )
 

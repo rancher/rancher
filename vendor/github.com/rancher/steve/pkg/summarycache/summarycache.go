@@ -92,12 +92,7 @@ func (s *SummaryCache) SummaryAndRelationship(obj runtime.Object) (*summary.Summ
 	defer s.RUnlock()
 
 	key := toKey(obj)
-	summaryObj, ok := s.cache.Get(key)
-	if !ok {
-		return summary.Summarized(obj), nil
-	}
-
-	summarized := summaryObj.(*summary.SummarizedObject)
+	summarized := summary.Summarized(obj)
 
 	relObjs, err := s.cache.ByIndex(relationshipIndex, key)
 	if err != nil {

@@ -50,6 +50,7 @@ type Operations struct {
 func NewOperations(
 	cg proxy.ClientGetter,
 	catalog catalogcontrollers.Interface,
+	pods corev1controllers.PodClient,
 	secrets corev1controllers.SecretClient) *Operations {
 	return &Operations{
 		cg:           cg,
@@ -57,6 +58,7 @@ func NewOperations(
 		Impersonator: podimpersonation.New("helm-op", cg, time.Hour),
 		repos:        catalog.Repo(),
 		secrets:      secrets,
+		pods:         pods,
 		clusterRepos: catalog.ClusterRepo(),
 		ops:          catalog.Operation(),
 		releases:     catalog.Release(),
@@ -79,16 +81,16 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 }
 
 func (s *Operations) Rollback(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
-	args, opNamespace, err := s.getRollbackArgs(namespace, name, options)
+	args, status, err := s.getRollbackArgs(namespace, name, options)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, opNamespace, args, emptyData())
+	return s.createOperation(ctx, user, status, args, emptyData())
 }
 
 func (s *Operations) Upgrade(ctx context.Context, user user.Info, kind, namespace, name string, options io.Reader) (*catalog.Operation, error) {
-	args, opNamespace, values, err := s.getUpgradeArgs(name, options)
+	args, status, values, err := s.getUpgradeArgs(name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -98,11 +100,11 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, kind, namespac
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, opNamespace, args, data)
+	return s.createOperation(ctx, user, status, args, data)
 }
 
 func (s *Operations) Install(ctx context.Context, user user.Info, kind, namespace, name string, options io.Reader) (*catalog.Operation, error) {
-	installArgs, opNamespace, values, err := s.getInstallArgs(name, options)
+	installArgs, status, values, err := s.getInstallArgs(name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +114,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, kind, namespac
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, opNamespace, installArgs, data)
+	return s.createOperation(ctx, user, status, installArgs, data)
 }
 
 func decodeParams(req *http.Request, target runtime.Object) error {
@@ -124,12 +126,14 @@ func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, 
 	if err := decodeParams(req, logOptions); err != nil {
 		return err
 	}
+
+	logOptions.Container = "helm"
 	logURL := client.CoreV1().RESTClient().
 		Get().
 		Namespace(pod.Namespace).
 		Resource("pods").
 		Name(pod.Name).
-		SubResource("logs").
+		SubResource("log").
 		VersionedParams(logOptions, scheme.ParameterCodec).URL()
 
 	httpClient := client.CoreV1().RESTClient().(*rest.RESTClient).Client
@@ -159,7 +163,11 @@ func (s *Operations) Log(rw http.ResponseWriter, req *http.Request, namespace, n
 		return err
 	}
 
-	if len(pod.OwnerReferences) == 0 || pod.OwnerReferences[0].UID != op.UID {
+	if len(pod.OwnerReferences) == 0 || len(op.OwnerReferences) == 0 || pod.OwnerReferences[0].UID != op.OwnerReferences[0].UID {
+		return validation.NotFound
+	}
+
+	if pod.Labels[podimpersonation.TokenLabel] != op.Status.Token {
 		return validation.NotFound
 	}
 
@@ -263,34 +271,40 @@ func getUser(namespace string, repoSpec *catalog.RepoSpec, userInfo user.Info) u
 	}
 }
 
-func (s *Operations) getUninstallArgs(releaseNamespace, releaseName string, body io.Reader) ([]string, string, error) {
+func (s *Operations) getUninstallArgs(releaseNamespace, releaseName string, body io.Reader) ([]string, catalog.OperationStatus, error) {
 	rel, err := s.releases.Get(releaseNamespace, releaseName, metav1.GetOptions{})
 	if err != nil {
-		return nil, "", err
+		return nil, catalog.OperationStatus{}, err
 	}
 
 	rollbackArgs := &catalog.ChartUninstallAction{}
 	if err := json.NewDecoder(body).Decode(rollbackArgs); err != nil {
-		return nil, "", err
+		return nil, catalog.OperationStatus{}, err
 	}
 
 	suffix := []string{
 		rel.Spec.Name,
 	}
 
-	args, _, err := toArgs("uninstall", nil, rollbackArgs, suffix)
-	return args, releaseNamespace, err
+	status := catalog.OperationStatus{
+		Action:    "uninstall",
+		Release:   rel.Spec.Name,
+		Namespace: releaseNamespace,
+	}
+
+	args, _, err := toArgs(status.Action, nil, rollbackArgs, suffix)
+	return args, status, err
 }
 
-func (s *Operations) getRollbackArgs(releaseNamespace, releaseName string, body io.Reader) ([]string, string, error) {
+func (s *Operations) getRollbackArgs(releaseNamespace, releaseName string, body io.Reader) ([]string, catalog.OperationStatus, error) {
 	rel, err := s.releases.Get(releaseNamespace, releaseName, metav1.GetOptions{})
 	if err != nil {
-		return nil, "", err
+		return nil, catalog.OperationStatus{}, err
 	}
 
 	rollbackArgs := &catalog.ChartRollbackAction{}
 	if err := json.NewDecoder(body).Decode(rollbackArgs); err != nil {
-		return nil, "", err
+		return nil, catalog.OperationStatus{}, err
 	}
 
 	suffix := []string{
@@ -298,15 +312,21 @@ func (s *Operations) getRollbackArgs(releaseNamespace, releaseName string, body 
 		fmt.Sprint(rel.Spec.Version),
 	}
 
-	args, _, err := toArgs("rollback", nil, rollbackArgs, suffix)
-	return args, releaseNamespace, err
+	status := catalog.OperationStatus{
+		Action:    "rollback",
+		Release:   rel.Spec.Name,
+		Namespace: releaseNamespace,
+	}
+
+	args, _, err := toArgs(status.Action, nil, rollbackArgs, suffix)
+	return args, status, err
 }
 
-func (s *Operations) getUpgradeArgs(repoName string, body io.Reader) ([]string, string, []byte, error) {
+func (s *Operations) getUpgradeArgs(repoName string, body io.Reader) ([]string, catalog.OperationStatus, []byte, error) {
 	upgradeArgs := &catalog.ChartUpgradeAction{}
 	err := json.NewDecoder(body).Decode(upgradeArgs)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, catalog.OperationStatus{}, nil, err
 	}
 
 	suffix := []string{
@@ -314,15 +334,21 @@ func (s *Operations) getUpgradeArgs(repoName string, body io.Reader) ([]string, 
 		repoName + "/" + upgradeArgs.ChartName,
 	}
 
+	status := catalog.OperationStatus{
+		Action:    "upgrade",
+		Release:   upgradeArgs.ReleaseName,
+		Namespace: namespace(upgradeArgs.Namespace),
+	}
+
 	args, values, err := toArgs("upgrade", upgradeArgs.Values, upgradeArgs, suffix)
-	return args, namespace(upgradeArgs.Namespace), values, err
+	return args, status, values, err
 }
 
-func (s *Operations) getInstallArgs(repoName string, body io.Reader) ([]string, string, []byte, error) {
+func (s *Operations) getInstallArgs(repoName string, body io.Reader) ([]string, catalog.OperationStatus, []byte, error) {
 	installArgs := &catalog.ChartInstallAction{}
 	err := json.NewDecoder(body).Decode(installArgs)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, catalog.OperationStatus{}, nil, err
 	}
 
 	var suffix []string
@@ -335,8 +361,14 @@ func (s *Operations) getInstallArgs(repoName string, body io.Reader) ([]string, 
 		suffix = append(suffix, repoName+"/"+installArgs.ChartName)
 	}
 
-	args, values, err := toArgs("install", installArgs.Values, installArgs, suffix)
-	return args, namespace(installArgs.Namespace), values, err
+	status := catalog.OperationStatus{
+		Action:    "install",
+		Release:   installArgs.ReleaseName,
+		Namespace: namespace(installArgs.Namespace),
+	}
+
+	args, values, err := toArgs(status.Action, installArgs.Values, installArgs, suffix)
+	return args, status, values, err
 }
 
 func namespace(ns string) string {
@@ -347,7 +379,16 @@ func namespace(ns string) string {
 }
 
 func toArgs(operation string, values map[string]interface{}, input interface{}, suffix []string) (args []string, valueContent []byte, err error) {
-	prefix := []string{"helm-update", operation}
+	var prefix []string
+
+	switch operation {
+	case "uninstall":
+		fallthrough
+	case "rollback":
+		prefix = []string{"helm-run", operation}
+	default:
+		prefix = []string{"helm-update", operation}
+	}
 
 	data, err := convert.EncodeToMap(input)
 	if err != nil {
@@ -356,6 +397,10 @@ func toArgs(operation string, values map[string]interface{}, input interface{}, 
 	delete(data, "values")
 	delete(data, "releaseName")
 	delete(data, "chartName")
+	if v, ok := data["disableOpenAPIValidation"]; ok {
+		delete(data, "disableOpenAPIValidation")
+		data["disableOpenapiValidation"] = v
+	}
 
 	for k, v := range data {
 		s := convert.ToString(v)
@@ -375,7 +420,7 @@ func toArgs(operation string, values map[string]interface{}, input interface{}, 
 	return append(prefix, append(args, suffix...)...), valueContent, nil
 }
 
-func (s *Operations) createOperation(ctx context.Context, user user.Info, namespace string, command []string, secretData map[string][]byte) (*catalog.Operation, error) {
+func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, command []string, secretData map[string][]byte) (*catalog.Operation, error) {
 	pod, podOptions := s.createPod(command, secretData)
 	pod, err := s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
@@ -384,20 +429,25 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, namesp
 
 	command[0] = "helm"
 
+	status.Token = pod.Labels[podimpersonation.TokenLabel]
+	status.Command = strings.Join(command, " ")
+	status.PodName = pod.Name
+	status.PodNamespace = pod.Namespace
+
 	op := &catalog.Operation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            pod.Name,
-			Namespace:       namespace,
+			Namespace:       status.Namespace,
 			OwnerReferences: pod.OwnerReferences,
 		},
-		Status: catalog.OperationStatus{
-			Token:        pod.Labels[podimpersonation.TokenLabel],
-			Command:      command,
-			PodName:      pod.Name,
-			PodNamespace: pod.Namespace,
-		},
 	}
-	return s.ops.Create(op)
+	op, err = s.ops.Create(op)
+	if err != nil {
+		return nil, err
+	}
+
+	op.Status = status
+	return s.ops.UpdateStatus(op)
 }
 
 func (s *Operations) createPod(command []string, secretData map[string][]byte) (*v1.Pod, *podimpersonation.PodOptions) {
@@ -438,7 +488,7 @@ func (s *Operations) createPod(command []string, secretData map[string][]byte) (
 					Stdin:           true,
 					TTY:             true,
 					StdinOnce:       true,
-					Image:           "ibuildthecloud/shell:v0.0.4",
+					Image:           "ibuildthecloud/shell:dev",
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Command:         command,
 					VolumeMounts: []v1.VolumeMount{

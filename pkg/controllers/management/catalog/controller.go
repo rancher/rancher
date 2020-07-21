@@ -8,8 +8,8 @@ import (
 
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/labels"

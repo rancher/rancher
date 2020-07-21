@@ -26,7 +26,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/types/user"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 )
 

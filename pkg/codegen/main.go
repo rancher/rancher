@@ -10,11 +10,11 @@ import (
 	"github.com/coreos/prometheus-operator/pkg/apis/monitoring"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
+	"github.com/rancher/rancher/pkg/codegen/generator"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	publicSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/generator"
 
 	"github.com/rancher/wrangler/pkg/controller-gen/args"
 	appsv1 "k8s.io/api/apps/v1"

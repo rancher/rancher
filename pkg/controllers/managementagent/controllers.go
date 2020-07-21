@@ -16,8 +16,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementagent/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	pkgmonitoring "github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/schemas/factory"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/types/factory"
 )
 
 func Register(ctx context.Context, cluster *config.UserOnlyContext) error {

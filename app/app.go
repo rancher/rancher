@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/rancher/rancher/pkg/crds/dashboard"
+
 	"github.com/rancher/norman/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/clusterapi"
@@ -15,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
-	"github.com/rancher/rancher/pkg/crds"
 	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/dialer"
@@ -93,7 +94,7 @@ func initFeatures(ctx context.Context, scaledContext *config.ScaledContext, cfg 
 		return err
 	}
 
-	if err := crds.Create(ctx, &scaledContext.RESTConfig); err != nil {
+	if err := dashboard.Create(ctx, &scaledContext.RESTConfig); err != nil {
 		return err
 	}
 

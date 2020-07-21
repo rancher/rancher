@@ -74,6 +74,10 @@ func dedupMessage(messages []string) []string {
 	var result []string
 
 	for _, message := range messages {
+		message = strings.TrimSpace(message)
+		if message == "" {
+			continue
+		}
 		if seen[message] {
 			continue
 		}

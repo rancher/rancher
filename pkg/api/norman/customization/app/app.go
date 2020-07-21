@@ -23,7 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	clusterschema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/user"
+	"github.com/rancher/rancher/pkg/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

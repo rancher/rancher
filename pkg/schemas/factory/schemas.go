@@ -4,7 +4,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/factory"
 	m "github.com/rancher/norman/types/mapper"
-	"github.com/rancher/rancher/pkg/types/mapper"
+	"github.com/rancher/rancher/pkg/schemas/mapper"
 )
 
 func Schemas(version *types.APIVersion) *types.Schemas {

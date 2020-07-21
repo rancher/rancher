@@ -9,9 +9,9 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/managementuser/logging/utils"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
+	"github.com/rancher/wrangler/pkg/ticker"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

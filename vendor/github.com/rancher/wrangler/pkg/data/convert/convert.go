@@ -261,10 +261,14 @@ func ToYAMLKey(str string) string {
 }
 
 func ToArgKey(str string) string {
-	var result []rune
+	var (
+		result []rune
+		input  = []rune(str)
+	)
 	cap := false
 
-	for i, r := range []rune(str) {
+	for i := 0; i < len(input); i++ {
+		r := input[i]
 		if i == 0 {
 			if unicode.IsUpper(r) {
 				cap = true
@@ -276,6 +280,15 @@ func ToArgKey(str string) string {
 		if unicode.IsUpper(r) {
 			if cap {
 				result = append(result, unicode.ToLower(r))
+			} else if len(input) > i+2 &&
+				unicode.IsUpper(input[i]) &&
+				unicode.IsUpper(input[i+1]) &&
+				unicode.IsUpper(input[i+2]) {
+				result = append(result, '-',
+					unicode.ToLower(input[i]),
+					unicode.ToLower(input[i+1]),
+					unicode.ToLower(input[i+2]))
+				i += 2
 			} else {
 				result = append(result, '-', unicode.ToLower(r))
 			}

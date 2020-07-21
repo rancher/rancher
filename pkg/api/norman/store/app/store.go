@@ -13,9 +13,9 @@ import (
 	hcommon "github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/namespace"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
