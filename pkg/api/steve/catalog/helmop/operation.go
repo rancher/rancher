@@ -488,7 +488,7 @@ func (s *Operations) createPod(command []string, secretData map[string][]byte) (
 					Stdin:           true,
 					TTY:             true,
 					StdinOnce:       true,
-					Image:           "ibuildthecloud/shell:dev",
+					Image:           "ibuildthecloud/shell:v0.0.5",
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Command:         command,
 					VolumeMounts: []v1.VolumeMount{
