@@ -24,6 +24,7 @@ import (
 	time "time"
 
 	genericcondition "github.com/rancher/wrangler/pkg/genericcondition"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -163,6 +164,13 @@ func (in *PlanSpec) DeepCopyInto(out *PlanSpec) {
 		in, out := &in.Secrets, &out.Secrets
 		*out = make([]SecretSpec, len(*in))
 		copy(*out, *in)
+	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Prepare != nil {
 		in, out := &in.Prepare, &out.Prepare

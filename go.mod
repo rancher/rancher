@@ -85,7 +85,7 @@ require (
 	github.com/rancher/rke v1.2.0-rc2.0.20200712062933-4c1d3db2b0c1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200719205634-ece0f7bce52c
-	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
+	github.com/rancher/system-upgrade-controller v0.6.2
 	github.com/rancher/wrangler v0.6.2-0.20200720053621-d4abf99e6583
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect

@@ -914,8 +914,8 @@ github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
 github.com/rancher/steve v0.0.0-20200719205634-ece0f7bce52c h1:PiGWPf89/J8VGK3ZeGc3JyChF0zX0+oRrNceG4ogrIk=
 github.com/rancher/steve v0.0.0-20200719205634-ece0f7bce52c/go.mod h1:NPmG/ARUncbEcIryPflKxrslJIyXnJQXBM16r8CKGr8=
-github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd h1:h4VDCviV2Iixfk9SjUcfzq0l+pRsvadt2QSNuoQKfxE=
-github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd/go.mod h1:8x2eK9Q5/1c2AC9xJtNFyAyjP9ytP4uPHhGA6wajIS0=
+github.com/rancher/system-upgrade-controller v0.6.2 h1:Q+YcllWjW7A/VdUgnxNIYPnVGTV0hruc1nZNX7iYd5k=
+github.com/rancher/system-upgrade-controller v0.6.2/go.mod h1:TvgsR2KC6Y1vtzbPv2szaxNKEijBslsAzazyDjDm5GI=
 github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
 github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f/go.mod h1:NmtmlLkchboIksYJuBemwcP4RBfv8FpeyhVoWXB9Wdc=
