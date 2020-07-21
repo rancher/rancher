@@ -18,6 +18,7 @@ var (
 
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
+	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "1440") // 24 hours
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds  = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	CACerts                           = NewSetting("cacerts", "")
@@ -37,6 +38,8 @@ var (
 	IngressIPDomain                   = NewSetting("ingress-ip-domain", "xip.io")
 	InstallUUID                       = NewSetting("install-uuid", "")
 	JailerTimeout                     = NewSetting("jailer-timeout", "60")
+	KubeconfigGenerateToken           = NewSetting("kubeconfig-generate-token", "true")
+	KubeconfigTokenTTLMinutes         = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
 	KubernetesVersion                 = NewSetting("k8s-version", "")
 	KubernetesVersionToServiceOptions = NewSetting("k8s-version-to-service-options", "")
 	KubernetesVersionToSystemImages   = NewSetting("k8s-version-to-images", "")
