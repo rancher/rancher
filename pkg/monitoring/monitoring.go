@@ -67,6 +67,7 @@ const (
 	RancherMonitoringTemplateName            = "system-library-rancher-monitoring"
 
 	monitoringTemplateName = "rancher-monitoring"
+	webhookSecreteName     = "webhook-receiver"
 )
 
 var (
@@ -140,6 +141,10 @@ func ClusterMonitoringInfo() (appName, appTargetNamespace string) {
 
 func ClusterAlertManagerInfo() (appName, appTargetNamespace string) {
 	return clusterLevelAlertManagerAppName, cattleNamespaceName
+}
+
+func SecretWebhook() (secretName, appTargetNamespace string) {
+	return webhookSecreteName, cattleNamespaceName
 }
 
 func ProjectMonitoringInfo(projectName string) (appName, appTargetNamespace string) {
