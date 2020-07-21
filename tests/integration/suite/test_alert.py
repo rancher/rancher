@@ -2,6 +2,19 @@ import pytest
 from rancher import ApiError
 from .common import random_str
 from .conftest import wait_until
+from .alert_common import MockReceiveAlert
+
+dingtalk_config = {
+    "type": "/v3/schemas/dingtalkConfig",
+    "url": "http://127.0.0.1:4050/dingtalk/test/",
+}
+
+microsoft_teams_config = {
+    "type": "/v3/schemas/msTeamsConfig",
+    "url": "http://127.0.0.1:4050/microsoftTeams",
+}
+
+MOCK_RECEIVER_ALERT_PORT = 4050
 
 
 def test_alert_access(admin_mc, admin_pc, admin_cc, user_mc, remove_resource):
@@ -31,3 +44,37 @@ def projectAlertRules(client):
     def cb():
         return len(client.list_projectAlertRule().data) > 0
     return cb
+
+
+@pytest.fixture(scope="module")
+def mock_receiver_alert():
+    server = MockReceiveAlert(port=MOCK_RECEIVER_ALERT_PORT)
+    server.start()
+    yield server
+    server.shutdown_server()
+
+
+def test_add_notifier(admin_mc, remove_resource, mock_receiver_alert):
+    client = admin_mc.client
+
+    # Add the notifier dingtalk and microsoftTeams
+    notifier_dingtalk = client.create_notifier(name="dingtalk",
+                                               clusterId="local",
+                                               dingtalkConfig=dingtalk_config)
+
+    notifier_microsoft_teams = client.create_notifier(
+        name="microsoftTeams",
+        clusterId="local",
+        msteamsConfig=microsoft_teams_config)
+
+    client.action(obj=notifier_microsoft_teams,
+                  action_name="send",
+                  msteamsConfig=microsoft_teams_config)
+
+    client.action(obj=notifier_dingtalk,
+                  action_name="send",
+                  dingtalkConfig=dingtalk_config)
+
+    # Remove the notifiers
+    remove_resource(notifier_dingtalk)
+    remove_resource(notifier_microsoft_teams)
