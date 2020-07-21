@@ -319,8 +319,8 @@ func (s *Store) listAndWatch(apiOp *types.APIRequest, k8sClient dynamic.Resource
 		for event := range watcher.ResultChan() {
 			if event.Type == watch.Error {
 				continue
-				result <- s.toAPIEvent(apiOp, schema, event.Type, event.Object)
 			}
+			result <- s.toAPIEvent(apiOp, schema, event.Type, event.Object)
 		}
 		return fmt.Errorf("closed")
 	})

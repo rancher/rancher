@@ -118,6 +118,14 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 		countLock   sync.Mutex
 	)
 
+	go func() {
+		<-apiOp.Context().Done()
+		countLock.Lock()
+		close(result)
+		result = nil
+		countLock.Unlock()
+	}()
+
 	counts = s.getCount(apiOp).Counts
 	for id := range counts {
 		schema := apiOp.Schemas.LookupSchema(id)
@@ -127,14 +135,6 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 
 		gvrToSchema[attributes.GVR(schema)] = schema
 	}
-
-	go func() {
-		<-apiOp.Context().Done()
-		countLock.Lock()
-		close(result)
-		result = nil
-		countLock.Unlock()
-	}()
 
 	onChange := func(add bool, gvr schema2.GroupVersionResource, _ string, obj, oldObj runtime.Object) error {
 		countLock.Lock()
@@ -205,7 +205,7 @@ func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.
 		return onChange(false, gvr, key, obj, nil)
 	})
 
-	return result, nil
+	return buffer(result), nil
 }
 
 func (s *Store) schemasToWatch(apiOp *types.APIRequest) (result []*types.APISchema) {

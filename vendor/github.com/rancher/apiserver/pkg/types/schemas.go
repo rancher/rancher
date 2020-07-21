@@ -2,14 +2,12 @@ package types
 
 import (
 	"strings"
-	"sync"
 
 	"github.com/rancher/wrangler/pkg/schemas"
 	"github.com/sirupsen/logrus"
 )
 
 type APISchemas struct {
-	sync.Mutex
 	InternalSchemas *schemas.Schemas
 	Schemas         map[string]*APISchema
 	index           map[string]*APISchema
@@ -24,8 +22,6 @@ func EmptyAPISchemas() *APISchemas {
 }
 
 func (a *APISchemas) ShallowCopy() *APISchemas {
-	a.Lock()
-	defer a.Unlock()
 	result := &APISchemas{
 		InternalSchemas: a.InternalSchemas,
 		Schemas:         map[string]*APISchema{},
@@ -67,8 +63,6 @@ func (a *APISchemas) addInternalSchema(schema *schemas.Schema) *APISchema {
 }
 
 func (a *APISchemas) Import(obj interface{}) (*APISchema, error) {
-	a.Lock()
-	defer a.Unlock()
 	schema, err := a.InternalSchemas.Import(obj)
 	if err != nil {
 		return nil, err
@@ -78,8 +72,6 @@ func (a *APISchemas) Import(obj interface{}) (*APISchema, error) {
 }
 
 func (a *APISchemas) MustImportAndCustomize(obj interface{}, f func(*APISchema)) {
-	a.Lock()
-	defer a.Unlock()
 	schema, err := a.InternalSchemas.Import(obj)
 	if err != nil {
 		panic(err)
@@ -112,8 +104,6 @@ func (a *APISchemas) addToIndex(schema *APISchema) {
 }
 
 func (a *APISchemas) AddSchema(schema APISchema) error {
-	a.Lock()
-	defer a.Unlock()
 	if err := a.InternalSchemas.AddSchema(*schema.Schema); err != nil {
 		return err
 	}
@@ -124,8 +114,6 @@ func (a *APISchemas) AddSchema(schema APISchema) error {
 }
 
 func (a *APISchemas) LookupSchema(name string) *APISchema {
-	a.Lock()
-	defer a.Unlock()
 	s, ok := a.Schemas[name]
 	if ok {
 		return s

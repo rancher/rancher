@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/wrangler/pkg/data/convert"
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	kstatus "sigs.k8s.io/cli-utils/pkg/kstatus/status"
 )
 
 const (
@@ -96,12 +97,14 @@ type Summarizer func(obj data.Object, conditions []Condition, summary Summary) S
 
 func init() {
 	Summarizers = []Summarizer{
+		checkStatusSummary,
 		checkErrors,
 		checkTransitioning,
 		checkActive,
 		checkPhase,
 		checkInitializing,
 		checkRemoving,
+		checkStandard,
 		checkLoadBalancer,
 		checkPod,
 		checkPodSelector,
@@ -127,6 +130,58 @@ func checkOwner(obj data.Object, conditions []Condition, summary Summary) Summar
 		}
 
 		summary.Relationships = append(summary.Relationships, rel)
+	}
+
+	return summary
+}
+
+func checkStatusSummary(obj data.Object, conditions []Condition, summary Summary) Summary {
+	obj = obj.Map("status", "summary")
+	if len(obj) == 0 {
+		return summary
+	}
+
+	if _, ok := obj["state"]; ok {
+		summary.State = obj.String("state")
+	}
+	if _, ok := obj["transitioning"]; ok {
+		summary.Transitioning = obj.Bool("transitioning")
+	}
+	if _, ok := obj["error"]; ok {
+		summary.Error = obj.Bool("error")
+	}
+	if _, ok := obj["message"]; ok {
+		summary.Message = append(summary.Message, obj.String("message"))
+	}
+
+	return summary
+}
+
+func checkStandard(obj data.Object, conditions []Condition, summary Summary) Summary {
+	if summary.State != "" {
+		return summary
+	}
+
+	result, err := kstatus.Compute(&unstructured.Unstructured{Object: obj})
+	if err != nil {
+		return summary
+	}
+
+	switch result.Status {
+	case kstatus.InProgressStatus:
+		summary.State = "in-progress"
+		summary.Transitioning = true
+	case kstatus.FailedStatus:
+		summary.State = "failed"
+		summary.Message = append(summary.Message, result.Message)
+		summary.Error = true
+	case kstatus.CurrentStatus:
+		summary.State = "active"
+		summary.Message = append(summary.Message, result.Message)
+	case kstatus.TerminatingStatus:
+		summary.State = "removing"
+		summary.Message = append(summary.Message, result.Message)
+		summary.Transitioning = true
 	}
 
 	return summary
