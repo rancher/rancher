@@ -1,7 +1,7 @@
 # Copyright (C) 2020, Oracle and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 
-FROM container-registry.oracle.com/os/oraclelinux:8-slim
+FROM container-registry.oracle.com/os/oraclelinux:8-slim@sha256:f8326394afd5bec6260f3445b1911ecfd79b5f0fa3333036916a6779d53d9411
 RUN microdnf update && microdnf install git curl ca-certificates unzip tar && \
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
