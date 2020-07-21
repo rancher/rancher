@@ -40,7 +40,7 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.8.2
 	github.com/Azure/go-autorest/autorest/to v0.3.1-0.20191028180845-3492b2aff503
 	github.com/DataDog/zstd v1.4.5 // indirect
-	github.com/aws/aws-sdk-go v1.30.22
+	github.com/aws/aws-sdk-go v1.33.5
 	github.com/beevik/etree v1.1.0 // indirect
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
@@ -126,5 +126,6 @@ require (
 	k8s.io/kubectl v0.18.0
 	k8s.io/kubernetes v1.18.0
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
+	sigs.k8s.io/aws-iam-authenticator v0.5.1
 	sigs.k8s.io/yaml v1.2.0
 )

@@ -43,7 +43,7 @@ github.com/PuerkitoBio/purell
 github.com/PuerkitoBio/urlesc
 # github.com/aquasecurity/kube-bench v0.1.0
 github.com/aquasecurity/kube-bench/check
-# github.com/aws/aws-sdk-go v1.30.22
+# github.com/aws/aws-sdk-go v1.33.5
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/arn
 github.com/aws/aws-sdk-go/aws/awserr
@@ -184,6 +184,8 @@ github.com/go-openapi/jsonreference
 github.com/go-openapi/spec
 # github.com/go-openapi/swag v0.19.5
 github.com/go-openapi/swag
+# github.com/gofrs/flock v0.7.1
+github.com/gofrs/flock
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
@@ -1268,6 +1270,9 @@ k8s.io/utils/trace
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
+# sigs.k8s.io/aws-iam-authenticator v0.5.1
+sigs.k8s.io/aws-iam-authenticator/pkg/arn
+sigs.k8s.io/aws-iam-authenticator/pkg/token
 # sigs.k8s.io/cli-utils v0.16.0
 sigs.k8s.io/cli-utils/pkg/kstatus/status
 # sigs.k8s.io/kustomize v2.0.3+incompatible
