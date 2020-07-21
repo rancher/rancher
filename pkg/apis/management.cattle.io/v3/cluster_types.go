@@ -5,10 +5,10 @@ import (
 	"encoding/gob"
 	"strings"
 
-	rketypes "github.com/rancher/rke/types"
-
+	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -112,20 +112,21 @@ type ClusterSpecBase struct {
 
 type ClusterSpec struct {
 	ClusterSpecBase
-	DisplayName                         string              `json:"displayName" norman:"required"`
-	Description                         string              `json:"description"`
-	Internal                            bool                `json:"internal" norman:"nocreate,noupdate"`
-	K3sConfig                           *K3sConfig          `json:"k3sConfig,omitempty"`
-	Rke2Config                          *Rke2Config         `json:"rke2Config,omitempty"`
-	ImportedConfig                      *ImportedConfig     `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
-	GoogleKubernetesEngineConfig        *MapStringInterface `json:"googleKubernetesEngineConfig,omitempty"`
-	AzureKubernetesServiceConfig        *MapStringInterface `json:"azureKubernetesServiceConfig,omitempty"`
-	AmazonElasticContainerServiceConfig *MapStringInterface `json:"amazonElasticContainerServiceConfig,omitempty"`
-	GenericEngineConfig                 *MapStringInterface `json:"genericEngineConfig,omitempty"`
-	ClusterTemplateName                 string              `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate],nocreate,noupdate"`
-	ClusterTemplateRevisionName         string              `json:"clusterTemplateRevisionName,omitempty" norman:"type=reference[clusterTemplateRevision]"`
-	ClusterTemplateAnswers              Answer              `json:"answers,omitempty"`
-	ClusterTemplateQuestions            []Question          `json:"questions,omitempty" norman:"nocreate,noupdate"`
+	DisplayName                         string                      `json:"displayName" norman:"required"`
+	Description                         string                      `json:"description"`
+	Internal                            bool                        `json:"internal" norman:"nocreate,noupdate"`
+	K3sConfig                           *K3sConfig                  `json:"k3sConfig,omitempty"`
+	Rke2Config                          *Rke2Config                 `json:"rke2Config,omitempty"`
+	ImportedConfig                      *ImportedConfig             `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
+	GoogleKubernetesEngineConfig        *MapStringInterface         `json:"googleKubernetesEngineConfig,omitempty"`
+	AzureKubernetesServiceConfig        *MapStringInterface         `json:"azureKubernetesServiceConfig,omitempty"`
+	AmazonElasticContainerServiceConfig *MapStringInterface         `json:"amazonElasticContainerServiceConfig,omitempty"`
+	GenericEngineConfig                 *MapStringInterface         `json:"genericEngineConfig,omitempty"`
+	EKSConfig                           *eksv1.EKSClusterConfigSpec `json:"eksConfig,omitempty"`
+	ClusterTemplateName                 string                      `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate],nocreate,noupdate"`
+	ClusterTemplateRevisionName         string                      `json:"clusterTemplateRevisionName,omitempty" norman:"type=reference[clusterTemplateRevision]"`
+	ClusterTemplateAnswers              Answer                      `json:"answers,omitempty"`
+	ClusterTemplateQuestions            []Question                  `json:"questions,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ImportedConfig struct {
@@ -163,6 +164,7 @@ type ClusterStatus struct {
 	CertificatesExpiration               map[string]CertExpiration   `json:"certificatesExpiration,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty"`
 	CurrentCisRunName                    string                      `json:"currentCisRunName,omitempty"`
+	EKSStatus                            EKSStatus                   `json:"eksStatus,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ClusterComponentStatus struct {
@@ -335,4 +337,10 @@ type SaveAsTemplateInput struct {
 type SaveAsTemplateOutput struct {
 	ClusterTemplateName         string `json:"clusterTemplateName,omitempty"`
 	ClusterTemplateRevisionName string `json:"clusterTemplateRevisionName,omitempty"`
+}
+
+type EKSStatus struct {
+	VirtualNetwork string   `json:"virtualNetwork"`
+	Subnets        []string `json:"subnets"`
+	SecurityGroups []string `json:"securityGroups"`
 }
