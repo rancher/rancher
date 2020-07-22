@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	app2 "github.com/rancher/rancher/pkg/app"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/coreos/go-semver/semver"
-	utils2 "github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -107,7 +108,7 @@ func (h *handler) deployK3sUpgradeController(clusterName string) error {
 	_, systemProjectName := ref.Parse(systemProjectID)
 
 	nsClient := userCtx.Core.Namespaces("")
-	appProjectName, err := utils2.EnsureAppProjectName(nsClient, systemProjectName, clusterName, systemUpgradeNS, creator.Name)
+	appProjectName, err := app2.EnsureAppProjectName(nsClient, systemProjectName, clusterName, systemUpgradeNS, creator.Name)
 	if err != nil {
 		return err
 	}

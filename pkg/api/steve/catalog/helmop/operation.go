@@ -401,6 +401,9 @@ func toArgs(operation string, values map[string]interface{}, input interface{}, 
 		delete(data, "disableOpenAPIValidation")
 		data["disableOpenapiValidation"] = v
 	}
+	if operation == "install" {
+		data["createNamespace"] = true
+	}
 
 	for k, v := range data {
 		s := convert.ToString(v)

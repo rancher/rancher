@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	app2 "github.com/rancher/rancher/pkg/app"
+
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/app/utils"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
@@ -312,11 +313,11 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}
-	err = utils.DetectAppCatalogExistence(appCatalogID, csh.catalogTemplateVersionLister)
+	err = app2.DetectAppCatalogExistence(appCatalogID, csh.catalogTemplateVersionLister)
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}
-	appDeployProjectID, err := utils.GetSystemProjectID(appInfo.clusterName, csh.projectLister)
+	appDeployProjectID, err := app2.GetSystemProjectID(appInfo.clusterName, csh.projectLister)
 	if err != nil {
 		return err
 	}
@@ -325,7 +326,7 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 	if err != nil {
 		return err
 	}
-	appProjectName, err := utils.EnsureAppProjectName(csh.nsClient, appDeployProjectID, appInfo.clusterName, v32.DefaultNamespaceForCis, creator.Name)
+	appProjectName, err := app2.EnsureAppProjectName(csh.nsClient, appDeployProjectID, appInfo.clusterName, v32.DefaultNamespaceForCis, creator.Name)
 	if err != nil {
 		return err
 	}
@@ -362,7 +363,7 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 		},
 	}
 
-	_, err = utils.DeployApp(csh.appClient, appDeployProjectID, app, false)
+	_, err = app2.DeployApp(csh.appClient, appDeployProjectID, app, false)
 	if err != nil {
 		return err
 	}
@@ -394,7 +395,7 @@ func (csh *cisScanHandler) collectTaints() (map[string]string, error) {
 }
 
 func (csh *cisScanHandler) deleteApp(appInfo *appInfo) error {
-	appDeployProjectID, err := utils.GetSystemProjectID(appInfo.clusterName, csh.projectLister)
+	appDeployProjectID, err := app2.GetSystemProjectID(appInfo.clusterName, csh.projectLister)
 	if err != nil {
 		if !kerrors.IsNotFound(err) {
 			return err
@@ -402,7 +403,7 @@ func (csh *cisScanHandler) deleteApp(appInfo *appInfo) error {
 		return nil
 	}
 
-	err = utils.DeleteApp(csh.appClient, appDeployProjectID, appInfo.appName)
+	err = app2.DeleteApp(csh.appClient, appDeployProjectID, appInfo.appName)
 	if err != nil {
 		if !kerrors.IsNotFound(err) {
 			return err

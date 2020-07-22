@@ -5,10 +5,11 @@ import (
 	"reflect"
 	"strings"
 
+	app2 "github.com/rancher/rancher/pkg/app"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
-	"github.com/rancher/rancher/pkg/app/utils"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/pkg/errors"
@@ -156,7 +157,7 @@ func allOwnedProjectsMonitoringDisabling(projectClient mgmtv3.ProjectLister) (bo
 func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr error) {
 	appName, appTargetNamespace := monitoring.SystemMonitoringInfo()
 
-	appDeployProjectID, err := utils.GetSystemProjectID(cluster.Name, app.projectLister)
+	appDeployProjectID, err := app2.GetSystemProjectID(cluster.Name, app.projectLister)
 	if err != nil {
 		return errors.Wrap(err, "failed to get System Project ID")
 	}
@@ -166,7 +167,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		return err
 	}
 
-	appProjectName, err := utils.EnsureAppProjectName(app.agentNamespaceClient, appDeployProjectID, cluster.Name, appTargetNamespace, creator.Name)
+	appProjectName, err := app2.EnsureAppProjectName(app.agentNamespaceClient, appDeployProjectID, cluster.Name, appTargetNamespace, creator.Name)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure monitoring project name")
 	}
@@ -232,7 +233,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		forceRedeploy = true
 	}
 
-	_, err = utils.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp, forceRedeploy)
+	_, err = app2.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp, forceRedeploy)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure prometheus operator app")
 	}
