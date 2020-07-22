@@ -10,7 +10,7 @@ ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
 RUN rm -f /bin/sh && ln -s /bin/bash /bin/sh
 ENV KUBECTL_VERSION v1.16.8
 RUN microdnf update && \
-    microdnf install curl ca-certificates jq iproute vim less bash-completion unzip sysstat acl tar && \
+    microdnf install curl ca-certificates jq iproute vim less bash-completion unzip sysstat acl tar hostname && \
     curl -sLf ${!DOCKER_URL} > /usr/bin/docker && \
     chmod +x /usr/bin/docker && \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
