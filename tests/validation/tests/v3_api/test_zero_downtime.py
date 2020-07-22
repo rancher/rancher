@@ -98,7 +98,7 @@ def test_zdt_drain():
     nodes = client.list_node(clusterId=cluster.id).data
     assert len(upgrade_nodes) == len(nodes), "Not all Nodes Upgraded"
     for node in nodes:
-        assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver,\
+        assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver, \
             "Not all Nodes Upgraded Correctly"
 
 
@@ -203,8 +203,8 @@ def create_zdt_setup(request):
     client = get_user_client()
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
-            len(zero_node_roles), random_test_name(HOST_NAME))
-    cluster, nodes = create_custom_host_from_nodes(aws_nodes, zero_node_roles,
+            len(node_roles), random_test_name(HOST_NAME))
+    cluster, nodes = create_custom_host_from_nodes(aws_nodes, node_roles,
                                                    random_cluster_name=False,
                                                    version=preupgrade_k8s)
     p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsecret" + str(random_int(10000, 99999)))
