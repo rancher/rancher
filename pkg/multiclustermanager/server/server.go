@@ -28,15 +28,15 @@ import (
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/metrics"
+	"github.com/rancher/rancher/pkg/multiclustermanager/server/capabilities"
+	"github.com/rancher/rancher/pkg/multiclustermanager/server/ui"
+	"github.com/rancher/rancher/pkg/multiclustermanager/server/whitelist"
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/websocket"
-	"github.com/rancher/rancher/server/capabilities"
-	"github.com/rancher/rancher/server/ui"
-	"github.com/rancher/rancher/server/whitelist"
 	"github.com/rancher/steve/pkg/auth"
 )
 
