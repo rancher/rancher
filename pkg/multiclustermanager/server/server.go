@@ -116,7 +116,8 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 	root.PathPrefix("/k8s/clusters/").Handler(auditHandler)
 	root.PathPrefix("/meta").Handler(auditHandler)
 	root.PathPrefix("/v1-telemetry").Handler(auditHandler)
-	root.PathPrefix("/v1-release/release").Handler(channelserver.NewProxy(ctx))
+	root.PathPrefix("/v1-k3s-release/release").Handler(channelserver.NewProxy(ctx))
+	root.PathPrefix("/v1-rke2-release/release").Handler(channelserver.Rke2Proxy(ctx))
 	root.NotFoundHandler = ui.UI(http.NotFoundHandler())
 	root.PathPrefix("/v1-saml").Handler(samlRoot)
 
