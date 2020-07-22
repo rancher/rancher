@@ -20,7 +20,7 @@ node_ver = postupgrade_k8s.split("-")[0]
 
 
 # @pytest.mark.skip(reason="tested")
-def test_cluster_upgrade():
+def test_zdt():
     client = get_user_client()
     cluster = namespace["cluster"]
     cluster, workload, ingress = validate_cluster_and_ingress(client, cluster,
@@ -65,7 +65,7 @@ def wait_for_node_upgrade(nodes, client, workload, timeout=2000):
 
 
 # @pytest.mark.skip(reason="tested")
-def test_drain_upgrade():
+def test_zdt_drain():
     client = get_user_client()
     cluster = namespace["cluster"]
     cluster, workload, ingress = validate_cluster_and_ingress(client, cluster,
