@@ -26,9 +26,10 @@ type TesterDeployer struct {
 	systemAccountManager *systemaccount.Manager
 }
 
-func NewTesterDeployer(mgmtCtx *config.ManagementContext, appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, podLister v1.PodLister, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.CatalogTemplateLister) *TesterDeployer {
+func NewTesterDeployer(mgmtCtx *config.ManagementContext, appsGetter projectv3.AppsGetter, appLister projectv3.AppLister, projectLister mgmtv3.ProjectLister, podLister v1.PodLister, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.CatalogTemplateLister) *TesterDeployer {
 	appDeployer := &AppDeployer{
 		AppsGetter: appsGetter,
+		AppsLister: appLister,
 		Namespaces: namespaces,
 		PodLister:  podLister,
 	}
