@@ -1,4 +1,4 @@
-package k3supgrade
+package k3sbaseupgrade
 
 import (
 	"strings"
@@ -12,7 +12,10 @@ import (
 const k3sMasterPlanName = "k3s-master-plan"
 const k3sWorkerPlanName = "k3s-worker-plan"
 const systemUpgradeServiceAccount = "system-upgrade"
-const upgradeImage = "rancher/k3s-upgrade"
+const k3supgradeImage = "rancher/k3s-upgrade"
+const rke2upgradeImage = "rancher/rke2-upgrade"
+const rke2MasterPlanName = "rke2-master-plan"
+const rke2WorkerPlanName = "rke2-worker-plan"
 
 var genericPlan = planv1.Plan{
 	TypeMeta: metav1.TypeMeta{
@@ -27,16 +30,15 @@ var genericPlan = planv1.Plan{
 		Concurrency:        0,
 		ServiceAccountName: systemUpgradeServiceAccount,
 		Cordon:             true,
-		Upgrade: &planv1.ContainerSpec{
-			Image: upgradeImage,
-		},
+		Upgrade:            &planv1.ContainerSpec{},
 	},
 	Status: planv1.PlanStatus{},
 }
 
-func generateMasterPlan(version string, concurrency int, drain bool) planv1.Plan {
+func generateMasterPlan(version string, concurrency int, drain bool, upgradeImage, masterPlanName string) planv1.Plan {
 	masterPlan := genericPlan
-	masterPlan.Name = k3sMasterPlanName
+	masterPlan.Spec.Upgrade.Image = upgradeImage
+	masterPlan.Name = masterPlanName
 	masterPlan.Spec.Version = version
 	masterPlan.Spec.Concurrency = int64(concurrency)
 
@@ -59,9 +61,10 @@ func generateMasterPlan(version string, concurrency int, drain bool) planv1.Plan
 	return masterPlan
 }
 
-func generateWorkerPlan(version string, concurrency int, drain bool) planv1.Plan {
+func generateWorkerPlan(version string, concurrency int, drain bool, upgradeImage, workerPlanName, masterPlanName string) planv1.Plan {
 	workerPlan := genericPlan
-	workerPlan.Name = k3sWorkerPlanName
+	workerPlan.Spec.Upgrade.Image = upgradeImage
+	workerPlan.Name = workerPlanName
 	workerPlan.Spec.Version = version
 	workerPlan.Spec.Concurrency = int64(concurrency)
 
@@ -74,7 +77,7 @@ func generateWorkerPlan(version string, concurrency int, drain bool) planv1.Plan
 	// worker plans wait for master plans to complete
 	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
 		Image: upgradeImage + ":" + parseVersion(version),
-		Args:  []string{"prepare", k3sMasterPlanName},
+		Args:  []string{"prepare", masterPlanName},
 	}
 	// select all nodes that are not master
 	workerPlan.Spec.NodeSelector = &metav1.LabelSelector{
@@ -87,8 +90,8 @@ func generateWorkerPlan(version string, concurrency int, drain bool) planv1.Plan
 	return workerPlan
 }
 
-func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int, drain bool) planv1.Plan {
-	masterPlan.Name = k3sMasterPlanName
+func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int, drain bool, masterPlanName string) planv1.Plan {
+	masterPlan.Name = masterPlanName
 	masterPlan.Spec.Version = version
 	masterPlan.Spec.Concurrency = int64(concurrency)
 
@@ -110,8 +113,8 @@ func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int
 	return masterPlan
 }
 
-func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int, drain bool) planv1.Plan {
-	workerPlan.Name = k3sWorkerPlanName
+func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int, drain bool, upgradeImage, workerPlanName, masterPlanName string) planv1.Plan {
+	workerPlan.Name = workerPlanName
 	workerPlan.Spec.Version = version
 	workerPlan.Spec.Concurrency = int64(concurrency)
 
@@ -124,7 +127,7 @@ func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int
 	// worker plans wait for master plans to complete
 	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
 		Image: upgradeImage + ":" + parseVersion(version),
-		Args:  []string{"prepare", k3sMasterPlanName},
+		Args:  []string{"prepare", masterPlanName},
 	}
 
 	workerPlan.Spec.NodeSelector = &metav1.LabelSelector{

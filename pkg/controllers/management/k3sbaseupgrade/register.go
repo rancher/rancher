@@ -1,4 +1,4 @@
-package k3supgrade
+package k3sbaseupgrade
 
 import (
 	"context"
@@ -47,6 +47,5 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		systemAccountManager:   systemaccount.NewManager(mgmtCtx),
 		manager:                manager,
 	}
-
-	wContext.Mgmt.Cluster().OnChange(ctx, "k3s-upgrade-controller", h.onClusterChange)
+	wContext.Mgmt.Cluster().OnChange(ctx, "k3sbase-upgrade-controller", h.onClusterChange)
 }

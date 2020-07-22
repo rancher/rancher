@@ -1,4 +1,4 @@
-package k3supgrade
+package k3sbaseupgrade
 
 import (
 	"testing"
