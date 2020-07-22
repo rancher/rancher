@@ -38,12 +38,21 @@ var (
 	fluentdCommand      = "fluentd -q --dry-run -i "
 	cleanCertDirCommand = "rm -rf "
 	tmpCertDirPrefix    = "/fluentd/etc/config/tmpCert"
+	/* Default configuration <match fluent.*> in old version rancher/fluentd is deprecated,
+	append the latest configuration to avoid the warning from old version rancher/fluentd. */
+	fluentdLabelConfig = `
+<label @FLUENT_LOG>
+    <match fluent.*>
+      	@type null
+    </match>
+</label>`
 )
 
 type Handler struct {
 	clusterManager       *clustermanager.Manager
 	dialerFactory        dialer.Factory
 	appsGetter           projectv3.AppsGetter
+	appLister            projectv3.AppLister
 	projectLister        mgmtv3.ProjectLister
 	templateLister       mgmtv3.CatalogTemplateLister
 	projectLoggingLister mgmtv3.ProjectLoggingLister
@@ -54,6 +63,7 @@ func NewHandler(management *config.ScaledContext, clusterManager *clustermanager
 		clusterManager:       clusterManager,
 		dialerFactory:        management.Dialer,
 		appsGetter:           management.Project,
+		appLister:            management.Project.Apps("").Controller().Lister(),
 		projectLister:        management.Management.Projects("").Controller().Lister(),
 		templateLister:       management.Management.CatalogTemplates("").Controller().Lister(),
 		projectLoggingLister: management.Management.ProjectLoggings("").Controller().Lister(),
@@ -166,9 +176,9 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 		return err
 	}
 
-	podLister := context.Core.Pods(loggingconfig.LoggingNamespace).Controller().Lister()
+	podLister := context.Core.Pods(metav1.NamespaceAll).Controller().Lister()
 	namespaces := context.Core.Namespaces(metav1.NamespaceAll)
-	testerDeployer := deployer.NewTesterDeployer(context.Management, h.appsGetter, h.projectLister, podLister, h.projectLoggingLister, namespaces, h.templateLister)
+	testerDeployer := deployer.NewTesterDeployer(context.Management, h.appsGetter, h.appLister, h.projectLister, podLister, h.projectLoggingLister, namespaces, h.templateLister)
 	configGenerator := configsyncer.NewConfigGenerator(metav1.NamespaceAll, h.projectLoggingLister, namespaces.Controller().Lister())
 
 	var dryRunConfigBuf []byte
@@ -205,6 +215,8 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 		certificate, clientCert, clientKey = configsyncer.GetSSLConfig(new.Spec.LoggingTargets)
 		certScretKeyName = strings.Replace(projectID, ":", "_", -1)
 	}
+
+	dryRunConfigBuf = append(dryRunConfigBuf, []byte(fluentdLabelConfig)...)
 
 	certificatePath = addCertPrefixPath(tmpCertDir, loggingconfig.SecretDataKeyCa(level, certScretKeyName))
 	clientCertPath = addCertPrefixPath(tmpCertDir, loggingconfig.SecretDataKeyCert(level, certScretKeyName))
