@@ -4,7 +4,7 @@ import (
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 type APIServiceLifecycle interface {

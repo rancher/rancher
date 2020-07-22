@@ -3,7 +3,7 @@ package v1
 import (
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
-	v1 "k8s.io/api/storage/v1"
+	"k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

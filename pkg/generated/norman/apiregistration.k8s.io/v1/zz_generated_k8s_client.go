@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 type Interface interface {
