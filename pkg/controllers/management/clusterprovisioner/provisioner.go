@@ -314,7 +314,7 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	if err != nil {
 		return cluster, err
 	}
-	err = k3sClusterConfig(cluster, nodes)
+	err = k3sBaseClusterConfig(cluster, nodes)
 	if err != nil {
 		return cluster, err
 	}
@@ -671,7 +671,8 @@ func skipLocalK3sImported(cluster *v32.Cluster) bool {
 	return cluster.Status.Driver == v32.ClusterDriverLocal ||
 		cluster.Status.Driver == v32.ClusterDriverImported ||
 		cluster.Status.Driver == v32.ClusterDriverK3s ||
-		cluster.Status.Driver == v32.ClusterDriverK3os
+		cluster.Status.Driver == v32.ClusterDriverK3os ||
+		cluster.Status.Driver == v32.ClusterDriverRke2
 }
 
 func (p *Provisioner) getConfig(reconcileRKE bool, spec v32.ClusterSpec, driverName, clusterName string) (*v32.ClusterSpec, interface{}, error) {
@@ -984,7 +985,7 @@ func GetBackupFilename(backup *v3.EtcdBackup) string {
 }
 
 // transform an imported cluster into a k3s or k3os cluster using its discovered version
-func k3sClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
+func k3sBaseClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 	// version is not found until cluster is provisioned
 	if cluster.Status.Driver == "" || cluster.Status.Version == nil || len(nodes) == 0 {
 		return &controller.ForgetError{
@@ -992,7 +993,8 @@ func k3sClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 			Reason: "Pending"}
 	}
 	if cluster.Status.Driver == v32.ClusterDriverK3s ||
-		cluster.Status.Driver == v32.ClusterDriverK3os {
+		cluster.Status.Driver == v32.ClusterDriverK3os ||
+		cluster.Status.Driver == v32.ClusterDriverRke2 {
 		return nil //no-op
 	}
 
@@ -1008,15 +1010,26 @@ func k3sClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 		}
 		// only set these values on init
 		if cluster.Spec.K3sConfig == nil {
-			cluster.Spec.K3sConfig = &v32.K3sConfig{
-				Version: cluster.Status.Version.String(),
-				K3sUpgradeStrategy: v32.K3sUpgradeStrategy{
-					ServerConcurrency: 1,
-					WorkerConcurrency: 1,
-				},
-			}
+			cluster.Spec.K3sConfig = &v32.K3sConfig{}
+			setTypeConfig(cluster.Spec.K3sConfig, cluster.Status.Version.String())
+		}
+	} else if strings.Contains(cluster.Status.Version.String(), "rke2") {
+		cluster.Status.Driver = v32.ClusterDriverRke2
+		if cluster.Spec.Rke2Config == nil {
+			cluster.Spec.Rke2Config = &v32.Rke2Config{}
+			setTypeConfig(cluster.Spec.Rke2Config, cluster.Status.Version.String())
 		}
 	}
-
 	return nil
+}
+
+func setTypeConfig(config interface{}, version string) {
+	switch c := config.(type) {
+	case *v32.K3sConfig:
+		c.Version = version
+		c.SetStrategy(1, 1)
+	case *v32.Rke2Config:
+		c.Version = version
+		c.SetStrategy(1, 1)
+	}
 }
