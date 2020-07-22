@@ -17,7 +17,7 @@ var (
 			JenkinsJnlp:   m("jenkins/jnlp-slave:3.35-4"),
 			AlpineGit:     m("rancher/pipeline-tools:v0.1.14"),
 			PluginsDocker: m("plugins/docker:18.09"),
-			Minio:         m("minio/minio:RELEASE.2019-09-25T18-25-51Z"),
+			Minio:         m("minio/minio:RELEASE.2020-07-13T18-09-56Z"),
 			Registry:      m("registry:2"),
 			RegistryProxy: m("rancher/pipeline-tools:v0.1.14"),
 			KubeApply:     m("rancher/pipeline-tools:v0.1.14"),
