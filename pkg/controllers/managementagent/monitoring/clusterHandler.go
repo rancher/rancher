@@ -7,11 +7,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-
-	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/app/utils"
+	app2 "github.com/rancher/rancher/pkg/app"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -166,12 +165,12 @@ func (ch *clusterHandler) ensureAppProjectName(clusterID, appTargetNamespace str
 		return "", err
 	}
 
-	appDeployProjectID, err := utils.GetSystemProjectID(clusterID, ch.app.projectLister)
+	appDeployProjectID, err := app2.GetSystemProjectID(clusterID, ch.app.projectLister)
 	if err != nil {
 		return "", err
 	}
 
-	appProjectName, err := utils.EnsureAppProjectName(ch.app.agentNamespaceClient, appDeployProjectID, clusterID, appTargetNamespace, creator.Name)
+	appProjectName, err := app2.EnsureAppProjectName(ch.app.agentNamespaceClient, appDeployProjectID, clusterID, appTargetNamespace, creator.Name)
 	if err != nil {
 		return "", err
 	}
@@ -433,7 +432,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		forceRedeploy = true
 	}
 
-	_, err = utils.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app, forceRedeploy)
+	_, err = app2.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app, forceRedeploy)
 	if err != nil {
 		return nil, err
 	}

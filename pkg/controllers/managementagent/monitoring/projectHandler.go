@@ -5,11 +5,13 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/rancher/rancher/pkg/app"
+	app2 "github.com/rancher/rancher/pkg/app"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/app/utils"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
@@ -140,7 +142,7 @@ func (ph *projectHandler) ensureAppProjectName(appTargetNamespace string, projec
 		return "", err
 	}
 
-	appProjectName, err := utils.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace, creator.Name)
+	appProjectName, err := app.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace, creator.Name)
 	if err != nil {
 		return "", err
 	}
@@ -235,7 +237,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	deployed, err := utils.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app, false)
+	deployed, err := app2.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app, false)
 	if err != nil {
 		return err
 	}

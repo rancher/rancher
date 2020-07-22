@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rancher/rancher/pkg/app"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
-	"github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	rcorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -77,7 +78,7 @@ func getUserSkipConfigMapName() string {
 }
 
 func createSecurityScanNamespace(nsClient rcorev1.NamespaceInterface, projectLister v3.ProjectLister, clusterName string) error {
-	systemProjectID, err := utils.GetSystemProjectID(clusterName, projectLister)
+	systemProjectID, err := app.GetSystemProjectID(clusterName, projectLister)
 	if err != nil {
 		return err
 	}
