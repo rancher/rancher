@@ -28,7 +28,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	}
 	isK3s := cluster.Status.Driver == v32.ClusterDriverK3s
 	isRke2 := cluster.Status.Driver == v32.ClusterDriverRke2
-	// only applies to k3s clusters
+	// only applies to k3s/rke2 clusters
 	if !isK3s && !isRke2 {
 		return cluster, nil
 	}
