@@ -12,6 +12,7 @@ DEBUG = os.environ.get('DEBUG', 'false')
 
 DEFAULT_CONFIG_NAME = 'cluster.yml'
 DEFAULT_NETWORK_PLUGIN = os.environ.get('DEFAULT_NETWORK_PLUGIN', 'canal')
+K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 
 
 class RKEClient(object):
@@ -54,7 +55,9 @@ class RKEClient(object):
         """
         render_dict = {
             'master_ssh_key_path': self.master_ssh_key_path,
-            'network_plugin': DEFAULT_NETWORK_PLUGIN}
+            'network_plugin': DEFAULT_NETWORK_PLUGIN,
+            'k8s_version': K8S_VERSION
+        }
         render_dict.update(kwargs)  # will up master_key if passed in
         node_index = 0
         for node in nodes:

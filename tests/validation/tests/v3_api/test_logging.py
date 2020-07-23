@@ -8,6 +8,7 @@ from .common import create_project_and_ns
 from .common import get_project_client_for_token
 from .common import create_kubeconfig
 from .common import wait_for_app_to_active
+from .common import wait_for_app_to_remove
 from .common import CATTLE_TEST_URL
 from .common import USER_TOKEN
 
@@ -31,7 +32,7 @@ CATTLE_ClUSTER_LOGGING_FLUENTD_TEST = \
     CATTLE_TEST_URL + "/v3/clusterloggings?action=test"
 CATTLE_PROJECT_LOGGING_FLUENTD_TEST = \
     CATTLE_TEST_URL + "/v3/projectloggings?action=test"
-FLUENTD_AGGREGATOR_CATALOG_ID = "catalog://?catalog=library&template=fluentd-aggregator&version=0.3.0"
+FLUENTD_AGGREGATOR_CATALOG_ID = "catalog://?catalog=library&template=fluentd-aggregator&version=0.3.1"
 
 
 def test_send_log_to_fluentd(setup_fluentd_aggregator):
@@ -253,6 +254,8 @@ def create_cluster_logging(config):
 def delete_cluster_logging(cluster_logging):
     admin_client = namespace["admin_client"]
     admin_client.delete(cluster_logging)
+    sys_p_client = namespace["sys_p_client"]
+    wait_for_app_to_remove(sys_p_client, fluentd_app_name)
 
 
 def create_project_logging(config):
@@ -268,6 +271,8 @@ def create_project_logging(config):
 def delete_project_logging(project_logging):
     admin_client = namespace["admin_client"]
     admin_client.delete(project_logging)
+    sys_p_client = namespace["sys_p_client"]
+    wait_for_app_to_remove(sys_p_client, fluentd_app_name)
 
 
 @pytest.fixture(scope='module', autouse="True")

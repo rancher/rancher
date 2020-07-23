@@ -1,3 +1,5 @@
+from .test_auth import enable_ad, load_setup_data, enable_openldap, \
+    OPENLDAP_AUTH_USER_PASSWORD, enable_freeipa, FREEIPA_AUTH_USER_PASSWORD
 from .common import *  # NOQA
 import ast
 
@@ -17,17 +19,22 @@ KEYPAIR_NAME_PREFIX = os.environ.get('RANCHER_KEYPAIR_NAME_PREFIX', "")
 RANCHER_CLUSTER_NAME = os.environ.get('RANCHER_CLUSTER_NAME', "")
 RANCHER_ELASTIC_SEARCH_ENDPOINT = os.environ.get(
     'RANCHER_ELASTIC_SEARCH_ENDPOINT', "")
+K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 
 
 def test_add_custom_host():
     aws_nodes = AmazonWebServices().create_multiple_nodes(
-        HOST_COUNT, random_test_name("testsa"+HOST_NAME))
+        HOST_COUNT, random_test_name("testsa" + HOST_NAME))
     if AGENT_REG_CMD != "":
         for aws_node in aws_nodes:
             additional_options = " --address " + aws_node.public_ip_address + \
                                  " --internal-address " + \
                                  aws_node.private_ip_address
-            agent_cmd = AGENT_REG_CMD + additional_options
+            if 'Administrator' == aws_node.ssh_user:
+                agent_cmd_temp = AGENT_REG_CMD.replace('| iex', ' ' + additional_options + ' | iex ')
+                agent_cmd = agent_cmd_temp + additional_options
+            else:
+                agent_cmd = AGENT_REG_CMD + additional_options
             aws_node.execute_command(agent_cmd)
             print("Nodes: " + aws_node.public_ip_address)
 
@@ -43,7 +50,7 @@ def test_deploy_rancher_server():
         'rancher/rancher'
     RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION
     aws_nodes = AmazonWebServices().create_multiple_nodes(
-        1, random_test_name("testsa"+HOST_NAME))
+        1, random_test_name("testsa" + HOST_NAME))
     aws_nodes[0].execute_command(RANCHER_SERVER_CMD)
     time.sleep(120)
     RANCHER_SERVER_URL = "https://" + aws_nodes[0].public_ip_address
@@ -57,9 +64,41 @@ def test_deploy_rancher_server():
     token = set_url_password_token(RANCHER_SERVER_URL)
     admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                   token=token, verify=False)
-    AUTH_URL = \
-        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
-    user, user_token = create_user(admin_client, AUTH_URL)
+    enable_url = \
+        RANCHER_SERVER_URL + "/v3/" + AUTH_PROVIDER + \
+        "Configs/" + AUTH_PROVIDER.lower() + "?action=testAndApply"
+    auth_admin_user = load_setup_data()["admin_user"]
+    auth_user_login_url = \
+        RANCHER_SERVER_URL + "/v3-public/" + AUTH_PROVIDER + "Providers/" \
+        + AUTH_PROVIDER.lower() + "?action=login"
+
+    if AUTH_PROVIDER == "activeDirectory":
+
+        enable_ad(auth_admin_user, token, enable_url=enable_url,
+                  password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
+        user_token = login_as_auth_user(load_setup_data()["standard_user"],
+                                        AUTH_USER_PASSWORD,
+                                        login_url=auth_user_login_url)["token"]
+    elif AUTH_PROVIDER == "openLdap":
+
+        enable_openldap(auth_admin_user, token, enable_url=enable_url,
+                        password=OPENLDAP_AUTH_USER_PASSWORD,
+                        nested=NESTED_GROUP_ENABLED)
+        user_token = login_as_auth_user(load_setup_data()["standard_user"],
+                                        OPENLDAP_AUTH_USER_PASSWORD,
+                                        login_url=auth_user_login_url)["token"]
+    elif AUTH_PROVIDER == "freeIpa":
+
+        enable_freeipa(auth_admin_user, token, enable_url=enable_url,
+                       password=FREEIPA_AUTH_USER_PASSWORD,
+                       nested=NESTED_GROUP_ENABLED)
+        user_token = login_as_auth_user(load_setup_data()["standard_user"],
+                                        FREEIPA_AUTH_USER_PASSWORD,
+                                        login_url=auth_user_login_url)["token"]
+    else:
+        AUTH_URL = \
+            RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
+        user, user_token = create_user(admin_client, AUTH_URL)
 
     env_details = "env.CATTLE_TEST_URL='" + RANCHER_SERVER_URL + "'\n"
     env_details += "env.ADMIN_TOKEN='" + token + "'\n"
@@ -71,8 +110,12 @@ def test_deploy_rancher_server():
                 5, random_test_name("testcustom"))
         node_roles = [["controlplane"], ["etcd"],
                       ["worker"], ["worker"], ["worker"]]
-        client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
+        client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                 token=user_token, verify=False)
+        if K8S_VERSION != "":
+            rke_config["kubernetesVersion"] = K8S_VERSION
+        print("the rke config for creating the cluster:")
+        print(rke_config)
         cluster = client.create_cluster(
             name=random_name(),
             driver="rancherKubernetesEngine",
@@ -91,7 +134,7 @@ def test_deploy_rancher_server():
 
 
 def test_delete_rancher_server():
-    client = get_user_client()
+    client = get_admin_client()
     clusters = client.list_cluster().data
     for cluster in clusters:
         delete_cluster(client, cluster)

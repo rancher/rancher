@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-v1
+  labels:
+    app: nginx
+    version: v1
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: v1
+      annotations:
+        sidecar.istio.io/proxyImage: "rancher/istio-proxyv2:1.4.3"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
