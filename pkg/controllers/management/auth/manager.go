@@ -758,6 +758,15 @@ func (m *manager) checkReferencedRoles(roleTemplateName string) (bool, error) {
 		return false, err
 	}
 
+	// upon upgrades, crtb/prtbs are reconciled before roletemplates.
+	// So these roles won't have the "own" verb at the time of this check added 2.4.6 onwards
+	if roleTemplate.Builtin && roleTemplate.Context == "project" && roleTemplateName == "project-owner" {
+		return true, nil
+	}
+	if roleTemplate.Builtin && roleTemplate.Context == "cluster" && roleTemplateName == "cluster-owner" {
+		return true, nil
+	}
+
 	for _, rule := range roleTemplate.Rules {
 		if slice.ContainsString(rule.Resources, projectResource) || slice.ContainsString(rule.Resources, clusterResource) {
 			if slice.ContainsString(rule.Verbs, "own") {
