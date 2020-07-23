@@ -84,21 +84,21 @@ def test_zdt_drain():
     )
     node_ver = postupgrade_k8s.split("-")[0]
     max_unavailable = 1
-    upgrade_nodes = []
+    upgrade_nodes = set()
     etcd_nodes = get_etcd_nodes(cluster, client)
     cp_nodes = get_cp_nodes(cluster, client)
     worker_nodes = get_worker_nodes(cluster, client)
     cp_nodes = validate_node_cordon(cp_nodes, workload)
     for upgraded in cp_nodes:
-        upgrade_nodes.append(upgraded)
+        upgrade_nodes.append(upgraded.uuid)
     etcd_nodes = validate_node_cordon(etcd_nodes, workload)
     for upgraded in etcd_nodes:
-        upgrade_nodes.append(upgraded)
+        upgrade_nodes.append(upgraded.uuid)
     upgrade_nodes.append(etcd_nodes)
     worker_nodes = validate_node_drain(worker_nodes, workload, 600,
                                        max_unavailable)
     for upgraded in worker_nodes:
-        upgrade_nodes.append(upgraded)
+        upgrade_nodes.append(upgraded.uuid)
     nodes = client.list_node(clusterId=cluster.id).data
     assert len(upgrade_nodes) == len(nodes), "Not all Nodes Upgraded"
     for node in nodes:
