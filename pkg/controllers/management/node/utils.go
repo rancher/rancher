@@ -2,6 +2,7 @@ package node
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -37,6 +38,7 @@ const (
 	nodeDirEnvKey     = "MACHINE_STORAGE_PATH="
 	nodeCmd           = "rancher-machine"
 	ec2TagFlag        = "tags"
+	defaultCmdTimeout = 30 * time.Minute
 )
 
 func buildAgentCommand(node *v3.Node, dockerRun string) []string {
@@ -108,21 +110,23 @@ func mapToSlice(m map[string]string) []string {
 	return ret
 }
 
-func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, error) {
+func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, context.CancelFunc, error) {
 	// In dev_mode, don't need jail or reference to jail in command
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
 		env := initEnviron(nodeDir)
-		command := exec.Command(nodeCmd, cmdArgs...)
+		ctx, cancel := context.WithTimeout(context.Background(), getTimeout())
+		command := exec.CommandContext(ctx, nodeCmd, cmdArgs...)
 		command.Env = env
-		return command, nil
+		return command, cancel, nil
 	}
 
 	cred, err := jailer.GetUserCred()
 	if err != nil {
-		return nil, errors.WithMessage(err, "get user cred error")
+		return nil, nil, errors.WithMessage(err, "get user cred error")
 	}
 
-	command := exec.Command(nodeCmd, cmdArgs...)
+	ctx, cancel := context.WithTimeout(context.Background(), getTimeout())
+	command := exec.CommandContext(ctx, nodeCmd, cmdArgs...)
 	command.SysProcAttr = &syscall.SysProcAttr{}
 	command.SysProcAttr.Credential = cred
 	command.SysProcAttr.Chroot = path.Join(jailer.BaseJailPath, node.Namespace)
@@ -131,7 +135,7 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, e
 		"PATH=/usr/bin:/var/lib/rancher/management-state/bin",
 	}
 	command.Env = jailer.WhitelistEnvvars(envvars)
-	return command, nil
+	return command, cancel, nil
 }
 
 func initEnviron(nodeDir string) []string {
@@ -227,10 +231,11 @@ func filterDockerMessage(msg string, node *v3.Node) (string, error) {
 }
 
 func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
-	command, err := buildCommand(nodeDir, node, []string{"ls", "-q"})
+	command, cancel, err := buildCommand(nodeDir, node, []string{"ls", "-q"})
 	if err != nil {
 		return false, err
 	}
+	defer cancel()
 
 	r, err := command.StdoutPipe()
 	if err != nil {
@@ -261,10 +266,11 @@ func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
 }
 
 func deleteNode(nodeDir string, node *v3.Node) error {
-	command, err := buildCommand(nodeDir, node, []string{"rm", "-f", node.Spec.RequestedHostname})
+	command, cancel, err := buildCommand(nodeDir, node, []string{"rm", "-f", node.Spec.RequestedHostname})
 	if err != nil {
 		return err
 	}
+	defer cancel()
 	stdoutReader, stderrReader, err := startReturnOutput(command)
 	if err != nil {
 		return err
@@ -321,4 +327,16 @@ func setEc2ClusterIDTag(data interface{}, clusterID string) {
 			m[ec2TagFlag] = convert.ToString(tags) + "," + tagValue
 		}
 	}
+}
+
+func getTimeout() time.Duration {
+	timeout := defaultCmdTimeout
+	timeoutStr := os.Getenv("CATTLE_CMD_TIMEOUT")
+	if timeoutStr != "" {
+		newTimeout, err := time.ParseDuration(timeoutStr)
+		if err == nil {
+			timeout = newTimeout
+		}
+	}
+	return timeout
 }
