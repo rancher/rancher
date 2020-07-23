@@ -75,6 +75,7 @@ const (
 	ClusterDriverK3s      = "k3s"
 	ClusterDriverK3os     = "k3os"
 	ClusterDriverRke2     = "rke2"
+	ClusterDriverEKS      = "EKS"
 )
 
 // +genclient

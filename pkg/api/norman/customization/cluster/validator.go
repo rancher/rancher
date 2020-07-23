@@ -67,6 +67,11 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	if err := v.validateGenericEngineConfig(request, &clusterSpec); err != nil {
 		return err
 	}
+
+	if err := v.validateEKSConfig(request, &clusterSpec); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -322,6 +327,47 @@ func (v *Validator) validateGenericEngineConfig(request *types.APIContext, spec 
 
 	return nil
 
+}
+
+func (v *Validator) validateEKSConfig(request *types.APIContext, spec *v32.ClusterSpec) error {
+	if spec.EKSConfig == nil {
+		return nil
+	}
+
+	var accessCred mgmtclient.CloudCredential
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, spec.EKSConfig.AmazonCredentialSecret, &accessCred); err != nil {
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
+				return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("cloud credential not found"))
+			}
+		}
+		return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("error accessing cloud credential"))
+	}
+
+	isNewImported := request.Method == http.MethodPost && spec.EKSConfig.Imported
+	if !isNewImported && len(spec.EKSConfig.NodeGroups) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node group"))
+	}
+
+	for _, ng := range spec.EKSConfig.NodeGroups {
+		if ng.NodegroupName == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("nodegroupName cannot be an empty string"))
+		}
+	}
+
+	if request.Method != http.MethodPost {
+		return nil
+	}
+
+	allNetworkingFields := len(spec.EKSConfig.Subnets) == 0 && len(spec.EKSConfig.SecurityGroups) == 0
+	noNetworkingFields := len(spec.EKSConfig.Subnets) != 0 && len(spec.EKSConfig.SecurityGroups) != 0
+
+	if !(allNetworkingFields || noNetworkingFields) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			"must provide both networking fields (subnets, securityGroups) or neither")
+	}
+
+	return nil
 }
 
 func validateEKS(prevCluster, newCluster map[string]interface{}) error {
