@@ -89,12 +89,16 @@ def test_zdt_drain():
     cp_nodes = get_cp_nodes(cluster, client)
     worker_nodes = get_worker_nodes(cluster, client)
     cp_nodes = validate_node_cordon(cp_nodes, workload)
-    upgrade_nodes.append(cp_nodes)
+    for upgraded in cp_nodes:
+        upgrade_nodes.append(upgraded)
     etcd_nodes = validate_node_cordon(etcd_nodes, workload)
+    for upgraded in etcd_nodes:
+        upgrade_nodes.append(upgraded)
     upgrade_nodes.append(etcd_nodes)
     worker_nodes = validate_node_drain(worker_nodes, workload, 600,
                                        max_unavailable)
-    upgrade_nodes.append(worker_nodes)
+    for upgraded in worker_nodes:
+        upgrade_nodes.append(upgraded)
     nodes = client.list_node(clusterId=cluster.id).data
     assert len(upgrade_nodes) == len(nodes), "Not all Nodes Upgraded"
     for node in nodes:
