@@ -2,10 +2,12 @@ package transform
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"golang.org/x/sync/errgroup"
 )
 
 type TransformerFunc func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error)
@@ -77,15 +79,28 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 		return data, nil
 	}
 
-	var result []map[string]interface{}
+	var (
+		eg     errgroup.Group
+		m      sync.Mutex
+		result []map[string]interface{}
+	)
+
 	for _, item := range data {
-		item, err := s.Transformer(apiContext, schema, item, opt)
-		if err != nil {
-			return nil, err
-		}
-		if item != nil {
-			result = append(result, item)
-		}
+		itemCopy := item
+		eg.Go(func() error {
+			val, err := s.Transformer(apiContext, schema, itemCopy, opt)
+			if err != nil {
+				return err
+			}
+			m.Lock()
+			result = append(result, val)
+			m.Unlock()
+			return nil
+		})
+	}
+	err = eg.Wait()
+	if err != nil {
+		return nil, err
 	}
 
 	return result, nil
