@@ -73,13 +73,14 @@ func (d *nodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) 
 		return nil, nil
 	}
 
-	nodeMapLock.Lock()
-	defer nodeMapLock.Unlock()
-
 	if obj.Spec.DesiredNodeUnschedulable == "drain" {
+		nodeMapLock.Lock()
 		if _, ok := d.nodesToContext[obj.Name]; ok {
+			nodeMapLock.Unlock()
 			return nil, nil
 		}
+		nodeMapLock.Unlock()
+
 		node, err := nodehelper.GetNodeForMachine(obj, d.nodeLister)
 		if err != nil {
 			return nil, err
@@ -88,11 +89,18 @@ func (d *nodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) 
 			return nil, fmt.Errorf("nodeDrain: error finding node [%s]", obj.Spec.RequestedHostname)
 		}
 		ctx, cancel := context.WithCancel(d.ctx)
+
+		nodeMapLock.Lock()
 		d.nodesToContext[obj.Name] = cancel
+		nodeMapLock.Unlock()
+
 		go d.drain(ctx, obj, node.Name, cancel)
 
 	} else if obj.Spec.DesiredNodeUnschedulable == "stopDrain" {
+		nodeMapLock.Lock()
 		cancelFunc, ok := d.nodesToContext[obj.Name]
+		nodeMapLock.Unlock()
+
 		if ok {
 			cancelFunc()
 		}
