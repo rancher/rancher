@@ -131,12 +131,11 @@ def validate_node_drain(nodes, workload, timeout=600, max_unavailable=1):
     upgrade_nodes = set()
     in_state = set()
     while len(upgrade_nodes) != len(nodes):
-        node = client.reload(node)
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for worker nodes to upgrade")
-        validate_ingress(namespace["p_client"], namespace["cluster"], [workload], host, path)
         for node in nodes:
+            node = client.reload(node)
             node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
             if node.state == "draining" or node.state == "drained":
                 in_state.add(node.uuid)
@@ -147,6 +146,7 @@ def validate_node_drain(nodes, workload, timeout=600, max_unavailable=1):
             if node.state == "draining":
                 unavailable.add(node.uuid)
         assert len(unavailable) <= max_unavailable, "Too many nodes unavailable"
+        validate_ingress(namespace["p_client"], namespace["cluster"], [workload], host, path)
         time.sleep(.1)
     assert len(in_state) == len(nodes)
     assert len(upgrade_nodes) == len(nodes)
@@ -192,8 +192,7 @@ def validate_cluster_and_ingress(client, cluster, intermediate_state="provisioni
 @pytest.fixture(scope='function', autouse="True")
 def create_zdt_setup(request):
     preupgrade_k8s = default_k8s_versions[0]
-    zero_node_roles = [["etcd"], ["etcd"], ["controlplane"], ["controlplane"],
-                       ["etcd"], ["worker"], ["worker"]]
+    zero_node_roles = [["etcd"], ["controlplane"], ["controlplane"], ["worker"], ["worker"]]
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"]]
     client = get_user_client()
