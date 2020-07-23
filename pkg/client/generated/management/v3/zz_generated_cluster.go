@@ -55,6 +55,7 @@ const (
 	ClusterFieldRancherKubernetesEngineConfig        = "rancherKubernetesEngineConfig"
 	ClusterFieldRemoved                              = "removed"
 	ClusterFieldRequested                            = "requested"
+	ClusterFieldRke2Config                           = "rke2Config"
 	ClusterFieldScheduledClusterScan                 = "scheduledClusterScan"
 	ClusterFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
 	ClusterFieldState                                = "state"
@@ -116,6 +117,7 @@ type Cluster struct {
 	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
 	Removed                              string                         `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested                            map[string]string              `json:"requested,omitempty" yaml:"requested,omitempty"`
+	Rke2Config                           *Rke2Config                    `json:"rke2Config,omitempty" yaml:"rke2Config,omitempty"`
 	ScheduledClusterScan                 *ScheduledClusterScan          `json:"scheduledClusterScan,omitempty" yaml:"scheduledClusterScan,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus    `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
 	State                                string                         `json:"state,omitempty" yaml:"state,omitempty"`
