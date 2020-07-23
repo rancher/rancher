@@ -91,48 +91,63 @@ def test_cmap_edit_single_ns():
         p_client, configmap, ns, updatedconfigmapdata)
 
 
-@if_test_rbac
-def test_rbac_cmap_cluster_owner_create(remove_resource):
+# Cluster member is not added in the role list below as this role does not
+# have access to the rbac created project and he has to create his own project
 
-    """
-    Verify cluster owner can create config map and deploy workload using
-    config map
-    """
-    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
-    project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-owner"))
+rbac_role_list = [
+    (CLUSTER_OWNER),
+    (PROJECT_OWNER),
+    (PROJECT_MEMBER),
+]
+
+
+@if_test_rbac
+@pytest.mark.parametrize("role", rbac_role_list)
+def test_rbac_cmap_create(role):
+    user_token = rbac_get_user_token_by_role(role)
+    project = rbac_get_project()
+    ns = rbac_get_namespace()
     p_client = get_project_client_for_token(project, user_token)
     rbac_configmap_create(p_client, ns)
-    remove_resource(project)
 
 
 @if_test_rbac
-def test_rbac_cmap_cluster_owner_edit(remove_resource):
-    """
-    Verify cluster owner can create config map and deploy workload using
-    config map
-    """
-    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
-    project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-owner"))
+@pytest.mark.parametrize("role", rbac_role_list)
+def test_rbac_cmap_edit(role):
+    user_token = rbac_get_user_token_by_role(role)
+    project = rbac_get_project()
+    ns = rbac_get_namespace()
     p_client = get_project_client_for_token(project, user_token)
     rbac_configmap_edit(p_client, ns)
-    remove_resource(project)
 
 
 @if_test_rbac
-def test_rbac_cmap_cluster_owner_delete(remove_resource):
-
-    """
-    Verify cluster owner can create config map and deploy workload using
-    config map
-    """
-    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
-    project, ns = create_project_and_ns(user_token, namespace["cluster"],
-                                        random_test_name("rbac-cluster-owner"))
+@pytest.mark.parametrize("role", rbac_role_list)
+def test_rbac_cmap_delete(role):
+    user_token = rbac_get_user_token_by_role(role)
+    project = rbac_get_project()
+    ns = rbac_get_namespace()
     p_client = get_project_client_for_token(project, user_token)
     rbac_configmap_delete(p_client, ns)
-    remove_resource(project)
+
+
+@if_test_rbac
+@pytest.mark.parametrize("role", rbac_role_list)
+def test_rbac_cmap_list(remove_resource, role):
+    cluster_owner_token = rbac_get_user_token_by_role(role)
+    project = rbac_get_project()
+    ns = rbac_get_namespace()
+    cluster_owner_p_client = get_project_client_for_token(project,
+                                                          cluster_owner_token)
+    configmap = rbac_configmap_create(cluster_owner_p_client, ns)
+    cmapname = configmap["name"]
+    cmapdict = cluster_owner_p_client.list_configMap(name=cmapname)
+    print(cmapdict)
+    assert cmapdict.resourceType == "configMap"
+    configmapdata = cmapdict.get('data')
+    assert len(configmapdata) == 1
+    assert configmapdata[0].name == cmapname
+    remove_resource(configmap)
 
 
 @if_test_rbac
@@ -168,6 +183,26 @@ def test_rbac_cmap_cluster_member_edit(remove_resource):
 
 
 @if_test_rbac
+def test_rbac_cmap_cluster_member_list(remove_resource):
+
+    user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
+    project, ns = create_project_and_ns(user_token, namespace["cluster"],
+                                        random_test_name("rbac-cluster-mem"))
+    p_client = get_project_client_for_token(project, user_token)
+    configmap = rbac_configmap_create(p_client, ns)
+    cmapname = configmap["name"]
+    print(cmapname)
+    cmapdict = p_client.list_configMap(name=cmapname)
+    print(cmapdict)
+    assert cmapdict.resourceType == "configMap"
+    configmapdata = cmapdict.get('data')
+    assert len(configmapdata) == 1
+    assert configmapdata[0].name == cmapname
+    remove_resource(project)
+    remove_resource(configmap)
+
+
+@if_test_rbac
 def test_rbac_cmap_cluster_member_delete(remove_resource):
 
     """
@@ -181,60 +216,6 @@ def test_rbac_cmap_cluster_member_delete(remove_resource):
     p_client = get_project_client_for_token(project, user_token)
     rbac_configmap_delete(p_client, ns)
     remove_resource(project)
-
-
-@if_test_rbac
-def test_rbac_cmap_project_owner_create():
-    user_token = rbac_get_user_token_by_role(PROJECT_OWNER)
-    project = rbac_get_project()
-    ns = rbac_get_namespace()
-    p_client = get_project_client_for_token(project, user_token)
-    rbac_configmap_create(p_client, ns)
-
-
-@if_test_rbac
-def test_rbac_cmap_project_owner_edit():
-    user_token = rbac_get_user_token_by_role(PROJECT_OWNER)
-    project = rbac_get_project()
-    ns = rbac_get_namespace()
-    p_client = get_project_client_for_token(project, user_token)
-    rbac_configmap_edit(p_client, ns)
-
-
-@if_test_rbac
-def test_rbac_cmap_project_owner_delete():
-    user_token = rbac_get_user_token_by_role(PROJECT_OWNER)
-    project = rbac_get_project()
-    ns = rbac_get_namespace()
-    p_client = get_project_client_for_token(project, user_token)
-    rbac_configmap_delete(p_client, ns)
-
-
-@if_test_rbac
-def test_rbac_cmap_project_member_create():
-    user_token = rbac_get_user_token_by_role(PROJECT_MEMBER)
-    project = rbac_get_project()
-    ns = rbac_get_namespace()
-    p_client = get_project_client_for_token(project, user_token)
-    rbac_configmap_create(p_client, ns)
-
-
-@if_test_rbac
-def test_rbac_cmap_project_member_edit():
-    user_token = rbac_get_user_token_by_role(PROJECT_MEMBER)
-    project = rbac_get_project()
-    ns = rbac_get_namespace()
-    p_client = get_project_client_for_token(project, user_token)
-    rbac_configmap_edit(p_client, ns)
-
-
-@if_test_rbac
-def test_rbac_cmap_project_member_delete():
-    user_token = rbac_get_user_token_by_role(PROJECT_MEMBER)
-    project = rbac_get_project()
-    ns = rbac_get_namespace()
-    p_client = get_project_client_for_token(project, user_token)
-    rbac_configmap_delete(p_client, ns)
 
 
 @if_test_rbac
@@ -314,6 +295,27 @@ def test_rbac_cmap_project_readonly_delete(remove_resource):
     remove_resource(configmap)
 
 
+@if_test_rbac
+def test_rbac_cmap_readonly_list(remove_resource):
+
+    cluster_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    user_token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    project = rbac_get_project()
+    ns = rbac_get_namespace()
+    cluster_owner_p_client = get_project_client_for_token(project,
+                                                          cluster_owner_token)
+    configmap = rbac_configmap_create(cluster_owner_p_client, ns)
+    p_client = get_project_client_for_token(project, user_token)
+    cmapname = configmap["name"]
+    cmapdict = p_client.list_configMap(name=cmapname)
+    print(cmapdict)
+    assert cmapdict.resourceType == "configMap"
+    configmapdata = cmapdict.get('data')
+    assert len(configmapdata) == 1
+    assert configmapdata[0].name == cmapname
+    remove_resource(configmap)
+
+
 def rbac_configmap_create(p_client, ns):
 
     """
@@ -328,6 +330,8 @@ def rbac_configmap_create(p_client, ns):
     # Create workloads with configmap in existing namespace
     create_and_validate_workload_with_configmap_as_volume(p_client, configmap,
                                                           ns, keyvaluepair)
+
+    return configmap
 
 
 def rbac_configmap_edit(p_client, ns):
@@ -356,6 +360,7 @@ def rbac_configmap_edit(p_client, ns):
     create_and_validate_workload_with_configmap_as_volume(p_client, configmap,
                                                           ns,
                                                           updatedconfigmapdata)
+    p_client.delete(updated_configmap)
 
 
 def rbac_configmap_delete(p_client, ns):

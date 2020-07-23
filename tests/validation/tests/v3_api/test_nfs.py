@@ -162,31 +162,9 @@ def create_project_client(request):
 
     # add  persistent volume to the cluster
     cluster_client = get_cluster_client_for_token(cluster, USER_TOKEN)
-    pv_name = random_test_name("pv")
-    pv_config = {"type": "persistentVolume",
-                 "accessModes": ["ReadWriteOnce"],
-                 "name": pv_name,
-                 "nfs": {"readOnly": "false",
-                         "type": "nfsvolumesource",
-                         "path": NFS_SERVER_MOUNT_PATH,
-                         "server": nfs_ip
-                         },
-                 "capacity": {"storage": "10Gi"}
-                 }
-    pv_object = cluster_client.create_persistent_volume(pv_config)
-    pv_object = wait_for_pv_to_be_available(cluster_client, pv_object)
 
-    # add persistent volume claim to the project
-    pvc_name = random_test_name("pvc")
-    pvc_config = {"accessModes": ["ReadWriteOnce"],
-                  "name": pvc_name,
-                  "volumeId": pv_object.id,
-                  "namespaceId": ns.id,
-                  "storageClassId": "",
-                  "resources": {"requests": {"storage": "10Gi"}}
-                  }
-    pvc_object = p_client.create_persistent_volume_claim(pvc_config)
-    pvc_object = wait_for_pvc_to_be_bound(p_client, pvc_object)
+    pv_object, pvc_object = create_pv_pvc(p_client, ns, nfs_ip, cluster_client)
+
     namespace["p_client"] = p_client
     namespace["ns"] = ns
     namespace["cluster"] = cluster

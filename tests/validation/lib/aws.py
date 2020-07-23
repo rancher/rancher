@@ -4,88 +4,37 @@ import logging
 import os
 import rsa
 import time
-
 from boto3.exceptions import Boto3Error
+from botocore.exceptions import ClientError
 from .cloud_provider import CloudProviderBase
 from .node import Node
 
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 
-
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 AWS_REGION_AZ = os.environ.get("AWS_REGION_AZ", "us-east-2a")
 AWS_SECURITY_GROUP = os.environ.get("AWS_SECURITY_GROUPS",
                                     'sg-0e753fd5550206e55')
 AWS_SUBNET = os.environ.get("AWS_SUBNET", "subnet-ee8cac86")
+AWS_HOSTED_ZONE_ID = os.environ.get("AWS_HOSTED_ZONE_ID", "")
 AWS_VPC_ID = os.environ.get("AWS_VPC_ID", "vpc-bfccf4d7")
-AWS_SECURITY_GROUPS = [AWS_SECURITY_GROUP]
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME")
-AWS_CICD_INSTANCE_TAG = os.environ.get(
-    "AWS_CICD_INSTANCE_TAG", 'rancher-validation')
-AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't2.medium')
+AWS_CICD_INSTANCE_TAG = os.environ.get("AWS_CICD_INSTANCE_TAG",
+                                       'rancher-validation')
 AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
-
-AWS_AMI = os.environ.get("AWS_AMI", "")
-AWS_USER = os.environ.get("AWS_USER", "ubuntu")
-AWS_HOSTED_ZONE_ID = os.environ.get("AWS_HOSTED_ZONE_ID", "")
+# by default the public Ubuntu 18.04 AMI is used
+AWS_DEFAULT_AMI = "ami-0d5d9d301c853a04a"
+AWS_DEFAULT_USER = "ubuntu"
+AWS_AMI = os.environ.get("AWS_AMI", AWS_DEFAULT_AMI)
+AWS_USER = os.environ.get("AWS_USER", AWS_DEFAULT_USER)
 AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "50")
+AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't3a.medium')
+
 AWS_WINDOWS_VOLUME_SIZE = os.environ.get("AWS_WINDOWS_VOLUME_SIZE", "100")
-
-PRIVATE_IMAGES = {
-    "rancheros-v1.5.1-docker-native": {
-        'image': 'ami-00769ca587d8e100c', 'ssh_user': 'rancher'},
-    "rancheros-v1.5.4-docker-native": {
-        'image': 'ami-022fc798437fb846a', 'ssh_user': 'rancher'},
-    "rancheros-v1.5.5-docker-native": {
-        'image': 'ami-002ab867b8b8591d5', 'ssh_user': 'rancher'},
-    "rhel-7.6-docker-native-113": {
-        'image': 'ami-04b9aacf7e1512c0b', 'ssh_user': 'ec2-user'},
-    "rhel-7.7-docker-native-113-selinux-off": {
-        'image': 'ami-03ff3301b6b68eaf8', 'ssh_user': 'ec2-user'},
-    "rhel-7.7-docker-native-113-selinux-on": {
-        'image': 'ami-069569219156fdf07', 'ssh_user': 'ec2-user'},
-    "rhel-7.7-docker-19.03-selinux-off": {
-        'image': 'ami-01ed32daf0a8275e9', 'ssh_user': 'ec2-user'},
-    "rhel-7.7-docker-19.03-selinux-on": {
-        'image': 'ami-0dc67f9cc295ff9da', 'ssh_user': 'ec2-user'},
-    "oracleLinux-7.7-kernel-UEKr5-docker-19.03": {
-        'image': 'ami-06dd5f94499093e3d', 'ssh_user': 'ec2-user'},
-    "suse-sles12-sp2-docker-18061ce": {
-        'image': 'ami-0cc154aeb82bd8fa0', 'ssh_user': 'ec2-user'},
-    "suse-sles12-sp5-docker-19.03.5": {
-        'image': 'ami-0591b00f223575dc5', 'ssh_user': 'ec2-user'},
-    "ubuntu-16.04-docker-18.09": {
-        'image': 'ami-07e968eb9151b2599', 'ssh_user': 'ubuntu'},
-    "ubuntu-18.04-docker-18.09": {
-        'image': 'ami-02dcbc347c866fb5d', 'ssh_user': 'ubuntu'},
-    "ubuntu-16.04-docker-19.03": {
-        'image': 'ami-0965ce682883e7d23', 'ssh_user': 'ubuntu'},
-    "ubuntu-18.04-docker-19.03": {
-        'image': 'ami-066f14e43aebc7472', 'ssh_user': 'ubuntu'},
-    "rhel-7.6-docker-18.09": {
-        'image': 'ami-094574ffb6efb3a9b', 'ssh_user': 'ec2-user'},
-    "windows-1903-docker-19.03": {
-        'image': 'ami-0f5bea682d4bdd318', 'ssh_user': 'Administrator'}}
-
-PUBLIC_AMI = {
-    'us-east-2': {
-        "ubuntu-18.04": {
-            'image': 'ami-0d5d9d301c853a04a', 'ssh_user': 'ubuntu'},
-        "ubuntu-16.04": {
-            'image': 'ami-965e6bf3', 'ssh_user': 'ubuntu'},
-        "rhel-7.4": {
-            'image': 'ami-0b1e356e', 'ssh_user': 'ec2-user'},
-        "ros-1.4.0": {
-            'image': 'ami-504b7435', 'ssh_user': 'rancher'}},
-    'us-east-1': {
-        "ubuntu-16.04": {
-            'image': 'ami-cf6c47aa', 'ssh_user': 'ubuntu'},
-        "rhel-7.4": {
-            'image': 'ami-0b1e356e', 'ssh_user': 'ec2-user'}}
-}
+AWS_WINDOWS_INSTANCE_TYPE = 't3.xlarge'
 
 
 class AmazonWebServices(CloudProviderBase):
@@ -108,6 +57,12 @@ class AmazonWebServices(CloudProviderBase):
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
 
+        self._db_client = boto3.client(
+            'rds',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION)
+
         self.master_ssh_key = None
         self.master_ssh_key_path = None
 
@@ -119,33 +74,13 @@ class AmazonWebServices(CloudProviderBase):
         self.created_node = []
         self.created_keys = []
 
-    # called if docker is to be installed
-    def _select_private_ami(self, os_version=None, docker_version=None):
-        os_version = os_version or self.OS_VERSION
-        docker_version = docker_version or self.DOCKER_VERSION
-        image = PRIVATE_IMAGES[
-            "{}-docker-{}".format(os_version, docker_version)]
-        return image['image'], image['ssh_user']
-
-    def _select_ami(self, os_version=None):
-        image = PUBLIC_AMI[AWS_REGION][os_version]
-        return image['image'], image['ssh_user']
-
-    def create_node(
-        self, node_name, key_name=None, os_version=None, docker_version=None,
-            wait_for_ready=True):
-
-        os_version = os_version or self.OS_VERSION
-        docker_version = docker_version or self.DOCKER_VERSION
-        if AWS_AMI:
-            image = AWS_AMI
-            ssh_user = AWS_USER
-        else:
-            if self.DOCKER_INSTALLED.lower() == 'false':
-                image, ssh_user = self._select_ami(os_version)
-            else:
-                image, ssh_user = \
-                    self._select_private_ami(os_version, docker_version)
+    def create_node(self, node_name, ami=AWS_AMI, ssh_user=AWS_USER,
+                    key_name=None, wait_for_ready=True, public_ip=True):
+        volume_size = AWS_VOLUME_SIZE
+        instance_type = AWS_INSTANCE_TYPE
+        if ssh_user == "Administrator":
+            volume_size = AWS_WINDOWS_VOLUME_SIZE
+            instance_type = AWS_WINDOWS_INSTANCE_TYPE
 
         if key_name:
             # if cert private key
@@ -165,30 +100,31 @@ class AmazonWebServices(CloudProviderBase):
             ssh_private_key = self.master_ssh_key
             ssh_private_key_path = self.master_ssh_key_path
 
-        if os_version is not None:
-            if 'windows' in os_version:
-                volume_size = AWS_WINDOWS_VOLUME_SIZE
-                instance_type = 't3.xlarge'
-            else:
-                volume_size = AWS_VOLUME_SIZE
-                instance_type = AWS_INSTANCE_TYPE
-
-        args = {"ImageId": image,
+        args = {"ImageId": ami,
                 "InstanceType": instance_type,
                 "MinCount": 1,
                 "MaxCount": 1,
-                "TagSpecifications": [{'ResourceType': 'instance', 'Tags': [
-                    {'Key': 'Name', 'Value': node_name},
-                    {'Key': 'CICD', 'Value': AWS_CICD_INSTANCE_TAG}]}],
+                "TagSpecifications": [
+                    {'ResourceType': 'instance',
+                     'Tags': [
+                         {'Key': 'Name', 'Value': node_name},
+                         {'Key': 'CICD', 'Value': AWS_CICD_INSTANCE_TAG}
+                     ]}
+                ],
                 "KeyName": key_name,
-                "NetworkInterfaces": [{
-                    'DeviceIndex': 0,
-                    'AssociatePublicIpAddress': True,
-                    'Groups': AWS_SECURITY_GROUPS}],
+                "NetworkInterfaces": [
+                    {'DeviceIndex': 0,
+                     'AssociatePublicIpAddress': public_ip,
+                     'Groups': [AWS_SECURITY_GROUP]
+                     }
+                ],
                 "Placement": {'AvailabilityZone': AWS_REGION_AZ},
                 "BlockDeviceMappings":
-                    [{"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": int(volume_size)}}]
+                    [{"DeviceName": "/dev/sda1",
+                      "Ebs": {"VolumeSize": int(volume_size)}
+                      }]
                 }
+
         if len(AWS_IAM_PROFILE) > 0:
             args["IamInstanceProfile"] = {'Name': AWS_IAM_PROFILE}
 
@@ -200,50 +136,51 @@ class AmazonWebServices(CloudProviderBase):
             ssh_key_name=ssh_private_key_name,
             ssh_key_path=ssh_private_key_path,
             ssh_key=ssh_private_key,
-            os_version=os_version,
-            docker_version=docker_version)
+            docker_version=self.DOCKER_VERSION,
+            docker_installed=self.DOCKER_INSTALLED)
 
         # mark for clean up at the end
         self.created_node.append(node.provider_node_id)
 
         if wait_for_ready:
             node = self.wait_for_node_state(node)
-            node.ready_node()
+            if public_ip:
+                node.ready_node()
+            else:
+                time.sleep(60)
         return node
 
-    def create_multiple_nodes(
-        self, number_of_nodes, node_name_prefix, os_version=None,
-            docker_version=None, key_name=None, wait_for_ready=True):
-
+    def create_multiple_nodes(self, number_of_nodes, node_name_prefix,
+                              ami=AWS_AMI, ssh_user=AWS_USER,
+                              key_name=None, wait_for_ready=True,
+                              public_ip=True):
         nodes = []
         for i in range(number_of_nodes):
-            node_name = "{}_{}".format(node_name_prefix, i)
-            nodes.append(self.create_node(
-                node_name, key_name=key_name, os_version=os_version,
-                docker_version=docker_version, wait_for_ready=False))
+            node_name = "{}-{}".format(node_name_prefix, i)
+            nodes.append(self.create_node(node_name,
+                                          ami=ami, ssh_user=ssh_user,
+                                          key_name=key_name,
+                                          wait_for_ready=False,
+                                          public_ip=public_ip))
 
         if wait_for_ready:
             nodes = self.wait_for_nodes_state(nodes)
-            # hack for instances
-            if self.DOCKER_INSTALLED.lower() == 'true':
-                time.sleep(5)
-                self.reboot_nodes(nodes)
-                time.sleep(10)
-                nodes = self.wait_for_nodes_state(nodes)
-
             # wait for window nodes to come up so we can decrypt the password
-            if os_version is not None:
-                if 'windows' in os_version:
-                    time.sleep(60 * 6)
+            if ssh_user == "Administrator":
+                time.sleep(60 * 6)
+                for node in nodes:
+                    node.ssh_password = \
+                        self.decrypt_windows_password(node.provider_node_id)
 
-            for node in nodes:
-                if os_version is not None:
-                    if 'windows' in os_version:
-                        node.ssh_password = self.decrypt_windows_password(node.provider_node_id)
-                node.ready_node()
+            if public_ip:
+                for node in nodes:
+                    node.ready_node()
+            else:
+                time.sleep(60)
+
         return nodes
 
-    def get_node(self, provider_id):
+    def get_node(self, provider_id, ssh_access=False):
         node_filter = [{
             'Name': 'instance-id', 'Values': [provider_id]}]
         try:
@@ -260,6 +197,11 @@ class AmazonWebServices(CloudProviderBase):
                 public_ip_address=aws_node.get('PublicIpAddress'),
                 private_ip_address=aws_node.get('PrivateIpAddress'),
                 state=aws_node['State']['Name'])
+            if ssh_access:
+                node.ssh_user = AWS_USER
+                node.ssh_key_name = AWS_SSH_KEY_NAME.replace('.pem', '')
+                node.ssh_key_path = self.master_ssh_key_path
+                node.ssh_key = self.master_ssh_key
             return node
         except Boto3Error as e:
             msg = "Failed while querying instance '{}' state!: {}".format(
@@ -395,10 +337,10 @@ class AmazonWebServices(CloudProviderBase):
 
     def _s3_list_files(self, client):
         """List files in specific S3 URL"""
-        response = client.list_objects(Bucket=os.environ.get(
-                                           "AWS_S3_BUCKET_NAME", ""),
-                                       Prefix=os.environ.get(
-                                           "AWS_S3_BUCKET_FOLDER_NAME", ""))
+        response = client.list_objects(
+            Bucket=os.environ.get("AWS_S3_BUCKET_NAME", ""),
+            Prefix=os.environ.get("AWS_S3_BUCKET_FOLDER_NAME", ""))
+
         for content in response.get('Contents', []):
             yield content.get('Key')
 
@@ -444,9 +386,9 @@ class AmazonWebServices(CloudProviderBase):
                 TargetGroupArn=target_group_arn,
                 Targets=targets)
 
-    def create_network_lb(self, name):
+    def create_network_lb(self, name, scheme='internet-facing'):
         return self._elbv2_client.create_load_balancer(
-            Name=name, Subnets=[AWS_SUBNET], Type='network'
+            Name=name, Subnets=[AWS_SUBNET], Scheme=scheme, Type='network'
         )
 
     def delete_lb(self, loadBalancerARN):
@@ -488,34 +430,61 @@ class AmazonWebServices(CloudProviderBase):
                              'TargetGroupArn': targetGroupARN}]
         )
 
-    def upsert_route_53_record_cname(self, recordName, recordValue):
+    def upsert_route_53_record_cname(
+            self, record_name, record_value, action='UPSERT',
+            record_type='CNAME', record_ttl=300):
         return self._route53_client.change_resource_record_sets(
             HostedZoneId=AWS_HOSTED_ZONE_ID,
             ChangeBatch={
-                'Comment': 'update',
+                'Comment': 'Record created or updated for automation',
                 'Changes': [{
-                    'Action': 'UPSERT',
+                    'Action': action,
                     'ResourceRecordSet': {
-                        'Name': recordName,
-                        'Type': 'CNAME',
-                        'TTL': 300,
+                        'Name': record_name,
+                        'Type': record_type,
+                        'TTL': record_ttl,
                         'ResourceRecords': [{
-                            'Value': recordValue
+                            'Value': record_value
                         }]
                     }
                 }]
             }
         )
 
+    def delete_route_53_record(self, record_name):
+        record = None
+        try:
+            res = self._route53_client.list_resource_record_sets(
+                HostedZoneId=AWS_HOSTED_ZONE_ID,
+                StartRecordName=record_name,
+                StartRecordType='CNAME',
+                MaxItems='1')
+            if len(res["ResourceRecordSets"]) > 0:
+                record = res["ResourceRecordSets"][0]
+        except ClientError as e:
+            print(e.response)
+
+        if record is not None and record["Name"] == record_name:
+            self._route53_client.change_resource_record_sets(
+                HostedZoneId=AWS_HOSTED_ZONE_ID,
+                ChangeBatch={
+                    'Comment': 'delete record',
+                    'Changes': [{
+                        'Action': 'DELETE',
+                        'ResourceRecordSet': record}]
+                }
+            )
+
     def decrypt_windows_password(self, instance_id):
         password = ""
-        password_data = self._client.\
+        password_data = self._client. \
             get_password_data(InstanceId=instance_id)['PasswordData']
         if password_data:
             password = base64.b64decode(password_data)
-            with open (self.get_ssh_key_path(AWS_SSH_KEY_NAME),'r') as privkeyfile:
+            with open(self.get_ssh_key_path(AWS_SSH_KEY_NAME), 'r') \
+                    as privkeyfile:
                 priv = rsa.PrivateKey.load_pkcs1(privkeyfile.read())
-                password = rsa.decrypt(password,priv).decode('utf-8')
+                password = rsa.decrypt(password, priv).decode('utf-8')
 
         return password
 
@@ -532,14 +501,51 @@ class AmazonWebServices(CloudProviderBase):
             raise RuntimeError(msg)
 
     def get_security_group_name(self, security_group_id):
-        security_group_filter = [{
+        sg_filter = [{
             'Name': 'group-id', 'Values': [security_group_id]}]
         try:
-            response = self._client.describe_security_groups(Filters=security_group_filter)
+            response = self._client.describe_security_groups(Filters=sg_filter)
             security_groups = response.get('SecurityGroups', [])
             if len(security_groups) > 0:
                 return security_groups[0]['GroupName']
         except Boto3Error as e:
-            msg = "Failed while querying security group name for '{}' in region {}: {}".format(
-                security_group_id, AWS_REGION, str(e))
+            msg = "Failed while querying security group name for '{}' " \
+                  "in region {}: {}".format(security_group_id,
+                                            AWS_REGION, str(e))
             raise RuntimeError(msg)
+
+    def get_target_groups(self, lb_arn):
+        tg_list = []
+        try:
+            res = self._elbv2_client.describe_listeners(
+                LoadBalancerArn=lb_arn)
+        except ClientError:
+            return tg_list
+        if res is not None:
+            for item in res["Listeners"]:
+                tg_arn = item["DefaultActions"][0]["TargetGroupArn"]
+                tg_list.append(tg_arn)
+        return tg_list
+
+    def get_lb(self, name):
+        try:
+            res = self._elbv2_client.describe_load_balancers(Names=[name])
+            return res['LoadBalancers'][0]['LoadBalancerArn']
+        except ClientError:
+            return None
+
+    def get_db(self, db_id):
+        try:
+            res = self._db_client.\
+                describe_db_instances(DBInstanceIdentifier=db_id)
+            return res['DBInstances'][0]['DBInstanceIdentifier']
+        except ClientError:
+            return None
+
+    def delete_db(self, db_id):
+        try:
+            self._db_client.delete_db_instance(DBInstanceIdentifier=db_id,
+                                               SkipFinalSnapshot=True,
+                                               DeleteAutomatedBackups=True)
+        except ClientError:
+            return None

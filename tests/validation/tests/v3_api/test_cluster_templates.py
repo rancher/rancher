@@ -1,9 +1,15 @@
+import copy
 import os
 import pytest
-from .common import *  # NOQA
-from .test_rbac import create_user
-from rancher import ApiError
 import requests
+from rancher import ApiError
+from .common import *  # NOQA
+from .test_monitoring import cluster_query_template
+from .test_monitoring import validate_cluster_graph
+from .test_rbac import create_user
+from .test_rke_cluster_provisioning import engine_install_url
+
+
 
 DO_ACCESSKEY = os.environ.get('DO_ACCESSKEY', "None")
 RANCHER_S3_BUCKETNAME = os.environ.get('RANCHER_S3_BUCKETNAME', "None")
@@ -14,6 +20,10 @@ AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', "None")
 user_token = {"stduser_with_createrketemplate_role": {"user": None,
                                                       "token": None},
               "standard_user": {"user": None, "token": None}}
+
+CLUSTER_MONITORING_APP = "cluster-monitoring"
+MONITORING_OPERATOR_APP = "monitoring-operator"
+
 
 
 @pytest.fixture(scope='module', autouse="True")
@@ -57,9 +67,27 @@ def get_k8s_versionlist():
     return k8sversionlist
 
 
-def get_cluster_config(k8sversion):
+def get_cluster_config(k8sversion, enableMonitoring="false"):
 
     rke_config = getRKEConfig(k8sversion)
+    cluster_config = {
+        "dockerRootDir": "/var/lib/docker123",
+        "enableClusterAlerting": "false",
+        "enableClusterMonitoring": enableMonitoring,
+        "enableNetworkPolicy": "false",
+        "type": "clusterSpecBase",
+        "localClusterAuthEndpoint": {
+            "enabled": "true",
+            "type": "localClusterAuthEndpoint"
+        },
+        "rancherKubernetesEngineConfig": rke_config
+    }
+    return cluster_config
+
+
+def get_cisscan_enabled_clusterconfig(k8sversion):
+    rke_config = getRKEConfig(k8sversion)
+
     cluster_config = {
         "dockerRootDir": "/var/lib/docker123",
         "enableClusterAlerting": "false",
@@ -69,6 +97,26 @@ def get_cluster_config(k8sversion):
         "localClusterAuthEndpoint": {
             "enabled": "true",
             "type": "localClusterAuthEndpoint"
+        },
+        "scheduledClusterScan": {
+            "enabled": "true",
+            "scanConfig": {
+                "cisScanConfig": {
+                    "debugMaster": "false",
+                    "debugWorker": "false",
+                    "overrideBenchmarkVersion": CIS_SCAN_PROFILE,
+                    "overrideSkip": "None",
+                    "profile": "permissive",
+                    "type": "/v3/schemas/cisScanConfig"
+                },
+                "type": "/v3/schemas/clusterScanConfig"
+            },
+            "scheduleConfig": {
+                "cronSchedule": "0 */1 * * *",
+                "retention": 24,
+                "type": "/v3/schemas/scheduledClusterScanConfig"
+            },
+            "type": "/v3/schemas/scheduledClusterScan"
         },
         "rancherKubernetesEngineConfig": rke_config
     }
@@ -87,20 +135,20 @@ def test_cluster_template_create_with_questions():
         "required": "true",
         "type": "string",
         "default": k8sversionlist[0]
-        },
+    },
         {
         "variable": "rancherKubernetesEngineConfig.network.plugin",
         "required": "true",
         "type": "string",
         "default": "canal"
-        },
+    },
         {
         "variable": "rancherKubernetesEngineConfig.services.etcd.backupConfig."
                     "s3BackupConfig.bucketName",
         "required": "true",
         "type": "string",
         "default": ""
-        },
+    },
         {
         "variable": "rancherKubernetesEngineConfig.services.etcd.backupConfig."
                     "s3BackupConfig.endpoint",
@@ -108,21 +156,21 @@ def test_cluster_template_create_with_questions():
         "type": "string",
         "default": ""
 
-        },
+    },
         {
         "variable": "rancherKubernetesEngineConfig.services.etcd.backupConfig."
                     "s3BackupConfig.accessKey",
         "required": "true",
         "type": "string",
         "default": ""
-        },
+    },
         {
         "variable": "rancherKubernetesEngineConfig.services.etcd.backupConfig."
                     "s3BackupConfig.secretKey",
         "required": "true",
         "type": "string",
         "default": ""
-        }]
+    }]
 
     answers = {
         "values": {
@@ -143,8 +191,10 @@ def test_cluster_template_create_with_questions():
     standard_user_client = \
         get_client_for_token(
             user_token["stduser_with_createrketemplate_role"]["token"])
-    cluster_template = standard_user_client.create_cluster_template(
-            name=random_test_name("template"), description="test-template")
+    cluster_template = \
+        standard_user_client.create_cluster_template(
+            name=random_test_name("template"),
+            description="test-template")
     clusterTemplateId = cluster_template.id
 
     revision_name = random_test_name("revision")
@@ -432,7 +482,7 @@ def test_cluster_template_enforcement_on_admin(request):
     # using rke config and also using rke template
     try:
         enforcement_settings_url = CATTLE_TEST_URL + \
-                          "/v3/settings/cluster-template-enforcement"
+            "/v3/settings/cluster-template-enforcement"
         data_test = {
             "name": "cluster-template-enforcement",
             "value": "true"
@@ -503,7 +553,7 @@ def test_cluster_template_enforcement_on_stduser():
     rke_config = getRKEConfig(k8sversionlist[0])
     try:
         enforcement_settings_url = CATTLE_TEST_URL + \
-                          "/v3/settings/cluster-template-enforcement"
+            "/v3/settings/cluster-template-enforcement"
         data_test = {
             "name": "cluster-template-enforcement",
             "value": "true"
@@ -523,9 +573,9 @@ def test_cluster_template_enforcement_on_stduser():
 
         cluster_template_revision1 = \
             standard_user_client.create_cluster_template_revision(
-                                        name=revision_name,
-                                        clusterConfig=cluster_config1,
-                                        clusterTemplateId=cluster_template.id)
+                name=revision_name,
+                clusterConfig=cluster_config1,
+                clusterTemplateId=cluster_template.id)
         time.sleep(2)
         cluster_template_revision1 = standard_user_client.reload(
             cluster_template_revision1)
@@ -557,6 +607,109 @@ def test_cluster_template_enforcement_on_stduser():
         }
         requests.put(enforcement_settings_url, json=data_test,
                      verify=False, headers=headers)
+
+    cluster_cleanup(standard_user_client, cluster)
+
+
+def test_cluster_template_create_with_cisscan_enabled():
+
+    k8sversionlist = get_k8s_versionlist()
+    # Obtain cluster config with cisscan enabled
+    cluster_config = get_cisscan_enabled_clusterconfig(k8sversionlist[0])
+    standard_user_client = \
+        get_client_for_token(
+            user_token["stduser_with_createrketemplate_role"]["token"])
+    userToken = user_token["stduser_with_createrketemplate_role"]["token"]
+
+    # Create a cluster template
+    cluster_template = standard_user_client.create_cluster_template(
+        name=random_test_name("template"), description="cis-enabled-template")
+    revision_name = random_test_name("revision1")
+    # Create a cluster template revision with the cis enabled cluster config
+    cluster_template_revision = \
+        standard_user_client.create_cluster_template_revision(
+            name=revision_name,
+            clusterConfig=cluster_config,
+            clusterTemplateId=cluster_template.id)
+    time.sleep(2)
+    cluster_template_revision = standard_user_client.reload(
+        cluster_template_revision)
+    cluster_name = random_test_name("test-auto")
+    # Create a cluster using the cluster template revision
+    cluster = create_node_cluster(
+        standard_user_client, name=cluster_name,
+        clusterTemplateRevisionId=cluster_template_revision.id,
+        userToken=userToken)
+    check_cluster_version(cluster, k8sversionlist[0])
+
+    # Verify that the cluster's applied spec has the cis scan parameters
+    # set as expected
+    assert cluster.appliedSpec. \
+        scheduledClusterScan.enabled == True
+    assert cluster.appliedSpec.scheduledClusterScan.\
+        scanConfig.type == "/v3/schemas/clusterScanConfig"
+    assert cluster.appliedSpec. \
+        scheduledClusterScan.scanConfig.\
+        cisScanConfig.overrideBenchmarkVersion == "rke-cis-1.4"
+    assert cluster.appliedSpec. \
+        scheduledClusterScan.scanConfig.cisScanConfig.profile == "permissive"
+    assert cluster.appliedSpec.scheduledClusterScan.scheduleConfig.\
+        cronSchedule == "0 */1 * * *"
+
+    cluster_cleanup(standard_user_client, cluster)
+
+
+def test_cluster_template_create_with_monitoring():
+
+    k8sversionlist = get_k8s_versionlist()
+    # Obtain cluster config with monitoring enabled
+    cluster_config = get_cluster_config(k8sversionlist[0],
+                                        enableMonitoring="true")
+    standard_user_client = \
+        get_client_for_token(
+            user_token["stduser_with_createrketemplate_role"]["token"])
+    userToken = user_token["stduser_with_createrketemplate_role"]["token"]
+
+    # Create a cluster template
+    cluster_template = standard_user_client.\
+        create_cluster_template(name=random_test_name("template"),
+                                description="test-template")
+    revision_name = random_test_name("revision1")
+    # Create cluster template revision with monitoring enabled cluster config
+    cluster_template_revision = \
+        standard_user_client.create_cluster_template_revision(
+            name=revision_name,
+            clusterConfig=cluster_config,
+            clusterTemplateId=cluster_template.id)
+    time.sleep(2)
+    cluster_template_revision = standard_user_client.reload(
+        cluster_template_revision)
+    cluster_name = random_test_name("test-auto")
+    # Create a cluster using the cluster template revision
+    cluster = create_node_cluster(
+        standard_user_client, name=cluster_name, nodecount=3, nodesize="8gb",
+        clusterTemplateRevisionId=cluster_template_revision.id,
+        userToken=userToken)
+    check_cluster_version(cluster, k8sversionlist[0])
+    assert cluster.appliedSpec.enableClusterMonitoring == True
+
+    # Verify the monitoring apps are deployed and active
+    system_project = \
+        standard_user_client.list_project(clusterId=cluster.id,
+                                          name="System").data[0]
+    sys_proj_client = get_project_client_for_token(system_project, USER_TOKEN)
+    wait_for_app_to_active(sys_proj_client, CLUSTER_MONITORING_APP, 1000)
+    wait_for_app_to_active(sys_proj_client, MONITORING_OPERATOR_APP, 1000)
+    # wait for all graphs to be available
+    time.sleep(60 * 3)
+    cluster_monitoring_obj = standard_user_client.list_clusterMonitorGraph()
+    # generate the request payload
+    query1 = copy.deepcopy(cluster_query_template)
+    query1["obj"] = cluster_monitoring_obj
+    query1["filters"]["clusterId"] = cluster.id
+    query1["filters"]["resourceType"] = "cluster"
+    # Verify graphs are generated
+    validate_cluster_graph(query1, "cluster")
 
     cluster_cleanup(standard_user_client, cluster)
 
@@ -597,9 +750,9 @@ def cluster_template_create_edit(userToken):
     time.sleep(2)
     cluster_template_revision2 = client.reload(
         cluster_template_revision2)
-    cluster = client.update(
-            cluster,
-            name=cluster_name,
+    cluster = \
+        client.update(
+            cluster, name=cluster_name,
             clusterTemplateRevisionId=cluster_template_revision2.id)
     cluster = validate_cluster(client,
                                cluster,
@@ -609,7 +762,7 @@ def cluster_template_create_edit(userToken):
     cluster_cleanup(client, cluster)
 
 
-def node_template_do(userclient):
+def node_template_digocean(userclient, nodesize):
     client = userclient
     do_cloud_credential_config = {"accessToken": DO_ACCESSKEY}
     do_cloud_credential = client.create_cloud_credential(
@@ -617,18 +770,20 @@ def node_template_do(userclient):
     time.sleep(3)
     node_template = client.create_node_template(
         digitaloceanConfig={"region": "nyc3",
-                            "size": "4gb",
-                            "image": "ubuntu-16-04-x64"},
+                            "size": nodesize,
+                            "image": "ubuntu-18-04-x64"},
         name=random_name(),
         driver="digitalocean",
         namespaceId="dig",
         cloudCredentialId=do_cloud_credential.id,
+        engineInstallURL=engine_install_url,
         useInternalIpAddress=True)
     node_template = client.wait_success(node_template)
     return node_template
 
 
-def create_node_cluster(userclient, name, clusterTemplateRevisionId=None,
+def create_node_cluster(userclient, name, nodecount=1, nodesize="4gb",
+                        clusterTemplateRevisionId=None,
                         rancherKubernetesEngineConfig=None, answers=None,
                         userToken=None):
     client = userclient
@@ -637,11 +792,12 @@ def create_node_cluster(userclient, name, clusterTemplateRevisionId=None,
             name=name,
             rancherKubernetesEngineConfig=rancherKubernetesEngineConfig)
     else:
-        cluster = client.create_cluster(
-                    name=name,
-                    clusterTemplateRevisionId=clusterTemplateRevisionId,
-                    answers=answers)
-    nodetemplate = node_template_do(client)
+        cluster = \
+            client.create_cluster(
+                name=name,
+                clusterTemplateRevisionId=clusterTemplateRevisionId,
+                answers=answers)
+    nodetemplate = node_template_digocean(client, nodesize)
     nodes = []
     node = {"hostnamePrefix": random_test_name("test-auto"),
             "nodeTemplateId": nodetemplate.id,
@@ -649,7 +805,7 @@ def create_node_cluster(userclient, name, clusterTemplateRevisionId=None,
             "controlPlane": True,
             "etcd": True,
             "worker": True,
-            "quantity": 1,
+            "quantity": nodecount,
             "clusterId": None}
     nodes.append(node)
     node_pools = []
@@ -727,11 +883,11 @@ def getRKEConfig(k8sversion):
                     "retention": 6,
                     "type": "backupConfig",
                     "s3BackupConfig": {
-                      "type": "s3BackupConfig",
-                      "accessKey": AWS_ACCESS_KEY_ID,
-                      "secretKey": AWS_SECRET_ACCESS_KEY,
-                      "bucketName": "test-auto-s3",
-                      "endpoint": "s3.amazonaws.com"
+                        "type": "s3BackupConfig",
+                        "accessKey": AWS_ACCESS_KEY_ID,
+                        "secretKey": AWS_SECRET_ACCESS_KEY,
+                        "bucketName": "test-auto-s3",
+                        "endpoint": "s3.amazonaws.com"
                     }
                 }
             }

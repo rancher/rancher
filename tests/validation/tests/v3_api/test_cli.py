@@ -6,12 +6,26 @@ from .test_rke_cluster_provisioning import (create_and_validate_custom_host,
                                             cluster_cleanup)
 from .cli_objects import RancherCli
 from .common import (ADMIN_TOKEN, USER_TOKEN, CATTLE_TEST_URL, CLUSTER_NAME,
-                     AWS_ACCESS_KEY_ID, get_admin_client, get_user_client,
-                     get_user_client_and_cluster)
+                     DATA_SUBDIR, get_admin_client, get_user_client,
+                     get_user_client_and_cluster, random_str,
+                     get_project_client_for_token)
 
+KNOWN_HOST = ast.literal_eval(os.environ.get('RANCHER_KNOWN_HOST', "False"))
 if_test_multicluster = pytest.mark.skipif(ast.literal_eval(
     os.environ.get('RANCHER_SKIP_MULTICLUSTER', "False")),
     reason='Multi-Cluster tests are skipped in the interest of time/cost.')
+
+SYSTEM_CHART_URL = "https://git.rancher.io/system-charts"
+SYSTEM_CHART_BRANCH = os.environ.get("RANCHER_SYSTEM_CHART_BRANCH", "dev")
+OPENEBS_CHART = 'openebs'
+OPENEBS_CHART_VERSION = '1.5.0'
+OPENEBS_CHART_VERSION_UPGRADE = '1.6.0'
+CHARTMUSEUM_CHART = 'chartmuseum'
+CHARTMUSEUM_CHART_VERSION = '2.3.1'
+APP_TIMEOUT = 120
+CATALOG_URL = "https://github.com/rancher/integration-test-charts.git"
+BRANCH = "validation-tests"
+CHARTMUSEUM_CHART_VERSION_CATALOG = 'latest'
 
 # Supplying default answers due to issue with multi-cluster app install:
 # https://github.com/rancher/rancher/issues/25514
@@ -107,43 +121,69 @@ def test_cli_namespace_delete(remove_cli_resource, rancher_cli: RancherCli):
 
 def test_cli_app_install(remove_cli_resource, rancher_cli: RancherCli):
     rancher_cli.log.info("Testing Upgrading Apps")
-    initial_app = rancher_cli.apps.install("openebs", "openebs",
-                                           version="1.5.0", timeout=120)
+    initial_app = rancher_cli.apps.install(
+        OPENEBS_CHART, "openebs", version=OPENEBS_CHART_VERSION,
+        timeout=APP_TIMEOUT)
     remove_cli_resource("apps", initial_app["id"])
     assert initial_app["state"] == "active"
-    assert initial_app["version"] == "1.5.0"
+    assert initial_app["version"] == OPENEBS_CHART_VERSION
+
+
+def test_cli_app_values_install(remove_cli_resource, rancher_cli: RancherCli):
+    rancher_cli.log.info("Testing Upgrading Apps")
+    initial_app = rancher_cli.apps.install(
+        CHARTMUSEUM_CHART, random_str(), version=CHARTMUSEUM_CHART_VERSION, 
+        timeout=APP_TIMEOUT, values=DATA_SUBDIR + "/appvalues.yaml")
+    remove_cli_resource("apps", initial_app["id"])
+    assert initial_app["state"] == "active"
+    assert initial_app["version"] == CHARTMUSEUM_CHART_VERSION
 
 
 def test_cli_app_upgrade(remove_cli_resource, rancher_cli: RancherCli):
     rancher_cli.log.info("Testing Rolling Back Apps")
-    initial_app = rancher_cli.apps.install("openebs", "openebs",
-                                           version="1.5.0", timeout=120)
+    initial_app = rancher_cli.apps.install(
+        OPENEBS_CHART, "openebs", version=OPENEBS_CHART_VERSION,
+        timeout=APP_TIMEOUT)
     remove_cli_resource("apps", initial_app["id"])
-    assert initial_app["version"] == "1.5.0"
-    upgraded_app = rancher_cli.apps.upgrade(initial_app, version="1.6.0")
+    assert initial_app["version"] == OPENEBS_CHART_VERSION
+    upgraded_app = rancher_cli.apps.upgrade(
+        initial_app, version=OPENEBS_CHART_VERSION_UPGRADE)
     assert upgraded_app["state"] == "active"
-    assert upgraded_app["version"] == "1.6.0"
+    assert upgraded_app["version"] == OPENEBS_CHART_VERSION_UPGRADE
 
 
 def test_cli_app_rollback(remove_cli_resource, rancher_cli: RancherCli):
     rancher_cli.log.info("Testing Deleting Apps")
-    initial_app = rancher_cli.apps.install("openebs", "openebs",
-                                           version="1.5.0", timeout=120)
+    initial_app = rancher_cli.apps.install(
+        OPENEBS_CHART, "openebs", version=OPENEBS_CHART_VERSION,
+        timeout=APP_TIMEOUT)
     remove_cli_resource("apps", initial_app["id"])
-    assert initial_app["version"] == "1.5.0"
-    upgraded_app = rancher_cli.apps.upgrade(initial_app, version="1.6.0")
-    assert upgraded_app["version"] == "1.6.0"
-    rolled_back_app = rancher_cli.apps.rollback(upgraded_app, "1.5.0")
+    assert initial_app["version"] == OPENEBS_CHART_VERSION
+    upgraded_app = rancher_cli.apps.upgrade(
+        initial_app, version=OPENEBS_CHART_VERSION_UPGRADE)
+    assert upgraded_app["version"] == OPENEBS_CHART_VERSION_UPGRADE
+    rolled_back_app = rancher_cli.apps.rollback(upgraded_app,
+                                                OPENEBS_CHART_VERSION)
     assert rolled_back_app["state"] == "active"
-    assert rolled_back_app["version"] == "1.5.0"
+    assert rolled_back_app["version"] == OPENEBS_CHART_VERSION
 
 
 def test_cli_app_delete(rancher_cli: RancherCli):
     rancher_cli.log.info("Testing Deleting Apps")
-    initial_app = rancher_cli.apps.install("openebs", "openebs",
-                                           version="1.5.0", timeout=120)
+    initial_app = rancher_cli.apps.install(
+        OPENEBS_CHART, "openebs", version=OPENEBS_CHART_VERSION,
+        timeout=APP_TIMEOUT)
     deleted = rancher_cli.apps.delete(initial_app)
     assert deleted
+
+
+def test_app_install_local_dir(remove_cli_resource, rancher_cli: RancherCli):
+    rancher_cli.log.info("Testing Installing of an App from Local directory")
+    initial_app = rancher_cli.apps.install_local_dir(
+        CATALOG_URL, BRANCH, CHARTMUSEUM_CHART,
+        version=CHARTMUSEUM_CHART_VERSION_CATALOG, timeout=APP_TIMEOUT)
+    remove_cli_resource("apps", initial_app["id"])
+    assert initial_app["state"] == "active"
 
 
 @if_test_multicluster
@@ -163,17 +203,17 @@ def test_cli_multiclusterapp_install(custom_cluster, remove_cli_resource,
                 targets.append(project["id"])
     assert len(targets) > 1
 
-    initial_app = rancher_cli.mcapps.install("openebs", targets=targets,
-                                             role="cluster-owner",
-                                             values=MULTICLUSTER_APP_ANSWERS,
-                                             version="1.5.0", timeout=120)
+    initial_app = rancher_cli.mcapps.install(
+        OPENEBS_CHART, targets=targets, role="cluster-owner",
+        values=MULTICLUSTER_APP_ANSWERS, version=OPENEBS_CHART_VERSION, 
+        timeout=APP_TIMEOUT)
     remove_cli_resource("mcapps", initial_app["name"])
     assert initial_app["state"] == "active"
-    assert initial_app["version"] == "1.5.0"
+    assert initial_app["version"] == OPENEBS_CHART_VERSION
     assert len(initial_app["targets"]) == len(targets)
     for target in initial_app["targets"]:
         assert target["state"] == "active"
-        assert target["version"] == "1.5.0"
+        assert target["version"] == OPENEBS_CHART_VERSION
 
 
 @if_test_multicluster
@@ -193,22 +233,23 @@ def test_cli_multiclusterapp_upgrade(custom_cluster, remove_cli_resource,
                 targets.append(project["id"])
     assert len(targets) > 1
 
-    initial_app = rancher_cli.mcapps.install("openebs", targets=targets,
-                                             role="cluster-owner",
-                                             values=MULTICLUSTER_APP_ANSWERS,
-                                             version="1.5.0", timeout=120)
+    initial_app = rancher_cli.mcapps.install(
+        OPENEBS_CHART, targets=targets, role="cluster-owner",
+        values=MULTICLUSTER_APP_ANSWERS, version=OPENEBS_CHART_VERSION, 
+        timeout=APP_TIMEOUT)
     remove_cli_resource("mcapps", initial_app["name"])
-    assert initial_app["version"] == "1.5.0"
+    assert initial_app["version"] == OPENEBS_CHART_VERSION
 
-    upgraded_app = rancher_cli.mcapps.upgrade(initial_app, version="1.6.0",
-                                              timeout=120)
+    upgraded_app = rancher_cli.mcapps.upgrade(
+        initial_app, version=OPENEBS_CHART_VERSION_UPGRADE,
+        timeout=APP_TIMEOUT)
     assert upgraded_app["state"] == "active"
-    assert upgraded_app["version"] == "1.6.0"
+    assert upgraded_app["version"] == OPENEBS_CHART_VERSION_UPGRADE
     assert upgraded_app["id"] == initial_app["id"]
     assert len(upgraded_app["targets"]) == len(targets)
     for target in upgraded_app["targets"]:
         assert target["state"] == "active"
-        assert target["version"] == "1.6.0"
+        assert target["version"] == OPENEBS_CHART_VERSION_UPGRADE
 
 
 @if_test_multicluster
@@ -228,25 +269,26 @@ def test_cli_multiclusterapp_rollback(custom_cluster, remove_cli_resource,
                 targets.append(project["id"])
     assert len(targets) > 1
 
-    initial_app = rancher_cli.mcapps.install("openebs", targets=targets,
-                                             role="cluster-owner",
-                                             values=MULTICLUSTER_APP_ANSWERS,
-                                             version="1.5.0", timeout=120)
+    initial_app = rancher_cli.mcapps.install(
+        OPENEBS_CHART, targets=targets, role="cluster-owner",
+        values=MULTICLUSTER_APP_ANSWERS, version=OPENEBS_CHART_VERSION, 
+        timeout=APP_TIMEOUT)
     remove_cli_resource("mcapps", initial_app["name"])
-    assert initial_app["version"] == "1.5.0"
-    upgraded_app = rancher_cli.mcapps.upgrade(initial_app, version="1.6.0",
-                                              timeout=120)
-    assert upgraded_app["version"] == "1.6.0"
+    assert initial_app["version"] == OPENEBS_CHART_VERSION
+    upgraded_app = rancher_cli.mcapps.upgrade(
+        initial_app, version=OPENEBS_CHART_VERSION_UPGRADE,
+        timeout=APP_TIMEOUT)
+    assert upgraded_app["version"] == OPENEBS_CHART_VERSION_UPGRADE
 
     rolled_back_app = rancher_cli.mcapps.rollback(
-        upgraded_app["name"], initial_app["revision"], timeout=120)
+        upgraded_app["name"], initial_app["revision"], timeout=APP_TIMEOUT)
     assert rolled_back_app["state"] == "active"
-    assert rolled_back_app["version"] == "1.5.0"
+    assert rolled_back_app["version"] == OPENEBS_CHART_VERSION
     assert rolled_back_app["id"] == upgraded_app["id"]
     assert len(rolled_back_app["targets"]) == len(targets)
     for target in rolled_back_app["targets"]:
         assert target["state"] == "active"
-        assert target["version"] == "1.5.0"
+        assert target["version"] == OPENEBS_CHART_VERSION
 
 
 @if_test_multicluster
@@ -266,11 +308,11 @@ def test_cli_multiclusterapp_delete(custom_cluster, remove_cli_resource,
                 targets.append(project["id"])
     assert len(targets) > 1
 
-    initial_app = rancher_cli.mcapps.install("openebs", targets=targets,
-                                             role="cluster-owner",
-                                             values=MULTICLUSTER_APP_ANSWERS,
-                                             version="1.5.0", timeout=120)
-    assert initial_app["version"] == "1.5.0"
+    initial_app = rancher_cli.mcapps.install(
+        OPENEBS_CHART, targets=targets, role="cluster-owner",
+        values=MULTICLUSTER_APP_ANSWERS, version=OPENEBS_CHART_VERSION, 
+        timeout=APP_TIMEOUT)
+    assert initial_app["version"] == OPENEBS_CHART_VERSION
     deleted, apps_deleted = rancher_cli.mcapps.delete(initial_app)
     assert deleted
     assert apps_deleted
@@ -279,11 +321,90 @@ def test_cli_multiclusterapp_delete(custom_cluster, remove_cli_resource,
 def test_cli_catalog(admin_cli: RancherCli):
     admin_cli.log.info("Testing Creating and Deleting Catalogs")
     admin_cli.login(CATTLE_TEST_URL, ADMIN_TOKEN)
-    catalog = admin_cli.catalogs.add("https://git.rancher.io/system-charts",
-                                     branch="dev")
+    catalog = admin_cli.catalogs.add(SYSTEM_CHART_URL,
+                                     branch=SYSTEM_CHART_BRANCH)
     assert catalog is not None
     deleted = admin_cli.catalogs.delete(catalog["name"])
     assert deleted
+
+
+@if_test_multicluster
+def test_cluster_removal(custom_cluster, admin_cli: RancherCli):
+    admin_cli.log.info("Testing Cluster Removal")
+    deleted = admin_cli.clusters.delete(custom_cluster.name)
+    assert deleted
+
+
+def test_inspection(rancher_cli: RancherCli):
+    # Test inspect on the default project used for cli tests
+    # Validate it has the expected clusterid, id, type, and active state
+    rancher_cli.log.info("Testing Inspect Resource")
+    resource = rancher_cli.inspect(
+        "project", rancher_cli.default_project["id"],
+        format="{{.clusterId}}|{{.id}}|{{.type}}|{{.state}}")
+    assert resource is not None
+    resource_arr = resource.split("|")
+    assert resource_arr[0] == rancher_cli.default_project["clusterId"]
+    assert resource_arr[1] == rancher_cli.default_project["id"]
+    assert resource_arr[2] == "project"
+    assert resource_arr[3] == "active"
+
+
+def test_ps(custom_workload, rancher_cli: RancherCli):
+    rancher_cli.log.info("Testing rancher ps")
+    # Deploy a workload and validate that the ps command shows it in the
+    # correct namespace with the correct name
+    rancher_cli.switch_context(rancher_cli.DEFAULT_CONTEXT)
+    ps = rancher_cli.ps()
+    expected_value = "{}|{}|nginx|2".format(
+        rancher_cli.default_namespace, custom_workload.name)
+    assert expected_value in ps.splitlines()
+
+
+def test_kubectl(custom_workload, rancher_cli: RancherCli):
+    rancher_cli.log.info("Testing kubectl commands from the CLI")
+    rancher_cli.switch_context(rancher_cli.DEFAULT_CONTEXT)
+    jsonpath = "-o jsonpath='{.spec.template.spec.containers[0].image}'"
+    result = rancher_cli.kubectl("get deploy -n {} {} {}".format(
+        rancher_cli.default_namespace, custom_workload.name, jsonpath))
+    assert result == "nginx"
+
+
+# Note this expects nodes not to be Windows due to usage of ifconfig.me
+@pytest.mark.skip(reason="Fails in Jenkins")
+def test_ssh(rancher_cli: RancherCli):
+    rancher_cli.log.info("Testing ssh into nodes.")
+    failures = []
+    rancher_cli.switch_context(rancher_cli.DEFAULT_CONTEXT)
+    nodes = rancher_cli.nodes.get()
+    rancher_cli.log.debug("Nodes is: {}".format(nodes))
+
+    is_jenkins = False
+    if os.environ.get("RANCHER_IS_JENKINS", None):
+        is_jenkins = True
+    for node in nodes:
+        ip = rancher_cli.nodes.ssh(node, "curl -s ifconfig.me",
+                                   known=KNOWN_HOST, is_jenkins=is_jenkins)
+        if node["ip"] != ip:
+            failures.append(node["ip"])
+    assert failures == []
+
+
+@pytest.fixture(scope='module')
+def custom_workload(rancher_cli):
+    client, cluster = get_user_client_and_cluster()
+    project = client.list_project(name=rancher_cli.default_project["name"],
+                                  clusterId=cluster.id).data[0]
+    p_client = get_project_client_for_token(project, USER_TOKEN)
+    workload = p_client.create_workload(
+        name=random_str(),
+        namespaceId=rancher_cli.default_namespace,
+        scale=2,
+        containers=[{
+            'name': 'one',
+            'image': 'nginx',
+        }])
+    return workload
 
 
 @pytest.fixture(scope='module')
@@ -297,7 +418,7 @@ def custom_cluster(request, rancher_cli):
         node_roles, random_cluster_name=True)
 
     def fin():
-        cluster_cleanup(get_user_client(), cluster, aws_nodes)
+        cluster_cleanup(get_admin_client(), cluster, aws_nodes)
     request.addfinalizer(fin)
     return cluster
 
