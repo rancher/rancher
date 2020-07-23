@@ -36,6 +36,8 @@ const (
 	ClusterFieldDesiredAuthImage                     = "desiredAuthImage"
 	ClusterFieldDockerRootDir                        = "dockerRootDir"
 	ClusterFieldDriver                               = "driver"
+	ClusterFieldEKSConfig                            = "eksConfig"
+	ClusterFieldEKSStatus                            = "eksStatus"
 	ClusterFieldEnableClusterAlerting                = "enableClusterAlerting"
 	ClusterFieldEnableClusterMonitoring              = "enableClusterMonitoring"
 	ClusterFieldEnableNetworkPolicy                  = "enableNetworkPolicy"
@@ -98,6 +100,8 @@ type Cluster struct {
 	DesiredAuthImage                     string                         `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
 	DockerRootDir                        string                         `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	Driver                               string                         `json:"driver,omitempty" yaml:"driver,omitempty"`
+	EKSConfig                            *EKSClusterConfigSpec          `json:"eksConfig,omitempty" yaml:"eksConfig,omitempty"`
+	EKSStatus                            *EKSStatus                     `json:"eksStatus,omitempty" yaml:"eksStatus,omitempty"`
 	EnableClusterAlerting                bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
 	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
