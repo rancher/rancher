@@ -1,4 +1,4 @@
-package k3sbaseupgrade
+package k3sbasedupgrade
 
 import (
 	"fmt"
@@ -80,7 +80,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	}
 
 	// create or update k3supgradecontroller if necessary
-	if err = h.deployK3sBaseUpgradeController(cluster.Name); err != nil {
+	if err = h.deployK3sBasedUpgradeController(cluster.Name); err != nil {
 		return cluster, err
 	}
 
@@ -94,7 +94,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 
 // deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
 // Updates k3s upgrader controller if one exists and is not the newest available version.
-func (h *handler) deployK3sBaseUpgradeController(clusterName string) error {
+func (h *handler) deployK3sBasedUpgradeController(clusterName string) error {
 	userCtx, err := h.manager.UserContext(clusterName)
 	if err != nil {
 		return err
@@ -150,7 +150,7 @@ func (h *handler) deployK3sBaseUpgradeController(clusterName string) error {
 				},
 			},
 			Spec: v33.AppSpec{
-				Description:     "Upgrade controller for k3s base clusters",
+				Description:     "Upgrade controller for k3s based clusters",
 				ExternalID:      latestVersionID,
 				ProjectName:     appProjectName,
 				TargetNamespace: systemUpgradeNS,

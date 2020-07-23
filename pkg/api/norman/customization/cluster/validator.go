@@ -14,7 +14,7 @@ import (
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/k3sbaseupgrade"
+	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cis"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
@@ -56,7 +56,7 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
-	if err := v.validateK3sBaseVersionUpgrade(request, &clusterSpec); err != nil {
+	if err := v.validateK3sBasedVersionUpgrade(request, &clusterSpec); err != nil {
 		return err
 	}
 
@@ -213,19 +213,19 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 
 // TODO: test validator
 // prevents downgrades, no-ops, and upgrading before versions have been set
-func (v *Validator) validateK3sBaseVersionUpgrade(request *types.APIContext, spec *v32.ClusterSpec) error {
+func (v *Validator) validateK3sBasedVersionUpgrade(request *types.APIContext, spec *v32.ClusterSpec) error {
 	upgradeNotReadyErr := httperror.NewAPIError(httperror.Conflict, "k3s version upgrade is not ready, try again later")
 
 	if request.Method == http.MethodPost {
 		return nil
 	}
-
-	if spec.K3sConfig == nil && spec.Rke2Config == nil {
+	isK3s := spec.K3sConfig != nil
+	isrke2 := spec.Rke2Config != nil
+	if !isK3s && !isrke2 {
 		// only applies to k3s clusters
 		return nil
 	}
-	isK3s := spec.K3sConfig != nil
-	isrke2 := spec.Rke2Config != nil
+
 	// must wait for original spec version to be set
 	if (isK3s && spec.K3sConfig.Version == "") || (isrke2 && spec.Rke2Config.Version == "") {
 		return upgradeNotReadyErr
@@ -254,7 +254,7 @@ func (v *Validator) validateK3sBaseVersionUpgrade(request *types.APIContext, spe
 		return nil
 	}
 
-	isNewer, err := k3sbaseupgrade.IsNewerVersion(prevVersion, updateVersion)
+	isNewer, err := k3sbasedupgrade.IsNewerVersion(prevVersion, updateVersion)
 	if err != nil {
 		errMsg := fmt.Sprintf("unable to compare cluster version [%s]", updateVersion)
 		return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)

@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/controllers/management/k3sbaseupgrade"
+	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rke/types/image"
@@ -276,7 +276,7 @@ func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) 
 				continue
 			}
 
-			versionGTMin, err := k3sbaseupgrade.IsNewerVersion(minVersion, rancherVersion)
+			versionGTMin, err := k3sbasedupgrade.IsNewerVersion(minVersion, rancherVersion)
 			if err != nil {
 				continue
 			}
@@ -285,7 +285,7 @@ func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) 
 				continue
 			}
 
-			versionLTMax, err := k3sbaseupgrade.IsNewerVersion(rancherVersion, maxVersion)
+			versionLTMax, err := k3sbasedupgrade.IsNewerVersion(rancherVersion, maxVersion)
 			if err != nil {
 				continue
 			}

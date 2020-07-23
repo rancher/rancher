@@ -1,4 +1,4 @@
-package k3sbaseupgrade
+package k3sbasedupgrade
 
 import (
 	"context"
@@ -79,12 +79,13 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 
 		} else {
 
-			if name := plan.Name; strings.Contains(name, "master-plan") {
+			switch name := plan.Name; name {
+			case k3sMasterPlanName, rke2MasterPlanName:
 				if plan.Namespace == systemUpgradeNS {
 					// reference absolute memory location
 					masterPlan = &planList.Items[i]
 				}
-			} else if strings.Contains(name, "worker-plan") {
+			case k3sWorkerPlanName, rke2WorkerPlanName:
 				if plan.Namespace == systemUpgradeNS {
 					// reference absolute memory location
 					workerPlan = &planList.Items[i]
