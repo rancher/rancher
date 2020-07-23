@@ -103,6 +103,7 @@ func buildObservedLabelMaps(collectors []interface{}, targetLabel string, observ
 	// }
 	count := 0
 	for _, collector := range collectors {
+		collector := collector
 		metricChan := make(chan prometheus.Metric)
 		metricFrame := &dto.Metric{}
 		go func() { collector.(prometheus.Collector).Collect(metricChan); close(metricChan) }()
