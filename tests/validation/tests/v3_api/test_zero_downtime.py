@@ -106,34 +106,7 @@ def validate_node_cordon(nodes, workload, timeout=600):
     client = get_user_client()
     start = time.time()
     in_state = set()
-    upgraded_nodes = set()
-    for node in nodes:
-        node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
-        while not (node_k8 == node_ver and node.state == "active"):
-            if time.time() - start > timeout:
-                raise AssertionError(
-                    "Timed out waiting for node upgrade")
-            if node.state == "cordoned":
-                in_state.add(node.uuid)
-            validate_ingress(namespace["p_client"], namespace["cluster"], [workload], host, path)
-            time.sleep(.1)
-            node = client.reload(node)
-            node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
-        if node_k8 == node_ver:
-            upgraded_nodes.add(node.uuid)
-        node = client.reload(node)
-        node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
-        assert node_k8 == node["info"]["kubernetes"]["kubeletVersion"]
-    assert len(in_state) == len(nodes), "nodes failed to achieve desired state"
-    assert len(upgraded_nodes) == len(nodes)
-    return upgraded_nodes
-
-
-def validate_node_drain(nodes, workload, timeout=600, max_unavailable=1):
-    client = get_user_client()
-    start = time.time()
     upgrade_nodes = set()
-    in_state = set()
     while len(upgrade_nodes) != len(nodes):
         if time.time() - start > timeout:
             raise AssertionError(
@@ -142,7 +115,30 @@ def validate_node_drain(nodes, workload, timeout=600, max_unavailable=1):
         for node in nodes:
             node = client.reload(node)
             node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
-            if node.state == "draining":
+            if node.state == "cordoned":
+                in_state.add(node.uuid)
+            if node_k8 == node_ver:
+                upgrade_nodes.add(node.uuid)
+        time.sleep(.1)
+    assert len(in_state) == len(nodes)
+    assert len(upgrade_nodes) == len(nodes)
+    return upgrade_nodes
+
+
+def validate_node_drain(nodes, workload, timeout=600, max_unavailable=1):
+    client = get_user_client()
+    start = time.time()
+    upgrade_nodes = set()
+    in_state = set()
+    while len(upgrade_nodes) != len(nodes):
+        node = client.reload(node)
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for worker nodes to upgrade")
+        validate_ingress(namespace["p_client"], namespace["cluster"], [workload], host, path)
+        for node in nodes:
+            node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
+            if node.state == "draining" or node.state == "drained":
                 in_state.add(node.uuid)
             if node_k8 == node_ver:
                 upgrade_nodes.add(node.uuid)
@@ -203,8 +199,8 @@ def create_zdt_setup(request):
     client = get_user_client()
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
-            len(node_roles), random_test_name(HOST_NAME))
-    cluster, nodes = create_custom_host_from_nodes(aws_nodes, node_roles,
+            len(zero_node_roles), random_test_name(HOST_NAME))
+    cluster, nodes = create_custom_host_from_nodes(aws_nodes, zero_node_roles,
                                                    random_cluster_name=False,
                                                    version=preupgrade_k8s)
     p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsecret" + str(random_int(10000, 99999)))
