@@ -1,4 +1,4 @@
-package k3supgrade
+package k3sbasedupgrade
 
 import (
 	"context"
@@ -20,8 +20,28 @@ const MaxDisplayNodes = 10
 
 // deployPlans creates a master and worker plan in the downstream cluster to instrument
 // the system-upgrade-controller in the downstream cluster
-func (h *handler) deployPlans(cluster *v3.Cluster) error {
-
+func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
+	var (
+		upgradeImage   string
+		masterPlanName string
+		workerPlanName string
+		Version        string
+		strategy       v32.ClusterUpgradeStrategy
+	)
+	switch {
+	case isRke2:
+		upgradeImage = rke2upgradeImage
+		masterPlanName = rke2MasterPlanName
+		workerPlanName = rke2WorkerPlanName
+		Version = cluster.Spec.Rke2Config.Version
+		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
+	case isK3s:
+		upgradeImage = k3supgradeImage
+		masterPlanName = k3sMasterPlanName
+		workerPlanName = k3sWorkerPlanName
+		Version = cluster.Spec.K3sConfig.Version
+		strategy = cluster.Spec.K3sConfig.ClusterUpgradeStrategy
+	}
 	// access downstream cluster
 	clusterCtx, err := h.manager.UserContext(cluster.Name)
 	if err != nil {
@@ -60,12 +80,12 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 		} else {
 
 			switch name := plan.Name; name {
-			case k3sMasterPlanName:
+			case k3sMasterPlanName, rke2MasterPlanName:
 				if plan.Namespace == systemUpgradeNS {
 					// reference absolute memory location
 					masterPlan = &planList.Items[i]
 				}
-			case k3sWorkerPlanName:
+			case k3sWorkerPlanName, rke2WorkerPlanName:
 				if plan.Namespace == systemUpgradeNS {
 					// reference absolute memory location
 					workerPlan = &planList.Items[i]
@@ -76,9 +96,9 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 	// if rancher plans exist, do we need to update?
 	if masterPlan.Name != "" || workerPlan.Name != "" {
 		if masterPlan.Name != "" {
-			newMaster := configureMasterPlan(*masterPlan, cluster.Spec.K3sConfig.Version,
-				cluster.Spec.K3sConfig.ServerConcurrency,
-				cluster.Spec.K3sConfig.DrainServerNodes)
+			newMaster := configureMasterPlan(*masterPlan, Version,
+				strategy.ServerConcurrency,
+				strategy.DrainServerNodes, masterPlanName)
 
 			if !cmp(*masterPlan, newMaster) {
 				planClient = planConfig.Plans(systemUpgradeNS)
@@ -90,9 +110,9 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 		}
 
 		if workerPlan.Name != "" {
-			newWorker := configureWorkerPlan(*workerPlan, cluster.Spec.K3sConfig.Version,
-				cluster.Spec.K3sConfig.WorkerConcurrency,
-				cluster.Spec.K3sConfig.DrainWorkerNodes)
+			newWorker := configureWorkerPlan(*workerPlan, Version,
+				strategy.WorkerConcurrency,
+				strategy.DrainWorkerNodes, upgradeImage, workerPlanName, masterPlanName)
 
 			if !cmp(*workerPlan, newWorker) {
 				planClient = planConfig.Plans(systemUpgradeNS)
@@ -105,17 +125,17 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 
 	} else { // create the plans
 		planClient = planConfig.Plans(systemUpgradeNS)
-		genMasterPlan := generateMasterPlan(cluster.Spec.K3sConfig.Version,
-			cluster.Spec.K3sConfig.ServerConcurrency,
-			cluster.Spec.K3sConfig.DrainServerNodes)
+		genMasterPlan := generateMasterPlan(Version,
+			strategy.ServerConcurrency,
+			strategy.DrainServerNodes, upgradeImage, masterPlanName)
 
 		masterPlan, err = planClient.Create(context.TODO(), &genMasterPlan, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
-		genWorkerPlan := generateWorkerPlan(cluster.Spec.K3sConfig.Version,
-			cluster.Spec.K3sConfig.WorkerConcurrency,
-			cluster.Spec.K3sConfig.DrainWorkerNodes)
+		genWorkerPlan := generateWorkerPlan(Version,
+			strategy.WorkerConcurrency,
+			strategy.DrainWorkerNodes, upgradeImage, workerPlanName, masterPlanName)
 
 		workerPlan, err = planClient.Create(context.TODO(), &genWorkerPlan, metav1.CreateOptions{})
 		if err != nil {
@@ -124,7 +144,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster) error {
 		logrus.Infof("Plans successfully deployed into cluster %s", cluster.Name)
 	}
 
-	cluster, err = h.modifyClusterCondition(cluster, *masterPlan, *workerPlan)
+	cluster, err = h.modifyClusterCondition(cluster, *masterPlan, *workerPlan, strategy)
 	if err != nil {
 		return err
 	}
@@ -158,7 +178,7 @@ func cmp(a, b planv1.Plan) bool {
 }
 
 //cluster state management during the upgrade, plans may be ""
-func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, workerPlan planv1.Plan) (*v3.Cluster, error) {
+func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, workerPlan planv1.Plan, strategy v32.ClusterUpgradeStrategy) (*v3.Cluster, error) {
 
 	// implement a simple state machine
 	// UpgradedTrue => GenericUpgrading =>  MasterPlanUpgrading || WorkerPlanUpgrading =>  UpgradedTrue
@@ -178,7 +198,7 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
 		v32.ClusterConditionUpgraded.Unknown(cluster)
-		c := cluster.Spec.K3sConfig.ServerConcurrency
+		c := strategy.ServerConcurrency
 		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded",
 			upgradingMessage(c, masterPlan.Status.Applying))
 		return h.enqueueOrUpdate(cluster, masterPlanMessage)
@@ -187,7 +207,7 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 
 	if workerPlan.Name != "" && len(workerPlan.Status.Applying) > 0 {
 		v32.ClusterConditionUpgraded.Unknown(cluster)
-		c := cluster.Spec.K3sConfig.WorkerConcurrency
+		c := strategy.WorkerConcurrency
 		workerPlanMessage := fmt.Sprintf("worker node [%s] being upgraded",
 			upgradingMessage(c, workerPlan.Status.Applying))
 		return h.enqueueOrUpdate(cluster, workerPlanMessage)

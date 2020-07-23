@@ -1,4 +1,4 @@
-package k3supgrade
+package k3sbasedupgrade
 
 import "testing"
 

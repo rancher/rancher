@@ -1,4 +1,4 @@
-package k3supgrade
+package k3sbasedupgrade
 
 import (
 	"fmt"
@@ -26,22 +26,39 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return nil, nil
 	}
+	isK3s := cluster.Status.Driver == v32.ClusterDriverK3s
+	isRke2 := cluster.Status.Driver == v32.ClusterDriverRke2
+	// only applies to k3s/rke2 clusters
+	if !isK3s && !isRke2 {
+		return cluster, nil
+	}
+	var (
+		updateVersion string
+		strategy      v32.ClusterUpgradeStrategy
+	)
+	switch {
+	case isK3s:
+		updateVersion = cluster.Spec.K3sConfig.Version
+		strategy = cluster.Spec.K3sConfig.ClusterUpgradeStrategy
+	case isRke2:
+		updateVersion = cluster.Spec.Rke2Config.Version
+		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
 
-	// only applies to k3s clusters
-	if cluster.Status.Driver != v32.ClusterDriverK3s {
+	}
+	if updateVersion == "" {
 		return cluster, nil
 	}
 
-	if cluster.Spec.K3sConfig == nil || cluster.Spec.K3sConfig.Version == "" {
+	if (isK3s && cluster.Spec.K3sConfig == nil) || (isRke2 && cluster.Spec.Rke2Config == nil) {
 		return cluster, nil
 	}
 
-	isNewer, err := IsNewerVersion(cluster.Status.Version.GitVersion, cluster.Spec.K3sConfig.Version)
+	isNewer, err := IsNewerVersion(cluster.Status.Version.GitVersion, updateVersion)
 	if err != nil {
 		return cluster, err
 	}
 	if !isNewer {
-		needsUpgrade, err := h.nodesNeedUpgrade(cluster)
+		needsUpgrade, err := h.nodesNeedUpgrade(cluster, updateVersion)
 		if err != nil {
 			return cluster, err
 		}
@@ -57,27 +74,27 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 
 	}
 	// set cluster upgrading status
-	cluster, err = h.modifyClusterCondition(cluster, planv1.Plan{}, planv1.Plan{})
+	cluster, err = h.modifyClusterCondition(cluster, planv1.Plan{}, planv1.Plan{}, strategy)
 	if err != nil {
 		return cluster, err
 	}
 
 	// create or update k3supgradecontroller if necessary
-	if err = h.deployK3sUpgradeController(cluster.Name); err != nil {
+	if err = h.deployK3sBasedUpgradeController(cluster.Name); err != nil {
 		return cluster, err
 	}
 
 	// deploy plans into downstream cluster
-	if err = h.deployPlans(cluster); err != nil {
+	if err = h.deployPlans(cluster, isK3s, isRke2); err != nil {
 		return cluster, err
 	}
 
 	return cluster, nil
 }
 
-// deployK3sUpgradeController creates a rancher k3s upgrader controller if one does not exist.
+// deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
 // Updates k3s upgrader controller if one exists and is not the newest available version.
-func (h *handler) deployK3sUpgradeController(clusterName string) error {
+func (h *handler) deployK3sBasedUpgradeController(clusterName string) error {
 	userCtx, err := h.manager.UserContext(clusterName)
 	if err != nil {
 		return err
@@ -133,7 +150,7 @@ func (h *handler) deployK3sUpgradeController(clusterName string) error {
 				},
 			},
 			Spec: v33.AppSpec{
-				Description:     "Upgrade controller for k3s clusters",
+				Description:     "Upgrade controller for k3s based clusters",
 				ExternalID:      latestVersionID,
 				ProjectName:     appProjectName,
 				TargetNamespace: systemUpgradeNS,
@@ -198,13 +215,13 @@ func IsNewerVersion(prevVersion, updatedVersion string) (bool, error) {
 }
 
 //nodeNeedsUpgrade checks all nodes in cluster, returns true if they still need to be upgraded
-func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster) (bool, error) {
+func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster, version string) (bool, error) {
 	v3NodeList, err := h.nodeLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return false, err
 	}
 	for _, node := range v3NodeList {
-		isNewer, err := IsNewerVersion(node.Status.InternalNodeStatus.NodeInfo.KubeletVersion, cluster.Spec.K3sConfig.Version)
+		isNewer, err := IsNewerVersion(node.Status.InternalNodeStatus.NodeInfo.KubeletVersion, version)
 		if err != nil {
 			return false, err
 		}
