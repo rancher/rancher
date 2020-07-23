@@ -224,8 +224,8 @@ func (v *Validator) validateK3sBaseVersionUpgrade(request *types.APIContext, spe
 		// only applies to k3s clusters
 		return nil
 	}
-	isK3s:= spec.K3sConfig!=nil
-	isrke2:=spec.Rke2Config!=nil
+	isK3s := spec.K3sConfig != nil
+	isrke2 := spec.Rke2Config != nil
 	// must wait for original spec version to be set
 	if (isK3s && spec.K3sConfig.Version == "") || (isrke2 && spec.Rke2Config.Version == "") {
 		return upgradeNotReadyErr
