@@ -349,6 +349,72 @@ func (c *CloudFormation) WaitUntilStackImportCompleteWithContext(ctx aws.Context
 	return w.WaitWithContext(ctx)
 }
 
+// WaitUntilStackRollbackComplete uses the AWS CloudFormation API operation
+// DescribeStacks to wait for a condition to be met before returning.
+// If the condition is not met within the max attempt window, an error will
+// be returned.
+func (c *CloudFormation) WaitUntilStackRollbackComplete(input *DescribeStacksInput) error {
+	return c.WaitUntilStackRollbackCompleteWithContext(aws.BackgroundContext(), input)
+}
+
+// WaitUntilStackRollbackCompleteWithContext is an extended version of WaitUntilStackRollbackComplete.
+// With the support for passing in a context and options to configure the
+// Waiter and the underlying request options.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *CloudFormation) WaitUntilStackRollbackCompleteWithContext(ctx aws.Context, input *DescribeStacksInput, opts ...request.WaiterOption) error {
+	w := request.Waiter{
+		Name:        "WaitUntilStackRollbackComplete",
+		MaxAttempts: 120,
+		Delay:       request.ConstantWaiterDelay(30 * time.Second),
+		Acceptors: []request.WaiterAcceptor{
+			{
+				State:   request.SuccessWaiterState,
+				Matcher: request.PathAllWaiterMatch, Argument: "Stacks[].StackStatus",
+				Expected: "UPDATE_ROLLBACK_COMPLETE",
+			},
+			{
+				State:   request.FailureWaiterState,
+				Matcher: request.PathAnyWaiterMatch, Argument: "Stacks[].StackStatus",
+				Expected: "UPDATE_FAILED",
+			},
+			{
+				State:   request.FailureWaiterState,
+				Matcher: request.PathAnyWaiterMatch, Argument: "Stacks[].StackStatus",
+				Expected: "UPDATE_ROLLBACK_FAILED",
+			},
+			{
+				State:   request.FailureWaiterState,
+				Matcher: request.PathAnyWaiterMatch, Argument: "Stacks[].StackStatus",
+				Expected: "DELETE_FAILED",
+			},
+			{
+				State:    request.FailureWaiterState,
+				Matcher:  request.ErrorWaiterMatch,
+				Expected: "ValidationError",
+			},
+		},
+		Logger: c.Config.Logger,
+		NewRequest: func(opts []request.Option) (*request.Request, error) {
+			var inCpy *DescribeStacksInput
+			if input != nil {
+				tmp := *input
+				inCpy = &tmp
+			}
+			req, _ := c.DescribeStacksRequest(inCpy)
+			req.SetContext(ctx)
+			req.ApplyOptions(opts...)
+			return req, nil
+		},
+	}
+	w.ApplyOptions(opts...)
+
+	return w.WaitWithContext(ctx)
+}
+
 // WaitUntilStackUpdateComplete uses the AWS CloudFormation API operation
 // DescribeStacks to wait for a condition to be met before returning.
 // If the condition is not met within the max attempt window, an error will

@@ -118,6 +118,7 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return err
 	}
 	logrus.Tracef("clusterDeploy: doSync: found [%d] nodes for cluster [%s]", len(nodes), cluster.Name)
+
 	if len(nodes) == 0 {
 		return nil
 	}

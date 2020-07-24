@@ -18,6 +18,7 @@ const (
 	ClusterStatusFieldConditions                           = "conditions"
 	ClusterStatusFieldCurrentCisRunName                    = "currentCisRunName"
 	ClusterStatusFieldDriver                               = "driver"
+	ClusterStatusFieldEKSStatus                            = "eksStatus"
 	ClusterStatusFieldFailedSpec                           = "failedSpec"
 	ClusterStatusFieldIstioEnabled                         = "istioEnabled"
 	ClusterStatusFieldLimits                               = "limits"
@@ -46,6 +47,7 @@ type ClusterStatus struct {
 	Conditions                           []ClusterCondition          `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	CurrentCisRunName                    string                      `json:"currentCisRunName,omitempty" yaml:"currentCisRunName,omitempty"`
 	Driver                               string                      `json:"driver,omitempty" yaml:"driver,omitempty"`
+	EKSStatus                            *EKSStatus                  `json:"eksStatus,omitempty" yaml:"eksStatus,omitempty"`
 	FailedSpec                           *ClusterSpec                `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	IstioEnabled                         bool                        `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	Limits                               map[string]string           `json:"limits,omitempty" yaml:"limits,omitempty"`
