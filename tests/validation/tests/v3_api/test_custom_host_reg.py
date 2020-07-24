@@ -64,37 +64,43 @@ def test_deploy_rancher_server():
     token = set_url_password_token(RANCHER_SERVER_URL)
     admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                   token=token, verify=False)
-    enable_url = \
-        RANCHER_SERVER_URL + "/v3/" + AUTH_PROVIDER + \
-        "Configs/" + AUTH_PROVIDER.lower() + "?action=testAndApply"
-    auth_admin_user = load_setup_data()["admin_user"]
-    auth_user_login_url = \
-        RANCHER_SERVER_URL + "/v3-public/" + AUTH_PROVIDER + "Providers/" \
-        + AUTH_PROVIDER.lower() + "?action=login"
 
-    if AUTH_PROVIDER == "activeDirectory":
+    if AUTH_PROVIDER:
 
-        enable_ad(auth_admin_user, token, enable_url=enable_url,
-                  password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
-        user_token = login_as_auth_user(load_setup_data()["standard_user"],
-                                        AUTH_USER_PASSWORD,
-                                        login_url=auth_user_login_url)["token"]
-    elif AUTH_PROVIDER == "openLdap":
+        enable_url = \
+            RANCHER_SERVER_URL + "/v3/" + AUTH_PROVIDER + \
+            "Configs/" + AUTH_PROVIDER.lower() + "?action=testAndApply"
+        auth_admin_user = load_setup_data()["admin_user"]
+        auth_user_login_url = \
+            RANCHER_SERVER_URL + "/v3-public/" + AUTH_PROVIDER + "Providers/" \
+            + AUTH_PROVIDER.lower() + "?action=login"
 
-        enable_openldap(auth_admin_user, token, enable_url=enable_url,
-                        password=OPENLDAP_AUTH_USER_PASSWORD,
-                        nested=NESTED_GROUP_ENABLED)
-        user_token = login_as_auth_user(load_setup_data()["standard_user"],
-                                        OPENLDAP_AUTH_USER_PASSWORD,
-                                        login_url=auth_user_login_url)["token"]
-    elif AUTH_PROVIDER == "freeIpa":
+        if AUTH_PROVIDER == "activeDirectory":
 
-        enable_freeipa(auth_admin_user, token, enable_url=enable_url,
-                       password=FREEIPA_AUTH_USER_PASSWORD,
-                       nested=NESTED_GROUP_ENABLED)
-        user_token = login_as_auth_user(load_setup_data()["standard_user"],
-                                        FREEIPA_AUTH_USER_PASSWORD,
-                                        login_url=auth_user_login_url)["token"]
+            enable_ad(auth_admin_user, token, enable_url=enable_url,
+                      password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
+            user_token = login_as_auth_user(
+                load_setup_data()["standard_user"],
+                AUTH_USER_PASSWORD,
+                login_url=auth_user_login_url)["token"]
+        elif AUTH_PROVIDER == "openLdap":
+
+            enable_openldap(auth_admin_user, token, enable_url=enable_url,
+                            password=OPENLDAP_AUTH_USER_PASSWORD,
+                            nested=NESTED_GROUP_ENABLED)
+            user_token = login_as_auth_user(
+                load_setup_data()["standard_user"],
+                OPENLDAP_AUTH_USER_PASSWORD,
+                login_url=auth_user_login_url)["token"]
+        elif AUTH_PROVIDER == "freeIpa":
+
+             enable_freeipa(auth_admin_user, token, enable_url=enable_url,
+                           password=FREEIPA_AUTH_USER_PASSWORD,
+                           nested=NESTED_GROUP_ENABLED)
+             user_token = login_as_auth_user(
+                 load_setup_data()["standard_user"],
+                 FREEIPA_AUTH_USER_PASSWORD,
+                 login_url=auth_user_login_url)["token"]
     else:
         AUTH_URL = \
             RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
