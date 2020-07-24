@@ -28,6 +28,9 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 	if err := managementstored.Setup(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled); err != nil {
 		return nil, err
 	}
+	if err := managementstored.AddOpenAPIV3SchemaToCRD(ctx, scaledContext); err != nil {
+		return nil, err
+	}
 
 	if err := userstored.Setup(ctx, scaledContext, clusterManager, k8sProxy); err != nil {
 		return nil, err

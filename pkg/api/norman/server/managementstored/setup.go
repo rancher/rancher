@@ -57,6 +57,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/store/scoped"
 	settingstore "github.com/rancher/rancher/pkg/api/norman/store/setting"
 	"github.com/rancher/rancher/pkg/api/norman/store/userscope"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authapi "github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/api/user"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
@@ -73,6 +74,9 @@ import (
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/schemas/openapi"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager,
@@ -212,6 +216,27 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	GlobalDNSProvidersPwdWrap(schemas, apiContext, localClusterEnabled)
 
 	return nil
+}
+
+func AddOpenAPIV3SchemaToCRD(ctx context.Context, apiContext *config.ScaledContext) error {
+	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
+	apiClient, err := factory.ClientGetter.APIExtClient(nil, config.ManagementStorageContext)
+	if err != nil {
+		return err
+	}
+	clusterCRD, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(ctx, "clusters.management.cattle.io", metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	clusterOpenAPISchema, err := openapi.ToOpenAPIFromStruct(v3.ClusterSpec{})
+	if err != nil {
+		return err
+	}
+	clusterCRD.Spec.Validation = &apiext.CustomResourceValidation{
+		OpenAPIV3Schema: clusterOpenAPISchema,
+	}
+	_, err = apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(ctx, clusterCRD, metav1.UpdateOptions{})
+	return err
 }
 
 func setupPasswordTypes(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
