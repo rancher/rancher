@@ -192,22 +192,26 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		// If there are no subnets it can be assumed that networking fields are not provided. In which case they
 		// should be created by the eks-operator, and needs to be copied to the cluster object.
 		if len(cluster.Status.EKSStatus.Subnets) == 0 {
-			if status["virtualNetwork"] != "" {
+			subnets, _ := status["subnets"].([]interface{})
+			if len(subnets) != 0 {
 				// network field have been generated and are ready to be copied
 				virtualNetwork, _ := status["virtualNetwork"].(string)
-				generatedSubnets, _ := status["subnets"].([]interface{})
-				generatedSecurityGroups, _ := status["securityGroups"].([]interface{})
+				subnets, _ := status["subnets"].([]interface{})
+				securityGroups, _ := status["securityGroups"].([]interface{})
 				cluster = cluster.DeepCopy()
 
 				// change fields on status to not be generated
 				cluster.Status.EKSStatus.VirtualNetwork = virtualNetwork
-				for _, val := range generatedSubnets {
+				for _, val := range subnets {
 					cluster.Status.EKSStatus.Subnets = append(cluster.Status.EKSStatus.Subnets, val.(string))
 				}
-				for _, val := range generatedSecurityGroups {
+				for _, val := range securityGroups {
 					cluster.Status.EKSStatus.SecurityGroups = append(cluster.Status.EKSStatus.SecurityGroups, val.(string))
 				}
-				return e.clusterClient.Update(cluster)
+				cluster, err = e.clusterClient.Update(cluster)
+				if err != nil {
+					return cluster, err
+				}
 			}
 		}
 
@@ -230,18 +234,6 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		}
 
 		failureMessage, _ := status["failureMessage"].(string)
-		if failureMessage != apimgmtv3.ClusterConditionUpdated.GetMessage(cluster) {
-			cluster = cluster.DeepCopy()
-			apimgmtv3.ClusterConditionUpdated.Message(cluster, failureMessage)
-			if failureMessage != "" {
-				apimgmtv3.ClusterConditionUpdated.False(cluster)
-			}
-			cluster, err = e.clusterClient.Update(cluster)
-			if err != nil {
-				return cluster, fmt.Errorf("failure setting updating condition for cluster [%s]: %v", cluster.Name, err)
-			}
-		}
-
 		e.clusterEnqueueAfter(cluster.Name, 20*time.Second)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster EKS [%s] to update", cluster.Name)
@@ -264,7 +256,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	}
 }
 
-func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, eksClusterConfigDynamic *unstructured.Unstructured, oldSpec map[string]interface{}) (*mgmtv3.Cluster, error) {
+func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, eksClusterConfigDynamic *unstructured.Unstructured, spec map[string]interface{}) (*mgmtv3.Cluster, error) {
 	// configs are not equal, need to update EKS cluster config
 	// getting resource version for watch
 	list, err := e.dynamicClient.Namespace(namespace.GlobalNamespace).List(context.TODO(), v1.ListOptions{})
@@ -276,7 +268,7 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 	if err != nil {
 		return cluster, err
 	}
-	eksClusterConfigDynamic.Object["spec"] = oldSpec
+	eksClusterConfigDynamic.Object["spec"] = spec
 	eksClusterConfigDynamic, err = e.dynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), eksClusterConfigDynamic, v1.UpdateOptions{})
 	if err != nil {
 		return cluster, err
