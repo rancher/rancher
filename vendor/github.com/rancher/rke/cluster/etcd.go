@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -48,6 +49,44 @@ func (c *Cluster) DeployRestoreCerts(ctx context.Context, clusterCerts map[strin
 		return err
 	}
 	return nil
+}
+
+func (c *Cluster) DeployStateFile(ctx context.Context, fullState *FullState, snapshotName string) error {
+	var errgrp errgroup.Group
+	hostsQueue := util.GetObjectQueue(c.EtcdHosts)
+	stateFile, err := json.MarshalIndent(fullState, "", "  ")
+	if err != nil {
+		return err
+	}
+	for w := 0; w < WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				err := pki.DeployStateOnPlaneHost(ctx, host.(*hosts.Host), c.SystemImages.CertDownloader, c.PrivateRegistriesMap, string(stateFile), snapshotName)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Cluster) GetStateFileFromSnapshot(ctx context.Context, snapshotName string) (string, error) {
+	backupImage := c.getBackupImage()
+	for _, host := range c.EtcdHosts {
+		stateFile, err := services.RunGetStateFileFromSnapshot(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotName, c.Services.Etcd)
+		if err != nil || stateFile == "" {
+			logrus.Infof("Could not extract state file from snapshot [%s] on host [%s]", snapshotName, host.Address)
+			continue
+		}
+		return stateFile, nil
+	}
+	return "", fmt.Errorf("Unable to find statefile in snapshot [%s]", snapshotName)
 }
 
 func (c *Cluster) PrepareBackup(ctx context.Context, snapshotPath string) error {

@@ -35,6 +35,7 @@ const (
 	EtcdDownloadBackupContainerName = "etcd-download-backup"
 	EtcdServeBackupContainerName    = "etcd-Serve-backup"
 	EtcdChecksumContainerName       = "etcd-checksum-checker"
+	EtcdStateFileContainerName      = "etcd-extract-statefile"
 	NginxProxyContainerName         = "nginx-proxy"
 	SidekickContainerName           = "service-sidekick"
 	LogLinkContainerName            = "rke-log-linker"

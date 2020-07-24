@@ -228,6 +228,19 @@ func GetCertificateDirPath(configPath, configDir string) string {
 	return trimmedName + certDirExt
 }
 
+func StringToFullState(ctx context.Context, stateFileContent string) (*FullState, error) {
+	rkeFullState := &FullState{}
+	logrus.Tracef("stateFileContent: %s", stateFileContent)
+	if err := json.Unmarshal([]byte(stateFileContent), rkeFullState); err != nil {
+		return rkeFullState, err
+	}
+	rkeFullState.DesiredState.CertificatesBundle = pki.TransformPEMToObject(rkeFullState.DesiredState.CertificatesBundle)
+	rkeFullState.CurrentState.CertificatesBundle = pki.TransformPEMToObject(rkeFullState.CurrentState.CertificatesBundle)
+	logrus.Tracef("rkeFullState: %+v", rkeFullState)
+
+	return rkeFullState, nil
+}
+
 func ReadStateFile(ctx context.Context, statePath string) (*FullState, error) {
 	rkeFullState := &FullState{}
 	fp, err := filepath.Abs(statePath)
