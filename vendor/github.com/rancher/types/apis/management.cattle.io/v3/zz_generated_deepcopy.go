@@ -521,6 +521,23 @@ func (in *BaseService) DeepCopyInto(out *BaseService) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.WindowsExtraArgs != nil {
+		in, out := &in.WindowsExtraArgs, &out.WindowsExtraArgs
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.WindowsExtraBinds != nil {
+		in, out := &in.WindowsExtraBinds, &out.WindowsExtraBinds
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.WindowsExtraEnv != nil {
+		in, out := &in.WindowsExtraEnv, &out.WindowsExtraEnv
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
