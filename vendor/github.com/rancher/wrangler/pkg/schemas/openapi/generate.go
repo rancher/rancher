@@ -52,7 +52,7 @@ func toOpenAPI(name string, schemas *types.Schemas) (*v1beta1.JSONSchemaProps, e
 	delete(newSchema.ResourceFields, "apiVersion")
 	delete(newSchema.ResourceFields, "metadata")
 
-	return schemaToProps(newSchema, schemas, map[string]bool{})
+	return SchemaToProps(newSchema, schemas, map[string]bool{})
 }
 
 func populateField(fieldJSP *v1beta1.JSONSchemaProps, f *types.Field) error {
@@ -104,7 +104,7 @@ func typeToProps(typeName string, schemas *types.Schemas, inflight map[string]bo
 	}
 
 	if schema != nil {
-		return schemaToProps(schema, schemas, inflight)
+		return SchemaToProps(schema, schemas, inflight)
 	}
 
 	jsp := &v1beta1.JSONSchemaProps{}
@@ -139,7 +139,7 @@ func typeToProps(typeName string, schemas *types.Schemas, inflight map[string]bo
 	return jsp, nil
 }
 
-func schemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[string]bool) (*v1beta1.JSONSchemaProps, error) {
+func SchemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[string]bool) (*v1beta1.JSONSchemaProps, error) {
 	jsp := &v1beta1.JSONSchemaProps{
 		Description: schema.Description,
 		Type:        "object",

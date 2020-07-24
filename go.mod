@@ -10,6 +10,8 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
 
+	github.com/rancher/wrangler => github.com/mrajashree/wrangler v0.6.2-0.20200723185507-4e5709808e36
+
 	k8s.io/api => k8s.io/api v0.18.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.18.0
