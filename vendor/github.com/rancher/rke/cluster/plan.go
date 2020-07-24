@@ -85,39 +85,40 @@ func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConf
 		if err != nil {
 			return clusterPlan, err
 		}
-		clusterPlan.Nodes = append(clusterPlan.Nodes, BuildRKEConfigNodePlan(ctx, myCluster, host, hostsInfoMap[host.Address], svcOptions))
+		clusterPlan.Nodes = append(clusterPlan.Nodes, BuildRKEConfigNodePlan(ctx, myCluster, host, svcOptions))
 	}
 	return clusterPlan, nil
 }
 
-func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts.Host, hostDockerInfo types.Info, svcOptions v3.KubernetesServicesOptions) v3.RKEConfigNodePlan {
-	prefixPath := hosts.GetPrefixPath(hostDockerInfo.OperatingSystem, myCluster.PrefixPath)
-	processes := map[string]v3.Process{}
-	portChecks := []v3.PortCheck{}
+func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts.Host, svcOptions v3.KubernetesServicesOptions) v3.RKEConfigNodePlan {
+	var portChecks []v3.PortCheck
+	processes := make(map[string]v3.Process)
+	host.SetPrefixPath(myCluster.getPrefixPath(host.OS()))
+
 	// Everybody gets a sidecar and a kubelet..
-	processes[services.SidekickContainerName] = myCluster.BuildSidecarProcess(host, prefixPath)
-	processes[services.KubeletContainerName] = myCluster.BuildKubeletProcess(host, prefixPath, svcOptions)
-	processes[services.KubeproxyContainerName] = myCluster.BuildKubeProxyProcess(host, prefixPath, svcOptions)
+	processes[services.SidekickContainerName] = myCluster.BuildSidecarProcess(host)
+	processes[services.KubeletContainerName] = myCluster.BuildKubeletProcess(host, svcOptions)
+	processes[services.KubeproxyContainerName] = myCluster.BuildKubeProxyProcess(host, svcOptions)
 
 	portChecks = append(portChecks, BuildPortChecksFromPortList(host, WorkerPortList, ProtocolTCP)...)
 	// Do we need an nginxProxy for this one ?
 	if !host.IsControl {
-		processes[services.NginxProxyContainerName] = myCluster.BuildProxyProcess(host, prefixPath)
+		processes[services.NginxProxyContainerName] = myCluster.BuildProxyProcess(host)
 	}
 	if host.IsControl {
-		processes[services.KubeAPIContainerName] = myCluster.BuildKubeAPIProcess(host, prefixPath, svcOptions)
-		processes[services.KubeControllerContainerName] = myCluster.BuildKubeControllerProcess(host, prefixPath, svcOptions)
-		processes[services.SchedulerContainerName] = myCluster.BuildSchedulerProcess(host, prefixPath, svcOptions)
+		processes[services.KubeAPIContainerName] = myCluster.BuildKubeAPIProcess(host, svcOptions)
+		processes[services.KubeControllerContainerName] = myCluster.BuildKubeControllerProcess(host, svcOptions)
+		processes[services.SchedulerContainerName] = myCluster.BuildSchedulerProcess(host, svcOptions)
 
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, ControlPlanePortList, ProtocolTCP)...)
 	}
 	if host.IsEtcd {
-		processes[services.EtcdContainerName] = myCluster.BuildEtcdProcess(host, myCluster.EtcdReadyHosts, prefixPath, svcOptions)
+		processes[services.EtcdContainerName] = myCluster.BuildEtcdProcess(host, myCluster.EtcdReadyHosts, svcOptions)
 
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, EtcdPortList, ProtocolTCP)...)
 	}
 	files := []v3.File{
-		v3.File{
+		{
 			Name:     cloudConfigFileName,
 			Contents: b64.StdEncoding.EncodeToString([]byte(myCluster.CloudConfigFile)),
 		},
@@ -130,7 +131,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 	}
 	return v3.RKEConfigNodePlan{
 		Address:    host.Address,
-		Processes:  osLimitationFilter(hostDockerInfo.OSType, processes),
+		Processes:  host.ProcessFilter(processes),
 		PortChecks: portChecks,
 		Files:      files,
 		Annotations: map[string]string{
@@ -141,38 +142,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 	}
 }
 
-func osLimitationFilter(osType string, processes map[string]v3.Process) map[string]v3.Process {
-	if osType != "windows" {
-		return processes
-	}
-
-	// windows limitations
-	for name, process := range processes {
-		// doesn't support host network on windows
-		if process.NetworkMode == "host" {
-			process.NetworkMode = ""
-		}
-
-		// doesn't support PID on windows
-		if process.PidMode != "" {
-			process.PidMode = ""
-		}
-
-		// doesn't support privileged mode on windows
-		if process.Privileged {
-			process.Privileged = false
-		}
-
-		// doesn't execute health check
-		process.HealthCheck = v3.HealthCheck{}
-
-		processes[name] = process
-	}
-
-	return processes
-}
-
-func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, serviceOptions v3.KubernetesServicesOptions) v3.Process {
+func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, serviceOptions v3.KubernetesServicesOptions) v3.Process {
 	// check if external etcd is used
 	etcdConnectionString := services.GetEtcdConnString(c.EtcdHosts, host.InternalAddress)
 	etcdPathPrefix := EtcdPathPrefix
@@ -188,11 +158,7 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, servi
 		etcdCAClientCert = pki.GetCertPath(pki.EtcdClientCACertName)
 	}
 
-	Command := []string{
-		c.getRKEToolsEntryPoint(),
-		"kube-apiserver",
-	}
-
+	Command := c.getRKEToolsEntryPoint(host.OS(), "kube-apiserver")
 	CommandArgs := map[string]string{
 		"client-ca-file":               pki.GetCertPath(pki.CACertName),
 		"cloud-provider":               c.CloudProvider.Name,
@@ -293,10 +259,10 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, servi
 		services.SidekickContainerName,
 	}
 	Binds := []string{
-		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
+		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
 	}
 	if c.Services.KubeAPI.AuditLog != nil && c.Services.KubeAPI.AuditLog.Enabled {
-		Binds = append(Binds, fmt.Sprintf("%s:/var/log/kube-audit:z", path.Join(prefixPath, "/var/log/kube-audit")))
+		Binds = append(Binds, fmt.Sprintf("%s:/var/log/kube-audit:z", path.Join(host.PrefixPath, "/var/log/kube-audit")))
 	}
 
 	// Override args if they exist, add additional args
@@ -335,12 +301,8 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, servi
 	}
 }
 
-func (c *Cluster) BuildKubeControllerProcess(host *hosts.Host, prefixPath string, serviceOptions v3.KubernetesServicesOptions) v3.Process {
-	Command := []string{
-		c.getRKEToolsEntryPoint(),
-		"kube-controller-manager",
-	}
-
+func (c *Cluster) BuildKubeControllerProcess(host *hosts.Host, serviceOptions v3.KubernetesServicesOptions) v3.Process {
+	Command := c.getRKEToolsEntryPoint(host.OS(), "kube-controller-manager")
 	CommandArgs := map[string]string{
 		"cloud-provider":                   c.CloudProvider.Name,
 		"cluster-cidr":                     c.ClusterCIDR,
@@ -381,7 +343,7 @@ func (c *Cluster) BuildKubeControllerProcess(host *hosts.Host, prefixPath string
 		services.SidekickContainerName,
 	}
 	Binds := []string{
-		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
+		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
 	}
 
 	for arg, value := range c.Services.KubeController.ExtraArgs {
@@ -420,32 +382,23 @@ func (c *Cluster) BuildKubeControllerProcess(host *hosts.Host, prefixPath string
 	}
 }
 
-func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, serviceOptions v3.KubernetesServicesOptions) v3.Process {
-	Command := []string{
-		c.getRKEToolsEntryPoint(),
-		"kubelet",
-	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
-		Command = []string{
-			"pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/usr/bin/entrypoint.ps1",
-			"kubelet",
-		}
-	}
-
+func (c *Cluster) BuildKubeletProcess(host *hosts.Host, serviceOptions v3.KubernetesServicesOptions) v3.Process {
+	kubelet := &c.Services.Kubelet
+	Command := c.getRKEToolsEntryPoint(host.OS(), "kubelet")
 	CommandArgs := map[string]string{
 		"client-ca-file":            pki.GetCertPath(pki.CACertName),
 		"cloud-provider":            c.CloudProvider.Name,
 		"cluster-dns":               c.ClusterDNSServer,
 		"cluster-domain":            c.ClusterDomain,
-		"fail-swap-on":              strconv.FormatBool(c.Services.Kubelet.FailSwapOn),
+		"fail-swap-on":              strconv.FormatBool(kubelet.FailSwapOn),
 		"hostname-override":         host.HostnameOverride,
 		"kubeconfig":                pki.GetConfigPath(pki.KubeNodeCertName),
-		"pod-infra-container-image": c.Services.Kubelet.InfraContainerImage,
-		"root-dir":                  path.Join(prefixPath, "/var/lib/kubelet"),
+		"pod-infra-container-image": kubelet.InfraContainerImage,
+		"root-dir":                  path.Join(host.PrefixPath, "/var/lib/kubelet"),
 	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
-		CommandArgs["kubeconfig"] = path.Join(prefixPath, pki.GetConfigPath(pki.KubeNodeCertName))
-		CommandArgs["client-ca-file"] = path.Join(prefixPath, pki.GetCertPath(pki.CACertName))
+	if host.IsWindows() { // compatible with Windows
+		CommandArgs["kubeconfig"] = path.Join(host.PrefixPath, pki.GetConfigPath(pki.KubeNodeCertName))
+		CommandArgs["client-ca-file"] = path.Join(host.PrefixPath, pki.GetCertPath(pki.CACertName))
 		// this's a stopgap, we could drop this after https://github.com/kubernetes/kubernetes/pull/75618 merged
 		CommandArgs["pod-infra-container-image"] = c.SystemImages.WindowsPodInfraContainer
 	}
@@ -462,30 +415,13 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, servi
 	}
 	if len(c.CloudProvider.Name) > 0 {
 		CommandArgs["cloud-config"] = cloudConfigFileName
-		if host.DockerInfo.OSType == "windows" { // compatible with Windows
-			CommandArgs["cloud-config"] = path.Join(prefixPath, cloudConfigFileName)
+		if host.IsWindows() { // compatible with Windows
+			CommandArgs["cloud-config"] = path.Join(host.PrefixPath, cloudConfigFileName)
 		}
 	}
 	if c.IsKubeletGenerateServingCertificateEnabled() {
 		CommandArgs["tls-cert-file"] = pki.GetCertPath(pki.GetCrtNameForHost(host, pki.KubeletCertName))
 		CommandArgs["tls-private-key-file"] = pki.GetCertPath(fmt.Sprintf("%s-key", pki.GetCrtNameForHost(host, pki.KubeletCertName)))
-	}
-
-	if len(c.CloudProvider.Name) > 0 {
-		c.Services.Kubelet.ExtraEnv = append(
-			c.Services.Kubelet.ExtraEnv,
-			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudConfigFile)))
-	}
-	if len(c.PrivateRegistriesMap) > 0 {
-		kubeletDockerConfig, _ := docker.GetKubeletDockerConfig(c.PrivateRegistriesMap)
-		c.Services.Kubelet.ExtraEnv = append(
-			c.Services.Kubelet.ExtraEnv,
-			fmt.Sprintf("%s=%s", KubeletDockerConfigEnv,
-				b64.StdEncoding.EncodeToString([]byte(kubeletDockerConfig))))
-
-		c.Services.Kubelet.ExtraEnv = append(
-			c.Services.Kubelet.ExtraEnv,
-			fmt.Sprintf("%s=%s", KubeletDockerConfigFileEnv, path.Join(prefixPath, KubeletDockerConfigPath)))
 	}
 
 	if serviceOptions.Kubelet != nil {
@@ -503,10 +439,10 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, servi
 				continue
 			}
 
-			// if the value has [PREFIX_PATH] prefix, we need to replace it with `prefixPath`,
+			// if the value has [PREFIX_PATH] prefix, we need to replace it with `host.PrefixPath`,
 			// e.g.: windows allows to use other drivers than `c:`
 			if strings.HasPrefix(v, "[PREFIX_PATH]") {
-				CommandArgs[k] = path.Join(prefixPath, strings.Replace(v, "[PREFIX_PATH]", "", -1))
+				CommandArgs[k] = path.Join(host.PrefixPath, strings.Replace(v, "[PREFIX_PATH]", "", -1))
 				continue
 			}
 
@@ -517,58 +453,68 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, servi
 	VolumesFrom := []string{
 		services.SidekickContainerName,
 	}
-	Binds := []string{
-		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
-		"/etc/cni:/etc/cni:rw,z",
-		"/opt/cni:/opt/cni:rw,z",
-		fmt.Sprintf("%s:/var/lib/cni:z", path.Join(prefixPath, "/var/lib/cni")),
-		"/var/lib/calico:/var/lib/calico:z",
-		"/etc/resolv.conf:/etc/resolv.conf",
-		"/sys:/sys:rprivate",
-		host.DockerInfo.DockerRootDir + ":" + host.DockerInfo.DockerRootDir + ":rw,rslave,z",
-		fmt.Sprintf("%s:%s:shared,z", path.Join(prefixPath, "/var/lib/kubelet"), path.Join(prefixPath, "/var/lib/kubelet")),
-		"/var/lib/rancher:/var/lib/rancher:shared,z",
-		"/var/run:/var/run:rw,rprivate",
-		"/run:/run:rprivate",
-		fmt.Sprintf("%s:/etc/ceph", path.Join(prefixPath, "/etc/ceph")),
-		"/dev:/host/dev:rprivate",
-		"/var/log/containers:/var/log/containers:z",
-		"/var/log/pods:/var/log/pods:z",
-		"/usr:/host/usr:ro",
-		"/etc:/host/etc:ro",
-	}
-	// Special case to simplify using flex volumes
-	if path.Join(prefixPath, "/var/lib/kubelet") != "/var/lib/kubelet" {
-		Binds = append(Binds, "/var/lib/kubelet/volumeplugins:/var/lib/kubelet/volumeplugins:shared,z")
-	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+
+	var Binds []string
+	if host.IsWindows() { // compatible with Windows
 		Binds = []string{
 			// put the execution binaries and cloud provider configuration to the host
-			fmt.Sprintf("%s:c:/host/etc/kubernetes", path.Join(prefixPath, "/etc/kubernetes")),
+			fmt.Sprintf("%s:c:/host/etc/kubernetes", path.Join(host.PrefixPath, "/etc/kubernetes")),
 			// put the flexvolume plugins or private registry docker configuration to the host
-			fmt.Sprintf("%s:c:/host/var/lib/kubelet", path.Join(prefixPath, "/var/lib/kubelet")),
+			fmt.Sprintf("%s:c:/host/var/lib/kubelet", path.Join(host.PrefixPath, "/var/lib/kubelet")),
 			// exchange resources with other components
-			fmt.Sprintf("%s:c:/host/run", path.Join(prefixPath, "/run")),
+			fmt.Sprintf("%s:c:/host/run", path.Join(host.PrefixPath, "/run")),
+		}
+	} else {
+		Binds = []string{
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
+			"/etc/cni:/etc/cni:rw,z",
+			"/opt/cni:/opt/cni:rw,z",
+			fmt.Sprintf("%s:/var/lib/cni:z", path.Join(host.PrefixPath, "/var/lib/cni")),
+			"/var/lib/calico:/var/lib/calico:z",
+			"/etc/resolv.conf:/etc/resolv.conf",
+			"/sys:/sys:rprivate",
+			host.DockerInfo.DockerRootDir + ":" + host.DockerInfo.DockerRootDir + ":rw,rslave,z",
+			fmt.Sprintf("%s:%s:shared,z", path.Join(host.PrefixPath, "/var/lib/kubelet"), path.Join(host.PrefixPath, "/var/lib/kubelet")),
+			"/var/lib/rancher:/var/lib/rancher:shared,z",
+			"/var/run:/var/run:rw,rprivate",
+			"/run:/run:rprivate",
+			fmt.Sprintf("%s:/etc/ceph", path.Join(host.PrefixPath, "/etc/ceph")),
+			"/dev:/host/dev:rprivate",
+			"/var/log/containers:/var/log/containers:z",
+			"/var/log/pods:/var/log/pods:z",
+			"/usr:/host/usr:ro",
+			"/etc:/host/etc:ro",
+		}
+
+		// Special case to simplify using flex volumes
+		if path.Join(host.PrefixPath, "/var/lib/kubelet") != "/var/lib/kubelet" {
+			Binds = append(Binds, "/var/lib/kubelet/volumeplugins:/var/lib/kubelet/volumeplugins:shared,z")
 		}
 	}
+	Binds = append(Binds, host.GetExtraBinds(kubelet.BaseService)...)
 
-	Env := c.Services.Kubelet.ExtraEnv
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	Env := host.GetExtraEnv(kubelet.BaseService)
+
+	if len(c.CloudProvider.Name) > 0 {
 		Env = append(Env,
-			fmt.Sprintf("%s=%s", ClusterCIDREnv, c.ClusterCIDR),
-			fmt.Sprintf("%s=%s", ClusterDomainEnv, c.ClusterDomain),
-			fmt.Sprintf("%s=%s", ClusterDNSServerEnv, c.ClusterDNSServer),
-			fmt.Sprintf("%s=%s", ClusterServiceCIDREnv, c.Services.KubeController.ServiceClusterIPRange),
-			fmt.Sprintf("%s=%s", NodeAddressEnv, host.Address),
-			fmt.Sprintf("%s=%s", NodeInternalAddressEnv, host.InternalAddress),
-			fmt.Sprintf("%s=%s", CloudProviderNameEnv, c.CloudProvider.Name),
-		)
+			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudConfigFile)))
+	}
+	if len(c.PrivateRegistriesMap) > 0 {
+		kubeletDockerConfig, _ := docker.GetKubeletDockerConfig(c.PrivateRegistriesMap)
+		Env = append(Env,
+			fmt.Sprintf("%s=%s", KubeletDockerConfigEnv,
+				b64.StdEncoding.EncodeToString([]byte(kubeletDockerConfig))))
+
+		Env = append(Env,
+			fmt.Sprintf("%s=%s", KubeletDockerConfigFileEnv, path.Join(host.PrefixPath, KubeletDockerConfigPath)))
 	}
 
-	for arg, value := range c.Services.Kubelet.ExtraArgs {
-		if _, ok := c.Services.Kubelet.ExtraArgs[arg]; ok {
-			CommandArgs[arg] = value
-		}
+	if host.IsWindows() { // compatible with Windows
+		Env = append(Env, c.getWindowsEnv(host)...)
+	}
+
+	for arg, value := range host.GetExtraArgs(kubelet.BaseService) {
+		CommandArgs[arg] = value
 	}
 
 	// If nodelocal DNS is configured, set cluster-dns to local IP
@@ -576,27 +522,20 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, servi
 		CommandArgs["cluster-dns"] = c.DNS.Nodelocal.IPAddress
 	}
 
-	for arg, value := range CommandArgs {
-		cmd := fmt.Sprintf("--%s=%s", arg, value)
-		Command = append(Command, cmd)
-	}
-
-	Binds = append(Binds, c.Services.Kubelet.ExtraBinds...)
-
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(false, services.KubeletPort),
 	}
-	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Kubelet.Image, c.PrivateRegistriesMap)
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(kubelet.Image, c.PrivateRegistriesMap)
 
 	return v3.Process{
 		Name:                    services.KubeletContainerName,
-		Command:                 Command,
+		Command:                 appendArgs(Command, CommandArgs),
 		VolumesFrom:             VolumesFrom,
 		Binds:                   getUniqStringList(Binds),
 		Env:                     getUniqStringList(Env),
 		NetworkMode:             "host",
 		RestartPolicy:           "always",
-		Image:                   c.Services.Kubelet.Image,
+		Image:                   kubelet.Image,
 		PidMode:                 "host",
 		Privileged:              true,
 		HealthCheck:             healthCheck,
@@ -607,25 +546,16 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, servi
 	}
 }
 
-func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, serviceOptions v3.KubernetesServicesOptions) v3.Process {
-	Command := []string{
-		c.getRKEToolsEntryPoint(),
-		"kube-proxy",
-	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
-		Command = []string{
-			"pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/usr/bin/entrypoint.ps1",
-			"kube-proxy",
-		}
-	}
-
+func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, serviceOptions v3.KubernetesServicesOptions) v3.Process {
+	kubeproxy := &c.Services.Kubeproxy
+	Command := c.getRKEToolsEntryPoint(host.OS(), "kube-proxy")
 	CommandArgs := map[string]string{
 		"cluster-cidr":      c.ClusterCIDR,
 		"hostname-override": host.HostnameOverride,
 		"kubeconfig":        pki.GetConfigPath(pki.KubeProxyCertName),
 	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
-		CommandArgs["kubeconfig"] = path.Join(prefixPath, pki.GetConfigPath(pki.KubeProxyCertName))
+	if host.IsWindows() { // compatible with Windows
+		CommandArgs["kubeconfig"] = path.Join(host.PrefixPath, pki.GetConfigPath(pki.KubeProxyCertName))
 	}
 
 	if serviceOptions.Kubeproxy != nil {
@@ -655,61 +585,47 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, ser
 	VolumesFrom := []string{
 		services.SidekickContainerName,
 	}
+
 	//TODO: we should reevaluate if any of the bind mounts here should be using read-only mode
-	Binds := []string{
-		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
-		"/run:/run",
-	}
-
-	BindModules := "/lib/modules:/lib/modules:z,ro"
-	if hosts.IsEnterpriseLinuxHost(host) && hosts.IsDockerSELinuxEnabled(host) && !hosts.IsEnterpriseLinuxDocker(host) {
-		// Avoid relabing on Enterprise Linux with Docker SELinux and upstream Docker
-		BindModules = "/lib/modules:/lib/modules:ro"
-	}
-	Binds = append(Binds, BindModules)
-
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	var Binds []string
+	if host.IsWindows() { // compatible with Windows
 		Binds = []string{
 			// put the execution binaries to the host
-			fmt.Sprintf("%s:c:/host/etc/kubernetes", path.Join(prefixPath, "/etc/kubernetes")),
+			fmt.Sprintf("%s:c:/host/etc/kubernetes", path.Join(host.PrefixPath, "/etc/kubernetes")),
 			// exchange resources with other components
-			fmt.Sprintf("%s:c:/host/run", path.Join(prefixPath, "/run")),
+			fmt.Sprintf("%s:c:/host/run", path.Join(host.PrefixPath, "/run")),
 		}
-	}
-
-	Env := c.Services.Kubeproxy.ExtraEnv
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
-		Env = append(Env,
-			fmt.Sprintf("%s=%s", ClusterCIDREnv, c.ClusterCIDR),
-			fmt.Sprintf("%s=%s", ClusterDomainEnv, c.ClusterDomain),
-			fmt.Sprintf("%s=%s", ClusterDNSServerEnv, c.ClusterDNSServer),
-			fmt.Sprintf("%s=%s", ClusterServiceCIDREnv, c.Services.KubeController.ServiceClusterIPRange),
-			fmt.Sprintf("%s=%s", NodeAddressEnv, host.Address),
-			fmt.Sprintf("%s=%s", NodeInternalAddressEnv, host.InternalAddress),
-			fmt.Sprintf("%s=%s", CloudProviderNameEnv, c.CloudProvider.Name),
-		)
-	}
-
-	for arg, value := range c.Services.Kubeproxy.ExtraArgs {
-		if _, ok := c.Services.Kubeproxy.ExtraArgs[arg]; ok {
-			CommandArgs[arg] = value
+	} else {
+		Binds = []string{
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
+			"/run:/run",
 		}
+
+		BindModules := "/lib/modules:/lib/modules:z,ro"
+		if hosts.IsEnterpriseLinuxHost(host) && hosts.IsDockerSELinuxEnabled(host) && !hosts.IsEnterpriseLinuxDocker(host) {
+			// Avoid relabing on Enterprise Linux with Docker SELinux and upstream Docker
+			BindModules = "/lib/modules:/lib/modules:ro"
+		}
+		Binds = append(Binds, BindModules)
+	}
+	Binds = append(Binds, host.GetExtraBinds(kubeproxy.BaseService)...)
+
+	Env := host.GetExtraEnv(kubeproxy.BaseService)
+	if host.IsWindows() { // compatible with Windows
+		Env = append(Env, c.getWindowsEnv(host)...)
 	}
 
-	for arg, value := range CommandArgs {
-		cmd := fmt.Sprintf("--%s=%s", arg, value)
-		Command = append(Command, cmd)
+	for arg, value := range host.GetExtraArgs(kubeproxy.BaseService) {
+		CommandArgs[arg] = value
 	}
-
-	Binds = append(Binds, c.Services.Kubeproxy.ExtraBinds...)
 
 	healthCheck := v3.HealthCheck{
 		URL: services.GetHealthCheckURL(false, services.KubeproxyPort),
 	}
-	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Kubeproxy.Image, c.PrivateRegistriesMap)
+	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(kubeproxy.Image, c.PrivateRegistriesMap)
 	return v3.Process{
 		Name:                    services.KubeproxyContainerName,
-		Command:                 Command,
+		Command:                 appendArgs(Command, CommandArgs),
 		VolumesFrom:             VolumesFrom,
 		Binds:                   getUniqStringList(Binds),
 		Env:                     getUniqStringList(Env),
@@ -718,7 +634,7 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, ser
 		PidMode:                 "host",
 		Privileged:              true,
 		HealthCheck:             healthCheck,
-		Image:                   c.Services.Kubeproxy.Image,
+		Image:                   kubeproxy.Image,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
 			services.ContainerNameLabel: services.KubeproxyContainerName,
@@ -726,16 +642,8 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, ser
 	}
 }
 
-func (c *Cluster) BuildProxyProcess(host *hosts.Host, prefixPath string) v3.Process {
-	Command := []string{
-		"nginx-proxy",
-	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
-		Command = []string{
-			"pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/usr/bin/nginx-proxy.ps1",
-		}
-	}
-
+func (c *Cluster) BuildProxyProcess(host *hosts.Host) v3.Process {
+	Command := c.getNginxEntryPoint(host.OS())
 	nginxProxyEnv := ""
 	for i, host := range c.ControlPlaneHosts {
 		nginxProxyEnv += fmt.Sprintf("%s", host.InternalAddress)
@@ -746,19 +654,19 @@ func (c *Cluster) BuildProxyProcess(host *hosts.Host, prefixPath string) v3.Proc
 	Env := []string{fmt.Sprintf("%s=%s", services.NginxProxyEnvName, nginxProxyEnv)}
 
 	VolumesFrom := []string{}
-	if host.DockerInfo.OSType == "windows" { // compatible withe Windows
+	if host.IsWindows() { // compatible withe Windows
 		VolumesFrom = []string{
 			services.SidekickContainerName,
 		}
 	}
 
 	Binds := []string{}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	if host.IsWindows() { // compatible with Windows
 		Binds = []string{
 			// put the execution binaries and generate the configuration to the host
-			fmt.Sprintf("%s:c:/host/etc/nginx", path.Join(prefixPath, "/etc/nginx")),
+			fmt.Sprintf("%s:c:/host/etc/nginx", path.Join(host.PrefixPath, "/etc/nginx")),
 			// exchange resources with other components
-			fmt.Sprintf("%s:c:/host/run", path.Join(prefixPath, "/run")),
+			fmt.Sprintf("%s:c:/host/run", path.Join(host.PrefixPath, "/run")),
 		}
 	}
 
@@ -782,12 +690,8 @@ func (c *Cluster) BuildProxyProcess(host *hosts.Host, prefixPath string) v3.Proc
 	}
 }
 
-func (c *Cluster) BuildSchedulerProcess(host *hosts.Host, prefixPath string, serviceOptions v3.KubernetesServicesOptions) v3.Process {
-	Command := []string{
-		c.getRKEToolsEntryPoint(),
-		"kube-scheduler",
-	}
-
+func (c *Cluster) BuildSchedulerProcess(host *hosts.Host, serviceOptions v3.KubernetesServicesOptions) v3.Process {
+	Command := c.getRKEToolsEntryPoint(host.OS(), "kube-scheduler")
 	CommandArgs := map[string]string{
 		"kubeconfig": pki.GetConfigPath(pki.KubeSchedulerCertName),
 	}
@@ -812,7 +716,7 @@ func (c *Cluster) BuildSchedulerProcess(host *hosts.Host, prefixPath string, ser
 		services.SidekickContainerName,
 	}
 	Binds := []string{
-		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
+		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
 	}
 
 	for arg, value := range c.Services.Scheduler.ExtraArgs {
@@ -849,29 +753,13 @@ func (c *Cluster) BuildSchedulerProcess(host *hosts.Host, prefixPath string, ser
 	}
 }
 
-func (c *Cluster) BuildSidecarProcess(host *hosts.Host, prefixPath string) v3.Process {
-	Command := []string{
-		"/bin/bash",
-	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
-		// windows docker doesn't support host network mode,
-		// so we can't use the network components installed by addon like Linux.
-		// we use sidecar container to maintain the network components
-		Command = []string{
-			"pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/usr/bin/sidecar.ps1",
-		}
-	}
+func (c *Cluster) BuildSidecarProcess(host *hosts.Host) v3.Process {
+	Command := c.getSidecarEntryPoint(host.OS())
 
 	Env := []string{}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	if host.IsWindows() { // compatible with Windows
+		Env = append(Env, c.getWindowsEnv(host)...)
 		Env = append(Env,
-			fmt.Sprintf("%s=%s", ClusterCIDREnv, c.ClusterCIDR),
-			fmt.Sprintf("%s=%s", ClusterDomainEnv, c.ClusterDomain),
-			fmt.Sprintf("%s=%s", ClusterDNSServerEnv, c.ClusterDNSServer),
-			fmt.Sprintf("%s=%s", ClusterServiceCIDREnv, c.Services.KubeController.ServiceClusterIPRange),
-			fmt.Sprintf("%s=%s", NodeAddressEnv, host.Address),
-			fmt.Sprintf("%s=%s", NodeInternalAddressEnv, host.InternalAddress),
-			fmt.Sprintf("%s=%s", CloudProviderNameEnv, c.CloudProvider.Name),
 			// sidekick needs the node name to drive the cni network management, e.g: flanneld
 			fmt.Sprintf("%s=%s", NodeNameOverrideEnv, host.HostnameOverride),
 			// sidekick use the network configuration to drive the cni network management, e.g: flanneld
@@ -880,26 +768,26 @@ func (c *Cluster) BuildSidecarProcess(host *hosts.Host, prefixPath string) v3.Pr
 	}
 
 	Binds := []string{}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	if host.IsWindows() { // compatible with Windows
 		Binds = []string{
 			// put the execution binaries and the cni binaries to the host
-			fmt.Sprintf("%s:c:/host/opt", path.Join(prefixPath, "/opt")),
+			fmt.Sprintf("%s:c:/host/opt", path.Join(host.PrefixPath, "/opt")),
 			// put the cni configuration to the host
-			fmt.Sprintf("%s:c:/host/etc/cni/net.d", path.Join(prefixPath, "/etc/cni/net.d")),
+			fmt.Sprintf("%s:c:/host/etc/cni/net.d", path.Join(host.PrefixPath, "/etc/cni/net.d")),
 			// put the cni network component configuration to the host
-			fmt.Sprintf("%s:c:/host/etc/kube-flannel", path.Join(prefixPath, "/etc/kube-flannel")),
+			fmt.Sprintf("%s:c:/host/etc/kube-flannel", path.Join(host.PrefixPath, "/etc/kube-flannel")),
 			// exchange resources with other components
-			fmt.Sprintf("%s:c:/host/run", path.Join(prefixPath, "/run")),
+			fmt.Sprintf("%s:c:/host/run", path.Join(host.PrefixPath, "/run")),
 		}
 	}
 
 	RestartPolicy := ""
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	if host.IsWindows() { // compatible with Windows
 		RestartPolicy = "always"
 	}
 
 	NetworkMode := "none"
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	if host.IsWindows() { // compatible with Windows
 		NetworkMode = ""
 	}
 
@@ -920,7 +808,7 @@ func (c *Cluster) BuildSidecarProcess(host *hosts.Host, prefixPath string) v3.Pr
 	}
 }
 
-func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, prefixPath string, serviceOptions v3.KubernetesServicesOptions) v3.Process {
+func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, serviceOptions v3.KubernetesServicesOptions) v3.Process {
 	nodeName := pki.GetCrtNameForHost(host, pki.EtcdCertName)
 	initCluster := ""
 	architecture := "amd64"
@@ -967,8 +855,8 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	}
 
 	Binds := []string{
-		fmt.Sprintf("%s:%s:z", path.Join(prefixPath, "/var/lib/etcd"), services.EtcdDataDir),
-		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
+		fmt.Sprintf("%s:%s:z", path.Join(host.PrefixPath, "/var/lib/etcd"), services.EtcdDataDir),
+		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
 	}
 
 	if serviceOptions.Etcd != nil {
@@ -1159,29 +1047,17 @@ func getUniqStringList(l []string) []string {
 	return ul
 }
 
-func (c *Cluster) getRKEToolsEntryPoint() string {
-	v := strings.Split(c.SystemImages.KubernetesServicesSidecar, ":")
-	last := v[len(v)-1]
-
-	sv, err := util.StrToSemVer(last)
-	if err != nil {
-		return DefaultToolsEntrypoint
-	}
-	svdefault, err := util.StrToSemVer(DefaultToolsEntrypointVersion)
-	if err != nil {
-		return DefaultToolsEntrypoint
-	}
-
-	if sv.LessThan(*svdefault) {
-		return LegacyToolsEntrypoint
-	}
-	return DefaultToolsEntrypoint
-}
-
 func getNetworkJSON(netconfig v3.NetworkConfig) string {
 	ret, err := json.Marshal(netconfig)
 	if err != nil {
 		return "{}"
 	}
 	return string(ret)
+}
+
+func appendArgs(command []string, args map[string]string) []string {
+	for arg, value := range args {
+		command = append(command, fmt.Sprintf("--%s=%s", arg, value))
+	}
+	return command
 }

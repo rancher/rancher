@@ -14,6 +14,9 @@ const (
 	KubeAPIServiceFieldSecretsEncryptionConfig = "secretsEncryptionConfig"
 	KubeAPIServiceFieldServiceClusterIPRange   = "serviceClusterIpRange"
 	KubeAPIServiceFieldServiceNodePortRange    = "serviceNodePortRange"
+	KubeAPIServiceFieldWindowsExtraArgs        = "winExtraArgs"
+	KubeAPIServiceFieldWindowsExtraBinds       = "winExtraBinds"
+	KubeAPIServiceFieldWindowsExtraEnv         = "winExtraEnv"
 )
 
 type KubeAPIService struct {
@@ -29,4 +32,7 @@ type KubeAPIService struct {
 	SecretsEncryptionConfig *SecretsEncryptionConfig `json:"secretsEncryptionConfig,omitempty" yaml:"secretsEncryptionConfig,omitempty"`
 	ServiceClusterIPRange   string                   `json:"serviceClusterIpRange,omitempty" yaml:"serviceClusterIpRange,omitempty"`
 	ServiceNodePortRange    string                   `json:"serviceNodePortRange,omitempty" yaml:"serviceNodePortRange,omitempty"`
+	WindowsExtraArgs        map[string]string        `json:"winExtraArgs,omitempty" yaml:"winExtraArgs,omitempty"`
+	WindowsExtraBinds       []string                 `json:"winExtraBinds,omitempty" yaml:"winExtraBinds,omitempty"`
+	WindowsExtraEnv         []string                 `json:"winExtraEnv,omitempty" yaml:"winExtraEnv,omitempty"`
 }

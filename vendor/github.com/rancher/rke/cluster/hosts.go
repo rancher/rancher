@@ -39,7 +39,7 @@ func (c *Cluster) TunnelHosts(ctx context.Context, flags ExternalFlags) error {
 	for _, uniqueHost := range uniqueHosts {
 		runHost := uniqueHost
 		errgrp.Go(func() error {
-			if err := runHost.TunnelUp(ctx, c.DockerDialerFactory, c.PrefixPath, c.Version); err != nil {
+			if err := runHost.TunnelUp(ctx, c.DockerDialerFactory, c.getPrefixPath(runHost.OS()), c.Version); err != nil {
 				// Unsupported Docker version is NOT a connectivity problem that we can recover! So we bail out on it
 				if strings.Contains(err.Error(), "Unsupported Docker version found") {
 					return err

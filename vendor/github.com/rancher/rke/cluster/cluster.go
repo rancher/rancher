@@ -124,7 +124,7 @@ func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptionData map[stri
 		if err != nil {
 			return "", err
 		}
-		etcdNodePlanMap[etcdHost.Address] = BuildRKEConfigNodePlan(ctx, c, etcdHost, etcdHost.DockerInfo, svcOptions)
+		etcdNodePlanMap[etcdHost.Address] = BuildRKEConfigNodePlan(ctx, c, etcdHost, svcOptions)
 	}
 
 	if len(c.Services.Etcd.ExternalURLs) > 0 {
@@ -143,7 +143,7 @@ func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptionData map[stri
 		if err != nil {
 			return "", err
 		}
-		cpNodePlanMap[cpHost.Address] = BuildRKEConfigNodePlan(ctx, c, cpHost, cpHost.DockerInfo, svcOptions)
+		cpNodePlanMap[cpHost.Address] = BuildRKEConfigNodePlan(ctx, c, cpHost, svcOptions)
 	}
 
 	if !reconcileCluster {
@@ -250,7 +250,7 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 		if err != nil {
 			return "", err
 		}
-		workerNodePlanMap[host.Address] = BuildRKEConfigNodePlan(ctx, c, host, host.DockerInfo, svcOptions)
+		workerNodePlanMap[host.Address] = BuildRKEConfigNodePlan(ctx, c, host, svcOptions)
 		if host.IsControl {
 			continue
 		}
@@ -1089,15 +1089,6 @@ func RestartClusterPods(ctx context.Context, kubeCluster *Cluster) error {
 	return nil
 }
 
-func (c *Cluster) GetHostInfoMap() map[string]types.Info {
-	hostsInfoMap := make(map[string]types.Info)
-	allHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
-	for _, host := range allHosts {
-		hostsInfoMap[host.Address] = host.DockerInfo
-	}
-	return hostsInfoMap
-}
-
 func IsLegacyKubeAPI(ctx context.Context, kubeCluster *Cluster) (bool, error) {
 	log.Infof(ctx, "[controlplane] Check if rotating a legacy cluster")
 	for _, host := range kubeCluster.ControlPlaneHosts {
@@ -1113,4 +1104,87 @@ func IsLegacyKubeAPI(ctx context.Context, kubeCluster *Cluster) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (c *Cluster) GetHostInfoMap() map[string]types.Info {
+	hostsInfoMap := make(map[string]types.Info)
+	allHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+	for _, host := range allHosts {
+		hostsInfoMap[host.Address] = host.DockerInfo
+	}
+	return hostsInfoMap
+}
+
+func (c *Cluster) getPrefixPath(os string) string {
+	switch {
+	case os == "windows" && c.WindowsPrefixPath != "":
+		return c.WindowsPrefixPath
+	default:
+		return c.PrefixPath
+	}
+}
+
+func (c *Cluster) getSidecarEntryPoint(os string) []string {
+	switch os {
+	case "windows":
+		return []string{"pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/usr/bin/sidecar.ps1"}
+	default:
+		return []string{"/bin/bash"}
+	}
+}
+
+func (c *Cluster) getNginxEntryPoint(os string) []string {
+	switch os {
+	case "windows":
+		return []string{"pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/usr/bin/nginx-proxy.ps1"}
+	default:
+		return []string{"nginx-proxy"}
+	}
+}
+
+func (c *Cluster) getRKEToolsEntryPoint(os, cmd string) []string {
+	var entrypoint []string
+	switch os {
+	case "windows":
+		entrypoint = c.getRKEToolsWindowsEntryPoint()
+	default:
+		entrypoint = c.getRKEToolsLinuxEntryPoint()
+	}
+
+	return append(entrypoint, cmd)
+}
+
+func (c *Cluster) getRKEToolsWindowsEntryPoint() []string {
+	return []string{"pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/usr/bin/entrypoint.ps1"}
+}
+
+func (c *Cluster) getRKEToolsLinuxEntryPoint() []string {
+	v := strings.Split(c.SystemImages.KubernetesServicesSidecar, ":")
+	last := v[len(v)-1]
+
+	sv, err := util.StrToSemVer(last)
+	if err != nil {
+		return []string{DefaultToolsEntrypoint}
+	}
+	svdefault, err := util.StrToSemVer(DefaultToolsEntrypointVersion)
+	if err != nil {
+		return []string{DefaultToolsEntrypoint}
+	}
+
+	if sv.LessThan(*svdefault) {
+		return []string{LegacyToolsEntrypoint}
+	}
+	return []string{DefaultToolsEntrypoint}
+}
+
+func (c *Cluster) getWindowsEnv(host *hosts.Host) []string {
+	return []string{
+		fmt.Sprintf("%s=%s", ClusterCIDREnv, c.ClusterCIDR),
+		fmt.Sprintf("%s=%s", ClusterDomainEnv, c.ClusterDomain),
+		fmt.Sprintf("%s=%s", ClusterDNSServerEnv, c.ClusterDNSServer),
+		fmt.Sprintf("%s=%s", ClusterServiceCIDREnv, c.Services.KubeController.ServiceClusterIPRange),
+		fmt.Sprintf("%s=%s", NodeAddressEnv, host.Address),
+		fmt.Sprintf("%s=%s", NodeInternalAddressEnv, host.InternalAddress),
+		fmt.Sprintf("%s=%s", CloudProviderNameEnv, c.CloudProvider.Name),
+	}
 }
