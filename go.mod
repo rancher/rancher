@@ -77,7 +77,7 @@ require (
 	github.com/prometheus/common v0.9.1
 	github.com/rancher/apiserver v0.0.0-20200721152301-4388bb184a8e
 	github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9
-	github.com/rancher/eks-operator v0.1.0-rc19
+	github.com/rancher/eks-operator v0.1.0-rc22
 	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20200714195611-b3163ad4ebc4

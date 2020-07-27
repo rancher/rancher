@@ -68,7 +68,6 @@ type NodeGroup struct {
 	InstanceType         *string            `json:"instanceType" norman:"required"`
 	Labels               map[string]*string `json:"labels"`
 	Ec2SshKey            *string            `json:"ec2SshKey"`
-	SourceSecurityGroups []*string          `json:"sourceSecurityGroups"`
 	DesiredSize          *int64             `json:"desiredSize"`
 	MaxSize              *int64             `json:"maxSize"`
 	MinSize              *int64             `json:"minSize"`

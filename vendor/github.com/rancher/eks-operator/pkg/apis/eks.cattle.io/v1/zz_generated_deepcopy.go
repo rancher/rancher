@@ -194,17 +194,6 @@ func (in *NodeGroup) DeepCopyInto(out *NodeGroup) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.SourceSecurityGroups != nil {
-		in, out := &in.SourceSecurityGroups, &out.SourceSecurityGroups
-		*out = make([]*string, len(*in))
-		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(string)
-				**out = **in
-			}
-		}
-	}
 	if in.DesiredSize != nil {
 		in, out := &in.DesiredSize, &out.DesiredSize
 		*out = new(int64)
