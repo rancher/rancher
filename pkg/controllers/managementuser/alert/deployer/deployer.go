@@ -8,6 +8,7 @@ import (
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	alertutil "github.com/rancher/rancher/pkg/controllers/managementuser/alert/common"
@@ -33,8 +34,14 @@ import (
 )
 
 var (
-	creatorIDAnn       = "field.cattle.io/creatorId"
-	systemProjectLabel = map[string]string{"authz.management.cattle.io/system-project": "true"}
+	creatorIDAnn          = "field.cattle.io/creatorId"
+	systemProjectLabel    = map[string]string{"authz.management.cattle.io/system-project": "true"}
+	webhookReceiverEnable = "webhook-receiver.enabled"
+
+	webhookReceiverTypes = []string{
+		"dingtalk",
+		"msteams",
+	}
 )
 
 type Deployer struct {
@@ -113,7 +120,7 @@ func (d *Deployer) sync() error {
 
 	systemProjectID := ref.Ref(systemProject)
 
-	needDeploy, err := d.needDeploy()
+	needDeploy, needWebhookReceiver, err := d.needDeploy()
 	if err != nil {
 		return fmt.Errorf("check alertmanager deployment failed, %v", err)
 	}
@@ -144,7 +151,7 @@ func (d *Deployer) sync() error {
 			newCluster = cluster.DeepCopy()
 		}
 
-		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID); err != nil {
+		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, needWebhookReceiver); err != nil {
 			return fmt.Errorf("deploy alertmanager failed, %v", err)
 		}
 
@@ -170,41 +177,56 @@ func (d *Deployer) sync() error {
 }
 
 // //only deploy the alertmanager when notifier is configured and alert is using it.
-func (d *Deployer) needDeploy() (bool, error) {
+func (d *Deployer) needDeploy() (bool, bool, error) {
+	needDeploy := false
+	needWebhookReceiver := false
+
 	notifiers, err := d.notifierLister.List("", labels.NewSelector())
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	if len(notifiers) == 0 {
-		return false, err
+		return false, false, err
 	}
 
 	clusterAlerts, err := d.clusterAlertGroupLister.List("", labels.NewSelector())
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	for _, alert := range clusterAlerts {
 		if len(alert.Spec.Recipients) > 0 {
-			return true, nil
+			needDeploy = true
+			for _, r := range alert.Spec.Recipients {
+				if slice.ContainsString(webhookReceiverTypes, r.NotifierType) {
+					needWebhookReceiver = true
+					return needDeploy, needWebhookReceiver, nil
+				}
+			}
 		}
 	}
 
 	projectAlerts, err := d.projectAlertGroupLister.List("", labels.NewSelector())
 	if err != nil {
-		return false, nil
+		return false, false, nil
 	}
 
 	for _, alert := range projectAlerts {
 		if controller.ObjectInCluster(d.clusterName, alert) {
 			if len(alert.Spec.Recipients) > 0 {
-				return true, nil
+				needDeploy = true
+				for _, r := range alert.Spec.Recipients {
+					if slice.ContainsString(webhookReceiverTypes, r.NotifierType) {
+						needWebhookReceiver = true
+						return needDeploy, needWebhookReceiver, nil
+					}
+				}
 			}
 		}
 	}
 
-	return false, nil
+	return needDeploy, needWebhookReceiver, nil
 }
 
 func (d *appDeployer) isDeploySuccess(cluster *mgmtv3.Cluster, appName, appTargetNamespace string) error {
@@ -269,7 +291,7 @@ func (d *appDeployer) getSecret(secretName, secretNamespace string) *corev1.Secr
 	}
 }
 
-func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string) (bool, error) {
+func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string, needWebhookReceiver bool) (bool, error) {
 	clusterName, systemProjectName := ref.Parse(systemProjectID)
 
 	ns := &corev1.Namespace{
@@ -293,9 +315,19 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 		return false, fmt.Errorf("failed to query %q App in %s Project, %v", appName, systemProjectName, err)
 	}
 
+	enableWebhookReceiver := fmt.Sprintf("%t", needWebhookReceiver)
 	if app != nil && app.Name == appName {
 		if app.DeletionTimestamp != nil {
 			return false, fmt.Errorf("stale %q App in %s Project is still on terminating", appName, systemProjectName)
+		}
+
+		if app.Spec.Answers[webhookReceiverEnable] != enableWebhookReceiver {
+			copy := app.DeepCopy()
+			copy.Spec.Answers[webhookReceiverEnable] = enableWebhookReceiver
+			_, err := d.appsGetter.Apps(systemProjectName).Update(copy)
+			if err != nil {
+				return false, fmt.Errorf("failed to update %q App, %v", appName, err)
+			}
 		}
 		return true, nil
 	}
@@ -331,6 +363,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 				"alertmanager.enabledRBAC":            "false",
 				"alertmanager.configFromSecret":       secret.Name,
 				"operator.enabled":                    "false",
+				webhookReceiverEnable:                 enableWebhookReceiver,
 			},
 			Description:     "Alertmanager for Rancher Monitoring",
 			ExternalID:      templateVersion.ExternalID,
