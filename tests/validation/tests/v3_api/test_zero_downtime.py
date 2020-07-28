@@ -67,9 +67,10 @@ def test_zdt_nodes():
     )
     node_ver = postupgrade_k8s.split("-")[0]
     upgrade_nodes = []
-    etcd_nodes = get_etcd_nodes(cluster, client)
     cp_nodes = get_cp_nodes(cluster, client)
+    etcd_nodes = get_etcd_nodes(cluster, client)
     worker_nodes = get_worker_nodes(cluster, client)
+    # Validate Node Upgrades by job
     cp_upgraded = validate_node_cordon(cp_nodes, workload)
     for upgraded in cp_upgraded:
         upgrade_nodes.append(upgraded)
@@ -91,7 +92,7 @@ def test_zdt_nodes():
         assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver, \
             "Not all Nodes Upgraded Correctly"
 
-
+@pytest.mark.skip(reason="tested")
 def test_zdt_backup():
     client = get_user_client()
     p_client = namespace["p_client"]
@@ -163,6 +164,7 @@ def validate_node_cordon(nodes, workload, timeout=600):
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for worker nodes to upgrade")
+        cluster = client.reload(cluster)
         validate_ingress(namespace["p_client"], namespace["cluster"], [workload], host, path)
         for node in nodes:
             node = client.reload(node)
