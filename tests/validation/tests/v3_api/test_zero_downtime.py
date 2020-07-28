@@ -285,8 +285,8 @@ def create_zdt_setup(request):
     namespace["c_client"] = c_client
     namespace["nodes"] = aws_nodes.copy()
 
-    # def fin():
-    #     client.delete(p)
-    #     cluster_cleanup(client, cluster, aws_nodes)
-    #
-    # request.addfinalizer(fin)
+    def fin():
+        client.delete(p)
+        cluster_cleanup(client, cluster, aws_nodes)
+
+    request.addfinalizer(fin)
