@@ -891,14 +891,15 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
 def validate_cluster(client, cluster, intermediate_state="provisioning",
                      check_intermediate_state=True, skipIngresscheck=True,
                      nodes_not_in_active_state=[], k8s_version="",
-                     userToken=USER_TOKEN):
+                     userToken=USER_TOKEN, timeout=MACHINE_TIMEOUT):
     # Allow sometime for the "cluster_owner" CRTB to take effect
     time.sleep(5)
     cluster = validate_cluster_state(
         client, cluster,
         check_intermediate_state=check_intermediate_state,
         intermediate_state=intermediate_state,
-        nodes_not_in_active_state=nodes_not_in_active_state)
+        nodes_not_in_active_state=nodes_not_in_active_state,
+        timeout=timeout)
     create_kubeconfig(cluster)
     if k8s_version != "":
         check_cluster_version(cluster, k8s_version)
@@ -1358,20 +1359,21 @@ def get_global_admin_client_and_cluster():
 def validate_cluster_state(client, cluster,
                            check_intermediate_state=True,
                            intermediate_state="provisioning",
-                           nodes_not_in_active_state=[]):
+                           nodes_not_in_active_state=[],
+                           timeout=MACHINE_TIMEOUT):
     start_time = time.time()
     if check_intermediate_state:
         cluster = wait_for_condition(
             client, cluster,
             lambda x: x.state == intermediate_state,
             lambda x: 'State is: ' + x.state,
-            timeout=MACHINE_TIMEOUT)
+            timeout=timeout)
         assert cluster.state == intermediate_state
     cluster = wait_for_condition(
         client, cluster,
         lambda x: x.state == "active",
         lambda x: 'State is: ' + x.state,
-        timeout=MACHINE_TIMEOUT)
+        timeout=timeout)
     assert cluster.state == "active"
     wait_for_nodes_to_become_active(client, cluster,
                                     exception_list=nodes_not_in_active_state)
