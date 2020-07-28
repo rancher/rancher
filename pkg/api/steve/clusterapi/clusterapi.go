@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/steve/pkg/stores/proxy"
 )
 
-type Server struct {
+type clusterAPIServer struct {
 	ctx          context.Context
 	asl          accesscontrol.AccessSetLookup
 	auth         auth.Middleware
@@ -26,13 +26,20 @@ type Server struct {
 	clusterLinks []string
 }
 
-func (s *Server) Setup(ctx context.Context, server *steveserver.Server) error {
+func ClusterAPI(ctx context.Context, server *steveserver.Server) (func(http.Handler) http.Handler, error) {
+	s := clusterAPIServer{}
+	if err := s.Setup(ctx, server); err != nil {
+		return nil, err
+	}
+	return s.Wrap, nil
+}
+
+func (s *clusterAPIServer) Setup(ctx context.Context, server *steveserver.Server) error {
 	s.ctx = ctx
 	s.asl = server.AccessSetLookup
-	s.auth = server.AuthMiddleware
 	s.cf = server.ClientFactory
 
-	server.SchemaTemplates = append(server.SchemaTemplates, schema.Template{
+	server.SchemaFactory.AddTemplate(schema.Template{
 		ID: "management.cattle.io.cluster",
 		Formatter: func(request *types.APIRequest, resource *types.RawResource) {
 			for _, link := range s.clusterLinks {
@@ -44,7 +51,7 @@ func (s *Server) Setup(ctx context.Context, server *steveserver.Server) error {
 	return nil
 }
 
-func (s *Server) newSchemas() *types.APISchemas {
+func (s *clusterAPIServer) newSchemas() *types.APISchemas {
 	store := proxy.NewProxyStore(s.cf, nil, s.asl)
 	schemas := types.EmptyAPISchemas()
 
@@ -76,7 +83,7 @@ func (s *Server) newSchemas() *types.APISchemas {
 	return schemas
 }
 
-func (s *Server) newAPIHandler() http.Handler {
+func (s *clusterAPIServer) newAPIHandler() http.Handler {
 	server := server.DefaultAPIServer()
 	for k, v := range server.ResponseWriters {
 		server.ResponseWriters[k] = stripNS{writer: v}
@@ -90,10 +97,10 @@ func (s *Server) newAPIHandler() http.Handler {
 	sf := schema.NewCollection(s.ctx, server.Schemas, s.asl)
 	sf.Reset(s.newSchemas().Schemas)
 
-	return s.auth.Wrap(schema.WrapServer(sf, server))
+	return schema.WrapServer(sf, server)
 }
 
-func (s *Server) Wrap(next http.Handler) http.Handler {
+func (s *clusterAPIServer) Wrap(next http.Handler) http.Handler {
 	server := s.newAPIHandler()
 	server = prefix(server)
 

@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"os"
 
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Register(context *config.ScaledContext) error {
+func Register(settingController managementcontrollers.SettingController) error {
 	sp := &settingsProvider{
-		settings:       context.Management.Settings(""),
-		settingsLister: context.Management.Settings("").Controller().Lister(),
+		settings:     settingController,
+		settingCache: settingController.Cache(),
 	}
 
 	if err := settings.SetProvider(sp); err != nil {
@@ -25,9 +25,9 @@ func Register(context *config.ScaledContext) error {
 }
 
 type settingsProvider struct {
-	settings       v3.SettingInterface
-	settingsLister v3.SettingLister
-	fallback       map[string]string
+	settings     managementcontrollers.SettingClient
+	settingCache managementcontrollers.SettingCache
+	fallback     map[string]string
 }
 
 func (s *settingsProvider) Get(name string) string {
@@ -35,9 +35,9 @@ func (s *settingsProvider) Get(name string) string {
 	if value != "" {
 		return value
 	}
-	obj, err := s.settingsLister.Get("", name)
+	obj, err := s.settingCache.Get(name)
 	if err != nil {
-		val, err := s.settings.Get(name, v1.GetOptions{})
+		val, err := s.settings.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return s.fallback[name]
 		}
@@ -54,7 +54,7 @@ func (s *settingsProvider) Set(name, value string) error {
 	if envValue != "" {
 		return fmt.Errorf("setting %s can not be set because it is from environment variable", name)
 	}
-	obj, err := s.settings.Get(name, v1.GetOptions{})
+	obj, err := s.settings.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (s *settingsProvider) Set(name, value string) error {
 }
 
 func (s *settingsProvider) SetIfUnset(name, value string) error {
-	obj, err := s.settings.Get(name, v1.GetOptions{})
+	obj, err := s.settings.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -86,10 +86,10 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 		key := settings.GetEnvKey(name)
 		value := os.Getenv(key)
 
-		obj, err := s.settings.Get(setting.Name, v1.GetOptions{})
+		obj, err := s.settings.Get(setting.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			newSetting := &v3.Setting{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: setting.Name,
 				},
 				Default: setting.Default,

@@ -96,6 +96,12 @@ func (d *deferredListWatcher) run(stopCh <-chan struct{}) {
 	d.lw = &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			d.tweakList(&options)
+			// If ResourceVersion is set to 0 then the Limit is ignored on the API side. Usually
+			// that's not a problem, but with very large counts of a single object type the client will
+			// hit it's connection timeout
+			if options.ResourceVersion == "0" {
+				options.ResourceVersion = ""
+			}
 			listObj := d.listObj.DeepCopyObject()
 			err := d.client.List(ctx, d.namespace, listObj, options)
 			return listObj, err

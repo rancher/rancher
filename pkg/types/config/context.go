@@ -4,20 +4,13 @@ import (
 	"context"
 	"time"
 
-	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/wrangler"
 
-	"github.com/rancher/wrangler/pkg/generic"
-
-	prommonitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
-	istiov1alpha3api "github.com/knative/pkg/apis/istio/v1alpha3"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient/dynamic"
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
-	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
-	managementv3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	projectv3api "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2beta2"
@@ -42,46 +35,22 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	wrbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/pkg/schemes"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/sirupsen/logrus"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	apiregistrationv12 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 var (
 	UserStorageContext       types.StorageContext = "user"
 	ManagementStorageContext types.StorageContext = "mgmt"
-	localSchemeBuilder                            = runtime.SchemeBuilder{
-		managementv3api.AddToScheme,
-		projectv3api.AddToScheme,
-		clusterv3api.AddToScheme,
-		scheme.AddToScheme,
-		apiextensionsv1beta1.AddToScheme,
-		apiregistrationv12.AddToScheme,
-		prommonitoringv1.AddToScheme,
-		istiov1alpha3api.AddToScheme,
-		catalogv1.AddToScheme,
-	}
-	AddToScheme = localSchemeBuilder.AddToScheme
-	Scheme      = runtime.NewScheme()
 )
-
-func init() {
-	utilruntime.Must(AddToScheme(Scheme))
-	utilruntime.Must(schemes.AddToScheme(Scheme))
-}
 
 type ScaledContext struct {
 	ClientGetter      proxy.ClientGetter
-	KubeConfig        clientcmdapi.Config
 	RESTConfig        rest.Config
 	ControllerFactory controller.SharedControllerFactory
 	UnversionedClient rest.Interface
@@ -117,25 +86,37 @@ func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
 	return mgmt, nil
 }
 
-func NewScaledContext(config rest.Config) (*ScaledContext, error) {
+type ScaleContextOptions struct {
+	ControllerFactory controller.SharedControllerFactory
+}
+
+func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledContext, error) {
 	var err error
+
+	if opts == nil {
+		opts = &ScaleContextOptions{}
+	}
 
 	context := &ScaledContext{
 		RESTConfig: config,
 	}
 
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&context.RESTConfig, Scheme)
+	if opts.ControllerFactory == nil {
+		controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&context.RESTConfig, wrangler.Scheme)
+		if err != nil {
+			return nil, err
+		}
+		context.ControllerFactory = controllerFactory
+	} else {
+		context.ControllerFactory = opts.ControllerFactory
+	}
+
+	context.Management, err = managementv3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
-	context.ControllerFactory = controllerFactory
 
-	context.Management, err = managementv3.NewFromControllerFactory(controllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
+	context.Project, err = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -145,16 +126,16 @@ func NewScaledContext(config rest.Config) (*ScaledContext, error) {
 		return nil, err
 	}
 
-	context.RBAC, err = rbacv1.NewFromControllerFactory(controllerFactory)
+	context.RBAC, err = rbacv1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Core, err = corev1.NewFromControllerFactory(controllerFactory)
+	context.Core, err = corev1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
-	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
+	context.Project, err = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -348,14 +329,9 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 		AddSchemas(clusterSchema.Schemas).
 		AddSchemas(projectSchema.Schemas)
 
-	context.Scheme = Scheme
+	context.Scheme = wrangler.Scheme
 
 	return context, err
-}
-
-func (c *ManagementContext) Start(ctx context.Context) error {
-	logrus.Info("Starting management controllers")
-	return c.ControllerFactory.Start(ctx, 50)
 }
 
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
@@ -371,7 +347,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, Scheme)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, wrangler.Scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +476,7 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 		RESTConfig: config,
 	}
 
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, Scheme)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, wrangler.Scheme)
 	if err != nil {
 		return nil, err
 	}

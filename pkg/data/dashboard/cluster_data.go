@@ -1,14 +1,15 @@
-package management
+package dashboard
 
 import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func addLocalCluster(embedded bool, adminName string, management *config.ManagementContext) error {
+func addLocalCluster(embedded bool, adminName string, wrangler *wrangler.Context) error {
 	c := &v3.Cluster{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "local",
@@ -25,6 +26,12 @@ func addLocalCluster(embedded bool, adminName string, management *config.Managem
 		},
 		Status: v32.ClusterStatus{
 			Driver: v32.ClusterDriverImported,
+			Conditions: []v32.ClusterCondition{
+				{
+					Type:   "Ready",
+					Status: corev1.ConditionTrue,
+				},
+			},
 		},
 	}
 	if embedded {
@@ -32,11 +39,12 @@ func addLocalCluster(embedded bool, adminName string, management *config.Managem
 	}
 
 	// Ignore error
-	management.Management.Clusters("").Create(c)
+	_, _ = wrangler.Mgmt.Cluster().Create(c)
 	return nil
 }
 
-func removeLocalCluster(management *config.ManagementContext) error {
-	management.Management.Clusters("").Delete("local", &v1.DeleteOptions{})
+func removeLocalCluster(wrangler *wrangler.Context) error {
+	// Ignore error
+	_ = wrangler.Mgmt.Cluster().Delete("local", &v1.DeleteOptions{})
 	return nil
 }

@@ -10,11 +10,10 @@ import (
 type RouterFunc func(h Handlers) http.Handler
 
 type Handlers struct {
-	K8sResource     http.Handler
-	GenericResource http.Handler
-	APIRoot         http.Handler
-	K8sProxy        http.Handler
-	Next            http.Handler
+	K8sResource http.Handler
+	APIRoot     http.Handler
+	K8sProxy    http.Handler
+	Next        http.Handler
 }
 
 func Routes(h Handlers) http.Handler {

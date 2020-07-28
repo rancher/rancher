@@ -343,7 +343,7 @@ func (s *Store) WatchNames(apiOp *types.APIRequest, schema *types.APISchema, w t
 	go func() {
 		defer close(result)
 		for item := range c {
-			if item.Error != nil && names.Has(item.Object.Name()) {
+			if item.Error == nil && names.Has(item.Object.Name()) {
 				result <- item
 			}
 		}

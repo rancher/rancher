@@ -25,21 +25,18 @@ func getSecret(secrets v1controller.SecretClient, namespace, name string) (*v1.S
 		return s, err
 	}
 
-	if err := createAndStore(secrets, namespace, name); err != nil {
-		return nil, err
-	}
-	return secrets.Get(namespace, name, metav1.GetOptions{})
+	return createAndStore(secrets, namespace, name)
 }
 
-func createAndStore(secrets v1controller.SecretClient, namespace string, name string) error {
+func createAndStore(secrets v1controller.SecretClient, namespace string, name string) (*v1.Secret, error) {
 	ca, cert, err := factory.GenCA()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	certPem, keyPem, err := factory.Marshal(ca, cert)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	secret := &v1.Secret{
@@ -54,6 +51,5 @@ func createAndStore(secrets v1controller.SecretClient, namespace string, name st
 		Type: v1.SecretTypeTLS,
 	}
 
-	secrets.Create(secret)
-	return nil
+	return secrets.Create(secret)
 }

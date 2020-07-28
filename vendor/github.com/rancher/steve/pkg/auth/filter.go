@@ -16,6 +16,11 @@ import (
 	"k8s.io/client-go/transport"
 )
 
+var ExistingContext = ToMiddleware(AuthenticatorFunc(func(req *http.Request) (user.Info, bool, error) {
+	user, ok := request.UserFrom(req.Context())
+	return user, ok, nil
+}))
+
 type Authenticator interface {
 	Authenticate(req *http.Request) (user.Info, bool, error)
 }
@@ -26,15 +31,12 @@ func (a AuthenticatorFunc) Authenticate(req *http.Request) (user.Info, bool, err
 	return a(req)
 }
 
-type Middleware func(http.ResponseWriter, *http.Request, http.Handler)
+type Middleware func(next http.Handler) http.Handler
 
-func (m Middleware) Wrap(handler http.Handler) http.Handler {
-	if m == nil {
-		return handler
+func (m Middleware) Chain(middleware Middleware) Middleware {
+	return func(next http.Handler) http.Handler {
+		return m(middleware(next))
 	}
-	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		m(rw, req, handler)
-	})
 }
 
 func WebhookConfigForURL(url string) (string, error) {
@@ -127,22 +129,32 @@ func (w *webhookAuth) Authenticate(req *http.Request) (user.Info, bool, error) {
 }
 
 func ToMiddleware(auth Authenticator) Middleware {
-	return func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
-		info, ok, err := auth.Authenticate(req)
-		if err != nil {
-			rw.WriteHeader(http.StatusUnauthorized)
-			rw.Write([]byte(err.Error()))
-			return
-		}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			info, ok, err := auth.Authenticate(req)
+			if err != nil {
+				info = &user.DefaultInfo{
+					Name: "system:cattle:error",
+					UID:  "system:cattle:error",
+					Groups: []string{
+						"system:unauthenticated",
+						"system:cattle:error",
+					},
+				}
+			} else if !ok {
+				info = &user.DefaultInfo{
+					Name: "system:unauthenticated",
+					UID:  "system:unauthenticated",
+					Groups: []string{
+						"system:unauthenticated",
+					},
+				}
+			}
 
-		if !ok {
-			rw.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		ctx := request.WithUser(req.Context(), info)
-		req = req.WithContext(ctx)
-		next.ServeHTTP(rw, req)
+			ctx := request.WithUser(req.Context(), info)
+			req = req.WithContext(ctx)
+			next.ServeHTTP(rw, req)
+		})
 	}
 }
 

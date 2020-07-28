@@ -6,27 +6,29 @@ import (
 
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
+	"github.com/rancher/steve/pkg/auth"
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8sUser "k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 type impersonatingAuth struct {
-	Authenticator
 	sar sar.SubjectAccessReview
 }
 
-func NewImpersonatingAuth(next Authenticator, sar sar.SubjectAccessReview) Authenticator {
+func NewImpersonatingAuth(sar sar.SubjectAccessReview) auth.Authenticator {
 	return &impersonatingAuth{
-		Authenticator: next,
-		sar:           sar,
+		sar: sar,
 	}
 }
 
-func (h *impersonatingAuth) Authenticate(req *http.Request) (authed bool, user string, groups []string, err error) {
-	authed, user, groups, err = h.Authenticator.Authenticate(req)
-	if err != nil || !authed {
-		return authed, user, groups, err
+func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool, error) {
+	userInfo, authed := request.UserFrom(req.Context())
+	if !authed {
+		return nil, false, nil
 	}
+	user := userInfo.GetName()
+	groups := userInfo.GetGroups()
 
 	var impersonateUser bool
 	var impersonateGroup bool
@@ -49,9 +51,9 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (authed bool, user s
 		if reqUser != "" && reqUser != user {
 			canDo, err := h.sar.UserCanImpersonateUser(req, user, reqUser)
 			if err != nil {
-				return false, user, groups, err
+				return nil, false, err
 			} else if !canDo {
-				return false, user, groups, errors.New("not allowed to impersonate")
+				return nil, false, errors.New("not allowed to impersonate")
 			}
 			impersonateUser = true
 		}
@@ -59,9 +61,9 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (authed bool, user s
 		if len(reqGroup) > 0 && !groupsEqual(reqGroup, groups) {
 			canDo, err := h.sar.UserCanImpersonateGroups(req, user, reqGroup)
 			if err != nil {
-				return false, user, groups, err
+				return nil, false, err
 			} else if !canDo {
-				return false, user, groups, errors.New("not allowed to impersonate")
+				return nil, false, errors.New("not allowed to impersonate")
 			}
 			impersonateGroup = true
 		}
@@ -79,7 +81,11 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (authed bool, user s
 		groups = append(groups, k8sUser.AllAuthenticated)
 	}
 
-	return true, user, groups, nil
+	return &k8sUser.DefaultInfo{
+		Name:   user,
+		UID:    user,
+		Groups: groups,
+	}, true, nil
 }
 
 func groupsEqual(group1, group2 []string) bool {

@@ -3,22 +3,13 @@ package management
 import (
 	"github.com/rancher/rancher/pkg/auth/data"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func Add(management *config.ManagementContext, addLocal, removeLocal, embedded bool) error {
-	adminName, err := addRoles(management)
+func Add(wrangler *wrangler.Context, management *config.ManagementContext, addLocal, removeLocal, embedded bool) error {
+	_, err := addRoles(wrangler, management)
 	if err != nil {
 		return err
-	}
-
-	if addLocal {
-		if err := addLocalCluster(embedded, adminName, management); err != nil {
-			return err
-		}
-	} else if removeLocal {
-		if err := removeLocalCluster(management); err != nil {
-			return err
-		}
 	}
 
 	if err := data.AuthConfigs(management); err != nil {
@@ -26,10 +17,6 @@ func Add(management *config.ManagementContext, addLocal, removeLocal, embedded b
 	}
 
 	if err := syncCatalogs(management); err != nil {
-		return err
-	}
-
-	if err := addSetting(); err != nil {
 		return err
 	}
 

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/apiserver/pkg/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/steve/pkg/podimpersonation"
@@ -22,6 +23,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -424,8 +426,13 @@ func toArgs(operation string, values map[string]interface{}, input interface{}, 
 }
 
 func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, command []string, secretData map[string][]byte) (*catalog.Operation, error) {
+	_, err := s.createNamespace(ctx, status.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	pod, podOptions := s.createPod(command, secretData)
-	pod, err := s.Impersonator.CreatePod(ctx, user, pod, podOptions)
+	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -451,6 +458,24 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 
 	op.Status = status
 	return s.ops.UpdateStatus(op)
+}
+
+func (s *Operations) createNamespace(ctx context.Context, namespace string) (*v1.Namespace, error) {
+	apiContext := types.GetAPIContext(ctx)
+	client, err := s.cg.K8sInterface(apiContext)
+	if err != nil {
+		return nil, err
+	}
+
+	ns, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}, metav1.CreateOptions{})
+	}
+	return ns, err
 }
 
 func (s *Operations) createPod(command []string, secretData map[string][]byte) (*v1.Pod, *podimpersonation.PodOptions) {

@@ -102,7 +102,7 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 	chartRepoTemplate := repoTemplate
 	chartRepoTemplate.Kind = "ClusterRepo"
 
-	server.SchemaTemplates = append(server.SchemaTemplates,
+	server.SchemaFactory.AddTemplate(
 		operationTemplate,
 		releaseTemplate,
 		repoTemplate,

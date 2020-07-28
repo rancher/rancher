@@ -4,11 +4,13 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -24,7 +26,7 @@ const (
 
 var defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 
-func addRoles(management *config.ManagementContext) (string, error) {
+func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
 
 	rb.addRole("Create Clusters", "clusters-create").
@@ -365,7 +367,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		return "", errors.Wrap(err, "problem reconciling role templates")
 	}
 
-	adminName, err := bootstrapAdmin(management)
+	adminName, err := BootstrapAdmin(wrangler, false)
 	if err != nil {
 		return "", err
 	}
@@ -380,11 +382,11 @@ func addRoles(management *config.ManagementContext) (string, error) {
 
 // bootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
 // already created the admin user and should not attempt it again. Otherwise attempt to create the admin.
-func bootstrapAdmin(management *config.ManagementContext) (string, error) {
+func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool) (string, error) {
 	var adminName string
 
 	set := labels.Set(defaultAdminLabel)
-	admins, err := management.Management.Users("").List(v1.ListOptions{LabelSelector: set.String()})
+	admins, err := management.Mgmt.User().List(v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
 		return "", err
 	}
@@ -393,7 +395,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 		adminName = admins.Items[0].Name
 	}
 
-	if _, err := management.K8sClient.CoreV1().ConfigMaps(cattleNamespace).Get(context.TODO(), bootstrapAdminConfig, v1.GetOptions{}); err != nil {
+	if _, err := management.K8s.CoreV1().ConfigMaps(cattleNamespace).Get(context.TODO(), bootstrapAdminConfig, v1.GetOptions{}); err != nil {
 		if !apierrors.IsNotFound(err) {
 			logrus.Warnf("Unable to determine if admin user already created: %v", err)
 			return "", nil
@@ -403,7 +405,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 		return adminName, nil
 	}
 
-	users, err := management.Management.Users("").List(v1.ListOptions{})
+	users, err := management.Mgmt.User().List(v1.ListOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -411,7 +413,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 	if len(users.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
 		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-		admin, err := management.Management.Users("").Create(&v3.User{
+		admin, err := management.Mgmt.User().Create(&v3.User{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "user-",
 				Labels:       defaultAdminLabel,
@@ -426,12 +428,13 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 		}
 		adminName = admin.Name
 
-		bindings, err := management.Management.GlobalRoleBindings("").List(v1.ListOptions{LabelSelector: set.String()})
+		bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
-			return "", err
+			logrus.Warnf("Failed to create default admin global role binding: %v", err)
+			bindings = &v3.GlobalRoleBindingList{}
 		}
 		if len(bindings.Items) == 0 {
-			_, err = management.Management.GlobalRoleBindings("").Create(
+			_, err = management.Mgmt.GlobalRoleBinding().Create(
 				&v3.GlobalRoleBinding{
 					ObjectMeta: v1.ObjectMeta{
 						GenerateName: "globalrolebinding-",
@@ -446,6 +449,51 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 				logrus.Info("Created default admin user and binding")
 			}
 		}
+
+		if createClusterRoleBinding {
+			users, err := management.Mgmt.User().List(v1.ListOptions{
+				LabelSelector: set.String(),
+			})
+
+			bindings, err := management.RBAC.ClusterRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
+			if err != nil {
+				return "", err
+			}
+			if len(bindings.Items) == 0 && len(users.Items) > 0 {
+				_, err = management.RBAC.ClusterRoleBinding().Create(
+					&rbacv1.ClusterRoleBinding{
+						ObjectMeta: v1.ObjectMeta{
+							GenerateName: "default-admin-",
+							Labels:       defaultAdminLabel,
+							OwnerReferences: []v1.OwnerReference{
+								{
+									APIVersion: "management.cattle.io/v3",
+									Kind:       "User",
+									Name:       users.Items[0].Name,
+									UID:        users.Items[0].UID,
+								},
+							},
+						},
+						Subjects: []rbacv1.Subject{
+							{
+								Kind:     "User",
+								APIGroup: rbacv1.GroupName,
+								Name:     users.Items[0].Name,
+							},
+						},
+						RoleRef: rbacv1.RoleRef{
+							APIGroup: rbacv1.GroupName,
+							Kind:     "ClusterRole",
+							Name:     "cluster-admin",
+						},
+					})
+				if err != nil {
+					logrus.Warnf("Failed to create default admin global role binding: %v", err)
+				} else {
+					logrus.Info("Created default admin user and binding")
+				}
+			}
+		}
 	}
 
 	adminConfigMap := corev1.ConfigMap{
@@ -455,7 +503,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 		},
 	}
 
-	_, err = management.K8sClient.CoreV1().ConfigMaps(cattleNamespace).Create(context.TODO(), &adminConfigMap, v1.CreateOptions{})
+	_, err = management.K8s.CoreV1().ConfigMaps(cattleNamespace).Create(context.TODO(), &adminConfigMap, v1.CreateOptions{})
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			logrus.Warnf("Error creating admin config map: %v", err)

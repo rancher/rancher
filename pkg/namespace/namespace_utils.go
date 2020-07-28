@@ -9,6 +9,7 @@ import (
 
 const (
 	statusAnn                   = "cattle.io/status"
+	System                      = "cattle-system"
 	GlobalNamespace             = "cattle-global-data"
 	NodeTemplateGlobalNamespace = "cattle-global-nt"
 )

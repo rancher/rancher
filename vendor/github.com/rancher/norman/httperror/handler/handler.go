@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/url"
 
 	"github.com/rancher/norman/httperror"
@@ -9,17 +10,16 @@ import (
 )
 
 func ErrorHandler(request *types.APIContext, err error) {
-	var error *httperror.APIError
-	if apiError, ok := err.(*httperror.APIError); ok {
-		if apiError.Cause != nil {
+	error := &httperror.APIError{}
+	if errors.As(err, &error) {
+		if error.Cause != nil {
 			url, _ := url.PathUnescape(request.Request.URL.String())
 			if url == "" {
 				url = request.Request.URL.String()
 			}
-			logrus.Errorf("API error response %v for %v %v. Cause: %v", apiError.Code.Status, request.Request.Method,
-				url, apiError.Cause)
+			logrus.Errorf("API error response %v for %v %v. Cause: %v", error.Code.Status, request.Request.Method,
+				url, error.Cause)
 		}
-		error = apiError
 	} else {
 		logrus.Errorf("Unknown error: %v", err)
 		error = &httperror.APIError{

@@ -136,5 +136,5 @@ func convertPrincipal(schema *types.Schema, principal v3.Principal) (map[string]
 
 func (h *principalsHandler) getToken(request *http.Request) (*v3.Token, error) {
 	token, err := h.auth.TokenFromRequest(request)
-	return token, errors.Wrap(err, "must authenticate")
+	return token, errors.Wrap(err, requests.ErrMustAuthenticate.Error())
 }
