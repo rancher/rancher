@@ -4,11 +4,10 @@ import time
 
 from .test_rke_cluster_provisioning import create_custom_host_from_nodes
 
-CLUSTER_NAME = "test1"
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testZeroDT")
+MAX_UNAVAILABLE = os.environ.get("MAX_UNAVAILABLE", "1")
 host = "test" + str(random_int(10000, 99999)) + ".com"
 path = "/name.html"
-
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None,
              "nodes": []}
 backup_info = {"backupname": None, "backup_id": None, "workload": None,
@@ -17,6 +16,7 @@ default_k8s_versions = ['v1.15.12-rancher2-2', 'v1.16.10-rancher2-1', 'v1.17.6-r
 preupgrade_k8s = default_k8s_versions[0]
 postupgrade_k8s = default_k8s_versions[1]
 node_ver = postupgrade_k8s.split("-")[0]
+pre_node_ver = preupgrade_k8s.split("-")[0]
 
 
 @pytest.mark.skip(reason="tested")
@@ -26,6 +26,7 @@ def test_zdt():
     cluster, workload, ingress = validate_cluster_and_ingress(client, cluster,
                                                               check_intermediate_state=False)
     # Update Cluster to k8 version + upgrade strategy maxUnavailable worker
+    # add services -> dic
     cluster = client.update_by_id_cluster(
         id=cluster.id,
         name="test1",
@@ -38,7 +39,7 @@ def test_zdt():
     )
     nodes = client.list_node(clusterId=cluster.id).data
     # Check Ingress is up during update
-    wait_for_node_upgrade(nodes, client, workload)
+    wait_for_node_upgrade(nodes, client, workload, node_ver)
     # Validate update has went through
     for node in nodes:
         node = client.reload(node)
@@ -46,27 +47,10 @@ def test_zdt():
     # Go through each node for k8 version upgrade and ensure ingress is still up
 
 
-def wait_for_node_upgrade(nodes, client, workload, timeout=2000):
-    start = time.time()
-    upgrade_nodes = set()
-    p_client = namespace["p_client"]
-    cluster = namespace["cluster"]
-    while len(upgrade_nodes) != len(nodes):
-        if time.time() - start > timeout:
-            raise AssertionError(
-                "Timed out waiting for K8 update")
-        validate_ingress(p_client, cluster, [workload], host, path)
-        for node in nodes:
-            node = client.reload(node)
-            node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
-            if node_k8 == node_ver:
-                upgrade_nodes.add(node.uuid)
-        time.sleep(5)
-
-
-# @pytest.mark.skip(reason="tested")
-def test_zdt_drain():
+@pytest.mark.skip(reason="tested")
+def test_zdt_nodes():
     client = get_user_client()
+    drain = True
     cluster = namespace["cluster"]
     cluster, workload, ingress = validate_cluster_and_ingress(client, cluster,
                                                               check_intermediate_state=False,
@@ -78,12 +62,11 @@ def test_zdt_drain():
         rancherKubernetesEngineConfig={
             "kubernetesVersion": postupgrade_k8s,
             "upgradeStrategy": {
-                'drain': True,
-                'maxUnavailableWorker': '10%',
+                'drain': drain,
+                'maxUnavailableWorker': MAX_UNAVAILABLE,
                 'type': '/v3/schemas/nodeUpgradeStrategy'}}
     )
     node_ver = postupgrade_k8s.split("-")[0]
-    max_unavailable = 1
     upgrade_nodes = []
     etcd_nodes = get_etcd_nodes(cluster, client)
     cp_nodes = get_cp_nodes(cluster, client)
@@ -94,15 +77,83 @@ def test_zdt_drain():
     etcd_upgraded = validate_node_cordon(etcd_nodes, workload)
     for upgraded in etcd_upgraded:
         upgrade_nodes.append(upgraded)
-    worker_nodes = validate_node_drain(worker_nodes, workload, 600,
-                                       max_unavailable)
-    for upgraded in worker_nodes:
+    if "%" in MAX_UNAVAILABLE:
+        max_unavailable = len(worker_nodes) * int(MAX_UNAVAILABLE.split("%")[0]) / 100
+    else:
+        max_unavailable = MAX_UNAVAILABLE
+
+    worker_upgraded = validate_node_drain(worker_nodes, workload, True, 600,
+                                          max_unavailable)
+    for upgraded in worker_upgraded:
         upgrade_nodes.append(upgraded)
     nodes = client.list_node(clusterId=cluster.id).data
     assert len(upgrade_nodes) == len(nodes), "Not all Nodes Upgraded"
     for node in nodes:
         assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver, \
             "Not all Nodes Upgraded Correctly"
+
+
+#@pytest.mark.skip(reason="wip")
+def test_zdt_backup():
+    client = get_user_client()
+    p_client = namespace["p_client"]
+    ns = namespace["ns"]
+    cluster = namespace["cluster"]
+    nodes = client.list_node(clusterId=cluster.id).data
+    cluster, workload, ingress = validate_cluster_and_ingress(client, cluster,
+                                                              check_intermediate_state=False,
+                                                              )
+    backup = cluster.backupEtcd()
+    backup_info["backupname"] = backup['metadata']['name']
+    wait_for_backup_to_active(cluster, backup_info["backupname"])
+    # Get all the backup info
+    etcdbackups = cluster.etcdBackups(name=backup_info["backupname"])
+    backup_info["etcdbackupdata"] = etcdbackups['data']
+    backup_info["backup_id"] = backup_info["etcdbackupdata"][0]['id']
+    backup_info["workload"] = workload
+    # Create workload after backup
+    name = random_test_name("default")
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    testworkload = p_client.create_workload(name=name,
+                                            containers=con,
+                                            namespaceId=ns.id)
+
+    validate_workload(p_client, testworkload, "deployment", ns.name)
+    # update cluster
+    cluster = client.update_by_id_cluster(
+        id=cluster.id,
+        name="test1",
+        rancherKubernetesEngineConfig={
+            "kubernetesVersion": postupgrade_k8s,
+            "upgradeStrategy": {
+                'drain': True,
+                'maxUnavailableWorker': '10%',
+                'type': '/v3/schemas/nodeUpgradeStrategy'}}
+    )
+    cluster = validate_cluster_state(client, cluster, intermediate_state="updating")
+    wait_for_node_upgrade(nodes, client, workload, node_ver)
+    for node in nodes:
+        node = client.reload(node)
+        assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver, \
+            "Not all Nodes Upgraded Correctly"
+    # Perform Full Restore
+    cluster.restoreFromEtcdBackup(etcdBackupId=backup_info["backup_id"], restoreRkeConfig="all")
+    cluster = client.reload(cluster)
+    cluster = validate_cluster_state(
+        client, cluster,
+        check_intermediate_state=True,
+        intermediate_state="updating",
+        )
+    wait_for_node_upgrade(nodes, client, workload, pre_node_ver)
+    # Verify the ingress created before taking the snapshot
+    validate_ingress(p_client, cluster, [backup_info["workload"]], host, path)
+    # Verify the workload created after getting a snapshot does not exist after restore
+    workload_list = p_client.list_workload(uuid=testworkload.uuid).data
+    assert len(workload_list) == 0, "workload shouldn't exist after restore"
+    for node in nodes:
+        assert node["info"]["kubernetes"]["kubeletVersion"] == pre_node_ver, \
+            "Not all Nodes Restored Correctly"
 
 
 def validate_node_cordon(nodes, workload, timeout=600):
@@ -128,7 +179,7 @@ def validate_node_cordon(nodes, workload, timeout=600):
     return upgrade_nodes
 
 
-def validate_node_drain(nodes, workload, timeout=600, max_unavailable=1):
+def validate_node_drain(nodes, workload, drain=False, timeout=600, max_unavailable=1):
     client = get_user_client()
     start = time.time()
     upgrade_nodes = set()
@@ -140,13 +191,17 @@ def validate_node_drain(nodes, workload, timeout=600, max_unavailable=1):
         for node in nodes:
             node = client.reload(node)
             node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
-            if node.state == "draining" or node.state == "drained":
-                in_state.add(node.uuid)
+            if drain:
+                if node.state == "draining" or node.state == "drained":
+                    in_state.add(node.uuid)
+            else:
+                if node.state == "cordoned":
+                    in_state.add(node.uuid)
             if node_k8 == node_ver:
                 upgrade_nodes.add(node.uuid)
         unavailable = set()
         for node in nodes:
-            if node.state == "draining":
+            if node.state != "active":
                 unavailable.add(node.uuid)
         assert len(unavailable) <= max_unavailable, "Too many nodes unavailable"
         validate_ingress(namespace["p_client"], namespace["cluster"], [workload], host, path)
@@ -154,6 +209,24 @@ def validate_node_drain(nodes, workload, timeout=600, max_unavailable=1):
     assert len(in_state) == len(nodes)
     assert len(upgrade_nodes) == len(nodes)
     return upgrade_nodes
+
+
+def wait_for_node_upgrade(nodes, client, workload, node_ver, timeout=600):
+    start = time.time()
+    upgrade_nodes = set()
+    p_client = namespace["p_client"]
+    cluster = namespace["cluster"]
+    while len(upgrade_nodes) != len(nodes):
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for K8 update")
+        validate_ingress(p_client, cluster, [workload], host, path)
+        for node in nodes:
+            node = client.reload(node)
+            node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
+            if node_k8 == node_ver:
+                upgrade_nodes.add(node.uuid)
+        time.sleep(5)
 
 
 def validate_cluster_and_ingress(client, cluster, intermediate_state="provisioning",
@@ -195,8 +268,8 @@ def validate_cluster_and_ingress(client, cluster, intermediate_state="provisioni
 @pytest.fixture(scope='function', autouse="True")
 def create_zdt_setup(request):
     preupgrade_k8s = default_k8s_versions[0]
-    zero_node_roles = [["etcd"], ["controlplane"], ["controlplane"], ["worker"], ["worker"]]
-    node_roles = [["controlplane"], ["etcd"],
+    #zero_node_roles = [["etcd"], ["controlplane"], ["controlplane"], ["worker"], ["worker"]]
+    zero_node_roles = [["controlplane"], ["etcd"],
                   ["worker"]]
     client = get_user_client()
     aws_nodes = \
@@ -215,8 +288,8 @@ def create_zdt_setup(request):
     namespace["c_client"] = c_client
     namespace["nodes"] = aws_nodes.copy()
 
-    def fin():
-        client.delete(p)
-        cluster_cleanup(client, cluster, aws_nodes)
-
-    request.addfinalizer(fin)
+    # def fin():
+    #     client.delete(p)
+    #     cluster_cleanup(client, cluster, aws_nodes)
+    #
+    # request.addfinalizer(fin)
