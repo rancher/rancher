@@ -164,8 +164,9 @@ def validate_node_cordon(nodes, workload, timeout=600):
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for worker nodes to upgrade")
+        cluster = namespace["cluster"]
         cluster = client.reload(cluster)
-        validate_ingress(namespace["p_client"], namespace["cluster"], [workload], host, path)
+        validate_ingress(namespace["p_client"], cluster, [workload], host, path)
         for node in nodes:
             node = client.reload(node)
             node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
