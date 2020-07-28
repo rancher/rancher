@@ -47,7 +47,6 @@ def test_zdt():
     # Go through each node for k8 version upgrade and ensure ingress is still up
 
 
-@pytest.mark.skip(reason="tested")
 def test_zdt_nodes():
     client = get_user_client()
     drain = True
@@ -93,7 +92,6 @@ def test_zdt_nodes():
             "Not all Nodes Upgraded Correctly"
 
 
-#@pytest.mark.skip(reason="wip")
 def test_zdt_backup():
     client = get_user_client()
     p_client = namespace["p_client"]
@@ -144,7 +142,7 @@ def test_zdt_backup():
         client, cluster,
         check_intermediate_state=True,
         intermediate_state="updating",
-        )
+    )
     wait_for_node_upgrade(nodes, client, workload, pre_node_ver)
     # Verify the ingress created before taking the snapshot
     validate_ingress(p_client, cluster, [backup_info["workload"]], host, path)
@@ -268,9 +266,8 @@ def validate_cluster_and_ingress(client, cluster, intermediate_state="provisioni
 @pytest.fixture(scope='function', autouse="True")
 def create_zdt_setup(request):
     preupgrade_k8s = default_k8s_versions[0]
-    #zero_node_roles = [["etcd"], ["controlplane"], ["controlplane"], ["worker"], ["worker"]]
-    zero_node_roles = [["controlplane"], ["etcd"],
-                  ["worker"]]
+    zero_node_roles = [["etcd"], ["controlplane"], ["controlplane"], ["worker"], ["worker"]]
+    # zero_node_roles = [["controlplane"], ["etcd"], ["worker"]]
     client = get_user_client()
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
