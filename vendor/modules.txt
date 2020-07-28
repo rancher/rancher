@@ -375,7 +375,7 @@ github.com/rancher/dynamiclistener/server
 github.com/rancher/dynamiclistener/storage/file
 github.com/rancher/dynamiclistener/storage/kubernetes
 github.com/rancher/dynamiclistener/storage/memory
-# github.com/rancher/eks-operator v0.1.0-rc19
+# github.com/rancher/eks-operator v0.1.0-rc22
 github.com/rancher/eks-operator/pkg/apis/eks.cattle.io
 github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1
 # github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91

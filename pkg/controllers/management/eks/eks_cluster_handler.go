@@ -154,6 +154,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	if !reflect.DeepEqual(eksClusterConfigMap, eksClusterConfigDynamic.Object["spec"]) {
 		// if cluster is imported make sure it's original spec has been copied copied before mutating
 		if !cluster.Spec.EKSConfig.Imported || cluster.GetAnnotations()[importedAnno] == "true" {
+			logrus.Infof("change detected for cluster [%s], updating EKSClusterConfig", cluster.Name)
 			return e.updateEKSClusterConfig(cluster, eksClusterConfigDynamic, eksClusterConfigMap)
 		}
 	}
@@ -288,7 +289,7 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 		case event := <-w.ResultChan():
 			eksClusterConfigDynamic = event.Object.(*unstructured.Unstructured)
 			status, _ := eksClusterConfigDynamic.Object["status"].(map[string]interface{})
-			if status["phase"] != "updating" {
+			if status["phase"] == "active" {
 				continue
 			}
 
