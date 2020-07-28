@@ -16,7 +16,7 @@ var (
 	provider       Provider
 	InjectDefaults string
 
-	AgentImage                        = NewSetting("agent-image", "rancher-agent:master-head")
+	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
