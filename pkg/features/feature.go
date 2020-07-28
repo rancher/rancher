@@ -5,12 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -22,22 +21,32 @@ var (
 		"unsupported-storage-drivers",
 		"Allows the use of types for storage providers and provisioners that are not enabled by default.",
 		false,
+		true,
 		true)
 	IstioVirtualServiceUI = newFeature(
 		"istio-virtual-service-ui",
 		"Exposes a UI that enables users to create, read, update and delete virtual services and destination rules, which are traffic management features of Istio.",
+		true,
 		true,
 		true)
 	Steve = newFeature(
 		"dashboard",
 		"Deploy experimental new UI for managing resources inside of clusters.",
 		true,
-		false)
+		false,
+		true)
 	SteveProxy = newFeature(
 		"proxy",
 		"Use new experimental proxy for Kubernetes API requests.",
 		false,
+		true,
 		true)
+	MCM = newFeature(
+		"multi-cluster-management",
+		"Multi-cluster provisioning and management of Kubernetes clusters.",
+		true,
+		true,
+		false)
 )
 
 type Feature struct {
@@ -48,44 +57,48 @@ type Feature struct {
 	def         bool
 	// if a feature is not dynamic, then rancher must be restarted when the value is changed
 	dynamic bool
+	// Whether we should install this feature or assume something else will install and manage the Feature CR
+	install bool
 }
 
 // InitializeFeatures updates feature default if given valid --features flag and creates/updates necessary features in k8s
-func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
+func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs string) {
 	// applies any default values assigned in --features flag to feature map
 	if err := applyArgumentDefaults(featureArgs); err != nil {
 		logrus.Errorf("failed to apply feature args: %v", err)
 	}
 
-	if ctx == nil {
+	if featuresClient == nil {
 		return
 	}
 
 	// creates any features in map that do not exist, updates features with new default value
 	for key, f := range features {
-		featureState, err := ctx.Management.Features("").Get(key, v1.GetOptions{})
+		featureState, err := featuresClient.Get(key, metav1.GetOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				logrus.Errorf("unable to retrieve feature %s in initialize features: %v", f.name, err)
 			}
 
-			// value starts off as nil, that way rancher can determine if value has been manually assigned
-			newFeature := &v3.Feature{
-				ObjectMeta: v1.ObjectMeta{
-					Name: f.name,
-				},
-				Spec: v32.FeatureSpec{
-					Value: nil,
-				},
-				Status: v32.FeatureStatus{
-					Default:     f.def,
-					Dynamic:     f.dynamic,
-					Description: f.description,
-				},
-			}
+			if f.install {
+				// value starts off as nil, that way rancher can determine if value has been manually assigned
+				newFeature := &v3.Feature{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: f.name,
+					},
+					Spec: v3.FeatureSpec{
+						Value: nil,
+					},
+					Status: v3.FeatureStatus{
+						Default:     f.def,
+						Dynamic:     f.dynamic,
+						Description: f.description,
+					},
+				}
 
-			if _, err := ctx.Management.Features("").Create(newFeature); err != nil {
-				logrus.Errorf("unable to create feature %s in initialize features: %v", f.name, err)
+				if _, err := featuresClient.Create(newFeature); err != nil {
+					logrus.Errorf("unable to create feature %s in initialize features: %v", f.name, err)
+				}
 			}
 		} else {
 			newFeatureState := featureState.DeepCopy()
@@ -104,7 +117,7 @@ func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
 				newFeatureState.Status.Description = f.description
 			}
 
-			if newFeatureState, err = ctx.Management.Features("").Update(newFeatureState); err != nil {
+			if newFeatureState, err = featuresClient.Update(newFeatureState); err != nil {
 				logrus.Errorf("unable to update feature %s in initialize features: %v", f.name, err)
 				continue
 			}
@@ -185,14 +198,25 @@ func GetFeatureByName(name string) *Feature {
 	return features[name]
 }
 
+func IsEnabled(feature *v3.Feature) bool {
+	if feature == nil {
+		return false
+	}
+	if feature.Spec.Value == nil {
+		return feature.Status.Default
+	}
+	return *feature.Spec.Value
+}
+
 // newFeature adds feature to the global feature map
-func newFeature(name, description string, def, dynamic bool) *Feature {
+func newFeature(name, description string, def, dynamic, install bool) *Feature {
 	feature := &Feature{
 		name:        name,
 		description: description,
 		def:         def,
 		val:         def,
 		dynamic:     dynamic,
+		install:     install,
 	}
 
 	// feature will be stored in feature map, features contained in feature

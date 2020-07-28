@@ -156,7 +156,7 @@ func clientForSetup(c *check.C) (*clientset.Clientset, *extclient.Clientset, *co
 	clusterClient, err := clientset.NewForConfig(workloadKubeConfig)
 	c.Assert(err, check.IsNil)
 
-	scaledContext, err := config.NewScaledContext(*clusterKubeConfig)
+	scaledContext, err := config.NewScaledContext(*clusterKubeConfig, nil)
 	c.Assert(err, check.IsNil)
 
 	workload, err := config.NewUserContext(scaledContext, *workloadKubeConfig, "")

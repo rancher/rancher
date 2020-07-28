@@ -59,7 +59,6 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 		return status, nil
 	}
 
-	status.ObservedGeneration = operation.Generation
 	pod, err := o.pods.Get(status.PodNamespace, status.PodName)
 	if apierrors.IsNotFound(err) {
 		kstatus.SetActive(&status)
@@ -70,9 +69,10 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 		if container.Name != "helm" {
 			continue
 		}
+		status.ObservedGeneration = operation.Generation
 		if container.State.Running != nil {
 			status.PodCreated = true
-			kstatus.SetTransitiong(&status, "")
+			kstatus.SetTransitioning(&status, "running operation")
 		} else if container.State.Terminated != nil {
 			status.PodCreated = true
 			if container.State.Terminated.ExitCode == 0 {
@@ -83,6 +83,10 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 						container.State.Terminated.Message,
 						container.State.Terminated.ExitCode))
 			}
+		} else if container.State.Waiting != nil {
+			kstatus.SetTransitioning(&status, "waiting to run operation")
+		} else {
+			kstatus.SetTransitioning(&status, "unknown state operation")
 		}
 	}
 

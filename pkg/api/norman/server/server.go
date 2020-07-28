@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/api/norman"
-
+	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
+	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/api/norman/server/managementstored"
 	"github.com/rancher/rancher/pkg/api/norman/server/userstored"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -39,5 +39,10 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 	}
 	server.AccessControl = scaledContext.AccessControl
 
-	return server, managementapi.Register(ctx, scaledContext, clusterManager, server)
+	if err := managementapi.Register(ctx, scaledContext, clusterManager, server); err != nil {
+		return nil, err
+	}
+
+	chainGzip := responsewriter.Chain{responsewriter.Gzip, responsewriter.ContentType}
+	return chainGzip.Handler(server), nil
 }

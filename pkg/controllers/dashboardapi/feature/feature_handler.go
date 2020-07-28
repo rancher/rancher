@@ -4,18 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
+	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func Register(ctx context.Context, scaled *config.ScaledContext) {
-	scaled.Management.Features("").AddHandler(ctx, "features-restart-handler", sync)
+func Register(ctx context.Context, features managementv3.FeatureController) {
+	features.OnChange(ctx, "features-restart-handler", sync)
 }
 
-func sync(key string, obj *v3.Feature) (runtime.Object, error) {
+func sync(key string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}

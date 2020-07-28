@@ -3,8 +3,6 @@ package management
 import (
 	"context"
 
-	"github.com/rancher/rancher/pkg/controllers/dashboard"
-
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/eks"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
@@ -17,10 +15,5 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 
 	k3sbasedupgrade.Register(ctx, wranglerContext, management, manager)
 	eks.Register(ctx, wranglerContext, management)
-
-	if err := dashboard.Register(ctx, wranglerContext); err != nil {
-		return err
-	}
-
 	return nil
 }

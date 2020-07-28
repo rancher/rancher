@@ -46,7 +46,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 
 	opts, err := SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to setup TLS listener")
 	}
 
 	migrateConfig(ctx, restConfig, opts)

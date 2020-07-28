@@ -399,7 +399,7 @@ func (s *AuthzSuite) SetUpSuite(c *check.C) {
 
 	err := workload.Start(ctx)
 	c.Assert(err, check.IsNil)
-	err = workload.Management.Start(ctx)
+	err = workload.Management.ControllerFactory.Start(ctx, 5)
 	c.Assert(err, check.IsNil)
 
 }

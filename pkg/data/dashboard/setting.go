@@ -1,4 +1,4 @@
-package management
+package dashboard
 
 import (
 	"github.com/pborman/uuid"

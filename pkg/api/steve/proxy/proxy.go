@@ -5,38 +5,109 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/gorilla/mux"
+	gmux "github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/remotedialer"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/proxy"
 	authzv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/client-go/rest"
 )
 
 type Handler struct {
-	authorizer   authorizer.Authorizer
-	tunnelServer *remotedialer.Server
-	clusters     v3.ClusterCache
+	authorizer    authorizer.Authorizer
+	dialerFactory ClusterDialerFactory
+	clusters      v3.ClusterCache
 }
 
-func NewProxyHandler(authorizer authorizer.Authorizer,
-	tunnelServer *remotedialer.Server,
-	clusters v3.ClusterCache) *Handler {
-	return &Handler{
-		authorizer:   authorizer,
-		tunnelServer: tunnelServer,
-		clusters:     clusters,
+type ClusterDialerFactory interface {
+	ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+func RewriteLocalCluster(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if strings.HasPrefix(req.URL.Path, "/k8s/clusters/local") {
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, "/k8s/clusters/local")
+			if req.URL.Path == "" {
+				req.URL.Path = "/"
+			}
+		}
+		next.ServeHTTP(rw, req)
+	})
+}
+
+func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
+	dialerFactory ClusterDialerFactory,
+	clusters v3.ClusterCache,
+	localSupport bool,
+	localCluster http.Handler) (func(http.Handler) http.Handler, error) {
+	cfg := authorizerfactory.DelegatingAuthorizerConfig{
+		SubjectAccessReviewClient: sar,
+		AllowCacheTTL:             time.Second * time.Duration(settings.AuthorizationCacheTTLSeconds.GetInt()),
+		DenyCacheTTL:              time.Second * time.Duration(settings.AuthorizationDenyCacheTTLSeconds.GetInt()),
+	}
+
+	authorizer, err := cfg.New()
+	if err != nil {
+		return nil, err
+	}
+
+	proxyHandler := NewProxyHandler(authorizer, dialerFactory, clusters)
+
+	mux := gmux.NewRouter()
+	mux.UseEncodedPath()
+	mux.Path("/v1/clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToProxy(localSupport, localCluster, mux, proxyHandler))
+	mux.Path("/v3/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToProxy(localSupport, localCluster, mux, proxyHandler))
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/", true)).Handler(proxyHandler)
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/", false)).Handler(proxyHandler)
+
+	return func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			mux.NotFoundHandler = handler
+			mux.ServeHTTP(rw, req)
+		})
+	}, nil
+}
+
+func routeToProxy(localSupport bool, localCluster http.Handler, mux *gmux.Router, proxyHandler *Handler) func(rw http.ResponseWriter, r *http.Request) {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		vars := gmux.Vars(r)
+		cluster := vars["clusterID"]
+		if cluster == "local" {
+			if localSupport {
+				localCluster.ServeHTTP(rw, r)
+			} else {
+				mux.NotFoundHandler.ServeHTTP(rw, r)
+			}
+			return
+		}
+		vars["prefix"] = "k8s/clusters/" + cluster
+		vars["suffix"] = "/v1/clusters/local"
+		r.URL.Path = "/k8s/clusters/" + cluster + "/v1/clusters/local"
+		proxyHandler.ServeHTTP(rw, r)
 	}
 }
 
-func (h *Handler) MatchNonLegacy(prefix string, force bool) mux.MatcherFunc {
-	return func(req *http.Request, match *mux.RouteMatch) bool {
+func NewProxyHandler(authorizer authorizer.Authorizer,
+	dialerFactory ClusterDialerFactory,
+	clusters v3.ClusterCache) *Handler {
+	return &Handler{
+		authorizer:    authorizer,
+		dialerFactory: dialerFactory,
+		clusters:      clusters,
+	}
+}
+
+func (h *Handler) MatchNonLegacy(prefix string, force bool) gmux.MatcherFunc {
+	return func(req *http.Request, match *gmux.RouteMatch) bool {
 		if !features.SteveProxy.Enabled() && !force {
 			return false
 		}
@@ -65,8 +136,8 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	prefix := "/" + mux.Vars(req)["prefix"]
-	clusterID := mux.Vars(req)["clusterID"]
+	prefix := "/" + gmux.Vars(req)["prefix"]
+	clusterID := gmux.Vars(req)["clusterID"]
 
 	if !h.canAccess(req.Context(), user, clusterID) {
 		rw.WriteHeader(http.StatusUnauthorized)
@@ -88,13 +159,14 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 	if err != nil {
 		return nil, err
 	}
-	dialer := h.tunnelServer.Dialer(host)
+	dialer := h.dialerFactory.ClusterDialer(host)
 	return dialer(ctx, network, "127.0.0.1:6443")
 }
 
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {
 	cfg := &rest.Config{
-		// this is bogus, the dialer will change it to 127.0.0.1:6443
+		// this is bogus, the dialer will change it to 127.0.0.1:6443, but the clusterID is used to lookup the tunnel
+		// connect
 		Host:      "https://" + clusterID,
 		UserAgent: rest.DefaultKubernetesUserAgent() + " cluster " + clusterID,
 		TLSClientConfig: rest.TLSClientConfig{

@@ -129,7 +129,7 @@ func TestFormatter(t *testing.T) {
 		assert.Nilf(err, "%s could not new fake RawResource", cs.caseName)
 
 		// verify
-		scaledContext, err := config.NewScaledContext(restclient.Config{})
+		scaledContext, err := config.NewScaledContext(restclient.Config{}, nil)
 		assert.Nil(err)
 		assert.NotNil(scaledContext)
 		tokenFormatter := NewFormatter(scaledContext)

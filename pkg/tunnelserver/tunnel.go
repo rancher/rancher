@@ -391,28 +391,3 @@ func (t *Authorizer) toCustomConfig(machine *client.Node) *v32.CustomConfig {
 	}
 	return result
 }
-
-func (t *Authorizer) Authenticate(req *http.Request) (authed bool, user string, groups []string, err error) {
-	token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
-	if token == "" {
-		return false, "", nil, nil
-	}
-
-	cluster, err := t.getClusterByToken(token)
-	if err == ErrClusterNotFound {
-		return false, "", nil, nil
-	}
-	if err != nil || cluster == nil {
-		return false, "", nil, err
-	}
-
-	return true, "system:cluster:" + cluster.Name,
-		[]string{
-			"system:authenticated",
-			"system:clusters",
-		}, nil
-}
-
-func (t *Authorizer) TokenFromRequest(req *http.Request) (*v3.Token, error) {
-	return nil, fmt.Errorf("token not found")
-}
