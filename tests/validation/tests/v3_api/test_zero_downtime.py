@@ -266,8 +266,8 @@ def validate_cluster_and_ingress(client, cluster, intermediate_state="provisioni
 @pytest.fixture(scope='function', autouse="True")
 def create_zdt_setup(request):
     preupgrade_k8s = default_k8s_versions[0]
-    zero_node_roles = [["etcd"], ["controlplane"], ["controlplane"], ["worker"], ["worker"]]
-    # zero_node_roles = [["controlplane"], ["etcd"], ["worker"]]
+    # zero_node_roles = [["etcd"], ["controlplane"], ["controlplane"], ["worker"], ["worker"]]
+    zero_node_roles = [["controlplane"], ["etcd"], ["worker"]]
     client = get_user_client()
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
