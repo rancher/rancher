@@ -37,7 +37,7 @@ func New() http.Handler {
 func emberIndexUnlessNoMCM() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if parse.IsBrowser(req, true) {
-			if emberEnabled() {
+			if features.MCM.Enabled() {
 				emberIndex.ServeHTTP(rw, req)
 			} else {
 				vueIndex.ServeHTTP(rw, req)
