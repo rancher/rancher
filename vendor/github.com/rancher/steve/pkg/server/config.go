@@ -2,16 +2,8 @@ package server
 
 import (
 	"context"
-	"net/http"
 	"time"
 
-	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/steve/pkg/accesscontrol"
-	"github.com/rancher/steve/pkg/auth"
-	"github.com/rancher/steve/pkg/client"
-	"github.com/rancher/steve/pkg/clustercache"
-	"github.com/rancher/steve/pkg/schema"
-	"github.com/rancher/steve/pkg/server/router"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io"
 	apiextensionsv1beta1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io"
@@ -26,24 +18,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
-
-type Server struct {
-	*Controllers
-
-	RESTConfig *rest.Config
-
-	ClientFactory   *client.Factory
-	BaseSchemas     *types.APISchemas
-	AccessSetLookup accesscontrol.AccessSetLookup
-	SchemaTemplates []schema.Template
-	AuthMiddleware  auth.Middleware
-	Next            http.Handler
-	Router          router.RouterFunc
-	ClusterCache    clustercache.ClusterCache
-	PostStartHooks  []func() error
-	StartHooks      []StartHook
-	DashboardURL    func() string
-}
 
 type Controllers struct {
 	RESTConfig *rest.Config

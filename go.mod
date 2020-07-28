@@ -75,19 +75,19 @@ require (
 	github.com/prometheus/client_golang v1.4.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.9.1
-	github.com/rancher/apiserver v0.0.0-20200721152301-4388bb184a8e
-	github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9
+	github.com/rancher/apiserver v0.0.0-20200728054330-c96faab6902b
+	github.com/rancher/dynamiclistener v0.2.1-0.20200728054858-bafb05165617
 	github.com/rancher/eks-operator v0.1.0-rc22
-	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
+	github.com/rancher/lasso v0.0.0-20200728055126-961184571d1b
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200714195611-b3163ad4ebc4
+	github.com/rancher/norman v0.0.0-20200728060519-1697d43171e1
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
 	github.com/rancher/rke v1.2.0-rc2.0.20200712062933-4c1d3db2b0c1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200721152628-f403507ea950
+	github.com/rancher/steve v0.0.0-20200724084200-a3fbe499d1cc
 	github.com/rancher/system-upgrade-controller v0.6.2
-	github.com/rancher/wrangler v0.6.2-0.20200721203632-787d93e49342
+	github.com/rancher/wrangler v0.6.2-0.20200728060155-6ce25c8fad86
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0

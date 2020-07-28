@@ -18,7 +18,7 @@ func SetError(obj interface{}, message string) {
 	Stalled.Message(obj, message)
 }
 
-func SetTransitiong(obj interface{}, message string) {
+func SetTransitioning(obj interface{}, message string) {
 	Reconciling.True(obj)
 	Reconciling.Message(obj, message)
 	Reconciling.Reason(obj, string(Reconciling))

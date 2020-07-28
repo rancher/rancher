@@ -353,7 +353,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/rancher/apiserver v0.0.0-20200721152301-4388bb184a8e
+# github.com/rancher/apiserver v0.0.0-20200728054330-c96faab6902b
 github.com/rancher/apiserver/pkg/apierror
 github.com/rancher/apiserver/pkg/builtin
 github.com/rancher/apiserver/pkg/handlers
@@ -367,7 +367,7 @@ github.com/rancher/apiserver/pkg/subscribe
 github.com/rancher/apiserver/pkg/types
 github.com/rancher/apiserver/pkg/urlbuilder
 github.com/rancher/apiserver/pkg/writer
-# github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9
+# github.com/rancher/dynamiclistener v0.2.1-0.20200728054858-bafb05165617
 github.com/rancher/dynamiclistener
 github.com/rancher/dynamiclistener/cert
 github.com/rancher/dynamiclistener/factory
@@ -378,7 +378,7 @@ github.com/rancher/dynamiclistener/storage/memory
 # github.com/rancher/eks-operator v0.1.0-rc22
 github.com/rancher/eks-operator/pkg/apis/eks.cattle.io
 github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1
-# github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
+# github.com/rancher/lasso v0.0.0-20200728055126-961184571d1b
 github.com/rancher/lasso/pkg/cache
 github.com/rancher/lasso/pkg/client
 github.com/rancher/lasso/pkg/controller
@@ -396,7 +396,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200714195611-b3163ad4ebc4
+# github.com/rancher/norman v0.0.0-20200728060519-1697d43171e1
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -474,14 +474,13 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200721152628-f403507ea950
+# github.com/rancher/steve v0.0.0-20200724084200-a3fbe499d1cc
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
 github.com/rancher/steve/pkg/client
 github.com/rancher/steve/pkg/clustercache
 github.com/rancher/steve/pkg/controllers/schema
-github.com/rancher/steve/pkg/dashboard
 github.com/rancher/steve/pkg/podimpersonation
 github.com/rancher/steve/pkg/proxy
 github.com/rancher/steve/pkg/resources
@@ -510,7 +509,7 @@ github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1
 github.com/rancher/system-upgrade-controller/pkg/condition
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/scheme
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1
-# github.com/rancher/wrangler v0.6.2-0.20200721203632-787d93e49342
+# github.com/rancher/wrangler v0.6.2-0.20200728060155-6ce25c8fad86
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/broadcast
