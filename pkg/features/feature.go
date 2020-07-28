@@ -44,7 +44,7 @@ var (
 	MCM = newFeature(
 		"multi-cluster-management",
 		"Multi-cluster provisioning and management of Kubernetes clusters.",
-		true,
+		false,
 		true,
 		false)
 )
