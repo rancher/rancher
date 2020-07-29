@@ -26,7 +26,6 @@ def test_zdt():
     cluster, workload, ingress = validate_cluster_and_ingress(client, cluster,
                                                               check_intermediate_state=False)
     # Update Cluster to k8 version + upgrade strategy maxUnavailable worker
-    # add services -> dic
     cluster = client.update_by_id_cluster(
         id=cluster.id,
         name="test1",
@@ -92,7 +91,7 @@ def test_zdt_nodes():
         assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver, \
             "Not all Nodes Upgraded Correctly"
 
-@pytest.mark.skip(reason="tested")
+
 def test_zdt_backup():
     client = get_user_client()
     p_client = namespace["p_client"]
