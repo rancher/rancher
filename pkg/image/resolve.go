@@ -1,3 +1,6 @@
+// Copyright (C) 2020, Oracle and/or its affiliates.
+// Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+
 package image
 
 import (
@@ -32,10 +35,6 @@ func Resolve(image string) string {
 func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	reg := util.GetPrivateRepoURL(cluster)
 	if reg != "" && !strings.HasPrefix(image, reg) {
-		//Images from Dockerhub Library repo, we add rancher prefix when using private registry
-		if !strings.Contains(image, "/") {
-			image = "rancher/" + image
-		}
 		return path.Join(reg, image)
 	}
 
