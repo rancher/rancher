@@ -162,6 +162,11 @@ func checkStandard(obj data.Object, conditions []Condition, summary Summary) Sum
 		return summary
 	}
 
+	// this is a hack to not call the standard summarizers on norman mapped objects
+	if strings.HasPrefix(obj.String("type"), "/") {
+		return summary
+	}
+
 	result, err := kstatus.Compute(&unstructured.Unstructured{Object: obj})
 	if err != nil {
 		return summary
@@ -170,6 +175,7 @@ func checkStandard(obj data.Object, conditions []Condition, summary Summary) Sum
 	switch result.Status {
 	case kstatus.InProgressStatus:
 		summary.State = "in-progress"
+		summary.Message = append(summary.Message, result.Message)
 		summary.Transitioning = true
 	case kstatus.FailedStatus:
 		summary.State = "failed"

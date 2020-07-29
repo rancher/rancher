@@ -87,7 +87,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200724084200-a3fbe499d1cc
 	github.com/rancher/system-upgrade-controller v0.6.2
-	github.com/rancher/wrangler v0.6.2-0.20200728060155-6ce25c8fad86
+	github.com/rancher/wrangler v0.6.2-0.20200729234100-2cb57bf36360
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0
