@@ -80,7 +80,7 @@ def test_zdt_nodes():
     if "%" in MAX_UNAVAILABLE:
         max_unavailable = len(worker_nodes) * int(MAX_UNAVAILABLE.split("%")[0]) / 100
     else:
-        max_unavailable = MAX_UNAVAILABLE
+        max_unavailable = int(MAX_UNAVAILABLE)
 
     worker_upgraded = validate_node_drain(worker_nodes, workload, True, 600,
                                           max_unavailable)
