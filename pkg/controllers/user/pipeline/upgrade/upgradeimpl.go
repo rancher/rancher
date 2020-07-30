@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/types/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -93,7 +94,7 @@ func (l *PipelineService) upgradeComponents(ns string) error {
 		return fmt.Errorf("upgrade system service %s:%s failed, %v", jenkinsDeployment.Namespace, jenkinsDeployment.Name, err)
 	}
 
-	//Only update image for Registry and Minio to preserve user customized configurations such as volumes
+	//Only update image or resources for Registry and Minio to preserve user customized configurations such as volumes
 	registryDeployment, err := l.deploymentLister.Get(ns, utils.RegistryName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -115,6 +116,12 @@ func (l *PipelineService) upgradeComponents(ns string) error {
 	}
 	toUpdateMinio := minioDeployment.DeepCopy()
 	toUpdateMinio.Spec.Template.Spec.Containers[0].Image = images.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Minio)
+	if toUpdateMinio.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Cmp(*resource.NewQuantity(500e6, resource.BinarySI)) < 0 {
+		toUpdateMinio.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+			corev1.ResourceCPU:    *toUpdateMinio.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu(),
+			corev1.ResourceMemory: *resource.NewQuantity(500e6, resource.BinarySI),
+		}
+	}
 	if _, err := l.deployments.Update(toUpdateMinio); err != nil {
 		return err
 	}
