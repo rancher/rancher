@@ -3,7 +3,8 @@ package pki
 import "time"
 
 const (
-	CertPathPrefix          = "/etc/kubernetes/ssl/"
+	K8sBaseDir              = "/etc/kubernetes/"
+	CertPathPrefix          = K8sBaseDir + "ssl/"
 	CertificatesServiceName = "certificates"
 	CrtDownloaderContainer  = "cert-deployer"
 	CertFetcherContainer    = "cert-fetcher"
@@ -11,6 +12,7 @@ const (
 	TempCertPath            = "/etc/kubernetes/.tmp/"
 	ClusterConfig           = "cluster.yml"
 	ClusterStateFile        = "cluster-state.yml"
+	ClusterStateExt         = ".rkestate"
 	ClusterStateEnv         = "CLUSTER_STATE"
 	BundleCertPath          = "/backup/pki.bundle.tar.gz"
 
