@@ -598,7 +598,7 @@ class AmazonWebServices(CloudProviderBase):
             "ec2SshKey": AWS_SSH_KEY_NAME.replace('.pem', '')
         }
 
-        return self._eks_client.\
+        ng = self._eks_client.\
             create_nodegroup(clusterName=cluster_name,
                              nodegroupName=name,
                              scalingConfig=scaling_config,
@@ -607,6 +607,9 @@ class AmazonWebServices(CloudProviderBase):
                              instanceTypes=[AWS_INSTANCE_TYPE],
                              nodeRole=EKS_WORKER_ROLE_ARN,
                              remoteAccess=remote_access)
+        waiter_ng = self._eks_client.get_waiter('nodegroup_active')
+        waiter_ng.wait(clusterName=cluster_name, nodegroupName=name)
+        return ng
 
     def describe_eks_cluster(self, name):
         try:
