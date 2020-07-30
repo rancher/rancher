@@ -1,11 +1,17 @@
 #!groovy
 
 jobs = [:]
-def deleteContainer = "${JOB_NAME}${BUILD_NUMBER}_delete"
+def job_name = "${JOB_NAME}"
+if (job_name.contains('/')) { 
+  job_names = job_name.split('/')
+  job_name = job_names[job_names.size() - 1] 
+}
+
+def deleteContainer = "${job_name}${BUILD_NUMBER}_delete"
 def deletePytestOptions = "-k test_delete_rancher_server"
 def deleteResultsOut = "delete-results.xml"
 def testsDir = "tests/v3_api/"
-def imageName = "rancher-validation-${JOB_NAME}${env.BUILD_NUMBER}"
+def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
 def envFile = ".env"
 def RANCHER_DEPLOYED = false
 
@@ -52,86 +58,89 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
   }
   node {
     wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
-      stage('Checkout') {
-        deleteDir()
-        checkout([
-                  $class: 'GitSCM',
-                  branches: [[name: "*/${branch}"]],
-                  extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                  userRemoteConfigs: scm.userRemoteConfigs
-                ])
-      }
+      withFolderProperties {
+        stage('Checkout') {
+          deleteDir()
+          checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${branch}"]],
+                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                  ])
+        }
 
-      try {
         try {
-          dir ("tests/validation") {
-            stage('Configure and Build') {
-              if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-                dir(".ssh") {
-                  def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
-                  writeFile file: AWS_SSH_KEY_NAME, text: decoded
+          try {
+            dir ("tests/validation") {
+              stage('Configure and Build') {
+                if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+                  dir(".ssh") {
+                    def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                    writeFile file: AWS_SSH_KEY_NAME, text: decoded
+                  }
                 }
+                sh "./tests/v3_api/scripts/configure.sh"
+                sh "./tests/v3_api/scripts/build.sh"
               }
-              sh "./tests/v3_api/scripts/configure.sh"
-              sh "./tests/v3_api/scripts/build.sh"
+
+              stage('Deploy Rancher server') {
+                sh "docker run --name ${job_name}${BUILD_NUMBER} -t --env-file .env ${imageName} /bin/bash " +
+                  "-c \'export RANCHER_SERVER_VERSION=${rancher_version} && pytest -v -s --junit-xml=setup.xml -k test_deploy_rancher_server tests/v3_api/\'"
+                sh "docker cp ${job_name}${BUILD_NUMBER}:/src/rancher-validation/tests/v3_api/rancher_env.config ."
+
+                load "rancher_env.config"
+                RANCHER_DEPLOYED = true
+              }
+            } catch (err) {
+                RANCHER_DEPLOYED = false
+                echo "Error: " + err
+                currentBuild.result = 'FAILURE'
+                error()
             }
 
-            stage('Deploy Rancher server') {
-              sh "docker run --name ${JOB_NAME}${BUILD_NUMBER} -t --env-file .env ${imageName} /bin/bash " +
-                "-c \'export RANCHER_SERVER_VERSION=${rancher_version} && pytest -v -s --junit-xml=setup.xml -k test_deploy_rancher_server tests/v3_api/\'"
-              sh "docker cp ${JOB_NAME}${BUILD_NUMBER}:/src/rancher-validation/tests/v3_api/rancher_env.config ."
-              load "rancher_env.config"
-              RANCHER_DEPLOYED = true
+            stage('Run provisioning tests') {
+              params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"), string(name: 'USER_TOKEN', value: "${USER_TOKEN}"), string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"), string(name: 'BRANCH', value: branch) ]
+
+              jobs["custom"] = { build job: 'rancher-v3_test_custom_cluster', parameters: params}
+              jobs["do"] = { build job: 'rancher-v3_test_do_cluster', parameters: params }
+              jobs["ec2"] = { build job: 'rancher-v3_test_ec2_cluster', parameters: params }
+              jobs["az"] = { build job: 'rancher-v3_test_az_cluster', parameters: params }
+
+              parallel jobs
             }
-          } catch (err) {
-              RANCHER_DEPLOYED = false
-              echo "Error: " + err
-              currentBuild.result = 'FAILURE'
-              error()
-          }
-
-          stage('Run provisioning tests') {
-            params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"), string(name: 'USER_TOKEN', value: "${USER_TOKEN}"), string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"), string(name: 'BRANCH', value: branch) ]
-
-            jobs["custom"] = { build job: 'rancher-v3_test_custom_cluster', parameters: params}
-            jobs["do"] = { build job: 'rancher-v3_test_do_cluster', parameters: params }
-            jobs["ec2"] = { build job: 'rancher-v3_test_ec2_cluster', parameters: params }
-            jobs["az"] = { build job: 'rancher-v3_test_az_cluster', parameters: params }
-
-            parallel jobs
-          }
-        } catch(err) {
-          echo "Error: " + err
-        } finally {
-          stage('Delete Rancher Server') {
-            try {
-              if (RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
-                echo "Sleeping for ${RANCHER_DELETE_DELAY} hours before deleting Rancher server"
-                sleep(time: RANCHER_DELETE_DELAY.toInteger(), unit: "HOURS")
-                sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
-                "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " +
-                "export ADMIN_TOKEN=${ADMIN_TOKEN} && export USER_TOKEN=${USER_TOKEN} && "+
-                "pytest -v -s --junit-xml=${deleteResultsOut} " +
-                "${deletePytestOptions} ${testsDir}\'"
+          } catch(err) {
+            echo "Error: " + err
+          } finally {
+            stage('Delete Rancher Server') {
+              try {
+                if (RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
+                  echo "Sleeping for ${RANCHER_DELETE_DELAY} hours before deleting Rancher server"
+                  sleep(time: RANCHER_DELETE_DELAY.toInteger(), unit: "HOURS")
+                  sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
+                  "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " +
+                  "export ADMIN_TOKEN=${ADMIN_TOKEN} && export USER_TOKEN=${USER_TOKEN} && "+
+                  "pytest -v -s --junit-xml=${deleteResultsOut} " +
+                  "${deletePytestOptions} ${testsDir}\'"
+                }
+                else {
+                  echo "Rancher server not deployed, skipping delete."
+                }
+              } catch(err) {
+                echo "Error: " + err
+                currentBuild.result = 'FAILURE'
               }
-              else {
-                echo "Rancher server not deployed, skipping delete."
-              }
-            } catch(err) {
-              echo "Error: " + err
-              currentBuild.result = 'FAILURE'
             }
-          }
 
-          stage('Test Report') {
-            sh "docker cp ${JOB_NAME}${BUILD_NUMBER}:/src/rancher-validation/setup.xml ."
-            step([$class: 'JUnitResultArchiver', testResults: '**/setup.xml'])
-          }
+            stage('Test Report') {
+              sh "docker cp ${job_name}${BUILD_NUMBER}:/src/rancher-validation/setup.xml ."
+              step([$class: 'JUnitResultArchiver', testResults: '**/setup.xml'])
+            }
 
-          stage('Cleanup') {
-            sh "docker stop ${JOB_NAME}${BUILD_NUMBER}"
-            sh "docker rm -v ${JOB_NAME}${BUILD_NUMBER}"
-            sh "docker rmi ${imageName}"
+            stage('Cleanup') {
+              sh "docker stop ${job_name}${BUILD_NUMBER}"
+              sh "docker rm -v ${job_name}${BUILD_NUMBER}"
+              sh "docker rmi ${imageName}"
+            }
           }
         }
       }
