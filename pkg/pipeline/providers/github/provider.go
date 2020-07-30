@@ -64,11 +64,6 @@ func (g *GhProvider) GetProviderConfig(projectID string) (interface{}, error) {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
 
-	metadataMap, ok := storedGithubPipelineConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve GithubConfig metadata, cannot read k8s Unstructured data")
-	}
-
 	if storedGithubPipelineConfig.Inherit {
 		globalConfig, err := g.getGithubConfigCR()
 		if err != nil {
@@ -77,13 +72,11 @@ func (g *GhProvider) GetProviderConfig(projectID string) (interface{}, error) {
 		storedGithubPipelineConfig.ClientSecret = globalConfig.ClientSecret
 	}
 
-	typemeta := &metav1.ObjectMeta{}
-	//time.Time cannot decode directly
-	delete(metadataMap, "creationTimestamp")
-	if err := mapstructure.Decode(metadataMap, typemeta); err != nil {
-		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
+	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedGithubPipelineConfigMap)
+	if err != nil {
+		return nil, err
 	}
-	storedGithubPipelineConfig.ObjectMeta = *typemeta
+	storedGithubPipelineConfig.ObjectMeta = *objectMeta
 	storedGithubPipelineConfig.APIVersion = "project.cattle.io/v3"
 	storedGithubPipelineConfig.Kind = v3.SourceCodeProviderConfigGroupVersionKind.Kind
 	return storedGithubPipelineConfig, nil

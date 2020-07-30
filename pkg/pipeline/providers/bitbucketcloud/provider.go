@@ -62,18 +62,11 @@ func (b *BcProvider) GetProviderConfig(projectID string) (interface{}, error) {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
 
-	metadataMap, ok := storedBitbucketPipelineConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve BitbucketConfig metadata, cannot read k8s Unstructured data")
+	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedBitbucketPipelineConfigMap)
+	if err != nil {
+		return nil, err
 	}
-
-	typemeta := &metav1.ObjectMeta{}
-	//time.Time cannot decode directly
-	delete(metadataMap, "creationTimestamp")
-	if err := mapstructure.Decode(metadataMap, typemeta); err != nil {
-		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
-	}
-	storedBitbucketPipelineConfig.ObjectMeta = *typemeta
+	storedBitbucketPipelineConfig.ObjectMeta = *objectMeta
 	storedBitbucketPipelineConfig.APIVersion = "project.cattle.io/v3"
 	storedBitbucketPipelineConfig.Kind = v3.SourceCodeProviderConfigGroupVersionKind.Kind
 	return storedBitbucketPipelineConfig, nil
