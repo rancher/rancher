@@ -53,19 +53,20 @@ func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, rkeCon
 	return doRunDeployer(ctx, host, env, certDownloaderImage, prsMap)
 }
 
-func DeployStateOnPlaneHost(ctx context.Context, host *hosts.Host, stateDownloaderImage string, prsMap map[string]v3.PrivateRegistry, clusterState string) error {
+func DeployStateOnPlaneHost(ctx context.Context, host *hosts.Host, stateDownloaderImage string, prsMap map[string]v3.PrivateRegistry, clusterState string, snapshotName string) error {
 	// remove existing container. Only way it's still here is if previous deployment failed
 	if err := docker.DoRemoveContainer(ctx, host.DClient, StateDeployerContainerName, host.Address); err != nil {
 		return err
 	}
 	containerEnv := []string{ClusterStateEnv + "=" + clusterState}
-	ClusterStateFilePath := path.Join(host.PrefixPath, TempCertPath, ClusterStateFile)
+	ClusterStateFilePath := path.Join(host.PrefixPath, K8sBaseDir, "/", fmt.Sprintf("%s%s", snapshotName, ClusterStateExt))
+	logrus.Debugf("[state] Deploying state to [%v] on node [%s]", ClusterStateFilePath, host.Address)
 	imageCfg := &container.Config{
 		Image: stateDownloaderImage,
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("t=$(mktemp); echo -e \"$%s\" > $t && mv $t %s && chmod 644 %s", ClusterStateEnv, ClusterStateFilePath, ClusterStateFilePath),
+			fmt.Sprintf("t=$(mktemp); echo \"$%s\" > $t && mv $t %s && chmod 400 %s", ClusterStateEnv, ClusterStateFilePath, ClusterStateFilePath),
 		},
 		Env: containerEnv,
 	}
