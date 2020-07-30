@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/clustercache"
 	"github.com/rancher/steve/pkg/resources/apigroups"
-	"github.com/rancher/steve/pkg/resources/clusters"
 	"github.com/rancher/steve/pkg/resources/common"
 	"github.com/rancher/steve/pkg/resources/counts"
 	"github.com/rancher/steve/pkg/resources/helm"
@@ -27,10 +26,7 @@ func DefaultSchemas(ctx context.Context, baseSchema *types.APISchemas, ccache cl
 	subscribe.Register(baseSchema)
 	apiroot.Register(baseSchema, []string{"v1"}, "proxy:/apis")
 	userpreferences.Register(baseSchema, cg)
-	helm.Register(baseSchema)
-
-	err := clusters.Register(ctx, baseSchema, cg, ccache)
-	return baseSchema, err
+	return baseSchema, nil
 }
 
 func DefaultSchemaTemplates(cf *client.Factory,
