@@ -177,7 +177,7 @@ def test_cli_app_delete(rancher_cli: RancherCli):
     assert deleted
 
 
-def test_app_install_local_dir(remove_cli_resource, rancher_cli: RancherCli):
+def test_cli_app_install_local_dir(remove_cli_resource, rancher_cli: RancherCli):
     rancher_cli.log.info("Testing Installing of an App from Local directory")
     initial_app = rancher_cli.apps.install_local_dir(
         CATALOG_URL, BRANCH, CHARTMUSEUM_CHART,

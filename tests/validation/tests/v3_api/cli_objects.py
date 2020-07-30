@@ -206,6 +206,7 @@ class AppCli(BaseCli):
         timeout = kwargs.get("timeout", DEFAULT_TIMEOUT)
         context = kwargs.get("context", self.DEFAULT_CONTEXT)
         version = kwargs.get("version", None)
+        current_dir = os.getcwd()
         os.chdir(DATA_SUBDIR)
         get_charts_cmd = \
             run_command("git clone -b {} {}".format(branch, catalog_url))
@@ -229,6 +230,7 @@ class AppCli(BaseCli):
         if not created:
             self.log.warn("Failed to install app {} within timeout of {} "
                           "seconds.".format(app_name, timeout))
+        os.chdir(current_dir)
         return self.get(app)
 
 
