@@ -32,92 +32,99 @@ node {
   println "Branch: ${branch}"
 
   wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
-    withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                      string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                      string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
-                      string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
-                      string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
-                     ]) {
-      stage('Checkout') {
-        deleteDir()
-        checkout([
-                  $class: 'GitSCM',
-                  branches: [[name: "*/${branch}"]],
-                  extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                  userRemoteConfigs: scm.userRemoteConfigs
-                ])
-      }
-      // change the current directory
-      dir ("tests/validation") {
-        stage('Configure and Build') {
-          if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-            dir(".ssh") {
-              def decoded = new String(env.AWS_SSH_PEM_KEY.decodeBase64())
-              writeFile file: env.AWS_SSH_KEY_NAME, text: decoded
+    withFolderProperties {
+      withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                        string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                        string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
+                      ]) {
+        stage('Checkout') {
+          deleteDir()
+          checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${branch}"]],
+                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                  ])
+        }
+        // change the current directory
+        dir ("tests/validation") {
+          stage('Configure and Build') {
+            if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+              dir(".ssh") {
+                def decoded = new String(env.AWS_SSH_PEM_KEY.decodeBase64())
+                writeFile file: env.AWS_SSH_KEY_NAME, text: decoded
+              }
+            }
+            sh "./tests/v3_api/scripts/configure.sh"
+            sh "./tests/v3_api/scripts/build.sh"
+          }
+
+          stage('install Rancher') {
+            // skip provisioning a new Rancher Server 
+            // if CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN are provided
+            if(env.CATTLE_TEST_URL != "" || env.ADMIN_TOKEN != "" || env.USER_TOKEN != "") {
+              println "Rancher Server is provided: ${env.CATTLE_TEST_URL}"
+            }
+            else {
+              def job_name = "${JOB_NAME}"
+              if (job_name.contains('/')) { 
+                job_names = job_name.split('/')
+                job_name = job_names[job_names.size() - 1] 
+              }
+              def rancherContainerName = "${job_name}${env.BUILD_NUMBER}_rancher_server"
+              def envFile = ".env"
+              def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
+              def rancher_version = rancher_version()
+              def deployPytestOptions = "-k test_deploy_rancher_server"
+              def setupResultsOut = "setup-results.xml"
+              def testResultsOut = "results.xml"
+              def testsDir = "tests/v3_api/"
+              def rancherConfig = "rancher_env.config"
+              def rootPath = "/src/rancher-validation/"
+              // deploy rancher server
+              sh "docker run --name ${rancherContainerName} -t --env-file ${envFile} " +
+                "${imageName} /bin/bash -c \'export RANCHER_SERVER_VERSION=${rancher_version} && " +
+                "pytest -v -s --junit-xml=${setupResultsOut} " +
+                "${deployPytestOptions} ${testsDir}\'"
+
+              // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN 
+              // and load into environment variables
+              sh "docker cp ${rancherContainerName}:${rootPath}${testsDir}${rancherConfig} ."
+              load rancherConfig
+              println "Rancher Server ip: ${env.CATTLE_TEST_URL}"
             }
           }
-          sh "./tests/v3_api/scripts/configure.sh"
-          sh "./tests/v3_api/scripts/build.sh"
-        }
-
-        stage('install Rancher') {
-          // skip provisioning a new Rancher Server 
-          // if CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN are provided
-          if(env.CATTLE_TEST_URL != "" || env.ADMIN_TOKEN != "" || env.USER_TOKEN != "") {
-            println "Rancher Server is provided: ${env.CATTLE_TEST_URL}"
-          }
-          else {
-            def rancherContainerName = "${JOB_NAME}${env.BUILD_NUMBER}_rancher_server"
-            def envFile = ".env"
-            def imageName = "rancher-validation-${JOB_NAME}${env.BUILD_NUMBER}"
-            def rancher_version = rancher_version()
-            def deployPytestOptions = "-k test_deploy_rancher_server"
-            def setupResultsOut = "setup-results.xml"
-            def testResultsOut = "results.xml"
-            def testsDir = "tests/v3_api/"
-            def rancherConfig = "rancher_env.config"
-            def rootPath = "/src/rancher-validation/"
-            // deploy rancher server
-            sh "docker run --name ${rancherContainerName} -t --env-file ${envFile} " +
-              "${imageName} /bin/bash -c \'export RANCHER_SERVER_VERSION=${rancher_version} && " +
-              "pytest -v -s --junit-xml=${setupResultsOut} " +
-              "${deployPytestOptions} ${testsDir}\'"
-
-            // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN 
-            // and load into environment variables
-            sh "docker cp ${rancherContainerName}:${rootPath}${testsDir}${rancherConfig} ."
-            load rancherConfig
-            println "Rancher Server ip: ${env.CATTLE_TEST_URL}"
-          }
-        }
-        
-        stage('run subjobs in parallel') {
-          try {
-              jobs = [:]
-              // get the list of versions
-              def versions = RANCHER_CLUSTER_OS_DOCKER_VERSION.split(',')
-              for(int i = 0; i < versions.size(); i++) {
-                def items = versions[i].split(':')
-                def name = items[0].trim()
-                def ami  = items[1].trim()
-                def user = items[2].trim()
-                def docker_installed = items[3].trim()
-                def params = [
-                      string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
-                      string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
-                      string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
-                      string(name: 'BRANCH', value: branch),
-                      string(name: 'AWS_AMI', value: "${ami}"),
-                      string(name: 'AWS_USER', value: "${user}"),
-                      string(name: 'DOCKER_INSTALLED', value: "${docker_installed}"),
-                      string(name: 'RANCHER_K8S_VERSION', value: "${env.RANCHER_K8S_VERSION}")
-                      ]
-                println "parameters: ${params}"
-                jobs["${name}"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params }
-              }
-              parallel jobs
-          } catch(err) {
-              echo "Error: " + err
+          
+          stage('run subjobs in parallel') {
+            try {
+                jobs = [:]
+                // get the list of versions
+                def versions = RANCHER_CLUSTER_OS_DOCKER_VERSION.split(',')
+                for(int i = 0; i < versions.size(); i++) {
+                  def items = versions[i].split(':')
+                  def name = items[0].trim()
+                  def ami  = items[1].trim()
+                  def user = items[2].trim()
+                  def docker_installed = items[3].trim()
+                  def params = [
+                        string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
+                        string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
+                        string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
+                        string(name: 'BRANCH', value: branch),
+                        string(name: 'AWS_AMI', value: "${ami}"),
+                        string(name: 'AWS_USER', value: "${user}"),
+                        string(name: 'DOCKER_INSTALLED', value: "${docker_installed}"),
+                        string(name: 'RANCHER_K8S_VERSION', value: "${env.RANCHER_K8S_VERSION}")
+                        ]
+                  println "parameters: ${params}"
+                  jobs["${name}"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params }
+                }
+                parallel jobs
+            } catch(err) {
+                echo "Error: " + err
+            }
           }
         }
       }

@@ -48,10 +48,16 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
   try {
     node {
       def rootPath = "/src/rancher-validation/"
-      def setupContainer = "${JOB_NAME}${env.BUILD_NUMBER}_setup"
-      def setupContainer2 = "${JOB_NAME}${env.BUILD_NUMBER}_setup2"
-      def deleteContainer = "${JOB_NAME}${env.BUILD_NUMBER}_delete"
-      def deleteContainer2 = "${JOB_NAME}${env.BUILD_NUMBER}_delete2"
+      def job_name = "${JOB_NAME}"
+      if (job_name.contains('/')) { 
+        job_names = job_name.split('/')
+        job_name = job_names[job_names.size() - 1] 
+      }
+
+      def setupContainer = "${job_name}${env.BUILD_NUMBER}_setup"
+      def setupContainer2 = "${job_name}${env.BUILD_NUMBER}_setup2"
+      def deleteContainer = "${job_name}${env.BUILD_NUMBER}_delete"
+      def deleteContainer2 = "${job_name}${env.BUILD_NUMBER}_delete2"
 
       def deployPytestOptions = "-k test_deploy_rancher_server"
 
@@ -73,146 +79,158 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
       def USER_TOKEN_2 = ""
 
       wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
-        withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                          string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                          string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
-                          string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
-                          string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')]) {
+        withFolderProperties {
+          withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                            string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                            string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                            string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                            string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')]) {
 
-          println "Branch: ${branch}"
-          stage('Checkout') {
-              deleteDir()
-              checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: "*/${branch}"]],
-                        extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                        userRemoteConfigs: scm.userRemoteConfigs
-                      ])
-          }
-
-          dir ("tests/validation/") {
-            stage('Configure and Build') {
-              if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-                dir(".ssh/") {
-                  def decoded = new String(env.AWS_SSH_PEM_KEY.decodeBase64())
-                  writeFile file: env.AWS_SSH_KEY_NAME, text: decoded
-                }
-              }
-              sh "./tests/v3_api/scripts/configure.sh"
-              sh "./tests/v3_api/scripts/build.sh"
+            println "Branch: ${branch}"
+            stage('Checkout') {
+                deleteDir()
+                checkout([
+                          $class: 'GitSCM',
+                          branches: [[name: "*/${branch}"]],
+                          extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                          userRemoteConfigs: scm.userRemoteConfigs
+                        ])
             }
 
-            try {
-              stage('Deploy Rancher server 1') {
-                try {
-                  // deploy rancher server
-                  sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
-                    "${imageName} /bin/bash -c \'export RANCHER_SERVER_VERSION=${rancher_version} && " +
-                    "pytest -v -s --junit-xml=${setupResultsOut} " +
-                    "${deployPytestOptions} ${testsDir}\'"
-
-                  // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
-                  sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
-                  load rancherConfig
-
-                  CATTLE_TEST_URL_2 = "${CATTLE_TEST_URL}"
-                  ADMIN_TOKEN_2 = "${ADMIN_TOKEN}"
-                  USER_TOKEN_2 = "${USER_TOKEN}"
-                } catch(err) {
-                  echo "Error: " + err
-                  echo 'Test run had failures. Collecting results...'
-                  currentBuild.result = 'FAILURE'
+            dir ("tests/validation/") {
+              stage('Configure and Build') {
+                if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+                  dir(".ssh/") {
+                    def decoded = new String(env.AWS_SSH_PEM_KEY.decodeBase64())
+                    writeFile file: env.AWS_SSH_KEY_NAME, text: decoded
+                  }
                 }
+                sh "./tests/v3_api/scripts/configure.sh"
+                sh "./tests/v3_api/scripts/build.sh"
               }
 
-              stage('Deploy Rancher server 2') {
-                try {
-                  // deploy rancher server
-                  sh "docker run --name ${setupContainer2} -t --env-file ${envFile} " +
-                    "${imageName} /bin/bash -c \'export RANCHER_SERVER_VERSION=${rancher_version} && " +
-                    "pytest -v -s --junit-xml=${setupResultsOut2} " +
-                    "${deployPytestOptions} ${testsDir}\'"
+              try {
+                stage('Deploy Rancher server 1') {
+                  try {
+                    // deploy rancher server
+                    sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
+                      "${imageName} /bin/bash -c \'export RANCHER_SERVER_VERSION=${rancher_version} && " +
+                      "pytest -v -s --junit-xml=${setupResultsOut} " +
+                      "${deployPytestOptions} ${testsDir}\'"
 
-                  // copy file containing CATTLE_TEST_URL & ADMIN_TOKEN and load into environment variables
-                  sh "docker cp ${setupContainer2}:${rootPath}${testsDir}${rancherConfig} ."
-                  load rancherConfig
-                } catch(err) {
-                  echo "Error: " + err
-                  echo 'Test run had failures. Collecting results...'
-                  currentBuild.result = 'FAILURE'
+                    // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
+                    sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
+                    load rancherConfig
+
+                    CATTLE_TEST_URL_2 = "${CATTLE_TEST_URL}"
+                    ADMIN_TOKEN_2 = "${ADMIN_TOKEN}"
+                    USER_TOKEN_2 = "${USER_TOKEN}"
+                  } catch(err) {
+                    echo "Error: " + err
+                    echo 'Test run had failures. Collecting results...'
+                    currentBuild.result = 'FAILURE'
+                  }
                 }
-              }
 
-              stage('Execute subjobs') {
-                try {
-                    jobs = [:]
-                    println "Branch: ${branch}"
-                    params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
-                              string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
-                              string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
-                              string(name: 'RANCHER_SERVER_VERSION', value: "${rancher_version}"), 
-                              string(name: 'BRANCH', value: branch) ]
+                stage('Deploy Rancher server 2') {
+                  try {
+                    // deploy rancher server
+                    sh "docker run --name ${setupContainer2} -t --env-file ${envFile} " +
+                      "${imageName} /bin/bash -c \'export RANCHER_SERVER_VERSION=${rancher_version} && " +
+                      "pytest -v -s --junit-xml=${setupResultsOut2} " +
+                      "${deployPytestOptions} ${testsDir}\'"
 
-                    params2 = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL_2}"),
-                                string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN_2}"),
-                                string(name: 'USER_TOKEN', value: "${USER_TOKEN_2}"),
-                                string(name: 'RANCHER_SERVER_VERSION', value: "${rancher_version}"),
+                    // copy file containing CATTLE_TEST_URL & ADMIN_TOKEN and load into environment variables
+                    sh "docker cp ${setupContainer2}:${rootPath}${testsDir}${rancherConfig} ."
+                    load rancherConfig
+                  } catch(err) {
+                    echo "Error: " + err
+                    echo 'Test run had failures. Collecting results...'
+                    currentBuild.result = 'FAILURE'
+                  }
+                }
+
+                stage('Execute subjobs') {
+                  try {
+                      jobs = [:]
+                      println "Branch: ${branch}"
+                      params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
+                                string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
+                                string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
+                                string(name: 'RANCHER_SERVER_VERSION', value: "${rancher_version}"), 
                                 string(name: 'BRANCH', value: branch) ]
 
-                    // Rancher server 1 is used to test RKE clusters
-                    jobs["do"] = { build job: 'rancher-v3_ontag_do_certification', parameters: params }
-                    jobs["ec2"] = { build job: 'rancher-v3_ontag_ec2_certification', parameters: params }
-                    jobs["az"] = { build job: 'rancher-v3_ontag_az_certification', parameters: params }
-                    jobs["custom"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params}
-                    jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
+                      params2 = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL_2}"),
+                                  string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN_2}"),
+                                  string(name: 'USER_TOKEN', value: "${USER_TOKEN_2}"),
+                                  string(name: 'RANCHER_SERVER_VERSION', value: "${rancher_version}"),
+                                  string(name: 'BRANCH', value: branch) ]
 
-                    // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters
-                    jobs["gke"] = { build job: 'rancher-v3_ontag_gke_certification', parameters: params2 }
-                    jobs["eks"] = { build job: 'rancher-v3_ontag_eks_certification', parameters: params2 }
-                    jobs["aks"] = { build job: 'rancher-v3_ontag_aks_certification', parameters: params2 }
-                    jobs["import"] = { build job: 'rancher-v3_ontag_import_certification', parameters: params2}
-                    jobs["importk3s"] = { build job: 'rancher-v3_ontag_import_k3s_certification', parameters: params2}
+                      // Rancher server 1 is used to test RKE clusters
+                      jobs["do"] = { build job: 'rancher-v3_ontag_do_certification', parameters: params }
+                      jobs["ec2"] = { build job: 'rancher-v3_ontag_ec2_certification', parameters: params }
+                      jobs["az"] = { build job: 'rancher-v3_ontag_az_certification', parameters: params }
+                      jobs["custom"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params}
+                      jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
 
-                    parallel jobs
-                  } catch(err) {
-                    echo "Error: " + err
-                  }
-              }
+                      // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters
+                      jobs["gke"] = { build job: 'rancher-v3_ontag_gke_certification', parameters: params2 }
+                      jobs["eks"] = { build job: 'rancher-v3_ontag_eks_certification', parameters: params2 }
+                      jobs["aks"] = { build job: 'rancher-v3_ontag_aks_certification', parameters: params2 }
+                      jobs["import"] = { build job: 'rancher-v3_ontag_import_certification', parameters: params2}
+                      jobs["importk3s"] = { build job: 'rancher-v3_ontag_import_k3s_certification', parameters: params2}
 
-              stage('Delete Rancher Server') {
-                if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
-                  try {
-                    sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
-                    "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
-                    "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} &&"+
-                    "pytest -v -s --junit-xml=${deleteResultsOut} " +
-                    "${deletePytestOptions} ${testsDir}\'"
-                  } catch(err) {
-                    echo "Error: " + err
-                  }
+                      parallel jobs
+                    } catch(err) {
+                      echo "Error: " + err
+                    }
+                }
 
-                  try {
-                    sh "docker run --name ${deleteContainer2} -t --env-file ${envFile} " +
-                    "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${CATTLE_TEST_URL_2} && " +
-                    "export ADMIN_TOKEN=${ADMIN_TOKEN_2} && export USER_TOKEN=${USER_TOKEN_2} &&" +
-                    "pytest -v -s --junit-xml=${deleteResultsOut2} " +
-                    "${deletePytestOptions} ${testsDir}\'"
-                  } catch(err) {
-                    echo "Error: " + err
+                stage('Delete Rancher Server') {
+                  if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
+                    try {
+                      sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
+                      "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
+                      "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} &&"+
+                      "pytest -v -s --junit-xml=${deleteResultsOut} " +
+                      "${deletePytestOptions} ${testsDir}\'"
+                    } catch(err) {
+                      echo "Error: " + err
+                    }
+
+                    try {
+                      sh "docker run --name ${deleteContainer2} -t --env-file ${envFile} " +
+                      "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${CATTLE_TEST_URL_2} && " +
+                      "export ADMIN_TOKEN=${ADMIN_TOKEN_2} && export USER_TOKEN=${USER_TOKEN_2} &&" +
+                      "pytest -v -s --junit-xml=${deleteResultsOut2} " +
+                      "${deletePytestOptions} ${testsDir}\'"
+                    } catch(err) {
+                      echo "Error: " + err
+                    }
                   }
                 }
-              }
 
-              stage('Test Report') {
-                // copy and archive test results
-                sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
-                sh "docker cp ${setupContainer2}:${rootPath}${setupResultsOut2} ."
-                sh "docker cp ${deleteContainer}:${rootPath}${deleteResultsOut} ."
-                sh "docker cp ${deleteContainer2}:${rootPath}${deleteResultsOut2} ."
-                step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
-                step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut2}"])
-                step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut}"])
-                step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut2}"])
+                stage('Test Report') {
+                  // copy and archive test results
+                  sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
+                  sh "docker cp ${setupContainer2}:${rootPath}${setupResultsOut2} ."
+                  sh "docker cp ${deleteContainer}:${rootPath}${deleteResultsOut} ."
+                  sh "docker cp ${deleteContainer2}:${rootPath}${deleteResultsOut2} ."
+                  step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
+                  step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut2}"])
+                  step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut}"])
+                  step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut2}"])
+                  sh "docker stop ${setupContainer}"
+                  sh "docker rm -v ${setupContainer}"
+                  sh "docker stop ${setupContainer2}"
+                  sh "docker rm -v ${setupContainer2}"
+                  sh "docker stop ${deleteContainer}"
+                  sh "docker rm -v ${deleteContainer}"
+                  sh "docker stop ${deleteContainer2}"
+                  sh "docker rm -v ${deleteContainer2}"
+                  sh "docker rmi ${imageName}"
+                }
+              } catch(err){
                 sh "docker stop ${setupContainer}"
                 sh "docker rm -v ${setupContainer}"
                 sh "docker stop ${setupContainer2}"
@@ -223,16 +241,6 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                 sh "docker rm -v ${deleteContainer2}"
                 sh "docker rmi ${imageName}"
               }
-            } catch(err){
-              sh "docker stop ${setupContainer}"
-              sh "docker rm -v ${setupContainer}"
-              sh "docker stop ${setupContainer2}"
-              sh "docker rm -v ${setupContainer2}"
-              sh "docker stop ${deleteContainer}"
-              sh "docker rm -v ${deleteContainer}"
-              sh "docker stop ${deleteContainer2}"
-              sh "docker rm -v ${deleteContainer2}"
-              sh "docker rmi ${imageName}"
             }
           }
         }
