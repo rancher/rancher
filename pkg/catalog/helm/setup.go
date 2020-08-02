@@ -286,7 +286,7 @@ func remoteShaChanged(repoURL, branch, sha, uuid string) (bool, error) {
 		logrus.Warnf("Problem creating request to check git remote sha of repo [%v]: %v", repoURL, err)
 		return true, nil
 	}
-	req.Header.Set("Accept", "application/vnd.github.chitauri-preview+sha")
+	req.Header.Set("Accept", "application/vnd.github.v3.sha")
 	req.Header.Set("If-None-Match", fmt.Sprintf("\"%s\"", sha))
 	if uuid != "" {
 		req.Header.Set("X-Install-Uuid", uuid)

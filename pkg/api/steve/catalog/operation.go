@@ -3,9 +3,11 @@ package catalog
 import (
 	"net/http"
 
+	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
+
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/rancher/pkg/api/steve/catalog/helmop"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -43,19 +45,16 @@ func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		err error
 	)
 
+	ns, name := nsAndName(apiRequest)
 	switch apiRequest.Action {
 	case "install":
-		op, err = o.ops.Install(apiRequest.Context(), user, getKind(apiRequest),
-			apiRequest.Namespace, apiRequest.Name, req.Body)
+		op, err = o.ops.Install(apiRequest.Context(), user, ns, name, req.Body)
 	case "upgrade":
-		op, err = o.ops.Upgrade(apiRequest.Context(), user, getKind(apiRequest),
-			apiRequest.Namespace, apiRequest.Name, req.Body)
+		op, err = o.ops.Upgrade(apiRequest.Context(), user, ns, name, req.Body)
 	case "rollback":
-		op, err = o.ops.Rollback(apiRequest.Context(), user,
-			apiRequest.Namespace, apiRequest.Name, req.Body)
+		op, err = o.ops.Rollback(apiRequest.Context(), user, ns, name, req.Body)
 	case "uninstall":
-		op, err = o.ops.Uninstall(apiRequest.Context(), user,
-			apiRequest.Namespace, apiRequest.Name, req.Body)
+		op, err = o.ops.Uninstall(apiRequest.Context(), user, ns, name, req.Body)
 	}
 
 	switch apiRequest.Link {
@@ -75,18 +74,11 @@ func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	apiRequest.WriteResponse(http.StatusCreated, types.APIObject{
 		Type: "chartActionOutput",
-		Object: &catalog.ChartActionOutput{
+		Object: &types2.ChartActionOutput{
 			OperationName:      op.Name,
 			OperationNamespace: op.Namespace,
 		},
 	})
-}
-
-func getKind(apiRequest *types.APIRequest) string {
-	if apiRequest.Type == "catalog.catalog.io.clusterrepo" {
-		return "ClusterRepo"
-	}
-	return "Repo"
 }
 
 func (o *operation) OnAdd(gvr schema2.GroupVersionResource, key string, obj runtime.Object) error {

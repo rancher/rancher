@@ -41,6 +41,11 @@ func newHandler(pathSetting func() string, enabled func() bool) *handler {
 		pathSetting: pathSetting,
 		middleware: responsewriter.Chain{
 			responsewriter.Gzip,
+			responsewriter.DenyFrameOptions,
+			responsewriter.CacheMiddleware("json", "js", "css"),
+		}.Handler,
+		indexMiddleware: responsewriter.Chain{
+			responsewriter.Gzip,
 			responsewriter.NoCache,
 			responsewriter.DenyFrameOptions,
 			responsewriter.ContentType,
@@ -49,9 +54,10 @@ func newHandler(pathSetting func() string, enabled func() bool) *handler {
 }
 
 type handler struct {
-	pathSetting    func() string
-	enabledSetting func() bool
-	middleware     func(http.Handler) http.Handler
+	pathSetting     func() string
+	enabledSetting  func() bool
+	middleware      func(http.Handler) http.Handler
+	indexMiddleware func(http.Handler) http.Handler
 }
 
 func (u *handler) path() (path string, isURL bool) {
@@ -70,7 +76,7 @@ func (u *handler) ServeAsset() http.Handler {
 }
 
 func (u *handler) IndexFile() http.Handler {
-	return u.middleware(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	return u.indexMiddleware(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if path, isURL := u.path(); isURL {
 			_ = serveIndex(rw, path)
 		} else {

@@ -200,7 +200,7 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	}
 
 	na, ca := getAgentImages(cluster.Name)
-	if cluster.Status.AgentImage != na || cluster.Status.AgentImage != ca {
+	if (cluster.Status.AgentImage != na && cluster.Status.Driver == v32.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
 			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
@@ -220,6 +220,10 @@ func getDesiredImage(cluster *v3.Cluster) string {
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
+	if cluster.Spec.Internal {
+		return nil
+	}
+
 	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
 	desiredAgent := getDesiredImage(cluster)
 	if desiredAgent == "" || desiredAgent == "fixed" {
@@ -238,6 +242,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 
 	desiredFeatures := map[string]bool{
 		features.Steve.Name(): features.Steve.Enabled(),
+		features.MCM.Name():   features.MCM.Enabled(),
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 
@@ -283,6 +288,17 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
 			}
 			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
+		}
+		if cluster.Status.Driver != v32.ClusterDriverRKE {
+			if output, err = kubectl.Delete([]byte(systemtemplate.NodeAgentDaemonSet), kubeConfig); err != nil {
+				logrus.Tracef("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v", string(output), err)
+				// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
+				dsNotFoundError := "daemonsets.apps \"cattle-node-agent\" not found"
+				if !strings.Contains(string(output), dsNotFoundError) {
+					return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
+				}
+				logrus.Debugf("Ignored '%s' error during delete cattle-node-agent DaemonSet", dsNotFoundError)
+			}
 		}
 		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil

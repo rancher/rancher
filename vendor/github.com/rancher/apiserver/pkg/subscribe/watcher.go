@@ -63,7 +63,9 @@ func (s *WatchSession) stream(ctx context.Context, sub Subscribe, result chan<- 
 		return err
 	}
 
-	c, err := schema.Store.Watch(s.apiOp.WithContext(ctx), schema, types.WatchRequest{
+	apiOp := s.apiOp.Clone().WithContext(ctx)
+	apiOp.Namespace = sub.Namespace
+	c, err := schema.Store.Watch(apiOp, schema, types.WatchRequest{
 		Revision: sub.ResourceVersion,
 		ID:       sub.ID,
 		Selector: sub.Selector,

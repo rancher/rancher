@@ -2,8 +2,10 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -64,10 +66,12 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
-	mux.Path("/v1/clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToProxy(localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/v3/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToProxy(localSupport, localCluster, mux, proxyHandler))
+	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToProxy(localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/", true)).Handler(proxyHandler)
 	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/", false)).Handler(proxyHandler)
+	mux.Path("/v3/clusters/{id}").Queries("shell", "true").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		routeToShellLink(rw, req, mux.NotFoundHandler)
+	})
 
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -75,6 +79,20 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 			mux.ServeHTTP(rw, req)
 		})
 	}, nil
+}
+
+func routeToShellLink(rw http.ResponseWriter, req *http.Request, next http.Handler) {
+	clusterID := gmux.Vars(req)["id"]
+	if clusterID == "local" {
+		req.URL.RawPath = "/v1/management.cattle.io.clusters/local"
+	} else {
+		req.URL.RawPath = fmt.Sprintf("/k8s/clusters/%s/v1/management.cattle.io.clusters/local", clusterID)
+	}
+	req.URL.Path = req.URL.RawPath
+	req.URL.RawQuery = url.Values{
+		"link": []string{"shell"},
+	}.Encode()
+	next.ServeHTTP(rw, req)
 }
 
 func routeToProxy(localSupport bool, localCluster http.Handler, mux *gmux.Router, proxyHandler *Handler) func(rw http.ResponseWriter, r *http.Request) {

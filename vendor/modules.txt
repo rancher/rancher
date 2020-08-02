@@ -116,6 +116,8 @@ github.com/crewjam/saml
 github.com/crewjam/saml/logger
 github.com/crewjam/saml/samlsp
 github.com/crewjam/saml/xmlenc
+# github.com/cyphar/filepath-securejoin v0.2.2
+github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -353,7 +355,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/rancher/apiserver v0.0.0-20200728054330-c96faab6902b
+# github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48
 github.com/rancher/apiserver/pkg/apierror
 github.com/rancher/apiserver/pkg/builtin
 github.com/rancher/apiserver/pkg/handlers
@@ -367,7 +369,7 @@ github.com/rancher/apiserver/pkg/subscribe
 github.com/rancher/apiserver/pkg/types
 github.com/rancher/apiserver/pkg/urlbuilder
 github.com/rancher/apiserver/pkg/writer
-# github.com/rancher/dynamiclistener v0.2.1-0.20200728054858-bafb05165617
+# github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9
 github.com/rancher/dynamiclistener
 github.com/rancher/dynamiclistener/cert
 github.com/rancher/dynamiclistener/factory
@@ -396,7 +398,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200728060519-1697d43171e1
+# github.com/rancher/norman v0.0.0-20200802063631-071be464e454
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -417,7 +419,6 @@ github.com/rancher/norman/parse
 github.com/rancher/norman/parse/builder
 github.com/rancher/norman/pkg/broadcast
 github.com/rancher/norman/pkg/dump
-github.com/rancher/norman/pkg/k8scheck
 github.com/rancher/norman/pkg/kwrapper/etcd
 github.com/rancher/norman/pkg/kwrapper/k8s
 github.com/rancher/norman/pkg/subscribe
@@ -474,7 +475,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200724084200-a3fbe499d1cc
+# github.com/rancher/steve v0.0.0-20200730044803-afb90310a200
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
@@ -485,7 +486,6 @@ github.com/rancher/steve/pkg/podimpersonation
 github.com/rancher/steve/pkg/proxy
 github.com/rancher/steve/pkg/resources
 github.com/rancher/steve/pkg/resources/apigroups
-github.com/rancher/steve/pkg/resources/clusters
 github.com/rancher/steve/pkg/resources/common
 github.com/rancher/steve/pkg/resources/counts
 github.com/rancher/steve/pkg/resources/helm
@@ -501,7 +501,6 @@ github.com/rancher/steve/pkg/stores/partition
 github.com/rancher/steve/pkg/stores/proxy
 github.com/rancher/steve/pkg/stores/selector
 github.com/rancher/steve/pkg/stores/switchschema
-github.com/rancher/steve/pkg/stores/switchstore
 github.com/rancher/steve/pkg/summarycache
 # github.com/rancher/system-upgrade-controller v0.6.2
 github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io
@@ -509,7 +508,7 @@ github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1
 github.com/rancher/system-upgrade-controller/pkg/condition
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/scheme
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1
-# github.com/rancher/wrangler v0.6.2-0.20200729234100-2cb57bf36360
+# github.com/rancher/wrangler v0.6.2-0.20200802063637-28dae3c1fc1b
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/broadcast
@@ -531,6 +530,7 @@ github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1
 github.com/rancher/wrangler/pkg/generic
 github.com/rancher/wrangler/pkg/genericcondition
 github.com/rancher/wrangler/pkg/gvk
+github.com/rancher/wrangler/pkg/k8scheck
 github.com/rancher/wrangler/pkg/kstatus
 github.com/rancher/wrangler/pkg/kubeconfig
 github.com/rancher/wrangler/pkg/kv
@@ -625,6 +625,12 @@ github.com/vmware/kube-fluentd-operator/config-reloader/fluentd
 github.com/vmware/kube-fluentd-operator/config-reloader/util
 # github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 github.com/xanzy/go-gitlab
+# github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f
+github.com/xeipuuv/gojsonpointer
+# github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415
+github.com/xeipuuv/gojsonreference
+# github.com/xeipuuv/gojsonschema v1.1.0
+github.com/xeipuuv/gojsonschema
 # go.opencensus.io v0.22.2
 go.opencensus.io
 go.opencensus.io/internal
@@ -825,6 +831,7 @@ helm.sh/helm/v3/internal/urlutil
 helm.sh/helm/v3/internal/version
 helm.sh/helm/v3/pkg/chart
 helm.sh/helm/v3/pkg/chart/loader
+helm.sh/helm/v3/pkg/chartutil
 helm.sh/helm/v3/pkg/cli
 helm.sh/helm/v3/pkg/getter
 helm.sh/helm/v3/pkg/helmpath
