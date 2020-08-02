@@ -4,30 +4,33 @@ import (
 	"context"
 	"net/http"
 
+	responsewriter "github.com/rancher/apiserver/pkg/middleware"
+
 	"github.com/rancher/apiserver/pkg/types"
+	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	"github.com/rancher/rancher/pkg/apis/catalog.cattle.io"
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2/content"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
-	v12 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	schemas3 "github.com/rancher/wrangler/pkg/schemas"
 )
 
 func Register(ctx context.Context, server *steve.Server,
-	secrets v12.SecretClient,
-	pods v12.PodClient,
-	configMaps v12.ConfigMapClient,
+	secrets corecontrollers.SecretController,
+	pods corecontrollers.PodClient,
+	configMaps corecontrollers.ConfigMapCache,
+	repos catalogcontrollers.RepoCache,
+	clusterRepos catalogcontrollers.ClusterRepoCache,
 	catalog catalogcontrollers.Interface) error {
 
 	ops := newOperation(server.ClientFactory, catalog, pods, secrets)
 	server.ClusterCache.OnAdd(ctx, ops.OnAdd)
 	server.ClusterCache.OnChange(ctx, ops.OnChange)
 
-	index := &indexDownload{
-		configMaps:   configMaps,
-		repos:        catalog.Repo(),
-		clusterRepos: catalog.ClusterRepo(),
+	index := &contentDownload{
+		contentManager: content.NewManager(configMaps, repos, secrets.Cache(), clusterRepos),
 	}
 
 	addSchemas(server, ops, index)
@@ -35,11 +38,11 @@ func Register(ctx context.Context, server *steve.Server,
 }
 
 func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
-	server.BaseSchemas.MustImportAndCustomize(v1.ChartUninstallAction{}, nil)
-	server.BaseSchemas.MustImportAndCustomize(v1.ChartUpgradeAction{}, nil)
-	server.BaseSchemas.MustImportAndCustomize(v1.ChartRollbackAction{}, nil)
-	server.BaseSchemas.MustImportAndCustomize(v1.ChartInstallAction{}, nil)
-	server.BaseSchemas.MustImportAndCustomize(v1.ChartActionOutput{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(types2.ChartUninstallAction{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgradeAction{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(types2.ChartRollbackAction{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(types2.ChartInstallAction{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(types2.ChartActionOutput{}, nil)
 
 	operationTemplate := schema2.Template{
 		Group: catalog.GroupName,
@@ -96,6 +99,8 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 			apiSchema.LinkHandlers = map[string]http.Handler{
 				"index": index,
 				"info":  index,
+				"chart": index,
+				"icon":  responsewriter.ContentType(index),
 			}
 		},
 	}

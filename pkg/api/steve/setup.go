@@ -17,6 +17,8 @@ func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) 
 		server,
 		config.Core.Secret(),
 		config.Core.Pod(),
-		config.Core.ConfigMap(),
+		config.Core.ConfigMap().Cache(),
+		config.Catalog.Repo().Cache(),
+		config.Catalog.ClusterRepo().Cache(),
 		config.Catalog)
 }

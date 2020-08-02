@@ -36,6 +36,12 @@ type RepoSpec struct {
 	// URL A http URL of the repo to connect to
 	URL string `json:"url,omitempty"`
 
+	// GitRepo a git repo to clone and index as the helm repo
+	GitRepo string `json:"gitRepo,omitempty"`
+
+	// GitBranch The git branch to follow
+	GitBranch string `json:"gitBranch,omitempty"`
+
 	// CABundle is a PEM encoded CA bundle which will be used to validate the repo's certificate.
 	// If unspecified, system trust roots will be used.
 	CABundle []byte `json:"caBundle,omitempty"`
@@ -44,7 +50,8 @@ type RepoSpec struct {
 	InsecureSkipTLSverify bool `json:"insecureSkipTLSVerify,omitempty"`
 
 	// ClientSecretName is the client secret to be used to connect to the repo
-	// It is expected the secret be of type "kubernetes.io/basic-auth" or "kubernetes.io/tls"
+	// It is expected the secret be of type "kubernetes.io/basic-auth" or "kubernetes.io/tls" for Helm repos
+	// and "kubernetes.io/basic-auth" or "kubernetes.io/ssh-auth" for git repos.
 	// For a repo the Namespace file will be ignored
 	ClientSecret *SecretReference `json:"clientSecret,omitempty"`
 
@@ -61,6 +68,9 @@ type RepoSpec struct {
 	// ServiceAccountNamespace namespace of the service account to use. This value is used only on
 	// ClusterRepo and will be ignored on Repo
 	ServiceAccountNamespace string `json:"serviceAccountNamespace,omitempty"`
+
+	// It disable the repo will
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 type RepoCondition string
@@ -70,6 +80,8 @@ const (
 )
 
 type RepoStatus struct {
+	ObservedGeneration int64 `json:"observedGeneration"`
+
 	// IndexConfigMapName is the configmap with the store index in it
 	IndexConfigMapName            string `json:"indexConfigMapName,omitempty"`
 	IndexConfigMapNamespace       string `json:"indexConfigMapNamespace,omitempty"`
@@ -77,6 +89,15 @@ type RepoStatus struct {
 
 	// DownloadTime the time when the index was last downloaded
 	DownloadTime metav1.Time `json:"downloadTime,omitempty"`
+
+	// The URL used for the last successful index
+	URL string `json:"url,omitempty"`
+
+	// The branch used for the last successful index
+	Branch string `json:"branch,omitempty"`
+
+	// The git commit used to generate the index
+	Commit string `json:"commit,omitempty"`
 
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
 }
@@ -98,7 +119,7 @@ type OperationStatus struct {
 	Release            string                              `json:"releaseName,omitempty"`
 	Namespace          string                              `json:"namespace,omitempty"`
 	Token              string                              `json:"token,omitempty"`
-	Command            string                              `json:"command,omitempty"`
+	Command            []string                            `json:"command,omitempty"`
 	PodName            string                              `json:"podName,omitempty"`
 	PodNamespace       string                              `json:"podNamespace,omitempty"`
 	PodCreated         bool                                `json:"podCreated,omitempty"`

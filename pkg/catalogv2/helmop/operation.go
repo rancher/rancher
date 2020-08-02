@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"path/filepath"
@@ -13,14 +14,15 @@ import (
 	"time"
 
 	"github.com/rancher/apiserver/pkg/types"
+	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2/content"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
-	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,23 +32,23 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/yaml"
 )
 
 const (
-	helmDataPath = "/home/shell/.config/helm"
+	helmDataPath = "/home/shell/helm"
 )
 
 type Operations struct {
-	namespace    string
-	Impersonator *podimpersonation.PodImpersonation
-	repos        catalogcontrollers.RepoClient
-	secrets      corev1controllers.SecretClient
-	clusterRepos catalogcontrollers.ClusterRepoClient
-	ops          catalogcontrollers.OperationClient
-	pods         corev1controllers.PodClient
-	releases     catalogcontrollers.ReleaseClient
-	cg           proxy.ClientGetter
+	namespace      string
+	contentManager *content.Manager
+	Impersonator   *podimpersonation.PodImpersonation
+	repos          catalogcontrollers.RepoClient
+	secrets        corev1controllers.SecretClient
+	clusterRepos   catalogcontrollers.ClusterRepoClient
+	ops            catalogcontrollers.OperationClient
+	pods           corev1controllers.PodClient
+	releases       catalogcontrollers.ReleaseClient
+	cg             proxy.ClientGetter
 }
 
 func NewOperations(
@@ -67,56 +69,50 @@ func NewOperations(
 	}
 }
 
-func emptyData() map[string][]byte {
-	return map[string][]byte{
-		"repositories.yaml": []byte("{}"),
-	}
-}
-
 func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
-	args, opNamespace, err := s.getUninstallArgs(namespace, name, options)
+	status, cmds, err := s.getUninstallArgs(namespace, name, options)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, opNamespace, args, emptyData())
+	return s.createOperation(ctx, user, status, cmds)
 }
 
 func (s *Operations) Rollback(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
-	args, status, err := s.getRollbackArgs(namespace, name, options)
+	status, cmds, err := s.getRollbackArgs(namespace, name, options)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, args, emptyData())
+	return s.createOperation(ctx, user, status, cmds)
 }
 
-func (s *Operations) Upgrade(ctx context.Context, user user.Info, kind, namespace, name string, options io.Reader) (*catalog.Operation, error) {
-	args, status, values, err := s.getUpgradeArgs(name, options)
+func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
+	status, cmds, err := s.getUpgradeCommand(namespace, name, options)
 	if err != nil {
 		return nil, err
 	}
 
-	user, data, err := s.getSecretData(user, kind, namespace, name, values)
+	user, err = s.getUser(user, namespace, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, args, data)
+	return s.createOperation(ctx, user, status, cmds)
 }
 
-func (s *Operations) Install(ctx context.Context, user user.Info, kind, namespace, name string, options io.Reader) (*catalog.Operation, error) {
-	installArgs, status, values, err := s.getInstallArgs(name, options)
+func (s *Operations) Install(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
+	status, cmds, err := s.getInstallCommand(namespace, name, options)
 	if err != nil {
 		return nil, err
 	}
 
-	user, data, err := s.getSecretData(user, kind, namespace, name, values)
+	user, err = s.getUser(user, namespace, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, installArgs, data)
+	return s.createOperation(ctx, user, status, cmds)
 }
 
 func decodeParams(req *http.Request, target runtime.Object) error {
@@ -181,8 +177,8 @@ func (s *Operations) Log(rw http.ResponseWriter, req *http.Request, namespace, n
 	return s.proxyLogRequest(rw, req, pod, client)
 }
 
-func (s *Operations) getSpec(kind, namespace, name string) (*catalog.RepoSpec, error) {
-	if kind == "ClusterRepo" {
+func (s *Operations) getSpec(namespace, name string) (*catalog.RepoSpec, error) {
+	if namespace == "" {
 		clusterRepo, err := s.clusterRepos.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
@@ -198,71 +194,21 @@ func (s *Operations) getSpec(kind, namespace, name string) (*catalog.RepoSpec, e
 	return &repo.Spec, nil
 }
 
-func (s *Operations) getSecretData(userInfo user.Info, kind, namespace, name string, values []byte) (user.Info, map[string][]byte, error) {
-	repoSpec, err := s.getSpec(kind, namespace, name)
+func (s *Operations) getUser(userInfo user.Info, namespace, name string) (user.Info, error) {
+	repoSpec, err := s.getSpec(namespace, name)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	data := map[string][]byte{}
-	entry := repo.Entry{
-		Name:                  name,
-		URL:                   repoSpec.URL,
-		InsecureSkipTLSverify: repoSpec.InsecureSkipTLSverify,
-	}
-
-	if repoSpec.ClientSecret != nil {
-		ns := repoSpec.ClientSecret.Namespace
-		if namespace != "" {
-			ns = namespace
-		}
-
-		secret, err := s.secrets.Get(ns, repoSpec.ClientSecret.Name, metav1.GetOptions{})
-		if err != nil {
-			return nil, nil, err
-		}
-
-		switch secret.Type {
-		case v1.SecretTypeTLS:
-			for k, v := range secret.Data {
-				data[k] = v
-			}
-			entry.CertFile = filepath.Join(helmDataPath, v1.TLSCertKey)
-			entry.KeyFile = filepath.Join(helmDataPath, v1.TLSPrivateKeyKey)
-		case v1.SecretTypeBasicAuth:
-			entry.Username = string(secret.Data[v1.BasicAuthUsernameKey])
-			entry.Password = string(secret.Data[v1.BasicAuthPasswordKey])
-		}
-	}
-
-	if len(repoSpec.CABundle) > 0 {
-		data["ca.pem"] = repoSpec.CABundle
-		entry.CAFile = filepath.Join(helmDataPath, "ca.pem")
-	}
-
-	file := repo.NewFile()
-	file.Repositories = append(file.Repositories, &entry)
-	fileBytes, err := yaml.Marshal(file)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	data["repositories.yaml"] = fileBytes
-	data["values.yaml"] = values
-
-	return getUser(namespace, repoSpec, userInfo), data, nil
-}
-
-func getUser(namespace string, repoSpec *catalog.RepoSpec, userInfo user.Info) user.Info {
 	if repoSpec.ServiceAccount == "" {
-		return userInfo
+		return userInfo, nil
 	}
 	serviceAccountNS := repoSpec.ServiceAccountNamespace
 	if namespace != "" {
 		serviceAccountNS = namespace
 	}
 	if serviceAccountNS == "" || strings.Contains(repoSpec.ServiceAccountNamespace, ":") {
-		return userInfo
+		return userInfo, nil
 	}
 	return &user.DefaultInfo{
 		Name: fmt.Sprintf("system:serviceaccount:%s:%s", repoSpec.ServiceAccount, serviceAccountNS),
@@ -270,70 +216,69 @@ func getUser(namespace string, repoSpec *catalog.RepoSpec, userInfo user.Info) u
 			"system:serviceaccounts",
 			"system:serviceaccounts:" + serviceAccountNS,
 		},
-	}
+	}, nil
 }
 
-func (s *Operations) getUninstallArgs(releaseNamespace, releaseName string, body io.Reader) ([]string, catalog.OperationStatus, error) {
+func (s *Operations) getUninstallArgs(releaseNamespace, releaseName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
 	rel, err := s.releases.Get(releaseNamespace, releaseName, metav1.GetOptions{})
 	if err != nil {
-		return nil, catalog.OperationStatus{}, err
+		return catalog.OperationStatus{}, nil, err
 	}
 
-	rollbackArgs := &catalog.ChartUninstallAction{}
-	if err := json.NewDecoder(body).Decode(rollbackArgs); err != nil {
-		return nil, catalog.OperationStatus{}, err
+	uninstallArgs := &types2.ChartUninstallAction{}
+	if err := json.NewDecoder(body).Decode(uninstallArgs); err != nil {
+		return catalog.OperationStatus{}, nil, err
 	}
 
-	suffix := []string{
-		rel.Spec.Name,
+	cmd := Command{
+		Operation: "uninstall",
+		ArgObjects: []interface{}{
+			uninstallArgs,
+		},
+		ReleaseName: rel.Spec.Name,
 	}
 
 	status := catalog.OperationStatus{
-		Action:    "uninstall",
+		Action:    cmd.Operation,
 		Release:   rel.Spec.Name,
 		Namespace: releaseNamespace,
 	}
 
-	args, _, err := toArgs(status.Action, nil, rollbackArgs, suffix)
-	return args, status, err
+	return status, Commands{cmd}, nil
 }
 
-func (s *Operations) getRollbackArgs(releaseNamespace, releaseName string, body io.Reader) ([]string, catalog.OperationStatus, error) {
+func (s *Operations) getRollbackArgs(releaseNamespace, releaseName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
 	rel, err := s.releases.Get(releaseNamespace, releaseName, metav1.GetOptions{})
 	if err != nil {
-		return nil, catalog.OperationStatus{}, err
+		return catalog.OperationStatus{}, nil, err
 	}
 
-	rollbackArgs := &catalog.ChartRollbackAction{}
+	rollbackArgs := &types2.ChartRollbackAction{}
 	if err := json.NewDecoder(body).Decode(rollbackArgs); err != nil {
-		return nil, catalog.OperationStatus{}, err
+		return catalog.OperationStatus{}, nil, err
 	}
 
-	suffix := []string{
-		rel.Spec.Name,
-		fmt.Sprint(rel.Spec.Version),
+	cmd := Command{
+		Operation: "rollback",
+		ArgObjects: []interface{}{
+			rollbackArgs,
+		},
+		ReleaseName: rel.Spec.Name,
 	}
-
 	status := catalog.OperationStatus{
 		Action:    "rollback",
 		Release:   rel.Spec.Name,
 		Namespace: releaseNamespace,
 	}
 
-	args, _, err := toArgs(status.Action, nil, rollbackArgs, suffix)
-	return args, status, err
+	return status, Commands{cmd}, err
 }
 
-func (s *Operations) getUpgradeArgs(repoName string, body io.Reader) ([]string, catalog.OperationStatus, []byte, error) {
-	upgradeArgs := &catalog.ChartUpgradeAction{}
+func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
+	upgradeArgs := &types2.ChartUpgradeAction{}
 	err := json.NewDecoder(body).Decode(upgradeArgs)
 	if err != nil {
-		return nil, catalog.OperationStatus{}, nil, err
-	}
-
-	suffix := []string{
-		upgradeArgs.ReleaseName,
-		repoName + "/" + upgradeArgs.ChartName,
+		return catalog.OperationStatus{}, nil, err
 	}
 
 	status := catalog.OperationStatus{
@@ -342,35 +287,190 @@ func (s *Operations) getUpgradeArgs(repoName string, body io.Reader) ([]string, 
 		Namespace: namespace(upgradeArgs.Namespace),
 	}
 
-	args, values, err := toArgs("upgrade", upgradeArgs.Values, upgradeArgs, suffix)
-	return args, status, values, err
+	cmd, err := s.getChartCommand(repoNamespace, repoName, upgradeArgs.ChartName, upgradeArgs.Version, upgradeArgs.Values)
+	if err != nil {
+		return status, nil, err
+	}
+	cmd.ReleaseName = upgradeArgs.ReleaseName
+	cmd.Operation = "upgrade"
+	cmd.ArgObjects = []interface{}{
+		upgradeArgs,
+	}
+
+	return status, Commands{cmd}, nil
 }
 
-func (s *Operations) getInstallArgs(repoName string, body io.Reader) ([]string, catalog.OperationStatus, []byte, error) {
-	installArgs := &catalog.ChartInstallAction{}
+type Command struct {
+	Operation   string
+	ArgObjects  []interface{}
+	ValuesFile  string
+	Values      []byte
+	ChartFile   string
+	Chart       []byte
+	ReleaseName string
+}
+
+type Commands []Command
+
+func (c Commands) CommandArgs() ([]string, error) {
+	var (
+		result []string
+	)
+	for _, c := range c {
+		args, err := c.renderArgs()
+		if err != nil {
+			return nil, err
+		}
+		if len(result) > 0 {
+			result = append(result, ";")
+		}
+		result = append(result, args...)
+	}
+	return result, nil
+}
+
+func (c Commands) Render() (map[string][]byte, error) {
+	data := map[string][]byte{}
+	for i, cmd := range c {
+		cmdData, err := cmd.Render(i)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range cmdData {
+			data[k] = v
+		}
+	}
+
+	return data, nil
+}
+
+func (c Command) Render(index int) (map[string][]byte, error) {
+	args, err := c.renderArgs()
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string][]byte{
+		fmt.Sprintf("operation%03d", index): []byte(strings.Join(args, "\x00")),
+		c.ValuesFile:                        c.Values,
+		c.ChartFile:                         c.Chart,
+	}, nil
+}
+
+func (c Command) renderArgs() ([]string, error) {
+	var (
+		args []string
+	)
+
+	dataMap := map[string]interface{}{}
+	for _, argObject := range c.ArgObjects {
+		data, err := convert.EncodeToMap(argObject)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range data {
+			dataMap[k] = v
+		}
+	}
+
+	delete(dataMap, "values")
+	delete(dataMap, "releaseName")
+	delete(dataMap, "chartName")
+	if v, ok := dataMap["disableOpenAPIValidation"]; ok {
+		delete(dataMap, "disableOpenAPIValidation")
+		dataMap["disableOpenapiValidation"] = v
+	}
+	if c.Operation == "install" {
+		dataMap["createNamespace"] = true
+	}
+
+	for k, v := range dataMap {
+		s := convert.ToString(v)
+		k = convert.ToArgKey(k)
+		args = append(args, fmt.Sprintf("%s=%s", k, s))
+	}
+
+	if len(c.Values) > 0 {
+		args = append(args, "--values="+filepath.Join(helmDataPath, c.ValuesFile))
+	}
+
+	sort.Strings(args)
+	if c.ReleaseName != "" {
+		args = append(args, c.ReleaseName)
+	}
+	if len(c.Chart) > 0 {
+		args = append(args, "/"+c.ChartFile)
+	}
+
+	return append([]string{c.Operation}, args...), nil
+}
+
+func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, values map[string]interface{}) (Command, error) {
+	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion)
+	if err != nil {
+		return Command{}, err
+	}
+	chartData, err := ioutil.ReadAll(chart)
+	chart.Close()
+	if err != nil {
+		return Command{}, err
+	}
+
+	c := Command{
+		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, chartVersion),
+		ChartFile:  fmt.Sprintf("%s-%s.tgz", chartName, chartVersion),
+		Chart:      chartData,
+	}
+
+	if len(values) > 0 {
+		c.Values, err = json.Marshal(values)
+		if err != nil {
+			return Command{}, err
+		}
+	}
+
+	return Command{}, nil
+}
+
+func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
+	installArgs := &types2.ChartInstallAction{}
 	err := json.NewDecoder(body).Decode(installArgs)
 	if err != nil {
-		return nil, catalog.OperationStatus{}, nil, err
+		return catalog.OperationStatus{}, nil, err
 	}
 
-	var suffix []string
-	if installArgs.ReleaseName == "" {
-		installArgs.GenerateName = true
-	} else {
-		suffix = append(suffix, installArgs.ReleaseName)
-	}
-	if installArgs.ChartName != "" {
-		suffix = append(suffix, repoName+"/"+installArgs.ChartName)
+	var (
+		cmds   []Command
+		status = catalog.OperationStatus{
+			Action: "install",
+		}
+	)
+
+	for _, chartInstall := range installArgs.Charts {
+		var suffix []string
+		if chartInstall.ReleaseName == "" {
+			chartInstall.GenerateName = true
+		} else {
+			suffix = append(suffix, chartInstall.ReleaseName)
+		}
+
+		cmd, err := s.getChartCommand(repoNamespace, repoName, chartInstall.ChartName, chartInstall.Version, chartInstall.Values)
+		if err != nil {
+			return status, nil, err
+		}
+		cmd.Operation = "install"
+		cmd.ArgObjects = []interface{}{
+			chartInstall.Values,
+			installArgs,
+		}
+
+		status.Release = chartInstall.ReleaseName
+		status.Namespace = namespace(chartInstall.Namespace)
+
+		cmds = append(cmds, cmd)
 	}
 
-	status := catalog.OperationStatus{
-		Action:    "install",
-		Release:   installArgs.ReleaseName,
-		Namespace: namespace(installArgs.Namespace),
-	}
-
-	args, values, err := toArgs(status.Action, installArgs.Values, installArgs, suffix)
-	return args, status, values, err
+	return status, cmds, err
 }
 
 func namespace(ns string) string {
@@ -380,67 +480,29 @@ func namespace(ns string) string {
 	return ns
 }
 
-func toArgs(operation string, values map[string]interface{}, input interface{}, suffix []string) (args []string, valueContent []byte, err error) {
-	var prefix []string
-
-	switch operation {
-	case "uninstall":
-		fallthrough
-	case "rollback":
-		prefix = []string{"helm-run", operation}
-	default:
-		prefix = []string{"helm-update", operation}
-	}
-
-	data, err := convert.EncodeToMap(input)
-	if err != nil {
-		return nil, nil, err
-	}
-	delete(data, "values")
-	delete(data, "releaseName")
-	delete(data, "chartName")
-	if v, ok := data["disableOpenAPIValidation"]; ok {
-		delete(data, "disableOpenAPIValidation")
-		data["disableOpenapiValidation"] = v
-	}
-	if operation == "install" {
-		data["createNamespace"] = true
-	}
-
-	for k, v := range data {
-		s := convert.ToString(v)
-		k = convert.ToArgKey(k)
-		args = append(args, fmt.Sprintf("%s=%s", k, s))
-	}
-
-	if len(values) > 0 {
-		args = append(args, "--values="+filepath.Join(helmDataPath, "values.yaml"))
-		valueContent, err = json.Marshal(values)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	sort.Strings(args)
-	return append(prefix, append(args, suffix...)...), valueContent, nil
-}
-
-func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, command []string, secretData map[string][]byte) (*catalog.Operation, error) {
+func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands) (*catalog.Operation, error) {
 	_, err := s.createNamespace(ctx, status.Namespace)
 	if err != nil {
 		return nil, err
 	}
 
-	pod, podOptions := s.createPod(command, secretData)
+	secretData, err := cmds.Render()
+	if err != nil {
+		return nil, err
+	}
+
+	pod, podOptions := s.createPod(secretData)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	command[0] = "helm"
+	status.Command, err = cmds.CommandArgs()
+	if err != nil {
+		return nil, err
+	}
 
 	status.Token = pod.Labels[podimpersonation.TokenLabel]
-	status.Command = strings.Join(command, " ")
 	status.PodName = pod.Name
 	status.PodNamespace = pod.Namespace
 
@@ -478,7 +540,7 @@ func (s *Operations) createNamespace(ctx context.Context, namespace string) (*v1
 	return ns, err
 }
 
-func (s *Operations) createPod(command []string, secretData map[string][]byte) (*v1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimpersonation.PodOptions) {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "helm-operation-",
@@ -516,9 +578,10 @@ func (s *Operations) createPod(command []string, secretData map[string][]byte) (
 					Stdin:           true,
 					TTY:             true,
 					StdinOnce:       true,
-					Image:           "ibuildthecloud/shell:v0.0.5",
+					Image:           "ibuildthecloud/shell:v0.0.6",
 					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         command,
+					Command:         []string{"helm-cmd"},
+					WorkingDir:      helmDataPath,
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "data",

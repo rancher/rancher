@@ -1,4 +1,4 @@
-package v1
+package types
 
 import (
 	"time"
@@ -6,26 +6,30 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
+type ChartInstall struct {
+	ChartName    string                `json:"chartName,omitempty"`
+	Version      string                `json:"version,omitempty"`
+	Namespace    string                `json:"namespace,omitempty"`
+	ReleaseName  string                `json:"releaseName,omitempty"`
+	GenerateName bool                  `json:"generateName,omitempty"`
+	NameTemplate string                `json:"nameTemplate,omitempty"`
+	Description  string                `json:"description,omitempty"`
+	Values       v3.MapStringInterface `json:"values,omitempty"`
+}
+
 type ChartInstallAction struct {
-	Atomic                   bool                  `json:"atomic,omitempty"`
-	ChartName                string                `json:"chartName,omitempty"`
-	Version                  string                `json:"version,omitempty"`
-	DryRun                   bool                  `json:"dryRun,omitempty"`
-	DisableHooks             bool                  `json:"noHooks,omitempty"`
-	Wait                     bool                  `json:"wait,omitempty"`
-	Timeout                  time.Duration         `json:"timeout,omitempty"`
-	Namespace                string                `json:"namespace,omitempty"`
-	ReleaseName              string                `json:"releaseName,omitempty"`
-	GenerateName             bool                  `json:"generateName,omitempty"`
-	NameTemplate             string                `json:"nameTemplate,omitempty"`
-	Description              string                `json:"description,omitempty"`
-	SkipCRDs                 bool                  `json:"skipCRDs,omitempty"`
-	DisableOpenAPIValidation bool                  `json:"disableOpenAPIValidation,omitempty"`
-	Values                   v3.MapStringInterface `json:"values,omitempty"`
+	DisableHooks             bool          `json:"noHooks,omitempty"`
+	Wait                     bool          `json:"wait,omitempty"`
+	Timeout                  time.Duration `json:"timeout,omitempty"`
+	SkipCRDs                 bool          `json:"skipCRDs,omitempty"`
+	DisableOpenAPIValidation bool          `json:"disableOpenAPIValidation,omitempty"`
+
+	Charts []ChartInstall `json:"charts,omitempty"`
 }
 
 type ChartInfo struct {
 	Readme    string                `json:"readme,omitempty"`
+	APPReadme string                `json:"appReadme,omitempty"`
 	Values    v3.MapStringInterface `json:"values,omitempty"`
 	Questions v3.MapStringInterface `json:"questions,omitempty"`
 	Chart     v3.MapStringInterface `json:"chart,omitempty"`

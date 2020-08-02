@@ -1,4 +1,4 @@
-package helm
+package http
 
 import (
 	"crypto/tls"
@@ -6,30 +6,17 @@ import (
 	"net/http"
 	"time"
 
-	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Client(secrets corev1controllers.SecretClient, spec *catalog.RepoSpec, secretNamespaceOverride string) (*http.Client, error) {
+func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bool) (*http.Client, error) {
 	var (
 		username  string
 		password  string
 		tlsConfig tls.Config
 	)
 
-	if spec.ClientSecret != nil {
-		ns := spec.ClientSecret.Namespace
-		if secretNamespaceOverride != "" {
-			ns = secretNamespaceOverride
-		}
-
-		secret, err := secrets.Get(ns, spec.ClientSecret.Name, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-
+	if secret != nil {
 		switch secret.Type {
 		case corev1.SecretTypeBasicAuth:
 			username = string(secret.Data[corev1.BasicAuthUsernameKey])
@@ -43,18 +30,22 @@ func Client(secrets corev1controllers.SecretClient, spec *catalog.RepoSpec, secr
 		}
 	}
 
-	if len(spec.CABundle) > 0 {
-		cert, err := x509.ParseCertificate(spec.CABundle)
+	if len(caBundle) > 0 {
+		cert, err := x509.ParseCertificate(caBundle)
 		if err != nil {
 			return nil, err
 		}
-		pool := x509.NewCertPool()
+		pool, err := x509.SystemCertPool()
+		if err != nil {
+			pool = x509.NewCertPool()
+		}
 		pool.AddCert(cert)
 		tlsConfig.RootCAs = pool
 	}
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = &tlsConfig
+	transport.TLSClientConfig.InsecureSkipVerify = insecureSkipTLSVerify
 
 	client := &http.Client{
 		Transport: transport,

@@ -7,7 +7,8 @@ import (
 	"io/ioutil"
 	"strings"
 
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -19,9 +20,8 @@ func decodeYAML(input io.Reader, target interface{}) error {
 	return yaml.Unmarshal(data, target)
 }
 
-func InfoFromTarball(input io.Reader) (*v1.ChartInfo, error) {
-	result := &v1.ChartInfo{
-		Readme:    "",
+func InfoFromTarball(input io.Reader) (*types.ChartInfo, error) {
+	result := &types.ChartInfo{
 		Values:    map[string]interface{}{},
 		Questions: map[string]interface{}{},
 		Chart:     map[string]interface{}{},
@@ -57,6 +57,12 @@ func InfoFromTarball(input io.Reader) (*v1.ChartInfo, error) {
 			if err := decodeYAML(tarball, &result.Chart); err != nil {
 				return nil, err
 			}
+		case "app-readme.md":
+			bytes, err := ioutil.ReadAll(tarball)
+			if err != nil {
+				return nil, err
+			}
+			result.APPReadme = string(bytes)
 		case "readme.md":
 			bytes, err := ioutil.ReadAll(tarball)
 			if err != nil {

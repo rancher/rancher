@@ -5,42 +5,35 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"path"
 	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2"
+	"github.com/rancher/rancher/pkg/catalogv2/git"
+	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/helm"
-	"github.com/rancher/rancher/pkg/settings"
+	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/pkg/condition"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
 )
 
 var (
-	interval               = 5 * time.Minute
-	CatalogSystemNameSpace = "dashboard-catalog"
-	repoUID                = "catalog.cattle.io/repo-uid"
+	interval = 5 * time.Minute
 )
 
 type repoHandler struct {
-	secrets      corev1controllers.SecretClient
+	secrets      corev1controllers.SecretCache
 	repos        catalogcontrollers.RepoController
 	clusterRepos catalogcontrollers.ClusterRepoController
 	configMaps   corev1controllers.ConfigMapClient
 }
 
 func RegisterRepos(ctx context.Context,
-	secrets corev1controllers.SecretClient,
+	secrets corev1controllers.SecretCache,
 	repos catalogcontrollers.RepoController,
 	clusterRepos catalogcontrollers.ClusterRepoController,
 	configMap corev1controllers.ConfigMapClient) {
@@ -61,10 +54,10 @@ func RegisterRepos(ctx context.Context,
 func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
 	if !shouldRefresh(&repo.Spec, &status) {
 		r.clusterRepos.EnqueueAfter(repo.Name, interval)
-		return status, nil
+		return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
 	}
 
-	return r.download(&repo.Spec, status, "", metav1.OwnerReference{
+	return r.download(&repo.Spec, status, &repo.ObjectMeta, metav1.OwnerReference{
 		APIVersion: catalog.SchemeGroupVersion.Group + "/" + catalog.SchemeGroupVersion.Version,
 		Kind:       "ClusterRepo",
 		Name:       repo.Name,
@@ -75,10 +68,10 @@ func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo
 func (r *repoHandler) RepoDownloadStatusHandler(repo *catalog.Repo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
 	if !shouldRefresh(&repo.Spec, &status) {
 		r.repos.EnqueueAfter(repo.Namespace, repo.Name, interval)
-		return status, nil
+		return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
 	}
 
-	return r.download(&repo.Spec, status, repo.Namespace, metav1.OwnerReference{
+	return r.download(&repo.Spec, status, &repo.ObjectMeta, metav1.OwnerReference{
 		APIVersion: catalog.SchemeGroupVersion.Group + "/" + catalog.SchemeGroupVersion.Version,
 		Kind:       "Repo",
 		Name:       repo.Name,
@@ -97,7 +90,7 @@ func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.Inde
 	}
 
 	if namespace == "" {
-		namespace = CatalogSystemNameSpace
+		namespace = namespaces.CatalogSystemNamespace
 	}
 
 	cm, err := r.configMaps.Get(namespace, name, metav1.GetOptions{})
@@ -125,49 +118,64 @@ func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.Inde
 	return r.configMaps.Update(cm)
 }
 
-func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, secretNamespaceOverride string, owner metav1.OwnerReference) (catalog.RepoStatus, error) {
-	client, err := helm.Client(r.secrets, repoSpec, secretNamespaceOverride)
+func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta) (catalog.RepoStatus, error) {
+	if status.Commit == "" {
+		return status, nil
+	}
+
+	status.ObservedGeneration = metadata.Generation
+	secret, err := catalogv2.GetSecret(r.secrets, repoSpec, metadata.Namespace)
 	if err != nil {
 		return status, err
 	}
-	defer client.CloseIdleConnections()
 
-	parsedURL, err := url.Parse(repoSpec.URL)
+	return status, git.Ensure(secret, metadata.Namespace, metadata.Name, status.URL, status.Commit)
+}
+
+func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta, owner metav1.OwnerReference) (catalog.RepoStatus, error) {
+	var (
+		index  *repo.IndexFile
+		commit string
+		err    error
+	)
+
+	status.ObservedGeneration = metadata.Generation
+
+	secret, err := catalogv2.GetSecret(r.secrets, repoSpec, metadata.Namespace)
 	if err != nil {
 		return status, err
 	}
-
-	parsedURL.RawPath = path.Join(parsedURL.RawPath, "index.yaml")
-	parsedURL.Path = path.Join(parsedURL.Path, "index.yaml")
 
 	downloadTime := metav1.Now()
-	url := parsedURL.String()
-	logrus.Infof("Downloading repo index from %s", url)
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
+	if repoSpec.GitRepo != "" && status.IndexConfigMapName == "" {
+		commit, err = git.Head(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch)
+		if err != nil {
+			return status, err
+		}
+		index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+	} else if repoSpec.GitRepo != "" {
+		commit, err = git.Update(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch)
+		if err != nil {
+			return status, err
+		}
+		status.URL = repoSpec.GitRepo
+		status.Branch = repoSpec.GitBranch
+		if status.Commit == commit {
+			status.DownloadTime = downloadTime
+			return status, nil
+		}
+		index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+	} else if repoSpec.URL != "" {
+		status.URL = repoSpec.URL
+		status.Branch = ""
+		index, err = helmhttp.DownloadIndex(secret, repoSpec.URL, repoSpec.CABundle, repoSpec.InsecureSkipTLSverify)
+	} else {
+		return status, nil
+	}
+	if err != nil || index == nil {
 		return status, err
 	}
-	req.Header.Set("X-Install-Uuid", settings.InstallUUID.Get())
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return status, err
-	}
-	defer resp.Body.Close()
-
-	bytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return status, err
-	}
-
-	// Marshall to file to ensure it matches the schema and this component doesn't just
-	// become a "fetch any file" service.
-	index := &repo.IndexFile{}
-	if err := yaml.Unmarshal(bytes, index); err != nil {
-		logrus.Errorf("failed to unmarshal %s: %v", url, err)
-		return status, fmt.Errorf("failed to parse response from %s", url)
-	}
 	index.SortEntries()
 
 	name := status.IndexConfigMapName
@@ -175,7 +183,7 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 		name = owner.Name
 	}
 
-	cm, err := r.createOrUpdateMap(secretNamespaceOverride, name, index, owner)
+	cm, err := r.createOrUpdateMap(metadata.Namespace, name, index, owner)
 	if err != nil {
 		return status, nil
 	}
@@ -184,10 +192,20 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 	status.IndexConfigMapNamespace = cm.Namespace
 	status.IndexConfigMapResourceVersion = cm.ResourceVersion
 	status.DownloadTime = downloadTime
+	status.Commit = commit
 	return status, nil
 }
 
 func shouldRefresh(spec *catalog.RepoSpec, status *catalog.RepoStatus) bool {
+	if status.Branch != spec.GitBranch {
+		return true
+	}
+	if spec.URL != "" && spec.URL != status.URL {
+		return true
+	}
+	if spec.GitRepo != "" && spec.GitRepo != status.URL {
+		return true
+	}
 	if status.IndexConfigMapName == "" {
 		return true
 	}
