@@ -219,6 +219,12 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		if cluster.Status.ServiceAccountToken == "" || cluster.Status.APIEndpoint == "" {
 			cluster, err = e.generateAndSetServiceAccount(cluster)
 			if err != nil {
+				var statusErr error
+				cluster, statusErr = e.setFalse(cluster, apimgmtv3.ClusterConditionWaiting,
+					fmt.Sprintf("failed to communicate with cluster: %v", err))
+				if statusErr != nil {
+					return cluster, statusErr
+				}
 				return cluster, err
 			}
 		}
@@ -322,7 +328,7 @@ func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 		logrus.Infof("generating service account token for cluster [%s]", cluster.Name)
 		sess, err := e.startAWSSession(cluster.Spec.EKSConfig.AmazonCredentialSecret)
 		if err != nil {
-			return cluster, nil
+			return cluster, err
 		}
 
 		endpoint := string(caSecret.Data["endpoint"])
@@ -340,6 +346,7 @@ func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 	}
 	return cluster, fmt.Errorf("failed waiting for cluster [%s] secret", cluster.Name)
 }
+
 func (e *eksOperatorController) copyImportedClusterSpec(cluster *mgmtv3.Cluster, eksClusterConfigMap map[string]interface{}) (*mgmtv3.Cluster, error) {
 	// imported annotation is not set- need to get spec from upstream cluster
 	var eksClusterConfigStructured eksv1.EKSClusterConfig
@@ -503,11 +510,6 @@ func generateSAToken(sess *session.Session, clusterID, endpoint, ca string) (str
 		return "", fmt.Errorf("error creating clientset: %v", err)
 	}
 
-	_, err = clientset.DiscoveryClient.ServerVersion()
-	if err != nil {
-		return "", fmt.Errorf("failed to get Kubernetes server version: %v", err)
-	}
-
 	return util.GenerateServiceAccountToken(clientset)
 }
 
@@ -545,7 +547,12 @@ func (e *eksOperatorController) setUnknown(cluster *mgmtv3.Cluster, condition co
 	cluster = cluster.DeepCopy()
 	condition.Unknown(cluster)
 	condition.Message(cluster, message)
-	return e.clusterClient.Update(cluster)
+	var err error
+	cluster, err = e.clusterClient.Update(cluster)
+	if err != nil {
+		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s unknown with message: %s", cluster.Name, condition, message)
+	}
+	return cluster, nil
 }
 
 func (e *eksOperatorController) setTrue(cluster *mgmtv3.Cluster, condition condition.Cond, message string) (*mgmtv3.Cluster, error) {
@@ -555,7 +562,12 @@ func (e *eksOperatorController) setTrue(cluster *mgmtv3.Cluster, condition condi
 	cluster = cluster.DeepCopy()
 	condition.True(cluster)
 	condition.Message(cluster, message)
-	return e.clusterClient.Update(cluster)
+	var err error
+	cluster, err = e.clusterClient.Update(cluster)
+	if err != nil {
+		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s true with message: %s", cluster.Name, condition, message)
+	}
+	return cluster, nil
 }
 
 func (e *eksOperatorController) setFalse(cluster *mgmtv3.Cluster, condition condition.Cond, message string) (*mgmtv3.Cluster, error) {
@@ -565,5 +577,10 @@ func (e *eksOperatorController) setFalse(cluster *mgmtv3.Cluster, condition cond
 	cluster = cluster.DeepCopy()
 	condition.False(cluster)
 	condition.Message(cluster, message)
-	return e.clusterClient.Update(cluster)
+	var err error
+	cluster, err = e.clusterClient.Update(cluster)
+	if err != nil {
+		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s false with message: %s", cluster.Name, condition, message)
+	}
+	return cluster, nil
 }
