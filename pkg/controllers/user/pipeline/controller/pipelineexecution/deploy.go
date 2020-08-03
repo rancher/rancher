@@ -895,7 +895,7 @@ func GetMinioDeployment(ns string) *appsv1.Deployment {
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
 									corev1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-									corev1.ResourceMemory: *resource.NewQuantity(200E6, resource.BinarySI),
+									corev1.ResourceMemory: *resource.NewQuantity(500E6, resource.BinarySI),
 								},
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
