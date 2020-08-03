@@ -160,7 +160,7 @@ def test_zdt_backup():
             "Not all Nodes Restored Correctly"
 
 
-def test_zdt_worker():
+def test_zdt_add_worker():
     client = get_user_client()
     cluster = namespace["cluster"]
     p_client = namespace["p_client"]
@@ -182,26 +182,20 @@ def test_zdt_worker():
     )
     nodes = client.list_node(clusterId=cluster.id).data
     original = len(nodes)
-    for node in nodes:
-        print("node 1 :", node.uuid)
     docker_run_cmd = \
         get_custom_host_registration_cmd(client, cluster, ["worker"],
                                          aws_node)
     aws_node.roles.append("worker")
     result = aws_node.execute_command(docker_run_cmd)
-    print(result)
     time.sleep(10)
     cluster = client.reload(cluster)
     nodes = client.list_node(clusterId=cluster.id).data
-    for node in nodes:
-        print("node 2 :", node.uuid)
     # Check Ingress is up during update
     wait_for_node_upgrade(nodes, p_client, cluster, workload, node_ver)
     # Validate update has went through
     assert len(client.list_node(clusterId=cluster.id).data) == original + 1
     for node in nodes:
         node = client.reload(node)
-        print("node 3 :", node.uuid)
         assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver
 
 
@@ -328,9 +322,6 @@ def validate_ingress(p_client, cluster, workloads, host, path,
     if len(host) > 0:
         curl_args += " --header 'Host: " + host + "'"
     nodes = get_schedulable_active_nodes(cluster, os_type="linux")
-    for node in nodes:
-        print("node: ", node.uuid)
-        print("node state: ", node.state)
     target_name_list = get_target_names(p_client, workloads)
     for node in nodes:
         host_ip = resolve_node_ip(node)
@@ -347,9 +338,6 @@ def get_schedulable_active_nodes(cluster, client=None, os_type=TEST_OS):
     if not client:
         client = get_user_client()
     nodes = client.list_node(clusterId=cluster.id).data
-    for node in nodes:
-        print("node: ", node.uuid)
-        print("node state: ", node.state)
     schedulable_nodes = []
     for node in nodes:
         if node.worker and (not node.unschedulable) and node.state == "active":
