@@ -12,6 +12,7 @@ resource_prefix = RANCHER_HA_HOSTNAME.split(".qa.rancher.space")[0]
 RANCHER_SERVER_URL = "https://" + RANCHER_HA_HOSTNAME
 
 RANCHER_CHART_VERSION = os.environ.get("RANCHER_CHART_VERSION")
+RANCHER_HELM_EXTRA_SETTINGS = os.environ.get("RANCHER_HELM_EXTRA_SETTINGS")
 RANCHER_IMAGE_TAG = os.environ.get("RANCHER_IMAGE_TAG")
 RANCHER_HELM_REPO = os.environ.get("RANCHER_HELM_REPO", "latest")
 RANCHER_LETSENCRYPT_EMAIL = os.environ.get("RANCHER_LETSENCRYPT_EMAIL")
@@ -291,6 +292,9 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
             create_tls_secrets(valid_cert=False)
         elif type == "byo-valid":
             create_tls_secrets(valid_cert=True)
+
+    if RANCHER_HELM_EXTRA_SETTINGS:
+        extra_settings.append(RANCHER_HELM_EXTRA_SETTINGS)
 
     if extra_settings:
         for setting in extra_settings:

@@ -838,7 +838,11 @@ def wait_for_status_code(url, expected_code=200, timeout=DEFAULT_TIMEOUT):
         r = requests.get(url, verify=False)
         if time.time() - start > timeout:
             raise Exception(
-                'Timed out waiting for status code{0}'.format(expected_code))
+                'Timed out waiting for status code {0}'
+                ', actual code {1}'.format(
+                    expected_code, r.status_code
+                )
+            )
     return
 
 
