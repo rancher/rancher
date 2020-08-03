@@ -59,8 +59,8 @@ var amiForRegionAndVersion = map[string]map[string]string{
 		"eu-north-1":     "ami-043dbb11ff9b5a350",
 		"me-south-1":     "ami-0209971c7465bb090",
 		"sa-east-1":      "ami-0ff3ff7ab99c06946",
-		"cn-north-1":     "ami-0e4cb8067782b693a",
-		"cn-northwest-1": "ami-047594a1f70bab3e2",
+		"cn-north-1":     "ami-0bd0f836c99725df4",
+		"cn-northwest-1": "ami-09be27ee84f66b04f",
 	},
 	"1.16": {
 		"us-east-2":      "ami-04cab20cf4ae39867",
@@ -80,8 +80,8 @@ var amiForRegionAndVersion = map[string]map[string]string{
 		"eu-north-1":     "ami-0e342b3155c477ea2",
 		"me-south-1":     "ami-04a12d5f3b7983b34",
 		"sa-east-1":      "ami-094d875bc33820805",
-		"cn-north-1":     "ami-06afea3bd7ff238c0",
-		"cn-northwest-1": "ami-01900c85f05f1f2b3",
+		"cn-north-1":     "ami-06ab9635ff6edebf6",
+		"cn-northwest-1": "ami-095af05476e5b9cf8",
 	},
 	"1.15": {
 		"us-east-2":      "ami-03c1ef6e2dcef9091",
@@ -101,8 +101,8 @@ var amiForRegionAndVersion = map[string]map[string]string{
 		"eu-north-1":     "ami-0cc9a5fbe0fb4846f",
 		"me-south-1":     "ami-0b55422936e1febca",
 		"sa-east-1":      "ami-0c882223525ac33e9",
-		"cn-north-1":     "ami-05b179a26f95a62db",
-		"cn-northwest-1": "ami-039044adc28bd70e9",
+		"cn-north-1":     "ami-054beb3a95a57dfb5",
+		"cn-northwest-1": "ami-06dc79ea6f9e0235e",
 	},
 }
 
