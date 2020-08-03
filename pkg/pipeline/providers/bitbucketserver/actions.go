@@ -14,11 +14,11 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/pki/cert"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	client "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 )
 
@@ -75,7 +75,7 @@ func (b *BsProvider) generateKeys(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	storedBitbucketPipelineConfig, ok := pConfig.(*v3.BitbucketServerPipelineConfig)
+	storedBitbucketPipelineConfig, ok := pConfig.(*v32.BitbucketServerPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get bitbucket server provider config")
 	}
@@ -113,7 +113,7 @@ func generateKeyPair() (string, string, error) {
 }
 
 func (b *BsProvider) requestLogin(apiContext *types.APIContext) error {
-	input := &v3.BitbucketServerRequestLoginInput{}
+	input := &v32.BitbucketServerRequestLoginInput{}
 	if err := json.NewDecoder(apiContext.Request.Body).Decode(input); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
@@ -124,7 +124,7 @@ func (b *BsProvider) requestLogin(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	storedBitbucketPipelineConfig, ok := pConfig.(*v3.BitbucketServerPipelineConfig)
+	storedBitbucketPipelineConfig, ok := pConfig.(*v32.BitbucketServerPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get bitbucket server provider config")
 	}
@@ -158,7 +158,7 @@ func (b *BsProvider) requestLogin(apiContext *types.APIContext) error {
 }
 
 func (b *BsProvider) testAndApply(apiContext *types.APIContext) error {
-	applyInput := &v3.BitbucketServerApplyInput{}
+	applyInput := &v32.BitbucketServerApplyInput{}
 
 	if err := json.NewDecoder(apiContext.Request.Body).Decode(applyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -170,7 +170,7 @@ func (b *BsProvider) testAndApply(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	storedBitbucketPipelineConfig, ok := pConfig.(*v3.BitbucketServerPipelineConfig)
+	storedBitbucketPipelineConfig, ok := pConfig.(*v32.BitbucketServerPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get bitbucket server provider config")
 	}
@@ -201,7 +201,7 @@ func (b *BsProvider) testAndApply(apiContext *types.APIContext) error {
 }
 
 func (b *BsProvider) login(apiContext *types.APIContext) error {
-	loginInput := v3.AuthUserInput{}
+	loginInput := v32.AuthUserInput{}
 	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
@@ -215,7 +215,7 @@ func (b *BsProvider) login(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	config, ok := pConfig.(*v3.BitbucketServerPipelineConfig)
+	config, ok := pConfig.(*v32.BitbucketServerPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get bitbucket provider config")
 	}

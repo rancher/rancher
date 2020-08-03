@@ -15,8 +15,9 @@ import (
 	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
-	"github.com/rancher/rancher/app"
+	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
+	"github.com/rancher/rancher/pkg/rancher"
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -29,8 +30,8 @@ var (
 )
 
 func main() {
-	app.RegisterPasswordResetCommand()
-	app.RegisterEnsureDefaultAdminCommand()
+	management.RegisterPasswordResetCommand()
+	management.RegisterEnsureDefaultAdminCommand()
 	if reexec.Init() {
 		return
 	}
@@ -52,7 +53,7 @@ func main() {
 		os.Setenv("PATH", newPath)
 	}
 
-	var config app.Config
+	var config rancher.Options
 
 	app := cli.NewApp()
 	app.Version = version.FriendlyVersion()
@@ -182,7 +183,7 @@ func main() {
 	app.Run(os.Args)
 }
 
-func initLogs(c *cli.Context, cfg app.Config) {
+func initLogs(c *cli.Context, cfg rancher.Options) {
 	switch c.String("log-format") {
 	case "simple":
 		logrus.SetFormatter(&simplelog.StandardFormatter{})
@@ -214,7 +215,7 @@ func migrateETCDlocal() {
 	os.Symlink("../etcd", "management-state/etcd")
 }
 
-func run(cli *cli.Context, cfg app.Config) error {
+func run(cli *cli.Context, cfg rancher.Options) error {
 	logrus.Infof("Rancher version %s is starting", version.FriendlyVersion())
 	logrus.Infof("Rancher arguments %+v", cfg)
 	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
@@ -229,7 +230,7 @@ func run(cli *cli.Context, cfg app.Config) error {
 	cfg.Embedded = embedded
 
 	os.Unsetenv("KUBECONFIG")
-	server, err := app.New(ctx, clientConfig, &cfg)
+	server, err := rancher.New(ctx, clientConfig, &cfg)
 	if err != nil {
 		return err
 	}

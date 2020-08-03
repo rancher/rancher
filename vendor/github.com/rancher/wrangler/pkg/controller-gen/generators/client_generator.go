@@ -70,7 +70,7 @@ func (cg *ClientGenerator) Packages(context *generator.Context, arguments *args.
 		}
 	}
 
-	return generator.Packages(packageList)
+	return packageList
 }
 
 func (cg *ClientGenerator) typesGroupPackage(name *types.Name, gv schema.GroupVersion, generatorArgs *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Package {

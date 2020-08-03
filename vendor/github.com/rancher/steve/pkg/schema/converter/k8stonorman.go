@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
+	"github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 )

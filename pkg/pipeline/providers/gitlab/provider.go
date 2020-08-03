@@ -3,15 +3,17 @@ package gitlab
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/project/v3"
+	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -56,7 +58,7 @@ func (g *GlProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	}
 	storedGitlabPipelineConfigMap := u.UnstructuredContent()
 
-	storedGitlabPipelineConfig := &v3.GitlabPipelineConfig{}
+	storedGitlabPipelineConfig := &v32.GitlabPipelineConfig{}
 	if err := mapstructure.Decode(storedGitlabPipelineConfigMap, storedGitlabPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}

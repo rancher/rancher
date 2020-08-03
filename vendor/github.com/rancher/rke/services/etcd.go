@@ -16,8 +16,8 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/pki/cert"
+	v3 "github.com/rancher/rke/types"
 	"github.com/rancher/rke/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -375,6 +375,47 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotContainerName)
 	}
 	return nil
+}
+
+func RunGetStateFileFromSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, es v3.ETCDService) (string, error) {
+	backupCmd := "etcd-backup"
+	imageCfg := &container.Config{
+		Cmd: []string{
+			"/opt/rke-tools/rke-etcd-backup",
+			backupCmd,
+			"extractstatefile",
+			"--name", name,
+		},
+		Image: etcdSnapshotImage,
+		Env:   es.ExtraEnv,
+	}
+	// Configure imageCfg for S3 backups
+	if es.BackupConfig != nil {
+		imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
+	}
+	hostCfg := &container.HostConfig{
+		Binds: []string{
+			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
+		},
+		NetworkMode:   container.NetworkMode("host"),
+		RestartPolicy: container.RestartPolicy{Name: "no"},
+	}
+
+	if err := docker.DoRemoveContainer(ctx, etcdHost.DClient, EtcdStateFileContainerName, etcdHost.Address); err != nil {
+		return "", err
+	}
+	if err := docker.DoRunOnetimeContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdStateFileContainerName, etcdHost.Address, ETCDRole, prsMap); err != nil {
+		return "", err
+	}
+	statefile, err := docker.ReadFileFromContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdStateFileContainerName, "/tmp/cluster.rkestate")
+	if err != nil {
+		return "", err
+	}
+	if err := docker.DoRemoveContainer(ctx, etcdHost.DClient, EtcdStateFileContainerName, etcdHost.Address); err != nil {
+		return "", err
+	}
+
+	return statefile, nil
 }
 
 func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, es v3.ETCDService) error {

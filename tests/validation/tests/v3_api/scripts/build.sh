@@ -6,8 +6,10 @@ set -eu
 DEBUG="${DEBUG:-false}"
 RKE_VERSION="${RKE_VERSION:-v1.0.2}"
 KUBECTL_VERSION="${KUBECTL_VERSION:-v1.16.6}"
-CLI_VERSION="${CLI_VERSION:-v2.3.2}"
+CLI_VERSION="${CLI_VERSION:-v2.4.5}"
 SONOBUOY_VERSION="${SONOBUOY_VERSION:-0.18.2}"
+
+TRIM_JOB_NAME=$(basename $JOB_NAME)
 
 if [ "false" != "${DEBUG}" ]; then
     echo "Environment:"
@@ -18,7 +20,7 @@ cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )/../../../" && pwd )"
 
 count=0
 while [[ 3 -gt $count ]]; do    
-    docker build -q -f Dockerfile.v3api --build-arg CLI_VERSION=$CLI_VERSION --build-arg RKE_VERSION=$RKE_VERSION --build-arg KUBECTL_VERSION=$KUBECTL_VERSION --build-arg SONOBUOY_VERSION=$SONOBUOY_VERSION -t rancher-validation-${JOB_NAME}${BUILD_NUMBER} .
+    docker build -q -f Dockerfile.v3api --build-arg CLI_VERSION=$CLI_VERSION --build-arg RKE_VERSION=$RKE_VERSION --build-arg KUBECTL_VERSION=$KUBECTL_VERSION --build-arg SONOBUOY_VERSION=$SONOBUOY_VERSION -t rancher-validation-${TRIM_JOB_NAME}${BUILD_NUMBER} .
 
     if [[ $? -eq 0 ]]; then break; fi
     count=$(($count + 1))

@@ -29,7 +29,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {

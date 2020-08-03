@@ -40,6 +40,31 @@ func NewSelfSignedCACert(key crypto.Signer, cn string, org ...string) (*x509.Cer
 	return x509.ParseCertificate(certDERBytes)
 }
 
+func NewSignedClientCert(signer crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer, cn string) (*x509.Certificate, error) {
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	if err != nil {
+		return nil, err
+	}
+
+	parent := x509.Certificate{
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		NotAfter:     time.Now().Add(time.Hour * 24 * 365).UTC(),
+		NotBefore:    caCert.NotBefore,
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName: cn,
+		},
+	}
+
+	cert, err := x509.CreateCertificate(rand.Reader, &parent, caCert, signer.Public(), caKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return x509.ParseCertificate(cert)
+}
+
 func NewSignedCert(signer crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer, cn string, orgs []string,
 	domains []string, ips []net.IP) (*x509.Certificate, error) {
 

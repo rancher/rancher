@@ -9,14 +9,16 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
@@ -291,7 +293,7 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 			return user, nil
 		}
 
-		if v3.UserConditionInitialRolesPopulated.IsTrue(user) {
+		if v32.UserConditionInitialRolesPopulated.IsTrue(user) {
 			// The users global role bindings were already created. They can differ
 			// from what is in the annotation if they were updated manually.
 			return user, nil
@@ -481,7 +483,7 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 		user.Annotations[roleTemplatesRequired] = rtr
 
 		if reflect.DeepEqual(roleMap["required"], createdRoles) {
-			v3.UserConditionInitialRolesPopulated.True(user)
+			v32.UserConditionInitialRolesPopulated.True(user)
 		}
 
 		_, err = m.users.Update(user)

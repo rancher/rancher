@@ -15,8 +15,8 @@ import (
 
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/rke/data"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/kdm"
+	v3 "github.com/rancher/rke/types"
+	"github.com/rancher/rke/types/kdm"
 )
 
 const (
@@ -90,7 +90,7 @@ func readFile(file string) ([]byte, error) {
 	return ioutil.ReadFile(file)
 }
 
-const RKEVersionDev = "v1.1.1-rc100"
+const RKEVersionDev = "v1.1.5-rc100"
 
 func initAddonTemplates(data kdm.Data) {
 	K8sVersionToTemplates = data.K8sVersionedTemplates

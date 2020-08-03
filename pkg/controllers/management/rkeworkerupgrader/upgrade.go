@@ -6,14 +6,18 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/docker/docker/pkg/locker"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	"github.com/rancher/rancher/pkg/types/config"
 	rkedefaults "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -89,7 +93,7 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 		return nil, nil
 	}
 
-	if node == nil || node.DeletionTimestamp != nil || !v3.NodeConditionProvisioned.IsTrue(node) {
+	if node == nil || node.DeletionTimestamp != nil || !v32.NodeConditionProvisioned.IsTrue(node) {
 		return node, nil
 	}
 
@@ -106,11 +110,11 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 		return uh.updateNodePlan(node, cluster, true)
 	}
 
-	if v3.ClusterConditionUpdated.IsUnknown(cluster) || cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] == "true" {
+	if v32.ClusterConditionUpdated.IsUnknown(cluster) || cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] == "true" {
 		return node, nil
 	}
 
-	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+	if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
 		// if sync is for a node that was just updated, do nothing
 
 		// node is already updated to cordon/drain/uncordon, do nothing
@@ -120,7 +124,7 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 			return node, nil
 		}
 		// node is upgrading and already updated with new node plan, do nothing
-		if v3.NodeConditionUpgraded.IsUnknown(node) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
+		if v32.NodeConditionUpgraded.IsUnknown(node) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
 			if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
 				logrus.Debugf("cluster [%s] worker-upgrade: return node [%s], plan's updated [%v]", cluster.Name,
 					node.Name, cluster.Status.NodeVersion)
@@ -173,7 +177,7 @@ func (uh *upgradeHandler) updateNodePlan(node *v3.Node, cluster *v3.Cluster, cre
 	}
 
 	nodeCopy := node.DeepCopy()
-	np := &v3.NodePlan{
+	np := &v32.NodePlan{
 		Plan:    nodePlan,
 		Version: cluster.Status.NodeVersion,
 	}
@@ -213,9 +217,9 @@ func (uh *upgradeHandler) updateNodePlanVersion(node *v3.Node, cluster *v3.Clust
 
 }
 
-func (uh *upgradeHandler) getNodePlan(node *v3.Node, cluster *v3.Cluster) (*v3.RKEConfigNodePlan, error) {
+func (uh *upgradeHandler) getNodePlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
 	var (
-		nodePlan *v3.RKEConfigNodePlan
+		nodePlan *rketypes.RKEConfigNodePlan
 		err      error
 	)
 	if nodeserver.IsNonWorker(node.Status.NodeConfig.Role) {
@@ -232,23 +236,23 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	uh.clusterLock.Lock(clusterName)
 	defer uh.clusterLock.Unlock(clusterName)
 
-	logrus.Debugf("cluster [%s] upgrading condition: [%v] plan changed: [%v]", clusterName, v3.ClusterConditionUpgraded.IsUnknown(cluster), planChanged)
+	logrus.Debugf("cluster [%s] upgrading condition: [%v] plan changed: [%v]", clusterName, v32.ClusterConditionUpgraded.IsUnknown(cluster), planChanged)
 
 	var (
 		clusterCopy *v3.Cluster
 		err         error
 	)
-	if !v3.ClusterConditionUpgraded.IsUnknown(cluster) || planChanged {
+	if !v32.ClusterConditionUpgraded.IsUnknown(cluster) || planChanged {
 		clusterCopy = cluster.DeepCopy()
-		v3.ClusterConditionUpgraded.Unknown(clusterCopy)
-		v3.ClusterConditionUpgraded.Message(clusterCopy, "updating worker nodes")
+		v32.ClusterConditionUpgraded.Unknown(clusterCopy)
+		v32.ClusterConditionUpgraded.Message(clusterCopy, "updating worker nodes")
 		clusterCopy.Status.NodeVersion++
 	}
 	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy == nil {
 		if clusterCopy == nil {
 			clusterCopy = cluster.DeepCopy()
 		}
-		clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &v3.NodeUpgradeStrategy{
+		clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &rketypes.NodeUpgradeStrategy{
 			MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
 			MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
 			Drain:                      false,
@@ -285,7 +289,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 		keys(status.notReady), keys(status.toProcess), keys(status.toPrepare), keys(status.upgraded))
 
 	for _, node := range status.upgraded {
-		if v3.NodeConditionUpgraded.IsTrue(node) {
+		if v32.NodeConditionUpgraded.IsTrue(node) {
 			continue
 		}
 
@@ -338,7 +342,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to upgrade", clusterName, node.Name)
 	}
 
-	var nodeDrainInput *v3.NodeDrainInput
+	var nodeDrainInput *rketypes.NodeDrainInput
 	state := "cordon"
 	if toDrain {
 		nodeDrainInput = upgradeStrategy.DrainInput
@@ -360,10 +364,10 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 
 	if status.done == status.filtered {
 		logrus.Debugf("cluster [%s] worker-upgrade: cluster is done upgrading, done %v len(nodes) %v", clusterName, status.done, status.filtered)
-		if !v3.ClusterConditionUpgraded.IsTrue(cluster) {
+		if !v32.ClusterConditionUpgraded.IsTrue(cluster) {
 			clusterCopy := cluster.DeepCopy()
-			v3.ClusterConditionUpgraded.True(clusterCopy)
-			v3.ClusterConditionUpgraded.Message(clusterCopy, "")
+			v32.ClusterConditionUpgraded.True(clusterCopy)
+			v32.ClusterConditionUpgraded.Message(clusterCopy, "")
 
 			if _, err := uh.clusters.Update(clusterCopy); err != nil {
 				return err
@@ -391,13 +395,13 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, err
 			continue
 		}
 
-		if node.Status.NodePlan == nil || v3.NodeConditionRegistered.IsUnknown(node) {
+		if node.Status.NodePlan == nil || v32.NodeConditionRegistered.IsUnknown(node) {
 			// node's not yet registered, change in its node plan should do nothing for cluster upgrade
 			continue
 		}
 
 		// if cluster's already upgrading, skip nodes that are yet to upgrade, planChangedForUpgrade will always be true
-		if v3.ClusterConditionUpgraded.IsUnknown(cluster) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
+		if v32.ClusterConditionUpgraded.IsUnknown(cluster) && node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
 			continue
 		}
 
@@ -411,7 +415,7 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, err
 		}
 	}
 
-	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
+	if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
 		return true, false, nil
 	}
 
@@ -462,9 +466,9 @@ func getRestoredCluster(cluster *v3.Cluster) *v3.Cluster {
 	cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] = "false"
 
 	// if restore's for a cluster stuck in upgrading, update it as upgraded
-	if v3.ClusterConditionUpgraded.IsUnknown(cluster) {
-		v3.ClusterConditionUpgraded.True(cluster)
-		v3.ClusterConditionUpgraded.Message(cluster, "restored worker nodes")
+	if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
+		v32.ClusterConditionUpgraded.True(cluster)
+		v32.ClusterConditionUpgraded.Message(cluster, "restored worker nodes")
 	}
 
 	return cluster

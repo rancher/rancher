@@ -6,8 +6,8 @@ import (
 
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"

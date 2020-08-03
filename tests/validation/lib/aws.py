@@ -36,9 +36,19 @@ AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't3a.medium')
 AWS_WINDOWS_VOLUME_SIZE = os.environ.get("AWS_WINDOWS_VOLUME_SIZE", "100")
 AWS_WINDOWS_INSTANCE_TYPE = 't3.xlarge'
 
+EKS_VERSION = os.environ.get("RANCHER_EKS_K8S_VERSION")
+EKS_ROLE_ARN = os.environ.get("RANCHER_EKS_ROLE_ARN")
+EKS_WORKER_ROLE_ARN = os.environ.get("RANCHER_EKS_WORKER_ROLE_ARN")
+
+AWS_SUBNETS = []
+if ',' in AWS_SUBNET:
+    AWS_SUBNETS = AWS_SUBNET.split(',')
+else:
+    AWS_SUBNETS = [AWS_SUBNET]
+
 
 class AmazonWebServices(CloudProviderBase):
-
+    
     def __init__(self):
         self._client = boto3.client(
             'ec2',
@@ -59,6 +69,12 @@ class AmazonWebServices(CloudProviderBase):
 
         self._db_client = boto3.client(
             'rds',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION)
+
+        self._eks_client = boto3.client(
+            'eks',
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION)
@@ -549,3 +565,69 @@ class AmazonWebServices(CloudProviderBase):
                                                DeleteAutomatedBackups=True)
         except ClientError:
             return None
+
+    def create_eks_cluster(self, name):
+        kubeconfig_path = self.create_eks_controlplane(name)
+        self.create_eks_nodegroup(name, '{}-ng'.format(name))
+        return kubeconfig_path
+
+    def create_eks_controlplane(self, name):
+        vpcConfiguration = {
+            "subnetIds": AWS_SUBNETS,
+            "securityGroupIds": [AWS_SECURITY_GROUP],
+            "endpointPublicAccess": True,
+            "endpointPrivateAccess": False
+        }
+
+        self._eks_client.\
+            create_cluster(name=name,
+                           version=EKS_VERSION,
+                           roleArn=EKS_ROLE_ARN,
+                           resourcesVpcConfig=vpcConfiguration)
+
+        return self.wait_for_eks_cluster_state(name, "ACTIVE")
+
+    def create_eks_nodegroup(self, cluster_name, name):
+        scaling_config = {
+            "minSize": 3,
+            "maxSize": 3,
+            "desiredSize": 3
+        }
+
+        remote_access = {
+            "ec2SshKey": AWS_SSH_KEY_NAME.replace('.pem', '')
+        }
+
+        ng = self._eks_client.\
+            create_nodegroup(clusterName=cluster_name,
+                             nodegroupName=name,
+                             scalingConfig=scaling_config,
+                             diskSize=20,
+                             subnets=AWS_SUBNETS,
+                             instanceTypes=[AWS_INSTANCE_TYPE],
+                             nodeRole=EKS_WORKER_ROLE_ARN,
+                             remoteAccess=remote_access)
+        waiter_ng = self._eks_client.get_waiter('nodegroup_active')
+        waiter_ng.wait(clusterName=cluster_name, nodegroupName=name)
+        return ng
+
+    def describe_eks_cluster(self, name):
+        try:
+            return self._eks_client.describe_cluster(name=name)
+        except ClientError:
+            return None
+
+    def wait_for_eks_cluster_state(self, name, target_state, timeout=1200):
+        start = time.time()
+        cluster = self.describe_eks_cluster(name)['cluster']
+        status = cluster['status']
+        while status != target_state:
+            if time.time() - start > timeout:
+                raise AssertionError(
+                    "Timed out waiting for state to get to " + target_state)
+
+            time.sleep(5)
+            cluster = self.describe_eks_cluster(name)['cluster']
+            status = cluster['status']
+            print(status)
+        return cluster

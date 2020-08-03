@@ -6,18 +6,19 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	ldapv2 "gopkg.in/ldap.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,7 +103,7 @@ func (p *ldapProvider) TransformToAuthProvider(authConfig map[string]interface{}
 }
 
 func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v3public.BasicLogin)
+	login, ok := input.(*v32.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}

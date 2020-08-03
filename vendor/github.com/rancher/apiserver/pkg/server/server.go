@@ -87,6 +87,10 @@ func (s *Server) setDefaults(ctx *types.APIRequest) {
 		}
 	}
 
+	if ctx.ErrorHandler == nil {
+		ctx.ErrorHandler = s.Defaults.ErrorHandler
+	}
+
 	ctx.AccessControl = s.AccessControl
 
 	if ctx.Schemas == nil {
@@ -113,7 +117,7 @@ func (s *Server) handle(apiOp *types.APIRequest, parser parse.Parser) {
 	if err := parser(apiOp, parse.MuxURLParser); err != nil {
 		// ensure defaults set so writer is assigned
 		s.setDefaults(apiOp)
-		s.handleError(apiOp, err)
+		apiOp.WriteError(err)
 		return
 	}
 
@@ -143,7 +147,7 @@ func (s *Server) handle(apiOp *types.APIRequest, parser parse.Parser) {
 	}
 
 	if code, data, err := s.handleOp(apiOp); err != nil {
-		s.handleError(apiOp, err)
+		apiOp.WriteError(err)
 	} else if obj, ok := data.(types.APIObject); ok {
 		apiOp.WriteResponse(code, obj)
 	} else if list, ok := data.(types.APIObjectList); ok {
@@ -168,6 +172,12 @@ func (s *Server) handleOp(apiOp *types.APIRequest) (int, interface{}, error) {
 	}
 
 	if action != nil {
+		if apiOp.Name != "" {
+			data, err := handle(apiOp, apiOp.Schema.ByIDHandler, s.Defaults.ByIDHandler)
+			if err != nil {
+				return http.StatusOK, data, err
+			}
+		}
 		return http.StatusOK, nil, handleAction(apiOp)
 	}
 
@@ -218,14 +228,6 @@ func handleAction(context *types.APIRequest) error {
 		return validation.ErrComplete
 	}
 	return nil
-}
-
-func (s *Server) handleError(apiOp *types.APIRequest, err error) {
-	if apiOp.Schema != nil && apiOp.Schema.ErrorHandler != nil {
-		apiOp.Schema.ErrorHandler(apiOp, err)
-	} else if s.Defaults.ErrorHandler != nil {
-		s.Defaults.ErrorHandler(apiOp, err)
-	}
 }
 
 func (s *Server) CustomAPIUIResponseWriter(cssURL, jsURL, version writer.StringGetter) {

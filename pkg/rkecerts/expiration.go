@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rkeCluster "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/pki/cert"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -21,12 +22,12 @@ func CleanCertificateBundle(certs map[string]pki.CertificatePKI) {
 	}
 }
 
-func GetCertExpiration(c string) (v3.CertExpiration, error) {
+func GetCertExpiration(c string) (v32.CertExpiration, error) {
 	date, err := GetCertExpirationDate(c)
 	if err != nil {
-		return v3.CertExpiration{}, err
+		return v32.CertExpiration{}, err
 	}
-	return v3.CertExpiration{
+	return v32.CertExpiration{
 		ExpirationDate: date.Format(time.RFC3339),
 	}, nil
 }

@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/ticker"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/namespace"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
 )
 

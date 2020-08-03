@@ -155,6 +155,8 @@ spec:
           env:
           - name: CATTLE_FEATURES
             value: "{{.Features}}"
+          - name: CATTLE_IS_RKE
+            value: "{{.IsRKE}}"
           - name: CATTLE_SERVER
             value: "{{.URLPlain}}"
           - name: CATTLE_CA_CHECKSUM
@@ -179,6 +181,8 @@ spec:
           defaultMode: 320
 
 ---
+
+{{ if .IsRKE }}
 
 apiVersion: apps/v1
 kind: DaemonSet
@@ -269,6 +273,8 @@ spec:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 25%
+
+{{- end }}
 
 {{- if .IsWindowsCluster}}
 
@@ -427,10 +433,19 @@ spec:
 {{- end }}
 `
 
-var AuthDaemonSet = `
+var (
+	AuthDaemonSet = `
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: kube-api-auth
     namespace: cattle-system
 `
+	NodeAgentDaemonSet = `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+    name: cattle-node-agent
+    namespace: cattle-system
+`
+)

@@ -10,19 +10,21 @@ import (
 	"sync"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,7 +84,7 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 	original := cluster
 	cluster = original.DeepCopy()
 
-	if cluster.Status.Driver == v3.ClusterDriverRKE {
+	if cluster.Status.Driver == v32.ClusterDriverRKE {
 		if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509|webhook"
 		} else {
@@ -106,7 +108,7 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	logrus.Tracef("clusterDeploy: doSync called for cluster [%s]", cluster.Name)
 
-	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
 		return nil
 	}
@@ -116,11 +118,12 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return err
 	}
 	logrus.Tracef("clusterDeploy: doSync: found [%d] nodes for cluster [%s]", len(nodes), cluster.Name)
+
 	if len(nodes) == 0 {
 		return nil
 	}
 
-	_, err = v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	_, err = v32.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		logrus.Tracef("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
@@ -163,7 +166,7 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 
 func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
-	if !v3.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
 	}
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
@@ -172,16 +175,16 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	repoChange := false
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
-			desiredRepo := util.GetPrivateRepo(cluster)
-			var appliedRepo *v3.PrivateRegistry
 			if len(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
-				appliedRepo = &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
-			}
-			if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
-				repoChange = true
-			}
-			if (desiredRepo == nil && appliedRepo != nil) || (desiredRepo != nil && appliedRepo == nil) {
-				repoChange = true
+				desiredRepo := util.GetPrivateRepo(cluster)
+				appliedRepo := &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
+
+				if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
+					repoChange = true
+				}
+				if (desiredRepo == nil && appliedRepo != nil) || (desiredRepo != nil && appliedRepo == nil) {
+					repoChange = true
+				}
 			}
 		}
 	}
@@ -197,7 +200,7 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	}
 
 	na, ca := getAgentImages(cluster.Name)
-	if cluster.Status.AgentImage != na || cluster.Status.AgentImage != ca {
+	if (cluster.Status.AgentImage != na && cluster.Status.Driver == v32.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
 			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
@@ -217,6 +220,10 @@ func getDesiredImage(cluster *v3.Cluster) string {
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
+	if cluster.Spec.Internal {
+		return nil
+	}
+
 	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
 	desiredAgent := getDesiredImage(cluster)
 	if desiredAgent == "" || desiredAgent == "fixed" {
@@ -235,6 +242,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 
 	desiredFeatures := map[string]bool{
 		features.Steve.Name(): features.Steve.Enabled(),
+		features.MCM.Name():   features.MCM.Enabled(),
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 
@@ -247,7 +255,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return err
 	}
 
-	if _, err = v3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
+	if _, err = v32.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
 		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures)
 		if err != nil {
 			return cluster, err
@@ -268,7 +276,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		if err != nil {
 			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Error while applying agent YAML, it will be retried automatically")
 		}
-		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AuthImage != "" {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
@@ -281,7 +289,18 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			}
 			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
-		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		if cluster.Status.Driver != v32.ClusterDriverRKE {
+			if output, err = kubectl.Delete([]byte(systemtemplate.NodeAgentDaemonSet), kubeConfig); err != nil {
+				logrus.Tracef("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v", string(output), err)
+				// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
+				dsNotFoundError := "daemonsets.apps \"cattle-node-agent\" not found"
+				if !strings.Contains(string(output), dsNotFoundError) {
+					return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
+				}
+				logrus.Debugf("Ignored '%s' error during delete cattle-node-agent DaemonSet", dsNotFoundError)
+			}
+		}
+		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	}); err != nil {
 		return err

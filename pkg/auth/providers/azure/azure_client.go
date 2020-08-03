@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/rancher/norman/httperror"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 type azureClient struct {
@@ -19,7 +21,7 @@ type azureClient struct {
 }
 
 // newClientCode sets up the SPT, user and group client using a code
-func newClientCode(code string, config *v3.AzureADConfig) (*azureClient, error) {
+func newClientCode(code string, config *v32.AzureADConfig) (*azureClient, error) {
 	ac := &azureClient{}
 
 	oauthConfig, err := adal.NewOAuthConfig(config.Endpoint, config.TenantID)
@@ -74,7 +76,7 @@ func newClientCode(code string, config *v3.AzureADConfig) (*azureClient, error) 
 }
 
 // newClientToken sets up the SPT, user and group client using a current Token
-func newClientToken(config *v3.AzureADConfig, azureToken adal.Token) (*azureClient, error) {
+func newClientToken(config *v32.AzureADConfig, azureToken adal.Token) (*azureClient, error) {
 	ac := &azureClient{}
 
 	oauthConfig, err := adal.NewOAuthConfig(config.Endpoint, config.TenantID)
@@ -132,25 +134,26 @@ func (ac *azureClient) marshalTokenJSON() ([]byte, error) {
 
 // parseJWTforField will parse the claims in a token for the field requested
 func parseJWTforField(tokenString string, fieldID string) (string, error) {
+	logrus.Tracef("Received access token %v from Azure AD", tokenString)
 	pieces := strings.Split(tokenString, ".")
 	if len(pieces) != 3 {
 		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
 	}
-
-	decoded, err := base64.RawStdEncoding.DecodeString(pieces[1])
+	logrus.Debug("Decoding access token for Azure AD")
+	decoded, err := base64.RawURLEncoding.DecodeString(pieces[1])
 	if err != nil {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "error decoding token")
 	}
 
 	var dat map[string]interface{}
-
+	logrus.Debug("Unmarshaling access token for Azure AD")
 	err = json.Unmarshal([]byte(decoded), &dat)
 	if err != nil {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "error unmarshaling token")
 	}
-
+	logrus.Debug("Retrieving field oid from Azure AD token")
 	if _, ok := dat[fieldID]; !ok {
-		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
+		return "", httperror.NewAPIError(httperror.InvalidFormat, "missing field oid from token")
 	}
 	return dat[fieldID].(string), nil
 }

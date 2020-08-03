@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/rke/cloudprovider/custom"
 	"github.com/rancher/rke/cloudprovider/openstack"
 	"github.com/rancher/rke/cloudprovider/vsphere"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rke/types"
 )
 
 type CloudProvider interface {

@@ -7,11 +7,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
-	v13 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -758,8 +758,21 @@ func (m *manager) checkReferencedRoles(roleTemplateName string) (bool, error) {
 		return false, err
 	}
 
-	if projectScopedAdminRoles[roleTemplate.Name] || roleTemplate.Administrative {
+	// upon upgrades, crtb/prtbs are reconciled before roletemplates.
+	// So these roles won't have the "own" verb at the time of this check added 2.4.6 onwards
+	if roleTemplate.Builtin && roleTemplate.Context == "project" && roleTemplateName == "project-owner" {
 		return true, nil
+	}
+	if roleTemplate.Builtin && roleTemplate.Context == "cluster" && roleTemplateName == "cluster-owner" {
+		return true, nil
+	}
+
+	for _, rule := range roleTemplate.Rules {
+		if slice.ContainsString(rule.Resources, projectResource) || slice.ContainsString(rule.Resources, clusterResource) {
+			if slice.ContainsString(rule.Verbs, "own") {
+				return true, nil
+			}
+		}
 	}
 	isOwnerRole := false
 	if len(roleTemplate.RoleTemplateNames) > 0 {

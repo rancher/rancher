@@ -13,14 +13,16 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/google/go-querystring/query"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/tomnomnom/linkheader"
 	"github.com/xanzy/go-gitlab"
@@ -47,7 +49,7 @@ type client struct {
 	API          string
 }
 
-func New(config *v3.GitlabPipelineConfig) (model.Remote, error) {
+func New(config *v32.GitlabPipelineConfig) (model.Remote, error) {
 	if config == nil {
 		return nil, errors.New("empty gitlab config")
 	}

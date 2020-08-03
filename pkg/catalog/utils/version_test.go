@@ -3,10 +3,12 @@ package utils
 import (
 	"testing"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/stretchr/testify/assert"
 
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func TestVersionBetween(t *testing.T) {
@@ -136,8 +138,8 @@ func TestVersionSatifiesRange(t *testing.T) {
 func TestLatestAvailableTemplateVersion(t *testing.T) {
 	template := &v3.CatalogTemplate{
 		Template: v3.Template{
-			Spec: v3.TemplateSpec{
-				Versions: []v3.TemplateVersionSpec{
+			Spec: v32.TemplateSpec{
+				Versions: []v32.TemplateVersionSpec{
 					{
 						ExternalID:        "catalog://?catalog=library&template=artifactory-ha&version=0.12.16",
 						Version:           "0.12.16",
@@ -163,8 +165,8 @@ func TestLatestAvailableTemplateVersion(t *testing.T) {
 
 	templateWithoutRancherVersion := &v3.CatalogTemplate{
 		Template: v3.Template{
-			Spec: v3.TemplateSpec{
-				Versions: []v3.TemplateVersionSpec{
+			Spec: v32.TemplateSpec{
+				Versions: []v32.TemplateVersionSpec{
 					{
 						ExternalID: "catalog://?catalog=library&template=artifactory-ha&version=0.12.16",
 						Version:    "0.12.16",

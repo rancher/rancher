@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/controllers/user/rbac"
-	authzv1 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
+	authzv1 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"gopkg.in/check.v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -399,7 +399,7 @@ func (s *AuthzSuite) SetUpSuite(c *check.C) {
 
 	err := workload.Start(ctx)
 	c.Assert(err, check.IsNil)
-	err = workload.Management.Start(ctx)
+	err = workload.Management.ControllerFactory.Start(ctx, 5)
 	c.Assert(err, check.IsNil)
 
 }

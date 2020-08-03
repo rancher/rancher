@@ -21,7 +21,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/metadata"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -483,14 +483,24 @@ func WaitForContainer(ctx context.Context, dClient *client.Client, hostname stri
 			return 1, fmt.Errorf("Could not inspect container [%s] on host [%s]: %s", containerName, hostname, err)
 		}
 		if container.State.Running {
-			log.Infof(ctx, "Container [%s] is still running on host [%s]", containerName, hostname)
+			stderr, stdout, err := GetContainerLogsStdoutStderr(ctx, dClient, containerName, "1", false)
+			if err != nil {
+				logrus.Warnf("Failed to get container logs from container [%s] on host [%s]: %v", containerName, hostname, err)
+			}
+
+			log.Infof(ctx, "Container [%s] is still running on host [%s]: stderr: [%s], stdout: [%s]", containerName, hostname, stderr, stdout)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 		logrus.Debugf("Exit code for [%s] container on host [%s] is [%d]", containerName, hostname, int64(container.State.ExitCode))
 		return int64(container.State.ExitCode), nil
 	}
-	return 1, fmt.Errorf("Container [%s] did not exit in time on host [%s]", containerName, hostname)
+	stderr, stdout, err := GetContainerLogsStdoutStderr(ctx, dClient, containerName, "1", false)
+	if err != nil {
+		logrus.Warnf("Failed to get container logs from container [%s] on host [%s]", containerName, hostname)
+	}
+
+	return 1, fmt.Errorf("Container [%s] did not exit in time on host [%s]: stderr: [%s], stdout: [%s]", containerName, hostname, stderr, stdout)
 }
 
 func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string) (bool, error) {

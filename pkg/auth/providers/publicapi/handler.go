@@ -7,9 +7,9 @@ import (
 	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
-	publicSchema "github.com/rancher/types/apis/management.cattle.io/v3public/schema"
-	v3public "github.com/rancher/types/client/management/v3public"
-	"github.com/rancher/types/config"
+	v3public "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	publicSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 type ServerOption func(server *normanapi.Server)

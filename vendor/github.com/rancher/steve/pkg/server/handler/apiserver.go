@@ -38,13 +38,12 @@ func New(cfg *rest.Config, sf schema.Factory, authMiddleware auth.Middleware, ne
 		proxy = k8sproxy.ImpersonatingHandler("/", cfg)
 	}
 
-	w := authMiddleware.Wrap
+	w := authMiddleware
 	handlers := router.Handlers{
-		Next:            next,
-		K8sResource:     w(a.apiHandler(k8sAPI)),
-		GenericResource: w(a.apiHandler(nil)),
-		K8sProxy:        w(proxy),
-		APIRoot:         w(a.apiHandler(apiRoot)),
+		Next:        next,
+		K8sResource: w(a.apiHandler(k8sAPI)),
+		K8sProxy:    w(proxy),
+		APIRoot:     w(a.apiHandler(apiRoot)),
 	}
 	if routerFunc == nil {
 		return router.Routes(handlers), nil
@@ -89,16 +88,12 @@ type APIFunc func(schema.Factory, *types.APIRequest)
 
 func (a *apiServer) apiHandler(apiFunc APIFunc) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		a.api(rw, req, apiFunc)
-	})
-}
-
-func (a *apiServer) api(rw http.ResponseWriter, req *http.Request, apiFunc APIFunc) {
-	apiOp, ok := a.common(rw, req)
-	if ok {
-		if apiFunc != nil {
-			apiFunc(a.sf, apiOp)
+		apiOp, ok := a.common(rw, req)
+		if ok {
+			if apiFunc != nil {
+				apiFunc(a.sf, apiOp)
+			}
+			a.server.Handle(apiOp)
 		}
-		a.server.Handle(apiOp)
-	}
+	})
 }

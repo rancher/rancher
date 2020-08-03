@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/steve/pkg/accesscontrol"
-	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 )
 
 func NewAccessControl(ctx context.Context, clusterName string, rbacClient v1.Interface) types.AccessControl {

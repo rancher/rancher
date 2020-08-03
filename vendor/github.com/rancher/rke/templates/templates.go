@@ -12,7 +12,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rke/metadata"
-	"github.com/rancher/types/kdm"
+	"github.com/rancher/rke/types/kdm"
 	"github.com/sirupsen/logrus"
 )
 

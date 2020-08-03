@@ -138,6 +138,8 @@ func (c *Collection) applyTemplates(schema *types.APISchema) {
 		}
 		if schema.Formatter == nil {
 			schema.Formatter = t.Formatter
+		} else if t.Formatter != nil {
+			schema.Formatter = types.FormatterChain(t.Formatter, schema.Formatter)
 		}
 		if schema.Store == nil {
 			if t.StoreFactory == nil {

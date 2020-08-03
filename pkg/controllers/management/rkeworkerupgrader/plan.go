@@ -7,17 +7,18 @@ import (
 
 	"github.com/pkg/errors"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	rkehosts "github.com/rancher/rke/hosts"
 	rkeservices "github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 )
 
-func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*v3.RKEConfigNodePlan, error) {
+func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
 	rkeConfig := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.DeepCopy()
-	rkeConfig.Nodes = []v3.RKEConfigNode{
+	rkeConfig.Nodes = []rketypes.RKEConfigNode{
 		*node.Status.NodeConfig,
 	}
 	rkeConfig.Nodes[0].Role = []string{rkeservices.WorkerRole, rkeservices.ETCDRole, rkeservices.ControlRole}
@@ -47,7 +48,7 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*v3
 		return nil, errors.Wrapf(err, "failed to create or get cluster token for share-mnt")
 	}
 
-	np := &v3.RKEConfigNodePlan{}
+	np := &rketypes.RKEConfigNodePlan{}
 
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == hostAddress {
@@ -65,7 +66,7 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*v3
 	return nil, fmt.Errorf("failed to find plan for %s", hostAddress)
 }
 
-func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*v3.RKEConfigNodePlan, error) {
+func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
 	infos, err := librke.GetDockerInfo(node)
 	if err != nil {
 		return nil, err
@@ -90,7 +91,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*v3.RK
 
 	logrus.Debugf("getDockerInfo for node [%s] dockerInfo [%s]", node.Name, hostDockerInfo.DockerRootDir)
 
-	np := &v3.RKEConfigNodePlan{}
+	np := &rketypes.RKEConfigNodePlan{}
 
 	token, err := uh.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
 	if err != nil {
@@ -141,7 +142,7 @@ func (uh *upgradeHandler) getServiceOptions(k8sVersion string, osType string) (m
 	return data, nil
 }
 
-func planChangedForUpgrade(newPlan *v3.RKEConfigNodePlan, oldPlan *v3.RKEConfigNodePlan) bool {
+func planChangedForUpgrade(newPlan *rketypes.RKEConfigNodePlan, oldPlan *rketypes.RKEConfigNodePlan) bool {
 	if newPlan == nil || oldPlan == nil {
 		return true
 	}
@@ -171,7 +172,7 @@ func planChangedForUpgrade(newPlan *v3.RKEConfigNodePlan, oldPlan *v3.RKEConfigN
 	return false
 }
 
-func processChanged(newp v3.Process, oldp v3.Process) bool {
+func processChanged(newp rketypes.Process, oldp rketypes.Process) bool {
 	name := newp.Name
 
 	if oldp.Image != newp.Image {
@@ -228,7 +229,7 @@ type compareProcess struct {
 	Privileged  bool
 }
 
-func forCompareProcess(p v3.Process) compareProcess {
+func forCompareProcess(p rketypes.Process) compareProcess {
 	return compareProcess{
 		Labels:      p.Labels,
 		NetworkMode: p.NetworkMode,
@@ -260,7 +261,7 @@ func sliceChanged(olds, news []string) bool {
 	return false
 }
 
-func planChangedForUpdate(newPlan, oldPlan *v3.RKEConfigNodePlan) bool {
+func planChangedForUpdate(newPlan, oldPlan *rketypes.RKEConfigNodePlan) bool {
 	// files passed in node config
 	if !reflect.DeepEqual(newPlan.Files, oldPlan.Files) {
 		return true

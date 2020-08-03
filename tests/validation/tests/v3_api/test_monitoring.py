@@ -515,6 +515,11 @@ def setup_monitoring(request):
     time.sleep(60 * 3)
 
     def fin():
+        if ENABLE_STORAGE == "true":
+            # make sure the longhorn app is deleted properly
+            # otherwise the namespace longhorn-system will be stuck in removing
+            project_client.delete(app)
+            validate_app_deletion(project_client, app.id)
         rancher_client.delete(project)
         # Disable monitoring
         cluster = rancher_client.reload(namespace["cluster"])
@@ -604,10 +609,11 @@ def wait_for_target_up(token, cluster, project, job):
     start = time.time()
     while True:
         t = requests.get(headers=headers1, url=url, verify=False).json()
-        for item in t["data"]["activeTargets"]:
-            if "job" in item["labels"].keys():
-                if item["labels"]["job"] == job and item["health"] == "up":
-                    return
+        if "data" in t.keys():
+            for item in t["data"]["activeTargets"]:
+                if "job" in item["labels"].keys():
+                    if item["labels"]["job"] == job and item["health"] == "up":
+                        return
         if time.time() - start > DEFAULT_MONITORING_TIMEOUT:
             raise AssertionError(
                 "Timed out waiting for target to be up")

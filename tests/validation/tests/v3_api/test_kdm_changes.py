@@ -111,13 +111,16 @@ def test_clusters_for_kdm():
     env_details = "env.CATTLE_TEST_URL='" + CATTLE_TEST_URL + "'\n"
     env_details += "env.ADMIN_TOKEN='" + ADMIN_TOKEN + "'\n"
     env_details += "env.USER_TOKEN='" + USER_TOKEN + "'\n"
+    names = ""
     i = 0
     for cluster in CLUSTER_LIST:
         env_details += \
             "env.CLUSTER_NAME_" + str(i) + "='" + cluster.name + "'\n"
+        names += cluster.name + ","
         i = i + 1
     create_config_file(env_details)
     print("env_details:", env_details)
+    print("list of cluster names: " + names[:-1])
     client = get_user_client()
     for cluster in CLUSTER_LIST:
         try:
@@ -132,6 +135,7 @@ def test_clusters_for_kdm():
 
     # printing results
     print("--------------Passed Cluster information--------------'\n")
+    print("Clusters: " + ''.join('{0},'.format(key) for key, value in passed_cluster.items()))
     for key, value in passed_cluster.items():
         print(key + "-->" + str(value) + "\n")
     print("--------------Failed Cluster information--------------'\n")

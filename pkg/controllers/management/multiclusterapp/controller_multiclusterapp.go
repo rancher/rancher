@@ -7,16 +7,19 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
-	"github.com/rancher/types/user"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -138,8 +141,8 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		return mcapp, nil
 	}
 
-	if resp.count == len(mcapp.Spec.Targets) && v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) &&
-		v3.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
+	if resp.count == len(mcapp.Spec.Targets) && v32.MultiClusterAppConditionInstalled.IsUnknown(mcapp) &&
+		v32.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
 		deleteContext(mcapp.Name)
 		return m.setRevisionAndUpdate(mcapp, creatorID)
 	}
@@ -217,7 +220,7 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 			}
 			if appUpdated {
 				count++
-				if !pv3.AppConditionInstalled.IsTrue(app) || !pv3.AppConditionDeployed.IsTrue(app) {
+				if !v33.AppConditionInstalled.IsTrue(app) || !v33.AppConditionDeployed.IsTrue(app) {
 					toUpdate = false
 					updateApps = []*pv3.App{}
 				}
@@ -358,8 +361,8 @@ func (m *MCAppManager) isChanged(mcapp *v3.MultiClusterApp) (bool, error) {
 }
 
 func (m *MCAppManager) toUpdate(mcapp *v3.MultiClusterApp) (bool, error) {
-	if v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) && v3.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
-		lastUpdated, err := time.Parse(time.RFC3339, v3.MultiClusterAppConditionInstalled.GetLastUpdated(mcapp))
+	if v32.MultiClusterAppConditionInstalled.IsUnknown(mcapp) && v32.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
+		lastUpdated, err := time.Parse(time.RFC3339, v32.MultiClusterAppConditionInstalled.GetLastUpdated(mcapp))
 		if err != nil {
 			return false, err
 		}
@@ -389,7 +392,7 @@ func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string
 				Annotations: ann,
 				Labels:      set,
 			},
-			Spec: pv3.AppSpec{
+			Spec: v33.AppSpec{
 				ProjectName:         projectName,
 				TargetNamespace:     nsName,
 				ExternalID:          externalID,
@@ -564,17 +567,17 @@ func (m *MCAppManager) updateCondition(mcappToUpdate *v3.MultiClusterApp, setCon
 }
 
 func setInstalledUnknown(mcapp *v3.MultiClusterApp) {
-	v3.MultiClusterAppConditionInstalled.Unknown(mcapp)
-	v3.MultiClusterAppConditionInstalled.Message(mcapp, "upgrading")
-	v3.MultiClusterAppConditionInstalled.LastUpdated(mcapp, time.Now().Format(time.RFC3339))
+	v32.MultiClusterAppConditionInstalled.Unknown(mcapp)
+	v32.MultiClusterAppConditionInstalled.Message(mcapp, "upgrading")
+	v32.MultiClusterAppConditionInstalled.LastUpdated(mcapp, time.Now().Format(time.RFC3339))
 }
 
 func setInstalledDone(mcapp *v3.MultiClusterApp) {
-	v3.MultiClusterAppConditionInstalled.True(mcapp)
-	v3.MultiClusterAppConditionInstalled.Message(mcapp, "")
+	v32.MultiClusterAppConditionInstalled.True(mcapp)
+	v32.MultiClusterAppConditionInstalled.Message(mcapp, "")
 }
 
-func (m *MCAppManager) createAnswerMap(answers []v3.Answer) (map[string]map[string]string, error) {
+func (m *MCAppManager) createAnswerMap(answers []v32.Answer) (map[string]map[string]string, error) {
 	// create a map, where key is the projectID or clusterID, or "global" if neither is provided, and value is the actual answer values
 	// Global scoped answers will have all questions. Project/cluster scoped will only have override keys. So we'll first create a global map,
 	// and then merge with project/cluster map

@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rkeCluster "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -47,13 +48,13 @@ func TestGetCertExpiration(t *testing.T) {
 	tests := []struct {
 		name    string
 		cert    string
-		want    v3.CertExpiration
+		want    v32.CertExpiration
 		wantErr bool
 	}{
 		{
 			name: "valid cert",
 			cert: exampleCert,
-			want: v3.CertExpiration{
+			want: v32.CertExpiration{
 				ExpirationDate: "2021-02-24T16:10:01Z",
 			},
 			wantErr: false,

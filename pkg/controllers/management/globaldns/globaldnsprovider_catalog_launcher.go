@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/norman/types/convert"
-	passwordutil "github.com/rancher/rancher/pkg/api/store/password"
+	passwordutil "github.com/rancher/rancher/pkg/api/norman/store/password"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
-	"github.com/rancher/types/user"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -241,7 +243,7 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 				Namespace:       sysProject,
 				OwnerReferences: ownerRef,
 			},
-			Spec: pv3.AppSpec{
+			Spec: v32.AppSpec{
 				ProjectName:     localClusterName + ":" + sysProject,
 				TargetNamespace: namespace.GlobalNamespace,
 				ExternalID:      appCatalogID,

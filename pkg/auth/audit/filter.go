@@ -13,10 +13,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func NewAuditLogFilter(ctx context.Context, auditWriter *LogWriter, next http.Handler) http.Handler {
-	return &auditHandler{
-		next:        next,
-		auditWriter: auditWriter,
+func NewAuditLogMiddleware(auditWriter *LogWriter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return &auditHandler{
+			next:        next,
+			auditWriter: auditWriter,
+		}
 	}
 }
 
@@ -31,12 +33,12 @@ func (h auditHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	user := GetUserInfo(req)
+	user := getUserInfo(req)
 
 	context := context.WithValue(req.Context(), userKey, user)
 	req = req.WithContext(context)
 
-	auditLog, err := new(h.auditWriter, req)
+	auditLog, err := newAuditLog(h.auditWriter, req)
 	if err != nil {
 		util.ReturnHTTPError(rw, req, 500, err.Error())
 		return

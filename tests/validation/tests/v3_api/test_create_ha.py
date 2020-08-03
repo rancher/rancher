@@ -1,4 +1,5 @@
 from .common import *  # NOQA
+from .test_boto_create_eks import get_eks_kubeconfig
 from .test_import_k3s_cluster import create_multiple_control_cluster
 from .test_rke_cluster_provisioning import rke_config
 
@@ -57,6 +58,7 @@ def test_remove_rancher_ha():
 
 def test_install_rancher_ha(precheck_certificate_options):
     cm_install = True
+    extra_settings = []
     if "byo-" in RANCHER_HA_CERT_OPTION:
         cm_install = False
     print("The hostname is: {}".format(RANCHER_HA_HOSTNAME))
@@ -75,6 +77,17 @@ def test_install_rancher_ha(precheck_certificate_options):
                 create_multiple_control_cluster()
             cmd = "cp {0} {1}".format(k3s_kubeconfig_path, kubeconfig_path)
             run_command_with_stderr(cmd)
+        elif RANCHER_LOCAL_CLUSTER_TYPE == "EKS":
+            create_resources_eks()
+            eks_kubeconfig_path = get_eks_kubeconfig(resource_prefix +
+                                                     "-ekscluster")
+            cmd = "cp {0} {1}".format(eks_kubeconfig_path, kubeconfig_path)
+            run_command_with_stderr(cmd)
+            install_eks_ingress()
+            extra_settings.append(
+                "--set ingress."
+                "extraAnnotations.\"kubernetes\\.io/ingress\\.class\"=nginx"
+            )
     else:
         write_kubeconfig()
 
@@ -92,7 +105,12 @@ def test_install_rancher_ha(precheck_certificate_options):
     if cm_install:
         install_cert_manager()
     add_repo_create_namespace()
-    install_rancher()
+    # Here we use helm to install the Rancher chart
+    install_rancher(extra_settings=extra_settings)
+    if RANCHER_LOCAL_CLUSTER_TYPE == "EKS":
+        # For EKS we need to wait for EKS to generate the nlb and then configure
+        # a Route53 record with the ingress address value
+        set_route53_with_eks_ingress()
     wait_for_status_code(url=RANCHER_SERVER_URL + "/v3", expected_code=401)
     print_kubeconfig()
     auth_url = \
@@ -140,6 +158,12 @@ def test_upgrade_rancher_ha(precheck_upgrade_options):
     install_rancher(upgrade=True)
 
 
+def create_resources_eks():
+    cluster_name = resource_prefix + "-ekscluster"
+    AmazonWebServices().create_eks_cluster(cluster_name)
+    AmazonWebServices().wait_for_eks_cluster_state(cluster_name, "ACTIVE")
+
+
 def create_resources():
     # Create nlb and grab ARN & dns name
     lb = AmazonWebServices().create_network_lb(name=resource_prefix + "-nlb")
@@ -165,7 +189,6 @@ def create_resources():
     AmazonWebServices().create_ha_nlb_listener(loadBalancerARN=lbArn,
                                                port=443,
                                                targetGroupARN=tg443Arn)
-
     targets = []
     aws_nodes = AmazonWebServices().\
         create_multiple_nodes(3, resource_prefix + "-server")
@@ -201,6 +224,23 @@ def install_cert_manager():
     time.sleep(120)
 
 
+def install_eks_ingress():
+    run_command_with_stderr(export_cmd + " && kubectl apply -f " +
+                            DATA_SUBDIR + "/eks_nlb.yml")
+
+
+def set_route53_with_eks_ingress():
+    kubectl_ingress = "kubectl get ingress -n cattle-system -o " \
+                      "jsonpath=\"" \
+                      "{.items[0].status.loadBalancer.ingress[0].hostname}\""
+    ingress_address = run_command_with_stderr(export_cmd
+                                              + " && " +
+                                              kubectl_ingress).decode()
+    AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
+                                                     ingress_address)
+    time.sleep(60)
+
+
 def add_repo_create_namespace(repo=RANCHER_HELM_REPO):
     repo_name = "rancher-" + repo
     repo_url = "https://releases.rancher.com/server-charts/" + repo
@@ -212,7 +252,7 @@ def add_repo_create_namespace(repo=RANCHER_HELM_REPO):
 
 
 def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
-                    upgrade=False):
+                    upgrade=False, extra_settings=None):
     operation = "install"
 
     if upgrade:
@@ -251,6 +291,10 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
             create_tls_secrets(valid_cert=False)
         elif type == "byo-valid":
             create_tls_secrets(valid_cert=True)
+
+    if extra_settings:
+        for setting in extra_settings:
+            helm_rancher_cmd = helm_rancher_cmd + " " + setting
 
     run_command_with_stderr(helm_rancher_cmd)
     time.sleep(120)
@@ -295,13 +339,13 @@ def write_kubeconfig():
     file.close()
 
 
-def set_url_and_password(server_url):
-    admin_token = set_url_password_token(server_url)
-    admin_client = rancher.Client(url=server_url + "/v3",
+def set_url_and_password(rancher_url, server_url=None):
+    admin_token = set_url_password_token(rancher_url, server_url)
+    admin_client = rancher.Client(url=rancher_url + "/v3",
                                   token=admin_token, verify=False)
-    auth_url = server_url + "/v3-public/localproviders/local?action=login"
+    auth_url = rancher_url + "/v3-public/localproviders/local?action=login"
     user, user_token = create_user(admin_client, auth_url)
-    env_details = "env.CATTLE_TEST_URL='" + server_url + "'\n"
+    env_details = "env.CATTLE_TEST_URL='" + rancher_url + "'\n"
     env_details += "env.ADMIN_TOKEN='" + admin_token + "'\n"
     env_details += "env.USER_TOKEN='" + user_token + "'\n"
     create_config_file(env_details)

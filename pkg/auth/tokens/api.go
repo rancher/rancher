@@ -7,9 +7,9 @@ import (
 	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 )
 

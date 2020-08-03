@@ -1,0 +1,41 @@
+---
+  defaultImage: true
+  image: 
+    repository: "ranchercharts/chartmuseum-chartmuseum"
+    tag: "v0.9.0"
+  env:
+    open:
+      STORAGE: "local"
+      STORAGE_AMAZON_BUCKET: ""
+      STORAGE_AMAZON_PREFIX: ""
+      STORAGE_AMAZON_REGION: ""
+      STORAGE_ALIBABA_BUCKET: ""
+      STORAGE_ALIBABA_ENDPOINT: ""
+      STORAGE_ALIBABA_PREFIX: ""
+      STORAGE_GOOGLE_BUCKET: ""
+      STORAGE_GOOGLE_PREFIX: ""
+      STORAGE_MICROSOFT_CONTAINER: ""
+      STORAGE_MICROSOFT_PREFIX: ""
+      STORAGE_OPENSTACK_CONTAINER: ""
+      STORAGE_OPENSTACK_PREFIX: ""
+      STORAGE_OPENSTACK_REGION: ""
+      SHOW_ADVANCED: false
+      CHART_URL: ""
+      DEPTH: "0"
+      ALLOW_OVERWRITE: false
+      AUTH_ANONYMOUS_GET: false
+      DISABLE_METRICS: true
+    existingSecret: ""
+    fakevar: "fakeval"
+  persistence:
+    enabled: false
+    size: "10Gi"
+    storageClass: ""
+    existingClaim: ""
+  ingress:
+    enabled: false
+    hosts:
+      -
+        name: "xip.io"
+  service:
+    type: "NodePort"

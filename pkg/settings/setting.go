@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,7 +19,7 @@ var (
 	InjectDefaults string
 
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
-	AuthImage                         = NewSetting("auth-image", v3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
+	AuthImage                         = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds  = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	CACerts                           = NewSetting("cacerts", "")
@@ -54,13 +55,13 @@ var (
 	ServerVersion                     = NewSetting("server-version", "dev")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
 	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan")
-	TelemetryOpt                      = NewSetting("telemetry-opt", "prompt")
+	TelemetryOpt                      = NewSetting("telemetry-opt", "")
 	TLSMinVersion                     = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                        = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
 	UIBanners                         = NewSetting("ui-banners", "{}")
 	UIFeedBackForm                    = NewSetting("ui-feedback-form", "")
 	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
-	UIPath                            = NewSetting("ui-path", "")
+	UIPreferred                       = NewSetting("ui-preferred", "ember")
 	UIIssues                          = NewSetting("ui-issues", "")
 	UIPL                              = NewSetting("ui-pl", "rancher")
 	UIKubernetesSupportedVersions     = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")

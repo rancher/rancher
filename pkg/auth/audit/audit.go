@@ -11,6 +11,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 const (
@@ -42,7 +43,7 @@ type auditLog struct {
 type log struct {
 	AuditID           k8stypes.UID `json:"auditID,omitempty"`
 	RequestURI        string       `json:"requestURI,omitempty"`
-	User              *UserInfo    `json:"user,omitempty"`
+	User              *User        `json:"user,omitempty"`
 	Method            string       `json:"method,omitempty"`
 	RemoteAddr        string       `json:"remoteAddr,omitempty"`
 	RequestTimestamp  string       `json:"requestTimestamp,omitempty"`
@@ -56,7 +57,7 @@ type log struct {
 
 var userKey struct{}
 
-type UserInfo struct {
+type User struct {
 	Name  string   `json:"name,omitempty"`
 	Group []string `json:"group,omitempty"`
 	// RequestUser is the --as user
@@ -65,19 +66,20 @@ type UserInfo struct {
 	RequestGroups []string `json:"requestGroups,omitempty"`
 }
 
-func GetUserInfo(req *http.Request) *UserInfo {
-	return &UserInfo{
-		Name:  req.Header.Get("Impersonate-User"),
-		Group: req.Header["Impersonate-Group"],
+func getUserInfo(req *http.Request) *User {
+	user, _ := request.UserFrom(req.Context())
+	return &User{
+		Name:  user.GetName(),
+		Group: user.GetGroups(),
 	}
 }
 
-func FromContext(ctx context.Context) (*UserInfo, bool) {
-	u, ok := ctx.Value(userKey).(*UserInfo)
+func FromContext(ctx context.Context) (*User, bool) {
+	u, ok := ctx.Value(userKey).(*User)
 	return u, ok
 }
 
-func new(writer *LogWriter, req *http.Request) (*auditLog, error) {
+func newAuditLog(writer *LogWriter, req *http.Request) (*auditLog, error) {
 	auditLog := &auditLog{
 		writer: writer,
 		log: &log{
@@ -100,7 +102,7 @@ func new(writer *LogWriter, req *http.Request) (*auditLog, error) {
 	return auditLog, nil
 }
 
-func (a *auditLog) write(userInfo *UserInfo, reqHeaders, resHeaders http.Header, resCode int, resBody []byte) error {
+func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, resCode int, resBody []byte) error {
 	a.log.User = userInfo
 	a.log.ResponseTimestamp = time.Now().Format(time.RFC3339)
 	a.log.RequestHeader = filterOutHeaders(reqHeaders, sensitiveRequestHeader)

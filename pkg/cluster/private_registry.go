@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 
 	"github.com/docker/docker/api/types"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
 )
 
 func GetPrivateRepoURL(cluster *v3.Cluster) string {
@@ -17,13 +18,13 @@ func GetPrivateRepoURL(cluster *v3.Cluster) string {
 	return registry.URL
 }
 
-func GetPrivateRepo(cluster *v3.Cluster) *v3.PrivateRegistry {
+func GetPrivateRepo(cluster *v3.Cluster) *rketypes.PrivateRegistry {
 	if cluster != nil && cluster.Spec.RancherKubernetesEngineConfig != nil && len(cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
 		config := cluster.Spec.RancherKubernetesEngineConfig
 		return &config.PrivateRegistries[0]
 	}
 	if settings.SystemDefaultRegistry.Get() != "" {
-		return &v3.PrivateRegistry{
+		return &rketypes.PrivateRegistry{
 			URL: settings.SystemDefaultRegistry.Get(),
 		}
 	}
@@ -38,7 +39,7 @@ func GenerateClusterPrivateRegistryDockerConfig(cluster *v3.Cluster) (string, er
 }
 
 // This method generates base64 encoded credentials for the registry
-func GeneratePrivateRegistryDockerConfig(privateRegistry *v3.PrivateRegistry) (string, error) {
+func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegistry) (string, error) {
 	if privateRegistry == nil || privateRegistry.User == "" || privateRegistry.Password == "" {
 		return "", nil
 	}

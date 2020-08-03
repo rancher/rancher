@@ -9,9 +9,10 @@ import (
 	"strings"
 	"text/template"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 var (
@@ -29,6 +30,7 @@ type context struct {
 	Namespace             string
 	URLPlain              string
 	IsWindowsCluster      bool
+	IsRKE                 bool
 	PrivateRegistryConfig string
 }
 
@@ -45,7 +47,7 @@ func toFeatureString(features map[string]bool) string {
 			buf.WriteString("=false")
 		}
 	}
-	return buf.String()
+	return buf.String() + ",multi-cluster-management=disable"
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
@@ -73,6 +75,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		Namespace:             base64.StdEncoding.EncodeToString([]byte(namespace)),
 		URLPlain:              url,
 		IsWindowsCluster:      isWindowsCluster,
+		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: privateRegistryConfig,
 	}
 

@@ -12,12 +12,14 @@ import (
 	"sync"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/gorilla/mux"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -36,7 +38,7 @@ var initMu sync.Mutex
 
 const UITranslationKeyForErrorMessage = "invalidSamlAttrs"
 
-func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) error {
+func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) error {
 
 	initMu.Lock()
 	defer initMu.Unlock()
@@ -155,6 +157,8 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	}
 	provider.clientState = &cookieStore
 
+	root.Use(responsewriter.ContentTypeOptions)
+
 	SamlProviders[name] = provider
 
 	switch name {
@@ -182,7 +186,6 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 
 func AuthHandler() http.Handler {
 	root = mux.NewRouter()
-	root.Use(responsewriter.ContentTypeOptions)
 
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
 	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
@@ -202,7 +205,7 @@ func AuthHandler() http.Handler {
 	return root
 }
 
-func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string][]string) (v3.Principal, []v3.Principal, error) {
+func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string][]string) (v3.Principal, []v3.Principal, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
 	uid, ok := samlData[config.UIDField]

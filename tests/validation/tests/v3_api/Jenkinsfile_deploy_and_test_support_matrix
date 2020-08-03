@@ -2,10 +2,16 @@
 
 node {
   def rootPath = "/src/rancher-validation/"
-  def setupContainer = "${JOB_NAME}${env.BUILD_NUMBER}_setup"
-  def clusterSetupContainer = "${JOB_NAME}${env.BUILD_NUMBER}_cluster_setup"
-  def testContainer = "${JOB_NAME}${env.BUILD_NUMBER}_test"
-  def deleteContainer = "${JOB_NAME}${env.BUILD_NUMBER}_delete"
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+
+  def setupContainer = "${job_name}${env.BUILD_NUMBER}_setup"
+  def clusterSetupContainer = "${job_name}${env.BUILD_NUMBER}_cluster_setup"
+  def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
+  def deleteContainer = "${job_name}${env.BUILD_NUMBER}_delete"
 
   def deployPytestOptions = "-k test_deploy_rancher_server"
   def deletePytestOptions = "-k test_delete_rancher_server"
@@ -14,7 +20,7 @@ node {
   def setupResultsOut = "setup-results.xml"
   def clusterSetupResultsOut = "cluster-setup-results.xml"
   def deleteResultsOut = "delete-results.xml"
-  def imageName = "rancher-validation-${JOB_NAME}${env.BUILD_NUMBER}"
+  def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
   def testsDir = "tests/v3_api/"
 
   def envFile = ".env"
@@ -26,197 +32,212 @@ node {
   }
 
   wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
-    withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                      string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                      string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
-                      string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
-                      string(credentialsId: 'DO_ACCESSKEY', variable: 'DO_ACCESSKEY'),
-                      string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
-                      string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
-                      string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
-                      string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZURE_TENANT_ID'),
-                      string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
-                      string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
-                      string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'RANCHER_AKS_SUBSCRIPTION_ID'),
-                      string(credentialsId: 'AZURE_TENANT_ID', variable: 'RANCHER_AKS_TENANT_ID'),
-                      string(credentialsId: 'AZURE_CLIENT_ID', variable: 'RANCHER_AKS_CLIENT_ID'),
-                      string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'RANCHER_AKS_SECRET_KEY'),
-                      string(credentialsId: 'RANCHER_REGISTRY_USER_NAME', variable: 'RANCHER_REGISTRY_USER_NAME'),
-                      string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
-                      string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
-                      string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
-                      string(credentialsId: 'RANCHER_GKE_CREDENTIAL', variable: 'RANCHER_GKE_CREDENTIAL'),
-                      string(credentialsId: 'RANCHER_AUTH_USER_PASSWORD', variable: 'RANCHER_AUTH_USER_PASSWORD'),
-                      string(credentialsId: 'RANCHER_HOSTNAME_OR_IP_ADDRESS', variable: 'RANCHER_HOSTNAME_OR_IP_ADDRESS'),
-                      string(credentialsId: 'RANCHER_CA_CERTIFICATE', variable: 'RANCHER_CA_CERTIFICATE'),
-                      string(credentialsId: 'RANCHER_SERVICE_ACCOUNT_NAME', variable: 'RANCHER_SERVICE_ACCOUNT_NAME'),
-                      string(credentialsId: 'RANCHER_SERVICE_ACCOUNT_PASSWORD', variable: 'RANCHER_SERVICE_ACCOUNT_PASSWORD'),
-                      string(credentialsId: 'RANCHER_USER_SEARCH_BASE', variable: 'RANCHER_USER_SEARCH_BASE'),
-                      string(credentialsId: 'RANCHER_DEFAULT_LOGIN_DOMAIN', variable: 'RANCHER_DEFAULT_LOGIN_DOMAIN'),
-                      string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
-                      string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
-                      string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
-                      string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY')]) {
-      stage('Checkout') {
-        deleteDir()
-        checkout([
-                  $class: 'GitSCM',
-                  branches: [[name: "*/${branch}"]],
-                  extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                  userRemoteConfigs: scm.userRemoteConfigs
-                ])
-      }
+    withFolderProperties {
+      withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
+                        string(credentialsId: 'DO_ACCESSKEY', variable: 'DO_ACCESSKEY'),
+                        string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                        string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
+                        string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
+                        string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZURE_TENANT_ID'),
+                        string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
+                        string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
+                        string(credentialsId: 'AZURE_AKS_SUBSCRIPTION_ID', variable: 'RANCHER_AKS_SUBSCRIPTION_ID'),
+                        string(credentialsId: 'AZURE_TENANT_ID', variable: 'RANCHER_AKS_TENANT_ID'),
+                        string(credentialsId: 'AZURE_CLIENT_ID', variable: 'RANCHER_AKS_CLIENT_ID'),
+                        string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'RANCHER_AKS_SECRET_KEY'),
+                        string(credentialsId: 'RANCHER_REGISTRY_USER_NAME', variable: 'RANCHER_REGISTRY_USER_NAME'),
+                        string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
+                        string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                        string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
+                        string(credentialsId: 'RANCHER_GKE_CREDENTIAL', variable: 'RANCHER_GKE_CREDENTIAL'),
+                        string(credentialsId: 'RANCHER_AUTH_USER_PASSWORD', variable: 'RANCHER_AUTH_USER_PASSWORD'),
+                        string(credentialsId: 'RANCHER_HOSTNAME_OR_IP_ADDRESS', variable: 'RANCHER_HOSTNAME_OR_IP_ADDRESS'),
+                        string(credentialsId: 'RANCHER_CA_CERTIFICATE', variable: 'RANCHER_CA_CERTIFICATE'),
+                        string(credentialsId: 'RANCHER_SERVICE_ACCOUNT_NAME', variable: 'RANCHER_SERVICE_ACCOUNT_NAME'),
+                        string(credentialsId: 'RANCHER_SERVICE_ACCOUNT_PASSWORD', variable: 'RANCHER_SERVICE_ACCOUNT_PASSWORD'),
+                        string(credentialsId: 'RANCHER_USER_SEARCH_BASE', variable: 'RANCHER_USER_SEARCH_BASE'),
+                        string(credentialsId: 'RANCHER_DEFAULT_LOGIN_DOMAIN', variable: 'RANCHER_DEFAULT_LOGIN_DOMAIN'),
+                        string(credentialsId: 'RANCHER_OPENLDAP_SERVICE_ACCOUNT_NAME', variable: 'RANCHER_OPENLDAP_SERVICE_ACCOUNT_NAME'),
+                        string(credentialsId: 'RANCHER_OPENLDAP_SERVICE_ACCOUNT_PASSWORD', variable: 'RANCHER_OPENLDAP_SERVICE_ACCOUNT_PASSWORD'),
+                        string(credentialsId: 'RANCHER_OPENLDAP_USER_SEARCH_BASE', variable: 'RANCHER_OPENLDAP_USER_SEARCH_BASE'),
+                        string(credentialsId: 'RANCHER_OPENLDAP_AUTH_USER_PASSWORD', variable: 'RANCHER_OPENLDAP_AUTH_USER_PASSWORD'),
+                        string(credentialsId: 'RANCHER_OPENLDAP_HOSTNAME_OR_IP_ADDRESS', variable: 'RANCHER_OPENLDAP_HOSTNAME_OR_IP_ADDRESS'),
+                        string(credentialsId: 'RANCHER_OPENLDAP_SPECIAL_CHAR_PASSWORD', variable: 'RANCHER_OPENLDAP_SPECIAL_CHAR_PASSWORD'),
+                        string(credentialsId: 'RANCHER_FREEIPA_SERVICE_ACCOUNT_NAME', variable: 'RANCHER_FREEIPA_SERVICE_ACCOUNT_NAME'),
+                        string(credentialsId: 'RANCHER_FREEIPA_SERVICE_ACCOUNT_PASSWORD', variable: 'RANCHER_FREEIPA_SERVICE_ACCOUNT_PASSWORD'),
+                        string(credentialsId: 'RANCHER_FREEIPA_USER_SEARCH_BASE', variable: 'RANCHER_FREEIPA_USER_SEARCH_BASE'),
+                        string(credentialsId: 'RANCHER_FREEIPA_GROUP_SEARCH_BASE', variable: 'RANCHER_FREEIPA_GROUP_SEARCH_BASE'),
+                        string(credentialsId: 'RANCHER_FREEIPA_AUTH_USER_PASSWORD', variable: 'RANCHER_FREEIPA_AUTH_USER_PASSWORD'),
+                        string(credentialsId: 'RANCHER_FREEIPA_HOSTNAME_OR_IP_ADDRESS', variable: 'RANCHER_FREEIPA_HOSTNAME_OR_IP_ADDRESS'),
+                        string(credentialsId: 'RANCHER_FREEIPA_SPECIAL_CHAR_PASSWORD', variable: 'RANCHER_FREEIPA_SPECIAL_CHAR_PASSWORD'),
+                        string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
+                        string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
+                        string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
+                        string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY')]) {
+        stage('Checkout') {
+          deleteDir()
+          checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${branch}"]],
+                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                  ])
+        }
 
-      dir ("tests/validation") {
-        try {
-          stage('Configure and Build') {
-            if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-              dir(".ssh") {
-                def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
-                writeFile file: AWS_SSH_KEY_NAME, text: decoded
+        dir ("tests/validation") {
+          try {
+            stage('Configure and Build') {
+              if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+                dir(".ssh") {
+                  def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                  writeFile file: AWS_SSH_KEY_NAME, text: decoded
+                }
               }
+
+              sh "./tests/v3_api/scripts/configure.sh"
+              sh "./tests/v3_api/scripts/build.sh"
             }
 
-            sh "./tests/v3_api/scripts/configure.sh"
-            sh "./tests/v3_api/scripts/build.sh"
-          }
+            stage('Deploy Rancher Server') {
+              try {
+                if (!env.CATTLE_TEST_URL || !env.ADMIN_TOKEN || !env.USER_TOKEN ||
+                (env.CATTLE_TEST_URL == "" && env.ADMIN_TOKEN == "" && env.USER_TOKEN == "")) {
+                  // deploy rancher server
+                  sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
+                    "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${setupResultsOut} " +
+                    "${deployPytestOptions} ${testsDir}\'"
+                  RANCHER_DEPLOYED = true
 
-          stage('Deploy Rancher Server') {
-            try {
-              if (!env.CATTLE_TEST_URL || !env.ADMIN_TOKEN || !env.USER_TOKEN ||
-              (env.CATTLE_TEST_URL == "" && env.ADMIN_TOKEN == "" && env.USER_TOKEN == "")) {
-                // deploy rancher server
-                sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
-                  "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${setupResultsOut} " +
-                  "${deployPytestOptions} ${testsDir}\'"
-                RANCHER_DEPLOYED = true
+                  // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
+                  sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
+                  load rancherConfig
+                }
+                else {
+                  echo "User Provided Rancher Server"
+                  RANCHER_DEPLOYED = false
+                }
 
-                // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
-                sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
-                load rancherConfig
-              }
-              else {
-                echo "User Provided Rancher Server"
+              } catch(err) {
+                echo "Error: " + err
                 RANCHER_DEPLOYED = false
               }
-
-            } catch(err) {
-              echo "Error: " + err
-              RANCHER_DEPLOYED = false
             }
-          }
 
-          stage('Deploy Clusters') {
-            try {
-              if (!env.RANCHER_CLUSTER_NAMES || env.RANCHER_CLUSTER_NAMES == "") {
-                  // deploy clusters of different versions
-                  sh "docker run --name ${clusterSetupContainer} -t --env-file ${envFile} " +
-                      "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
-                      "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
-                      "&& pytest -v -s --junit-xml=${clusterSetupResultsOut} " +
-                    "${deployClusterPytestOptions} ${testsDir}\'"
+            stage('Deploy Clusters') {
+              try {
+                if (!env.RANCHER_CLUSTER_NAMES || env.RANCHER_CLUSTER_NAMES == "") {
+                    // deploy clusters of different versions
+                    sh "docker run --name ${clusterSetupContainer} -t --env-file ${envFile} " +
+                        "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
+                        "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
+                        "&& pytest -v -s --junit-xml=${clusterSetupResultsOut} " +
+                      "${deployClusterPytestOptions} ${testsDir}\'"
 
-                  CLUSTERS_CREATED = true
-                  // copy file containing RANCHER_CLUSTER_NAMES and load into environment variables
-                  sh "docker cp ${clusterSetupContainer}:${rootPath}${testsDir}${rancherConfig} ."
-                  load rancherConfig
-               }
-               else {
-                  echo "Given clusters: ${env.RANCHER_CLUSTER_NAMES}"
-                  CLUSTERS_CREATED = false
-               }
-            } catch(err) {
-              echo "Error: " + err
-              CLUSTERS_CREATED = true
-              sh "docker cp ${clusterSetupContainer}:${rootPath}${testsDir}${rancherConfig} ."
-              load rancherConfig
-              currentBuild.result = 'UNSTABLE'
-            }
-          }
-
-          stage('Run Validation Tests in Parallel') {
-            try {
-                jobs = [:]
-                cluster_arr = env.RANCHER_CLUSTER_NAMES.split(",")
-                cluster_count = cluster_arr.size()
-                if (!env.RANCHER_UPGRADE_CHECK || env.RANCHER_UPGRADE_CHECK == "") {
-                    RANCHER_UPGRADE_CHECK = "preupgrade"
+                    CLUSTERS_CREATED = true
+                    // copy file containing RANCHER_CLUSTER_NAMES and load into environment variables
+                    sh "docker cp ${clusterSetupContainer}:${rootPath}${testsDir}${rancherConfig} ."
+                    load rancherConfig
                 }
-                if (!env.RANCHER_VALIDATE_RESOURCES_PREFIX || env.RANCHER_VALIDATE_RESOURCES_PREFIX == "") {
-                    RANCHER_VALIDATE_RESOURCES_PREFIX = "mystep1"
+                else {
+                    echo "Given clusters: ${env.RANCHER_CLUSTER_NAMES}"
+                    CLUSTERS_CREATED = false
                 }
-                if (!env.RANCHER_CREATE_RESOURCES_PREFIX || env.RANCHER_CREATE_RESOURCES_PREFIX == "") {
-                    RANCHER_CREATE_RESOURCES_PREFIX = "mystep1"
-                }
-                for (int i = 0; i < cluster_count; i++) {
-                  def params = [
-                    string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
-                    string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
-                    string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
-                    string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}"),
-                    string(name: 'PYTEST_OPTIONS', value: "${PYTEST_OPTIONS}"),
-                    string(name: 'RANCHER_UPGRADE_CHECK', value: "${RANCHER_UPGRADE_CHECK}"),
-                    string(name: 'RANCHER_VALIDATE_RESOURCES_PREFIX', value: "${RANCHER_VALIDATE_RESOURCES_PREFIX}"),
-                    string(name: 'RANCHER_CREATE_RESOURCES_PREFIX', value: "${RANCHER_CREATE_RESOURCES_PREFIX}"),
-                  ]
-                  echo "Params are: ${params}"
-                  jobs["test-${i}"] = { build job: 'rancher-v3_needs_cluster', parameters: params }
-                }
-                parallel jobs
-            } catch(err) {
+              } catch(err) {
                 echo "Error: " + err
+                CLUSTERS_CREATED = true
+                sh "docker cp ${clusterSetupContainer}:${rootPath}${testsDir}${rancherConfig} ."
+                load rancherConfig
                 currentBuild.result = 'UNSTABLE'
-            }
-          }
-
-        } catch(err) {
-          echo "Error: " + err
-        } finally {
-          stage('Delete Rancher Server') {
-            try {
-              if (RANCHER_DEPLOYED && env.RANCHER_DELETE_SERVER && env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
-                sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
-                "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
-                "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} && "+
-                "pytest -v -s --junit-xml=${deleteResultsOut} " +
-                "${deletePytestOptions} ${testsDir}\'"
-                sh "docker cp ${deleteContainer}:${rootPath}${deleteResultsOut} ."
-                step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut}"])
               }
-              else {
-                echo "Skipping Rancher server deletion."
+            }
+
+            stage('Run Validation Tests in Parallel') {
+              try {
+                  jobs = [:]
+                  cluster_arr = env.RANCHER_CLUSTER_NAMES.split(",")
+                  cluster_count = cluster_arr.size()
+                  if (!env.RANCHER_UPGRADE_CHECK || env.RANCHER_UPGRADE_CHECK == "") {
+                      RANCHER_UPGRADE_CHECK = "preupgrade"
+                  }
+                  if (!env.RANCHER_VALIDATE_RESOURCES_PREFIX || env.RANCHER_VALIDATE_RESOURCES_PREFIX == "") {
+                      RANCHER_VALIDATE_RESOURCES_PREFIX = "mystep1"
+                  }
+                  if (!env.RANCHER_CREATE_RESOURCES_PREFIX || env.RANCHER_CREATE_RESOURCES_PREFIX == "") {
+                      RANCHER_CREATE_RESOURCES_PREFIX = "mystep1"
+                  }
+                  for (int i = 0; i < cluster_count; i++) {
+                    def params = [
+                      string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
+                      string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
+                      string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
+                      string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}"),
+                      string(name: 'PYTEST_OPTIONS', value: "${PYTEST_OPTIONS}"),
+                      string(name: 'RANCHER_UPGRADE_CHECK', value: "${RANCHER_UPGRADE_CHECK}"),
+                      string(name: 'RANCHER_VALIDATE_RESOURCES_PREFIX', value: "${RANCHER_VALIDATE_RESOURCES_PREFIX}"),
+                      string(name: 'RANCHER_CREATE_RESOURCES_PREFIX', value: "${RANCHER_CREATE_RESOURCES_PREFIX}"),
+                    ]
+                    echo "Params are: ${params}"
+                    jobs["test-${i}"] = { build job: 'rancher-v3_needs_cluster', parameters: params }
+                  }
+                  parallel jobs
+              } catch(err) {
+                  echo "Error: " + err
+                  currentBuild.result = 'UNSTABLE'
               }
-            } catch(err) {
-              echo "Error: " + err
-              currentBuild.result = 'FAILURE'
-            }
-          }
-
-          stage('Test Report') {
-            // copy and archive test results
-            if (RANCHER_DEPLOYED) {
-              sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
-              sh "docker stop ${setupContainer}"
-              sh "docker rm -v ${setupContainer}"
-              step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
             }
 
-            if (CLUSTERS_CREATED) {
-              sh "docker cp ${clusterSetupContainer}:${rootPath}${clusterSetupResultsOut} ."
-              sh "docker stop ${clusterSetupContainer}"
-              sh "docker rm -v ${clusterSetupContainer}"
-              step([$class: 'JUnitResultArchiver', testResults: "**/${clusterSetupResultsOut}"])
+          } catch(err) {
+            echo "Error: " + err
+          } finally {
+            stage('Delete Rancher Server') {
+              try {
+                if (RANCHER_DEPLOYED && env.RANCHER_DELETE_SERVER && env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
+                  sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
+                  "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
+                  "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} && "+
+                  "pytest -v -s --junit-xml=${deleteResultsOut} " +
+                  "${deletePytestOptions} ${testsDir}\'"
+                  sh "docker cp ${deleteContainer}:${rootPath}${deleteResultsOut} ."
+                  step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut}"])
+                }
+                else {
+                  echo "Skipping Rancher server deletion."
+                }
+              } catch(err) {
+                echo "Error: " + err
+                currentBuild.result = 'FAILURE'
+              }
             }
-          }
 
-          if (RANCHER_DEPLOYED && env.RANCHER_DELETE_SERVER && env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
-            sh "docker stop ${deleteContainer}"
-            sh "docker rm -v ${deleteContainer}"
-          }
+            stage('Test Report') {
+              // copy and archive test results
+              if (RANCHER_DEPLOYED) {
+                sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
+                sh "docker stop ${setupContainer}"
+                sh "docker rm -v ${setupContainer}"
+                step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
+              }
 
-          sh "docker rmi ${imageName}"
-        } // finally
-      } // dir
-    } // creds
+              if (CLUSTERS_CREATED) {
+                sh "docker cp ${clusterSetupContainer}:${rootPath}${clusterSetupResultsOut} ."
+                sh "docker stop ${clusterSetupContainer}"
+                sh "docker rm -v ${clusterSetupContainer}"
+                step([$class: 'JUnitResultArchiver', testResults: "**/${clusterSetupResultsOut}"])
+              }
+            }
+
+            if (RANCHER_DEPLOYED && env.RANCHER_DELETE_SERVER && env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
+              sh "docker stop ${deleteContainer}"
+              sh "docker rm -v ${deleteContainer}"
+            }
+
+            sh "docker rmi ${imageName}"
+          } // finally
+        } // dir
+      } // creds
+    } // folder properties
   } // wrap
 } // node

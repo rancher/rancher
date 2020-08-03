@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/namespace"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,13 +41,13 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		templateNamespace = projectCatalog.Namespace
 	}
 
-	newHelmVersionCommits := map[string]v3.VersionCommits{}
+	newHelmVersionCommits := map[string]v32.VersionCommits{}
 	var errs []error
 	var updateErrors []error
 	var createErrors []error
 	var createdTemplates, updatedTemplates, deletedTemplates, failedTemplates int
 
-	if (v3.CatalogConditionRefreshed.IsUnknown(catalog) && !strings.Contains(v3.CatalogConditionRefreshed.GetStatus(catalog), "syncing catalog")) || v3.CatalogConditionRefreshed.IsTrue(catalog) || catalog.Status.Conditions == nil {
+	if (v32.CatalogConditionRefreshed.IsUnknown(catalog) && !strings.Contains(v32.CatalogConditionRefreshed.GetStatus(catalog), "syncing catalog")) || v32.CatalogConditionRefreshed.IsTrue(catalog) || catalog.Status.Conditions == nil {
 		cmt, err = m.updateCatalogInfo(cmt, catalogType, "sync", true, false)
 		if err != nil {
 			return err
@@ -54,7 +56,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 
 	entriesWithErrors, entriesToProcess := m.preprocessCatalog(catalog, index.IndexFile.Entries)
 	for chart, metadata := range entriesToProcess {
-		newHelmVersionCommits[chart] = v3.VersionCommits{
+		newHelmVersionCommits[chart] = v32.VersionCommits{
 			Value: map[string]string{},
 		}
 		existingHelmVersionCommits := map[string]string{}
@@ -107,9 +109,9 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		template.Spec.DisplayName = chart
 		template.Status.HelmVersion = catalog.Spec.HelmVersion
 		label := map[string]string{}
-		var versions []v3.TemplateVersionSpec
+		var versions []v32.TemplateVersionSpec
 		for _, version := range metadata {
-			v := v3.TemplateVersionSpec{
+			v := v32.TemplateVersionSpec{
 				Version: strings.ToLower(version.Version),
 			}
 

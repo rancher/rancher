@@ -19,8 +19,8 @@ import (
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/wrangler-api/pkg/generated/controllers/core"
-	corev1controllers "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/generated/controllers/core"
+	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,7 +46,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 
 	opts, err := SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to setup TLS listener")
 	}
 
 	migrateConfig(ctx, restConfig, opts)

@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rke/cloudprovider/aws"
 	"github.com/rancher/rke/cloudprovider/azure"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3/fakes"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/pointer"
@@ -37,14 +38,14 @@ func TestSetNodePortRange(t *testing.T) {
 			Name: "testCluster",
 		},
 	}
-	testCluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{
-		Services: v3.RKEConfigServices{
-			KubeAPI: v3.KubeAPIService{
+	testCluster.Spec.RancherKubernetesEngineConfig = &rketypes.RancherKubernetesEngineConfig{
+		Services: rketypes.RKEConfigServices{
+			KubeAPI: rketypes.KubeAPIService{
 				ServiceNodePortRange: testServiceNodePortRange,
 			},
 		},
 	}
-	caps := v3.Capabilities{}
+	caps := v32.Capabilities{}
 	caps, err := c.RKECapabilities(caps, *testCluster.Spec.RancherKubernetesEngineConfig, testCluster.Name)
 	assert.Nil(t, err)
 	assert.Equal(t, testServiceNodePortRange, caps.NodePortRange)
@@ -58,17 +59,17 @@ func TestLoadBalancerCapability(t *testing.T) {
 			Name: "testCluster",
 		},
 	}
-	testCluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{}
+	testCluster.Spec.RancherKubernetesEngineConfig = &rketypes.RancherKubernetesEngineConfig{}
 
 	// map of cloud provider name to expected lb capability
-	cloudProviderLBCapabilityMap := map[v3.CloudProvider]*bool{
-		v3.CloudProvider{}: nil,
-		v3.CloudProvider{Name: aws.AWSCloudProviderName}:     &lbCap,
-		v3.CloudProvider{Name: azure.AzureCloudProviderName}: &lbCap,
+	cloudProviderLBCapabilityMap := map[rketypes.CloudProvider]*bool{
+		rketypes.CloudProvider{}:                                   nil,
+		rketypes.CloudProvider{Name: aws.AWSCloudProviderName}:     &lbCap,
+		rketypes.CloudProvider{Name: azure.AzureCloudProviderName}: &lbCap,
 	}
 	for cloudProvider, expectedLB := range cloudProviderLBCapabilityMap {
 		testCluster.Spec.RancherKubernetesEngineConfig.CloudProvider = cloudProvider
-		caps := v3.Capabilities{}
+		caps := v32.Capabilities{}
 		caps, err := c.RKECapabilities(caps, *testCluster.Spec.RancherKubernetesEngineConfig, testCluster.Name)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedLB, caps.LoadBalancerCapabilities.Enabled)
@@ -77,10 +78,10 @@ func TestLoadBalancerCapability(t *testing.T) {
 
 func TestIngressCapability(t *testing.T) {
 	c := initializeController()
-	rkeSpec := v3.ClusterSpec{
-		ClusterSpecBase: v3.ClusterSpecBase{
-			RancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
-				Ingress: v3.IngressConfig{
+	rkeSpec := v32.ClusterSpec{
+		ClusterSpecBase: v32.ClusterSpecBase{
+			RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+				Ingress: rketypes.IngressConfig{
 					Provider: NginxIngressProvider,
 				},
 			},
@@ -104,7 +105,7 @@ func TestIngressCapability(t *testing.T) {
 	testClusters[1].Spec.RancherKubernetesEngineConfig.Ingress.Provider = ""
 
 	for _, testCluster := range testClusters {
-		caps := v3.Capabilities{}
+		caps := v32.Capabilities{}
 		caps, err := c.RKECapabilities(caps, *testCluster.Spec.RancherKubernetesEngineConfig, testCluster.Name)
 		assert.Nil(t, err)
 		assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Ingress.Provider, caps.IngressCapabilities[0].IngressProvider)
@@ -113,8 +114,8 @@ func TestIngressCapability(t *testing.T) {
 
 type capabilitiesTestCase struct {
 	annotations  map[string]string
-	capabilities v3.Capabilities
-	result       v3.Capabilities
+	capabilities v32.Capabilities
+	result       v32.Capabilities
 	errMsg       string
 }
 
@@ -139,8 +140,8 @@ func TestOverrideCapabilities(t *testing.T) {
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "pspEnabled"): "true",
 			},
-			capabilities: v3.Capabilities{},
-			result: v3.Capabilities{
+			capabilities: v32.Capabilities{},
+			result: v32.Capabilities{
 				PspEnabled: true,
 			},
 		},
@@ -148,8 +149,8 @@ func TestOverrideCapabilities(t *testing.T) {
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "nodePortRange"): "9999",
 			},
-			capabilities: v3.Capabilities{},
-			result: v3.Capabilities{
+			capabilities: v32.Capabilities{},
+			result: v32.Capabilities{
 				NodePortRange: "9999",
 			},
 		},
@@ -157,9 +158,9 @@ func TestOverrideCapabilities(t *testing.T) {
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "ingressCapabilities"): "[{\"customDefaultBackend\":true,\"ingressProvider\":\"asdf\"}]",
 			},
-			capabilities: v3.Capabilities{},
-			result: v3.Capabilities{
-				IngressCapabilities: []v3.IngressCapabilities{
+			capabilities: v32.Capabilities{},
+			result: v32.Capabilities{
+				IngressCapabilities: []v32.IngressCapabilities{
 					{
 						CustomDefaultBackend: pointer.BoolPtr(true),
 						IngressProvider:      "asdf",
@@ -171,14 +172,14 @@ func TestOverrideCapabilities(t *testing.T) {
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "notarealcapability"): "something",
 			},
-			capabilities: v3.Capabilities{},
+			capabilities: v32.Capabilities{},
 			errMsg:       "resource field [notarealcapability] from capabillities annotation not found",
 		},
 		{
 			annotations: map[string]string{
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "pspEnabled"): "5",
 			},
-			capabilities: v3.Capabilities{},
+			capabilities: v32.Capabilities{},
 			errMsg:       "strconv.ParseBool: parsing \"5\": invalid syntax",
 		},
 	}

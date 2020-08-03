@@ -14,7 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/git"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -286,7 +286,7 @@ func remoteShaChanged(repoURL, branch, sha, uuid string) (bool, error) {
 		logrus.Warnf("Problem creating request to check git remote sha of repo [%v]: %v", repoURL, err)
 		return true, nil
 	}
-	req.Header.Set("Accept", "application/vnd.github.chitauri-preview+sha")
+	req.Header.Set("Accept", "application/vnd.github.v3.sha")
 	req.Header.Set("If-None-Match", fmt.Sprintf("\"%s\"", sha))
 	if uuid != "" {
 		req.Header.Set("X-Install-Uuid", uuid)

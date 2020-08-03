@@ -2,13 +2,14 @@ package hosts
 
 import (
 	"fmt"
-	"k8s.io/client-go/transport"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"k8s.io/client-go/transport"
+
+	v3 "github.com/rancher/rke/types"
 	"golang.org/x/crypto/ssh"
 )
 

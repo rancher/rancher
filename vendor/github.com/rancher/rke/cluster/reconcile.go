@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 )

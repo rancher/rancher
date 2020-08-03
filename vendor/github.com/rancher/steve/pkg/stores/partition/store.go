@@ -11,7 +11,7 @@ import (
 
 type Partitioner interface {
 	Lookup(apiOp *types.APIRequest, schema *types.APISchema, verb, id string) (Partition, error)
-	All(apiOp *types.APIRequest, schema *types.APISchema, verb string) ([]Partition, error)
+	All(apiOp *types.APIRequest, schema *types.APISchema, verb, id string) ([]Partition, error)
 	Store(apiOp *types.APIRequest, partition Partition) (types.Store, error)
 }
 
@@ -74,7 +74,7 @@ func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.AP
 		result types.APIObjectList
 	)
 
-	paritions, err := s.Partitioner.All(apiOp, schema, "list")
+	paritions, err := s.Partitioner.All(apiOp, schema, "list", "")
 	if err != nil {
 		return result, err
 	}
@@ -123,13 +123,13 @@ func (s *Store) Update(apiOp *types.APIRequest, schema *types.APISchema, data ty
 }
 
 func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, wr types.WatchRequest) (chan types.APIEvent, error) {
-	partitions, err := s.Partitioner.All(apiOp, schema, "watch")
+	partitions, err := s.Partitioner.All(apiOp, schema, "watch", wr.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(apiOp.Context())
-	apiOp = apiOp.WithContext(ctx)
+	apiOp = apiOp.Clone().WithContext(ctx)
 
 	eg := errgroup.Group{}
 	response := make(chan types.APIEvent)

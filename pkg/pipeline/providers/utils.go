@@ -1,16 +1,17 @@
 package providers
 
 import (
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	uuid "github.com/satori/go.uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func GetPipelineConfigByBranch(sourceCodeCredentials v3.SourceCodeCredentialInterface, sourceCodeCredentialLister v3.SourceCodeCredentialLister, pipeline *v3.Pipeline, branch string) (*v3.PipelineConfig, error) {
+func GetPipelineConfigByBranch(sourceCodeCredentials v3.SourceCodeCredentialInterface, sourceCodeCredentialLister v3.SourceCodeCredentialLister, pipeline *v3.Pipeline, branch string) (*v32.PipelineConfig, error) {
 	credentialName := pipeline.Spec.SourceCodeCredentialName
 	repoURL := pipeline.Spec.RepositoryURL
 	_, projID := ref.Parse(pipeline.Spec.ProjectName)

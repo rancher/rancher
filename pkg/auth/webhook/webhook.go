@@ -2,19 +2,17 @@ package webhook
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 type TokenReviewer struct {
-	Authenticator requests.Authenticator
-	ExternalIDs   bool
+	ExternalIDs bool
 }
 
 func (t *TokenReviewer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -30,16 +28,22 @@ func (t *TokenReviewer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		Header: map[string][]string{},
 	}
 
-	if strings.HasPrefix(tr.Spec.Token, "cookie://") {
-		req.Header.Set("Cookie", fmt.Sprintf("R_SESS=%s", strings.TrimPrefix(tr.Spec.Token, "cookie://")))
-	} else {
-		req.Header.Set("Authorization", "Bearer "+tr.Spec.Token)
+	userInfo, ok := request.UserFrom(req.Context())
+	if !ok {
+		handleErr(rw, requests.ErrMustAuthenticate)
+		return
 	}
 
-	ok, user, groups, err := t.Authenticator.Authenticate(req)
-	if err != nil {
-		handleErr(rw, err)
-		return
+	user := v1.UserInfo{
+		UID:      userInfo.GetUID(),
+		Username: userInfo.GetName(),
+		Groups:   userInfo.GetGroups(),
+	}
+	for k, v := range userInfo.GetExtra() {
+		if user.Extra == nil {
+			user.Extra = map[string]v1.ExtraValue{}
+		}
+		user.Extra[k] = v
 	}
 
 	trResp := &v1.TokenReview{
@@ -49,11 +53,7 @@ func (t *TokenReviewer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		},
 		Status: v1.TokenReviewStatus{
 			Authenticated: ok,
-			User: v1.UserInfo{
-				UID:      user,
-				Username: user,
-				Groups:   groups,
-			},
+			User:          user,
 		},
 	}
 

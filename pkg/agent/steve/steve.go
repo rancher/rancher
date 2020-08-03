@@ -35,9 +35,11 @@ func Run(ctx context.Context, namespace string) error {
 		return err
 	}
 
-	s := server.Server{
-		RestConfig:     c,
+	s, err := server.New(ctx, c, &server.Options{
 		AuthMiddleware: auth.ToMiddleware(auth.AuthenticatorFunc(auth.Impersonation)),
+	})
+	if err != nil {
+		return err
 	}
 
 	go func() {

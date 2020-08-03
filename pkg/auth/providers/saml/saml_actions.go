@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func (s *Provider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -35,7 +36,7 @@ func (s *Provider) actionHandler(actionName string, action *types.Action, reques
 func (s *Provider) testAndEnable(actionName string, action *types.Action, request *types.APIContext) error {
 	// get Final redirect URL from request body
 
-	samlLogin := &v3.SamlConfigTestInput{}
+	samlLogin := &v32.SamlConfigTestInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(samlLogin); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("SAML: Failed to parse body: %v", err))

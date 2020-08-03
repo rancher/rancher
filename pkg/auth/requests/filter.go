@@ -6,24 +6,23 @@ import (
 
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/util"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-func NewAuthenticationFilter(auth Authenticator, next http.Handler) (http.Handler, error) {
+func NewAuthenticatedFilter(next http.Handler) http.Handler {
 	return &authHeaderHandler{
-		auth: auth,
 		next: next,
-	}, nil
+	}
 }
 
 type authHeaderHandler struct {
-	auth Authenticator
 	next http.Handler
 }
 
 func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	authed, user, groups, err := h.auth.Authenticate(req)
-	if err != nil || !authed {
-		util.ReturnHTTPError(rw, req, 401, err.Error())
+	userInfo, authed := request.UserFrom(req.Context())
+	if !authed {
+		util.ReturnHTTPError(rw, req, 401, ErrMustAuthenticate.Error())
 		return
 	}
 
@@ -34,16 +33,16 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		}
 	}
 
-	req.Header.Set("Impersonate-User", user)
+	req.Header.Set("Impersonate-User", userInfo.GetName())
 	req.Header.Del("Impersonate-Group")
-	for _, group := range groups {
+	for _, group := range userInfo.GetGroups() {
 		req.Header.Add("Impersonate-Group", group)
 	}
 
 	auditUser, ok := audit.FromContext(req.Context())
 	if ok {
-		auditUser.Name = user
-		auditUser.Group = groups
+		auditUser.Name = userInfo.GetName()
+		auditUser.Group = userInfo.GetGroups()
 	}
 
 	h.next.ServeHTTP(rw, req)

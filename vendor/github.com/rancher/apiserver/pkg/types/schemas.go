@@ -62,13 +62,24 @@ func (a *APISchemas) addInternalSchema(schema *schemas.Schema) *APISchema {
 	return apiSchema
 }
 
+func (a *APISchemas) Import(obj interface{}) (*APISchema, error) {
+	schema, err := a.InternalSchemas.Import(obj)
+	if err != nil {
+		return nil, err
+	}
+	apiSchema := a.addInternalSchema(schema)
+	return apiSchema, nil
+}
+
 func (a *APISchemas) MustImportAndCustomize(obj interface{}, f func(*APISchema)) {
 	schema, err := a.InternalSchemas.Import(obj)
 	if err != nil {
 		panic(err)
 	}
 	apiSchema := a.addInternalSchema(schema)
-	f(apiSchema)
+	if f != nil {
+		f(apiSchema)
+	}
 }
 
 func (a *APISchemas) MustAddSchemas(schemas *APISchemas) *APISchemas {

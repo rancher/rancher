@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -17,7 +19,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,15 +29,15 @@ const (
 )
 
 type NodeConfig struct {
-	ClusterName        string                `json:"clusterName"`
-	Certs              string                `json:"certs"`
-	Processes          map[string]v3.Process `json:"processes"`
-	Files              []v3.File             `json:"files"`
-	NodeVersion        int                   `json:"nodeVersion"`
-	AgentCheckInterval int                   `json:"agentCheckInterval"`
+	ClusterName        string                      `json:"clusterName"`
+	Certs              string                      `json:"certs"`
+	Processes          map[string]rketypes.Process `json:"processes"`
+	Files              []rketypes.File             `json:"files"`
+	NodeVersion        int                         `json:"nodeVersion"`
+	AgentCheckInterval int                         `json:"agentCheckInterval"`
 }
 
-func runProcess(ctx context.Context, name string, p v3.Process, start, forceRestart bool) error {
+func runProcess(ctx context.Context, name string, p rketypes.Process, start, forceRestart bool) error {
 	c, err := client.NewEnvClient()
 	if err != nil {
 		return err
@@ -169,7 +170,7 @@ func restart(ctx context.Context, c *client.Client, id string) error {
 	return c.ContainerRestart(ctx, id, &timeoutDuration)
 }
 
-func changed(ctx context.Context, c *client.Client, expectedProcess v3.Process, container types.Container) (bool, error) {
+func changed(ctx context.Context, c *client.Client, expectedProcess rketypes.Process, container types.Container) (bool, error) {
 	actualDockerInspect, err := c.ContainerInspect(ctx, container.ID)
 	if err != nil {
 		return false, err
@@ -178,7 +179,7 @@ func changed(ctx context.Context, c *client.Client, expectedProcess v3.Process, 
 	if err != nil {
 		return false, err
 	}
-	actualProcess := v3.Process{
+	actualProcess := rketypes.Process{
 		Command:     actualDockerInspect.Config.Entrypoint,
 		Args:        actualDockerInspect.Config.Cmd,
 		Env:         actualDockerInspect.Config.Env,
@@ -328,7 +329,7 @@ func natPortSetToSlice(args map[nat.Port]struct{}) []nat.Port {
 	return result
 }
 
-func runLogLinker(ctx context.Context, c *client.Client, containerName string, p v3.Process) error {
+func runLogLinker(ctx context.Context, c *client.Client, containerName string, p rketypes.Process) error {
 	inspect, err := c.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return err

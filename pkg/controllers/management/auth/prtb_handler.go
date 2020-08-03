@@ -9,8 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -41,11 +41,6 @@ var prtbClusterManagmentPlaneResources = map[string]string{
 	"clustercatalogs":         "management.cattle.io",
 	"catalogtemplates":        "management.cattle.io",
 	"catalogtemplateversions": "management.cattle.io",
-}
-
-var projectScopedAdminRoles = map[string]bool{
-	"project-owner": true,
-	"admin":         true,
 }
 
 type prtbLifecycle struct {

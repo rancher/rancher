@@ -7,9 +7,9 @@ import (
 	"regexp"
 
 	"github.com/rancher/norman/types/slice"
+	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/services"
-	managementv3 "github.com/rancher/types/client/management/v3"
 )
 
 const (

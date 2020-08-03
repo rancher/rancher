@@ -11,17 +11,19 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types/convert"
+	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	appsv1 "github.com/rancher/types/apis/apps/v1"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/config/dialer"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -326,8 +328,8 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 	if buildinfo.Result == "FAILURE" {
 		//some errors are disclosed in buildinfo but not in wfbuildinfo
 		execution.Status.ExecutionState = utils.StateFailed
-		v3.PipelineExecutionConditionBuilt.False(execution)
-		v3.PipelineExecutionConditionBuilt.Message(execution, "buildinfo result failure")
+		v32.PipelineExecutionConditionBuilt.False(execution)
+		v32.PipelineExecutionConditionBuilt.Message(execution, "buildinfo result failure")
 		updated = true
 	}
 
@@ -385,18 +387,18 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 		execution.Labels[utils.PipelineFinishLabel] = "true"
 		execution.Status.ExecutionState = utils.StateSuccess
 
-		v3.PipelineExecutionConditionProvisioned.True(execution)
-		v3.PipelineExecutionConditionBuilt.True(execution)
+		v32.PipelineExecutionConditionProvisioned.True(execution)
+		v32.PipelineExecutionConditionBuilt.True(execution)
 	} else if info.Status == "FAILED" && execution.Status.ExecutionState != utils.StateAborted &&
 		execution.Status.ExecutionState != utils.StateFailed {
 		updated = true
 		execution.Labels[utils.PipelineFinishLabel] = "true"
 		execution.Status.ExecutionState = utils.StateFailed
-		if v3.PipelineExecutionConditionProvisioned.IsUnknown(execution) {
-			v3.PipelineExecutionConditionProvisioned.True(execution)
+		if v32.PipelineExecutionConditionProvisioned.IsUnknown(execution) {
+			v32.PipelineExecutionConditionProvisioned.True(execution)
 		}
-		v3.PipelineExecutionConditionBuilt.False(execution)
-		v3.PipelineExecutionConditionBuilt.Message(execution, "Buildinfo got FAILED status")
+		v32.PipelineExecutionConditionBuilt.False(execution)
+		v32.PipelineExecutionConditionBuilt.Message(execution, "Buildinfo got FAILED status")
 	} else if info.Status == "IN_PROGRESS" && execution.Status.ExecutionState == utils.StateWaiting {
 		updated = true
 		execution.Status.ExecutionState = utils.StateBuilding
@@ -413,14 +415,14 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 			} else if err != nil {
 				return false, err
 			}
-			prevMessage := v3.PipelineExecutionConditionProvisioned.GetMessage(execution)
+			prevMessage := v32.PipelineExecutionConditionProvisioned.GetMessage(execution)
 			curMessage := translatePreparingMessage(prepareLog.Text)
 			if prevMessage != curMessage && curMessage != "" {
-				v3.PipelineExecutionConditionProvisioned.Message(execution, curMessage)
+				v32.PipelineExecutionConditionProvisioned.Message(execution, curMessage)
 				updated = true
 			}
 		} else {
-			v3.PipelineExecutionConditionProvisioned.True(execution)
+			v32.PipelineExecutionConditionProvisioned.True(execution)
 		}
 	}
 
@@ -448,7 +450,7 @@ func (j *Engine) successStep(execution *v3.PipelineExecution, stage int, step in
 			execution.Status.ExecutionState = utils.StateSuccess
 			execution.Status.Ended = endTime
 			execution.Labels[utils.PipelineFinishLabel] = "true"
-			v3.PipelineExecutionConditionBuilt.True(execution)
+			v32.PipelineExecutionConditionBuilt.True(execution)
 		}
 	}
 
@@ -465,8 +467,8 @@ func (j *Engine) failStep(execution *v3.PipelineExecution, stage int, step int, 
 	execution.Status.Stages[stage].State = utils.StateFailed
 	if execution.Status.ExecutionState != utils.StateAborted {
 		execution.Status.ExecutionState = utils.StateFailed
-		v3.PipelineExecutionConditionBuilt.False(execution)
-		v3.PipelineExecutionConditionBuilt.Message(execution, fmt.Sprintf("Got FAILED status in '%s' stage", execution.Spec.PipelineConfig.Stages[stage].Name))
+		v32.PipelineExecutionConditionBuilt.False(execution)
+		v32.PipelineExecutionConditionBuilt.Message(execution, fmt.Sprintf("Got FAILED status in '%s' stage", execution.Spec.PipelineConfig.Stages[stage].Name))
 	}
 	if execution.Status.Stages[stage].Steps[step].Started == "" {
 		execution.Status.Stages[stage].Steps[step].Started = startTime
@@ -536,8 +538,8 @@ func buildingStep(execution *v3.PipelineExecution, stage int, step int, jenkinsS
 
 	stageName := execution.Spec.PipelineConfig.Stages[stage].Name
 	message := fmt.Sprintf("Running '%s' stage", stageName)
-	v3.PipelineExecutionConditionBuilt.CreateUnknownIfNotExists(execution)
-	v3.PipelineExecutionConditionBuilt.Message(execution, message)
+	v32.PipelineExecutionConditionBuilt.CreateUnknownIfNotExists(execution)
+	v32.PipelineExecutionConditionBuilt.Message(execution, message)
 }
 
 func skipStep(execution *v3.PipelineExecution, stage int, step int, jenkinsStage Stage) {
@@ -565,7 +567,7 @@ func skipStep(execution *v3.PipelineExecution, stage int, step int, jenkinsStage
 		execution.Status.ExecutionState = utils.StateSuccess
 		execution.Status.Ended = endTime
 		execution.Labels[utils.PipelineFinishLabel] = "true"
-		v3.PipelineExecutionConditionBuilt.True(execution)
+		v32.PipelineExecutionConditionBuilt.True(execution)
 	}
 }
 

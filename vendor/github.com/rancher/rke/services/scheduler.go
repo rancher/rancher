@@ -5,7 +5,7 @@ import (
 
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rke/types"
 )
 
 func runScheduler(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, schedulerProcess v3.Process, alpineImage string) error {

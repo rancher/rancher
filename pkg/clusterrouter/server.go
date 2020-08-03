@@ -3,7 +3,7 @@ package clusterrouter
 import (
 	"net/http"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
 type server interface {

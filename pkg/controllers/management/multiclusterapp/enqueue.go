@@ -3,10 +3,10 @@ package multiclusterapp
 import (
 	"context"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/namespace"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

@@ -11,9 +11,9 @@ import (
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func Setup(ctx context.Context, clusterRouter requests.ClusterRouter, scaledContext *config.ScaledContext, schemas *types.Schemas) {

@@ -21,10 +21,13 @@ Prerequisite:
    will create clusters to match two
 '''
 
+
 # Config Fields
 HOSTNAME_OR_IP_ADDRESS = os.environ.get("RANCHER_HOSTNAME_OR_IP_ADDRESS")
-PORT = os.environ.get("RANCHER_PORT", 636)
+PORT = os.environ.get("RANCHER_PORT", "")
 CA_CERTIFICATE = os.environ.get("RANCHER_CA_CERTIFICATE", "")
+OPENLDAP_CA_CERTIFICATE = os.environ.get("RANCHER_OPENLDAP_CA_CERTIFICATE", "")
+FREEIPA_CA_CERTIFICATE = os.environ.get("RANCHER_FREEIPA_CA_CERTIFICATE", "")
 CONNECTION_TIMEOUT = os.environ.get("RANCHER_CONNECTION_TIMEOUT", 5000)
 SERVICE_ACCOUNT_NAME = os.environ.get("RANCHER_SERVICE_ACCOUNT_NAME")
 SERVICE_ACCOUNT_PASSWORD = os.environ.get("RANCHER_SERVICE_ACCOUNT_PASSWORD")
@@ -36,7 +39,36 @@ OPENLDAP_SPECIAL_CHAR_PASSWORD = \
     os.environ.get("RANCHER_OPENLDAP_SPECIAL_CHAR_PASSWORD")
 FREEIPA_SPECIAL_CHAR_PASSWORD = \
     os.environ.get("RANCHER_FREEIPA_SPECIAL_CHAR_PASSWORD")
+OPENLDAP_HOSTNAME_OR_IP_ADDRESS = \
+    os.environ.get("RANCHER_OPENLDAP_HOSTNAME_OR_IP_ADDRESS")
+OPENLDAP_SERVICE_ACCOUNT_NAME = \
+    os.environ.get("RANCHER_OPENLDAP_SERVICE_ACCOUNT_NAME")
+OPENLDAP_SERVICE_ACCOUNT_PASSWORD = \
+    os.environ.get("RANCHER_OPENLDAP_SERVICE_ACCOUNT_PASSWORD")
+OPENLDAP_USER_SEARCH_BASE = os.environ.get("RANCHER_OPENLDAP_USER_SEARCH_BASE")
+OPENLDAP_AUTH_USER_PASSWORD = \
+    os.environ.get("RANCHER_OPENLDAP_AUTH_USER_PASSWORD")
 
+FREEIPA_HOSTNAME_OR_IP_ADDRESS = \
+    os.environ.get("RANCHER_FREEIPA_HOSTNAME_OR_IP_ADDRESS")
+FREEIPA_SERVICE_ACCOUNT_NAME = \
+    os.environ.get("RANCHER_FREEIPA_SERVICE_ACCOUNT_NAME")
+FREEIPA_SERVICE_ACCOUNT_PASSWORD = \
+    os.environ.get("RANCHER_FREEIPA_SERVICE_ACCOUNT_PASSWORD")
+FREEIPA_USER_SEARCH_BASE = os.environ.get("RANCHER_FREEIPA_USER_SEARCH_BASE")
+FREEIPA_GROUP_SEARCH_BASE = os.environ.get("RANCHER_FREEIPA_GROUP_SEARCH_BASE")
+
+FREEIPA_AUTH_USER_PASSWORD = \
+    os.environ.get("RANCHER_FREEIPA_AUTH_USER_PASSWORD")
+
+PASSWORD = ""
+
+if AUTH_PROVIDER == "activeDirectory":
+    PASSWORD = AUTH_USER_PASSWORD
+elif AUTH_PROVIDER == "openLdap":
+    PASSWORD = OPENLDAP_AUTH_USER_PASSWORD
+elif AUTH_PROVIDER == "freeIpa":
+    PASSWORD = FREEIPA_AUTH_USER_PASSWORD
 
 CATTLE_AUTH_URL = \
     CATTLE_TEST_URL + \
@@ -150,7 +182,7 @@ def special_character_users_login(access_mode):
     delete_cluster_users()
     auth_setup_data = setup["auth_setup_data"]
     admin_user = auth_setup_data["admin_user"]
-    admin_token = login(admin_user, AUTH_USER_PASSWORD)
+    admin_token = login(admin_user, PASSWORD)
     allowed_principal_ids = []
     if AUTH_PROVIDER == "activeDirectory":
         disable_ad(admin_user, admin_token)
@@ -178,14 +210,14 @@ def special_character_users_login(access_mode):
             admin_token, access_mode, allowed_principal_ids)
 
         for user in auth_setup_data["specialchar_in_username"]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
         for user in auth_setup_data["specialchar_in_password"]:
             login(user, AD_SPECIAL_CHAR_PASSWORD)
         for user in auth_setup_data["specialchar_in_userdn"]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
         for group in auth_setup_data["specialchar_in_groupname"]:
             for user in auth_setup_data[group]:
-                login(user, AUTH_USER_PASSWORD)
+                login(user, PASSWORD)
 
     if AUTH_PROVIDER == "openLdap":
         for user in auth_setup_data["specialchar_in_user_cn_sn"]:
@@ -202,14 +234,14 @@ def special_character_users_login(access_mode):
             admin_token, access_mode, allowed_principal_ids)
 
         for user in auth_setup_data["specialchar_in_user_cn_sn"]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
         for user in auth_setup_data["specialchar_in_uid"]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
         for user in auth_setup_data["specialchar_in_password"]:
             login(user, OPENLDAP_SPECIAL_CHAR_PASSWORD)
         for group in auth_setup_data["specialchar_in_groupname"]:
             for user in auth_setup_data[group]:
-                login(user, AUTH_USER_PASSWORD)
+                login(user, PASSWORD)
 
     if AUTH_PROVIDER == "freeIpa":
         for user in auth_setup_data["specialchar_in_users"]:
@@ -225,19 +257,20 @@ def special_character_users_login(access_mode):
             admin_token, access_mode, allowed_principal_ids)
 
         for user in auth_setup_data["specialchar_in_users"]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
         for user in auth_setup_data["specialchar_in_password"]:
             login(user, FREEIPA_SPECIAL_CHAR_PASSWORD)
         for group in auth_setup_data["specialchar_in_groupname"]:
             for user in auth_setup_data[group]:
-                login(user, AUTH_USER_PASSWORD)
+                login(user, PASSWORD)
 
 
 def validate_access_control_set_access_mode(access_mode):
+
     delete_cluster_users()
     auth_setup_data = setup["auth_setup_data"]
     admin_user = auth_setup_data["admin_user"]
-    token = login(admin_user, AUTH_USER_PASSWORD)
+    token = login(admin_user, PASSWORD)
     allowed_principal_ids = []
     for user in auth_setup_data["allowed_users"]:
         allowed_principal_ids.append(principal_lookup(user, token))
@@ -249,19 +282,19 @@ def validate_access_control_set_access_mode(access_mode):
     add_users_to_site_access(token, access_mode, allowed_principal_ids)
 
     for user in auth_setup_data["allowed_users"]:
-        login(user, AUTH_USER_PASSWORD)
+        login(user, PASSWORD)
 
     for group in auth_setup_data["allowed_groups"]:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
 
     for user in auth_setup_data["dis_allowed_users"]:
-        login(user, AUTH_USER_PASSWORD,
+        login(user, PASSWORD,
               expected_status=setup["permission_denied_code"])
 
     for group in auth_setup_data["dis_allowed_groups"]:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD,
+            login(user, PASSWORD,
                   expected_status=setup["permission_denied_code"])
 
     # Add users and groups from dis allowed list to access rancher-server
@@ -276,18 +309,18 @@ def validate_access_control_set_access_mode(access_mode):
     add_users_to_site_access(token, access_mode, allowed_principal_ids)
 
     for user in auth_setup_data["allowed_users"]:
-        login(user, AUTH_USER_PASSWORD)
+        login(user, PASSWORD)
 
     for group in auth_setup_data["allowed_groups"]:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
 
     for user in auth_setup_data["dis_allowed_users"]:
-        login(user, AUTH_USER_PASSWORD)
+        login(user, PASSWORD)
 
     for group in auth_setup_data["dis_allowed_groups"]:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
 
     # Remove users and groups from allowed list to access rancher-server
     allowed_principal_ids = [principal_lookup(admin_user, token)]
@@ -301,20 +334,20 @@ def validate_access_control_set_access_mode(access_mode):
     add_users_to_site_access(token, access_mode, allowed_principal_ids)
 
     for user in auth_setup_data["allowed_users"]:
-        login(user, AUTH_USER_PASSWORD,
+        login(user, PASSWORD,
               expected_status=setup["permission_denied_code"])
 
     for group in auth_setup_data["allowed_groups"]:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD,
+            login(user, PASSWORD,
                   expected_status=setup["permission_denied_code"])
 
     for user in auth_setup_data["dis_allowed_users"]:
-        login(user, AUTH_USER_PASSWORD)
+        login(user, PASSWORD)
 
     for group in auth_setup_data["dis_allowed_groups"]:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
 
 
 def validate_add_users_and_groups_to_cluster_or_project(
@@ -325,7 +358,7 @@ def validate_add_users_and_groups_to_cluster_or_project(
         delete_existing_users_in_project(client, project)
     auth_setup_data = setup["auth_setup_data"]
     admin_user = auth_setup_data["admin_user"]
-    token = login(admin_user, AUTH_USER_PASSWORD)
+    token = login(admin_user, PASSWORD)
     allowed_principal_ids = [principal_lookup(admin_user, token)]
 
     # Add users and groups in allowed list to access rancher-server
@@ -339,11 +372,11 @@ def validate_add_users_and_groups_to_cluster_or_project(
         users_to_check = auth_setup_data["users_added_to_project"]
     for group in groups_to_check:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD,
+            login(user, PASSWORD,
                   expected_status=setup["permission_denied_code"])
 
     for user in users_to_check:
-        login(user, AUTH_USER_PASSWORD,
+        login(user, PASSWORD,
               expected_status=setup["permission_denied_code"])
 
     client = get_client_for_token(token)
@@ -371,20 +404,21 @@ def validate_add_users_and_groups_to_cluster_or_project(
 
     for group in groups_to_check:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD, expected_status)
+            login(user, PASSWORD, expected_status)
 
     for user in users_to_check:
-        login(user, AUTH_USER_PASSWORD, expected_status)
+        login(user, PASSWORD, expected_status)
 
 
 def validate_access_control_disable_and_enable_auth(access_mode):
+
     delete_cluster_users()
     delete_project_users()
     auth_setup_data = setup["auth_setup_data"]
 
     # Login as admin user to disable auth, should be success, then enable it.
     admin_user = auth_setup_data["admin_user"]
-    admin_token = login(admin_user, AUTH_USER_PASSWORD)
+    admin_token = login(admin_user, PASSWORD)
     if AUTH_PROVIDER == "activeDirectory":
         disable_ad(admin_user, admin_token)
         enable_ad(admin_user, admin_token)
@@ -406,7 +440,7 @@ def validate_access_control_disable_and_enable_auth(access_mode):
     add_users_to_site_access(admin_token, access_mode, allowed_principal_ids)
 
     for user in auth_setup_data["allowed_users"]:
-        token = login(user, AUTH_USER_PASSWORD)
+        token = login(user, PASSWORD)
         if AUTH_PROVIDER == "activeDirectory":
             disable_ad(user, token,
                        expected_status=setup["permission_denied_code"])
@@ -430,7 +464,7 @@ def validate_access_control_disable_and_enable_nestedgroups(access_mode):
 
     auth_setup_data = setup["auth_setup_data"]
     admin_user = auth_setup_data["admin_user"]
-    token = login(admin_user, AUTH_USER_PASSWORD)
+    token = login(admin_user, PASSWORD)
     if AUTH_PROVIDER == "activeDirectory":
         enable_ad(admin_user, token)
     if AUTH_PROVIDER == "openLdap":
@@ -449,15 +483,15 @@ def validate_access_control_disable_and_enable_nestedgroups(access_mode):
 
     for group in auth_setup_data["allowed_nestedgroups"]:
         for user in auth_setup_data[group]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
 
     if AUTH_PROVIDER == "freeIpa":
         for user in auth_setup_data["users_under_nestedgroups"]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
 
     if AUTH_PROVIDER == "activeDirectory" or AUTH_PROVIDER == "openLdap":
         for user in auth_setup_data["users_under_nestedgroups"]:
-            login(user, AUTH_USER_PASSWORD,
+            login(user, PASSWORD,
                   expected_status=setup["permission_denied_code"])
 
         # Enable nestedgroup feature, so users under nestedgroups can login
@@ -477,10 +511,10 @@ def validate_access_control_disable_and_enable_nestedgroups(access_mode):
 
         for group in auth_setup_data["allowed_nestedgroups"]:
             for user in auth_setup_data[group]:
-                login(user, AUTH_USER_PASSWORD)
+                login(user, PASSWORD)
 
         for user in auth_setup_data["users_under_nestedgroups"]:
-            login(user, AUTH_USER_PASSWORD)
+            login(user, PASSWORD)
 
 
 def login(username, password, expected_status=201):
@@ -506,35 +540,34 @@ def get_tls(certificate):
 
 
 def enable_openldap(username, token, enable_url=CATTLE_AUTH_ENABLE_URL,
-                    password=AUTH_USER_PASSWORD, nested=False,
+                    password=PASSWORD, nested=False,
                     expected_status=200):
     headers = {'Authorization': 'Bearer ' + token}
     ldap_config = {
         "accessMode": "unrestricted",
         "connectionTimeout": CONNECTION_TIMEOUT,
-        "certificate": CA_CERTIFICATE,
+        "certificate": OPENLDAP_CA_CERTIFICATE,
         "groupDNAttribute": "entryDN",
         "groupMemberMappingAttribute": "member",
         "groupMemberUserAttribute": "entryDN",
         "groupNameAttribute": "cn",
         "groupObjectClass": "groupOfNames",
         "groupSearchAttribute": "cn",
-        "nestedGroupMembershipEnabled": False,
+        "nestedGroupMembershipEnabled": nested,
         "enabled": True,
         "port": PORT,
-        "servers": [HOSTNAME_OR_IP_ADDRESS],
-        "serviceAccountDistinguishedName": SERVICE_ACCOUNT_NAME,
-        "tls": get_tls(CA_CERTIFICATE),
+        "servers": [OPENLDAP_HOSTNAME_OR_IP_ADDRESS],
+        "serviceAccountDistinguishedName": OPENLDAP_SERVICE_ACCOUNT_NAME,
+        "tls": get_tls(OPENLDAP_CA_CERTIFICATE),
         "userDisabledBitMask": 0,
         "userLoginAttribute": "uid",
         "userMemberAttribute": "memberOf",
         "userNameAttribute": "cn",
         "userObjectClass": "inetOrgPerson",
         "userSearchAttribute": "uid|sn|givenName",
-        "userSearchBase": USER_SEARCH_BASE,
-        "serviceAccountPassword": SERVICE_ACCOUNT_PASSWORD
+        "userSearchBase": OPENLDAP_USER_SEARCH_BASE,
+        "serviceAccountPassword": OPENLDAP_SERVICE_ACCOUNT_PASSWORD
     }
-
     ca_cert = ldap_config["certificate"]
     ldap_config["certificate"] = ca_cert.replace('\\n', '\n')
 
@@ -554,7 +587,7 @@ def disable_openldap(username, token, expected_status=200):
     headers = {'Authorization': 'Bearer ' + token}
     r = requests.post(CATTLE_AUTH_DISABLE_URL, json={
         'username': username,
-        'password': AUTH_USER_PASSWORD
+        'password': PASSWORD
     }, verify=False, headers=headers)
     assert r.status_code == expected_status
     print("Disable openLdap request for " +
@@ -619,13 +652,13 @@ def disable_ad(username, token, expected_status=200):
 
 
 def enable_freeipa(username, token, enable_url=CATTLE_AUTH_ENABLE_URL,
-                   password=AUTH_USER_PASSWORD, nested=False,
+                   password=PASSWORD, nested=False,
                    expected_status=200):
     headers = {'Authorization': 'Bearer ' + token}
     r = requests.post(enable_url, json={
         "ldapConfig": {
             "accessMode": "unrestricted",
-            "certificate": CA_CERTIFICATE,
+            "certificate": FREEIPA_CA_CERTIFICATE,
             "connectionTimeout": CONNECTION_TIMEOUT,
             "groupDNAttribute": "entrydn",
             "groupMemberMappingAttribute": "member",
@@ -633,27 +666,26 @@ def enable_freeipa(username, token, enable_url=CATTLE_AUTH_ENABLE_URL,
             "groupNameAttribute": "cn",
             "groupObjectClass": "groupofnames",
             "groupSearchAttribute": "cn",
-            "groupSearchBase": GROUP_SEARCH_BASE,
+            "groupSearchBase": FREEIPA_GROUP_SEARCH_BASE,
             "enabled": True,
             "nestedGroupMembershipEnabled": nested,
             "port": PORT,
-            "servers": [
-                HOSTNAME_OR_IP_ADDRESS
-            ],
-            "serviceAccountDistinguishedName": SERVICE_ACCOUNT_NAME,
-            "tls": get_tls(CA_CERTIFICATE),
+            "servers": [FREEIPA_HOSTNAME_OR_IP_ADDRESS],
+            "serviceAccountDistinguishedName": FREEIPA_SERVICE_ACCOUNT_NAME,
+            "tls": get_tls(FREEIPA_CA_CERTIFICATE),
             "userDisabledBitMask": 0,
             "userLoginAttribute": "uid",
             "userMemberAttribute": "memberOf",
             "userNameAttribute": "givenName",
             "userObjectClass": "inetorgperson",
             "userSearchAttribute": "uid|sn|givenName",
-            "userSearchBase": USER_SEARCH_BASE,
-            "serviceAccountPassword": SERVICE_ACCOUNT_PASSWORD
+            "userSearchBase": FREEIPA_USER_SEARCH_BASE,
+            "serviceAccountPassword": FREEIPA_SERVICE_ACCOUNT_PASSWORD
         },
         "username": username,
         "password": password
     }, verify=False, headers=headers)
+
     print("Enable freeIpa request for " +
           username + " " + str(expected_status))
     assert r.status_code == expected_status
@@ -728,6 +760,13 @@ def delete_existing_users_in_project(client, project):
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
+
+    '''
+    This method enables auth on the Rancher server setup. Two clusters are
+    required in the setup. If two clusters are not present, it will create
+    the clusters.
+    '''
+
     if AUTH_PROVIDER not in ("activeDirectory", "openLdap", "freeIpa"):
         assert False, "Auth Provider set is not supported"
     setup["auth_setup_data"] = load_setup_data()
@@ -738,6 +777,10 @@ def create_project_client(request):
         admin_user = auth_setup_data["admin_user"]
         if AUTH_PROVIDER == 'activeDirectory':
             enable_ad(admin_user, ADMIN_TOKEN)
+        elif AUTH_PROVIDER == 'openLdap':
+            enable_openldap(admin_user, ADMIN_TOKEN)
+        elif AUTH_PROVIDER == 'freeIpa':
+            enable_freeipa(admin_user, ADMIN_TOKEN)
 
     cluster_total = len(client.list_cluster().data)
     node_roles = [["controlplane", "etcd", "worker"]]

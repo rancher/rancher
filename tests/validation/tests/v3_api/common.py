@@ -1355,6 +1355,7 @@ def validate_cluster_state(client, cluster,
                            check_intermediate_state=True,
                            intermediate_state="provisioning",
                            nodes_not_in_active_state=[]):
+    start_time = time.time()
     if check_intermediate_state:
         cluster = wait_for_condition(
             client, cluster,
@@ -1379,6 +1380,10 @@ def validate_cluster_state(client, cluster,
         if delta > timeout:
             msg = "Timeout waiting for K8s version to be synced"
             raise Exception(msg)
+    end_time = time.time()
+    diff = time.strftime("%H:%M:%S", time.gmtime(end_time - start_time))
+    print("The total time for provisioning/updating the cluster {} : {}".
+          format(cluster.name, diff))
     return cluster
 
 
@@ -1773,9 +1778,10 @@ def validate_app_deletion(client, app_id,
             raise AssertionError(
                 "Timed out waiting for app to delete")
         time.sleep(.5)
-        app = client.list_app(id=app_id).data
-        if len(app) == 0:
+        app_data = client.list_app(id=app_id).data
+        if len(app_data) == 0:
             break
+        application = app_data[0]
 
 
 def validate_catalog_app(proj_client, app, external_id, answer=None):
@@ -2049,10 +2055,10 @@ def readDataFile(data_dir, name):
         return f.read()
 
 
-def set_url_password_token(server_url):
+def set_url_password_token(rancher_url, server_url=None):
     """Returns a ManagementContext for the default global admin user."""
     auth_url = \
-        server_url + "/v3-public/localproviders/local?action=login"
+        rancher_url + "/v3-public/localproviders/local?action=login"
     r = requests.post(auth_url, json={
         'username': 'admin',
         'password': 'admin',
@@ -2062,14 +2068,17 @@ def set_url_password_token(server_url):
     token = r.json()['token']
     print(token)
     # Change admin password
-    client = rancher.Client(url=server_url + "/v3",
+    client = rancher.Client(url=rancher_url + "/v3",
                             token=token, verify=False)
     admin_user = client.list_user(username="admin").data
     admin_user[0].setpassword(newPassword=ADMIN_PASSWORD)
 
     # Set server-url settings
     serverurl = client.list_setting(name="server-url").data
-    client.update(serverurl[0], value=server_url)
+    if server_url:
+        client.update(serverurl[0], value=server_url)
+    else:
+        client.update(serverurl[0], value=rancher_url)
     return token
 
 
@@ -2700,11 +2709,17 @@ def configure_cis_requirements(aws_nodes, profile, node_roles, client,
     if profile == 'rke-cis-1.5':
         create_kubeconfig(cluster)
         network_policy_file = DATA_SUBDIR + "/default-allow-all.yaml"
+        account_update_file = DATA_SUBDIR + "/account_update.yaml"
         items = execute_kubectl_cmd("get namespaces -A")["items"]
         all_ns = [item["metadata"]["name"] for item in items]
         for ns in all_ns:
             execute_kubectl_cmd("apply -f {0} -n {1}".
                                 format(network_policy_file, ns))
+        namespace = ["default", "kube-system"]
+        for ns in namespace:
+            execute_kubectl_cmd('patch serviceaccount default'
+                                ' -n {0} -p "$(cat {1})"'.
+                                format(ns, account_update_file))
     return cluster
 
 

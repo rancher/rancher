@@ -13,10 +13,11 @@ import (
 	errs "github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,7 +106,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 
 	if driver.Exists() && err == nil && !forceUpdate {
 		// add credential schema
-		credFields := map[string]v3.Field{}
+		credFields := map[string]v32.Field{}
 		if err != nil {
 			logrus.Errorf("error getting schema %v", err)
 		}
@@ -133,11 +134,11 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	}
 
 	if !driver.Exists() || forceUpdate {
-		v3.NodeDriverConditionDownloaded.Unknown(obj)
-		v3.NodeDriverConditionInstalled.Unknown(obj)
+		v32.NodeDriverConditionDownloaded.Unknown(obj)
+		v32.NodeDriverConditionInstalled.Unknown(obj)
 	}
 
-	newObj, err := v3.NodeDriverConditionDownloaded.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v32.NodeDriverConditionDownloaded.Once(obj, func() (runtime.Object, error) {
 		// update status
 		obj, err = m.nodeDriverClient.Update(obj)
 		if err != nil {
@@ -154,7 +155,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	}
 
 	obj = newObj.(*v3.NodeDriver)
-	newObj, err = v3.NodeDriverConditionInstalled.Once(obj, func() (runtime.Object, error) {
+	newObj, err = v32.NodeDriverConditionInstalled.Once(obj, func() (runtime.Object, error) {
 		if err := driver.Install(); err != nil {
 			return nil, err
 		}
@@ -182,8 +183,8 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	if err != nil {
 		return nil, err
 	}
-	credFields := map[string]v3.Field{}
-	resourceFields := map[string]v3.Field{}
+	credFields := map[string]v32.Field{}
+	resourceFields := map[string]v32.Field{}
 	pubCredFields, privateCredFields, passwordFields, defaults := getCredFields(obj.Annotations)
 	for _, flag := range flags {
 		name, field, err := FlagToField(flag)
@@ -214,7 +215,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		resourceFields[name] = field
 	}
 	dynamicSchema := &v3.DynamicSchema{
-		Spec: v3.DynamicSchemaSpec{
+		Spec: v32.DynamicSchemaSpec{
 			ResourceFields: resourceFields,
 		},
 	}
@@ -250,13 +251,13 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	return m.createCredSchema(obj, credFields)
 }
 
-func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v3.Field) (*v3.NodeDriver, error) {
+func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v32.Field) (*v3.NodeDriver, error) {
 	name := credentialConfigSchemaName(obj.Spec.DisplayName)
 	credSchema, err := m.schemaLister.Get("", name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			credentialSchema := &v3.DynamicSchema{
-				Spec: v3.DynamicSchemaSpec{
+				Spec: v32.DynamicSchemaSpec{
 					ResourceFields: credFields,
 				},
 			}
@@ -285,7 +286,7 @@ func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v
 }
 
 func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
-	if v3.NodeDriverConditionDownloaded.IsUnknown(obj) || v3.NodeDriverConditionInstalled.IsUnknown(obj) {
+	if v32.NodeDriverConditionDownloaded.IsUnknown(obj) || v32.NodeDriverConditionInstalled.IsUnknown(obj) {
 		return true
 	}
 
@@ -363,8 +364,8 @@ func (m *Lifecycle) Updated(obj *v3.NodeDriver) (runtime.Object, error) {
 		return obj, err
 	}
 
-	v3.NodeDriverConditionActive.True(obj)
-	v3.NodeDriverConditionInactive.True(obj)
+	v32.NodeDriverConditionActive.True(obj)
+	v32.NodeDriverConditionInactive.True(obj)
 
 	return obj, nil
 }
@@ -412,9 +413,9 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
-		resourceField := map[string]v3.Field{}
+		resourceField := map[string]v32.Field{}
 		if embedded {
-			resourceField[fieldName] = v3.Field{
+			resourceField[fieldName] = v32.Field{
 				Create:   true,
 				Nullable: true,
 				Update:   update,
@@ -436,12 +437,12 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 	shouldUpdate := false
 	if embedded {
 		if nodeSchema.Spec.ResourceFields == nil {
-			nodeSchema.Spec.ResourceFields = map[string]v3.Field{}
+			nodeSchema.Spec.ResourceFields = map[string]v32.Field{}
 		}
 		if _, ok := nodeSchema.Spec.ResourceFields[fieldName]; !ok {
 			// if embedded we add the type to schema
 			logrus.Infof("uploading %s to %s schema", fieldName, schemaID)
-			nodeSchema.Spec.ResourceFields[fieldName] = v3.Field{
+			nodeSchema.Spec.ResourceFields[fieldName] = v32.Field{
 				Create:   true,
 				Nullable: true,
 				Update:   update,
@@ -496,21 +497,21 @@ func credentialConfigSchemaName(driverName string) string {
 	return fmt.Sprintf("%s%s", driverName, "credentialconfig")
 }
 
-func updateDefault(credField v3.Field, val, kind string) v3.Field {
+func updateDefault(credField v32.Field, val, kind string) v32.Field {
 	switch kind {
 	case "int":
 		i, err := strconv.Atoi(val)
 		if err == nil {
-			credField.Default = v3.Values{IntValue: i}
+			credField.Default = v32.Values{IntValue: i}
 		} else {
 			logrus.Errorf("error converting %s to int %v", val, err)
 		}
 	case "boolean":
-		credField.Default = v3.Values{BoolValue: convert.ToBool(val)}
+		credField.Default = v32.Values{BoolValue: convert.ToBool(val)}
 	case "array[string]":
-		credField.Default = v3.Values{StringSliceValue: convert.ToStringSlice(val)}
+		credField.Default = v32.Values{StringSliceValue: convert.ToStringSlice(val)}
 	case "password", "string":
-		credField.Default = v3.Values{StringValue: val}
+		credField.Default = v32.Values{StringValue: val}
 	default:
 		logrus.Errorf("unsupported kind for default val:%s kind:%s", val, kind)
 	}

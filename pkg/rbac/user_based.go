@@ -23,13 +23,15 @@ type accessControlCache struct {
 }
 
 func NewAccessControlHandler() auth.Middleware {
-	return func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
-		val := &accessControlCache{
-			cache: map[string]types.AccessControl{},
-		}
-		ctx := context.WithValue(req.Context(), contextKey{}, val)
-		req = req.WithContext(ctx)
-		next.ServeHTTP(rw, req)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			val := &accessControlCache{
+				cache: map[string]types.AccessControl{},
+			}
+			ctx := context.WithValue(req.Context(), contextKey{}, val)
+			req = req.WithContext(ctx)
+			next.ServeHTTP(rw, req)
+		})
 	}
 }
 

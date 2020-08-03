@@ -14,10 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -198,7 +200,7 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 			return node, err
 		}
 		logrus.Infof("[node-controller-rancher-machine] %v", msg)
-		v3.NodeConditionProvisioned.Message(node, msg)
+		v32.NodeConditionProvisioned.Message(node, msg)
 		// ignore update errors
 		if newObj, err := m.nodeClient.Update(node); err == nil {
 			node = newObj

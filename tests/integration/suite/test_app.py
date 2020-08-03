@@ -647,6 +647,107 @@ def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):
     assert app2.helmVersion == "helm_v3"
 
 
+def test_app_upgrade_has_helmversion(admin_pc, admin_mc, remove_resource):
+    """Test helm version exists on new chart versions when added to an
+    existing catalog and that the helm version carries through template,
+    templateVersion and app on upgrade"""
+    app_client = admin_pc.client
+    catalog_client = admin_mc.client
+    catalog_name = random_str()
+    app1_name = random_str()
+    app2_name = random_str()
+    helm_3 = 'helm_v3'
+    cat_base = "catalog://?catalog=" + catalog_name + \
+               "&template=rancher-v3-issue&version="
+
+    helm3_catalog = catalog_client.create_catalog(
+        name=catalog_name,
+        branch="helmversion-onupdate-1v",
+        url=DEFAULT_CATALOG,
+        helmVersion=helm_3
+    )
+    remove_resource(helm3_catalog)
+    wait_for_template_to_be_created(catalog_client, catalog_name)
+
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+    # check helm version at template level
+    templates = catalog_client.list_template(catalogId=helm3_catalog.id).data
+    assert templates[1].status.helmVersion == helm_3
+    # check helm version at templateVersion level
+    templateVersion = catalog_client.list_templateVersion(
+        name=catalog_name+"-rancher-v3-issue-0.1.0")
+    assert templateVersion.data[0].status.helmVersion == helm_3
+    # creating app with existing chart version in catalog
+    app1 = app_client.create_app(
+        name=app1_name,
+        externalId=cat_base+"0.1.0&namespace="+ns.name,
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(app1)
+    wait_for_workload(app_client, ns.name, count=1)
+    app1 = app_client.reload(app1)
+    # check that the correct helm version is on the app
+    assert "helmVersion" in app1
+    assert app1.helmVersion == helm_3
+    # changing branch on catalog to simulate adding a new chart version to the
+    # catalog
+    catalog_data = {
+        'name': catalog_name,
+        'branch': "helmversion-onupdate-2v",
+        'url': DEFAULT_CATALOG,
+        'helmVersion': helm_3
+    }
+    helm3_catalog = catalog_client.update(helm3_catalog, catalog_data)
+
+    def ensure_updated_catalog(catalog):
+        catalog = catalog_client.reload(catalog)
+        templates = catalog_client.list_template(catalogId=catalog.id).data
+        templatesString = ','.join([str(i) for i in templates])
+        if "0.1.1" in templatesString:
+            return catalog
+        return None
+    helm3_catalog = wait_for(
+        lambda: ensure_updated_catalog(helm3_catalog),
+        fail_handler=lambda:
+        "Timed out waiting for catalog to stop transitioning")
+    templates = catalog_client.list_template(catalogId=helm3_catalog.id).data
+    assert templates[1].status.helmVersion == helm_3
+    templateVersion = catalog_client.list_templateVersion(
+        name=catalog_name+"-rancher-v3-issue-0.1.1")
+    assert templateVersion.data[0].status.helmVersion == helm_3
+    project_client = user_project_client(admin_pc, admin_pc.project)
+    # update existing app with new version to ensure correct
+    # helm version is listed
+    app_data = {
+        'name': app1_name,
+        'externalId': cat_base+"0.1.1",
+        'targetNamespace': ns.name,
+        'projectId': admin_pc.project.id,
+    }
+    project_client.update(app1, app_data)
+    app1 = project_client.reload(app1)
+    assert "helmVersion" in app1
+    assert app1.helmVersion == helm_3
+
+    # create a new app with new version to ensure helm version is listed
+    app2 = app_client.create_app(
+        name=app2_name,
+        externalId=cat_base+"0.1.1&namespace="+ns.name,
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(app2)
+    wait_for_workload(admin_pc.client, ns.name, count=2)
+    app2 = app_client.reload(app2)
+    # check that the correct helm version is on the app
+    assert "helmVersion" in app2
+    assert app2.helmVersion == helm_3
+
+
 def test_app_externalid_target_project_verification(admin_mc,
                                                     admin_pc,
                                                     user_factory,
@@ -758,6 +859,28 @@ def test_app_externalid_target_project_verification(admin_mc,
         }]
     }
     p1_client.update(app, update_data)
+
+
+def test_local_app_can_deploy(admin_pc, admin_mc, remove_resource):
+    """Test that an app without an externalId can be deployed
+    successfully to simulate a local app deployed through cli"""
+    app_client = admin_pc.client
+    app_name = random_str()
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+
+    # create app without the externalId value set
+    app = app_client.create_app(
+        name=app_name,
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(app)
+    wait_for(lambda: app_client.by_id_app(app.id) is not None,
+             fail_handler=lambda:
+             "app could not be found")
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):

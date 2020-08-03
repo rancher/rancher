@@ -94,24 +94,24 @@ func (s *Store) sendSchemas(result chan types.APIEvent, apiOp *types.APIRequest,
 		return oldSchemas
 	}
 
+	inNewSchemas := map[string]bool{}
 	for _, apiObject := range schemastore.FilterSchemas(apiOp, schemas.Schemas).Objects {
 		result <- types.APIEvent{
 			Name:         types.ChangeAPIEvent,
 			ResourceType: "schema",
 			Object:       apiObject,
 		}
-		delete(oldSchemas.Schemas, apiObject.ID)
+		inNewSchemas[apiObject.ID] = true
 	}
 
-	for id, oldSchema := range oldSchemas.Schemas {
+	for _, oldSchema := range schemastore.FilterSchemas(apiOp, oldSchemas.Schemas).Objects {
+		if inNewSchemas[oldSchema.ID] {
+			continue
+		}
 		result <- types.APIEvent{
-			Name:         types.ChangeAPIEvent,
+			Name:         types.RemoveAPIEvent,
 			ResourceType: "schema",
-			Object: types.APIObject{
-				Type:   "schema",
-				ID:     id,
-				Object: oldSchema,
-			},
+			Object:       oldSchema,
 		}
 	}
 

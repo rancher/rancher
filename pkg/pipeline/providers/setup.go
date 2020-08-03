@@ -2,6 +2,7 @@ package providers
 
 import (
 	"github.com/rancher/norman/types"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/pipeline/providers/bitbucketcloud"
 	"github.com/rancher/rancher/pkg/pipeline/providers/bitbucketserver"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
@@ -9,9 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/providers/gitlab"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
-	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/project/v3"
-	"github.com/rancher/types/config"
+	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/client-go/tools/cache"
 )
 

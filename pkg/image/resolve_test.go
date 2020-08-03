@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/kdm"
+	rketypes "github.com/rancher/rke/types"
+	"github.com/rancher/rke/types/kdm"
 	assertlib "github.com/stretchr/testify/assert"
 )
 
@@ -83,7 +84,7 @@ func TestFetchImagesFromSystem(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	toolsSystemImages := v3.ToolsSystemImages
+	toolsSystemImages := v32.ToolsSystemImages
 
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy,
@@ -98,7 +99,7 @@ func TestFetchImagesFromSystem(t *testing.T) {
 
 	testCases := []struct {
 		caseName               string
-		inputRkeSystemImages   map[string]v3.RKESystemImages
+		inputRkeSystemImages   map[string]rketypes.RKESystemImages
 		inputOsType            OSType
 		outputShouldContain    []string
 		outputShouldNotContain []string
@@ -187,7 +188,7 @@ func TestGetImages(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	toolsSystemImages := v3.ToolsSystemImages
+	toolsSystemImages := v32.ToolsSystemImages
 
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy, // from system
@@ -209,7 +210,7 @@ func TestGetImages(t *testing.T) {
 		caseName               string
 		inputSystemChartPath   string
 		inputImagesFromArgs    []string
-		inputRkeSystemImages   map[string]v3.RKESystemImages
+		inputRkeSystemImages   map[string]rketypes.RKESystemImages
 		inputOsType            OSType
 		outputShouldContain    []string
 		outputShouldNotContain []string
@@ -324,9 +325,9 @@ func flatStringSlice(slices ...[]string) []string {
 	return ret
 }
 
-func selectFirstEntry(rkeSystemImages map[string]v3.RKESystemImages) v3.RKESystemImages {
+func selectFirstEntry(rkeSystemImages map[string]rketypes.RKESystemImages) rketypes.RKESystemImages {
 	for _, rkeSystemImage := range rkeSystemImages {
 		return rkeSystemImage
 	}
-	return v3.RKESystemImages{}
+	return rketypes.RKESystemImages{}
 }

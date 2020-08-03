@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	v1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/config"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 )
 

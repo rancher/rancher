@@ -8,8 +8,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 )

@@ -2,6 +2,7 @@ import os
 import tempfile
 import pytest
 from rancher import ApiError
+from kubernetes.client import CoreV1Api
 from .common import auth_check, random_str, string_to_encoding
 from .conftest import wait_for
 import time
@@ -59,7 +60,8 @@ def test_node_fields(admin_mc):
 def test_node_template_delete(admin_mc, remove_resource):
     """Test deleting a nodeTemplate that is in use by a nodePool.
     The nodeTemplate should not be deleted while in use, after the nodePool is
-    removed it should delete.
+    removed, the nodes referencing the nodeTemplate will be deleted
+    and the nodeTemplate should delete
     """
     client = admin_mc.client
     node_template, cloud_credential = create_node_template(client)
@@ -92,9 +94,15 @@ def test_node_template_delete(admin_mc, remove_resource):
 
     wait_for(_node_pool_reload)
 
-    node_template = client.reload(node_template)
-    assert 'remove' in node_template.links
-    # NodePool is gone, template should delete
+    def _wait_for_remove_link():
+        nt = client.reload(node_template)
+        if hasattr(nt.links, "remove"):
+            return True
+        return False
+
+    wait_for(_wait_for_remove_link)
+
+    # NodePool and Nodes are gone, template should delete
     client.delete(node_template)
 
     node_template = client.reload(node_template)
@@ -123,7 +131,7 @@ def test_cloud_credential_delete(admin_mc, remove_resource):
 
 def test_writing_config_to_disk(admin_mc, wait_remove_resource):
     """Test that userdata and other fields from node driver configs are being
-    writting to disk as expected.
+    written to disk as expected.
     """
     client = admin_mc.client
     tempdir = tempfile.gettempdir()
@@ -203,9 +211,9 @@ def test_amazon_node_driver_schema(admin_mc):
             'amazonec2config missing support for field {}'.format(field)
 
 
-def create_node_template(client):
+def create_node_template(client, clientId="test"):
     cloud_credential = client.create_cloud_credential(
-        azurecredentialConfig={"clientId": "test",
+        azurecredentialConfig={"clientId": clientId,
                                "subscriptionId": "test",
                                "clientSecret": "test"})
     wait_for_cloud_credential(client, cloud_credential.id)
@@ -230,6 +238,7 @@ def wait_for_cloud_credential(client, cloud_credential_id, timeout=60):
             raise Exception('Timeout waiting for cloud credential')
         time.sleep(interval)
         interval *= 2
+        creds = client.list_cloud_credential()
         for val in creds:
             if val["id"] == cloud_credential_id:
                 cred = val
@@ -271,6 +280,79 @@ def test_user_access_to_other_template(user_factory, remove_resource):
     assert e.value.error.status == 404
     assert e.value.error.message == \
         "unable to find node template [%s]" % user2_node_template.id
+
+
+def test_user_cluster_owner_access_to_pool(admin_mc,
+                                           user_factory,
+                                           remove_resource,
+                                           wait_remove_resource):
+    """Test that a cluster created by the admin is accessible by another user
+    added as a cluster-owner, validate nodepool changing and switching
+    nodetemplate"""
+
+    # make an admin and user client
+    admin_client = admin_mc.client
+    k8sclient = CoreV1Api(admin_mc.k8s_client)
+    user = user_factory()
+
+    # make a cluster
+    cluster = admin_client.create_cluster(
+        name=random_str(),
+        rancherKubernetesEngineConfig={
+            "accessKey": "junk"
+        }
+    )
+    remove_resource(cluster)
+
+    # wait for the namespace created by the cluster
+    def _check_namespace(cluster):
+        for n in k8sclient.list_namespace().items:
+            if n.metadata.name == cluster.id:
+                return True
+        return False
+
+    wait_for(lambda: _check_namespace(cluster))
+
+    # add user as cluster-owner to the cluster
+    crtb = admin_client.create_cluster_role_template_binding(
+        userId=user.user.id,
+        roleTemplateId="cluster-owner",
+        clusterId=cluster.id,
+    )
+    remove_resource(crtb)
+
+    # admin creates a node template and assigns to a pool
+    admin_node_template, admin_cloud_credential = create_node_template(
+        admin_client, "admincloudcred-" + random_str())
+    admin_pool = admin_client.create_node_pool(
+        nodeTemplateId=admin_node_template.id,
+        hostnamePrefix="test",
+        clusterId=cluster.id)
+    wait_remove_resource(admin_pool)
+    remove_resource(admin_cloud_credential)
+    remove_resource(admin_node_template)
+
+    # create a template for the user to try and assign
+    user_node_template, user_cloud_credential = create_node_template(
+        user.client, "usercloudcred-" + random_str())
+    remove_resource(user_cloud_credential)
+    remove_resource(user_node_template)
+
+    # will pass, cluster owner user can change pool quantity
+    user.client.update(admin_pool, quantity=2)
+    # will pass, can set to a template owned by the user
+    user.client.update(admin_pool, nodeTemplateId=user_node_template.id)
+
+    # will fail, can not update nodepool template,
+    # if no access to the original template
+    with pytest.raises(ApiError) as e:
+        user.client.update(admin_pool, nodeTemplateId=admin_node_template.id)
+    assert e.value.error.status == 404
+    assert e.value.error.message == "unable to find node template [%s]" % \
+                                    admin_node_template.id
+
+    # delete this by hand and the rest will cleanup
+    admin_client.delete(admin_pool)
 
 
 def test_admin_access_to_node_template(admin_mc, list_remove_resource):

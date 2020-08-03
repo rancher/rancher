@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 	"gopkg.in/check.v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -156,7 +156,7 @@ func clientForSetup(c *check.C) (*clientset.Clientset, *extclient.Clientset, *co
 	clusterClient, err := clientset.NewForConfig(workloadKubeConfig)
 	c.Assert(err, check.IsNil)
 
-	scaledContext, err := config.NewScaledContext(*clusterKubeConfig)
+	scaledContext, err := config.NewScaledContext(*clusterKubeConfig, nil)
 	c.Assert(err, check.IsNil)
 
 	workload, err := config.NewUserContext(scaledContext, *workloadKubeConfig, "")

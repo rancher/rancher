@@ -7,8 +7,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 const TemporaryCredentialsAnnotationKey = "clusterstatus.management.cattle.io/temporary-security-credentials"

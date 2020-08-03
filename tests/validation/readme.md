@@ -84,6 +84,22 @@ RANCHER_ENGINE_INSTALL_URL defaults to https://get.docker.com/, docker installer
 RANCHER_CLONE_FROM defaults to ubuntu-bionic-18.04-cloudimg, vm to clone from.
 RANCHER_RESOURCE_POOL defaults to the validation-tests pool resource pool to put the vms in
 ```
+### oke_cluster test
+Environment variables for the Oracle Container Engine (OKE) cluster test
+```
+CATTLE_TEST_URL no default. The Rancher server for test execution.
+USER_TOKEN user token used for /meta/oci/ calls
+RANCHER_OCI_TENANCY_OCID required OCID of the tenancy in which to create the cluster and resources
+RANCHER_OCI_COMPARTMENT_OCID required OCID of the compartment in which to create the cluster and resources
+RANCHER_OCI_USER_OCID required OCID of a user who has access to the specified tenancy/compartment
+RANCHER_OCI_FINGERPRINT URL required fingerprint corresponding to the specified user's private API Key
+RANCHER_OCI_PRIVATE_KEY_PATH required private API key path for the specified OCI user, in PEM format
+RANCHER_OCI_PRIVATE_KEY_PASSPHRASE required if user private key is protected with a passphrase
+RANCHER_OCI_REGION defaults to us-phoenix-1
+RANCHER_OKE_VERSION defaults to latest version 
+RANCHER_OKE_NODE_SHAPE defaults to random OKE node shape
+RANCHER_OKE_NODE_IMAGE defaults to latest Oracle Linux node image
+```
 
 ## RKE template defaults variables:
 ```

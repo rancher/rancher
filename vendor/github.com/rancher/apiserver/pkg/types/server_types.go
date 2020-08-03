@@ -106,6 +106,7 @@ type APIRequest struct {
 	Query          url.Values
 	ResponseFormat string
 	ResponseWriter ResponseWriter
+	ErrorHandler   ErrorHandler
 	URLPrefix      string
 	URLBuilder     URLBuilder
 	AccessControl  AccessControl
@@ -161,6 +162,10 @@ func (r *APIRequest) WriteResponseList(code int, list APIObjectList) {
 	r.ResponseWriter.WriteList(r, code, list)
 }
 
+func (r *APIRequest) WriteError(err error) {
+	r.ErrorHandler(r, err)
+}
+
 type URLBuilder interface {
 	Current() string
 
@@ -200,6 +205,8 @@ func DefaultByID(store Store, apiOp *APIRequest, schema *APISchema, id string) (
 
 type WatchRequest struct {
 	Revision string
+	ID       string
+	Selector string
 }
 
 var (
@@ -211,6 +218,8 @@ var (
 type APIEvent struct {
 	Name         string    `json:"name,omitempty"`
 	ResourceType string    `json:"resourceType,omitempty"`
+	ID           string    `json:"id,omitempty"`
+	Selector     string    `json:"selector,omitempty"`
 	Revision     string    `json:"revision,omitempty"`
 	Object       APIObject `json:"-"`
 	Error        error     `json:"-"`

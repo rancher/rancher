@@ -15,15 +15,19 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	rketypes "github.com/rancher/rke/types"
+
 	minio "github.com/minio/minio-go"
 	"github.com/minio/minio-go/pkg/credentials"
-	"github.com/rancher/kontainer-engine/drivers/rke"
-	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
+	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
-	"github.com/rancher/rancher/pkg/ticker"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,7 +83,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
-	if v3.BackupConditionCompleted.IsFalse(b) || v3.BackupConditionCompleted.IsTrue(b) {
+	if rketypes.BackupConditionCompleted.IsFalse(b) || rketypes.BackupConditionCompleted.IsTrue(b) {
 		return b, nil
 	}
 
@@ -92,12 +96,12 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 		return b, fmt.Errorf("[etcd-backup] cluster doesn't have a backup config")
 	}
 
-	if !v3.BackupConditionCreated.IsTrue(b) {
+	if !rketypes.BackupConditionCreated.IsTrue(b) {
 		b.Spec.Filename = generateBackupFilename(b.Name, cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig)
 		b.Spec.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
-		v3.BackupConditionCreated.True(b)
+		rketypes.BackupConditionCreated.True(b)
 		// we set ConditionCompleted to Unknown to avoid incorrect "active" state
-		v3.BackupConditionCompleted.Unknown(b)
+		rketypes.BackupConditionCompleted.Unknown(b)
 		b, err = c.backupClient.Update(b)
 		if err != nil {
 			return b, err
@@ -198,7 +202,7 @@ func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error
 	if err != nil {
 		return nil, err
 	}
-	v3.BackupConditionCreated.CreateUnknownIfNotExists(newBackup)
+	rketypes.BackupConditionCreated.CreateUnknownIfNotExists(newBackup)
 	return c.backupClient.Create(newBackup)
 
 }
@@ -211,7 +215,7 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 	}
 
 	snapshotName := clusterprovisioner.GetBackupFilename(b)
-	bObj, err := v3.BackupConditionCompleted.Do(b, func() (runtime.Object, error) {
+	bObj, err := rketypes.BackupConditionCompleted.Do(b, func() (runtime.Object, error) {
 		cluster, err := c.clusterClient.Get(b.Spec.ClusterID, metav1.GetOptions{})
 		if err != nil {
 			return b, err
@@ -228,8 +232,8 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 		return b, inErr
 	})
 	if err != nil {
-		v3.BackupConditionCompleted.False(bObj)
-		v3.BackupConditionCompleted.ReasonAndMessageFromError(bObj, err)
+		rketypes.BackupConditionCompleted.False(bObj)
+		rketypes.BackupConditionCompleted.ReasonAndMessageFromError(bObj, err)
 		return bObj, err
 	}
 	return bObj, nil
@@ -303,11 +307,11 @@ func NewBackupObject(cluster *v3.Cluster, manual bool) (*v3.EtcdBackup, error) {
 				},
 			},
 		},
-		Spec: v3.EtcdBackupSpec{
+		Spec: rketypes.EtcdBackupSpec{
 			ClusterID: cluster.Name,
 			Manual:    manual,
 		},
-		Status: v3.EtcdBackupStatus{
+		Status: rketypes.EtcdBackupStatus{
 			KubernetesVersion: cluster.Spec.RancherKubernetesEngineConfig.Version,
 			ClusterObject:     compressedCluster,
 		},
@@ -365,7 +369,7 @@ func DecompressCluster(cluster string) (*v3.Cluster, error) {
 	return &c, nil
 }
 
-func generateBackupFilename(snapshotName string, backupConfig *v3.BackupConfig) string {
+func generateBackupFilename(snapshotName string, backupConfig *rketypes.BackupConfig) string {
 	// no backup config
 	if backupConfig == nil {
 		return ""
@@ -387,7 +391,7 @@ func generateBackupFilename(snapshotName string, backupConfig *v3.BackupConfig) 
 
 }
 
-func GetS3Client(sbc *v3.S3BackupConfig, timeout int) (*minio.Client, error) {
+func GetS3Client(sbc *rketypes.S3BackupConfig, timeout int) (*minio.Client, error) {
 	if sbc == nil {
 		return nil, fmt.Errorf("Can't find S3 backup target configuration")
 	}
@@ -460,7 +464,7 @@ func getBucketLookupType(endpoint string) minio.BucketLookupType {
 }
 
 func getBackupCompletedTime(o runtime.Object) time.Time {
-	t, _ := time.Parse(time.RFC3339, v3.BackupConditionCompleted.GetLastUpdated(o))
+	t, _ := time.Parse(time.RFC3339, rketypes.BackupConditionCompleted.GetLastUpdated(o))
 	return t
 }
 
@@ -487,7 +491,7 @@ func shouldBackup(cluster *v3.Cluster) bool {
 		return false
 	}
 	// we only work with ready clusters
-	if !v3.ClusterConditionReady.IsTrue(cluster) {
+	if !v32.ClusterConditionReady.IsTrue(cluster) {
 		return false
 	}
 
@@ -507,12 +511,12 @@ func getBackoff() wait.Backoff {
 	}
 }
 
-func isBackupSet(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
+func isBackupSet(rkeConfig *rketypes.RancherKubernetesEngineConfig) bool {
 	return rkeConfig != nil && // rke cluster
 		rkeConfig.Services.Etcd.BackupConfig != nil // backupConfig is set
 }
 
-func isRecurringBackupEnabled(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
+func isRecurringBackupEnabled(rkeConfig *rketypes.RancherKubernetesEngineConfig) bool {
 	return isBackupSet(rkeConfig) && rkeConfig.Services.Etcd.BackupConfig.Enabled != nil && *rkeConfig.Services.Etcd.BackupConfig.Enabled
 }
 

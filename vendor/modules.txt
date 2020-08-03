@@ -43,7 +43,7 @@ github.com/PuerkitoBio/purell
 github.com/PuerkitoBio/urlesc
 # github.com/aquasecurity/kube-bench v0.1.0
 github.com/aquasecurity/kube-bench/check
-# github.com/aws/aws-sdk-go v1.28.2
+# github.com/aws/aws-sdk-go v1.33.5
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/arn
 github.com/aws/aws-sdk-go/aws/awserr
@@ -63,6 +63,7 @@ github.com/aws/aws-sdk-go/aws/endpoints
 github.com/aws/aws-sdk-go/aws/request
 github.com/aws/aws-sdk-go/aws/session
 github.com/aws/aws-sdk-go/aws/signer/v4
+github.com/aws/aws-sdk-go/internal/context
 github.com/aws/aws-sdk-go/internal/ini
 github.com/aws/aws-sdk-go/internal/sdkio
 github.com/aws/aws-sdk-go/internal/sdkmath
@@ -70,6 +71,7 @@ github.com/aws/aws-sdk-go/internal/sdkrand
 github.com/aws/aws-sdk-go/internal/sdkuri
 github.com/aws/aws-sdk-go/internal/shareddefaults
 github.com/aws/aws-sdk-go/internal/strings
+github.com/aws/aws-sdk-go/internal/sync/singleflight
 github.com/aws/aws-sdk-go/private/protocol
 github.com/aws/aws-sdk-go/private/protocol/ec2query
 github.com/aws/aws-sdk-go/private/protocol/json/jsonutil
@@ -114,6 +116,8 @@ github.com/crewjam/saml
 github.com/crewjam/saml/logger
 github.com/crewjam/saml/samlsp
 github.com/crewjam/saml/xmlenc
+# github.com/cyphar/filepath-securejoin v0.2.2
+github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -172,14 +176,18 @@ github.com/fsnotify/fsnotify
 github.com/ghodss/yaml
 # github.com/go-ini/ini v1.37.0
 github.com/go-ini/ini
+# github.com/go-logr/logr v0.1.0
+github.com/go-logr/logr
 # github.com/go-openapi/jsonpointer v0.19.3
 github.com/go-openapi/jsonpointer
 # github.com/go-openapi/jsonreference v0.19.3
 github.com/go-openapi/jsonreference
-# github.com/go-openapi/spec v0.19.3
+# github.com/go-openapi/spec v0.19.5
 github.com/go-openapi/spec
 # github.com/go-openapi/swag v0.19.5
 github.com/go-openapi/swag
+# github.com/gofrs/flock v0.7.1
+github.com/gofrs/flock
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
@@ -220,7 +228,7 @@ github.com/googleapis/gnostic/extensions
 github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.1
 github.com/gorilla/websocket
-# github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc
+# github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
 github.com/gregjones/httpcache
 github.com/gregjones/httpcache/diskcache
 # github.com/hashicorp/errwrap v1.0.0
@@ -250,17 +258,17 @@ github.com/huandu/xstrings
 github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
-# github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
+# github.com/jmespath/go-jmespath v0.3.0
 github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.1.0
 github.com/jonboulle/clockwork
-# github.com/json-iterator/go v1.1.9
+# github.com/json-iterator/go v1.1.8
 github.com/json-iterator/go
 # github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8 => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 github.com/knative/pkg/apis/istio
 github.com/knative/pkg/apis/istio/common/v1alpha1
 github.com/knative/pkg/apis/istio/v1alpha3
-# github.com/konsorten/go-windows-terminal-sequences v1.0.2
+# github.com/konsorten/go-windows-terminal-sequences v1.0.3
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/kr/pretty v0.1.0
 github.com/kr/pretty
@@ -276,6 +284,8 @@ github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/maruel/panicparse v0.0.0-20171209025017-c0182c169410
 github.com/maruel/panicparse/stack
+# github.com/matryer/moq v0.0.0-20200607124540-4638a53893e6 => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
+github.com/matryer/moq/pkg/moq
 # github.com/mattn/go-colorable v0.1.2
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.9
@@ -314,6 +324,11 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
+# github.com/oracle/oci-go-sdk v18.0.0+incompatible
+github.com/oracle/oci-go-sdk/common
+github.com/oracle/oci-go-sdk/containerengine
+github.com/oracle/oci-go-sdk/core
+github.com/oracle/oci-go-sdk/identity
 # github.com/pborman/uuid v1.2.0
 github.com/pborman/uuid
 # github.com/pelletier/go-toml v1.2.0
@@ -340,7 +355,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/rancher/apiserver v0.0.0-20200612212259-10457317eb0b
+# github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48
 github.com/rancher/apiserver/pkg/apierror
 github.com/rancher/apiserver/pkg/builtin
 github.com/rancher/apiserver/pkg/handlers
@@ -354,7 +369,7 @@ github.com/rancher/apiserver/pkg/subscribe
 github.com/rancher/apiserver/pkg/types
 github.com/rancher/apiserver/pkg/urlbuilder
 github.com/rancher/apiserver/pkg/writer
-# github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234
+# github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9
 github.com/rancher/dynamiclistener
 github.com/rancher/dynamiclistener/cert
 github.com/rancher/dynamiclistener/factory
@@ -362,22 +377,10 @@ github.com/rancher/dynamiclistener/server
 github.com/rancher/dynamiclistener/storage/file
 github.com/rancher/dynamiclistener/storage/kubernetes
 github.com/rancher/dynamiclistener/storage/memory
-# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200508010131-226462dc5558
-github.com/rancher/kontainer-engine/cluster
-github.com/rancher/kontainer-engine/drivers/aks
-github.com/rancher/kontainer-engine/drivers/eks
-github.com/rancher/kontainer-engine/drivers/gke
-github.com/rancher/kontainer-engine/drivers/import
-github.com/rancher/kontainer-engine/drivers/options
-github.com/rancher/kontainer-engine/drivers/rke
-github.com/rancher/kontainer-engine/drivers/rke/rkecerts
-github.com/rancher/kontainer-engine/drivers/util
-github.com/rancher/kontainer-engine/logstream
-github.com/rancher/kontainer-engine/service
-github.com/rancher/kontainer-engine/store
-github.com/rancher/kontainer-engine/types
-github.com/rancher/kontainer-engine/utils
-# github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
+# github.com/rancher/eks-operator v0.1.0-rc22
+github.com/rancher/eks-operator/pkg/apis/eks.cattle.io
+github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1
+# github.com/rancher/lasso v0.0.0-20200728055126-961184571d1b
 github.com/rancher/lasso/pkg/cache
 github.com/rancher/lasso/pkg/client
 github.com/rancher/lasso/pkg/controller
@@ -395,7 +398,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200609220258-00d350370ee8
+# github.com/rancher/norman v0.0.0-20200802063631-071be464e454
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -405,6 +408,7 @@ github.com/rancher/norman/authorization
 github.com/rancher/norman/clientbase
 github.com/rancher/norman/condition
 github.com/rancher/norman/controller
+github.com/rancher/norman/generator
 github.com/rancher/norman/httperror
 github.com/rancher/norman/httperror/handler
 github.com/rancher/norman/lifecycle
@@ -415,7 +419,6 @@ github.com/rancher/norman/parse
 github.com/rancher/norman/parse/builder
 github.com/rancher/norman/pkg/broadcast
 github.com/rancher/norman/pkg/dump
-github.com/rancher/norman/pkg/k8scheck
 github.com/rancher/norman/pkg/kwrapper/etcd
 github.com/rancher/norman/pkg/kwrapper/k8s
 github.com/rancher/norman/pkg/subscribe
@@ -438,37 +441,12 @@ github.com/rancher/norman/types/set
 github.com/rancher/norman/types/slice
 github.com/rancher/norman/types/values
 github.com/rancher/norman/urlbuilder
-# github.com/rancher/rancher/pkg/auth v0.0.0 => ./pkg/auth
-github.com/rancher/rancher/pkg/auth/api
-github.com/rancher/rancher/pkg/auth/api/secrets
-github.com/rancher/rancher/pkg/auth/api/user
-github.com/rancher/rancher/pkg/auth/audit
-github.com/rancher/rancher/pkg/auth/data
-github.com/rancher/rancher/pkg/auth/principals
-github.com/rancher/rancher/pkg/auth/providerrefresh
-github.com/rancher/rancher/pkg/auth/providers
-github.com/rancher/rancher/pkg/auth/providers/activedirectory
-github.com/rancher/rancher/pkg/auth/providers/azure
-github.com/rancher/rancher/pkg/auth/providers/common
-github.com/rancher/rancher/pkg/auth/providers/common/ldap
-github.com/rancher/rancher/pkg/auth/providers/github
-github.com/rancher/rancher/pkg/auth/providers/googleoauth
-github.com/rancher/rancher/pkg/auth/providers/ldap
-github.com/rancher/rancher/pkg/auth/providers/local
-github.com/rancher/rancher/pkg/auth/providers/publicapi
-github.com/rancher/rancher/pkg/auth/providers/saml
-github.com/rancher/rancher/pkg/auth/requests
-github.com/rancher/rancher/pkg/auth/requests/sar
-github.com/rancher/rancher/pkg/auth/settings
-github.com/rancher/rancher/pkg/auth/tokens
-github.com/rancher/rancher/pkg/auth/util
-github.com/rancher/rancher/pkg/auth/webhook
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
-# github.com/rancher/rke v1.2.0-rc2.0.20200617185447-84082186085a
+# github.com/rancher/rke v1.2.0-rc4
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -490,22 +468,24 @@ github.com/rancher/rke/pki
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/services
 github.com/rancher/rke/templates
+github.com/rancher/rke/types
+github.com/rancher/rke/types/image
+github.com/rancher/rke/types/kdm
 github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200612212358-02b060294531
+# github.com/rancher/steve v0.0.0-20200730044803-afb90310a200
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
 github.com/rancher/steve/pkg/client
 github.com/rancher/steve/pkg/clustercache
 github.com/rancher/steve/pkg/controllers/schema
-github.com/rancher/steve/pkg/dashboard
+github.com/rancher/steve/pkg/podimpersonation
 github.com/rancher/steve/pkg/proxy
 github.com/rancher/steve/pkg/resources
 github.com/rancher/steve/pkg/resources/apigroups
-github.com/rancher/steve/pkg/resources/clusters
 github.com/rancher/steve/pkg/resources/common
 github.com/rancher/steve/pkg/resources/counts
 github.com/rancher/steve/pkg/resources/helm
@@ -521,54 +501,14 @@ github.com/rancher/steve/pkg/stores/partition
 github.com/rancher/steve/pkg/stores/proxy
 github.com/rancher/steve/pkg/stores/selector
 github.com/rancher/steve/pkg/stores/switchschema
-github.com/rancher/steve/pkg/stores/switchstore
-# github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
+github.com/rancher/steve/pkg/summarycache
+# github.com/rancher/system-upgrade-controller v0.6.2
 github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io
 github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1
 github.com/rancher/system-upgrade-controller/pkg/condition
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/scheme
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1
-# github.com/rancher/types v0.0.0-20200609171939-d21f6b7b59e8
-github.com/rancher/types/apis/apiregistration.k8s.io/v1
-github.com/rancher/types/apis/apps/v1
-github.com/rancher/types/apis/autoscaling/v2beta2
-github.com/rancher/types/apis/batch/v1
-github.com/rancher/types/apis/batch/v1beta1
-github.com/rancher/types/apis/cluster.cattle.io/v3
-github.com/rancher/types/apis/cluster.cattle.io/v3/schema
-github.com/rancher/types/apis/core/v1
-github.com/rancher/types/apis/core/v1/fakes
-github.com/rancher/types/apis/extensions/v1beta1
-github.com/rancher/types/apis/management.cattle.io/v3
-github.com/rancher/types/apis/management.cattle.io/v3/fakes
-github.com/rancher/types/apis/management.cattle.io/v3/schema
-github.com/rancher/types/apis/management.cattle.io/v3public
-github.com/rancher/types/apis/management.cattle.io/v3public/schema
-github.com/rancher/types/apis/monitoring.coreos.com/v1
-github.com/rancher/types/apis/networking.istio.io/v1alpha3
-github.com/rancher/types/apis/networking.k8s.io/v1
-github.com/rancher/types/apis/policy/v1beta1
-github.com/rancher/types/apis/project.cattle.io/v3
-github.com/rancher/types/apis/project.cattle.io/v3/schema
-github.com/rancher/types/apis/rbac.authorization.k8s.io/v1
-github.com/rancher/types/apis/storage.k8s.io/v1
-github.com/rancher/types/client/cluster/v3
-github.com/rancher/types/client/management/v3
-github.com/rancher/types/client/management/v3public
-github.com/rancher/types/client/project/v3
-github.com/rancher/types/compose
-github.com/rancher/types/condition
-github.com/rancher/types/config
-github.com/rancher/types/config/dialer
-github.com/rancher/types/factory
-github.com/rancher/types/image
-github.com/rancher/types/kdm
-github.com/rancher/types/mapper
-github.com/rancher/types/namespace
-github.com/rancher/types/peermanager
-github.com/rancher/types/status
-github.com/rancher/types/user
-# github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f
+# github.com/rancher/wrangler v0.6.2-0.20200802063637-28dae3c1fc1b
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/broadcast
@@ -579,9 +519,19 @@ github.com/rancher/wrangler/pkg/controller-gen/generators
 github.com/rancher/wrangler/pkg/crd
 github.com/rancher/wrangler/pkg/data
 github.com/rancher/wrangler/pkg/data/convert
+github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io
+github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1beta1
+github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io
+github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io/v1
+github.com/rancher/wrangler/pkg/generated/controllers/core
+github.com/rancher/wrangler/pkg/generated/controllers/core/v1
+github.com/rancher/wrangler/pkg/generated/controllers/rbac
+github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1
 github.com/rancher/wrangler/pkg/generic
 github.com/rancher/wrangler/pkg/genericcondition
 github.com/rancher/wrangler/pkg/gvk
+github.com/rancher/wrangler/pkg/k8scheck
+github.com/rancher/wrangler/pkg/kstatus
 github.com/rancher/wrangler/pkg/kubeconfig
 github.com/rancher/wrangler/pkg/kv
 github.com/rancher/wrangler/pkg/leader
@@ -591,6 +541,7 @@ github.com/rancher/wrangler/pkg/objectset
 github.com/rancher/wrangler/pkg/patch
 github.com/rancher/wrangler/pkg/randomtoken
 github.com/rancher/wrangler/pkg/ratelimit
+github.com/rancher/wrangler/pkg/relatedresource
 github.com/rancher/wrangler/pkg/schemas
 github.com/rancher/wrangler/pkg/schemas/definition
 github.com/rancher/wrangler/pkg/schemas/mappers
@@ -604,16 +555,8 @@ github.com/rancher/wrangler/pkg/summary
 github.com/rancher/wrangler/pkg/summary/client
 github.com/rancher/wrangler/pkg/summary/informer
 github.com/rancher/wrangler/pkg/summary/lister
+github.com/rancher/wrangler/pkg/ticker
 github.com/rancher/wrangler/pkg/yaml
-# github.com/rancher/wrangler-api v0.6.1-0.20200515193802-dcf70881b087
-github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io
-github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1
-github.com/rancher/wrangler-api/pkg/generated/controllers/apiregistration.k8s.io
-github.com/rancher/wrangler-api/pkg/generated/controllers/apiregistration.k8s.io/v1
-github.com/rancher/wrangler-api/pkg/generated/controllers/core
-github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1
-github.com/rancher/wrangler-api/pkg/generated/controllers/rbac
-github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1
 # github.com/robfig/cron v1.1.0
 github.com/robfig/cron
 # github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7
@@ -631,7 +574,7 @@ github.com/segmentio/kafka-go
 github.com/segmentio/kafka-go/sasl
 # github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
-# github.com/sirupsen/logrus v1.4.2
+# github.com/sirupsen/logrus v1.6.0
 github.com/sirupsen/logrus
 # github.com/spf13/afero v1.2.2
 github.com/spf13/afero
@@ -682,6 +625,12 @@ github.com/vmware/kube-fluentd-operator/config-reloader/fluentd
 github.com/vmware/kube-fluentd-operator/config-reloader/util
 # github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 github.com/xanzy/go-gitlab
+# github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f
+github.com/xeipuuv/gojsonpointer
+# github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415
+github.com/xeipuuv/gojsonreference
+# github.com/xeipuuv/gojsonschema v1.1.0
+github.com/xeipuuv/gojsonschema
 # go.opencensus.io v0.22.2
 go.opencensus.io
 go.opencensus.io/internal
@@ -699,18 +648,26 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
-# golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
+# golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
 golang.org/x/crypto/argon2
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blowfish
+golang.org/x/crypto/cast5
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/internal/subtle
+golang.org/x/crypto/openpgp
+golang.org/x/crypto/openpgp/armor
+golang.org/x/crypto/openpgp/clearsign
+golang.org/x/crypto/openpgp/elgamal
+golang.org/x/crypto/openpgp/errors
+golang.org/x/crypto/openpgp/packet
+golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/poly1305
 golang.org/x/crypto/ripemd160
@@ -719,7 +676,10 @@ golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/agent
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20191112182307-2180aed22343
+# golang.org/x/mod v0.2.0
+golang.org/x/mod/module
+golang.org/x/mod/semver
+# golang.org/x/net v0.0.0-20200625001655-4c5254603344
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
@@ -739,11 +699,11 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+# golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20200122134326-e047566fdf82
+# golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -761,19 +721,25 @@ golang.org/x/text/unicode/norm
 golang.org/x/text/width
 # golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20191115202509-3a792d9c32b2
+# golang.org/x/tools v0.0.0-20200505023115-26f46d2f7ef8
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/internal/gcimporter
 golang.org/x/tools/go/internal/packagesdriver
 golang.org/x/tools/go/packages
 golang.org/x/tools/imports
+golang.org/x/tools/internal/event
+golang.org/x/tools/internal/event/core
+golang.org/x/tools/internal/event/keys
+golang.org/x/tools/internal/event/label
 golang.org/x/tools/internal/fastwalk
+golang.org/x/tools/internal/gocommand
 golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/imports
-golang.org/x/tools/internal/module
-golang.org/x/tools/internal/semver
-golang.org/x/tools/internal/span
+golang.org/x/tools/internal/packagesinternal
+# golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
+golang.org/x/xerrors
+golang.org/x/xerrors/internal
 # google.golang.org/api v0.14.0
 google.golang.org/api/admin/directory/v1
 google.golang.org/api/compute/v1
@@ -854,11 +820,27 @@ gopkg.in/ini.v1
 gopkg.in/ldap.v2
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
-# gopkg.in/yaml.v2 v2.2.8
+# gopkg.in/yaml.v2 v2.3.0
 gopkg.in/yaml.v2
 # helm.sh/helm/v3 v3.2.0
+helm.sh/helm/v3/internal/ignore
+helm.sh/helm/v3/internal/sympath
+helm.sh/helm/v3/internal/third_party/k8s.io/kubernetes/deployment/util
+helm.sh/helm/v3/internal/tlsutil
+helm.sh/helm/v3/internal/urlutil
+helm.sh/helm/v3/internal/version
 helm.sh/helm/v3/pkg/chart
+helm.sh/helm/v3/pkg/chart/loader
+helm.sh/helm/v3/pkg/chartutil
+helm.sh/helm/v3/pkg/cli
+helm.sh/helm/v3/pkg/getter
+helm.sh/helm/v3/pkg/helmpath
+helm.sh/helm/v3/pkg/helmpath/xdg
+helm.sh/helm/v3/pkg/kube
+helm.sh/helm/v3/pkg/plugin
+helm.sh/helm/v3/pkg/provenance
 helm.sh/helm/v3/pkg/release
+helm.sh/helm/v3/pkg/repo
 helm.sh/helm/v3/pkg/time
 # k8s.io/api v0.18.0 => k8s.io/api v0.18.0
 k8s.io/api/admission/v1
@@ -912,7 +894,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-# k8s.io/apimachinery v0.18.0 => k8s.io/apimachinery v0.18.0
+# k8s.io/apimachinery v0.18.5 => k8s.io/apimachinery v0.18.0
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
@@ -1016,7 +998,6 @@ k8s.io/cli-runtime/pkg/resource
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/cached/disk
 k8s.io/client-go/discovery/cached/memory
-k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
 k8s.io/client-go/informers
 k8s.io/client-go/informers/admissionregistration
@@ -1159,6 +1140,7 @@ k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
 k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
 k8s.io/client-go/pkg/version
 k8s.io/client-go/plugin/pkg/client/auth/exec
+k8s.io/client-go/plugin/pkg/client/auth/gcp
 k8s.io/client-go/rest
 k8s.io/client-go/rest/watch
 k8s.io/client-go/restmapper
@@ -1170,7 +1152,6 @@ k8s.io/client-go/scale/scheme/appsv1beta2
 k8s.io/client-go/scale/scheme/autoscalingv1
 k8s.io/client-go/scale/scheme/extensionsint
 k8s.io/client-go/scale/scheme/extensionsv1beta1
-k8s.io/client-go/testing
 k8s.io/client-go/third_party/forked/golang/template
 k8s.io/client-go/tools/auth
 k8s.io/client-go/tools/cache
@@ -1184,6 +1165,7 @@ k8s.io/client-go/tools/metrics
 k8s.io/client-go/tools/pager
 k8s.io/client-go/tools/reference
 k8s.io/client-go/tools/remotecommand
+k8s.io/client-go/tools/watch
 k8s.io/client-go/transport
 k8s.io/client-go/transport/spdy
 k8s.io/client-go/util/cert
@@ -1214,7 +1196,7 @@ k8s.io/component-base/featuregate
 k8s.io/component-base/metrics
 k8s.io/component-base/metrics/legacyregistry
 k8s.io/component-base/version
-# k8s.io/gengo v0.0.0-20200114144118-36b2048a9120
+# k8s.io/gengo v0.0.0-20200710205751-c0d492a0f3ca
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
 k8s.io/gengo/examples/set-gen/sets
@@ -1227,6 +1209,8 @@ k8s.io/helm/pkg/proto/hapi/chart
 k8s.io/helm/pkg/proto/hapi/release
 # k8s.io/klog v1.0.0
 k8s.io/klog
+# k8s.io/klog/v2 v2.0.0
+k8s.io/klog/v2
 # k8s.io/kube-aggregator v0.18.0 => k8s.io/kube-aggregator v0.18.0
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
@@ -1292,6 +1276,11 @@ k8s.io/utils/trace
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
+# sigs.k8s.io/aws-iam-authenticator v0.5.1
+sigs.k8s.io/aws-iam-authenticator/pkg/arn
+sigs.k8s.io/aws-iam-authenticator/pkg/token
+# sigs.k8s.io/cli-utils v0.16.0
+sigs.k8s.io/cli-utils/pkg/kstatus/status
 # sigs.k8s.io/kustomize v2.0.3+incompatible
 sigs.k8s.io/kustomize/pkg/commands/build
 sigs.k8s.io/kustomize/pkg/constants

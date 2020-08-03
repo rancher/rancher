@@ -35,5 +35,8 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     tar -xzf "sonobuoy_$SONOBUOY_VERSION"_linux_amd64.tar.gz -C /tmp && \
     mv /tmp/sonobuoy /usr/local/bin && \
     chmod +x /usr/local/bin/sonobuoy && \
+    wget https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip && \
+    unzip awscli-exe-linux-x86_64.zip && \
+    ./aws/install && \
     cd $WORKSPACE && \
     pip install -r requirements_v3api.txt

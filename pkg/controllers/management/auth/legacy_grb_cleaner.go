@@ -3,9 +3,9 @@ package auth
 import (
 	"strings"
 
-	grbstore "github.com/rancher/rancher/pkg/api/store/globalrolebindings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

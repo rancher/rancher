@@ -11,8 +11,8 @@ import (
 	"github.com/rancher/steve/pkg/resources/common"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schema/converter"
-	apiextcontrollerv1beta1 "github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
-	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	apiextcontrollerv1beta1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -55,7 +55,7 @@ func Register(ctx context.Context,
 	apiService v1.APIServiceController,
 	ssar authorizationv1client.SelfSubjectAccessReviewInterface,
 	schemasHandler SchemasHandler,
-	schemas *schema2.Collection) (init func() error) {
+	schemas *schema2.Collection) {
 
 	h := &handler{
 		ctx:     ctx,
@@ -69,11 +69,6 @@ func Register(ctx context.Context,
 
 	apiService.OnChange(ctx, "schema", h.OnChangeAPIService)
 	crd.OnChange(ctx, "schema", h.OnChangeCRD)
-
-	return func() error {
-		h.queueRefresh()
-		return h.refreshAll(ctx)
-	}
 }
 
 func (h *handler) OnChangeCRD(key string, crd *v1beta1.CustomResourceDefinition) (*v1beta1.CustomResourceDefinition, error) {
