@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/rancher/apiserver/pkg/types"
 	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
@@ -43,7 +44,6 @@ type Operations struct {
 	contentManager *content.Manager
 	Impersonator   *podimpersonation.PodImpersonation
 	repos          catalogcontrollers.RepoClient
-	secrets        corev1controllers.SecretClient
 	clusterRepos   catalogcontrollers.ClusterRepoClient
 	ops            catalogcontrollers.OperationClient
 	pods           corev1controllers.PodClient
@@ -54,18 +54,18 @@ type Operations struct {
 func NewOperations(
 	cg proxy.ClientGetter,
 	catalog catalogcontrollers.Interface,
-	pods corev1controllers.PodClient,
-	secrets corev1controllers.SecretClient) *Operations {
+	contentManager *content.Manager,
+	pods corev1controllers.PodClient) *Operations {
 	return &Operations{
-		cg:           cg,
-		namespace:    "dashboard-catalog",
-		Impersonator: podimpersonation.New("helm-op", cg, time.Hour),
-		repos:        catalog.Repo(),
-		secrets:      secrets,
-		pods:         pods,
-		clusterRepos: catalog.ClusterRepo(),
-		ops:          catalog.Operation(),
-		releases:     catalog.Release(),
+		cg:             cg,
+		contentManager: contentManager,
+		namespace:      "dashboard-catalog",
+		Impersonator:   podimpersonation.New("helm-op", cg, time.Hour),
+		repos:          catalog.Repo(),
+		pods:           pods,
+		clusterRepos:   catalog.ClusterRepo(),
+		ops:            catalog.Operation(),
+		releases:       catalog.Release(),
 	}
 }
 
@@ -324,6 +324,7 @@ func (c Commands) CommandArgs() ([]string, error) {
 		if len(result) > 0 {
 			result = append(result, ";")
 		}
+		result = append(result, "helm")
 		result = append(result, args...)
 	}
 	return result, nil
@@ -374,6 +375,7 @@ func (c Command) renderArgs() ([]string, error) {
 	}
 
 	delete(dataMap, "values")
+	delete(dataMap, "charts")
 	delete(dataMap, "releaseName")
 	delete(dataMap, "chartName")
 	if v, ok := dataMap["disableOpenAPIValidation"]; ok {
@@ -387,6 +389,11 @@ func (c Command) renderArgs() ([]string, error) {
 	for k, v := range dataMap {
 		s := convert.ToString(v)
 		k = convert.ToArgKey(k)
+		// This is a possibly unneeded check, but we want to ensure the strings have no null bytes so
+		// running the xargs -0 works.
+		if !utf8.ValidString(s) || !utf8.ValidString(k) {
+			return nil, fmt.Errorf("invalid non-utf8 string")
+		}
 		args = append(args, fmt.Sprintf("%s=%s", k, s))
 	}
 
@@ -399,7 +406,7 @@ func (c Command) renderArgs() ([]string, error) {
 		args = append(args, c.ReleaseName)
 	}
 	if len(c.Chart) > 0 {
-		args = append(args, "/"+c.ChartFile)
+		args = append(args, filepath.Join(helmDataPath, c.ChartFile))
 	}
 
 	return append([]string{c.Operation}, args...), nil
@@ -429,7 +436,7 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 		}
 	}
 
-	return Command{}, nil
+	return c, nil
 }
 
 func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
@@ -460,9 +467,10 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 		}
 		cmd.Operation = "install"
 		cmd.ArgObjects = []interface{}{
-			chartInstall.Values,
+			chartInstall,
 			installArgs,
 		}
+		cmd.ReleaseName = chartInstall.ReleaseName
 
 		status.Release = chartInstall.ReleaseName
 		status.Namespace = namespace(chartInstall.Namespace)
@@ -578,8 +586,8 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 					Stdin:           true,
 					TTY:             true,
 					StdinOnce:       true,
-					Image:           "ibuildthecloud/shell:v0.0.6",
-					ImagePullPolicy: v1.PullIfNotPresent,
+					Image:           "ibuildthecloud/shell:dev",
+					ImagePullPolicy: v1.PullAlways,
 					Command:         []string{"helm-cmd"},
 					WorkingDir:      helmDataPath,
 					VolumeMounts: []v1.VolumeMount{
