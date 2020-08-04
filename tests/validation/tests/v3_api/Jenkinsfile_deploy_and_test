@@ -104,6 +104,8 @@ node {
           
             stage('Deploy Rancher Server') {
               try {
+              if (!env.CATTLE_TEST_URL || !env.ADMIN_TOKEN || !env.USER_TOKEN ||
+                (env.CATTLE_TEST_URL == "" && env.ADMIN_TOKEN == "" && env.USER_TOKEN == "")) {
                 // deploy rancher server
                 sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
                   "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${setupResultsOut} " +
@@ -114,7 +116,13 @@ node {
                 sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
                 load rancherConfig
                 
-              } catch(err) {
+              }
+              else {
+                  echo "User Provided Rancher Server"
+                  RANCHER_DEPLOYED = false
+               }
+               }
+                catch(err) {
                 echo "Error: " + err
                 RANCHER_DEPLOYED = false
               }
@@ -123,12 +131,16 @@ node {
             stage('Run Validation Tests') {
               try { 
                 // run tests
+                def clusterName="${env.RANCHER_CLUSTER_NAME}"
+                if (RANCHER_DEPLOYED) {
+                    clusterName="${env.CLUSTER_NAME}"
+                }
                 sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
                   "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
                   "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
-                  "&& export RANCHER_CLUSTER_NAME=${env.CLUSTER_NAME} " + "&& pytest -v -s --junit-xml=${testResultsOut} " +
+                  "&& export RANCHER_CLUSTER_NAME=${clusterName} " + "&& pytest -v -s --junit-xml=${testResultsOut} " +
                   "${PYTEST_OPTIONS} ${testsDir}\'"
-              } catch(err) {
+               } catch(err) {
                 echo "Error: " + err
                 echo 'Test run had failures. Collecting results...'
               }
@@ -158,17 +170,21 @@ node {
             
             stage('Test Report') {
               // copy and archive test results
-              sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
+              if (RANCHER_DEPLOYED) {
+                  sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
+                  step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
+
+              }
               sh "docker cp ${testContainer}:${rootPath}${testResultsOut} ."
-              step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
               step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
+
             }
-
-            sh "docker stop ${setupContainer}"
-            sh "docker stop ${testContainer}"
-
-            sh "docker rm -v ${setupContainer}"
-            sh "docker rm -v ${testContainer}"
+            if (RANCHER_DEPLOYED) {
+                sh "docker stop ${setupContainer}"
+                sh "docker rm -v ${setupContainer}"
+            }
+                sh "docker stop ${testContainer}"
+                sh "docker rm -v ${testContainer}"
 
             if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
               sh "docker stop ${deleteContainer}"

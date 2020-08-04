@@ -1287,7 +1287,7 @@ def exec_shell_command(ip, port, cmd, password, user="root", sshKey=None):
 
 def wait_for_ns_to_become_active(client, ns, timeout=DEFAULT_TIMEOUT):
     start = time.time()
-    time.sleep(2)
+    time.sleep(10)
     nss = client.list_namespace(uuid=ns.uuid).data
     assert len(nss) == 1
     ns = nss[0]
