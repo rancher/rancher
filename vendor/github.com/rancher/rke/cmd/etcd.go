@@ -77,6 +77,10 @@ func EtcdCommand() cli.Command {
 			Name:  "custom-certs",
 			Usage: "Use custom certificates from a cert dir",
 		},
+		cli.BoolFlag{
+			Name:  "use-local-state",
+			Usage: "Use local state file (do not check or use snapshot archive for state file)",
+		},
 	}
 	snapshotRestoreFlags = append(append(snapshotFlags, snapshotRestoreFlags...), commonFlags...)
 
@@ -144,41 +148,49 @@ func RestoreEtcdSnapshot(
 	snapshotName string) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	var APIURL, caCrt, clientCert, clientKey string
 
-	log.Infof(ctx, "Checking if state file is included in snapshot file for %s", snapshotName)
-	// Creating temp cluster to check if snapshot archive contains statefile and retrieve it
-	tempCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, "")
-	if err != nil {
-		return APIURL, caCrt, clientCert, clientKey, nil, err
-	}
-	if err := tempCluster.SetupDialers(ctx, dialersOptions); err != nil {
-		return APIURL, caCrt, clientCert, clientKey, nil, err
-	}
-	if err := tempCluster.TunnelHosts(ctx, flags); err != nil {
-		return APIURL, caCrt, clientCert, clientKey, nil, err
-	}
-
 	rkeFullState := &cluster.FullState{}
 	stateFileRetrieved := false
-
 	// Local state file
 	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
-	// Extract state file from snapshot
-	stateFile, err := tempCluster.GetStateFileFromSnapshot(ctx, snapshotName)
-	// If state file is not in snapshot (or can't be retrieved), fallback to local state file
-	if err != nil {
-		logrus.Infof("Could not extract state file from snapshot [%s] on any host, falling back to local state file: %v", snapshotName, err)
-		rkeFullState, _ = cluster.ReadStateFile(ctx, stateFilePath)
-	} else {
-		// Parse extracted statefile to FullState struct
-		rkeFullState, err = cluster.StringToFullState(ctx, stateFile)
+
+	if !flags.UseLocalState {
+		log.Infof(ctx, "Checking if state file is included in snapshot file for [%s]", snapshotName)
+		// Creating temp cluster to check if snapshot archive contains state file and retrieve it
+		tempCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, "")
 		if err != nil {
-			logrus.Errorf("Error when converting state file contents to rkeFullState: %v", err)
 			return APIURL, caCrt, clientCert, clientKey, nil, err
 		}
-		logrus.Infof("State file is successfully extracted from snapshot [%s]", snapshotName)
-		stateFileRetrieved = true
-	}
+		if err := tempCluster.SetupDialers(ctx, dialersOptions); err != nil {
+			return APIURL, caCrt, clientCert, clientKey, nil, err
+		}
+		if err := tempCluster.TunnelHosts(ctx, flags); err != nil {
+			return APIURL, caCrt, clientCert, clientKey, nil, err
+		}
 
+		// Extract state file from snapshot
+		stateFile, err := tempCluster.GetStateFileFromSnapshot(ctx, snapshotName)
+		// If state file is not in snapshot (or can't be retrieved), fallback to local state file
+		if err != nil {
+			logrus.Infof("Could not extract state file from snapshot [%s] on any host, falling back to local state file: %v", snapshotName, err)
+			rkeFullState, _ = cluster.ReadStateFile(ctx, stateFilePath)
+		} else {
+			// Parse extracted state file to FullState struct
+			rkeFullState, err = cluster.StringToFullState(ctx, stateFile)
+			if err != nil {
+				logrus.Errorf("Error when converting state file contents to rkeFullState: %v", err)
+				return APIURL, caCrt, clientCert, clientKey, nil, err
+			}
+			logrus.Infof("State file is successfully extracted from snapshot [%s]", snapshotName)
+			stateFileRetrieved = true
+		}
+	} else {
+		var err error
+		log.Infof(ctx, "Not checking if state file is included in snapshot file for [%s], using local state file [%s]", snapshotName, stateFilePath)
+		rkeFullState, err = cluster.ReadStateFile(ctx, stateFilePath)
+		if err != nil {
+			return APIURL, caCrt, clientCert, clientKey, nil, err
+		}
+	}
 	log.Infof(ctx, "Restoring etcd snapshot %s", snapshotName)
 
 	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, rkeFullState.DesiredState.EncryptionConfig)
@@ -190,8 +202,8 @@ func RestoreEtcdSnapshot(
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	// If we can't retrieve statefile from snapshot, and we don't have local, we need to check for legacy cluster
-	if !stateFileRetrieved {
+	// If we can't retrieve state file from snapshot, and we don't have local, we need to check for legacy cluster
+	if !stateFileRetrieved || flags.UseLocalState {
 		if err := checkLegacyCluster(ctx, kubeCluster, rkeFullState, flags); err != nil {
 			return APIURL, caCrt, clientCert, clientKey, nil, err
 		}
@@ -305,7 +317,7 @@ func SnapshotSaveEtcdHostsFromCli(ctx *cli.Context) error {
 		logrus.Warnf("Name of the snapshot is not specified using [%s]", etcdSnapshotName)
 	}
 	// setting up the flags
-	flags := cluster.GetExternalFlags(false, false, false, "", filePath)
+	flags := cluster.GetExternalFlags(false, false, false, false, "", filePath)
 
 	return SnapshotSaveEtcdHosts(context.Background(), rkeConfig, hosts.DialersOptions{}, flags, etcdSnapshotName)
 }
@@ -331,7 +343,10 @@ func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 		return fmt.Errorf("you must specify the snapshot name to restore")
 	}
 	// setting up the flags
-	flags := cluster.GetExternalFlags(false, false, false, "", filePath)
+	// flag to use local state file
+	useLocalState := ctx.Bool("use-local-state")
+
+	flags := cluster.GetExternalFlags(false, false, false, useLocalState, "", filePath)
 	// Custom certificates and certificate dir flags
 	flags.CertificateDir = ctx.String("cert-dir")
 	flags.CustomCerts = ctx.Bool("custom-certs")

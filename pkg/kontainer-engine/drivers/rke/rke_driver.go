@@ -478,7 +478,7 @@ func (d *Driver) cleanup(stateDir string) {
 
 func (d *Driver) getFlags(rkeConfig v3.RancherKubernetesEngineConfig, stateDir string) (hosts.DialersOptions, cluster.ExternalFlags) {
 	dialers := hosts.GetDialerOptions(d.DockerDialer, d.LocalDialer, d.wrapTransport(&rkeConfig))
-	externalFlags := cluster.GetExternalFlags(false, false, false, stateDir, "")
+	externalFlags := cluster.GetExternalFlags(false, false, false, true, stateDir, "")
 	return dialers, externalFlags
 }
 
