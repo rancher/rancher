@@ -29,6 +29,15 @@ type Server struct {
 	scaledContext *config.ScaledContext
 }
 
+func NewHeaderAuth() (*Server, error) {
+	return &Server{
+		Authenticator: steveauth.ToMiddleware(steveauth.AuthenticatorFunc(steveauth.Impersonation)),
+		Management: func(next http.Handler) http.Handler {
+			return next
+		},
+	}, nil
+}
+
 func NewServer(ctx context.Context, cfg *rest.Config) (*Server, error) {
 	sc, err := config.NewScaledContext(*cfg, nil)
 	if err != nil {
@@ -121,6 +130,9 @@ func (s *Server) OnLeader(ctx context.Context) error {
 }
 
 func (s *Server) Start(ctx context.Context, leader bool) error {
+	if s.scaledContext == nil {
+		return nil
+	}
 	if err := s.scaledContext.Start(ctx); err != nil {
 		return err
 	}

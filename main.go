@@ -230,7 +230,13 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	cfg.Embedded = embedded
 
 	os.Unsetenv("KUBECONFIG")
-	server, err := rancher.New(ctx, clientConfig, &cfg)
+
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil
+	}
+
+	server, err := rancher.New(ctx, restConfig, &cfg)
 	if err != nil {
 		return err
 	}

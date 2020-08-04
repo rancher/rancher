@@ -180,6 +180,13 @@ func (f *Feature) Enabled() bool {
 	return f.val
 }
 
+// Disable will disable a feature such that regardless of the user's choice it will always be false
+func (f *Feature) Disable() {
+	f.val = false
+	f.def = false
+	delete(features, f.name)
+}
+
 // Dynamic returns whether the feature is dynamic. Rancher must be restarted when
 // a non-dynamic feature's effective value is changed.
 func (f *Feature) Dynamic() bool {
