@@ -53,7 +53,7 @@ func (c *Cluster) GetClusterState(ctx context.Context, fullState *FullState) (*C
 	}
 
 	// resetup external flags
-	flags := GetExternalFlags(false, false, false, c.ConfigDir, c.ConfigPath)
+	flags := GetExternalFlags(false, false, false, false, c.ConfigDir, c.ConfigPath)
 	currentCluster, err := InitClusterObject(ctx, fullState.CurrentState.RancherKubernetesEngineConfig, flags, fullState.CurrentState.EncryptionConfig)
 	if err != nil {
 		return nil, err
