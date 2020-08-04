@@ -198,6 +198,11 @@ RANCHER_HOSTNAME_PREFIX = os.environ.get("RANCHER_HOSTNAME_PREFIX",
                                          test_run_id)
 # -----------------------------------------------------------------------------
 
+# this is used for testing rbac v2
+test_rbac_v2 = os.environ.get("RANCHER_TEST_RBAC_V2", "False")
+if_test_rbac_v2 = pytest.mark.skipif(test_rbac_v2 != "True",
+                                     reason='test for rbac v2 is skipped')
+
 
 def is_windows(os_type=TEST_OS):
     return os_type == "windows"
