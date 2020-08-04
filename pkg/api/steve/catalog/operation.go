@@ -3,10 +3,10 @@ package catalog
 import (
 	"net/http"
 
-	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
-
 	"github.com/rancher/apiserver/pkg/types"
+	catalogtypes "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/steve/pkg/stores/proxy"
@@ -24,10 +24,10 @@ type operation struct {
 func newOperation(
 	cg proxy.ClientGetter,
 	catalog catalogcontrollers.Interface,
-	pods corev1controllers.PodClient,
-	secrets corev1controllers.SecretClient) *operation {
+	contentManager *content.Manager,
+	pods corev1controllers.PodClient) *operation {
 	return &operation{
-		ops: helmop.NewOperations(cg, catalog, pods, secrets),
+		ops: helmop.NewOperations(cg, catalog, contentManager, pods),
 	}
 }
 
@@ -74,7 +74,7 @@ func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	apiRequest.WriteResponse(http.StatusCreated, types.APIObject{
 		Type: "chartActionOutput",
-		Object: &types2.ChartActionOutput{
+		Object: &catalogtypes.ChartActionOutput{
 			OperationName:      op.Name,
 			OperationNamespace: op.Namespace,
 		},

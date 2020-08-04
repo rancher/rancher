@@ -25,12 +25,14 @@ func Register(ctx context.Context, server *steve.Server,
 	clusterRepos catalogcontrollers.ClusterRepoCache,
 	catalog catalogcontrollers.Interface) error {
 
-	ops := newOperation(server.ClientFactory, catalog, pods, secrets)
+	contentManager := content.NewManager(configMaps, repos, secrets.Cache(), clusterRepos)
+
+	ops := newOperation(server.ClientFactory, catalog, contentManager, pods)
 	server.ClusterCache.OnAdd(ctx, ops.OnAdd)
 	server.ClusterCache.OnChange(ctx, ops.OnChange)
 
 	index := &contentDownload{
-		contentManager: content.NewManager(configMaps, repos, secrets.Cache(), clusterRepos),
+		contentManager: contentManager,
 	}
 
 	addSchemas(server, ops, index)
@@ -42,6 +44,7 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgradeAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartRollbackAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartInstallAction{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(types2.ChartInstall{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartActionOutput{}, nil)
 
 	operationTemplate := schema2.Template{
