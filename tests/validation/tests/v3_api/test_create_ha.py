@@ -103,6 +103,7 @@ def test_install_rancher_ha(precheck_certificate_options):
         print("Error: {0}".format(e))
         assert False, "check the logs in console for details"
 
+    print_kubeconfig()
     if cm_install:
         install_cert_manager()
     add_repo_create_namespace()
@@ -113,7 +114,6 @@ def test_install_rancher_ha(precheck_certificate_options):
         # a Route53 record with the ingress address value
         set_route53_with_eks_ingress()
     wait_for_status_code(url=RANCHER_SERVER_URL + "/v3", expected_code=401)
-    print_kubeconfig()
     auth_url = \
         RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
     wait_for_status_code(url=auth_url, expected_code=200)
