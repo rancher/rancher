@@ -288,7 +288,7 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	updateOnly := ctx.Bool("update-only")
 	disablePortCheck := ctx.Bool("disable-port-check")
 	// setting up the flags
-	flags := cluster.GetExternalFlags(false, updateOnly, disablePortCheck, "", filePath)
+	flags := cluster.GetExternalFlags(false, updateOnly, disablePortCheck, false, "", filePath)
 	// Custom certificates and certificate dir flags
 	flags.CertificateDir = ctx.String("cert-dir")
 	flags.CustomCerts = ctx.Bool("custom-certs")
@@ -323,7 +323,7 @@ func clusterUpLocal(ctx *cli.Context) error {
 	// setting up the dialers
 	dialers := hosts.GetDialerOptions(nil, hosts.LocalHealthcheckFactory, nil)
 	// setting up the flags
-	flags := cluster.GetExternalFlags(true, false, false, "", filePath)
+	flags := cluster.GetExternalFlags(true, false, false, false, "", filePath)
 
 	if ctx.Bool("init") {
 		return ClusterInit(context.Background(), rkeConfig, dialers, flags)
@@ -349,7 +349,7 @@ func clusterUpDind(ctx *cli.Context) error {
 	// setting up the dialers
 	dialers := hosts.GetDialerOptions(hosts.DindConnFactory, hosts.DindHealthcheckConnFactory, nil)
 	// setting up flags
-	flags := cluster.GetExternalFlags(false, false, disablePortCheck, "", filePath)
+	flags := cluster.GetExternalFlags(false, false, disablePortCheck, false, "", filePath)
 	flags.DinD = true
 
 	if ctx.Bool("init") {
