@@ -13,13 +13,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
-
-	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -106,7 +104,7 @@ func StartTiller(context context.Context, tempDirs *HelmPath, port, namespace st
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	cmd, err := JailCommand(cmd, tempDirs.FullPath)
+	cmd, err := jailer.JailCommand(cmd, tempDirs.FullPath)
 	if err != nil {
 		return err
 	}
@@ -176,7 +174,7 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 	stderrBuf := &bytes.Buffer{}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = stderrBuf
-	cmd, err = JailCommand(cmd, tempDirs.FullPath)
+	cmd, err = jailer.JailCommand(cmd, tempDirs.FullPath)
 	if err != nil {
 		return err
 	}
@@ -254,7 +252,7 @@ func DeleteCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 		cmd = exec.Command(HelmV2, "delete", "--purge", obj.Name)
 	}
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
-	cmd, err := JailCommand(cmd, tempDirs.FullPath)
+	cmd, err := jailer.JailCommand(cmd, tempDirs.FullPath)
 	if err != nil {
 		return err
 	}
@@ -263,25 +261,6 @@ func DeleteCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 		return nil
 	}
 	return errors.New(string(combinedOutput))
-}
-
-func JailCommand(cmd *exec.Cmd, jailPath string) (*exec.Cmd, error) {
-	if os.Getenv("CATTLE_DEV_MODE") != "" {
-		return cmd, nil
-	}
-
-	cred, err := jailer.GetUserCred()
-	if err != nil {
-		return nil, errors.WithMessage(err, "get user cred error")
-	}
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	cmd.SysProcAttr.Credential = cred
-	cmd.SysProcAttr.Chroot = jailPath
-	cmd.Env = jailer.WhitelistEnvvars(cmd.Env)
-	cmd.Env = append(cmd.Env, "PWD=/")
-	cmd.Dir = "/"
-	return cmd, nil
 }
 
 // escapeCommas will escape the commas in a string, unless helm would identify it as a list
