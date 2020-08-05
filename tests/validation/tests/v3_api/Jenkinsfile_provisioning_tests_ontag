@@ -84,15 +84,9 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
               }
 
               stage('Deploy Rancher server') {
-<<<<<<< HEAD
-                sh "docker run --name ${JOB_NAME}${BUILD_NUMBER} -t --env-file .env ${imageName} /bin/bash " +
-                  "-c \'export RANCHER_SERVER_VERSION=${rancher_version} && pytest -v -s --junit-xml=setup.xml -k test_deploy_rancher_server tests/v3_api/\'"
-                sh "docker cp ${JOB_NAME}${BUILD_NUMBER}:/src/rancher-validation/tests/v3_api/rancher_env.config ."
-=======
                 sh "docker run --name ${job_name}${BUILD_NUMBER} -t --env-file .env ${imageName} /bin/bash " +
                   "-c \'export RANCHER_SERVER_VERSION=${rancher_version} && pytest -v -s --junit-xml=setup.xml -k test_deploy_rancher_server tests/v3_api/\'"
                 sh "docker cp ${job_name}${BUILD_NUMBER}:/src/rancher-validation/tests/v3_api/rancher_env.config ."
->>>>>>> c29145652... Add withFolderProperties to pipelines for migration
                 load "rancher_env.config"
                 RANCHER_DEPLOYED = true
               }
