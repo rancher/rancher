@@ -2803,7 +2803,7 @@ def create_service_account_configfile():
     return name
 
 
-def test_reader(file_path=None):
+def rbac_test_file_reader(file_path=None):
     """
     This method generates test cases from an input file and return the result
     that can be used to parametrize pytest cases
@@ -2811,6 +2811,8 @@ def test_reader(file_path=None):
     :return: a list of tuples of
             (cluster_role, command, authorization, service account name)
     """
+    if test_rbac_v2 == "False":
+        return []
 
     if file_path is None:
         pytest.fail("no file is provided")
