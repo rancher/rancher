@@ -168,7 +168,7 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, *common.HelmPath, er
 	sbErr := &bytes.Buffer{}
 	cmd.Stdout = sbOut
 	cmd.Stderr = sbErr
-	cmd, err = common.JailCommand(cmd, tempDir.FullPath)
+	cmd, err = jailer.JailCommand(cmd, tempDir.FullPath)
 	if err != nil {
 		return "", nil, err
 	}
@@ -234,7 +234,7 @@ func renderNotes(obj *v3.App, tempDirs *common.HelmPath, port string) (string, e
 	cmd.Stdout = noteOut
 	cmd.Stderr = sbErr
 	var err error
-	cmd, err = common.JailCommand(cmd, tempDirs.FullPath)
+	cmd, err = jailer.JailCommand(cmd, tempDirs.FullPath)
 	if err != nil {
 		return "", err
 	}

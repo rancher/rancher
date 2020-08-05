@@ -7,12 +7,12 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"os/user"
 	"reflect"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
+
+	"github.com/rancher/rancher/pkg/jailer"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
@@ -444,17 +444,10 @@ func (r *RunningDriver) Start() (string, error) {
 		processContext, r.cancel = context.WithCancel(context.Background())
 
 		cmd := exec.CommandContext(processContext, r.Path, port)
-
-		if os.Getenv("CATTLE_DEV_MODE") == "" {
-			cred, err := getUserCred()
-			if err != nil {
-				return "", errors.WithMessage(err, "get user cred error")
-			}
-
-			cmd.SysProcAttr = &syscall.SysProcAttr{}
-			cmd.SysProcAttr.Credential = cred
-			cmd.SysProcAttr.Chroot = "/opt/jail/driver-jail"
-			cmd.Env = whitelistEnvvars([]string{"PATH=/usr/bin"})
+		cmd.Env = []string{"PATH=/usr/bin"}
+		cmd, err = jailer.JailCommand(cmd, "/opt/jail/driver-jail")
+		if err != nil {
+			return "", errors.WithMessage(err, "failed to setup jail command")
 		}
 
 		// redirect output to console
@@ -624,51 +617,4 @@ func (e *EngineService) RemoveLegacyServiceAccount(ctx context.Context, name str
 	defer cls.Driver.Close()
 
 	return cls.RemoveLegacyServiceAccount(ctx)
-}
-
-// getUserCred looks up the user and provides it in syscall.Credential
-func getUserCred() (*syscall.Credential, error) {
-	u, err := user.Current()
-	if err != nil {
-		uID := os.Getuid()
-		u, err = user.LookupId(strconv.Itoa(uID))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	i, err := strconv.ParseUint(u.Uid, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	uid := uint32(i)
-
-	i, err = strconv.ParseUint(u.Gid, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	gid := uint32(i)
-
-	return &syscall.Credential{Uid: uid, Gid: gid}, nil
-}
-
-func whitelistEnvvars(envvars []string) []string {
-	wl := os.Getenv("CATTLE_KONTAINER_ENGINE_WHITELIST_ENVVARS")
-	envWhiteList := strings.Split(wl, ",")
-
-	if len(envWhiteList) == 0 {
-		envWhiteList = []string{
-			"HTTP_PROXY",
-			"HTTPS_PROXY",
-			"NO_PROXY",
-		}
-	}
-
-	for _, wlVar := range envWhiteList {
-		if val := os.Getenv(wlVar); val != "" {
-			envvars = append(envvars, wlVar+"="+val)
-		}
-	}
-
-	return envvars
 }
