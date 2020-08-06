@@ -351,11 +351,16 @@ func (c Command) Render(index int) (map[string][]byte, error) {
 		return nil, err
 	}
 
-	return map[string][]byte{
+	data := map[string][]byte{
 		fmt.Sprintf("operation%03d", index): []byte(strings.Join(args, "\x00")),
-		c.ValuesFile:                        c.Values,
-		c.ChartFile:                         c.Chart,
-	}, nil
+	}
+	if len(c.ValuesFile) > 0 {
+		data[c.ValuesFile] = c.Values
+	}
+	if len(c.ChartFile) > 0 {
+		data[c.ChartFile] = c.Chart
+	}
+	return data, nil
 }
 
 func (c Command) renderArgs() ([]string, error) {
