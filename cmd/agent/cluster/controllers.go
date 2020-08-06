@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/rancher/rancher/pkg/agent/steve"
+	"github.com/rancher/rancher/cmd/agent/steve"
 )
 
 var running bool
