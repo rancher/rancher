@@ -38,24 +38,16 @@ func GetURLAndInterval() (string, string) {
 
 }
 
-func run() chan error {
+func run(cmdArgs []string) chan error {
 	done := make(chan error, 1)
 	go func() {
 		defer close(done)
-
 		url, interval := GetURLAndInterval()
-		cmd := exec.Command(
-			prog,
-			"--config-key=k3s",
-			"--config-key=rke2",
-			"--path-prefix=v1-k3s-release",
-			"--path-prefix=v1-rke2-release",
-			"--url", url,
+		cmdArgs = append(cmdArgs, "--url", url,
 			"--url=/var/lib/rancher-data/driver-metadata/data.json",
 			"--refresh-interval", interval,
-			"--listen-address=0.0.0.0:8115",
-			"--channel-server-version", getChannelServerArg(),
-			getChannelServerArg())
+			"--channel-server-version", getChannelServerArg(), getChannelServerArg())
+		cmd := exec.Command(prog, cmdArgs...)
 		channelserverCmd = cmd
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -64,7 +56,7 @@ func run() chan error {
 	return done
 }
 
-func Start(ctx context.Context) error {
+func Start(ctx context.Context, cmdArgs []string) error {
 	if _, err := exec.LookPath(prog); err != nil {
 		logrus.Errorf("Failed to find %s, will not run /v1-release API: %v", prog, err)
 		return nil
@@ -77,7 +69,7 @@ func Start(ctx context.Context) error {
 				logrus.Errorf("error terminating channelserver: %v", err)
 			}
 			return ctx.Err()
-		case err := <-run():
+		case err := <-run(cmdArgs):
 			logrus.Infof("failed to run channelserver: %v", err)
 		}
 		backoff.Next("next", time.Now())
