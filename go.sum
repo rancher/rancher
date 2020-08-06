@@ -830,6 +830,8 @@ github.com/rancher/norman v0.0.0-20200520181341-ab75acb55410 h1:iPheUCT5yzEWhMsI
 github.com/rancher/norman v0.0.0-20200520181341-ab75acb55410/go.mod h1:j0ffXOmInpTVfy/4M8zLrpgkUOwEe6YFBJ/tzkBss78=
 github.com/rancher/norman v0.0.0-20200609224801-7afd2e9bf37f h1:A88Zbs3ztrHMe3ZrFklkJ6Kp3oCkXVSpnTXrgLzgLvw=
 github.com/rancher/norman v0.0.0-20200609224801-7afd2e9bf37f/go.mod h1:j0ffXOmInpTVfy/4M8zLrpgkUOwEe6YFBJ/tzkBss78=
+github.com/rancher/norman v0.0.0-20200806175025-f974dbfb2734 h1:nQg+3b0fPKUBaYP1yYPEvW6fg27qtwPRIwZe4lHXkgk=
+github.com/rancher/norman v0.0.0-20200806175025-f974dbfb2734/go.mod h1:7SIoXCD1NVlmN2tO65sqbue1dAcgYMKEUwedRfXi45U=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e h1:j6+HqCET/NLPBtew2m5apL7jWw/PStQ7iGwXjgAqdvo=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e/go.mod h1:XbYHTPaXuw8ZY9bylhYKQh/nJxDaTKk3YhAxPl4Qy/k=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAXBa/AuNAG0bhMusIXVh74dc1bbYOAe+HY=
