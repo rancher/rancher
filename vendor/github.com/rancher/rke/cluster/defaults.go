@@ -120,6 +120,7 @@ type ExternalFlags struct {
 	GenerateCSR      bool
 	Local            bool
 	UpdateOnly       bool
+	UseLocalState    bool
 }
 
 func setDefaultIfEmptyMapValue(configMap map[string]string, key string, value string) {
@@ -606,13 +607,14 @@ func (c *Cluster) setCloudProvider() error {
 	return nil
 }
 
-func GetExternalFlags(local, updateOnly, disablePortCheck bool, configDir, clusterFilePath string) ExternalFlags {
+func GetExternalFlags(local, updateOnly, disablePortCheck, useLocalState bool, configDir, clusterFilePath string) ExternalFlags {
 	return ExternalFlags{
 		Local:            local,
 		UpdateOnly:       updateOnly,
 		DisablePortCheck: disablePortCheck,
 		ConfigDir:        configDir,
 		ClusterFilePath:  clusterFilePath,
+		UseLocalState:    useLocalState,
 	}
 }
 

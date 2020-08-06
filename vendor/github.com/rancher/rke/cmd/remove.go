@@ -116,7 +116,7 @@ func clusterRemoveFromCli(ctx *cli.Context) error {
 	}
 
 	// setting up the flags
-	flags := cluster.GetExternalFlags(false, false, false, "", filePath)
+	flags := cluster.GetExternalFlags(false, false, false, false, "", filePath)
 
 	return ClusterRemove(context.Background(), rkeConfig, hosts.DialersOptions{}, flags)
 }
@@ -140,7 +140,7 @@ func clusterRemoveLocal(ctx *cli.Context) error {
 		return err
 	}
 	// setting up the flags
-	flags := cluster.GetExternalFlags(true, false, false, "", filePath)
+	flags := cluster.GetExternalFlags(true, false, false, false, "", filePath)
 
 	return ClusterRemove(context.Background(), rkeConfig, hosts.DialersOptions{}, flags)
 }
