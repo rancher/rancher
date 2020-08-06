@@ -14,7 +14,7 @@ import (
 	"github.com/rancher/steve/pkg/resources/apigroups"
 	"github.com/rancher/steve/pkg/resources/common"
 	"github.com/rancher/steve/pkg/resources/counts"
-	"github.com/rancher/steve/pkg/resources/helm"
+	"github.com/rancher/steve/pkg/resources/formatters"
 	"github.com/rancher/steve/pkg/resources/userpreferences"
 	"github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/stores/proxy"
@@ -38,11 +38,15 @@ func DefaultSchemaTemplates(cf *client.Factory,
 		apigroups.Template(discovery),
 		{
 			ID:        "configmap",
-			Formatter: helm.DropHelmData,
+			Formatter: formatters.DropHelmData,
 		},
 		{
 			ID:        "secret",
-			Formatter: helm.DropHelmData,
+			Formatter: formatters.DropHelmData,
+		},
+		{
+			ID:        "pod",
+			Formatter: formatters.Pod,
 		},
 	}
 }

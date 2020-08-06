@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -117,21 +116,12 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, e
 		return command, nil
 	}
 
-	cred, err := jailer.GetUserCred()
-	if err != nil {
-		return nil, errors.WithMessage(err, "get user cred error")
-	}
-
 	command := exec.Command(nodeCmd, cmdArgs...)
-	command.SysProcAttr = &syscall.SysProcAttr{}
-	command.SysProcAttr.Credential = cred
-	command.SysProcAttr.Chroot = path.Join(jailer.BaseJailPath, node.Namespace)
-	envvars := []string{
+	command.Env = []string{
 		nodeDirEnvKey + nodeDir,
 		"PATH=/usr/bin:/var/lib/rancher/management-state/bin",
 	}
-	command.Env = jailer.WhitelistEnvvars(envvars)
-	return command, nil
+	return jailer.JailCommand(command, path.Join(jailer.BaseJailPath, node.Namespace))
 }
 
 func initEnviron(nodeDir string) []string {

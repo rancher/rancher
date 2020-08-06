@@ -8,12 +8,10 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
 	_ "github.com/rancher/norman/controller"
-	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
@@ -218,7 +216,6 @@ func migrateETCDlocal() {
 func run(cli *cli.Context, cfg rancher.Options) error {
 	logrus.Infof("Rancher version %s is starting", version.FriendlyVersion())
 	logrus.Infof("Rancher arguments %+v", cfg)
-	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
 	ctx := signals.SetupSignalHandler(context.Background())
 
 	migrateETCDlocal()
@@ -230,7 +227,13 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	cfg.Embedded = embedded
 
 	os.Unsetenv("KUBECONFIG")
-	server, err := rancher.New(ctx, clientConfig, &cfg)
+
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil
+	}
+
+	server, err := rancher.New(ctx, restConfig, &cfg)
 	if err != nil {
 		return err
 	}

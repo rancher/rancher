@@ -218,6 +218,9 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 		if cluster.Status.ServiceAccountToken == "" || cluster.Status.APIEndpoint == "" {
 			cluster, err = e.generateAndSetServiceAccount(cluster)
+			if err != nil {
+				return cluster, err
+			}
 		}
 
 		// check for unauthorized error

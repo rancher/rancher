@@ -2,12 +2,13 @@ package steve
 
 import (
 	"context"
+	"net/http"
 	"sync"
+	"time"
 
-	server2 "github.com/rancher/dynamiclistener/server"
+	"github.com/rancher/rancher/pkg/rancher"
+
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/steve/pkg/auth"
-	"github.com/rancher/steve/pkg/server"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
@@ -17,7 +18,7 @@ var (
 	runLock sync.Mutex
 )
 
-func Run(ctx context.Context, namespace string) error {
+func Run() error {
 	if !features.Steve.Enabled() {
 		return nil
 	}
@@ -35,18 +36,32 @@ func Run(ctx context.Context, namespace string) error {
 		return err
 	}
 
-	s, err := server.New(ctx, c, &server.Options{
-		AuthMiddleware: auth.ToMiddleware(auth.AuthenticatorFunc(auth.Impersonation)),
-	})
-	if err != nil {
-		return err
-	}
-
 	go func() {
-		err := s.ListenAndServe(ctx, 6443, 6080, &server2.ListenOpts{
-			BindHost: "127.0.0.1",
-		})
-		logrus.Fatalf("steve exited: %v", err)
+		for {
+			ctx, cancel := context.WithCancel(context.Background())
+			r, err := rancher.New(ctx, c, &rancher.Options{
+				AddLocal: "true",
+				Agent:    true,
+			})
+			if err != nil {
+				cancel()
+				logrus.Errorf("failed to initialize Rancher: %v", err)
+				time.Sleep(10 * time.Second)
+				continue
+			}
+
+			if err := r.Start(ctx); err != nil {
+				cancel()
+				logrus.Errorf("failed to start Rancher: %v", err)
+				time.Sleep(10 * time.Second)
+				continue
+			}
+
+			if err := http.ListenAndServe("127.0.0.1:6080", r.Handler); err != nil {
+				logrus.Fatalf("steve exited: %v", err)
+			}
+			cancel()
+		}
 	}()
 
 	running = true

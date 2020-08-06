@@ -198,6 +198,11 @@ RANCHER_HOSTNAME_PREFIX = os.environ.get("RANCHER_HOSTNAME_PREFIX",
                                          test_run_id)
 # -----------------------------------------------------------------------------
 
+# this is used for testing rbac v2
+test_rbac_v2 = os.environ.get("RANCHER_TEST_RBAC_V2", "False")
+if_test_rbac_v2 = pytest.mark.skipif(test_rbac_v2 != "True",
+                                     reason='test for rbac v2 is skipped')
+
 
 def is_windows(os_type=TEST_OS):
     return os_type == "windows"
@@ -838,7 +843,11 @@ def wait_for_status_code(url, expected_code=200, timeout=DEFAULT_TIMEOUT):
         r = requests.get(url, verify=False)
         if time.time() - start > timeout:
             raise Exception(
-                'Timed out waiting for status code{0}'.format(expected_code))
+                'Timed out waiting for status code {0}'
+                ', actual code {1}'.format(
+                    expected_code, r.status_code
+                )
+            )
     return
 
 
@@ -887,14 +896,15 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
 def validate_cluster(client, cluster, intermediate_state="provisioning",
                      check_intermediate_state=True, skipIngresscheck=True,
                      nodes_not_in_active_state=[], k8s_version="",
-                     userToken=USER_TOKEN):
+                     userToken=USER_TOKEN, timeout=MACHINE_TIMEOUT):
     # Allow sometime for the "cluster_owner" CRTB to take effect
     time.sleep(5)
     cluster = validate_cluster_state(
         client, cluster,
         check_intermediate_state=check_intermediate_state,
         intermediate_state=intermediate_state,
-        nodes_not_in_active_state=nodes_not_in_active_state)
+        nodes_not_in_active_state=nodes_not_in_active_state,
+        timeout=timeout)
     create_kubeconfig(cluster)
     if k8s_version != "":
         check_cluster_version(cluster, k8s_version)
@@ -1354,20 +1364,21 @@ def get_global_admin_client_and_cluster():
 def validate_cluster_state(client, cluster,
                            check_intermediate_state=True,
                            intermediate_state="provisioning",
-                           nodes_not_in_active_state=[]):
+                           nodes_not_in_active_state=[],
+                           timeout=MACHINE_TIMEOUT):
     start_time = time.time()
     if check_intermediate_state:
         cluster = wait_for_condition(
             client, cluster,
             lambda x: x.state == intermediate_state,
             lambda x: 'State is: ' + x.state,
-            timeout=MACHINE_TIMEOUT)
+            timeout=timeout)
         assert cluster.state == intermediate_state
     cluster = wait_for_condition(
         client, cluster,
         lambda x: x.state == "active",
         lambda x: 'State is: ' + x.state,
-        timeout=MACHINE_TIMEOUT)
+        timeout=timeout)
     assert cluster.state == "active"
     wait_for_nodes_to_become_active(client, cluster,
                                     exception_list=nodes_not_in_active_state)
@@ -2735,3 +2746,121 @@ def get_node_details(cluster, client):
         if node.worker:
             break
     return client, node
+
+
+def create_service_account_configfile():
+    client, cluster = get_user_client_and_cluster()
+    create_kubeconfig(cluster)
+    name = random_name()
+    # create a service account
+    execute_kubectl_cmd(cmd="create sa {}".format(name), json_out=False)
+    # get the ca and token
+    res = execute_kubectl_cmd(cmd="get secret -o name", json_out=False)
+    secret_name = ""
+    for item in res.split("\n"):
+        if name in item:
+            secret_name = item.split("/")[1]
+            break
+    res = execute_kubectl_cmd(cmd="get secret {}".format(secret_name))
+    ca = res["data"]["ca.crt"]
+    token = res["data"]["token"]
+    token = base64.b64decode(token).decode()
+
+    server = None
+    nodes = client.list_node(clusterId=cluster.id).data
+    for node in nodes:
+        if node.controlPlane:
+            server = "https://" + node.externalIpAddress + ":6443"
+            break
+    assert server is not None, 'failed to get the public ip of control plane'
+
+    config = """
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - name: test-cluster
+      cluster:
+        server: {server}
+        certificate-authority-data: {ca}
+    contexts:
+    - name: default-context
+      context:
+        cluster: test-cluster
+        namespace: default
+        user: test-user
+    current-context: default-context
+    users:
+    - name: test-user
+      user:
+        token: {token}
+    """
+    config = config.format(server=server, ca=ca, token=token)
+    config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                               name + ".yaml")
+    with open(config_file, "w") as file:
+        file.write(config)
+
+    return name
+
+
+def rbac_test_file_reader(file_path=None):
+    """
+    This method generates test cases from an input file and return the result
+    that can be used to parametrize pytest cases
+    :param file_path: the path to the JSON file for test cases
+    :return: a list of tuples of
+            (cluster_role, command, authorization, service account name)
+    """
+    if test_rbac_v2 == "False":
+        return []
+
+    if file_path is None:
+        pytest.fail("no file is provided")
+    with open(file_path) as reader:
+        test_cases = json.loads(reader.read().replace("{resource_root}",
+                                                      DATA_SUBDIR))
+    output = []
+    for cluster_role, checks in test_cases.items():
+        # create a service account for each role
+        name = create_service_account_configfile()
+        # create the cluster role binding
+        cmd = "create clusterrolebinding {} " \
+              "--clusterrole {} " \
+              "--serviceaccount {}".format(name, cluster_role,
+                                           "default:" + name)
+        execute_kubectl_cmd(cmd, json_out=False)
+        for command in checks["should_pass"]:
+            output.append((cluster_role, command, True, name))
+        for command in checks["should_fail"]:
+            output.append((cluster_role, command, False, name))
+
+    return output
+
+
+def validate_cluster_role_rbac(cluster_role, command, authorization, name):
+    """
+     This methods creates a new service account to validate the permissions
+     both before and after creating the cluster role binding between the
+     service account and the cluster role
+    :param cluster_role:  the cluster role
+    :param command: the kubectl command to run
+    :param authorization: if the service account has the permission: True/False
+    :param name: the name of the service account, cluster role binding, and the
+    kubeconfig file
+    """
+
+    config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                               name + ".yaml")
+    result = execute_kubectl_cmd(command,
+                                 json_out=False,
+                                 kubeconfig=config_file,
+                                 stderr=True).decode('utf_8')
+    if authorization:
+        assert "Error from server (Forbidden)" not in result, \
+            "{} should have the authorization to run {}".format(cluster_role,
+                                                                command)
+    else:
+        assert "Error from server (Forbidden)" in result, \
+            "{} should NOT have the authorization to run {}".format(
+                cluster_role, command)
+

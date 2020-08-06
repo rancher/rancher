@@ -39,6 +39,11 @@ func (s *shell) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		_ = client.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	}()
 	s.proxyRequest(rw, req, pod, client)
 }
 
@@ -48,13 +53,14 @@ func (s *shell) proxyRequest(rw http.ResponseWriter, req *http.Request, pod *v1.
 		Namespace(pod.Namespace).
 		Resource("pods").
 		Name(pod.Name).
-		SubResource("attach").
-		VersionedParams(&v1.PodAttachOptions{
+		SubResource("exec").
+		VersionedParams(&v1.PodExecOptions{
 			Stdin:     true,
 			Stdout:    true,
 			Stderr:    true,
 			TTY:       true,
 			Container: "shell",
+			Command:   []string{"welcome"},
 		}, scheme.ParameterCodec).URL()
 
 	httpClient := client.CoreV1().RESTClient().(*rest.RESTClient).Client

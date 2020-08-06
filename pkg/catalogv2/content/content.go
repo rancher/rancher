@@ -3,9 +3,12 @@ package content
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/url"
+	"time"
 
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -18,7 +21,6 @@ import (
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
 )
 
 type Manager struct {
@@ -101,14 +103,16 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	}
 
 	index := &repo.IndexFile{}
-	return index, yaml.Unmarshal(data, index)
+	return index, json.Unmarshal(data, index)
 }
 
 func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadCloser, string, error) {
+	start := time.Now()
 	index, err := c.Index(namespace, name)
 	if err != nil {
 		return nil, "", err
 	}
+	fmt.Println("INDEX: ", time.Now().Sub(start))
 
 	chart, err := index.Get(chartName, version)
 	if err != nil {
@@ -129,6 +133,10 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 		return nil, "", err
 	}
 
+	start = time.Now()
+	defer func() {
+		fmt.Println("GET: ", time.Now().Sub(start))
+	}()
 	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
 }
 

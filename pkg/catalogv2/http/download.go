@@ -48,6 +48,13 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		defer ioutil.ReadAll(resp.Body)
+		return nil, "", validation.ErrorCode{
+			Status: resp.StatusCode,
+		}
+	}
+
 	data, err := ioutil.ReadAll(resp.Body)
 	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.String()), nil
 }

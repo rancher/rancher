@@ -25,7 +25,6 @@ import (
 	"github.com/rancher/wrangler/pkg/k8scheck"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 type Options struct {
@@ -43,6 +42,7 @@ type Options struct {
 	AuditLogMaxsize   int
 	AuditLogMaxbackup int
 	AuditLevel        int
+	Agent             bool
 	Features          string
 }
 
@@ -57,12 +57,16 @@ type Rancher struct {
 	opts       *Options
 }
 
-func New(ctx context.Context, clientConfig clientcmd.ClientConfig, opts *Options) (*Rancher, error) {
+func New(ctx context.Context, restConfig *rest.Config, opts *Options) (*Rancher, error) {
+	var (
+		authServer *auth.Server
+	)
+
 	if opts == nil {
 		opts = &Options{}
 	}
 
-	restConfig, err := setupAndValidationRESTConfig(ctx, clientConfig)
+	restConfig, err := setupAndValidationRESTConfig(ctx, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -79,9 +83,17 @@ func New(ctx context.Context, clientConfig clientcmd.ClientConfig, opts *Options
 	// Initialize Features as early as possible
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
 
-	authServer, err := auth.NewServer(ctx, restConfig)
-	if err != nil {
-		return nil, err
+	if opts.Agent {
+		authServer, err = auth.NewHeaderAuth()
+		if err != nil {
+			return nil, err
+		}
+		features.MCM.Disable()
+	} else {
+		authServer, err = auth.NewServer(ctx, restConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
@@ -199,11 +211,7 @@ func newMCM(wrangler *wrangler.Context, opts *Options) wrangler.MultiClusterMana
 	})
 }
 
-func setupAndValidationRESTConfig(ctx context.Context, clientConfig clientcmd.ClientConfig) (*rest.Config, error) {
-	restConfig, err := clientConfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
+func setupAndValidationRESTConfig(ctx context.Context, restConfig *rest.Config) (*rest.Config, error) {
 	restConfig = steveserver.RestConfigDefaults(restConfig)
 	return restConfig, k8scheck.Wait(ctx, *restConfig)
 }

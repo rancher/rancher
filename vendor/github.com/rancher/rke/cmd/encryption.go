@@ -55,7 +55,7 @@ func rotateEncryptionKeyFromCli(ctx *cli.Context) error {
 	}
 
 	// setting up the flags
-	flags := cluster.GetExternalFlags(false, false, false, "", filePath)
+	flags := cluster.GetExternalFlags(false, false, false, false, "", filePath)
 
 	return RotateEncryptionKey(context.Background(), rkeConfig, hosts.DialersOptions{}, flags)
 }

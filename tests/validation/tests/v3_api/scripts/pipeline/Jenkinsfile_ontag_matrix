@@ -68,7 +68,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
       def deleteResultsOut = "delete-results.xml"
       def deleteResultsOut2 = "delete-results-2.xml"
 
-      def imageName = "rancher-validation-${JOB_NAME}${env.BUILD_NUMBER}"
+      def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
       def testsDir = "tests/v3_api/"
 
       def envFile = ".env"
