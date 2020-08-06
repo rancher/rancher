@@ -72,8 +72,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
 	unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
-	unauthed.PathPrefix("/v1-k3s-release/release").Handler(channelserver.NewProxy(ctx))
-	unauthed.PathPrefix("/v1-rke2-release/release").Handler(channelserver.Rke2Proxy(ctx))
+	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver.NewProxy(ctx))
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
