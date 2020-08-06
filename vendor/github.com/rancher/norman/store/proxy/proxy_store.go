@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	"k8s.io/utils/trace"
 )
 
 var (
@@ -195,6 +196,8 @@ func (s *Store) Context() types.StorageContext {
 func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	var resultList unstructured.UnstructuredList
 
+	listTrace := trace.New("Proxy Store List", trace.Field{Key: "resource", Value: s.resourcePlural})
+	defer listTrace.LogIfLong(10 * time.Second)
 	// if there are no namespaces field in options, a single request is made
 	if opt == nil || opt.Namespaces == nil {
 		ns := getNamespace(apiContext, opt)
@@ -230,13 +233,24 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 		}
 	}
 
+	listTrace.Step("Completed List", trace.Field{Key: "list-len", Value: len(resultList.Items)})
+
 	var result []map[string]interface{}
 
 	for _, obj := range resultList.Items {
 		result = append(result, s.fromInternal(apiContext, schema, obj.Object))
 	}
 
-	return apiContext.AccessControl.FilterList(apiContext, schema, result, s.authContext), nil
+	listTrace.Step("Completed fromInternal")
+
+	filtered := apiContext.AccessControl.FilterList(apiContext, schema, result, s.authContext)
+
+	listTrace.Step("Completed FilterList")
+
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		listTrace.Log()
+	}
+	return filtered, nil
 }
 
 func (s *Store) retryList(namespace string, apiContext *types.APIContext) (*unstructured.UnstructuredList, error) {
