@@ -1,0 +1,318 @@
+{
+  "istio-admin": {
+    "should_pass": [
+      "create -f {resource_root}/istio/crds/virtualservice.yaml",
+      "get virtualservices",
+      "apply -f {resource_root}/istio/crds/virtualservice.yaml",
+      "delete -f {resource_root}/istio/crds/virtualservice.yaml",
+
+      "create -f {resource_root}/istio/crds/destinationrule.yaml",
+      "get destinationrules",
+      "apply -f {resource_root}/istio/crds/destinationrule.yaml",
+      "delete -f {resource_root}/istio/crds/destinationrule.yaml",
+
+      "create -f {resource_root}/istio/crds/envoyfilter.yaml",
+      "get envoyfilters",
+      "apply -f {resource_root}/istio/crds/envoyfilter.yaml",
+      "delete -f {resource_root}/istio/crds/envoyfilter.yaml",
+
+      "create -f {resource_root}/istio/crds/gateway.yaml",
+      "get gateways",
+      "apply -f {resource_root}/istio/crds/gateway.yaml",
+      "delete -f {resource_root}/istio/crds/gateway.yaml",
+
+      "create -f {resource_root}/istio/crds/serviceentry.yaml",
+      "get serviceentry",
+      "apply -f {resource_root}/istio/crds/serviceentry.yaml",
+      "delete -f {resource_root}/istio/crds/serviceentry.yaml",
+
+      "create -f {resource_root}/istio/crds/sidecar.yaml",
+      "get sidecars",
+      "apply -f {resource_root}/istio/crds/sidecar.yaml",
+      "delete -f {resource_root}/istio/crds/sidecar.yaml",
+
+      "create -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+      "get authorizationpolicy",
+      "apply -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+      "delete -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+
+      "create -f {resource_root}/istio/crds/peerauthentication.yaml",
+      "get peerauthentication",
+      "apply -f {resource_root}/istio/crds/peerauthentication.yaml",
+      "delete -f {resource_root}/istio/crds/peerauthentication.yaml",
+
+      "create -f {resource_root}/istio/crds/requestauthentication.yaml",
+      "get requestauthentication",
+      "apply -f {resource_root}/istio/crds/requestauthentication.yaml",
+      "delete -f {resource_root}/istio/crds/requestauthentication.yaml",
+
+      "create -f {resource_root}/istio/crds/workloadentry.yaml",
+      "get workloadentry",
+      "apply -f {resource_root}/istio/crds/workloadentry.yaml",
+      "delete -f {resource_root}/istio/crds/workloadentry.yaml",
+
+      "get adapters",
+      "get attributemanifests",
+      "get handlers",
+      "get httpapispecbindings",
+      "get httpapispecs",
+      "get instances",
+      "get quotaspecbindings",
+      "get quotaspecs",
+      "get rules",
+      "get templates"
+    ],
+    "should_fail": [
+      "create -f {resource_root}/istio/crds/adapter.yaml",
+      "apply -f {resource_root}/istio/crds/adapter.yaml",
+      "delete -f {resource_root}/istio/crds/adapter.yaml",
+
+      "create -f {resource_root}/istio/crds/attributemanifest.yaml",
+      "apply -f {resource_root}/istio/crds/attributemanifest.yaml",
+      "delete -f {resource_root}/istio/crds/attributemanifest.yaml",
+
+      "create -f {resource_root}/istio/crds/handler.yaml",
+      "apply -f {resource_root}/istio/crds/handler.yaml",
+      "delete -f {resource_root}/istio/crds/handler.yaml",
+
+      "create -f {resource_root}/istio/crds/httpapispec.yaml",
+      "apply -f {resource_root}/istio/crds/httpapispec.yaml",
+      "delete -f {resource_root}/istio/crds/httpapispec.yaml",
+
+      "create -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+      "apply -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+      "delete -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+
+      "create -f {resource_root}/istio/crds/instance.yaml",
+      "apply -f {resource_root}/istio/crds/instance.yaml",
+      "delete -f {resource_root}/istio/crds/instance.yaml",
+
+      "create -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+      "apply -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+      "delete -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+
+      "create -f {resource_root}/istio/crds/quotaspec.yaml",
+      "apply -f {resource_root}/istio/crds/quotaspec.yaml",
+      "delete -f {resource_root}/istio/crds/quotaspec.yaml",
+
+      "create -f {resource_root}/istio/crds/rule.yaml",
+      "apply -f {resource_root}/istio/crds/rule.yaml",
+      "delete -f {resource_root}/istio/crds/rule.yaml",
+
+      "create -f {resource_root}/istio/crds/template.yaml",
+      "apply -f {resource_root}/istio/crds/template.yaml",
+      "delete -f {resource_root}/istio/crds/template.yaml"
+    ]
+  },
+  "istio-edit": {
+    "should_pass": [
+      "create -f {resource_root}/istio/crds/virtualservice.yaml",
+      "get virtualservices",
+      "apply -f {resource_root}/istio/crds/virtualservice.yaml",
+      "delete -f {resource_root}/istio/crds/virtualservice.yaml",
+
+      "create -f {resource_root}/istio/crds/destinationrule.yaml",
+      "get destinationrules",
+      "apply -f {resource_root}/istio/crds/destinationrule.yaml",
+      "delete -f {resource_root}/istio/crds/destinationrule.yaml",
+
+      "create -f {resource_root}/istio/crds/envoyfilter.yaml",
+      "get envoyfilters",
+      "apply -f {resource_root}/istio/crds/envoyfilter.yaml",
+      "delete -f {resource_root}/istio/crds/envoyfilter.yaml",
+
+      "create -f {resource_root}/istio/crds/gateway.yaml",
+      "get gateways",
+      "apply -f {resource_root}/istio/crds/gateway.yaml",
+      "delete -f {resource_root}/istio/crds/gateway.yaml",
+
+      "create -f {resource_root}/istio/crds/serviceentry.yaml",
+      "get serviceentry",
+      "apply -f {resource_root}/istio/crds/serviceentry.yaml",
+      "delete -f {resource_root}/istio/crds/serviceentry.yaml",
+
+      "create -f {resource_root}/istio/crds/sidecar.yaml",
+      "get sidecars",
+      "apply -f {resource_root}/istio/crds/sidecar.yaml",
+      "delete -f {resource_root}/istio/crds/sidecar.yaml",
+
+      "create -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+      "get authorizationpolicy",
+      "apply -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+      "delete -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+
+      "create -f {resource_root}/istio/crds/peerauthentication.yaml",
+      "get peerauthentication",
+      "apply -f {resource_root}/istio/crds/peerauthentication.yaml",
+      "delete -f {resource_root}/istio/crds/peerauthentication.yaml",
+
+      "create -f {resource_root}/istio/crds/requestauthentication.yaml",
+      "get requestauthentication",
+      "apply -f {resource_root}/istio/crds/requestauthentication.yaml",
+      "delete -f {resource_root}/istio/crds/requestauthentication.yaml",
+
+      "create -f {resource_root}/istio/crds/workloadentry.yaml",
+      "get workloadentry",
+      "apply -f {resource_root}/istio/crds/workloadentry.yaml",
+      "delete -f {resource_root}/istio/crds/workloadentry.yaml",
+
+      "get adapters",
+      "get attributemanifests",
+      "get handlers",
+      "get httpapispecbindings",
+      "get httpapispecs",
+      "get instances",
+      "get quotaspecbindings",
+      "get quotaspecs",
+      "get rules",
+      "get templates"
+    ],
+    "should_fail": [
+      "create -f {resource_root}/istio/crds/adapter.yaml",
+      "apply -f {resource_root}/istio/crds/adapter.yaml",
+      "delete -f {resource_root}/istio/crds/adapter.yaml",
+
+      "create -f {resource_root}/istio/crds/attributemanifest.yaml",
+      "apply -f {resource_root}/istio/crds/attributemanifest.yaml",
+      "delete -f {resource_root}/istio/crds/attributemanifest.yaml",
+
+      "create -f {resource_root}/istio/crds/handler.yaml",
+      "apply -f {resource_root}/istio/crds/handler.yaml",
+      "delete -f {resource_root}/istio/crds/handler.yaml",
+
+      "create -f {resource_root}/istio/crds/httpapispec.yaml",
+      "apply -f {resource_root}/istio/crds/httpapispec.yaml",
+      "delete -f {resource_root}/istio/crds/httpapispec.yaml",
+
+      "create -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+      "apply -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+      "delete -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+
+      "create -f {resource_root}/istio/crds/instance.yaml",
+      "apply -f {resource_root}/istio/crds/instance.yaml",
+      "delete -f {resource_root}/istio/crds/instance.yaml",
+
+      "create -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+      "apply -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+      "delete -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+
+      "create -f {resource_root}/istio/crds/quotaspec.yaml",
+      "apply -f {resource_root}/istio/crds/quotaspec.yaml",
+      "delete -f {resource_root}/istio/crds/quotaspec.yaml",
+
+      "create -f {resource_root}/istio/crds/rule.yaml",
+      "apply -f {resource_root}/istio/crds/rule.yaml",
+      "delete -f {resource_root}/istio/crds/rule.yaml",
+
+      "create -f {resource_root}/istio/crds/template.yaml",
+      "apply -f {resource_root}/istio/crds/template.yaml",
+      "delete -f {resource_root}/istio/crds/template.yaml"
+    ]
+  },
+  "istio-view": {
+    "should_pass": [
+      "get virtualservices",
+      "get destinationrules",
+      "get envoyfilters",
+      "get gateways",
+      "get serviceentry",
+      "get sidecars",
+      "get authorizationpolicy",
+      "get peerauthentication",
+      "get requestauthentication",
+      "get workloadentry",
+
+      "get adapters",
+      "get attributemanifests",
+      "get handlers",
+      "get httpapispecbindings",
+      "get httpapispecs",
+      "get instances",
+      "get quotaspecbindings",
+      "get quotaspecs",
+      "get rules",
+      "get templates"
+    ],
+    "should_fail": [
+      "create -f {resource_root}/istio/crds/virtualservice.yaml",
+      "apply -f {resource_root}/istio/crds/virtualservice.yaml",
+      "delete -f {resource_root}/istio/crds/virtualservice.yaml",
+
+      "create -f {resource_root}/istio/crds/destinationrule.yaml",
+      "apply -f {resource_root}/istio/crds/destinationrule.yaml",
+      "delete -f {resource_root}/istio/crds/destinationrule.yaml",
+
+      "create -f {resource_root}/istio/crds/envoyfilter.yaml",
+      "apply -f {resource_root}/istio/crds/envoyfilter.yaml",
+      "delete -f {resource_root}/istio/crds/envoyfilter.yaml",
+
+      "create -f {resource_root}/istio/crds/gateway.yaml",
+      "apply -f {resource_root}/istio/crds/gateway.yaml",
+      "delete -f {resource_root}/istio/crds/gateway.yaml",
+
+      "create -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+      "apply -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+      "delete -f {resource_root}/istio/crds/authorizationpolicy.yaml",
+
+      "create -f {resource_root}/istio/crds/serviceentry.yaml",
+      "apply -f {resource_root}/istio/crds/serviceentry.yaml",
+      "delete -f {resource_root}/istio/crds/serviceentry.yaml",
+
+      "create -f {resource_root}/istio/crds/sidecar.yaml",
+      "apply -f {resource_root}/istio/crds/sidecar.yaml",
+      "delete -f {resource_root}/istio/crds/sidecar.yaml",
+
+      "create -f {resource_root}/istio/crds/peerauthentication.yaml",
+      "apply -f {resource_root}/istio/crds/peerauthentication.yaml",
+      "delete -f {resource_root}/istio/crds/peerauthentication.yaml",
+
+      "create -f {resource_root}/istio/crds/requestauthentication.yaml",
+      "apply -f {resource_root}/istio/crds/requestauthentication.yaml",
+      "delete -f {resource_root}/istio/crds/requestauthentication.yaml",
+
+      "create -f {resource_root}/istio/crds/workloadentry.yaml",
+      "apply -f {resource_root}/istio/crds/workloadentry.yaml",
+      "delete -f {resource_root}/istio/crds/workloadentry.yaml",
+
+      "create -f {resource_root}/istio/crds/adapter.yaml",
+      "apply -f {resource_root}/istio/crds/adapter.yaml",
+      "delete -f {resource_root}/istio/crds/adapter.yaml",
+
+      "create -f {resource_root}/istio/crds/attributemanifest.yaml",
+      "apply -f {resource_root}/istio/crds/attributemanifest.yaml",
+      "delete -f {resource_root}/istio/crds/attributemanifest.yaml",
+
+      "create -f {resource_root}/istio/crds/handler.yaml",
+      "apply -f {resource_root}/istio/crds/handler.yaml",
+      "delete -f {resource_root}/istio/crds/handler.yaml",
+
+      "create -f {resource_root}/istio/crds/httpapispec.yaml",
+      "apply -f {resource_root}/istio/crds/httpapispec.yaml",
+      "delete -f {resource_root}/istio/crds/httpapispec.yaml",
+
+      "create -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+      "apply -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+      "delete -f {resource_root}/istio/crds/httpapispecbinding.yaml",
+
+      "create -f {resource_root}/istio/crds/instance.yaml",
+      "apply -f {resource_root}/istio/crds/instance.yaml",
+      "delete -f {resource_root}/istio/crds/instance.yaml",
+
+      "create -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+      "apply -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+      "delete -f {resource_root}/istio/crds/quotaspecbinding.yaml",
+
+      "create -f {resource_root}/istio/crds/quotaspec.yaml",
+      "apply -f {resource_root}/istio/crds/quotaspec.yaml",
+      "delete -f {resource_root}/istio/crds/quotaspec.yaml",
+
+      "create -f {resource_root}/istio/crds/rule.yaml",
+      "apply -f {resource_root}/istio/crds/rule.yaml",
+      "delete -f {resource_root}/istio/crds/rule.yaml",
+
+      "create -f {resource_root}/istio/crds/template.yaml",
+      "apply -f {resource_root}/istio/crds/template.yaml",
+      "delete -f {resource_root}/istio/crds/template.yaml"
+    ]
+  }
+}
