@@ -6,7 +6,9 @@
 /.trash-cache
 /trash.lock
 /.idea
+/package/data.json
 /package/rancher
+/package/rancher.yaml
 /package/agent
 /tests/MANIFEST
 /tests/integration/MANIFEST

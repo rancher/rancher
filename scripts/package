@@ -5,8 +5,6 @@ source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
 SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.5"}
-SUFFIX=""
-[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
 
 cd $(dirname $0)/../package
 
@@ -21,10 +19,11 @@ if [ -n "$DRONE_TAG" ]; then
     TAG=$DRONE_TAG
 fi
 
-cp ../bin/rancher ../bin/agent ../bin/data.json .
+cp ../bin/rancher.yaml ../bin/rancher ../bin/agent ../bin/data.json .
 
 IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
+RUNTIME_IMAGE=${REPO}/rancher-runtime:${TAG}
 
 if [ ${ARCH} == arm64 ]; then
     sed -i -e '$a\' -e 'ENV ETCD_UNSUPPORTED_ARCH=arm64' Dockerfile
@@ -32,11 +31,18 @@ fi
 
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} -t ${IMAGE} .
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} -t ${AGENT_IMAGE} -f Dockerfile.agent .
+if [ "${ARCH}" == amd64 ]; then
+    docker build -t ${RUNTIME_IMAGE} -f Dockerfile.runtime .
+fi
 echo ${IMAGE} > ../dist/images
 echo ${AGENT_IMAGE} >> ../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}
 echo
 
 cd ../bin
-mkdir -p /tmp/system-charts && git clone --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts /tmp/system-charts
-TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go /tmp/system-charts $IMAGE $AGENT_IMAGE
+
+if [ ! -d build/system-charts ]; then
+    mkdir -p build
+    git clone --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts build/system-charts
+fi
+HOME=$(pwd)/.. TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts $IMAGE $AGENT_IMAGE

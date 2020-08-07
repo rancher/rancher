@@ -17,4 +17,4 @@ if [[ $? > 0 ]]; then
     exit 1
 fi
 
-helm unittest /tmp/chart/rancher
+helm unittest ../../build/chart/rancher

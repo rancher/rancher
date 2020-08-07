@@ -9,4 +9,4 @@ if [[ $? > 0 ]]; then
     exit 1
 fi
 
-helm lint /tmp/chart/rancher
+helm lint ../../build/chart/rancher
