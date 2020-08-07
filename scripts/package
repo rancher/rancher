@@ -34,6 +34,8 @@ docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} -t ${AGENT_IMAG
 if [ "${ARCH}" == amd64 ]; then
     docker build -t ${RUNTIME_IMAGE} -f Dockerfile.runtime .
 fi
+
+mkdir -p ../dist
 echo ${IMAGE} > ../dist/images
 echo ${AGENT_IMAGE} >> ../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}

@@ -178,7 +178,7 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 		return nil, err
 	}
 	dialer := h.dialerFactory.ClusterDialer(host)
-	return dialer(ctx, network, "127.0.0.1:6443")
+	return dialer(ctx, network, "127.0.0.1:6080")
 }
 
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {

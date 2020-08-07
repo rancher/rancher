@@ -114,6 +114,10 @@ func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext) (*m
 }
 
 func (s *Server) OnLeader(ctx context.Context) error {
+	if s.scaledContext == nil {
+		return nil
+	}
+
 	management := &config.ManagementContext{
 		Management: s.scaledContext.Management,
 		Core:       s.scaledContext.Core,
@@ -133,6 +137,7 @@ func (s *Server) Start(ctx context.Context, leader bool) error {
 	if s.scaledContext == nil {
 		return nil
 	}
+
 	if err := s.scaledContext.Start(ctx); err != nil {
 		return err
 	}

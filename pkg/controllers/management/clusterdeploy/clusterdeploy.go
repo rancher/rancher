@@ -242,7 +242,6 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 
 	desiredFeatures := map[string]bool{
 		features.Steve.Name(): features.Steve.Enabled(),
-		features.MCM.Name():   features.MCM.Enabled(),
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 

@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
+	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -152,6 +153,8 @@ func cleanup(ctx context.Context) error {
 }
 
 func run() error {
+	topContext := signals.SetupSignalHandler(context.Background())
+
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
 	params, err := getParams()
 	if err != nil {
@@ -281,7 +284,7 @@ func run() error {
 		}
 
 		if isCluster() {
-			err = cluster.RunControllers()
+			err = cluster.RunControllers(topContext)
 			if err != nil {
 				logrus.Fatal(err)
 			}

@@ -142,7 +142,7 @@ func applyArgumentDefaults(featureArgs string) error {
 		return nil
 	}
 
-	formattingError := fmt.Errorf("feature argument should be of the form \"features=feature1=bool,feature2=bool\"")
+	formattingError := fmt.Errorf("feature argument [%s] should be of the form \"features=feature1=bool,feature2=bool\"", featureArgs)
 	args := strings.Split(featureArgs, ",")
 
 	applyFeatureDefaults := make(map[string]bool)

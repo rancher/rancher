@@ -13,9 +13,6 @@ func addLocalCluster(embedded bool, adminName string, wrangler *wrangler.Context
 	c := &v3.Cluster{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "local",
-			Annotations: map[string]string{
-				"field.cattle.io/creatorId": adminName,
-			},
 		},
 		Spec: v32.ClusterSpec{
 			Internal:    true,
@@ -33,6 +30,11 @@ func addLocalCluster(embedded bool, adminName string, wrangler *wrangler.Context
 				},
 			},
 		},
+	}
+	if adminName != "" {
+		c.Annotations = map[string]string{
+			"field.cattle.io/creatorId": adminName,
+		}
 	}
 	if embedded {
 		c.Status.Driver = v32.ClusterDriverLocal
