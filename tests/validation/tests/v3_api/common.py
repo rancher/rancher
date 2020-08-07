@@ -643,13 +643,16 @@ def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT):
     return p
 
 
-def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
+def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS, activeNodes=False):
     if not client:
         client = get_user_client()
     nodes = client.list_node(clusterId=cluster.id).data
     schedulable_nodes = []
+    active_only = True
     for node in nodes:
-        if node.worker and (not node.unschedulable):
+        if activeNodes:
+            active_only = node.state == "active"
+        if node.worker and (not node.unschedulable) and active_only:
             for key, val in node.labels.items():
                 # Either one of the labels should be present on the node
                 if key == 'kubernetes.io/os' or key == 'beta.kubernetes.io/os':
@@ -659,6 +662,9 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
         # Including master in list of nodes as master is also schedulable
         if 'k3s' in cluster.version["gitVersion"] and node.controlPlane:
             schedulable_nodes.append(node)
+    # Including master in list of nodes as master is also schedulable
+    if 'k3s' in cluster.version["gitVersion"] and node.controlPlane:
+        schedulable_nodes.append(node)
     return schedulable_nodes
 
 
@@ -698,14 +704,14 @@ def get_role_nodes(cluster, role, client=None):
 
 
 def validate_ingress(p_client, cluster, workloads, host, path,
-                     insecure_redirect=False):
+                     insecure_redirect=False, active_nodes=False):
     time.sleep(10)
     curl_args = " "
     if (insecure_redirect):
         curl_args = " -L --insecure "
     if len(host) > 0:
         curl_args += " --header 'Host: " + host + "'"
-    nodes = get_schedulable_nodes(cluster, os_type="linux")
+    nodes = get_schedulable_nodes(cluster, os_type="linux", activeNodes=active_nodes)
     target_name_list = get_target_names(p_client, workloads)
     for node in nodes:
         host_ip = resolve_node_ip(node)
@@ -750,6 +756,7 @@ def validate_ingress_using_endpoint(p_client, ingress, workloads,
 def get_target_names(p_client, workloads):
     pods = []
     for workload in workloads:
+        print("workload: ", workload)
         pod_list = p_client.list_pod(workloadId=workload.id).data
         pods.extend(pod_list)
     target_name_list = []
