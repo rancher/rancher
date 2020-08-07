@@ -114,7 +114,7 @@ func (s *shell) createPod() *v1.Pod {
 							Value: "/home/shell/.kube/config",
 						},
 					},
-					Image:           "ibuildthecloud/shell:v0.0.5",
+					Image:           "ibuildthecloud/shell:v0.0.10",
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},

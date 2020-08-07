@@ -20,13 +20,14 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
-	"github.com/rancher/rancher/cmd/agent/clean"
-	"github.com/rancher/rancher/cmd/agent/cluster"
-	"github.com/rancher/rancher/cmd/agent/node"
+	"github.com/rancher/rancher/pkg/agent/clean"
+	"github.com/rancher/rancher/pkg/agent/cluster"
+	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
+	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -152,6 +153,8 @@ func cleanup(ctx context.Context) error {
 }
 
 func run() error {
+	topContext := signals.SetupSignalHandler(context.Background())
+
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
 	params, err := getParams()
 	if err != nil {
@@ -281,7 +284,7 @@ func run() error {
 		}
 
 		if isCluster() {
-			err = cluster.RunControllers()
+			err = cluster.RunControllers(topContext)
 			if err != nil {
 				logrus.Fatal(err)
 			}

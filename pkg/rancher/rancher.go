@@ -75,6 +75,7 @@ func New(ctx context.Context, restConfig *rest.Config, opts *Options) (*Rancher,
 	if err != nil {
 		return nil, err
 	}
+	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 
 	if err := crds.Create(ctx, restConfig); err != nil {
 		return nil, err
@@ -126,7 +127,6 @@ func New(ctx context.Context, restConfig *rest.Config, opts *Options) (*Rancher,
 		return nil, err
 	}
 
-	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, opts.AuditLevel, opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
 

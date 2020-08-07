@@ -591,8 +591,8 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 					Stdin:           true,
 					TTY:             true,
 					StdinOnce:       true,
-					Image:           "ibuildthecloud/shell:dev",
-					ImagePullPolicy: v1.PullAlways,
+					Image:           "ibuildthecloud/shell:v0.0.10",
+					ImagePullPolicy: v1.PullIfNotPresent,
 					Command:         []string{"helm-cmd"},
 					WorkingDir:      helmDataPath,
 					VolumeMounts: []v1.VolumeMount{

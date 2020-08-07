@@ -2,7 +2,6 @@ package steve
 
 import (
 	"context"
-	"net/http"
 	"sync"
 	"time"
 
@@ -18,7 +17,7 @@ var (
 	runLock sync.Mutex
 )
 
-func Run() error {
+func Run(ctx context.Context) error {
 	if !features.Steve.Enabled() {
 		return nil
 	}
@@ -38,10 +37,11 @@ func Run() error {
 
 	go func() {
 		for {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(ctx)
 			r, err := rancher.New(ctx, c, &rancher.Options{
-				AddLocal: "true",
-				Agent:    true,
+				HTTPSListenPort: 6080,
+				AddLocal:        "true",
+				Agent:           true,
 			})
 			if err != nil {
 				cancel()
@@ -50,16 +50,13 @@ func Run() error {
 				continue
 			}
 
-			if err := r.Start(ctx); err != nil {
+			if err := r.ListenAndServe(ctx); err != nil {
 				cancel()
 				logrus.Errorf("failed to start Rancher: %v", err)
 				time.Sleep(10 * time.Second)
 				continue
 			}
 
-			if err := http.ListenAndServe("127.0.0.1:6080", r.Handler); err != nil {
-				logrus.Fatalf("steve exited: %v", err)
-			}
 			cancel()
 		}
 	}()

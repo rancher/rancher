@@ -34,6 +34,8 @@ docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} -t ${AGENT_IMAG
 if [ "${ARCH}" == amd64 ]; then
     docker build -t ${RUNTIME_IMAGE} -f Dockerfile.runtime .
 fi
+
+mkdir -p ../dist
 echo ${IMAGE} > ../dist/images
 echo ${AGENT_IMAGE} >> ../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}
@@ -45,4 +47,4 @@ if [ ! -d build/system-charts ]; then
     mkdir -p build
     git clone --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts build/system-charts
 fi
-HOME=$(pwd)/.. TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts $IMAGE $AGENT_IMAGE
+TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts $IMAGE $AGENT_IMAGE
