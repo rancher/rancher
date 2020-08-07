@@ -60,18 +60,12 @@ func (g *GlProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	if err := mapstructure.Decode(storedGitlabPipelineConfigMap, storedGitlabPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
-	metadataMap, ok := storedGitlabPipelineConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve GitlabConfig metadata, cannot read k8s Unstructured data")
-	}
 
-	typemeta := &metav1.ObjectMeta{}
-	//time.Time cannot decode directly
-	delete(metadataMap, "creationTimestamp")
-	if err := mapstructure.Decode(metadataMap, typemeta); err != nil {
-		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
+	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedGitlabPipelineConfigMap)
+	if err != nil {
+		return nil, err
 	}
-	storedGitlabPipelineConfig.ObjectMeta = *typemeta
+	storedGitlabPipelineConfig.ObjectMeta = *objectMeta
 	storedGitlabPipelineConfig.APIVersion = "project.cattle.io/v3"
 	storedGitlabPipelineConfig.Kind = v3.SourceCodeProviderConfigGroupVersionKind.Kind
 	return storedGitlabPipelineConfig, nil
