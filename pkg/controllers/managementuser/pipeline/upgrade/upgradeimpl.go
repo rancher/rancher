@@ -25,6 +25,7 @@ var (
 )
 
 type PipelineService struct {
+	daemonSets           appsv1.DaemonSetInterface
 	deployments          appsv1.DeploymentInterface
 	deploymentLister     appsv1.DeploymentLister
 	namespaceLister      v1.NamespaceLister
@@ -37,6 +38,7 @@ func NewService() *PipelineService {
 }
 
 func (l *PipelineService) Init(cluster *config.UserContext) {
+	l.daemonSets = cluster.Apps.DaemonSets("")
 	l.deployments = cluster.Apps.Deployments("")
 	l.deploymentLister = cluster.Apps.Deployments("").Controller().Lister()
 	l.namespaceLister = cluster.Core.Namespaces("").Controller().Lister()
@@ -45,10 +47,11 @@ func (l *PipelineService) Init(cluster *config.UserContext) {
 }
 
 func (l *PipelineService) Version() (string, error) {
-	raw := fmt.Sprintf("%s-%s-%s",
+	raw := fmt.Sprintf("%s-%s-%s-%s",
 		v32.ToolsSystemImages.PipelineSystemImages.Jenkins,
 		v32.ToolsSystemImages.PipelineSystemImages.Registry,
-		v32.ToolsSystemImages.PipelineSystemImages.Minio)
+		v32.ToolsSystemImages.PipelineSystemImages.Minio,
+		v32.ToolsSystemImages.PipelineSystemImages.RegistryProxy)
 	return getDefaultVersion(raw)
 }
 
@@ -65,6 +68,10 @@ func (l *PipelineService) Upgrade(currentVersion string) (newVersion string, err
 		if err := l.upgradeComponents(v.Name); err != nil {
 			return "", err
 		}
+	}
+
+	if err := l.upgradeRegistryProxy(); err != nil {
+		return "", err
 	}
 
 	return l.Version()
@@ -126,6 +133,17 @@ func (l *PipelineService) upgradeComponents(ns string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (l *PipelineService) upgradeRegistryProxy() error {
+	registryProxyDaemonset := pipelineexecution.GetProxyDaemonset()
+	if _, err := l.daemonSets.Update(registryProxyDaemonset); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("upgrade system service %s:%s failed, %v", registryProxyDaemonset.Namespace, registryProxyDaemonset.Name, err)
+	}
 	return nil
 }
 
