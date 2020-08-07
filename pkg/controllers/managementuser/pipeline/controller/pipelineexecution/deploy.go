@@ -346,6 +346,9 @@ func getRegistryCredential(projectID string, token string, hostname string) (*co
 			Annotations: map[string]string{
 				projectIDFieldLabel: projectID,
 			},
+			Labels: map[string]string{
+				"cattle.io/creator": "norman",
+			},
 		},
 		Data: map[string][]byte{
 			corev1.DockerConfigJsonKey: configJSON,
