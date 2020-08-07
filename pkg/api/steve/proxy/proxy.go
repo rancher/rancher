@@ -108,8 +108,8 @@ func routeToProxy(localSupport bool, localCluster http.Handler, mux *gmux.Router
 			return
 		}
 		vars["prefix"] = "k8s/clusters/" + cluster
-		vars["suffix"] = "/v1/clusters/local"
-		r.URL.Path = "/k8s/clusters/" + cluster + "/v1/clusters/local"
+		vars["suffix"] = "/v1/management.cattle.io.clusters/local"
+		r.URL.Path = "/k8s/clusters/" + cluster + "/v1/management.cattle.io.clusters/local"
 		proxyHandler.ServeHTTP(rw, r)
 	}
 }
