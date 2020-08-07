@@ -13,4 +13,4 @@ $env:GOARCH=$env:ARCH
 $env:GOOS='windows'
 $env:CGO_ENABLED=0
 $LINKFLAGS = ('-X main.VERSION={0} -s -w -extldflags "-static"' -f $env:VERSION)
-go build -i -tags k8s -ldflags $LINKFLAGS -o .\bin\agent.exe .\pkg\agent
+go build -i -tags k8s -ldflags $LINKFLAGS -o .\bin\agent.exe .\cmd\agent

@@ -76,6 +76,29 @@ steps:
     event:
     - push
 
+- name: docker-publish-head-runtime
+  image: plugins/docker
+  settings:
+    build_args:
+    - ARCH=amd64
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.runtime
+    tag: ${DRONE_BRANCH/release\//}-head-linux-amd64
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher-runtime
+    username:
+      from_secret: docker_username
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
 - name: docker-publish
   image: plugins/docker
   settings:
@@ -114,6 +137,25 @@ steps:
     event:
     - tag
 
+- name: docker-publish-runtime
+  image: plugins/docker
+  settings:
+    build_args:
+    - ARCH=amd64
+    - "VERSION=${DRONE_TAG}"
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.runtime
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher-runtime
+    tag: "${DRONE_TAG}-linux-amd64"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
 - name: github_binary_prerelease
   image: plugins/github-release
   settings:
@@ -123,6 +165,7 @@ steps:
     - sha256
     files:
     - "bin/rancher-*"
+    - "bin/rancherd-*"
     prerelease: true
   when:
     event:
@@ -141,6 +184,7 @@ steps:
     - sha256
     files:
     - "bin/rancher-*"
+    - "bin/rancherd-*"
   when:
     event:
     - tag
@@ -648,6 +692,22 @@ kind: pipeline
 name: manifest
 
 steps:
+- name: push-head-runtime-manifest
+  image: plugins/manifest
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    spec: manifest-runtime-head.tmpl
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
 - name: push-head-agent-manifest
   image: plugins/manifest
   settings:
@@ -695,6 +755,18 @@ steps:
       - "refs/heads/release/v*"
     event:
     - push
+
+- name: push-runtime-manifest
+  image: plugins/manifest
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    spec: manifest-runtime.tmpl
+  when:
+    event:
+    - tag
 
 - name: push-agent-manifest
   image: plugins/manifest
@@ -810,6 +882,17 @@ steps:
     cache_control: "public,no-cache,proxy-revalidate"
     source: bin/chart
     target: releases.rancher.com/server-charts
+    token:
+      from_secret: google_auth_key
+
+- name: bin-publish
+  image: plugins/gcs
+  settings:
+    acl:
+    - allUsers:READER
+    cache_control: "public,no-cache,proxy-revalidate"
+    source: bin/rancherd
+    target: releases.rancher.com/rancherd
     token:
       from_secret: google_auth_key
 

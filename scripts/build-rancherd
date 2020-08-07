@@ -1,0 +1,21 @@
+#!/bin/bash
+set -e
+
+source $(dirname $0)/version
+
+cd $(dirname $0)/..
+
+mkdir -p bin
+cd ./cmd/rancherd
+
+[ "$(uname)" != "Darwin" ] && LINKFLAGS="-extldflags -static -s"
+CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o ../../bin/rancherd-${ARCH}
+if [ "$ARCH" = "amd64" ]; then
+    cp ../../bin/rancherd-${ARCH} ../../bin/rancherd
+fi
+
+cd ../..
+./scripts/chart/build
+./scripts/chart/package
+
+sed -e "s|%{CHART_CONTENT}%|$(base64 -w0 ./bin/chart/*/rancher-${CHART_VERSION}.tgz)|g" ./scripts/rancher.yaml.tmpl > ./bin/rancher.yaml

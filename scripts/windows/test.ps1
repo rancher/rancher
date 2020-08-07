@@ -10,7 +10,7 @@ cd $SRC_PATH
 
 $env:GOARCH=$env:ARCH
 $env:GOOS='windows'
-go test -v -cover -tags 'test' ./pkg/agent/...
+go test -v -cover -tags 'test' ./cmd/agent/...
 if (-not $?) {
     Log-Fatal "go test failed"
 }

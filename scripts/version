@@ -45,7 +45,11 @@ if [ -z "$ARCH" ]; then
     ARCH=amd64
 fi
 
+SUFFIX=""
+[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
+
 echo "ARCH: $ARCH"
 echo "CHART_REPO: $CHART_REPO"
 echo "CHART_VERSION: $CHART_VERSION"
 echo "VERSION: $VERSION"
+echo "SUFFIX: $SUFFIX"

@@ -1,0 +1,7 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: rancher
+  namespace: cattle-system
+spec:
+  chartContent: %{CHART_CONTENT}%
