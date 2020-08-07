@@ -10,3 +10,6 @@ fi
 
 echo Running: golangci-lint
 golangci-lint run
+
+echo Verifying modules
+go mod verify

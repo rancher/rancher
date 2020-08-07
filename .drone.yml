@@ -35,11 +35,11 @@ steps:
   settings:
     build_args:
     - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
-    tag: ${DRONE_BRANCH/release\//}-head-linux-amd64
+    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
       from_secret: docker_password
     repo: rancher/rancher
@@ -58,11 +58,11 @@ steps:
   settings:
     build_args:
     - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
-    tag: ${DRONE_BRANCH/release\//}-head-linux-amd64
+    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
@@ -81,11 +81,11 @@ steps:
   settings:
     build_args:
     - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.runtime
-    tag: ${DRONE_BRANCH/release\//}-head-linux-amd64
+    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
       from_secret: docker_password
     repo: rancher/rancher-runtime
@@ -98,6 +98,25 @@ steps:
       - "refs/heads/release/v*"
     event:
     - push
+
+- name: bin-publish
+  image: plugins/gcs
+  settings:
+    acl:
+    - allUsers:READER
+    cache_control: "public,no-cache,proxy-revalidate"
+    source: bin/rancherd
+    target: releases.rancher.com/rancherd/rancherd-master
+    token:
+      from_secret: google_auth_key
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
 
 - name: docker-publish
   image: plugins/docker
@@ -257,11 +276,11 @@ steps:
   settings:
     build_args:
     - ARCH=arm64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
-    tag: ${DRONE_BRANCH/release\//}-head-linux-arm64
+    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
     password:
       from_secret: docker_password
     repo: rancher/rancher
@@ -280,11 +299,11 @@ steps:
   settings:
     build_args:
     - ARCH=arm64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
-    tag: ${DRONE_BRANCH/release\//}-head-linux-arm64
+    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
@@ -400,14 +419,14 @@ steps:
       build_args:
         - SERVERCORE_VERSION=1809
         - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
       repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-head-windows-1809
+      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1809
       username:
         from_secret: docker_username
     volumes:
@@ -508,14 +527,14 @@ steps:
       build_args:
         - SERVERCORE_VERSION=1903
         - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
       repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-head-windows-1903
+      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1903
       username:
         from_secret: docker_username
     volumes:
@@ -617,14 +636,14 @@ steps:
       build_args:
         - SERVERCORE_VERSION=1909
         - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
       repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-head-windows-1909
+      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1909
       username:
         from_secret: docker_username
     volumes:
@@ -882,17 +901,6 @@ steps:
     cache_control: "public,no-cache,proxy-revalidate"
     source: bin/chart
     target: releases.rancher.com/server-charts
-    token:
-      from_secret: google_auth_key
-
-- name: bin-publish
-  image: plugins/gcs
-  settings:
-    acl:
-    - allUsers:READER
-    cache_control: "public,no-cache,proxy-revalidate"
-    source: bin/rancherd
-    target: releases.rancher.com/rancherd
     token:
       from_secret: google_auth_key
 
