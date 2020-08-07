@@ -3,7 +3,7 @@ package cluster
 import (
 	"context"
 
-	"github.com/rancher/rancher/cmd/agent/steve"
+	"github.com/rancher/rancher/pkg/agent/steve"
 )
 
 var running bool
