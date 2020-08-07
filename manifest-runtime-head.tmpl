@@ -1,7 +1,0 @@
-image: rancher/rancher-runtime:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}
-manifests:
-  -
-    image: rancher/rancher-runtime:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}-linux-amd64
-    platform:
-      architecture: amd64
-      os: linux
