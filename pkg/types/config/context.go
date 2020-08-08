@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/rancher/pkg/wrangler"
-
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient/dynamic"
 	"github.com/rancher/norman/restwatch"
@@ -33,6 +31,8 @@ import (
 	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rancher/pkg/user"
+	"github.com/rancher/rancher/pkg/wrangler"
+	steve "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	wrbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -98,7 +98,7 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	}
 
 	context := &ScaledContext{
-		RESTConfig: config,
+		RESTConfig: *steve.RestConfigDefaults(&config),
 	}
 
 	if opts.ControllerFactory == nil {
@@ -268,7 +268,7 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 	var err error
 
 	context := &ManagementContext{
-		RESTConfig: c.RESTConfig,
+		RESTConfig: *steve.RestConfigDefaults(&c.RESTConfig),
 	}
 
 	config := c.RESTConfig
@@ -337,7 +337,7 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
 	var err error
 	context := &UserContext{
-		RESTConfig:  config,
+		RESTConfig:  *steve.RestConfigDefaults(&config),
 		ClusterName: clusterName,
 		runContext:  scaledContext.RunContext,
 	}
@@ -473,7 +473,7 @@ func (w *UserContext) Start(ctx context.Context) error {
 func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 	var err error
 	context := &UserOnlyContext{
-		RESTConfig: config,
+		RESTConfig: *steve.RestConfigDefaults(&config),
 	}
 
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, wrangler.Scheme)
