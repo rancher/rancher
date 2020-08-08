@@ -720,7 +720,11 @@ steps:
       from_secret: docker_password
     spec: manifest-runtime.tmpl
   when:
+    instance:
+      include:
+      - drone-publish.rancher.io
     event:
+    - push
     - tag
 
 - name: push-agent-manifest
@@ -732,7 +736,11 @@ steps:
       from_secret: docker_password
     spec: manifest-agent.tmpl
   when:
+    instance:
+      include:
+      - drone-publish.rancher.io
     event:
+    - push
     - tag
 
 - name: push-manifest
@@ -744,7 +752,11 @@ steps:
       from_secret: docker_password
     spec: manifest.tmpl
   when:
+    instance:
+      include:
+      - drone-publish.rancher.io
     event:
+    - push
     - tag
 
 - name: build-chart
