@@ -2,7 +2,7 @@ import json
 import pytest
 from rancher import ApiError
 from .common import random_str
-from .conftest import wait_for, wait_for_condition
+from .conftest import wait_for
 
 
 @pytest.mark.skip(reason="cluster-defaults disabled")
@@ -65,22 +65,28 @@ def test_eks_cluster_immutable_subnets(admin_mc, remove_resource):
                 "subnet-02388a166136f98c4"
             ]})
     remove_resource(cluster)
-    wait_for_condition(
-        'DefaultProjectCreated', 'True', admin_mc.client, cluster)
 
-    # try to edit cluster subnets
-    with pytest.raises(ApiError) as e:
-        admin_mc.client.update_by_id_cluster(
-            id=cluster.id,
-            amazonElasticContainerServiceConfig={
-                 "accessKey": "asdfsd",
-                 "secretKey": "verySecretKey",
-                 "subnets": [
-                     "subnet-045bfaeca7d3f1cb3"
-                 ]})
+    def cannot_modify_error():
+        with pytest.raises(ApiError) as e:
+            # try to edit cluster subnets
+            admin_mc.client.update_by_id_cluster(
+                id=cluster.id,
+                amazonElasticContainerServiceConfig={
+                     "accessKey": "asdfsd",
+                     "secretKey": "verySecretKey",
+                     "subnets": [
+                         "subnet-045bfaeca7d3f1cb3"
+                     ]})
+        if e.value.error.status == 404:
+            return False
+        print(e)
+        assert e.value.error.status == 422
+        assert e.value.error.message ==\
+            'cannot modify EKS subnets after creation'
+        return True
 
-    assert e.value.error.status == 422
-    assert e.value.error.message == 'cannot modify EKS subnets after creation'
+    # lister used by cluster validator may not be up to date, may need to retry
+    wait_for(cannot_modify_error)
 
     # tests updates still work
     new = admin_mc.client.update_by_id_cluster(
