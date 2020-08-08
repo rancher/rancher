@@ -531,7 +531,7 @@ def validate_workload_image(client, workload, expectedImage, ns):
 
 def execute_kubectl_cmd(cmd, json_out=True, stderr=False,
                         kubeconfig=kube_fname):
-    command = 'kubectl --kubeconfig {0} {1}'.format(
+    command = 'kubectl --insecure-skip-tls-verify --kubeconfig {0} {1}'.format(
         kubeconfig, cmd)
     if json_out:
         command += ' -o json'

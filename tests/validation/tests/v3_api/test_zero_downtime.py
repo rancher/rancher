@@ -17,13 +17,25 @@ namespace = {"p_client": None, "ns": None, "cluster": None, "project": None,
              "nodes": []}
 backup_info = {"backupname": None, "backup_id": None, "workload": None,
                "backupfilename": None, "etcdbackupdata": None}
+service_extra_args = {'etcd': {
+    'backupConfig': {'enabled': True, 'intervalHours': 12, 'retention': 6, 's3BackupConfig': None,
+                     'safeTimestamp': False, 'type': '/v3/schemas/backupConfig'}, 'creation': '12h',
+    'extraArgs': {'election-timeout': '5000', 'heartbeat-interval': '500'},
+    'gid': 0, 'retention': '72h', 'snapshot': False, 'type': '/v3/schemas/etcdService', 'uid': 0},
+                      'kubeApi': {'alwaysPullImages': False, 'podSecurityPolicy': False,
+                                  'serviceNodePortRange': '30000-32767', 'type': '/v3/schemas/kubeAPIService'},
+                      'kubeController': {'type': '/v3/schemas/kubeControllerService'},
+                      'kubelet': {'extraArgs': {"max-pods": "120"}, 'failSwapOn': False,
+                                  'generateServingCertificate': False, 'type': '/v3/schemas/kubeletService'},
+                      'kubeproxy': {'type': '/v3/schemas/kubeproxyService'},
+                      'scheduler': {'type': '/v3/schemas/schedulerService'}, 'type': '/v3/schemas/rkeConfigServices'}
 
 
 def test_zero_downtime():
     client, cluster, workload, ingress = get_and_validate_cluster()
     # Update Cluster to k8 version + upgrade strategy maxUnavailable worker
     rke_updated_config = get_default_rke_config(cluster)
-    rke_updated_config["kubernetesVersion"] = K8S_VERSION_UPGRADE
+    rke_updated_config["services"] = service_extra_args
     rke_updated_config["upgradeStrategy"] = {
         'drain': True,
         'maxUnavailableWorker': MAX_UNAVAILABLE_WORKER,
@@ -32,7 +44,7 @@ def test_zero_downtime():
     cluster = client.update(cluster,
                             name=cluster.name,
                             rancherKubernetesEngineConfig=rke_updated_config)
-    upgraded_nodes = validate_nodes_after_upgrade(cluster, workload)
+    upgraded_nodes = validate_nodes_after_upgrade(cluster, workload, k8version=False)
     nodes = client.list_node(clusterId=cluster.id).data
     assert len(upgraded_nodes) == len(nodes), "Not all Nodes Upgraded"
 
@@ -200,29 +212,34 @@ def get_max_unavailable(num_nodes):
     return max_unavailable
 
 
-def validate_nodes_after_upgrade(cluster, workload):
+def validate_nodes_after_upgrade(cluster, workload, k8version=False):
     client = get_user_client()
     completed_upgrade = []
     cp_nodes = get_role_nodes(cluster, "control")
     etcd_nodes = get_role_nodes(cluster, "etcd")
     worker_nodes = get_role_nodes(cluster, "worker")
     # Validate Node Upgrades by role
-    cp_upgraded = validate_node_state(cp_nodes, workload, False)
+    cp_upgraded = validate_node_state(cp_nodes, workload, k8version)
     completed_upgrade.extend(cp_upgraded)
-    etcd_upgraded = validate_node_state(etcd_nodes, workload, False)
+    etcd_upgraded = validate_node_state(etcd_nodes, workload, k8version)
     completed_upgrade.extend(etcd_upgraded)
-    worker_upgraded = validate_node_state(worker_nodes, workload, DRAIN, 600,
+    worker_upgraded = validate_node_state(worker_nodes, workload, k8version, DRAIN, 600,
                                           )
     completed_upgrade.extend(worker_upgraded)
     nodes = client.list_node(clusterId=cluster.id).data
     node_ver = K8S_VERSION_UPGRADE.split("-")[0]
-    for node in nodes:
-        assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver, \
-            "Not all Nodes Upgraded Correctly"
+    if k8version:
+        for node in nodes:
+            assert node["info"]["kubernetes"]["kubeletVersion"] == node_ver, \
+                "Not all Nodes Upgraded Correctly"
+    else:
+        for node in nodes:
+            assert node["capacity"]["pods"] == "120", \
+                "Not all Nodes Upgraded Correctly"
     return completed_upgrade
 
 
-def validate_node_state(nodes, workload, drain=False, timeout=600,
+def validate_node_state(nodes, workload, k8version=False, drain=False, timeout=100,
                         ):
     client = get_user_client()
     start = time.time()
@@ -232,20 +249,29 @@ def validate_node_state(nodes, workload, drain=False, timeout=600,
     while len(completed_upgrade) != len(nodes):
         if time.time() - start > timeout:
             raise AssertionError(
-                "Timed out waiting for worker nodes to upgrade")
+                "Timed out waiting for nodes to upgrade")
         unavailable = set()
         for node in nodes:
             # Reload for updated node state and availability
             node = client.reload(node)
-            node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
+            print("node: ", node.uuid)
+            print("node state: ", node.state)
             if drain:
                 if node.state == "draining" or node.state == "drained":
                     in_transition_state.add(node.uuid)
             else:
                 if node.state == "cordoned":
                     in_transition_state.add(node.uuid)
-            if node_k8 == node_ver:
-                completed_upgrade.add(node.uuid)
+            if k8version:
+                node_k8 = node["info"]["kubernetes"]["kubeletVersion"]
+                if node_k8 == node_ver:
+                    completed_upgrade.add(node.uuid)
+            else:
+                node_pods = node["capacity"]["pods"]
+                print("node pod: ", node_pods)
+                if node_pods == 120 or node_pods == "120":
+                    print("adding")
+                    completed_upgrade.add(node.uuid)
             if node.state != "active":
                 unavailable.add(node.uuid)
         if node.worker:
@@ -313,7 +339,7 @@ def validate_cluster_and_ingress(client, cluster,
     return cluster, workload, ingress
 
 
-@pytest.fixture(scope='function', autouse="True")
+@pytest.fixture(scope='module', autouse="True")
 def create_zdt_setup(request):
     if NODE_COUNT_CLUSTER == 8:
         node_roles = [["etcd"], ["controlplane"], ["controlplane"],
