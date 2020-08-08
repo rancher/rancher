@@ -4,7 +4,7 @@ set -e
 source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
-SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.5"}
+SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.4"}
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.5"}
 
 cd $(dirname $0)/../package
