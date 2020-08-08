@@ -40,7 +40,7 @@ var (
 		"Use new experimental proxy for Kubernetes API requests.",
 		false,
 		true,
-		true)
+		false)
 	MCM = newFeature(
 		"multi-cluster-management",
 		"Multi-cluster provisioning and management of Kubernetes clusters.",
