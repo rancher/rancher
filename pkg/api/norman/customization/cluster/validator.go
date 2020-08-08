@@ -316,7 +316,7 @@ func (v *Validator) validateGenericEngineConfig(request *types.APIContext, spec 
 		clusterName := request.ID
 		prevCluster, err := v.ClusterLister.Get("", clusterName)
 		if err != nil {
-			return httperror.WrapAPIError(err, httperror.InvalidBodyContent, err.Error())
+			return err
 		}
 
 		err = validateEKS(*prevCluster.Spec.GenericEngineConfig, *spec.AmazonElasticContainerServiceConfig)
