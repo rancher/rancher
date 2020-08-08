@@ -1,29 +1,29 @@
 image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}
 manifests:
   -
-    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}{{/if}}-linux-amd64
+    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-amd64
     platform:
       architecture: amd64
       os: linux
   -
-    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}{{/if}}-linux-arm64
+    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-arm64
     platform:
       architecture: arm64
       os: linux
   -
-    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}{{/if}}-windows-1809
+    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-1809
     platform:
       architecture: amd64
       os: windows
       version: 1809
   -
-    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}{{/if}}-windows-1903
+    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-1903
     platform:
       architecture: amd64
       os: windows
       version: 1903
   -
-    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}{{/if}}-windows-1909
+    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-1909
     platform:
       architecture: amd64
       os: windows
