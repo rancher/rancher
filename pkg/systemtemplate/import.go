@@ -47,7 +47,7 @@ func toFeatureString(features map[string]bool) string {
 			buf.WriteString("=false")
 		}
 	}
-	return buf.String() + ",multi-cluster-management=disable"
+	return buf.String()
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
