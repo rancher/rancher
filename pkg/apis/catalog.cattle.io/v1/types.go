@@ -69,7 +69,7 @@ type RepoSpec struct {
 	// ClusterRepo and will be ignored on Repo
 	ServiceAccountNamespace string `json:"serviceAccountNamespace,omitempty"`
 
-	// It disable the repo will
+	// If disabled the repo clone will not be updated or allowed to be installed from
 	Enabled *bool `json:"enabled,omitempty"`
 }
 

@@ -1,9 +1,15 @@
 package norman
 
 import (
+	"regexp"
+
 	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/settings"
+)
+
+var (
+	releasePattern = regexp.MustCompile("^v[0-9]")
 )
 
 func NewServer(schemas *types.Schemas) (*normanapi.Server, error) {
@@ -20,15 +26,25 @@ func ConfigureAPIUI(server *normanapi.Server) {
 }
 
 func cssURL() string {
-	if settings.UIIndex.Get() != "local" {
+	switch settings.UIOfflinePreferred.Get() {
+	case "dynamic":
+		if !releasePattern.MatchString(settings.ServerVersion.Get()) {
+			return ""
+		}
+	case "false":
 		return ""
 	}
-	return "/api-ui/ui.min.css"
+	return "/api-ui/ui-min.css"
 }
 
 func jsURL() string {
-	if settings.UIIndex.Get() != "local" {
+	switch settings.UIOfflinePreferred.Get() {
+	case "dynamic":
+		if !releasePattern.MatchString(settings.ServerVersion.Get()) {
+			return ""
+		}
+	case "false":
 		return ""
 	}
-	return "/api-ui/ui.min.js"
+	return "/api-ui/ui-min.js"
 }

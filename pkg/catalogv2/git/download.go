@@ -3,16 +3,22 @@ package git
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"os"
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
 const (
-	stateDir = "management-state/git-repo"
+	stateDir  = "management-state/git-repo"
+	staticDir = "/var/lib/rancher-data/local-catalogs/v2"
 )
 
 func gitDir(namespace, name, gitURL string) string {
+	staticDir := filepath.Join(staticDir, namespace, name)
+	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
+		return staticDir
+	}
 	return filepath.Join(stateDir, namespace, name, hash(gitURL))
 }
 

@@ -27,7 +27,6 @@ var (
 	CLIURLLinux                       = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                     = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	ClusterControllerStartCount       = NewSetting("cluster-controller-start-count", "50")
-	DashboardIndex                    = NewSetting("dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
 	EngineInstallURL                  = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/19.03.sh")
 	EngineISOURL                      = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
 	EngineNewestVersion               = NewSetting("engine-newest-version", "v17.12.0")
@@ -61,7 +60,11 @@ var (
 	UIBanners                         = NewSetting("ui-banners", "{}")
 	UIFeedBackForm                    = NewSetting("ui-feedback-form", "")
 	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
+	UIPath                            = NewSetting("ui-path", "/usr/share/rancher/ui")
+	UIDashboardIndex                  = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
+	UIDashboardPath                   = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
 	UIPreferred                       = NewSetting("ui-preferred", "ember")
+	UIOfflinePreferred                = NewSetting("ui-offline-preferred", "dynamic")
 	UIIssues                          = NewSetting("ui-issues", "")
 	UIPL                              = NewSetting("ui-pl", "rancher")
 	UIKubernetesSupportedVersions     = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
@@ -76,7 +79,8 @@ var (
 	ClusterTemplateEnforcement        = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir              = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	IgnoreNodeName                    = NewSetting("ignore-node-name", "")       // nodes to ignore when syncing v1.node to v3.node
+	ChartDefaultBranch                = NewSetting("system-chart-default-branch", "dev-v2.5")
+	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 )
 
 func init() {

@@ -318,6 +318,11 @@ func (a *catalogStatusHandler) sync(key string, obj *v3.Catalog) (*v3.Catalog, e
 		}
 	}
 	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+		if a.condition != "" {
+			// Since status has changed, update the lastUpdatedTime
+			a.condition.LastUpdated(&newStatus, time.Now().UTC().Format(time.RFC3339))
+		}
+
 		var newErr error
 		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)

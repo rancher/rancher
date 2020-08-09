@@ -1,6 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.13
+go 1.14
 
 replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
@@ -80,14 +80,14 @@ require (
 	github.com/rancher/eks-operator v0.1.0-rc22
 	github.com/rancher/lasso v0.0.0-20200807231317-fff0364fb3f6
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200802063631-071be464e454
+	github.com/rancher/norman v0.0.0-20200808070119-a173b50371f8
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/remotedialer v0.2.6-0.20200403185207-c326f2656545
+	github.com/rancher/remotedialer v0.2.6-0.20200809004951-760d0515479e
 	github.com/rancher/rke v1.2.0-rc5
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200807222103-f3edb7357f75
 	github.com/rancher/system-upgrade-controller v0.6.2
-	github.com/rancher/wrangler v0.6.2-0.20200802063637-28dae3c1fc1b
+	github.com/rancher/wrangler v0.6.2-0.20200809004846-a1e5f1c8fc30
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0
