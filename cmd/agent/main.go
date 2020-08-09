@@ -275,7 +275,7 @@ func run() error {
 		}
 	}
 
-	onConnect := func(ctx context.Context) error {
+	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
 		interval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)

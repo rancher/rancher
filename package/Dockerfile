@@ -14,11 +14,12 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.5
-ARG DASHBOARD_BRANCH=latest
+ARG CHART_DEFAULT_BRANCH=dev-v2.5
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ARG RANCHER_METADATA_BRANCH=dev-v2.5
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
+ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
 ENV CATTLE_K3S_VERSION v1.17.2+k3s1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher45
@@ -31,17 +32,18 @@ ENV KUBECTL_VERSION v1.17.6
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
 ENV RANCHER_METADATA_BRANCH ${RANCHER_METADATA_BRANCH}
-ENV CATTLE_DASHBOARD_INDEX https://releases.rancher.com/dashboard/${DASHBOARD_BRANCH}/index.html
 ENV HELM_VERSION v3.2.0
 ENV KUSTOMIZE_VERSION v3.5.4
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/helm3-library && \
+    mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
     git clone -b $CATTLE_SYSTEM_CHART_DEFAULT_BRANCH --single-branch https://github.com/rancher/system-charts /var/lib/rancher-data/local-catalogs/system-library && \
+    git clone -b $CATTLE_CHART_DEFAULT_BRANCH --depth 1 https://github.com/rancher/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts && \
+    git clone -b $CATTLE_CHART_DEFAULT_BRANCH --depth 1 https://github.com/rancher/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts && \
     git clone -b master --single-branch https://github.com/rancher/charts /var/lib/rancher-data/local-catalogs/library && \
     git clone -b master --single-branch https://github.com/rancher/helm3-charts /var/lib/rancher-data/local-catalogs/helm3-library
-
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
@@ -102,8 +104,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry /usr/bin/k3s /usr/bin/kubectl /usr/bin/channelserver && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.4.10
+ENV CATTLE_DASHBOARD_UI_VERSION master
 ENV CATTLE_CLI_VERSION v2.4.0-rc4
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
@@ -128,7 +130,10 @@ RUN mkdir -p /usr/share/rancher/ui && \
     mkdir -p /usr/share/rancher/ui/api-ui && \
     cd /usr/share/rancher/ui/api-ui && \
     curl -sL https://releases.rancher.com/api-ui/${CATTLE_API_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
-    cd /var/lib/rancher
+    mkdir -p /usr/share/rancher/ui-dashboard/dashboard && \
+    cd /usr/share/rancher/ui-dashboard/dashboard && \
+    curl -sL https://releases.rancher.com/dashboard/${CATTLE_DASHBOARD_UI_VERSION}.tar.gz | tar xvzf - --strip-components=2 && \
+    ln -s dashboard/index.html ../index.html
 
 ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
