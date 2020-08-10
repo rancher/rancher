@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	mclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -200,18 +201,11 @@ func (g *GhProvider) getGithubConfigCR() (*v33.GithubConfig, error) {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
 
-	metadataMap, ok := storedGithubConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve GithubConfig metadata, cannot read k8s Unstructured data")
+	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedGithubConfigMap)
+	if err != nil {
+		return nil, err
 	}
-
-	typemeta := &metav1.ObjectMeta{}
-	//time.Time cannot decode directly
-	delete(metadataMap, "creationTimestamp")
-	if err := mapstructure.Decode(metadataMap, typemeta); err != nil {
-		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
-	}
-	storedGithubConfig.ObjectMeta = *typemeta
+	storedGithubConfig.ObjectMeta = *objectMeta
 
 	return storedGithubConfig, nil
 }
