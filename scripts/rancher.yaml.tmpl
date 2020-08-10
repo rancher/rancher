@@ -2,6 +2,7 @@ apiVersion: helm.cattle.io/v1
 kind: HelmChart
 metadata:
   name: rancher
-  namespace: cattle-system
+  namespace: kube-system
 spec:
+  targetNamespace: cattle-system
   chartContent: %{CHART_CONTENT}%
