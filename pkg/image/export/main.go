@@ -69,8 +69,6 @@ func run(systemChartPath string, imagesFromArgs []string) error {
 	if os.IsNotExist(err) {
 		b, err = ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
 	}
-	x, _ := os.Getwd()
-	fmt.Println("ASDFASDFASDF", x)
 	if err != nil {
 		return err
 	}
