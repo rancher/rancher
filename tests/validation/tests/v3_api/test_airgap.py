@@ -27,8 +27,6 @@ IMAGE_LIST = os.environ.get("RANCHER_IMAGE_LIST", ",".join(
 ARCH = os.environ.get("RANCHER_ARCH", "amd64")
 
 AG_HOST_NAME = random_test_name(HOST_NAME)
-print("Host Name: {}".format(AG_HOST_NAME))
-assert len(AG_HOST_NAME) < 17, "Provide a hostname that is 16 chars or less"
 RANCHER_AG_INTERNAL_HOSTNAME = AG_HOST_NAME + "-internal.qa.rancher.space"
 RANCHER_AG_HOSTNAME = AG_HOST_NAME + ".qa.rancher.space"
 RESOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
@@ -42,7 +40,7 @@ def test_deploy_bastion():
     assert node.public_ip_address is not None
 
 
-def test_deploy_airgap_rancher():
+def test_deploy_airgap_rancher(check_hostname_length):
     bastion_node = deploy_bastion_server()
     save_res, load_res = add_rancher_images_to_private_registry(bastion_node)
     assert "Image pull success: rancher/rancher:{}".format(
@@ -172,7 +170,7 @@ def test_deploy_airgap_k3s_tarball():
             restart_k3s = 'sudo systemctl restart k3s-agent'
             if num == 0:
                 restart_k3s = 'sudo systemctl restart k3s && ' \
-                          'sudo chmod 644 /etc/rancher/k3s/k3s.yaml'
+                              'sudo chmod 644 /etc/rancher/k3s/k3s.yaml'
             run_command_on_airgap_node(bastion_node, ag_node, restart_k3s)
         results = add_cluster_to_rancher(bastion_node, [ag_nodes[0]])
         for result in results:
@@ -218,7 +216,7 @@ def deploy_bastion_server():
 
     # Copy SSH Key to Bastion and local dir and give it proper permissions
     write_key_command = "cat <<EOT >> {}.pem\n{}\nEOT".format(
-        bastion_node.ssh_key_name,  bastion_node.ssh_key)
+        bastion_node.ssh_key_name, bastion_node.ssh_key)
     bastion_node.execute_command(write_key_command)
     local_write_key_command = \
         "mkdir -p {} && cat <<EOT >> {}/{}.pem\n{}\nEOT".format(
@@ -641,7 +639,7 @@ def wait_for_airgap_pods_ready(bastion_node, ag_nodes):
             if "Completed" not in pod and "Running" not in pod:
                 print("Problem pod: {}".format(pod))
                 unready_pods.append(pod)
-        if unready_pods:
+        if unready_pods or not pods_arr:
             wait_for_pods_to_be_ready = True
         else:
             wait_for_pods_to_be_ready = False
@@ -709,7 +707,7 @@ def create_nlb_and_add_targets(aws_nodes):
             tg80_arn)['TargetHealthDescriptions'][0]['TargetHealth']['State']
         health443 = AmazonWebServices().describe_target_health(
             tg443_arn)['TargetHealthDescriptions'][0]['TargetHealth']['State']
-        if health80 in ['initial', 'healthy']\
+        if health80 in ['initial', 'healthy'] \
                 and health443 in ['initial', 'healthy']:
             break
         time.sleep(1)
@@ -743,3 +741,9 @@ def get_bastion_node(provider_id):
     if bastion_node is None:
         pytest.fail("Did not provide a valid Provider ID for the bastion node")
     return bastion_node
+
+
+@pytest.fixture()
+def check_hostname_length():
+    print("Host Name: {}".format(AG_HOST_NAME))
+    assert len(AG_HOST_NAME) < 17, "Provide hostname that is 16 chars or less"
