@@ -80,7 +80,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	}
 
 	// create or update k3supgradecontroller if necessary
-	if err = h.deployK3sBasedUpgradeController(cluster.Name); err != nil {
+	if err = h.deployK3sBasedUpgradeController(cluster.Name, isK3s, isRke2); err != nil {
 		return cluster, err
 	}
 
@@ -94,7 +94,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 
 // deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
 // Updates k3s upgrader controller if one exists and is not the newest available version.
-func (h *handler) deployK3sBasedUpgradeController(clusterName string) error {
+func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isRke2 bool) error {
 	userCtx, err := h.manager.UserContext(clusterName)
 	if err != nil {
 		return err
@@ -134,16 +134,21 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string) error {
 	appClient := userCtx.Management.Project.Apps("")
 
 	latestVersionID := latestTemplateVersion.ExternalID
-
-	app, err := appLister.Get(systemProjectName, "rancher-k3s-upgrader")
+	var appname string
+	switch {
+	case isK3s:
+		appname = "rancher-k3s-upgrader"
+	case isRke2:
+		appname = "rancher-rke2-upgrader"
+	}
+	app, err := appLister.Get(systemProjectName, appname)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
 		}
-
 		desiredApp := &v33.App{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "rancher-k3s-upgrader",
+				Name:      appname,
 				Namespace: systemProjectName,
 				Annotations: map[string]string{
 					"field.cattle.io/creatorId": creator.Name,
