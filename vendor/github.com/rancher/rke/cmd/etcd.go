@@ -65,7 +65,23 @@ func EtcdCommand() cli.Command {
 			Usage: "Specify s3 folder name",
 		},
 	}
-	snapshotFlags = append(snapshotFlags, commonFlags...)
+	snapshotSaveFlags := append(snapshotFlags, commonFlags...)
+
+	snapshotRestoreFlags := []cli.Flag{
+		cli.StringFlag{
+			Name:  "cert-dir",
+			Usage: "Specify a certificate dir path",
+		},
+		cli.BoolFlag{
+			Name:  "custom-certs",
+			Usage: "Use custom certificates from a cert dir",
+		},
+		cli.BoolFlag{
+			Name:  "use-local-state",
+			Usage: "Use local state file (do not check or use snapshot archive for state file)",
+		},
+	}
+	snapshotRestoreFlags = append(append(snapshotFlags, snapshotRestoreFlags...), commonFlags...)
 
 	return cli.Command{
 		Name:  "etcd",
@@ -74,13 +90,13 @@ func EtcdCommand() cli.Command {
 			{
 				Name:   "snapshot-save",
 				Usage:  "Take snapshot on all etcd hosts",
-				Flags:  snapshotFlags,
+				Flags:  snapshotSaveFlags,
 				Action: SnapshotSaveEtcdHostsFromCli,
 			},
 			{
 				Name:   "snapshot-restore",
 				Usage:  "Restore existing snapshot",
-				Flags:  snapshotFlags,
+				Flags:  snapshotRestoreFlags,
 				Action: RestoreEtcdSnapshotFromCli,
 			},
 		},
