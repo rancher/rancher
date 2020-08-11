@@ -632,6 +632,15 @@ class AmazonWebServices(CloudProviderBase):
         except ClientError:
             return None
 
+    def describe_eks_nodegroup(self, cluster_name, nodegroup_name):
+        try:
+            return self._eks_client.describe_nodegroup(
+                clusterName=cluster_name,
+                nodegroupName=nodegroup_name
+            )
+        except ClientError:
+            return None
+
     def wait_for_eks_cluster_state(self, name, target_state, timeout=1200):
         start = time.time()
         cluster = self.describe_eks_cluster(name)['cluster']
