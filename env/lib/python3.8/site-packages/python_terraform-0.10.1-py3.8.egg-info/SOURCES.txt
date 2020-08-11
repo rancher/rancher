@@ -1,0 +1,9 @@
+setup.cfg
+setup.py
+python_terraform/__init__.py
+python_terraform/tfstate.py
+python_terraform.egg-info/PKG-INFO
+python_terraform.egg-info/SOURCES.txt
+python_terraform.egg-info/dependency_links.txt
+python_terraform.egg-info/top_level.txt
+test/test_terraform.py

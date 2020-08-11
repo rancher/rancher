@@ -1,0 +1,22 @@
+{
+  "pagination": {
+    "DescribeBudgets": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Budgets"
+    },
+    "DescribeNotificationsForBudget": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Notifications"
+    },
+    "DescribeSubscribersForNotification": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Subscribers"
+    }
+  }
+}

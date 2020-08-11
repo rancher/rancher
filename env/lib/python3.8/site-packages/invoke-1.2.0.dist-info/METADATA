@@ -1,0 +1,50 @@
+Metadata-Version: 2.0
+Name: invoke
+Version: 1.2.0
+Summary: Pythonic task execution
+Home-page: http://docs.pyinvoke.org
+Author: Jeff Forcier
+Author-email: jeff@bitprophet.org
+License: BSD
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: System Administrators
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: Unix
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Topic :: Software Development
+Classifier: Topic :: Software Development :: Build Tools
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: System :: Software Distribution
+Classifier: Topic :: System :: Systems Administration
+
+
+To find out what's new in this version of Invoke, please see `the changelog
+<http://pyinvoke.org/changelog.html#1.2.0>`_.
+
+Welcome to Invoke!
+==================
+
+Invoke is a Python (2.7 and 3.4+) library for managing shell-oriented
+subprocesses and organizing executable Python code into CLI-invokable tasks. It
+draws inspiration from various sources (``make``/``rake``, Fabric 1.x, etc) to
+arrive at a powerful & clean feature set.
+
+For a high level introduction, including example code, please see `our main
+project website <http://pyinvoke.org>`_; or for detailed API docs, see `the
+versioned API website <http://docs.pyinvoke.org>`_.
+
+
+

@@ -1,0 +1,3980 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="multicast-addresses.xsl"?>
+<?oxygen RNGSchema="multicast-addresses.rng" type="xml"?>
+<registry xmlns="http://www.iana.org/assignments" id="multicast-addresses">
+  <title>IPv4 Multicast Address Space Registry</title>
+  <updated>2016-10-20</updated>
+  <expert>Stig Venaas</expert>
+  <note>Host Extensions for IP Multicasting <xref type="rfc" data="rfc1112"/> specifies the extensions
+required of a host implementation of the Internet Protocol (IP) to
+support multicasting.  The multicast addresses are in the range
+224.0.0.0 through 239.255.255.255. Address assignments are listed below.
+
+The range of addresses between 224.0.0.0 and 224.0.0.255, inclusive,
+is reserved for the use of routing protocols and other low-level
+topology discovery or maintenance protocols, such as gateway discovery
+and group membership reporting.  Multicast routers should not forward
+any multicast datagram with destination addresses in this range,
+regardless of its TTL.</note>
+  
+  
+  <registry id="multicast-addresses-1">
+    <title>Local Network Control Block (224.0.0.0 - 224.0.0.255  (224.0.0/24))</title>
+    <xref type="rfc" data="rfc5771"/>
+    <registration_rule>Expert Review, IESG Approval, or Standards Action</registration_rule>
+    <note>(*)  It is only appropriate to use these values in explicitly-
+configured experiments; they MUST NOT be shipped as defaults in
+implementations.  See <xref type="rfc" data="rfc3692"/> for details.</note>
+    <record>
+      <addr>224.0.0.0</addr>
+      <description>Base Address (Reserved)</description>
+      <xref type="rfc" data="rfc1112"/>
+      <xref type="person" data="Jon_Postel"/>
+    </record>
+    <record>
+      <addr>224.0.0.1</addr>
+      <description>All Systems on this Subnet</description>
+      <xref type="rfc" data="rfc1112"/>
+      <xref type="person" data="Jon_Postel"/>
+    </record>
+    <record>
+      <addr>224.0.0.2</addr>
+      <description>All Routers on this Subnet</description>
+      <xref type="person" data="Jon_Postel"/>
+    </record>
+    <record>
+      <addr>224.0.0.3</addr>
+      <description>Unassigned</description>
+    </record>
+    <record>
+      <addr>224.0.0.4</addr>
+      <description>DVMRP    Routers</description>
+      <xref type="rfc" data="rfc1075"/>
+      <xref type="person" data="Jon_Postel"/>
+    </record>
+    <record>
+      <addr>224.0.0.5</addr>
+      <description>OSPFIGP  OSPFIGP All Routers</description>
+      <xref type="rfc" data="rfc2328"/>
+      <xref type="person" data="OSPF_WG_Chairs"/>
+    </record>
+    <record>
+      <addr>224.0.0.6</addr>
+      <description>OSPFIGP  OSPFIGP Designated Routers</description>
+      <xref type="rfc" data="rfc2328"/>
+      <xref type="person" data="OSPF_WG_Chairs"/>
+    </record>
+    <record>
+      <addr>224.0.0.7</addr>
+      <description>ST Routers</description>
+      <xref type="rfc" data="rfc1190"/>
+      <xref type="person" data="Karen_Seo"/>
+    </record>
+    <record>
+      <addr>224.0.0.8</addr>
+      <description>ST Hosts</description>
+      <xref type="rfc" data="rfc1190"/>
+      <xref type="person" data="Karen_Seo"/>
+    </record>
+    <record>
+      <addr>224.0.0.9</addr>
+      <description>RIP2 Routers</description>
+      <xref type="rfc" data="rfc1723"/>
+      <xref type="person" data="Gary_S_Malkin"/>
+    </record>
+    <record date="1996-03-01" updated="2016-03-21">
+      <addr>224.0.0.10</addr>
+      <description>EIGRP Routers</description>
+      <xref type="rfc" data="rfc7868"/>
+    </record>
+    <record>
+      <addr>224.0.0.11</addr>
+      <description>Mobile-Agents</description>
+      <xref type="text">[Bill Simpson]</xref>
+    </record>
+    <record>
+      <addr>224.0.0.12</addr>
+      <description>DHCP Server / Relay Agent</description>
+      <xref type="text">[Unknown]</xref>
+    </record>
+    <record date="1996-03-01">
+      <addr>224.0.0.13</addr>
+      <description>All PIM Routers</description>
+      <xref type="person" data="Dino_Farinacci"/>
+    </record>
+    <record date="1996-04-01">
+      <addr>224.0.0.14</addr>
+      <description>RSVP-ENCAPSULATION</description>
+      <xref type="person" data="Bob_Braden"/>
+    </record>
+    <record date="1997-02-01">
+      <addr>224.0.0.15</addr>
+      <description>all-cbt-routers</description>
+      <xref type="person" data="Tony_Ballardie"/>
+      <xref type="rfc" data="rfc2189"/>
+    </record>
+    <record date="1997-06-01">
+      <addr>224.0.0.16</addr>
+      <description>designated-sbm</description>
+      <xref type="person" data="Fred_Baker"/>
+    </record>
+    <record date="1997-06-01">
+      <addr>224.0.0.17</addr>
+      <description>all-sbms</description>
+      <xref type="person" data="Fred_Baker"/>
+    </record>
+    <record>
+      <addr>224.0.0.18</addr>
+      <description>VRRP</description>
+      <xref type="rfc" data="rfc3768"/>
+      <xref type="rfc" data="rfc5798"/>
+    </record>
+    <record date="1999-10-01">
+      <addr>224.0.0.19</addr>
+      <description>IPAllL1ISs</description>
+      <xref type="person" data="Tony_Przygienda"/>
+    </record>
+    <record date="1999-10-01">
+      <addr>224.0.0.20</addr>
+      <description>IPAllL2ISs</description>
+      <xref type="person" data="Tony_Przygienda"/>
+    </record>
+    <record date="1999-10-01">
+      <addr>224.0.0.21</addr>
+      <description>IPAllIntermediate Systems</description>
+      <xref type="person" data="Tony_Przygienda"/>
+    </record>
+    <record date="1999-10-01">
+      <addr>224.0.0.22</addr>
+      <description>IGMP</description>
+      <xref type="person" data="Steve_Deering"/>
+    </record>
+    <record date="2000-03-01">
+      <addr>224.0.0.23</addr>
+      <description>GLOBECAST-ID</description>
+      <xref type="person" data="Piers_Scannell"/>
+    </record>
+    <record>
+      <addr>224.0.0.24</addr>
+      <description>OSPFIGP-TE</description>
+      <xref type="rfc" data="rfc4973"/>
+    </record>
+    <record date="2000-03-01">
+      <addr>224.0.0.25</addr>
+      <description>router-to-switch</description>
+      <xref type="person" data="Ishan_Wu"/>
+    </record>
+    <record>
+      <addr>224.0.0.26</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="2000-03-01">
+      <addr>224.0.0.27</addr>
+      <description>Al MPP Hello</description>
+      <xref type="person" data="Brian_Martinicky"/>
+    </record>
+    <record date="2000-03-01">
+      <addr>224.0.0.28</addr>
+      <description>ETC Control</description>
+      <xref type="person" data="Steve_Polishinski"/>
+    </record>
+    <record date="2000-05-01">
+      <addr>224.0.0.29</addr>
+      <description>GE-FANUC</description>
+      <xref type="person" data="Ian_Wacey"/>
+    </record>
+    <record date="2000-05-01">
+      <addr>224.0.0.30</addr>
+      <description>indigo-vhdp</description>
+      <xref type="person" data="Colin_Caughie"/>
+    </record>
+    <record date="2000-05-01">
+      <addr>224.0.0.31</addr>
+      <description>shinbroadband</description>
+      <xref type="person" data="Sakon_Kittivatcharapong"/>
+    </record>
+    <record date="2000-05-01">
+      <addr>224.0.0.32</addr>
+      <description>digistar</description>
+      <xref type="person" data="Brian_Kerkan"/>
+    </record>
+    <record date="2003-03-01">
+      <addr>224.0.0.33</addr>
+      <description>ff-system-management</description>
+      <xref type="person" data="Dave_Glanzer"/>
+    </record>
+    <record date="2000-06-01">
+      <addr>224.0.0.34</addr>
+      <description>pt2-discover</description>
+      <xref type="person" data="Ralph_Kammerlander"/>
+    </record>
+    <record date="2000-07-01">
+      <addr>224.0.0.35</addr>
+      <description>DXCLUSTER</description>
+      <xref type="person" data="Dirk_Koopman"/>
+    </record>
+    <record date="2001-01-01">
+      <addr>224.0.0.36</addr>
+      <description>DTCP Announcement</description>
+      <xref type="person" data="Patrick_Cipiere"/>
+    </record>
+    <record date="2001-12-01">
+      <addr>224.0.0.37-224.0.0.68</addr>
+      <description>zeroconfaddr   (renew 12/02)</description>
+      <xref type="person" data="Erik_Guttman"/>
+    </record>
+    <record>
+      <addr>224.0.0.69-224.0.0.100</addr>
+      <description>Reserved</description>
+      <xref type="person" data="IANA"/>
+    </record>
+    <record date="2001-12-01">
+      <addr>224.0.0.101</addr>
+      <description>cisco-nhap</description>
+      <xref type="person" data="Mark_Bakke"/>
+    </record>
+    <record date="2001-12-01">
+      <addr>224.0.0.102</addr>
+      <description>HSRP</description>
+      <xref type="person" data="Ian_Wilson"/>
+    </record>
+    <record date="2002-02-01">
+      <addr>224.0.0.103</addr>
+      <description>MDAP</description>
+      <xref type="person" data="Johan_Deleu"/>
+    </record>
+    <record date="2002-10-01">
+      <addr>224.0.0.104</addr>
+      <description>Nokia MC CH</description>
+      <xref type="person" data="Morteza_Kalhour"/>
+    </record>
+    <record date="2003-03-01">
+      <addr>224.0.0.105</addr>
+      <description>ff-lr-address</description>
+      <xref type="person" data="Dave_Glanzer"/>
+    </record>
+    <record>
+      <addr>224.0.0.106</addr>
+      <description>All-Snoopers</description>
+      <xref type="rfc" data="rfc4286"/>
+    </record>
+    <record date="2007-02-02">
+      <addr>224.0.0.107</addr>
+      <description>PTP-pdelay</description>
+      <xref type="uri" data="http://ieee1588.nist.gov/"/>
+      <xref type="person" data="Kang_Lee"/>
+    </record>
+    <record date="2007-08-30">
+      <addr>224.0.0.108</addr>
+      <description>Saratoga</description>
+      <xref type="person" data="Lloyd_Wood"/>
+      <reviewed>2011-03-17</reviewed>
+    </record>
+    <record>
+      <addr>224.0.0.109</addr>
+      <description>LL-MANET-Routers</description>
+      <xref type="rfc" data="rfc5498"/>
+      <reviewed>2011-02-23</reviewed>
+    </record>
+    <record date="2009-01-20">
+      <addr>224.0.0.110</addr>
+      <description>IGRS</description>
+      <xref type="person" data="Xiaoyu_Zhou"/>
+    </record>
+    <record>
+      <addr>224.0.0.111</addr>
+      <description>Babel</description>
+      <xref type="rfc" data="rfc6126"/>
+    </record>
+    <record date="2011-11-02">
+      
+      <addr>224.0.0.112</addr>
+      <description>MMA Device Discovery</description>
+      <xref type="person" data="Tom_White"/>
+    </record>
+    <record date="2011-11-18">
+      <addr>224.0.0.113</addr>
+      <description>AllJoyn</description>
+      <xref type="person" data="Craig_Dowell"/>
+    </record>
+    <record date="2012-06-12">
+      <addr>224.0.0.114</addr>
+      <description>Inter RFID Reader Protocol</description>
+      <xref type="person" data="Wayne_Wenyu_Liu"/>
+    </record>
+    <record date="2014-07-01">
+      <addr>224.0.0.115</addr>
+      <description>JSDP</description>
+      <xref type="person" data="J._Ryan_Stinnett"/>
+    </record>
+    <record date="2016-10-20">
+      <addr>224.0.0.116</addr>
+      <description>Device discovery/config</description>
+      <xref type="person" data="COMTECH_Kft."/>
+    </record>
+    <record>
+      <addr>224.0.0.117-224.0.0.250</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="2000-04-01">
+      <addr>224.0.0.251</addr>
+      <description>mDNS</description>
+      <xref type="rfc" data="rfc6762"/>
+    </record>
+    <record>
+      <addr>224.0.0.252</addr>
+      <description>Link-local Multicast Name Resolution</description>
+      <xref type="rfc" data="rfc4795"/>
+      <reviewed>2011-03-17</reviewed>
+    </record>
+    <record>
+      <addr>224.0.0.253</addr>
+      <description>Teredo</description>
+      <xref type="rfc" data="rfc4380"/>
+      <reviewed>2010-02-14</reviewed>
+    </record>
+    <record>
+      <addr>224.0.0.254</addr>
+      <description>RFC3692-style Experiment (*)</description>
+      <xref type="rfc" data="rfc4727"/>
+    </record>
+    <record>
+      <addr>224.0.0.255</addr>
+      <description>Unassigned</description>
+    </record>
+  </registry>
+
+  
+  <registry id="multicast-addresses-2">
+    <title>Internetwork Control Block (224.0.1.0 - 224.0.1.255  (224.0.1/24))</title>
+    <xref type="rfc" data="rfc5771"/>
+    <registration_rule>Expert Review, IESG Approval, or Standards Action</registration_rule>
+    <record>
+      <addr>224.0.1.0</addr>
+      <description>VMTP Managers Group</description>
+      <xref type="rfc" data="rfc1045"/>
+      <xref type="person" data="Dave_Cheriton"/>
+    </record>
+    <record>
+      <addr>224.0.1.1</addr>
+      <description>NTP Network Time Protocol</description>
+      <xref type="rfc" data="rfc1119"/>
+      <xref type="rfc" data="rfc5905"/>
+      <xref type="person" data="David_Mills"/>
+    </record>
+    <record>
+      <addr>224.0.1.2</addr>
+      <description>SGI-Dogfight</description>
+      <xref type="person" data="Andrew_Cherenson"/>
+    </record>
+    <record>
+      <addr>224.0.1.3</addr>
+      <description>Rwhod</description>
+      <xref type="person" data="Steve_Deering_2"/>
+    </record>
+    <record>
+      <addr>224.0.1.4</addr>
+      <description>VNP</description>
+      <xref type="person" data="Dave_Cheriton"/>
+    </record>
+    <record>
+      <addr>224.0.1.5</addr>
+      <description>Artificial Horizons - Aviator</description>
+      <xref type="person" data="Bruce_Factor"/>
+    </record>
+    <record>
+      <addr>224.0.1.6</addr>
+      <description>NSS - Name Service Server</description>
+      <xref type="person" data="Bill_Schilit"/>
+    </record>
+    <record>
+      <addr>224.0.1.7</addr>
+      <description>AUDIONEWS - Audio News Multicast</description>
+      <xref type="person" data="Martin_Forssen"/>
+    </record>
+    <record>
+      <addr>224.0.1.8</addr>
+      <description>SUN NIS+ Information Service</description>
+      <xref type="person" data="Chuck_McManis"/>
+    </record>
+    <record>
+      <addr>224.0.1.9</addr>
+      <description>MTP Multicast Transport Protocol</description>
+      <xref type="person" data="Susie_Armstrong"/>
+    </record>
+    <record>
+      <addr>224.0.1.10</addr>
+      <description>IETF-1-LOW-AUDIO</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.0.1.11</addr>
+      <description>IETF-1-AUDIO</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.0.1.12</addr>
+      <description>IETF-1-VIDEO</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.0.1.13</addr>
+      <description>IETF-2-LOW-AUDIO</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.0.1.14</addr>
+      <description>IETF-2-AUDIO</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.0.1.15</addr>
+      <description>IETF-2-VIDEO</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.0.1.16</addr>
+      <description>MUSIC-SERVICE</description>
+    </record>
+    <record>
+      <addr>224.0.1.17</addr>
+      <description>SEANET-TELEMETRY</description>
+    </record>
+    <record>
+      <addr>224.0.1.18</addr>
+      <description>SEANET-IMAGE</description>
+    </record>
+    <record date="1996-04-01">
+      <addr>224.0.1.19</addr>
+      <description>MLOADD</description>
+      <xref type="person" data="Bob_Braden"/>
+    </record>
+    <record>
+      <addr>224.0.1.20</addr>
+      <description>any private experiment</description>
+      <xref type="person" data="Jon_Postel"/>
+    </record>
+    <record>
+      <addr>224.0.1.21</addr>
+      <description>DVMRP on MOSPF</description>
+      <xref type="text">[John Moy]</xref>
+    </record>
+    <record date="1995-05-01">
+      <addr>224.0.1.22</addr>
+      <description>SVRLOC</description>
+      <xref type="person" data="John_Veizades"/>
+    </record>
+    <record>
+      <addr>224.0.1.23</addr>
+      <description>XINGTV</description>
+      <xref type="person" data="Howard_Gordon"/>
+    </record>
+    <record>
+      <addr>224.0.1.24</addr>
+      <description>microsoft-ds</description>
+      <xref type="text">&lt;arnoldm&amp;microsoft.com&gt;</xref>
+    </record>
+    <record>
+      <addr>224.0.1.25</addr>
+      <description>nbc-pro</description>
+      <xref type="text">&lt;bloomer&amp;birch.crd.ge.com&gt;</xref>
+    </record>
+    <record>
+      <addr>224.0.1.26</addr>
+      <description>nbc-pfn</description>
+      <xref type="text">&lt;bloomer&amp;birch.crd.ge.com&gt;</xref>
+    </record>
+    <record date="1994-11-01">
+      <addr>224.0.1.27</addr>
+      <description>lmsc-calren-1</description>
+      <xref type="person" data="Yea_Uang"/>
+    </record>
+    <record date="1994-11-01">
+      <addr>224.0.1.28</addr>
+      <description>lmsc-calren-2</description>
+      <xref type="person" data="Yea_Uang"/>
+    </record>
+    <record date="1994-11-01">
+      <addr>224.0.1.29</addr>
+      <description>lmsc-calren-3</description>
+      <xref type="person" data="Yea_Uang"/>
+    </record>
+    <record date="1994-11-01">
+      <addr>224.0.1.30</addr>
+      <description>lmsc-calren-4</description>
+      <xref type="person" data="Yea_Uang"/>
+    </record>
+    <record date="1995-01-01">
+      <addr>224.0.1.31</addr>
+      <description>ampr-info</description>
+      <xref type="person" data="Rob_Janssen"/>
+    </record>
+    <record date="1995-01-01">
+      <addr>224.0.1.32</addr>
+      <description>mtrace</description>
+      <xref type="person" data="Steve_Casner_2"/>
+    </record>
+    <record date="1996-04-01">
+      <addr>224.0.1.33</addr>
+      <description>RSVP-encap-1</description>
+      <xref type="person" data="Bob_Braden"/>
+    </record>
+    <record date="1996-04-01">
+      <addr>224.0.1.34</addr>
+      <description>RSVP-encap-2</description>
+      <xref type="person" data="Bob_Braden"/>
+    </record>
+    <record date="1995-05-01">
+      <addr>224.0.1.35</addr>
+      <description>SVRLOC-DA</description>
+      <xref type="person" data="John_Veizades"/>
+    </record>
+    <record date="1995-08-01">
+      <addr>224.0.1.36</addr>
+      <description>rln-server</description>
+      <xref type="person" data="Brian_Kean"/>
+    </record>
+    <record date="1995-10-01">
+      <addr>224.0.1.37</addr>
+      <description>proshare-mc</description>
+      <xref type="person" data="Mark_Lewis"/>
+    </record>
+    <record>
+      <addr>224.0.1.38</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="1996-03-01">
+      <addr>224.0.1.39</addr>
+      <description>cisco-rp-announce</description>
+      <xref type="person" data="Dino_Farinacci"/>
+    </record>
+    <record date="1996-03-01">
+      <addr>224.0.1.40</addr>
+      <description>cisco-rp-discovery</description>
+      <xref type="person" data="Dino_Farinacci"/>
+    </record>
+    <record date="1996-05-01">
+      <addr>224.0.1.41</addr>
+      <description>gatekeeper</description>
+      <xref type="person" data="Jim_Toga"/>
+    </record>
+    <record date="1996-07-01">
+      <addr>224.0.1.42</addr>
+      <description>iberiagames</description>
+      <xref type="person" data="Jose_Luis_Marocho"/>
+    </record>
+    <record date="1996-11-01">
+      <addr>224.0.1.43</addr>
+      <description>nwn-discovery</description>
+      <xref type="person" data="Arnoud_Zwemmer"/>
+    </record>
+    <record date="1996-11-01">
+      <addr>224.0.1.44</addr>
+      <description>nwn-adaptor</description>
+      <xref type="person" data="Arnoud_Zwemmer"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>224.0.1.45</addr>
+      <description>isma-1</description>
+      <xref type="person" data="Stephen_Dunne"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>224.0.1.46</addr>
+      <description>isma-2</description>
+      <xref type="person" data="Stephen_Dunne"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>224.0.1.47</addr>
+      <description>telerate</description>
+      <xref type="person" data="Wenjie_Peng"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>224.0.1.48</addr>
+      <description>ciena</description>
+      <xref type="person" data="Mike_Rodbell"/>
+    </record>
+    <record>
+      <addr>224.0.1.49</addr>
+      <description>dcap-servers</description>
+      <xref type="rfc" data="rfc2114"/>
+    </record>
+    <record>
+      <addr>224.0.1.50</addr>
+      <description>dcap-clients</description>
+      <xref type="rfc" data="rfc2114"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>224.0.1.51</addr>
+      <description>mcntp-directory</description>
+      <xref type="person" data="Heiko_Rupp"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>224.0.1.52</addr>
+      <description>mbone-vcr-directory</description>
+      <xref type="person" data="Wieland_Holdfelder"/>
+    </record>
+    <record date="1997-03-01">
+      <addr>224.0.1.53</addr>
+      <description>heartbeat</description>
+      <xref type="person" data="Louis_Mamakos"/>
+    </record>
+    <record date="1997-04-01">
+      <addr>224.0.1.54</addr>
+      <description>sun-mc-grp</description>
+      <xref type="person" data="Michael_DeMoney"/>
+    </record>
+    <record date="1997-04-01">
+      <addr>224.0.1.55</addr>
+      <description>extended-sys</description>
+      <xref type="person" data="David_Poole"/>
+    </record>
+    <record date="1997-06-01">
+      <addr>224.0.1.56</addr>
+      <description>pdrncs</description>
+      <xref type="person" data="Paul_Wissenbach"/>
+    </record>
+    <record date="1997-06-01">
+      <addr>224.0.1.57</addr>
+      <description>tns-adv-multi</description>
+      <xref type="person" data="Jerome_Albin"/>
+    </record>
+    <record date="1997-08-01">
+      <addr>224.0.1.58</addr>
+      <description>vcals-dmu</description>
+      <xref type="person" data="Masato_Shindoh"/>
+    </record>
+    <record date="1997-09-01">
+      <addr>224.0.1.59</addr>
+      <description>zuba</description>
+      <xref type="person" data="Dan_Jackson"/>
+    </record>
+    <record date="1997-07-01">
+      <addr>224.0.1.60</addr>
+      <description>hp-device-disc</description>
+      <xref type="person" data="Shivaun_Albright"/>
+    </record>
+    <record date="1997-07-01">
+      <addr>224.0.1.61</addr>
+      <description>tms-production</description>
+      <xref type="person" data="Asad_Gilani"/>
+    </record>
+    <record date="1997-08-01">
+      <addr>224.0.1.62</addr>
+      <description>sunscalar</description>
+      <xref type="person" data="Terry_Gibson"/>
+    </record>
+    <record date="1997-09-01">
+      <addr>224.0.1.63</addr>
+      <description>mmtp-poll</description>
+      <xref type="person" data="Bryan_Costales"/>
+    </record>
+    <record date="1997-10-01">
+      <addr>224.0.1.64</addr>
+      <description>compaq-peer</description>
+      <xref type="person" data="Victor_Volpe"/>
+    </record>
+    <record date="1997-12-01">
+      <addr>224.0.1.65</addr>
+      <description>iapp</description>
+      <xref type="person" data="Bob_Meier"/>
+    </record>
+    <record date="1997-12-01">
+      <addr>224.0.1.66</addr>
+      <description>multihasc-com</description>
+      <xref type="person" data="Darcy_Brockbank"/>
+    </record>
+    <record date="1997-12-01">
+      <addr>224.0.1.67</addr>
+      <description>serv-discovery</description>
+      <xref type="person" data="Chas_Honton"/>
+    </record>
+    <record>
+      <addr>224.0.1.68</addr>
+      <description>mdhcpdisover</description>
+      <xref type="rfc" data="rfc2730"/>
+    </record>
+    <record date="1998-02-01">
+      <addr>224.0.1.69</addr>
+      <description>MMP-bundle-discovery1</description>
+      <xref type="person" data="Gary_Scott_Malkin"/>
+    </record>
+    <record date="1998-02-01">
+      <addr>224.0.1.70</addr>
+      <description>MMP-bundle-discovery2</description>
+      <xref type="person" data="Gary_Scott_Malkin"/>
+    </record>
+    <record date="1998-02-01" updated="2014-11-07">
+      <addr>224.0.1.71</addr>
+      <description>XYPOINT DGPS Data Feed</description>
+      <xref type="person" data="NE-TEAM_at_telecomsys.com"/>
+    </record>
+    <record date="1998-02-01">
+      <addr>224.0.1.72</addr>
+      <description>GilatSkySurfer</description>
+      <xref type="person" data="Yossi_Gal"/>
+    </record>
+    <record date="1997-03-01">
+      <addr>224.0.1.73</addr>
+      <description>SharesLive</description>
+      <xref type="person" data="Shane_Rowatt"/>
+    </record>
+    <record>
+      <addr>224.0.1.74</addr>
+      <description>NorthernData</description>
+      <xref type="text">[Sheers]</xref>
+    </record>
+    <record>
+      <addr>224.0.1.75</addr>
+      <description>SIP</description>
+      <xref type="text">[Schulzrinne]</xref>
+    </record>
+    <record date="1998-03">
+      <addr>224.0.1.76</addr>
+      <description>IAPP</description>
+      <xref type="person" data="Henri_Moelard"/>
+    </record>
+    <record date="1998-03-01">
+      <addr>224.0.1.77</addr>
+      <description>AGENTVIEW</description>
+      <xref type="person" data="Ram_Iyer"/>
+    </record>
+    <record date="1998-04-01">
+      <addr>224.0.1.78</addr>
+      <description>Tibco Multicast1</description>
+      <xref type="person" data="Raymond_Shum"/>
+    </record>
+    <record date="1998-04-01">
+      <addr>224.0.1.79</addr>
+      <description>Tibco Multicast2</description>
+      <xref type="person" data="Raymond_Shum"/>
+    </record>
+    <record date="1998-06-01">
+      <addr>224.0.1.80</addr>
+      <description>MSP</description>
+      <xref type="person" data="Evan_Caves"/>
+    </record>
+    <record date="1998-06-01">
+      <addr>224.0.1.81</addr>
+      <description>OTT (One-way Trip Time)</description>
+      <xref type="person" data="Beverly_Schwartz"/>
+    </record>
+    <record date="1998-08-01">
+      <addr>224.0.1.82</addr>
+      <description>TRACKTICKER</description>
+      <xref type="person" data="Alan_Novick"/>
+    </record>
+    <record date="1998-08-01">
+      <addr>224.0.1.83</addr>
+      <description>dtn-mc</description>
+      <xref type="person" data="Bob_Gaddie"/>
+    </record>
+    <record date="1998-08-01">
+      <addr>224.0.1.84</addr>
+      <description>jini-announcement</description>
+      <xref type="person" data="Bob_Scheifler"/>
+    </record>
+    <record date="1998-08-01">
+      <addr>224.0.1.85</addr>
+      <description>jini-request</description>
+      <xref type="person" data="Bob_Scheifler"/>
+    </record>
+    <record date="1998-08-01">
+      <addr>224.0.1.86</addr>
+      <description>sde-discovery</description>
+      <xref type="person" data="Peter_Aronson"/>
+    </record>
+    <record date="1998-08-01">
+      <addr>224.0.1.87</addr>
+      <description>DirecPC-SI</description>
+      <xref type="person" data="Doug_Dillon"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.88</addr>
+      <description>B1RMonitor</description>
+      <xref type="person" data="Ed_Purkiss"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.89</addr>
+      <description>3Com-AMP3 dRMON</description>
+      <xref type="person" data="Prakash_Banthia"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.90</addr>
+      <description>imFtmSvc</description>
+      <xref type="person" data="Zia_Bhatti"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.91</addr>
+      <description>NQDS4</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.92</addr>
+      <description>NQDS5</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.93</addr>
+      <description>NQDS6</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.94</addr>
+      <description>NLVL12</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.95</addr>
+      <description>NTDS1</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.96</addr>
+      <description>NTDS2</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.97</addr>
+      <description>NODSA</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.98</addr>
+      <description>NODSB</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.99</addr>
+      <description>NODSC</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.100</addr>
+      <description>NODSD</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.101</addr>
+      <description>NQDS4R</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.102</addr>
+      <description>NQDS5R</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.103</addr>
+      <description>NQDS6R</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.104</addr>
+      <description>NLVL12R</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.105</addr>
+      <description>NTDS1R</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.106</addr>
+      <description>NTDS2R</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.107</addr>
+      <description>NODSAR</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.108</addr>
+      <description>NODSBR</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.109</addr>
+      <description>NODSCR</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-09-01">
+      <addr>224.0.1.110</addr>
+      <description>NODSDR</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1998-10-01">
+      <addr>224.0.1.111</addr>
+      <description>MRM</description>
+      <xref type="person" data="Liming_Wei"/>
+    </record>
+    <record date="1998-11-01">
+      <addr>224.0.1.112</addr>
+      <description>TVE-FILE</description>
+      <xref type="person" data="Dean_Blackketter"/>
+    </record>
+    <record date="1998-11-01">
+      <addr>224.0.1.113</addr>
+      <description>TVE-ANNOUNCE</description>
+      <xref type="person" data="Dean_Blackketter"/>
+    </record>
+    <record date="1998-11-01">
+      <addr>224.0.1.114</addr>
+      <description>Mac Srv Loc</description>
+      <xref type="person" data="Bill_Woodcock"/>
+    </record>
+    <record date="1998-11-01">
+      <addr>224.0.1.115</addr>
+      <description>Simple Multicast</description>
+      <xref type="person" data="Jon_Crowcroft"/>
+    </record>
+    <record date="1998-11-01">
+      <addr>224.0.1.116</addr>
+      <description>SpectraLinkGW</description>
+      <xref type="person" data="Mark_Hamilton"/>
+    </record>
+    <record date="1998-11-01">
+      <addr>224.0.1.117</addr>
+      <description>dieboldmcast</description>
+      <xref type="person" data="Gene_Marsh"/>
+    </record>
+    <record date="1998-12-01">
+      <addr>224.0.1.118</addr>
+      <description>Tivoli Systems</description>
+      <xref type="person" data="Jon_Gabriel"/>
+    </record>
+    <record date="1998-12-01">
+      <addr>224.0.1.119</addr>
+      <description>pq-lic-mcast</description>
+      <xref type="person" data="Bob_Sledge"/>
+    </record>
+    <record date="2007-03-01">
+      <addr>224.0.1.120</addr>
+      <description>SPRYWARE LLC</description>
+      <xref type="person" data="Michael_Kreutzjans"/>
+    </record>
+    <record date="1998-12-01">
+      <addr>224.0.1.121</addr>
+      <description>Pipesplatform</description>
+      <xref type="person" data="Daniel_Dissett"/>
+    </record>
+    <record date="1999-01-01">
+      <addr>224.0.1.122</addr>
+      <description>LiebDevMgmg-DM</description>
+      <xref type="person" data="Mike_Velten"/>
+    </record>
+    <record date="1999-01-01">
+      <addr>224.0.1.123</addr>
+      <description>TRIBALVOICE</description>
+      <xref type="person" data="Nigel_Thompson"/>
+    </record>
+    <record>
+      <addr>224.0.1.124</addr>
+      <description>Unassigned (Retracted 1/29/01)</description>
+    </record>
+    <record>
+      <addr>224.0.1.125</addr>
+      <description>PolyCom Relay1</description>
+      <xref type="text">[Coutiere]</xref>
+    </record>
+    <record date="1999-03-01">
+      <addr>224.0.1.126</addr>
+      <description>Infront Multi1</description>
+      <xref type="person" data="Morten_Lindeman"/>
+    </record>
+    <record date="1999-03-01">
+      <addr>224.0.1.127</addr>
+      <description>XRX DEVICE DISC</description>
+      <xref type="person" data="Michael_Wang"/>
+    </record>
+    <record date="1999-04-01">
+      <addr>224.0.1.128</addr>
+      <description>CNN</description>
+      <xref type="person" data="Joel_Lynch"/>
+    </record>
+    <record date="2007-02-02">
+      <addr>224.0.1.129</addr>
+      <description>PTP-primary</description>
+      <xref type="uri" data="http://ieee1588.nist.gov/"/>
+      <xref type="person" data="Kang_Lee"/>
+    </record>
+    <record date="2007-02-02">
+      <addr>224.0.1.130</addr>
+      <description>PTP-alternate1</description>
+      <xref type="uri" data="http://ieee1588.nist.gov/"/>
+      <xref type="person" data="Kang_Lee"/>
+    </record>
+    <record date="2007-02-02">
+      <addr>224.0.1.131</addr>
+      <description>PTP-alternate2</description>
+      <xref type="uri" data="http://ieee1588.nist.gov/"/>
+      <xref type="person" data="Kang_Lee"/>
+    </record>
+    <record date="2007-02-02">
+      <addr>224.0.1.132</addr>
+      <description>PTP-alternate3</description>
+      <xref type="uri" data="http://ieee1588.nist.gov/"/>
+      <xref type="person" data="Kang_Lee"/>
+    </record>
+    <record date="1999-04-01">
+      <addr>224.0.1.133</addr>
+      <description>ProCast</description>
+      <xref type="person" data="Shai_Revzen"/>
+    </record>
+    <record date="1999-04-01">
+      <addr>224.0.1.134</addr>
+      <description>3Com Discp</description>
+      <xref type="person" data="Peter_White"/>
+    </record>
+    <record date="1999-05-01">
+      <addr>224.0.1.135</addr>
+      <description>CS-Multicasting</description>
+      <xref type="person" data="Nedelcho_Stanev"/>
+    </record>
+    <record date="1999-06-01">
+      <addr>224.0.1.136</addr>
+      <description>TS-MC-1</description>
+      <xref type="person" data="Darrell_Sveistrup"/>
+    </record>
+    <record date="1999-06-01">
+      <addr>224.0.1.137</addr>
+      <description>Make Source</description>
+      <xref type="person" data="Anthony_Daga"/>
+    </record>
+    <record date="1999-06-01">
+      <addr>224.0.1.138</addr>
+      <description>Teleborsa</description>
+      <xref type="person" data="Paolo_Strazzera"/>
+    </record>
+    <record date="1999-07-01">
+      <addr>224.0.1.139</addr>
+      <description>SUMAConfig</description>
+      <xref type="person" data="Walter_Wallach"/>
+    </record>
+    <record>
+      <addr>224.0.1.140</addr>
+      <description>capwap-ac</description>
+      <xref type="rfc" data="rfc5415"/>
+    </record>
+    <record date="1999-10-01">
+      <addr>224.0.1.141</addr>
+      <description>DHCP-SERVERS</description>
+      <xref type="person" data="Eric_Hall"/>
+    </record>
+    <record date="1999-08-01">
+      <addr>224.0.1.142</addr>
+      <description>CN Router-LL</description>
+      <xref type="person" data="Ian_Armitage"/>
+    </record>
+    <record date="2008-02-04">
+      <addr>224.0.1.143</addr>
+      <description>EMWIN</description>
+      <xref type="person" data="Antonio_Querubin"/>
+    </record>
+    <record date="1999-08-01">
+      <addr>224.0.1.144</addr>
+      <description>Alchemy Cluster</description>
+      <xref type="person" data="Stacey_O_Rourke"/>
+      <xref type="person" data="Stacey_O_Rourke_2"/>
+    </record>
+    <record date="1999-08-01">
+      <addr>224.0.1.145</addr>
+      <description>Satcast One</description>
+      <xref type="person" data="Julian_Nevell"/>
+    </record>
+    <record date="1999-08-01">
+      <addr>224.0.1.146</addr>
+      <description>Satcast Two</description>
+      <xref type="person" data="Julian_Nevell"/>
+    </record>
+    <record date="1999-08-01">
+      <addr>224.0.1.147</addr>
+      <description>Satcast Three</description>
+      <xref type="person" data="Julian_Nevell"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.148</addr>
+      <description>Intline</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="1999-09-01">
+      <addr>224.0.1.149</addr>
+      <description>8x8 Multicast</description>
+      <xref type="person" data="Mike_Roper"/>
+    </record>
+    <record>
+      <addr>224.0.1.150</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.151</addr>
+      <description>Intline-1</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.152</addr>
+      <description>Intline-2</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.153</addr>
+      <description>Intline-3</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.154</addr>
+      <description>Intline-4</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.155</addr>
+      <description>Intline-5</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.156</addr>
+      <description>Intline-6</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.157</addr>
+      <description>Intline-7</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.158</addr>
+      <description>Intline-8</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.159</addr>
+      <description>Intline-9</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.160</addr>
+      <description>Intline-10</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.161</addr>
+      <description>Intline-11</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.162</addr>
+      <description>Intline-12</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.163</addr>
+      <description>Intline-13</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.164</addr>
+      <description>Intline-14</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.165</addr>
+      <description>Intline-15</description>
+      <xref type="person" data="Robert_Sliwinski"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.166</addr>
+      <description>marratech-cc</description>
+      <xref type="person" data="Peter_Parnes"/>
+    </record>
+    <record date="2000-02-01">
+      <addr>224.0.1.167</addr>
+      <description>EMS-InterDev</description>
+      <xref type="person" data="Stephen_T_Lyda"/>
+    </record>
+    <record date="2000-03-01">
+      <addr>224.0.1.168</addr>
+      <description>itb301</description>
+      <xref type="person" data="Bodo_Rueskamp"/>
+    </record>
+    <record date="2000-07-01">
+      <addr>224.0.1.169</addr>
+      <description>rtv-audio</description>
+      <xref type="person" data="Chris_Adams"/>
+    </record>
+    <record date="2000-07-01">
+      <addr>224.0.1.170</addr>
+      <description>rtv-video</description>
+      <xref type="person" data="Chris_Adams"/>
+    </record>
+    <record date="2000-07-01">
+      <addr>224.0.1.171</addr>
+      <description>HAVI-Sim</description>
+      <xref type="person" data="Stephan_Wasserroth"/>
+    </record>
+    <record date="1999-08-01">
+      <addr>224.0.1.172</addr>
+      <description>Nokia Cluster</description>
+      <xref type="person" data="Stacey_O_Rourke"/>
+      <xref type="person" data="Stacey_O_Rourke_2"/>
+    </record>
+    <record date="2001-06-01">
+      <addr>224.0.1.173</addr>
+      <description>host-request</description>
+      <xref type="person" data="Keith_Thompson"/>
+    </record>
+    <record date="2001-06-01">
+      <addr>224.0.1.174</addr>
+      <description>host-announce</description>
+      <xref type="person" data="Keith_Thompson"/>
+    </record>
+    <record date="2001-12-01">
+      <addr>224.0.1.175</addr>
+      <description>ptk-cluster</description>
+      <xref type="person" data="Robert_Hodgson"/>
+    </record>
+    <record date="2002-02-01">
+      <addr>224.0.1.176</addr>
+      <description>Proxim Protocol</description>
+      <xref type="person" data="Gajendra_Shukla"/>
+    </record>
+    <record date="2002-10-01">
+      <addr>224.0.1.177</addr>
+      <description>Gemtek Systems</description>
+      <xref type="person" data="Alex_Lee"/>
+    </record>
+    <record date="2003-01-01">
+      <addr>224.0.1.178</addr>
+      <description>IEEE IAPP</description>
+      <xref type="person" data="Stuart_Kerry"/>
+    </record>
+    <record date="2006-04-11">
+      <addr>224.0.1.179</addr>
+      <description>1451_Dot5_802_Discovery</description>
+      <xref type="person" data="Ryon_Coleman"/>
+    </record>
+    <record date="2006-04-11">
+      <addr>224.0.1.180</addr>
+      <description>1451_Dot5_802_Group_1</description>
+      <xref type="person" data="Ryon_Coleman"/>
+    </record>
+    <record date="2006-04-11">
+      <addr>224.0.1.181</addr>
+      <description>1451_Dot5_802_Group_2</description>
+      <xref type="person" data="Ryon_Coleman"/>
+    </record>
+    <record date="2006-04-11">
+      <addr>224.0.1.182</addr>
+      <description>1451_Dot5_802_Group_3</description>
+      <xref type="person" data="Ryon_Coleman"/>
+    </record>
+    <record date="2006-04-11">
+      <addr>224.0.1.183</addr>
+      <description>1451_Dot5_802_Group_4</description>
+      <xref type="person" data="Ryon_Coleman"/>
+    </record>
+    <record date="2007-03-06">
+      <addr>224.0.1.184</addr>
+      <description>VFSDP</description>
+      <xref type="person" data="Adam_Yellen"/>
+    </record>
+    <record>
+      <addr>224.0.1.185</addr>
+      <description>ASAP</description>
+      <xref type="rfc" data="rfc5352"/>
+    </record>
+    <record>
+      <addr>224.0.1.186</addr>
+      <description>SL-MANET-ROUTERS</description>
+      <xref type="rfc" data="rfc6621"/>
+    </record>    
+    <record date="2013-07-25">
+      <addr>224.0.1.187</addr>
+      <description>All CoAP Nodes</description>
+      <xref type="rfc" data="rfc7252"/>
+    </record>
+    <record>
+      <addr>224.0.1.188-224.0.1.255</addr>
+      <description>Unassigned</description>
+    </record>
+  </registry>
+
+  
+  <registry id="multicast-addresses-3">
+    <title>AD-HOC Block I (224.0.2.0 - 224.0.255.255)</title>
+    <xref type="rfc" data="rfc5771"/>
+    <registration_rule>Expert Review, IESG Approval, or Standards Action</registration_rule>
+    <record>
+      <addr>224.0.2.0</addr>
+      <description>Unassigned</description>
+    </record>
+    <record>
+      <addr>224.0.2.1</addr>
+      <description>"rwho" Group (BSD) (unofficial)</description>
+      <xref type="person" data="Jon_Postel"/>
+    </record>
+    <record>
+      <addr>224.0.2.2</addr>
+      <description>SUN RPC PMAPPROC_CALLIT</description>
+      <xref type="person" data="Brendan_Eic"/>
+    </record>
+    <record date="2005-01-01">
+      <addr>224.0.2.3</addr>
+      <description>EPSON-disc-set</description>
+      <xref type="person" data="SEIKO_EPSON_Corp"/>
+    </record>
+    <record date="2009-08-28">
+      <addr>224.0.2.4</addr>
+      <description>All C1222 Nodes</description>
+      <xref type="rfc" data="rfc6142"/>
+    </record>
+    <record date="2012-04-17">
+      <addr>224.0.2.5</addr>
+      <description>Monitoring Discovery Protocol</description>
+      <xref type="person" data="Alan_Robertson"/>
+    </record>
+    <record date="2012-04-25">
+      <addr>224.0.2.6</addr>
+      <description>BitSend MediaStreams</description>
+      <xref type="person" data="Carl-Johan_Sjöberg"/>
+    </record>
+    <record date="2012-11-19">
+      <addr>224.0.2.7-224.0.2.8</addr>
+      <description>rxWARN</description>
+      <xref type="person" data="Caleb_Bell"/>
+    </record>
+    <record date="2016-10-04">
+      <addr>224.0.2.9</addr>
+      <description>DATV streams</description>
+      <xref type="person" data="Grant_Taylor"/>
+    </record>
+    <record>
+      <addr>224.0.2.10-224.0.2.63</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="1996-04" updated="2015-10-23">
+      <addr>224.0.2.64-224.0.2.95</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+      <reviewed>2007-07</reviewed>
+    </record>
+    <record date="1997-07-01">
+      <addr>224.0.2.96-224.0.2.127</addr>
+      <description>BallisterNet</description>
+      <xref type="person" data="Tom_Ballister"/>
+    </record>
+    <record date="1997-02-01">
+      <addr>224.0.2.128-224.0.2.191</addr>
+      <description>WOZ-Garage</description>
+      <xref type="person" data="Douglas_Marquardt"/>
+    </record>
+    <record date="1997-02-01" updated="2015-10-23">
+      <addr>224.0.2.192-224.0.2.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record>
+      <addr>224.0.3.0-224.0.3.255</addr>
+      <description>RFE Generic Service</description>
+      <xref type="person" data="Daniel_Steinber"/>
+    </record>
+    <record>
+      <addr>224.0.4.0-224.0.4.255</addr>
+      <description>RFE Individual Conferences</description>
+      <xref type="person" data="Daniel_Steinber"/>
+    </record>
+    <record>
+      <addr>224.0.5.0-224.0.5.127</addr>
+      <description>CDPD Groups</description>
+      <xref type="text">[Bob Brenner]</xref>
+    </record>
+    <record date="1998-10-01" updated="2015-10-23">
+      <addr>224.0.5.128-224.0.5.191</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record date="2001-08-01" updated="2015-10-23">
+      <addr>224.0.5.192-224.0.5.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record>
+      <addr>224.0.6.0-224.0.6.127</addr>
+      <description>Cornell ISIS Project</description>
+      <xref type="text">[Tim Clark]</xref>
+    </record>
+    <record date="2009-09-24">
+      <addr>224.0.6.128-224.0.6.143</addr>
+      <description>MoeSingh</description>
+      <xref type="person" data="Moe_Singh"/>
+    </record>
+    <record>
+      <addr>224.0.6.144-224.0.6.150</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="2014-08-01">
+      <addr>224.0.6.151</addr>
+      <description>Canon-Device-control</description>
+      <xref type="person" data="Hiroshi_Okubo"/>
+    </record>
+    <record>
+      <addr>224.0.6.152-224.0.6.191</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="2014-09-19">
+      <addr>224.0.6.192-224.0.6.255</addr>
+      <description>OneChicago multicast</description>
+      <xref type="person" data="Brian_Trudeau"/>
+    </record>
+    <record date="1994-11-01">
+      <addr>224.0.7.0-224.0.7.255</addr>
+      <description>Where-Are-You</description>
+      <xref type="person" data="Bill_Simpson"/>
+    </record>
+    <record date="2011-05-20">
+      <addr>224.0.8.0-224.0.8.255</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="1998-04-01">
+      <addr>224.0.9.0-224.0.9.255</addr>
+      <description>The Thing System</description>
+      <xref type="person" data="Carl_Malamud"/>
+    </record>
+    <record date="1996-04-01">
+      <addr>224.0.10.0-224.0.10.255</addr>
+      <description>DLSw Groups</description>
+      <xref type="person" data="Choon_Lee"/>
+    </record>
+    <record date="1996-08-01">
+      <addr>224.0.11.0-224.0.11.255</addr>
+      <description>NCC.NET Audio</description>
+      <xref type="person" data="David_Rubin"/>
+    </record>
+    <record date="1996-11-01">
+      <addr>224.0.12.0-224.0.12.63</addr>
+      <description>Microsoft and MSNBC</description>
+      <xref type="person" data="Tom_Blank"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>224.0.13.0-224.0.13.255</addr>
+      <description>WorldCom Broadcast Services</description>
+      <xref type="person" data="Tony_Barber"/>
+    </record>
+    <record date="1997-02-01">
+      <addr>224.0.14.0-224.0.14.255</addr>
+      <description>NLANR</description>
+      <xref type="person" data="Duane_Wessels"/>
+    </record>
+    <record date="1997-02-01" updated="2015-10-12">
+      <addr>224.0.15.0-224.0.15.255</addr>
+      <description>Agilent Technologies</description>
+      <xref type="person" data="IP_Admin"/>
+    </record>
+    <record date="1997-04-01">
+      <addr>224.0.16.0-224.0.16.255</addr>
+      <description>XingNet</description>
+      <xref type="person" data="Mika_Uusitalo"/>
+    </record>
+    <record date="1997-07-01">
+      <addr>224.0.17.0-224.0.17.31</addr>
+      <description>Mercantile &amp; Commodity Exchange</description>
+      <xref type="person" data="Asad_Gilani"/>
+    </record>
+    <record date="1999-03-01">
+      <addr>224.0.17.32-224.0.17.63</addr>
+      <description>NDQMD1</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="1999-03-01">
+      <addr>224.0.17.64-224.0.17.127</addr>
+      <description>ODN-DTV</description>
+      <xref type="person" data="Richard_Hodges"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>224.0.18.0-224.0.18.255</addr>
+      <description>Dow Jones</description>
+      <xref type="person" data="Wenjie_Peng"/>
+    </record>
+    <record date="1997-08-01">
+      <addr>224.0.19.0-224.0.19.63</addr>
+      <description>Walt Disney Company</description>
+      <xref type="person" data="Scott_Watson"/>
+    </record>
+    <record date="1997-10-01">
+      <addr>224.0.19.64-224.0.19.95</addr>
+      <description>Cal Multicast</description>
+      <xref type="person" data="Ed_Moran"/>
+    </record>
+    <record date="1997-10" updated="2015-10-23">
+      <addr>224.0.19.96-224.0.19.127</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+      <reviewed>2007-07</reviewed>
+    </record>
+    <record date="1997-12-01">
+      <addr>224.0.19.128-224.0.19.191</addr>
+      <description>IIG Multicast</description>
+      <xref type="person" data="Wayne_Carr"/>
+    </record>
+    <record date="1998-05-01">
+      <addr>224.0.19.192-224.0.19.207</addr>
+      <description>Metropol</description>
+      <xref type="person" data="James_Crawford"/>
+    </record>
+    <record date="1998-07-01">
+      <addr>224.0.19.208-224.0.19.239</addr>
+      <description>Xenoscience, Inc.</description>
+      <xref type="person" data="Mary_Timm"/>
+    </record>
+    <record date="2007-03-01">
+      <addr>224.0.19.240-224.0.19.255</addr>
+      <description>MJDPM</description>
+      <xref type="person" data="Matthew_Straight"/>
+    </record>
+    <record date="1998-07-01">
+      <addr>224.0.20.0-224.0.20.63</addr>
+      <description>MS-IP/TV</description>
+      <xref type="person" data="Tony_Wong"/>
+    </record>
+    <record date="1998-08-01">
+      <addr>224.0.20.64-224.0.20.127</addr>
+      <description>Reliable Network Solutions</description>
+      <xref type="person" data="Werner_Vogels"/>
+    </record>
+    <record date="1998-08-01">
+      <addr>224.0.20.128-224.0.20.143</addr>
+      <description>TRACKTICKER Group</description>
+      <xref type="person" data="Alan_Novick"/>
+    </record>
+    <record date="1999-08-01">
+      <addr>224.0.20.144-224.0.20.207</addr>
+      <description>CNR Rebroadcast MCA</description>
+      <xref type="person" data="Robert_Sautter"/>
+    </record>
+    <record date="1999-01-01">
+      <addr>224.0.21.0-224.0.21.127</addr>
+      <description>Talarian MCAST</description>
+      <xref type="person" data="Geoff_Mendal"/>
+    </record>
+    <record date="1999-06-01">
+      <addr>224.0.22.0-224.0.22.239</addr>
+      <description>WORLD MCAST</description>
+      <xref type="person" data="Ian_Stewart"/>
+    </record>
+    <record date="2007-10-31">
+      <addr>224.0.22.240-224.0.22.255</addr>
+      <description>Jones International</description>
+      <xref type="person" data="Jim_Ginsburg"/>
+    </record>
+    <record date="2003-02-01">
+      <addr>224.0.23.0</addr>
+      <description>ECHONET</description>
+      <xref type="person" data="Takeshi_Saito"/>
+    </record>
+    <record date="2003-02-01">
+      <addr>224.0.23.1</addr>
+      <description>Ricoh-device-ctrl</description>
+      <xref type="person" data="Akihiro_Nishida"/>
+    </record>
+    <record date="2003-02-01">
+      <addr>224.0.23.2</addr>
+      <description>Ricoh-device-ctrl</description>
+      <xref type="person" data="Akihiro_Nishida"/>
+    </record>
+    <record date="2003-04-01">
+      <addr>224.0.23.3-224.0.23.10</addr>
+      <description>Telefeed</description>
+      <xref type="person" data="Wally_Beddoe"/>
+    </record>
+    <record date="2003-05-01">
+      <addr>224.0.23.11</addr>
+      <description>SpectraTalk</description>
+      <xref type="person" data="Madhav_Karhade"/>
+    </record>
+    <record date="2003-07-01">
+      <addr>224.0.23.12</addr>
+      <description>EIBnet/IP</description>
+      <xref type="person" data="Marc_Goossens"/>
+    </record>
+    <record date="2003-10-01">
+      <addr>224.0.23.13</addr>
+      <description>TVE-ANNOUNCE2</description>
+      <xref type="person" data="Michael_Dolan"/>
+    </record>
+    <record date="2004-01-01">
+      <addr>224.0.23.14</addr>
+      <description>DvbServDisc</description>
+      <xref type="person" data="Bert_van_Willigen"/>
+    </record>
+    <record date="2007-03-01">
+      <addr>224.0.23.15-224.0.23.31</addr>
+      <description>MJDPM</description>
+      <xref type="person" data="Matthew_Straight"/>
+    </record>
+    <record date="2004-02-01">
+      <addr>224.0.23.32</addr>
+      <description>Norman MCMP</description>
+      <xref type="person" data="Kristian_A_Bognaes"/>
+    </record>
+    <record date="2004-06-01">
+      <addr>224.0.23.33</addr>
+      <description>RRDP</description>
+      <xref type="person" data="Tetsuo_Hoshi"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.34</addr>
+      <description>AF_NA</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.35</addr>
+      <description>AF_OPRA_NBBO</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.36</addr>
+      <description>AF_OPRA_FULL</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.37</addr>
+      <description>AF_NEWS</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.38</addr>
+      <description>AF_NA_CHI</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.39</addr>
+      <description>AF_OPRA_NBBO_CHI</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.40</addr>
+      <description>AF_OPRA_FULL_CHI</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.41</addr>
+      <description>AF_NEWS_CHI</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-02-01">
+      <addr>224.0.23.42</addr>
+      <description>Control for IP Video</description>
+      <xref type="person" data="Nadine_Guillaume"/>
+    </record>
+    <record date="2005-02-01">
+      <addr>224.0.23.43</addr>
+      <description>acp-discovery</description>
+      <xref type="person" data="Andy_Belk"/>
+    </record>
+    <record date="2005-02-01">
+      <addr>224.0.23.44</addr>
+      <description>acp-management</description>
+      <xref type="person" data="Andy_Belk"/>
+    </record>
+    <record date="2005-02-01">
+      <addr>224.0.23.45</addr>
+      <description>acp-data</description>
+      <xref type="person" data="Andy_Belk"/>
+    </record>
+    <record date="2006-06-16" updated="2015-04-23">
+      <addr>224.0.23.46</addr>
+      <description>dof-multicast</description>
+      <xref type="person" data="Bryant_Eastham"/>
+      <reviewed>2015-04-23</reviewed>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.47</addr>
+      <description>AF_DOB_CHI</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.48</addr>
+      <description>AF_OPRA_FULL2_CHI</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.49</addr>
+      <description>AF_DOB</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2005-10-28">
+      <addr>224.0.23.50</addr>
+      <description>AF_OPRA_FULL2</description>
+      <xref type="person" data="Bob_Brzezinski"/>
+    </record>
+    <record date="2006-08-07">
+      <addr>224.0.23.51</addr>
+      <description>Fairview</description>
+      <xref type="person" data="Jim_Lyle"/>
+    </record>
+    <record date="2006-08-11" updated="2015-10-23">
+      <addr>224.0.23.52</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record date="2006-11-30">
+      <addr>224.0.23.53</addr>
+      <description>MCP</description>
+      <xref type="person" data="Tim_DeBaillie"/>
+    </record>
+    <record date="2007-01-17">
+      <addr>224.0.23.54</addr>
+      <description>ServDiscovery</description>
+      <xref type="person" data="Paul_Langille"/>
+    </record>
+    <record date="2008-02-04">
+      <addr>224.0.23.55</addr>
+      <description>noaaport1</description>
+      <xref type="person" data="Antonio_Querubin"/>
+    </record>
+    <record date="2008-02-04">
+      <addr>224.0.23.56</addr>
+      <description>noaaport2</description>
+      <xref type="person" data="Antonio_Querubin"/>
+    </record>
+    <record date="2008-02-04">
+      <addr>224.0.23.57</addr>
+      <description>noaaport3</description>
+      <xref type="person" data="Antonio_Querubin"/>
+    </record>
+    <record date="2008-02-04">
+      <addr>224.0.23.58</addr>
+      <description>noaaport4</description>
+      <xref type="person" data="Antonio_Querubin"/>
+    </record>
+    <record date="2008-02-22">
+      <addr>224.0.23.59</addr>
+      <description>DigacIP7</description>
+      <xref type="person" data="Jonathan_Niedfeldt"/>
+    </record>
+    <record date="2008-12-19">
+      <addr>224.0.23.60</addr>
+      <description>AtscSvcSig</description>
+      <xref type="person" data="Jerry_Whitaker"/>
+    </record>
+    <record date="2009-03-13">
+      <addr>224.0.23.61</addr>
+      <description>SafetyNET p (potentially IGMPv1)</description>
+      <xref type="person" data="Pilz"/>
+    </record>
+    <record date="2009-05-12">
+      <addr>224.0.23.62</addr>
+      <description>BluemoonGamesMC</description>
+      <xref type="person" data="Christopher_Mettin"/>
+    </record>
+    <record date="2009-05-12">
+      <addr>224.0.23.63</addr>
+      <description>iADT Discovery</description>
+      <xref type="person" data="Paul_Suhler"/>
+    </record>
+    <record date="2004-01-01">
+      <addr>224.0.23.64-224.0.23.80</addr>
+      <description>Moneyline</description>
+      <xref type="person" data="Guido_Petronio"/>
+    </record>
+    <record>
+      <addr>224.0.23.81-224.0.23.127</addr>
+      <description>Reserved (Moneyline)</description>
+    </record>
+    <record date="2004-01-01">
+      <addr>224.0.23.128-224.0.23.157</addr>
+      <description>PHLX</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record date="2005-09-01">
+      <addr>224.0.23.158</addr>
+      <description>VSCP</description>
+      <xref type="person" data="Charles_Tewiah"/>
+    </record>
+    <record date="2005-11-04">
+      <addr>224.0.23.159</addr>
+      <description>LXI-EVENT</description>
+      <xref type="person" data="Nick_Barendt"/>
+    </record>
+    <record date="2006-02-09">
+      <addr>224.0.23.160</addr>
+      <description>solera_lmca</description>
+      <xref type="person" data="Mark_Armstrong"/>
+    </record>
+    <record date="2006-03-17">
+      <addr>224.0.23.161</addr>
+      <description>VBooster</description>
+      <xref type="person" data="Alexander_Pevzner"/>
+    </record>
+    <record date="2006-03-17">
+      <addr>224.0.23.162</addr>
+      <description>cajo discovery</description>
+      <xref type="person" data="John_Catherino"/>
+    </record>
+    <record date="2006-03-31">
+      <addr>224.0.23.163</addr>
+      <description>INTELLIDEN</description>
+      <xref type="person" data="Jeff_Schenk"/>
+    </record>
+    <record date="2006-07-11">
+      <addr>224.0.23.164</addr>
+      <description>IceEDCP</description>
+      <xref type="person" data="Oliver_Lewis"/>
+    </record>
+    <record date="2006-07-11">
+      <addr>224.0.23.165</addr>
+      <description>omasg</description>
+      <xref type="person" data="Mark_Lipford"/>
+    </record>
+    <record date="2006-08-15">
+      <addr>224.0.23.166</addr>
+      <description>MEDIASTREAM</description>
+      <xref type="person" data="Maurice_Robberson"/>
+    </record>
+    <record date="2006-08-21">
+      <addr>224.0.23.167</addr>
+      <description>Systech Mcast</description>
+      <xref type="person" data="Dan_Jakubiec"/>
+    </record>
+    <record date="2007-07-06">
+      <addr>224.0.23.168</addr>
+      <description>tricon-system-management</description>
+      <xref type="person" data="John_Gabler"/>
+    </record>
+    <record date="2008-01-14">
+      <addr>224.0.23.169</addr>
+      <description>MNET discovery</description>
+      <xref type="person" data="Andy_Crick"/>
+    </record>
+    <record date="2009-09-24">
+      <addr>224.0.23.170</addr>
+      <description>CCNx (not for global routing)</description>
+      <xref type="person" data="Simon_Barber"/>
+    </record>
+    <record date="2009-11-11">
+      <addr>224.0.23.171</addr>
+      <description>LLAFP</description>
+      <xref type="person" data="Michael_Lyle"/>
+    </record>
+    <record date="2010-02-04">
+      <addr>224.0.23.172</addr>
+      <description>UFMP</description>
+      <xref type="person" data="Albert_Berlovitch"/>
+    </record>
+    <record date="2010-02-26">
+      <addr>224.0.23.173</addr>
+      <description>PHILIPS-HEALTH</description>
+      <xref type="person" data="Anthony_Kandaya"/>
+    </record>
+    <record date="2010-02-26">
+      <addr>224.0.23.174</addr>
+      <description>PHILIPS-HEALTH</description>
+      <xref type="person" data="Anthony_Kandaya"/>
+    </record>
+    <record date="2010-03-12">
+      <addr>224.0.23.175</addr>
+      <description>QDP</description>
+      <xref type="person" data="Kevin_Gross"/>
+    </record>
+    <record date="2011-06-06">
+      <addr>224.0.23.176</addr>
+      <description>CalAmp WCP</description>
+      <xref type="person" data="Pierre_Oliver"/>
+    </record>
+    <record date="2012-08-28">
+      <addr>224.0.23.177</addr>
+      <description>AES discovery</description>
+      <xref type="person" data="Kevin_Gross_2"/>
+    </record>    
+    <record date="2013-02-08">
+      <addr>224.0.23.178</addr>
+      <description>JDP Java Discovery Protocol</description>
+      <xref type="person" data="Florian_Weimer"/>
+    </record>
+    <record date="2014-06-04">
+      <addr>224.0.23.179</addr>
+      <description>PixelPusher</description>
+      <xref type="person" data="Jasmine_Strong"/>
+    </record>
+    <record date="2014-12-17">
+      <addr>224.0.23.180</addr>
+      <description>network metronome</description>
+      <xref type="person" data="George_Neville-Neil"/>
+    </record>
+    <record date="2016-04-19">
+      <addr>224.0.23.181</addr>
+      <description>polaris-video-transport</description>
+      <xref type="person" data="Geoff_Golder"/>
+    </record>
+    <record>
+      <addr>224.0.23.182-224.0.23.191</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="2008-08-12">
+      <addr>224.0.23.192-224.0.23.255</addr>
+      <description>PINKOTC</description>
+      <xref type="person" data="Sergey_Shulgin"/>
+    </record>
+    <record date="2006-06-09">
+      <addr>224.0.24.0-224.0.24.127</addr>
+      <description>AGSC UK VVs</description>
+      <xref type="person" data="Andrew_Rowley"/>
+    </record>
+    <record date="2006-08-07">
+      <addr>224.0.24.128-224.0.24.255</addr>
+      <description>EM-MULTI</description>
+      <xref type="person" data="Soren_Martin_Sorensen"/>
+    </record>
+    <record date="2007-03-22">
+      <addr>224.0.25.0-224.0.28.255</addr>
+      <description>CME Market Data</description>
+      <xref type="person" data="Sarunas_Brakauskas"/>
+    </record>
+    <record date="2007-03-22">
+      <addr>224.0.29.0-224.0.30.255</addr>
+      <description>Deutsche Boerse</description>
+      <xref type="person" data="Jan_Drwal"/>
+    </record>
+    <record date="2007-07-17">
+      <addr>224.0.31.0-224.0.34.255</addr>
+      <description>CME Market Data</description>
+      <xref type="person" data="Sarunas_Brakauskas"/>
+    </record>
+    <record date="2007-08-31">
+      <addr>224.0.35.0-224.0.35.255</addr>
+      <description>M2S</description>
+      <xref type="person" data="Itamar_Gilad"/>
+    </record>
+    <record date="2016-09-29">
+      <addr>224.0.36.0-224.0.36.255</addr>
+      <description>DigiPlay</description>
+      <xref type="person" data="Robert_Taylor"/>
+    </record>
+    <record>
+      <addr>224.0.37.0-224.0.38.255</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="2007-09-12">
+      <addr>224.0.39.0-224.0.40.255</addr>
+      <description>CDAS</description>
+      <xref type="person" data="Oyvind_H_Olsen"/>
+    </record>
+    <record date="2007-11-28" updated="2015-10-23">
+      <addr>224.0.41.0-224.0.41.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+      <reviewed>2011-02-15</reviewed>
+    </record>
+    <record date="2008-01-15">
+      <addr>224.0.42.0-224.0.45.255</addr>
+      <description>MEDIAL</description>
+      <xref type="person" data="Media_Alliance_JSC"/>
+    </record>
+    <record date="2008-01-25">
+      <addr>224.0.46.0-224.0.50.255</addr>
+      <description>Deutsche Boerse</description>
+      <xref type="person" data="Jan_Drwal"/>
+    </record>
+    <record date="2008-04-09">
+      <addr>224.0.51.0-224.0.51.255</addr>
+      <description>ALCOM-IPTV</description>
+      <xref type="person" data="Jan_Erik_Eriksson"/>
+    </record>
+    <record date="2008-07-23" updated="2014-11-24">
+      <addr>224.0.52.0-224.0.53.255</addr>
+      <description>Euronext</description>
+      <xref type="person" data="Euronext_Admin"/>
+      <reviewed>2014-11-24</reviewed>
+    </record>
+    <record date="2008-08-20">
+      <addr>224.0.54.0-224.0.57.255</addr>
+      <description>Get - BCN</description>
+      <xref type="person" data="Arne_Hvidsten"/>
+    </record>
+    <record date="2008-08-27" updated="2015-10-23">
+      <addr>224.0.58.0-224.0.61.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record date="2008-12-24">
+      <addr>224.0.62.0-224.0.62.255</addr>
+      <description>BATS</description>
+      <xref type="person" data="Andrew_Brown"/>
+    </record>
+    <record date="2009-03-13">
+      <addr>224.0.63.0-224.0.63.255</addr>
+      <description>BATS Trading</description>
+      <xref type="person" data="Tim_Gorsline"/>
+    </record>
+    <record date="2009-03-13" updated="2014-11-24">
+      <addr>224.0.64.0-224.0.67.255</addr>
+      <description>Euronext</description>
+      <xref type="person" data="Euronext_Admin"/>
+      <reviewed>2014-11-24</reviewed>
+    </record>
+    <record date="2009-05-12" updated="2016-05-06">
+      <addr>224.0.68.0-224.0.69.255</addr>
+      <description>ISE</description>
+      <xref type="person" data="ISE-Networks"/>
+    </record>
+    <record date="2009-06-16" updated="2015-10-23">
+      <addr>224.0.70.0-224.0.71.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+      <reviewed>2011-03-01</reviewed>
+    </record>
+    <record date="2009-08-28">
+      <addr>224.0.72.0-224.0.72.255</addr>
+      <description>TMX</description>
+      <xref type="person" data="Michael_Caravetta"/>
+      <xref type="person" data="Boris_Garber"/>
+    </record>
+    <record date="2009-08-28">
+      <addr>224.0.73.0-224.0.74.255</addr>
+      <description>Direct Edge</description>
+      <xref type="person" data="Javier_Landin"/>
+    </record>
+    <record date="2010-01-22" updated="2016-05-06">
+      <addr>224.0.75.0-224.0.75.255</addr>
+      <description>ISE</description>
+      <xref type="person" data="ISE-Networks"/>
+    </record>
+    <record date="2010-02-26" updated="2015-10-23">
+      <addr>224.0.76.0-224.0.76.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+      <reviewed>2011-03-01</reviewed>
+    </record>
+    <record date="2010-02-26" updated="2015-10-23">
+      <addr>224.0.77.0-224.0.77.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record date="2010-03-12">
+      <addr>224.0.78.0-224.0.78.255</addr>
+      <description>ALCOM-IPTV</description>
+      <xref type="person" data="Jan_Erik_Eriksson"/>
+    </record>
+    <record date="2010-08-24" updated="2016-05-06">
+      <addr>224.0.79.0-224.0.81.255</addr>
+      <description>ISE</description>
+      <xref type="person" data="ISE-Networks"/>
+    </record>
+    <record date="2011-01-31">
+      <addr>224.0.82.0-224.0.85.255</addr>
+      <description>BATS Trading</description>
+      <xref type="person" data="Tim_Gorsline"/>
+    </record>
+    <record date="2011-02-10" updated="2015-10-23">
+      <addr>224.0.86.0-224.0.101.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record date="2011-04-13" updated="2015-10-23">
+      <addr>224.0.102.0-224.0.102.127</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record date="2014-06-12">
+      <addr>224.0.102.128-224.0.102.255</addr>
+      <description>MVS-IPTV-2</description>
+      <xref type="person" data="Andrew_Hoyos"/>
+    </record>
+    <record date="2011-04-20">
+      <addr>224.0.103.0-224.0.104.255</addr>
+      <description>MVS-IPTV</description>
+      <xref type="person" data="Adam_DeMinter"/>
+      <xref type="person" data="Andrew_Hoyos"/>
+    </record>
+    <record date="2011-06-06">
+      <addr>224.0.105.0-224.0.105.127</addr>
+      <description>MIAX Multicast</description>
+      <xref type="person" data="Ruben_Hernandez"/>
+    </record>
+    <record>
+      <addr>224.0.105.128-224.0.105.255</addr>
+      
+      <description>Unassigned</description>
+    </record>
+    <record date="2011-06-16">
+      <addr>224.0.106.0-224.0.106.255</addr>
+      <description>TMX</description>
+      <xref type="person" data="Michael_Caravetta"/>
+      <xref type="person" data="Boris_Garber"/>
+    </record>
+    <record date="2011-07-13">
+      <addr>224.0.107.0-224.0.108.255</addr>
+      <description>Alpha Group</description>
+      <xref type="person" data="Zaklina_Petkovic"/>
+    </record>
+    <record date="2011-10-25">
+      <addr>224.0.109.0-224.0.110.255</addr>
+      <description>Zaklina_Petkovic</description>
+      <xref type="person" data="David_Brett"/>
+    </record>
+    <record date="2011-10-25" updated="2014-09-05"> 
+      <addr>224.0.111.0-224.0.111.255</addr>
+      <description>VoleraDataFeed</description>
+      <xref type="person" data="Gerald_Hanweck"/>
+    </record>
+    <record date="2011-12-07">
+      <addr>224.0.112.0-224.0.112.255</addr>
+      <description>JHB-STOCK-EXCH</description>
+      <xref type="person" data="Clem_Verwey"/>
+    </record>
+    <record date="2011-12-19">
+      <addr>224.0.113.0-224.0.114.255</addr>
+      <description>Deutsche Boerse</description>
+      <xref type="person" data="Jan_Drwal"/>
+    </record>
+    <record date="2012-06-12">
+      <addr>224.0.115.0-224.0.115.255</addr>
+      <description>TMX</description>
+      <xref type="person" data="Michael_Caravetta"/>
+      <xref type="person" data="Boris_Garber"/>
+    </record>
+    <record date="2012-06-19">
+      <addr>224.0.116.0-224.0.116.255</addr>
+      <description>Ido Rosen</description>
+      <xref type="person" data="Ido_Rosen"/>
+    </record>
+    <record date="2012-07-12" updated="2016-05-06">
+      <addr>224.0.117.0-224.0.119.255</addr>
+      <description>ISE</description>
+      <xref type="person" data="ISE-Networks"/>
+    </record>
+    <record date="2013-01-15">
+      <addr>224.0.120.0-224.0.120.255</addr>
+      <description>czechbone iptv</description>
+      <xref type="person" data="Jan_Vitek"/>
+    </record>    
+    <record date="2013-05-13">
+      <addr>224.0.121.0-224.0.121.255</addr>
+      <description>AQUIS-EXCHANGE</description>
+      <xref type="person" data="Mark_Chester"/>
+    </record>    
+    <record date="2013-05-25">
+      <addr>224.0.122.0-224.0.123.255</addr>
+      <description>DNS:NET TV</description>
+      <xref type="person" data="Marlon_Berlin"/>
+    </record>    
+    <record date="2013-05-30">
+      <addr>224.0.124.0-224.0.124.255</addr>
+      <description>Boston Options Exchange</description>
+      <xref type="person" data="David_Wilson"/>
+      <xref type="person" data="Michael_Caravetta_2"/>
+    </record>    
+    <record date="2013-09-05">
+      <addr>224.0.125.0-224.0.125.255</addr>
+      <description>Hanweck Associates</description>
+      <xref type="person" data="Gerald_Hanweck"/>
+    </record>
+    <record date="2013-10-31">
+      <addr>224.0.126.0-224.0.129.255</addr>
+      <description>ICE market data</description>
+      <xref type="person" data="Chad_Myers"/>
+    </record>
+    <record date="2014-03-05">
+      <addr>224.0.130.0-224.0.131.255</addr>
+      <description>BATS Trading</description>
+      <xref type="person" data="Andrew_Brown"/>
+    </record>
+    <record date="2014-04-12">
+      <addr>224.0.132.0-224.0.135.255</addr>
+      <description>Net By Net Holding IPTV</description>
+      <xref type="person" data="Lev_V._Cherednikov"/>
+    </record>
+    <record date="2014-05-16">
+      <addr>224.0.136.0-224.0.139.255</addr>
+      <description>Aequitas Innovations Inc.</description>
+      <xref type="person" data="Zaklina_Petkovic_2"/>
+    </record>
+    <record date="2014-09-04">
+      <addr>224.0.140.0-224.0.140.255</addr>
+      <description>Instinet</description>
+      <xref type="person" data="Sam_Birru"/>
+    </record>
+    <record date="2015-06-30">
+      <addr>224.0.141.0-224.0.141.255</addr>
+      <description>MIAX-2</description>
+      <xref type="person" data="Ruben_Hernandez"/>
+    </record>
+    <record>
+      <addr>224.0.142.0-224.0.143.255</addr>
+      
+      <description>Unassigned</description>
+    </record>
+    
+    <record date="2015-03-23">
+      <addr>224.0.144.0-224.0.151.255</addr>
+      <description>VZ-Multicast-Public</description>
+      <xref type="person" data="Stephen_Ray_Middleton"/>
+    </record>
+    <record date="2016-04-19">
+      <addr>224.0.152.0-224.0.152.255</addr>
+      <description>cse-md</description>
+      <xref type="person" data="David_Brett_2"/>
+    </record>
+    <record date="2016-05-24">
+      <addr>224.0.153.0-224.0.156.255</addr>
+      <description>Get - BCN</description>
+      <xref type="person" data="Arne_Hvidsten"/>
+    </record>
+    <record>
+      <addr>224.0.157.0-224.0.159.255</addr>
+      
+      <description>Unassigned</description>
+    </record>
+    
+    <record date="2016-07-07">
+      <addr>224.0.160.0-224.0.165.255</addr>
+      <description>Deutsche Boerse</description>
+      <xref type="person" data="Bernd_Uphoff"/>
+    </record>
+    <record>
+      <addr>224.0.166.0-224.0.249.255</addr>
+      <description>Unassigned</description>
+    </record>
+    
+    <record date="2009-09-01">
+      <addr>224.0.250.0-224.0.251.255</addr>
+      <description>KPN Broadcast Services</description>
+      <xref type="person" data="Ad_C_Spelt"/>
+      <xref type="person" data="KPN_IP_Office"/>
+    </record>
+    <record date="2005-08-01">
+      <addr>224.0.252.0-224.0.252.255</addr>
+      <description>KPN Broadcast Services</description>
+      <xref type="person" data="Ad_C_Spelt"/>
+      <xref type="person" data="KPN_IP_Office"/>
+    </record>
+    <record date="2005-08-01">
+      <addr>224.0.253.0-224.0.253.255</addr>
+      <description>KPN Broadcast Services</description>
+      <xref type="person" data="Ad_C_Spelt"/>
+      <xref type="person" data="KPN_IP_Office"/>
+    </record>
+    <record date="2006-03-31">
+      <addr>224.0.254.0-224.0.254.255</addr>
+      <description>Intelsat IPTV</description>
+      <xref type="person" data="Karl_Elad"/>
+      <reviewed>2011-02-22</reviewed>
+    </record>
+    <record date="2006-03-31">
+      <addr>224.0.255.0-224.0.255.255</addr>
+      <description>Intelsat IPTV</description>
+      <xref type="person" data="Karl_Elad"/>
+      <reviewed>2011-02-22</reviewed>
+    </record>
+  </registry>
+  
+  
+  <registry id="multicast-addresses-4">
+    <title>RESERVED (224.1.0.0-224.1.255.255 (224.1/16))</title>
+    <xref type="rfc" data="rfc5771"/>
+    <note>No new assignments are being made in this range for the time being.</note>
+    <record>
+      <addr>224.1.0.0-224.1.0.37</addr>
+      <description>Reserved</description>
+      <xref type="person" data="IANA"/>
+    </record>
+    <record date="2004-05-01">
+      <addr>224.1.0.38</addr>
+      <description>dantz</description>
+      <xref type="person" data="Richard_Zulch"/>
+    </record>
+    <record>
+      <addr>224.1.0.39-224.1.1.255</addr>
+      <description>Reserved</description>
+      <xref type="person" data="IANA"/>
+    </record>
+    <record date="2006-02-17" updated="2015-10-23">
+      <addr>224.1.2.0-224.1.2.255</addr>
+      <description>Intercontinental Exchange, Inc.</description>
+      <xref type="person" data="RIR_Admin"/>
+    </record>
+    <record date="2006-05-22">
+      <addr>224.1.3.0-224.1.4.255</addr>
+      <description>NOB Cross media facilities</description>
+      <xref type="person" data="Technicolor_NL_NOC"/>
+    </record>
+    <record>
+      <addr>224.1.5.0-224.1.255.255</addr>
+      <description>Reserved</description>
+      <xref type="person" data="IANA"/>
+    </record>
+  </registry>
+  
+  
+  <registry id="multicast-addresses-5">
+    <title>SDP/SAP Block (224.2.0.0-224.2.255.255 (224.2/16))</title>
+    <xref type="rfc" data="rfc5771"/>
+    <record>
+      <addr>224.2.0.0-224.2.127.253</addr>
+      <description>Multimedia Conference Calls</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.2.127.254</addr>
+      <description>SAPv1 Announcements</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.2.127.255</addr>
+      <description>SAPv0 Announcements (deprecated)</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+    <record>
+      <addr>224.2.128.0-224.2.255.255</addr>
+      <description>SAP Dynamic Assignments</description>
+      <xref type="person" data="Steve_Casner"/>
+    </record>
+  </registry>
+  
+  
+  <registry id="multicast-addresses-6">
+    <title>AD-HOC Block II (224.3.0.0-224.4.255.255 (224.3/16, 224.4/16))</title>
+    <xref type="rfc" data="rfc5771"/>
+    <registration_rule>Expert Review, IESG Approval, or Standards Action</registration_rule>
+    <record date="1999-03-01">
+      <addr>224.3.0.0-224.3.0.63</addr>
+      <description>Nasdaqmdfeeds  (re-new/March 2003)</description>
+      <xref type="person" data="Michael_Rosenberg"/>
+    </record>
+    <record>
+      <addr>224.3.0.64-224.3.255.255</addr>
+      <description>Reserved</description>
+      <xref type="person" data="IANA"/>
+    </record>
+    <record date="2006-03-31">
+      <addr>224.4.0.0-224.4.0.255</addr>
+      <description>London Stock Exchange</description>
+      <xref type="person" data="Guy_Whitehouse"/>
+    </record>
+    <record date="2008-02-25">
+      <addr>224.4.1.0-224.4.1.255</addr>
+      <description>London Stock Exchange</description>
+      <xref type="person" data="Greig_Saunders"/>
+    </record>
+    <record date="2008-02-29">
+      <addr>224.4.2.0-224.4.2.255</addr>
+      <description>London Stock Exchange</description>
+      <xref type="person" data="Greig_Saunders"/>
+    </record>
+    <record date="2008-12-24">
+      <addr>224.4.3.0-224.4.4.255</addr>
+      <description>London Stock Exchange</description>
+      <xref type="person" data="Greig_Saunders"/>
+    </record>
+    <record date="2009-05-12">
+      <addr>224.4.5.0-224.4.6.255</addr>
+      <description>London Stock Exchange</description>
+      <xref type="person" data="Greig_Saunders"/>
+    </record>
+    <record date="2012-04-10">
+      <addr>224.4.7.0-224.4.7.255</addr>
+      <description>CBOE Holdings</description>
+      <xref type="person" data="John_Rittner"/>
+    </record>
+    <record date="2012-04-11" updated="2016-05-06">
+      <addr>224.4.8.0-224.4.9.255</addr>
+      <description>ISE</description>
+      <xref type="person" data="ISE-Networks"/>
+    </record>
+    <record date="2012-04-11">
+      <addr>224.4.10.0-224.4.13.255</addr>
+      <description>London Stock Exchange</description>
+      <xref type="person" data="Tim_Johnson"/>
+    </record>
+    <record>
+      <addr>224.4.14.0-224.4.255.255</addr>
+      <description>Reserved</description>
+      <xref type="person" data="IANA"/>
+    </record>
+  </registry>
+  
+  
+  <registry id="multicast-addresses-7">
+  <title>RESERVED (224.5.0.0-224.251.255.255 (251 /16s))</title>
+  <xref type="rfc" data="rfc5771"/>
+  <record>
+  <addr>224.5.0.0-224.251.255.255</addr>
+  <description>Reserved</description>
+  <xref type="person" data="IANA"/>
+  </record>
+  </registry>
+  
+  
+  <registry id="multicast-addresses-8">
+    <title>DIS Transient Groups 224.252.0.0-224.255.255.255 (224.252/14))</title>
+   <xref type="rfc" data="rfc2365"/>
+      <record>
+      <addr>224.252.0.0-224.255.255.255</addr>
+      <description>DIS Transient Groups</description>
+      <xref type="person" data="IANA"/>
+      <xref type="rfc" data="rfc2365"/>
+    </record>
+ </registry>
+
+  
+  <registry id="multicast-addresses-9">
+    <title>RESERVED (225.0.0.0-231.255.255.255 (7 /8s))</title>
+    <xref type="rfc" data="rfc5771"/>
+     <record>
+      <addr>225.0.0.0-231.255.255.255</addr>
+      <description>Reserved</description>
+       <xref type="person" data="IANA"/>
+    </record>
+  </registry>
+  
+  
+  <registry id="multicast-addresses-10">
+    <title>Source-Specific Multicast Block (232.0.0.0-232.255.255.255 (232/8))</title>
+    <xref type="rfc" data="rfc5771"/>
+    <note>Addresses within the 232.0.1.0-232.255.255.255 are dynamically
+allocated by hosts when needed <xref type="rfc" data="rfc4607"/></note>
+    <record>
+      <addr>232.0.0.0</addr>
+      <description>Reserved</description>
+      <xref type="rfc" data="rfc4607"/>
+    </record>
+    <record>
+      <addr>232.0.0.1-232.0.0.255</addr>
+      <description>Reserved for IANA allocation</description>
+      <xref type="rfc" data="rfc4607"/>
+    </record>
+    <record>
+      <addr>232.0.1.0-232.255.255.255</addr>
+      <description>Reserved for local host allocation</description>
+      <xref type="rfc" data="rfc4607"/>
+    </record>
+  </registry>
+  
+  
+ <registry id="glop">
+    <title>GLOP Block</title>
+    <xref type="rfc" data="rfc3180"/>
+    <record>
+      <addr>233.0.0.0-233.251.255.255</addr>
+      <description>GLOP Block</description>
+      <xref type="rfc" data="rfc3180"/>
+    </record>
+  </registry>
+  
+  
+  <registry id="multicast-addresses-11">
+    <title>AD-HOC Block III (233.252.0.0-233.255.255.255 (233.252/14))</title>
+    <xref type="rfc" data="rfc5771"/>
+    <registration_rule>Expert Review, IESG Approval, or Standards Action</registration_rule>
+    <record date="2010-01-20">
+      <addr>233.252.0.0-233.252.0.255</addr>
+      <description>MCAST-TEST-NET</description>
+      <xref type="person" data="IANA"/>
+      <xref type="rfc" data="rfc5771"/>
+      <xref type="rfc" data="rfc6676"/>
+      <reviewed>2010-01-20</reviewed>
+    </record>
+    <record date="2010-08-12">
+      <addr>233.252.1.0-233.252.1.31</addr>
+      <description>Spryware</description>
+      <xref type="person" data="Kenneth_Felix"/>
+    </record>
+    <record>
+      <addr>233.252.1.32-233.252.1.255</addr>
+      <description>Unassigned</description>
+    </record>
+    <record date="2010-08-12">
+      <addr>233.252.2.0-233.252.7.255</addr>
+      <description>Tradition</description>
+      <xref type="person" data="Tradition_Network_Operations_and_Command_Center"/>
+    </record>
+    <record date="2010-08-12">
+      <addr>233.252.8.0-233.252.11.255</addr>
+      <description>BVMF_MKT_DATA</description>
+      <xref type="person" data="Roberto_Costa_Simoes"/>
+    </record>
+    <record date="2010-09-14">
+      <addr>233.252.12.0-233.252.13.255</addr>
+      <description>blizznet-tv-services</description>
+      <xref type="person" data="Paul_Wallner"/>
+    </record>
+    <record date="2016-09-27">
+      <addr>233.252.14.0-233.252.17.255</addr>
+      <description>BVMF_MKT_DATA_2</description>
+      <xref type="person" data="Guilherme_Longanezi"/>
+    </record>
+    <record>
+      <addr>233.252.18.0-233.255.255.255</addr>
+      <description>Unassigned</description>
+    </record>
+  </registry>
+  
+  <registry id="unicast-prefix-based">
+    <title>Unicast-Prefix-based IPv4 Multicast Addresses</title>
+    <xref type="rfc" data="rfc6034"/>
+    <record date="2010-08-11">
+      <addr>234.0.0.0-234.255.255.255</addr>
+      <description>Unicast-Prefix-based IPv4 Multicast Addresses</description>
+      <xref type="rfc" data="rfc6034"/>
+    </record>
+  </registry>
+
+  
+  <registry id="multicast-addresses-12">
+    <title>Scoped Multicast Ranges</title>
+    <xref type="rfc" data="rfc5771"/>
+    <record>
+      <addr>235.0.0.0-238.255.255.255</addr>
+      <description>Reserved</description>
+      <xref type="person" data="IANA"/>
+    </record>
+    <record date="1997-01-01">
+      <addr>239.0.0.0-239.255.255.255</addr>
+      <description>Organization-Local Scope</description>
+      <xref type="person" data="David_Meyer"/>
+      <xref type="rfc" data="rfc2365"/>
+    </record>
+  </registry>
+  
+  
+  <registry id="multicast-addresses-13">
+    <title>Relative Addresses used with Scoped Multicast Addresses</title>
+    <xref type="rfc" data="rfc5771"/>
+    <note>(*)  It is only appropriate to use these values in explicitly-
+configured experiments; they MUST NOT be shipped as defaults in
+implementations.  See <xref type="rfc" data="rfc3692"/> for details.
+
+These addresses are listed in the Domain Name Service under MCAST.NET
+and 224.IN-ADDR.ARPA.
+
+Note that when used on an Ethernet or IEEE 802 network, the 23
+low-order bits of the IP Multicast address are placed in the low-order
+23 bits of the Ethernet or IEEE 802 net multicast address
+1.0.94.0.0.0.  See the section on "IANA ETHERNET ADDRESS BLOCK".</note>
+    <record date="1998-12-01">
+      <relative>0</relative>
+      <description>SAP Session Announcement Protocol</description>
+      <xref type="person" data="Mark_Handley"/>
+    </record>
+    <record>
+      <relative>1</relative>
+      <description>MADCAP Protocol</description>
+      <xref type="rfc" data="rfc2730"/>
+    </record>
+    <record date="2001-12-01">
+      <relative>2</relative>
+      <description>SLPv2 Discovery</description>
+      <xref type="person" data="Erik_Guttman"/>
+    </record>
+    <record date="2000-06-01">
+      <relative>3</relative>
+      <description>MZAP</description>
+      <xref type="person" data="Dave_Thaler"/>
+    </record>
+    <record date="1999-08-01">
+      <relative>4</relative>
+      <description>Multicast Discovery of DNS Services</description>
+      <xref type="person" data="Bill_Manning"/>
+    </record>
+    <record date="2006-06-27">
+      <relative>5</relative>
+      <description>SSDP</description>
+      <xref type="person" data="UPnP_Forum"/>
+    </record>
+    <record date="1999-10-01">
+      <relative>6</relative>
+      <description>DHCP v4</description>
+      <xref type="person" data="Eric_Hall"/>
+    </record>
+    <record date="2000-07-01">
+      <relative>7</relative>
+      <description>AAP</description>
+      <xref type="person" data="Stephen_Hanna"/>
+    </record>
+    <record>
+      <relative>8</relative>
+      <description>MBUS</description>
+      <xref type="rfc" data="rfc3259"/>
+    </record>
+    <record date="2006-06-27">
+      <relative>9</relative>
+      <description>UPnP</description>
+      <xref type="person" data="UPnP_Forum"/>
+    </record>
+    <record>
+      <relative>10</relative>
+      <description>MCAST-TEST-NET-2</description>
+      <xref type="rfc" data="rfc6676"/>
+    </record>
+    <record>
+      <relative>11-252</relative>
+      <description>Reserved - To be assigned by the IANA</description>
+    </record>
+    <record>
+      <relative>253</relative>
+      <description>Reserved</description>
+    </record>
+    <record>
+      <relative>254</relative>
+      <description>RFC3692-style Experiment (*)</description>
+      <xref type="rfc" data="rfc4727"/>
+    </record>
+    <record>
+      <relative>255</relative>
+      <description>Reserved - To be assigned by the IANA</description>
+    </record>
+  </registry>
+
+  <people>
+    <person id="Ad_C_Spelt">
+      <name>Ad C. Spelt</name>
+      <uri>mailto:a.c.spelt&amp;kpn.com</uri>
+      <updated>2009-09-01</updated>
+    </person>
+    <person id="Adam_DeMinter">
+      <name>Adam DeMinter</name>
+      <uri>mailto:adam.deminter&amp;mwt.net</uri>
+      <updated>2011-04-20</updated>
+    </person>
+    <person id="Adam_Yellen">
+      <name>Adam Yellen</name>
+      <uri>mailto:adam&amp;videofurnace.com</uri>
+      <updated>2009-08-12</updated>
+    </person>
+    <person id="Akihiro_Nishida">
+      <name>Akihiro Nishida</name>
+      <uri>mailto:nishida&amp;src.ricoh.co.jp</uri>
+      <updated>2003-02-01</updated>
+    </person>
+    <person id="Alan_Novick">
+      <name>Alan Novick</name>
+      <uri>mailto:anovick&amp;tdc.com</uri>
+      <updated>1998-08-01</updated>
+    </person>
+    <person id="Alan_Robertson">
+      <name>Alan Robertson</name>
+      <uri>mailto:alanr&amp;unix.sh</uri>
+      <updated>2012-04-17</updated>
+    </person>
+    <person id="Albert_Berlovitch">
+      <name>Albert Berlovitch</name>
+      <uri>mailto:albertb&amp;voltaire.com</uri>
+      <updated>2010-02-04</updated>
+    </person>
+    <person id="Alex_Lee">
+      <name>Alex Lee</name>
+      <uri>mailto:alex_mrlee&amp;gemtek.com.tw</uri>
+      <updated>2002-10-01</updated>
+    </person>
+    <person id="Alexander_Pevzner">
+      <name>Alexander Pevzner</name>
+      <uri>mailto:pzz&amp;pzz.msk.ru</uri>
+      <updated>2006-03-17</updated>
+    </person>
+    <person id="Andrew_Brown">
+      <name>Andrew Brown</name>
+      <uri>mailto:abrown&amp;batstrading.com</uri>
+      <updated>2014-03-05</updated>
+    </person>
+    <person id="Andrew_Cherenson">
+      <name>Andrew Cherenson</name>
+      <uri>mailto:arc&amp;sgi.com</uri>
+    </person>
+    <person id="Andrew_Hoyos">
+      <name>Andrew Hoyos</name>
+      <uri>mailto:andrew&amp;hoyosconsulting.com</uri>
+      <updated>2011-04-20</updated>
+    </person>
+    <person id="Andrew_Rowley">
+      <name>Andrew Rowley</name>
+      <uri>mailto:Andrew.Rowley&amp;manchester.ac.uk</uri>
+      <updated>2006-06-09</updated>
+    </person>
+    <person id="Andy_Belk">
+      <name>Andy Belk</name>
+      <uri>mailto:register1&amp;azulsystems.com</uri>
+      <updated>2005-02-01</updated>
+    </person>
+    <person id="Andy_Crick">
+      <name>Andy Crick</name>
+      <uri>mailto:acrick&amp;haascnc.com</uri>
+      <updated>2008-01-14</updated>
+    </person>
+    <person id="Anthony_Daga">
+      <name>Anthony Daga</name>
+      <uri>mailto:anthony&amp;mksrc.com</uri>
+      <updated>1999-06-01</updated>
+    </person>
+    <person id="Anthony_Kandaya">
+      <name>Anthony Kandaya</name>
+      <uri>mailto:Anthony.kandaya&amp;philips.com</uri>
+      <updated>2012-05-23</updated>
+    </person>
+    <person id="Antonio_Querubin">
+      <name>Antonio Querubin</name>
+      <uri>mailto:tony&amp;lava.net</uri>
+      <updated>2008-02-04</updated>
+    </person>
+    <person id="Arne_Hvidsten">
+      <name>Arne Hvidsten</name>
+      <uri>mailto:arne.hvidsten&amp;get.no</uri>
+      <updated>2016-05-24</updated>
+    </person>
+    <person id="Arnoud_Zwemmer">
+      <name>Arnoud Zwemmer</name>
+      <uri>mailto:arnoud&amp;nwn.nl</uri>
+      <updated>1996-11-01</updated>
+    </person>
+    <person id="Asad_Gilani">
+      <name>Asad Gilani</name>
+      <uri>mailto:agilani&amp;nymex.com</uri>
+      <updated>1997-07-01</updated>
+    </person>
+    <person id="Bernd_Uphoff">
+      <name>Bernd Uphoff</name>
+      <uri>mailto:bernd.uphoff&amp;deutsche-boerse.com</uri>
+      <updated>2016-07-07</updated>
+    </person>
+    <person id="Bert_van_Willigen">
+      <name>Bert van Willigen</name>
+      <uri>mailto:bert.vanwilligen&amp;philips.com</uri>
+      <updated>2004-01-01</updated>
+    </person>
+    <person id="Beverly_Schwartz">
+      <name>Beverly Schwartz</name>
+      <uri>mailto:bschwart&amp;bbn.com</uri>
+      <updated>1998-06-01</updated>
+    </person>
+    <person id="Bill_Manning">
+      <name>Bill Manning</name>
+      <uri>mailto:bmanning&amp;isi.edu</uri>
+      <updated>1999-08-01</updated>
+    </person>
+    <person id="Bill_Schilit">
+      <name>Bill Schilit</name>
+      <uri>mailto:schilit&amp;parc.xerox.com</uri>
+    </person>
+    <person id="Bill_Simpson">
+      <name>Bill Simpson</name>
+      <uri>mailto:bill.simpson&amp;um.cc.umich.edu</uri>
+      <updated>1994-11-01</updated>
+    </person>
+    <person id="Bill_Woodcock">
+      <name>Bill Woodcock</name>
+      <uri>mailto:woody&amp;zocalo.net</uri>
+      <updated>1998-11-01</updated>
+    </person>
+    <person id="Bob_Braden">
+      <name>Bob Braden</name>
+      <uri>mailto:braden&amp;isi.edu</uri>
+      <updated>1996-04-01</updated>
+    </person>
+    <person id="Bob_Brzezinski">
+      <name>Bob Brzezinski</name>
+      <uri>mailto:bob.brzezinski&amp;activfinancial.com</uri>
+      <updated>2005-10-28</updated>
+    </person>
+    <person id="Bob_Gaddie">
+      <name>Bob Gaddie</name>
+      <uri>mailto:bobg&amp;dtn.com</uri>
+      <updated>1998-08-01</updated>
+    </person>
+    <person id="Bob_Meier">
+      <name>Bob Meier</name>
+      <uri>mailto:meierb&amp;norand.com</uri>
+      <updated>1997-12-01</updated>
+    </person>
+    <person id="Bob_Scheifler">
+      <name>Bob Scheifler</name>
+      <uri>mailto:Bob.Scheifler&amp;sun.com</uri>
+      <updated>1998-08-01</updated>
+    </person>
+    <person id="Bob_Sledge">
+      <name>Bob Sledge</name>
+      <uri>mailto:bob&amp;pqsystems.com</uri>
+      <updated>1998-12-01</updated>
+    </person>
+    <person id="Bodo_Rueskamp">
+      <name>Bodo Rueskamp</name>
+      <uri>mailto:br&amp;itchigo.com</uri>
+      <updated>2000-03-01</updated>
+    </person>
+    <person id="Boris_Garber">
+      <name>Boris Garber</name>
+      <uri>mailto:Boris.Garber&amp;tsx.com</uri>
+      <updated>2012-06-12</updated>
+    </person>
+    <person id="Brendan_Eic">
+      <name>Brendan Eic</name>
+      <uri>mailto:brendan&amp;illyria.wpd.sgi.com</uri>
+    </person>
+    <person id="Brian_Kean">
+      <name>Brian Kean</name>
+      <uri>mailto:bkean&amp;dca.com</uri>
+      <updated>1995-08-01</updated>
+    </person>
+    <person id="Brian_Kerkan">
+      <name>Brian Kerkan</name>
+      <uri>mailto:brian&amp;satcomsystems.com</uri>
+      <updated>2000-05-01</updated>
+    </person>
+    <person id="Brian_Martinicky">
+      <name>Brian Martinicky</name>
+      <uri>mailto:Brian_Martinicky&amp;automationintelligence.com</uri>
+      <updated>2000-03-01</updated>
+    </person>
+    <person id="Brian_Trudeau">
+      <name>Brian Trudeau</name>
+      <uri>mailto:btrudeau&amp;onechicago.com</uri>
+      <updated>2014-09-19</updated>
+    </person>
+    <person id="Bruce_Factor">
+      <name>Bruce Factor</name>
+      <uri>mailto:ahi!bigapple!bruce&amp;uunet.uu.net</uri>
+    </person>
+    <person id="Bryan_Costales">
+      <name>Bryan Costales</name>
+      <uri>mailto:bcx&amp;infobeat.com</uri>
+      <updated>1997-09-01</updated>
+    </person>
+    <person id="Bryant_Eastham">
+      <name>Bryant Eastham</name>
+      <uri>mailto:protocol&amp;opendof.org</uri>
+      <updated>2015-04-23</updated>
+    </person>
+    <person id="Caleb_Bell">
+      <name>Caleb Bell</name>
+      <uri>mailto:cbell&amp;rxnetworks.com</uri>
+      <updated>2012-11-19</updated>
+    </person>
+    <person id="Carl-Johan_Sjöberg">
+      <name>Carl-Johan Sjöberg</name>
+      <uri>mailto:cjs&amp;bitsend.se</uri>
+      <updated>2012-04-25</updated>
+    </person>
+    <person id="Carl_Malamud">
+      <name>Carl Malamud</name>
+      <uri>mailto:carl&amp;media.org</uri>
+      <updated>2014-01-03</updated>
+    </person>    
+    <person id="Chad_Myers">
+      <name>Chad Myers</name>
+      <uri>mailto:chad.myers&amp;theice.com</uri>
+      <updated>2013-10-31</updated>
+    </person>
+    <person id="Charles_Tewiah">
+      <name>Charles Tewiah</name>
+      <uri>mailto:charles.tewiah&amp;westlb-systems.co.uk</uri>
+      <updated>2005-09-01</updated>
+    </person>
+    <person id="Chas_Honton">
+      <name>Chas Honton</name>
+      <uri>mailto:chas&amp;secant.com</uri>
+      <updated>1997-12-01</updated>
+    </person>
+    <person id="Choon_Lee">
+      <name>Choon Lee</name>
+      <uri>mailto:cwl&amp;nsd.3com.com</uri>
+      <updated>1996-04-01</updated>
+    </person>
+    <person id="Chris_Adams">
+      <name>Chris Adams</name>
+      <uri>mailto:jc.adams&amp;reuters.com</uri>
+      <updated>2000-07-01</updated>
+    </person>
+    <person id="Christopher_Mettin">
+      <name>Christopher Mettin</name>
+      <uri>mailto:cmettin&amp;gqbc-online.com</uri>
+      <updated>2009-05-12</updated>
+    </person>
+    <person id="Chuck_McManis">
+      <name>Chuck McManis</name>
+      <uri>mailto:cmcmanis&amp;sun.com</uri>
+    </person>
+    <person id="Clem_Verwey">
+      <name>Clem Verwey</name>
+      <uri>mailto:clemv&amp;jse.co.za</uri>
+      <updated>2011-12-07</updated>
+    </person>
+    <person id="Colin_Caughie">
+      <name>Colin Caughie</name>
+      <uri>mailto:cfc&amp;indigo-avs.com</uri>
+      <updated>2000-05-01</updated>
+    </person>
+    <person id="COMTECH_Kft.">
+      <name>COMTECH Kft.</name>
+      <uri>mailto:dev&amp;comtech.co.hu</uri>
+      <updated>2016-10-20</updated>
+    </person>
+    <person id="Craig_Dowell">
+      <name>Craig Dowell</name>
+      <uri>mailto:cdowell&amp;quicinc.com</uri>
+      <updated>2011-11-18</updated>
+    </person>
+    <person id="Dan_Jackson">
+      <name>Dan Jackson</name>
+      <uri>mailto:jdan&amp;us.ibm.com</uri>
+      <updated>1997-09-01</updated>
+    </person>
+    <person id="Dan_Jakubiec">
+      <name>Dan Jakubiec</name>
+      <uri>mailto:dan.jakubiec&amp;systech.com</uri>
+      <updated>2006-09-21</updated>
+    </person>
+    <person id="Daniel_Dissett">
+      <name>Daniel Dissett</name>
+      <uri>mailto:ddissett&amp;peerlogic.com</uri>
+      <updated>1998-12-01</updated>
+    </person>
+    <person id="Daniel_Steinber">
+      <name>Daniel Steinber</name>
+      <uri>mailto:Daniel.Steinberg&amp;eng.sun.com</uri>
+    </person>
+    <person id="Darcy_Brockbank">
+      <name>Darcy Brockbank</name>
+      <uri>mailto:darcy&amp;hasc.com</uri>
+      <updated>1997-12-01</updated>
+    </person>
+    <person id="Darrell_Sveistrup">
+      <name>Darrell Sveistrup</name>
+      <uri>mailto:darrells&amp;truesolutions.net</uri>
+      <updated>1999-06-01</updated>
+    </person>
+    <person id="Dave_Cheriton">
+      <name>Dave Cheriton</name>
+      <uri>mailto:cheriton&amp;dsg.stanford.edu</uri>
+    </person>
+    <person id="Dave_Glanzer">
+      <name>Dave Glanzer</name>
+      <uri>mailto:dave.glanzer&amp;fieldbus.org</uri>
+      <updated>2003-03-01</updated>
+    </person>
+    <person id="Dave_Thaler">
+      <name>Dave Thaler</name>
+      <uri>mailto:dthaler&amp;microsoft.com</uri>
+      <updated>2000-06-01</updated>
+    </person>    
+    <person id="David_Brett">
+      <name>David Brett</name>
+      <uri>mailto:david.brett&amp;alpha-group.ca</uri>
+      <updated>2011-10-25</updated>
+    </person>
+    <person id="David_Brett_2">
+      <name>David Brett</name>
+      <uri>mailto:david.brett&amp;thecse.com</uri>
+      <updated>2016-04-19</updated>
+    </person>
+    <person id="David_Meyer">
+      <name>David Meyer</name>
+      <uri>mailto:meyer&amp;ns.uoregon.edu</uri>
+      <updated>1997-01-01</updated>
+    </person>
+    <person id="David_Mills">
+      <name>David Mills</name>
+      <uri>mailto:mills&amp;udel.edu</uri>
+    </person>
+    <person id="David_Poole">
+      <name>David Poole</name>
+      <uri>mailto:davep&amp;extendsys.com</uri>
+      <updated>1997-04-01</updated>
+    </person>
+    <person id="David_Rubin">
+      <name>David Rubin</name>
+      <uri>mailto:drubin&amp;ncc.net</uri>
+      <updated>1996-08-01</updated>
+    </person>    
+    <person id="David_Wilson">
+      <name>David Wilson</name>
+      <uri>mailto:dwilson&amp;m-x.ca</uri>
+      <updated>2013-05-30</updated>
+    </person>
+    <person id="Dean_Blackketter">
+      <name>Dean Blackketter</name>
+      <uri>mailto:dean&amp;corp.webtv.net</uri>
+      <updated>1998-11-01</updated>
+    </person>
+    <person id="Dino_Farinacci">
+      <name>Dino Farinacci</name>
+      <uri>mailto:dino&amp;procket.com</uri>
+      <updated>1996-03-01</updated>
+    </person>
+    <person id="Dirk_Koopman">
+      <name>Dirk Koopman</name>
+      <uri>mailto:djk&amp;tobit.co.uk</uri>
+      <updated>2000-07-01</updated>
+    </person>
+    <person id="Doug_Dillon">
+      <name>Doug Dillon</name>
+      <uri>mailto:dillon&amp;hns.com</uri>
+      <updated>1998-08-01</updated>
+    </person>
+    <person id="Douglas_Marquardt">
+      <name>Douglas Marquardt</name>
+      <uri>mailto:dmarquar&amp;woz.org</uri>
+      <updated>1997-02-01</updated>
+    </person>
+    <person id="Duane_Wessels">
+      <name>Duane Wessels</name>
+      <uri>mailto:wessels&amp;nlanr.net</uri>
+      <updated>1997-02-01</updated>
+    </person>
+    <person id="Ed_Moran">
+      <name>Ed Moran</name>
+      <uri>mailto:admin&amp;cruzjazz.com</uri>
+      <updated>1997-10-01</updated>
+    </person>
+    <person id="Ed_Purkiss">
+      <name>Ed Purkiss</name>
+      <uri>mailto:epurkiss&amp;wdmacodi.com</uri>
+      <updated>1998-09-01</updated>
+    </person>
+    <person id="Eric_Hall">
+      <name>Eric Hall</name>
+      <uri>mailto:ehall&amp;ntrg.com</uri>
+      <updated>1999-10-01</updated>
+    </person>
+    <person id="Erik_Guttman">
+      <name>Erik Guttman</name>
+      <uri>mailto:Erik.Guttman&amp;sun.com</uri>
+      <updated>2001-12-01</updated>
+    </person>
+    <person id="Euronext_Admin">
+      <name>Euronext Admin</name>
+      <uri>mailto:iana-admin&amp;euronext.com</uri>
+      <updated>2014-11-24</updated>
+    </person>
+    <person id="Evan_Caves">
+      <name>Evan Caves</name>
+      <uri>mailto:evan&amp;acc.com</uri>
+      <updated>1998-06-01</updated>
+    </person>
+    <person id="Florian_Weimer">
+      <name>Florian Weimer</name>
+      <uri>mailto:fweimer&amp;redhat.com</uri>
+      <updated>2013-02-08</updated>
+    </person>
+    <person id="Fred_Baker">
+      <name>Fred Baker</name>
+      <uri>mailto:fred&amp;cisco.com</uri>
+      <updated>1997-06-01</updated>
+    </person>
+    <person id="Gajendra_Shukla">
+      <name>Gajendra Shukla</name>
+      <uri>mailto:gshukla&amp;proxim.com</uri>
+      <updated>2002-02-01</updated>
+    </person>
+    <person id="Gary_S_Malkin">
+      <name>Gary S. Malkin</name>
+      <uri>mailto:GMALKIN&amp;xylogics.com</uri>
+    </person>
+    <person id="Gary_Scott_Malkin">
+      <name>Gary Scott Malkin</name>
+      <uri>mailto:gmalkin&amp;baynetworks.com</uri>
+      <updated>1998-02-01</updated>
+    </person>
+    <person id="Gene_Marsh">
+      <name>Gene Marsh</name>
+      <uri>mailto:MarshM&amp;diebold.com</uri>
+      <updated>1998-11-01</updated>
+    </person>
+    <person id="Geoff_Golder">
+      <name>Geoff Golder</name>
+      <uri>mailto:geoffgolder&amp;gmail.com</uri>
+      <updated>2016-04-19</updated>
+    </person>
+    <person id="Geoff_Mendal">
+      <name>Geoff Mendal</name>
+      <uri>mailto:mendal&amp;talarian.com</uri>
+      <updated>1999-01-01</updated>
+    </person>
+    <person id="George_Neville-Neil">
+      <name>George Neville-Neil</name>
+      <uri>mailto:gnn&amp;neville-neil.com</uri>
+      <updated>2014-12-17</updated>
+    </person>
+    <person id="Gerald_Hanweck">
+      <name>Gerald Hanweck</name>
+      <uri>mailto:jhanweck&amp;hanweckassoc.com</uri>
+      <updated>2014-09-05</updated>
+    </person>
+    <person id="Grant_Taylor">
+      <name>Grant Taylor</name>
+      <uri>mailto:grantwtt&amp;gmail.com</uri>
+      <updated>2016-10-04</updated>
+    </person>
+    <person id="Greig_Saunders">
+      <name>Greig Saunders</name>
+      <uri>mailto:gsaunder&amp;londonstockexchange.com</uri>
+      <updated>2009-05-12</updated>
+    </person>
+    <person id="Guido_Petronio">
+      <name>Guido Petronio</name>
+      <uri>mailto:guido.petronio&amp;moneyline.com</uri>
+      <updated>2004-01-01</updated>
+    </person>
+    <person id="Guilherme_Longanezi">
+      <name>Guilherme Longanezi</name>
+      <uri>mailto:glonganezi&amp;bvmf.com.br</uri>
+      <updated>2016-09-27</updated>
+    </person>
+    <person id="Guy_Whitehouse">
+      <name>Guy Whitehouse</name>
+      <uri>mailto:gwhitehouse&amp;londonstockexchange.com</uri>
+      <updated>2006-03-31</updated>
+    </person>
+    <person id="Heiko_Rupp">
+      <name>Heiko Rupp</name>
+      <uri>mailto:hwr&amp;xlink.net</uri>
+      <updated>1997-01-01</updated>
+    </person>
+    <person id="Henri_Moelard">
+      <name>Henri Moelard</name>
+      <uri>mailto:HMOELARD&amp;wcnd.nl.lucent.com</uri>
+      <updated>1998-03</updated>
+    </person>
+    <person id="Hiroshi_Okubo">
+      <name>Hiroshi Okubo</name>
+      <uri>mailto:okubo.hiroshi&amp;canon.co.jp</uri>
+      <updated>2014-08-01</updated>
+    </person>
+    <person id="Howard_Gordon">
+      <name>Howard Gordon</name>
+      <uri>mailto:hgordon&amp;xingtech.com</uri>
+    </person>
+    <person id="IANA">
+      <name>IANA</name>
+      <uri>mailto:iana&amp;iana.org</uri>
+    </person>
+    <person id="Ian_Armitage">
+      <name>Ian Armitage</name>
+      <uri>mailto:ian&amp;coactive.com</uri>
+      <updated>1999-08-01</updated>
+    </person>
+    <person id="Ian_Stewart">
+      <name>Ian Stewart</name>
+      <uri>mailto:iandbige&amp;yahoo.com</uri>
+      <updated>1999-06-01</updated>
+    </person>
+    <person id="Ian_Wacey">
+      <name>Ian Wacey</name>
+      <uri>mailto:iain.wacey&amp;gefalbany.ge.com</uri>
+      <updated>2000-05-01</updated>
+    </person>
+    <person id="Ian_Wilson">
+      <name>Ian Wilson</name>
+      <uri>mailto:iwilson&amp;cisco.com</uri>
+      <updated>2001-12-01</updated>
+    </person>
+    <person id="Ido_Rosen">
+      <name>Ido Rosen</name>
+      <uri>mailto:iana&amp;idorosen.com</uri>
+      <updated>2012-06-19</updated>
+    </person>
+    <person id="IP_Admin">
+      <name>IP Admin</name>
+      <uri>mailto:ipaddr&amp;agilent.com</uri>
+      <updated>2015-10-12</updated>
+    </person>
+    <person id="ISE-Networks">
+      <name>ISE-Networks</name>
+      <uri>mailto:isenetworks&amp;ise.com</uri>
+      <updated>2016-05-06</updated>
+    </person>
+    <person id="Ishan_Wu">
+      <name>Ishan Wu</name>
+      <uri>mailto:iwu&amp;cisco.com</uri>
+      <updated>2000-03-01</updated>
+    </person>
+    <person id="Itamar_Gilad">
+      <name>Itamar Gilad</name>
+      <uri>mailto:itamar&amp;arootz.com</uri>
+      <updated>2007-08-31</updated>
+    </person>
+    <person id="J._Ryan_Stinnett">
+      <name>J. Ryan Stinnett</name>
+      <uri>mailto:jryans&amp;mozilla.com</uri>
+      <updated>2014-07-01</updated>
+    </person>
+    <person id="James_Crawford">
+      <name>James Crawford</name>
+      <uri>mailto:jcrawford&amp;metropol.net</uri>
+      <updated>1998-05-01</updated>
+    </person>
+    <person id="Jan_Drwal">
+      <name>Jan Drwal</name>
+      <uri>mailto:Jan.Drwal&amp;deutsche-boerse.com</uri>
+      <updated>2011-12-19</updated>
+    </person>
+    <person id="Jan_Erik_Eriksson">
+      <name>Jan-Erik Eriksson</name>
+      <uri>mailto:jee&amp;alcom.ax</uri>
+      <updated>2010-03-12</updated>
+    </person>
+    <person id="Jan_Vitek">
+      <name>Jan Vitek</name>
+      <uri>mailto:vitek&amp;selfservis.cz</uri>
+      <updated>2013-01-15</updated>
+    </person>
+    <person id="Jasmine_Strong">
+      <name>Jasmine Strong</name>
+      <uri>mailto:jasmine&amp;heroicrobotics.com</uri>
+      <updated>2014-06-04</updated>
+    </person>
+    <person id="Javier_Landin">
+      <name>Javier Landin</name>
+      <uri>mailto:jlandin&amp;directedge.com</uri>
+      <updated>2009-08-28</updated>
+    </person>
+    <person id="Jeff_Schenk">
+      <name>Jeff Schenk</name>
+      <uri>mailto:Jeff.Schenk&amp;intelliden.com</uri>
+      <updated>2006-03-31</updated>
+    </person>
+    <person id="Jerome_Albin">
+      <name>Jerome Albin</name>
+      <uri>mailto:albin&amp;taec.enet.dec.com</uri>
+      <updated>1997-06-01</updated>
+    </person>
+    <person id="Jerry_Whitaker">
+      <name>Jerry Whitaker</name>
+      <uri>mailto:jwhitaker&amp;atsc.org</uri>
+      <updated>2008-12-19</updated>
+    </person>
+    <person id="Jim_Ginsburg">
+      <name>Jim Ginsburg</name>
+      <uri>mailto:JGinsburg&amp;jonescorp.com</uri>
+      <updated>2007-10-31</updated>
+    </person>
+    <person id="Jim_Lyle">
+      <name>Jim Lyle</name>
+      <uri>mailto:jim.lyle&amp;siliconimage.com</uri>
+      <updated>2006-08-07</updated>
+    </person>
+    <person id="Jim_Toga">
+      <name>Jim Toga</name>
+      <uri>mailto:jtoga&amp;ibeam.jf.intel.com</uri>
+      <updated>1996-05-01</updated>
+    </person>
+    <person id="Joel_Lynch">
+      <name>Joel Lynch</name>
+      <uri>mailto:joel.lynch&amp;cnn.com</uri>
+      <updated>1999-04-01</updated>
+    </person>
+    <person id="Johan_Deleu">
+      <name>Johan Deleu</name>
+      <uri>mailto:johan.deleu&amp;alcatel.be</uri>
+      <updated>2002-02-01</updated>
+    </person>
+    <person id="John_Catherino">
+      <name>John Catherino</name>
+      <uri>mailto:cajo&amp;dev.java.net</uri>
+      <updated>2006-03-31</updated>
+    </person>
+    <person id="John_Gabler">
+      <name>John Gabler</name>
+      <uri>mailto:john.gabler&amp;ips.invensys.com</uri>
+      <updated>2007-07-06</updated>
+    </person>
+    <person id="John_Rittner">
+      <name>John Rittner</name>
+      <uri>mailto:rittnerj&amp;cboe.com</uri>
+      <updated>2012-04-10</updated>
+    </person>
+    <person id="John_Veizades">
+      <name>John Veizades</name>
+      <uri>mailto:veizades&amp;tgv.com</uri>
+      <updated>1995-05-01</updated>
+    </person>
+    <person id="Jon_Crowcroft">
+      <name>Jon Crowcroft</name>
+      <uri>mailto:jon&amp;hocus.cs.ucl.ac.uk</uri>
+      <updated>1998-11-01</updated>
+    </person>
+    <person id="Jon_Gabriel">
+      <name>Jon Gabriel</name>
+      <uri>mailto:grabriel&amp;tivoli.com</uri>
+      <updated>1998-12-01</updated>
+    </person>
+    <person id="Jon_Postel">
+      <name>Jon Postel</name>
+      <uri>mailto:postel&amp;isi.edu</uri>
+    </person>
+    <person id="Jonathan_Niedfeldt">
+      <name>Jonathan Niedfeldt</name>
+      <uri>mailto:jon&amp;digitalacoustics.com</uri>
+      <updated>2008-02-22</updated>
+    </person>
+    <person id="Jose_Luis_Marocho">
+      <name>Jose Luis Marocho</name>
+      <uri>mailto:73374.313&amp;compuserve.com</uri>
+      <updated>1996-07-01</updated>
+    </person>
+    <person id="Julian_Nevell">
+      <name>Julian Nevell</name>
+      <uri>mailto:JNEVELL&amp;vbs.bt.co.uk</uri>
+      <updated>1999-08-01</updated>
+    </person>
+    <person id="Kang_Lee">
+      <name>Kang Lee</name>
+      <uri>mailto:kang.lee&amp;nist.gov</uri>
+      <updated>2007-02-02</updated>
+    </person>
+    <person id="Karen_Seo">
+      <name>Karen Seo</name>
+      <uri>mailto:kseo&amp;bbn.com</uri>
+    </person>
+    <person id="Karl_Elad">
+      <name>Karl Elad</name>
+      <uri>mailto:karl.elad&amp;intelsat.com</uri>
+      <updated>2006-03-31</updated>
+    </person>
+    <person id="Keith_Thompson">
+      <name>Keith Thompson</name>
+      <uri>mailto:thompson&amp;ridgeback.east.sun.com</uri>
+      <updated>2001-06-01</updated>
+    </person>
+    <person id="Kevin_Gross">
+      <name>Kevin Gross</name>
+      <uri>mailto:kvng&amp;ieee.org</uri>
+      <updated>2010-03-12</updated>
+    </person>
+    <person id="Kevin_Gross_2">
+      <name>Kevin Gross</name>
+      <uri>mailto:kevin.gross&amp;avanw.com</uri>
+      <updated>2012-08-28</updated>
+    </person>
+    <person id="KPN_IP_Office">
+      <name>KPN IP Office</name>
+      <uri>mailto:kpn-ip-office&amp;kpn.com</uri>
+      <updated>2011-04-18</updated>
+    </person>
+    <person id="Kristian_A_Bognaes">
+      <name>Kristian A. Bognaes</name>
+      <uri>mailto:kristian.bognaes&amp;norman.com</uri>
+      <updated>2014-01-08</updated>
+    </person>
+    <person id="Lev_V._Cherednikov">
+      <name>Lev V. Cherednikov</name>
+      <uri>mailto:lev.cherednikov&amp;nbn-holding.ru</uri>
+      <updated>2014-04-12</updated>
+    </person>
+    <person id="Liming_Wei">
+      <name>Liming Wei</name>
+      <uri>mailto:lwei&amp;cisco.com</uri>
+      <updated>1998-10-01</updated>
+    </person>
+    <person id="Lloyd_Wood">
+      <name>Lloyd Wood</name>
+      <uri>mailto:L.Wood&amp;surrey.ac.uk</uri>
+      <updated>2011-03-17</updated>
+    </person>
+    <person id="Louis_Mamakos">
+      <name>Louis Mamakos</name>
+      <uri>mailto:louie&amp;uu.net</uri>
+      <updated>1997-03-01</updated>
+    </person>
+    <person id="Kenneth_Felix">
+      <name>Kenneth Felix</name>
+      <uri>mailto:ken&amp;spryware.com</uri>
+      <updated>2010-08-12</updated>
+    </person>
+    <person id="Madhav_Karhade">
+      <name>Madhav Karhade</name>
+      <uri>mailto:Madhav.Karhade&amp;wibhu.com</uri>
+      <updated>2003-05-01</updated>
+    </person>
+    <person id="Marc_Goossens">
+      <name>Marc Goossens</name>
+      <uri>mailto:mgoossens&amp;eiba.com</uri>
+      <updated>2003-07-01</updated>
+    </person>
+    <person id="Mark_Armstrong">
+      <name>Mark Armstrong</name>
+      <uri>mailto:Mark.Armstrong&amp;soleratec.com</uri>
+      <updated>2006-02-09</updated>
+    </person>
+    <person id="Mark_Bakke">
+      <name>Mark Bakke</name>
+      <uri>mailto:mbakke&amp;cisco.com</uri>
+      <updated>2001-12-01</updated>
+    </person>    
+    <person id="Mark_Chester">
+      <name>Mark Chester</name>
+      <uri>mailto:networks&amp;aquis.eu</uri>
+      <updated>2013-05-13</updated>
+    </person>
+    <person id="Mark_Hamilton">
+      <name>Mark Hamilton</name>
+      <uri>mailto:mah&amp;spectralink.com</uri>
+      <updated>1998-11-01</updated>
+    </person>
+    <person id="Mark_Handley">
+      <name>Mark Handley</name>
+      <uri>mailto:mjh&amp;isi.edu</uri>
+      <updated>1998-12-01</updated>
+    </person>
+    <person id="Mark_Lewis">
+      <name>Mark Lewis</name>
+      <uri>mailto:Mark_Lewis&amp;ccm.jf.intel.com</uri>
+      <updated>1995-10-01</updated>
+    </person>
+    <person id="Mark_Lipford">
+      <name>Mark Lipford</name>
+      <uri>mailto:mark.a.lipford&amp;sprint.com</uri>
+      <updated>2006-07-11</updated>
+    </person>    
+    <person id="Marlon_Berlin">
+      <name>Marlon Berlin</name>
+      <uri>mailto:marlon.berlin&amp;dns-net.de</uri>
+      <updated>2013-05-25</updated>
+    </person>
+    <person id="Martin_Forssen">
+      <name>Martin Forssen</name>
+      <uri>mailto:maf&amp;dtek.chalmers.se</uri>
+    </person>
+    <person id="Mary_Timm">
+      <name>Mary Timm</name>
+      <uri>mailto:mary&amp;xenoscience.com</uri>
+      <updated>1998-07-01</updated>
+    </person>
+    <person id="Masato_Shindoh">
+      <name>Masato Shindoh</name>
+      <uri>mailto:jl11456&amp;yamato.ibm.co.jp</uri>
+      <updated>1997-08-01</updated>
+    </person>
+    <person id="Matthew_Straight">
+      <name>Matthew Straight</name>
+      <uri>mailto:matt_straight&amp;yahoo.com</uri>
+      <updated>2007-03-01</updated>
+    </person>
+    <person id="Maurice_Robberson">
+      <name>Maurice Robberson</name>
+      <uri>mailto:ceo&amp;mediastreamusa.com</uri>
+      <updated>2006-09-15</updated>
+    </person>
+    <person id="Media_Alliance_JSC">
+      <name>Media Alliance JSC</name>
+      <uri>mailto:noc&amp;medi-a.ru</uri>
+      <updated>2008-01-15</updated>
+    </person>
+    <person id="Michael_Caravetta">
+      <name>Michael Caravetta</name>
+      <uri>mailto:Michael.Caravetta&amp;tsx.com</uri>
+      <updated>2012-06-15</updated>
+    </person>    
+    <person id="Michael_Caravetta_2">
+      <name>Michael Caravetta</name>
+      <uri>mailto:Network_Reps&amp;tsx.com</uri>
+      <updated>2013-06-03</updated>
+    </person>
+    <person id="Michael_DeMoney">
+      <name>Michael DeMoney</name>
+      <uri>mailto:demoney&amp;eng.sun.com</uri>
+      <updated>1997-04-01</updated>
+    </person>
+    <person id="Michael_Dolan">
+      <name>Michael Dolan</name>
+      <uri>mailto:miked&amp;tbt.com</uri>
+      <updated>2003-10-01</updated>
+    </person>
+    <person id="Michael_Kreutzjans">
+      <name>Michael Kreutzjans</name>
+      <uri>mailto:mike&amp;spryware.com</uri>
+      <updated>2007-03-01</updated>
+    </person>
+    <person id="Michael_Lyle">
+      <name>Michael Lyle</name>
+      <uri>mailto:protocols&amp;translattice.com</uri>
+      <updated>2009-11-11</updated>
+    </person>
+    <person id="Michael_Rosenberg">
+      <name>Michael Rosenberg</name>
+      <uri>mailto:michael.rosenberg&amp;nasdaqomx.com</uri>
+      <updated>2012-03-15</updated>
+    </person>
+    <person id="Michael_Wang">
+      <name>Michael Wang</name>
+      <uri>mailto:Michael.Wang&amp;usa.xerox.com</uri>
+      <updated>1999-03-01</updated>
+    </person>
+    <person id="Mika_Uusitalo">
+      <name>Mika Uusitalo</name>
+      <uri>mailto:msu&amp;xingtech.com</uri>
+      <updated>1997-04-01</updated>
+    </person>
+    <person id="Mike_Rodbell">
+      <name>Mike Rodbell</name>
+      <uri>mailto:mrodbell&amp;ciena.com</uri>
+      <updated>1997-01-01</updated>
+    </person>
+    <person id="Mike_Roper">
+      <name>Mike Roper</name>
+      <uri>mailto:mroper&amp;8x8.com</uri>
+      <updated>1999-09-01</updated>
+    </person>
+    <person id="Mike_Velten">
+      <name>Mike Velten</name>
+      <uri>mailto:mike_velten&amp;liebert.com</uri>
+      <updated>1999-01-01</updated>
+    </person>
+    <person id="Moe_Singh">
+      <name>Moe Singh</name>
+      <uri>mailto:moesingh&amp;hotmail.com</uri>
+      <updated>2009-09-24</updated>
+    </person>
+    <person id="Morten_Lindeman">
+      <name>Morten Lindeman</name>
+      <uri>mailto:Morten.Lindeman&amp;os.telia.no</uri>
+      <updated>1999-03-01</updated>
+    </person>
+    <person id="Morteza_Kalhour">
+      <name>Morteza Kalhour</name>
+      <uri>mailto:morteza.kalhour&amp;nokia.com</uri>
+      <updated>2002-10-01</updated>
+    </person>
+    <person id="Nadine_Guillaume">
+      <name>Nadine Guillaume</name>
+      <uri>mailto:nadine.guillaume&amp;sciatl.com</uri>
+      <updated>2005-02-01</updated>
+    </person>
+    <person id="Nedelcho_Stanev">
+      <name>Nedelcho Stanev</name>
+      <uri>mailto:nstanev&amp;csoft.bg</uri>
+      <updated>1999-05-01</updated>
+    </person>
+    <person id="NE-TEAM_at_telecomsys.com">
+      <name>NE-TEAM_at_telecomsys.com</name>
+      <uri>mailto:NE-TEAM&amp;telecomsys.com</uri>
+      <updated>2014-11-07</updated>
+    </person>
+    <person id="Nick_Barendt">
+      <name>Nick Barendt</name>
+      <uri>mailto:nbarendt&amp;vxitech.com</uri>
+      <updated>2005-11-01</updated>
+    </person>
+    <person id="Nigel_Thompson">
+      <name>Nigel Thompson</name>
+      <uri>mailto:nigelt&amp;tribal.com</uri>
+      <updated>1999-01-01</updated>
+    </person>
+    <person id="Oliver_Lewis">
+      <name>Oliver Lewis</name>
+      <uri>mailto:o.lewis&amp;icerobotics.co.uk</uri>
+      <updated>2006-07-11</updated>
+    </person>
+    <person id="OSPF_WG_Chairs">
+      <name>OSPF WG Chairs</name>
+      <uri>mailto:ospf-chairs&amp;ietf.org</uri>
+    </person>
+    <person id="Oyvind_H_Olsen">
+      <name>Oyvind H. Olsen</name>
+      <uri>mailto:oyvind-hollup.olsen&amp;canaldigital.com</uri>
+      <updated>2007-09-12</updated>
+    </person>
+    <person id="Paolo_Strazzera">
+      <name>Paolo Strazzera</name>
+      <uri>mailto:p.strazzera&amp;telematica.it</uri>
+      <updated>1999-06-01</updated>
+    </person>
+    <person id="Patrick_Cipiere">
+      <name>Patrick Cipiere</name>
+      <uri>mailto:Patrick.Cipiere&amp;udcast.com</uri>
+      <updated>2001-01-01</updated>
+    </person>
+    <person id="Paul_Langille">
+      <name>Paul Langille</name>
+      <uri>mailto:plangille&amp;dnpg.com</uri>
+      <updated>2007-01-17</updated>
+    </person>
+    <person id="Paul_Suhler">
+      <name>Paul Suhler</name>
+      <uri>mailto:paul.suhler&amp;quantum.com</uri>
+      <updated>2009-05-12</updated>
+    </person>
+    <person id="Paul_Wallner">
+      <name>Paul Wallner</name>
+      <uri>mailto:paul.wallner&amp;wienstrom.at</uri>
+      <updated>2010-09-14</updated>
+    </person>
+    <person id="Paul_Wissenbach">
+      <name>Paul Wissenbach</name>
+      <uri>mailto:paulwi&amp;vnd.tek.com</uri>
+      <updated>1997-06-01</updated>
+    </person>
+    <person id="Peter_Aronson">
+      <name>Peter Aronson</name>
+      <uri>mailto:paronson&amp;esri.com</uri>
+      <updated>1998-08-01</updated>
+    </person>
+    <person id="Peter_Parnes">
+      <name>Peter Parnes</name>
+      <uri>mailto:peppar&amp;marratech.com</uri>
+      <updated>2000-02-01</updated>
+    </person>
+    <person id="Peter_White">
+      <name>Peter White</name>
+      <uri>mailto:peter_white&amp;3com.com</uri>
+      <updated>1999-04-01</updated>
+    </person>
+    <person id="Pierre_Oliver">
+      <name>Pierre Oliver</name>
+      <uri>mailto:polivier&amp;calamp.com</uri>
+      <updated>2011-06-06</updated>
+    </person>
+    <person id="Piers_Scannell">
+      <name>Piers Scannell</name>
+      <uri>mailto:piers&amp;globecastne.com</uri>
+      <updated>2000-03-01</updated>
+    </person>
+    <person id="Pilz">
+      <name>Pilz GmbH and Co. KG</name>
+      <uri>mailto:pilz.gmbh&amp;pilz.de</uri>
+      <updated>2009-03-17</updated>
+    </person>
+    <person id="Prakash_Banthia">
+      <name>Prakash Banthia</name>
+      <uri>mailto:prakash_banthia&amp;3com.com</uri>
+      <updated>1998-09-01</updated>
+    </person>
+    <person id="Ralph_Kammerlander">
+      <name>Ralph Kammerlander</name>
+      <uri>mailto:ralph.kammerlander&amp;khe.siemens.de</uri>
+      <updated>2000-06-01</updated>
+    </person>
+    <person id="Ram_Iyer">
+      <name>Ram Iyer</name>
+      <uri>mailto:ram&amp;aaccorp.com</uri>
+      <updated>1998-03-01</updated>
+    </person>
+    <person id="Raymond_Shum">
+      <name>Raymond Shum</name>
+      <uri>mailto:rshum&amp;ms.com</uri>
+      <updated>1998-04-01</updated>
+    </person>
+    <person id="Richard_Hodges">
+      <name>Richard Hodges</name>
+      <uri>mailto:rh&amp;source.net</uri>
+      <updated>1999-03-01</updated>
+    </person>
+    <person id="Richard_Zulch">
+      <name>Richard Zulch</name>
+      <uri>mailto:richard_zulch&amp;dantz.com</uri>
+      <updated>2004-05-01</updated>
+    </person>
+    <person id="RIR_Admin">
+      <name>RIR Admin</name>
+      <uri>mailto:riradmin&amp;nyx.com</uri>
+      <updated>2015-10-23</updated>
+    </person>
+    <person id="Rob_Janssen">
+      <name>Rob Janssen</name>
+      <uri>mailto:rob&amp;pe1chl.ampr.org</uri>
+      <updated>1995-01-01</updated>
+    </person>
+    <person id="Robert_Hodgson">
+      <name>Robert Hodgson</name>
+      <uri>mailto:robert&amp;paratek.co.uk</uri>
+      <updated>2001-12-01</updated>
+    </person>
+    <person id="Robert_Sautter">
+      <name>Robert Sautter</name>
+      <uri>mailto:rsautter&amp;acdnj.itt.com</uri>
+      <updated>1999-08-01</updated>
+    </person>
+    <person id="Robert_Sliwinski">
+      <name>Robert Sliwinski</name>
+      <uri>mailto:sliwinre&amp;mail1st.com</uri>
+      <updated>2000-02-01</updated>
+    </person>
+    <person id="Robert_Taylor">
+      <name>Robert Taylor</name>
+      <uri>mailto:rtaylor&amp;digicelgroup.com</uri>
+      <updated>2016-09-29</updated>
+    </person>
+    <person id="Roberto_Costa_Simoes">
+      <name>Roberto Costa Simoes</name>
+      <uri>mailto:rcosta&amp;bvmf.com.br</uri>
+      <updated>2010-08-18</updated>
+    </person>
+    <person id="Ruben_Hernandez">
+      <name>Ruben Hernandez</name>
+      <uri>mailto:rhernandez&amp;miami-holdings.com</uri>
+      <updated>2015-06-30</updated>
+    </person>
+    <person id="Ryon_Coleman">
+      <name>Ryon Coleman</name>
+      <uri>mailto:rcoleman&amp;3eti.com</uri>
+      <updated>2006-04-11</updated>
+    </person>
+    <person id="SEIKO_EPSON_Corp">
+      <name>SEIKO EPSON Corp</name>
+      <uri>mailto:ogata.hideaki&amp;exc.epson.co.jp</uri>
+      <updated>2005-01-01</updated>
+    </person>
+    <person id="Sakon_Kittivatcharapong">
+      <name>Sakon Kittivatcharapong</name>
+      <uri>mailto:sakonk&amp;cscoms.net</uri>
+      <updated>2000-05-01</updated>
+    </person>
+    <person id="Sam_Birru">
+      <name>Sam Birru</name>
+      <uri>mailto:sam.birru&amp;instinet.co.uk</uri>
+      <updated>2014-09-05</updated>
+    </person>
+    <person id="Sarunas_Brakauskas">
+      <name>Sarunas Brakauskas</name>
+      <uri>mailto:sbrakaus&amp;cme.com</uri>
+      <updated>2007-07-17</updated>
+    </person>
+    <person id="Scott_Watson">
+      <name>Scott Watson</name>
+      <uri>mailto:scott&amp;disney.com</uri>
+      <updated>1997-08-01</updated>
+    </person>
+    <person id="Sergey_Shulgin">
+      <name>Sergey Shulgin</name>
+      <uri>mailto:sshulgin&amp;pinkotc.com</uri>
+      <updated>2008-08-12</updated>
+    </person>
+    <person id="Shai_Revzen">
+      <name>Shai Revzen</name>
+      <uri>mailto:shai.revzen&amp;harmonicinc.com</uri>
+      <updated>1999-04-01</updated>
+    </person>
+    <person id="Shane_Rowatt">
+      <name>Shane Rowatt</name>
+      <uri>mailto:shane.rowatt&amp;star.com.au</uri>
+      <updated>1997-03-01</updated>
+    </person>
+    <person id="Shivaun_Albright">
+      <name>Shivaun Albright</name>
+      <uri>mailto:shivaun_albright&amp;hp.com</uri>
+      <updated>1997-07-01</updated>
+    </person>
+    <person id="Simon_Barber">
+      <name>Simon Barber</name>
+      <uri>mailto:simon.barber&amp;parc.com</uri>
+      <updated>2009-09-24</updated>
+    </person>
+    <person id="Soren_Martin_Sorensen">
+      <name>Soren Martin Sorensen</name>
+      <uri>mailto:sms&amp;energimidt.dk</uri>
+      <updated>2006-08-07</updated>
+    </person>
+    <person id="Stacey_O_Rourke">
+      <name>Stacey O'Rourke</name>
+      <uri>mailto:stacey&amp;network-alchemy.com</uri>
+      <updated>1999-08-01</updated>
+    </person>
+    <person id="Stacey_O_Rourke_2">
+      <name>Stacey O'Rourke</name>
+      <uri>mailto:stacey&amp;cips.nokia.com</uri>
+      <updated>2001-01-01</updated>
+    </person>
+    <person id="Stephan_Wasserroth">
+      <name>Stephan Wasserroth</name>
+      <uri>mailto:wasserroth&amp;fokus.gmd.de</uri>
+      <updated>2000-07-01</updated>
+    </person>
+    <person id="Stephen_Dunne">
+      <name>Stephen Dunne</name>
+      <uri>mailto:sdun&amp;isma.co.uk</uri>
+      <updated>1997-01-01</updated>
+    </person>
+    <person id="Stephen_Hanna">
+      <name>Stephen Hanna</name>
+      <uri>mailto:steve.hanna&amp;sun.com</uri>
+      <updated>2000-07-01</updated>
+    </person>
+    <person id="Stephen_Ray_Middleton">
+      <name>Stephen Ray Middleton</name>
+      <uri>mailto:stephen.r.middleton&amp;verizon.com</uri>
+      <updated>2015-03-23</updated>
+    </person>
+    <person id="Stephen_T_Lyda">
+      <name>Stephen T. Lyda</name>
+      <uri>mailto:slyda&amp;emsg.com</uri>
+      <updated>2000-02-01</updated>
+    </person>
+    <person id="Steve_Casner">
+      <name>Steve Casner</name>
+      <uri>mailto:casner&amp;precept.com</uri>
+    </person>
+    <person id="Steve_Casner_2">
+      <name>Steve Casner</name>
+      <uri>mailto:casner&amp;isi.edu</uri>
+      <updated>1995-01-01</updated>
+    </person>
+    <person id="Steve_Deering">
+      <name>Steve Deering</name>
+      <uri>mailto:deering&amp;cisco.com</uri>
+      <updated>1999-10-01</updated>
+    </person>
+    <person id="Steve_Deering_2">
+      <name>Steve Deering</name>
+      <uri>mailto:deering&amp;parc.xerox.com</uri>
+    </person>
+    <person id="Steve_Polishinski">
+      <name>Steve Polishinski</name>
+      <uri>mailto:spolishinski&amp;etcconnect.com</uri>
+      <updated>2000-03-01</updated>
+    </person>
+    <person id="Stuart_Kerry">
+      <name>Stuart Kerry</name>
+      <uri>mailto:stuart.kerry&amp;philips.com</uri>
+      <updated>2003-01-01</updated>
+    </person>
+    <person id="Susie_Armstrong">
+      <name>Susie Armstrong</name>
+      <uri>mailto:Armstrong.wbst128&amp;xerox.com</uri>
+    </person>
+    <person id="Takeshi_Saito">
+      <name>Takeshi Saito</name>
+      <uri>mailto:takeshi.saito&amp;toshiba.co.jp</uri>
+      <updated>2003-02-01</updated>
+    </person>
+    <person id="Technicolor_NL_NOC">
+      <name>Technicolor NL NOC</name>
+      <uri>mailto:noc&amp;technicolor.com</uri>
+      <updated>2009-12-23</updated>
+    </person>
+    <person id="Terry_Gibson">
+      <name>Terry Gibson</name>
+      <uri>mailto:terry.gibson&amp;sun.com</uri>
+      <updated>1997-08-01</updated>
+    </person>
+    <person id="Tetsuo_Hoshi">
+      <name>Tetsuo Hoshi</name>
+      <uri>mailto:tetsuo.hoshi&amp;jp.yokogawa.com</uri>
+      <updated>2004-06-01</updated>
+    </person>
+    <person id="Tim_DeBaillie">
+      <name>Tim DeBaillie</name>
+      <uri>mailto:debaillie&amp;ciholas.com</uri>
+      <updated>2006-11-30</updated>
+    </person>
+    <person id="Tim_Gorsline">
+      <name>Tim Gorsline</name>
+      <uri>mailto:tgorsline&amp;batstrading.com</uri>
+      <updated>2011-01-31</updated>
+    </person>
+    <person id="Tim_Johnson">
+      <uri>mailto:tjohnson&amp;londonstockexchange.com</uri>
+      <updated>2012-04-11</updated>
+    </person>
+    <person id="Tom_Ballister">
+      <name>Tom Ballister</name>
+      <uri>mailto:tom&amp;ballister.com</uri>
+      <updated>1997-07-01</updated>
+    </person>
+    <person id="Tom_Blank">
+      <name>Tom Blank</name>
+      <uri>mailto:tomblank&amp;microsoft.com</uri>
+      <updated>1996-11-01</updated>
+    </person>
+    <person id="Tom_White">
+      <name>Tom White</name>
+      <uri>mailto:info&amp;midi.org</uri>
+      <updated>2011-11-02</updated>
+    </person>
+    <person id="Tony_Ballardie">
+      <name>Tony Ballardie</name>
+      <uri>mailto:A.Ballardie&amp;cs.ucl.ac.uk</uri>
+      <updated>1997-02-01</updated>
+    </person>
+    <person id="Tony_Barber">
+      <name>Tony Barber</name>
+      <uri>mailto:tony.barber&amp;wcom.com</uri>
+      <updated>1997-01-01</updated>
+    </person>
+    <person id="Tony_Przygienda">
+      <name>Tony Przygienda</name>
+      <uri>mailto:prz&amp;siara.com</uri>
+      <updated>1999-10-01</updated>
+    </person>
+    <person id="Tony_Wong">
+      <name>Tony Wong</name>
+      <uri>mailto:wongt&amp;ms.com</uri>
+      <updated>1998-07-01</updated>
+    </person>
+    <person id="Tradition_Network_Operations_and_Command_Center">
+      <name>Tradition Network Operations and Command Center</name>
+      <uri>mailto:SH-Networking&amp;tradition.com</uri>
+      <updated>2010-09-22</updated>
+    </person>
+    <person id="UPnP_Forum">
+      <name>UPnP Forum</name>
+      <uri>mailto:upnpadmin&amp;forum.upnp.org</uri>
+      <updated>2006-06-27</updated>
+    </person>
+    <person id="Victor_Volpe">
+      <name>Victor Volpe</name>
+      <uri>mailto:vvolpe&amp;smtp.microcom.com</uri>
+      <updated>1997-10-01</updated>
+    </person>
+    <person id="Wally_Beddoe">
+      <name>Wally Beddoe</name>
+      <uri>mailto:WBeddoe&amp;tkusa.com</uri>
+      <updated>2003-04-01</updated>
+    </person>
+    <person id="Walter_Wallach">
+      <name>Walter Wallach</name>
+      <uri>mailto:walt&amp;sumatech.com</uri>
+      <updated>1999-07-01</updated>
+    </person>
+    <person id="Wayne_Carr">
+      <name>Wayne Carr</name>
+      <uri>mailto:Wayne_Carr&amp;ccm.intel.com</uri>
+      <updated>1997-12-01</updated>
+    </person>
+    <person id="Wayne_Wenyu_Liu">
+      <name>Wayne Wenyu Liu</name>
+      <uri>mailto:wayne.wenyu.liu&amp;gmail.com</uri>
+      <updated>2012-06-12</updated>
+    </person>
+    <person id="Wenjie_Peng">
+      <name>Wenjie Peng</name>
+      <uri>mailto:wpeng&amp;tts.telerate.com</uri>
+      <updated>1997-01-01</updated>
+    </person>
+    <person id="Werner_Vogels">
+      <name>Werner Vogels</name>
+      <uri>mailto:vogels&amp;rnets.com</uri>
+      <updated>1998-08-01</updated>
+    </person>
+    <person id="Wieland_Holdfelder">
+      <name>Wieland Holdfelder</name>
+      <uri>mailto:whd&amp;pi4.informatik.uni-mannheim.de</uri>
+      <updated>1997-01-01</updated>
+    </person>
+    <person id="Xiaoyu_Zhou">
+      <name>Xiaoyu Zhou</name>
+      <uri>mailto:zhouxyi&amp;lenovo.com</uri>
+      <updated>2009-01-20</updated>
+    </person>
+    <person id="Yea_Uang">
+      <name>Yea Uang</name>
+      <uri>mailto:uang&amp;force.decnet.lockheed.com</uri>
+      <updated>1994-11-01</updated>
+    </person>
+    <person id="Yossi_Gal">
+      <name>Yossi Gal</name>
+      <uri>mailto:yossi&amp;gilat.com</uri>
+      <updated>1998-02-01</updated>
+    </person>
+    <person id="Zaklina_Petkovic">
+      <name>Zaklina Petkovic</name>
+      <uri>mailto:zaklina.petkovic&amp;alphatradingsystems.ca</uri>
+      <updated>2011-07-13</updated>
+    </person>
+    <person id="Zaklina_Petkovic_2">
+      <name>Zaklina Petkovic</name>
+      <uri>mailto:zaklina.petkovic&amp;aequin.com</uri>
+      <updated>2014-05-16</updated>
+    </person>
+    <person id="Zia_Bhatti">
+      <name>Zia Bhatti</name>
+      <uri>mailto:zia&amp;netright.com</uri>
+      <updated>1998-09-01</updated>
+    </person>
+  </people>
+</registry>

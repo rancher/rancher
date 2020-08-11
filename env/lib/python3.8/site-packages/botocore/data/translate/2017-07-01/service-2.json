@@ -1,0 +1,568 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2017-07-01",
+    "endpointPrefix":"translate",
+    "jsonVersion":"1.1",
+    "protocol":"json",
+    "serviceFullName":"Amazon Translate",
+    "serviceId":"Translate",
+    "signatureVersion":"v4",
+    "signingName":"translate",
+    "targetPrefix":"AWSShineFrontendService_20170701",
+    "uid":"translate-2017-07-01"
+  },
+  "operations":{
+    "DeleteTerminology":{
+      "name":"DeleteTerminology",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DeleteTerminologyRequest"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>A synchronous action that deletes a custom terminology.</p>"
+    },
+    "GetTerminology":{
+      "name":"GetTerminology",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"GetTerminologyRequest"},
+      "output":{"shape":"GetTerminologyResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Retrieves a custom terminology.</p>"
+    },
+    "ImportTerminology":{
+      "name":"ImportTerminology",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ImportTerminologyRequest"},
+      "output":{"shape":"ImportTerminologyResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Creates or updates a custom terminology, depending on whether or not one already exists for the given terminology name. Importing a terminology with the same name as an existing one will merge the terminologies based on the chosen merge strategy. Currently, the only supported merge strategy is OVERWRITE, and so the imported terminology will overwrite an existing terminology of the same name.</p> <p>If you import a terminology that overwrites an existing one, the new terminology take up to 10 minutes to fully propagate and be available for use in a translation due to cache policies with the DataPlane service that performs the translations.</p>"
+    },
+    "ListTerminologies":{
+      "name":"ListTerminologies",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListTerminologiesRequest"},
+      "output":{"shape":"ListTerminologiesResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Provides a list of custom terminologies associated with your account.</p>"
+    },
+    "TranslateText":{
+      "name":"TranslateText",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"TranslateTextRequest"},
+      "output":{"shape":"TranslateTextResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"TextSizeLimitExceededException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"UnsupportedLanguagePairException"},
+        {"shape":"DetectedLanguageLowConfidenceException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ServiceUnavailableException"}
+      ],
+      "documentation":"<p>Translates input text from the source language to the target language. It is not necessary to use English (en) as either the source or the target language but not all language combinations are supported by Amazon Translate. For more information, see <a href=\"http://docs.aws.amazon.com/translate/latest/dg/pairs.html\">Supported Language Pairs</a>.</p> <ul> <li> <p>Arabic (ar)</p> </li> <li> <p>Chinese (Simplified) (zh)</p> </li> <li> <p>Chinese (Traditional) (zh-TW)</p> </li> <li> <p>Czech (cs)</p> </li> <li> <p>Danish (da)</p> </li> <li> <p>Dutch (nl)</p> </li> <li> <p>English (en)</p> </li> <li> <p>Finnish (fi)</p> </li> <li> <p>French (fr)</p> </li> <li> <p>German (de)</p> </li> <li> <p>Hebrew (he)</p> </li> <li> <p>Indonesian (id)</p> </li> <li> <p>Italian (it)</p> </li> <li> <p>Japanese (ja)</p> </li> <li> <p>Korean (ko)</p> </li> <li> <p>Polish (pl)</p> </li> <li> <p>Portuguese (pt)</p> </li> <li> <p>Russian (ru)</p> </li> <li> <p>Spanish (es)</p> </li> <li> <p>Swedish (sv)</p> </li> <li> <p>Turkish (tr)</p> </li> </ul> <p>To have Amazon Translate determine the source language of your text, you can specify <code>auto</code> in the <code>SourceLanguageCode</code> field. If you specify <code>auto</code>, Amazon Translate will call Amazon Comprehend to determine the source language.</p>"
+    }
+  },
+  "shapes":{
+    "AppliedTerminology":{
+      "type":"structure",
+      "members":{
+        "Name":{
+          "shape":"ResourceName",
+          "documentation":"<p>The name of the custom terminology applied to the input text by Amazon Translate for the translated text response.</p>"
+        },
+        "Terms":{
+          "shape":"TermList",
+          "documentation":"<p>The specific terms of the custom terminology applied to the input text by Amazon Translate for the translated text response. A maximum of 250 terms will be returned, and the specific terms applied will be the first 250 terms in the source text. </p>"
+        }
+      },
+      "documentation":"<p>The custom terminology applied to the input text by Amazon Translate for the translated text response. This is optional in the response and will only be present if you specified terminology input in the request. Currently, only one terminology can be applied per TranslateText request.</p>"
+    },
+    "AppliedTerminologyList":{
+      "type":"list",
+      "member":{"shape":"AppliedTerminology"}
+    },
+    "BoundedLengthString":{
+      "type":"string",
+      "max":5000,
+      "min":1,
+      "pattern":"[\\P{M}\\p{M}]{1,5000}"
+    },
+    "DeleteTerminologyRequest":{
+      "type":"structure",
+      "required":["Name"],
+      "members":{
+        "Name":{
+          "shape":"ResourceName",
+          "documentation":"<p>The name of the custom terminology being deleted. </p>"
+        }
+      }
+    },
+    "Description":{
+      "type":"string",
+      "max":256,
+      "pattern":"[\\P{M}\\p{M}]{0,256}"
+    },
+    "DetectedLanguageLowConfidenceException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "DetectedLanguageCode":{
+          "shape":"LanguageCodeString",
+          "documentation":"<p>The language code of the auto-detected language from Amazon Comprehend.</p>"
+        }
+      },
+      "documentation":"<p>The confidence that Amazon Comprehend accurately detected the source language is low. If a low confidence level is acceptable for your application, you can use the language in the exception to call Amazon Translate again. For more information, see the <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/API_DetectDominantLanguage.html\">DetectDominantLanguage</a> operation in the <i>Amazon Comprehend Developer Guide</i>. </p>",
+      "exception":true
+    },
+    "EncryptionKey":{
+      "type":"structure",
+      "required":[
+        "Type",
+        "Id"
+      ],
+      "members":{
+        "Type":{
+          "shape":"EncryptionKeyType",
+          "documentation":"<p>The type of encryption key used by Amazon Translate to encrypt custom terminologies.</p>"
+        },
+        "Id":{
+          "shape":"EncryptionKeyID",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the encryption key being used to encrypt the custom terminology.</p>"
+        }
+      },
+      "documentation":"<p>The encryption key used to encrypt the custom terminologies used by Amazon Translate.</p>"
+    },
+    "EncryptionKeyID":{
+      "type":"string",
+      "max":400,
+      "min":1,
+      "pattern":"(arn:aws((-us-gov)|(-cn))?:kms:)?([a-z]{2}-[a-z]+-\\d:)?(\\d{12}:)?(((key/)?[a-zA-Z0-9-_]+)|(alias/[a-zA-Z0-9:/_-]+))"
+    },
+    "EncryptionKeyType":{
+      "type":"string",
+      "enum":["KMS"]
+    },
+    "GetTerminologyRequest":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "TerminologyDataFormat"
+      ],
+      "members":{
+        "Name":{
+          "shape":"ResourceName",
+          "documentation":"<p>The name of the custom terminology being retrieved.</p>"
+        },
+        "TerminologyDataFormat":{
+          "shape":"TerminologyDataFormat",
+          "documentation":"<p>The data format of the custom terminology being retrieved, either CSV or TMX.</p>"
+        }
+      }
+    },
+    "GetTerminologyResponse":{
+      "type":"structure",
+      "members":{
+        "TerminologyProperties":{
+          "shape":"TerminologyProperties",
+          "documentation":"<p>The properties of the custom terminology being retrieved.</p>"
+        },
+        "TerminologyDataLocation":{
+          "shape":"TerminologyDataLocation",
+          "documentation":"<p>The data location of the custom terminology being retrieved. The custom terminology file is returned in a presigned url that has a 30 minute expiration.</p>"
+        }
+      }
+    },
+    "ImportTerminologyRequest":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "MergeStrategy",
+        "TerminologyData"
+      ],
+      "members":{
+        "Name":{
+          "shape":"ResourceName",
+          "documentation":"<p>The name of the custom terminology being imported.</p>"
+        },
+        "MergeStrategy":{
+          "shape":"MergeStrategy",
+          "documentation":"<p>The merge strategy of the custom terminology being imported. Currently, only the OVERWRITE merge strategy is supported. In this case, the imported terminology will overwrite an existing terminology of the same name.</p>"
+        },
+        "Description":{
+          "shape":"Description",
+          "documentation":"<p>The description of the custom terminology being imported.</p>"
+        },
+        "TerminologyData":{
+          "shape":"TerminologyData",
+          "documentation":"<p>The terminology data for the custom terminology being imported.</p>"
+        },
+        "EncryptionKey":{
+          "shape":"EncryptionKey",
+          "documentation":"<p>The encryption key for the custom terminology being imported.</p>"
+        }
+      }
+    },
+    "ImportTerminologyResponse":{
+      "type":"structure",
+      "members":{
+        "TerminologyProperties":{
+          "shape":"TerminologyProperties",
+          "documentation":"<p>The properties of the custom terminology being imported.</p>"
+        }
+      }
+    },
+    "Integer":{"type":"integer"},
+    "InternalServerException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> An internal server error occurred. Retry your request.</p>",
+      "exception":true,
+      "fault":true
+    },
+    "InvalidParameterValueException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p>The value of the parameter is invalid. Review the value of the parameter you are using to correct it, and then retry your operation.</p>",
+      "exception":true
+    },
+    "InvalidRequestException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> The request that you made is invalid. Check your request to determine why it's invalid and then retry the request. </p>",
+      "exception":true
+    },
+    "LanguageCodeString":{
+      "type":"string",
+      "max":5,
+      "min":2
+    },
+    "LanguageCodeStringList":{
+      "type":"list",
+      "member":{"shape":"LanguageCodeString"}
+    },
+    "LimitExceededException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p>The specified limit has been exceeded. Review your request and retry it with a quantity below the stated limit.</p>",
+      "exception":true
+    },
+    "ListTerminologiesRequest":{
+      "type":"structure",
+      "members":{
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>If the result of the request to ListTerminologies was truncated, include the NextToken to fetch the next group of custom terminologies. </p>"
+        },
+        "MaxResults":{
+          "shape":"MaxResultsInteger",
+          "documentation":"<p>The maximum number of custom terminologies returned per list request.</p>"
+        }
+      }
+    },
+    "ListTerminologiesResponse":{
+      "type":"structure",
+      "members":{
+        "TerminologyPropertiesList":{
+          "shape":"TerminologyPropertiesList",
+          "documentation":"<p>The properties list of the custom terminologies returned on the list request.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p> If the response to the ListTerminologies was truncated, the NextToken fetches the next group of custom terminologies. </p>"
+        }
+      }
+    },
+    "MaxResultsInteger":{
+      "type":"integer",
+      "max":500,
+      "min":1
+    },
+    "MergeStrategy":{
+      "type":"string",
+      "enum":["OVERWRITE"]
+    },
+    "NextToken":{
+      "type":"string",
+      "max":8192,
+      "pattern":"\\p{ASCII}{0,8192}"
+    },
+    "ResourceName":{
+      "type":"string",
+      "max":256,
+      "min":1,
+      "pattern":"^([A-Za-z0-9-]_?)+$"
+    },
+    "ResourceNameList":{
+      "type":"list",
+      "member":{"shape":"ResourceName"}
+    },
+    "ResourceNotFoundException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p>The resource you are looking for has not been found. Review the resource you're looking for and see if a different resource will accomplish your needs before retrying the revised request. .</p>",
+      "exception":true
+    },
+    "ServiceUnavailableException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p>The Amazon Translate service is temporarily unavailable. Please wait a bit and then retry your request.</p>",
+      "exception":true
+    },
+    "String":{
+      "type":"string",
+      "max":10000,
+      "pattern":"[\\P{M}\\p{M}]{0,10000}"
+    },
+    "Term":{
+      "type":"structure",
+      "members":{
+        "SourceText":{
+          "shape":"String",
+          "documentation":"<p>The source text of the term being translated by the custom terminology.</p>"
+        },
+        "TargetText":{
+          "shape":"String",
+          "documentation":"<p>The target text of the term being translated by the custom terminology.</p>"
+        }
+      },
+      "documentation":"<p>The term being translated by the custom terminology.</p>"
+    },
+    "TermList":{
+      "type":"list",
+      "member":{"shape":"Term"}
+    },
+    "TerminologyArn":{
+      "type":"string",
+      "pattern":"^arn:aws((-us-gov)|(-cn))?:translate:[a-zA-Z0-9-]+:[0-9]{12}:terminology/.+?/.+?$"
+    },
+    "TerminologyData":{
+      "type":"structure",
+      "required":[
+        "File",
+        "Format"
+      ],
+      "members":{
+        "File":{
+          "shape":"TerminologyFile",
+          "documentation":"<p>The file containing the custom terminology data.</p>"
+        },
+        "Format":{
+          "shape":"TerminologyDataFormat",
+          "documentation":"<p>The data format of the custom terminology. Either CSV or TMX.</p>"
+        }
+      },
+      "documentation":"<p>The data associated with the custom terminology.</p>"
+    },
+    "TerminologyDataFormat":{
+      "type":"string",
+      "enum":[
+        "CSV",
+        "TMX"
+      ]
+    },
+    "TerminologyDataLocation":{
+      "type":"structure",
+      "required":[
+        "RepositoryType",
+        "Location"
+      ],
+      "members":{
+        "RepositoryType":{
+          "shape":"String",
+          "documentation":"<p>The repository type for the custom terminology data.</p>"
+        },
+        "Location":{
+          "shape":"String",
+          "documentation":"<p>The location of the custom terminology data.</p>"
+        }
+      },
+      "documentation":"<p>The location of the custom terminology data.</p>"
+    },
+    "TerminologyFile":{
+      "type":"blob",
+      "max":10485760,
+      "sensitive":true
+    },
+    "TerminologyProperties":{
+      "type":"structure",
+      "members":{
+        "Name":{
+          "shape":"ResourceName",
+          "documentation":"<p>The name of the custom terminology.</p>"
+        },
+        "Description":{
+          "shape":"Description",
+          "documentation":"<p>The description of the custom terminology properties.</p>"
+        },
+        "Arn":{
+          "shape":"TerminologyArn",
+          "documentation":"<p> The Amazon Resource Name (ARN) of the custom terminology. </p>"
+        },
+        "SourceLanguageCode":{
+          "shape":"LanguageCodeString",
+          "documentation":"<p>The language code for the source text of the translation request for which the custom terminology is being used.</p>"
+        },
+        "TargetLanguageCodes":{
+          "shape":"LanguageCodeStringList",
+          "documentation":"<p>The language codes for the target languages available with the custom terminology file. All possible target languages are returned in array.</p>"
+        },
+        "EncryptionKey":{
+          "shape":"EncryptionKey",
+          "documentation":"<p>The encryption key for the custom terminology.</p>"
+        },
+        "SizeBytes":{
+          "shape":"Integer",
+          "documentation":"<p>The size of the file used when importing a custom terminology.</p>"
+        },
+        "TermCount":{
+          "shape":"Integer",
+          "documentation":"<p>The number of terms included in the custom terminology.</p>"
+        },
+        "CreatedAt":{
+          "shape":"Timestamp",
+          "documentation":"<p>The time at which the custom terminology was created, based on the timestamp.</p>"
+        },
+        "LastUpdatedAt":{
+          "shape":"Timestamp",
+          "documentation":"<p>The time at which the custom terminology was last update, based on the timestamp.</p>"
+        }
+      },
+      "documentation":"<p>The properties of the custom terminology.</p>"
+    },
+    "TerminologyPropertiesList":{
+      "type":"list",
+      "member":{"shape":"TerminologyProperties"}
+    },
+    "TextSizeLimitExceededException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> The size of the text you submitted exceeds the size limit. Reduce the size of the text or use a smaller document and then retry your request. </p>",
+      "exception":true
+    },
+    "Timestamp":{"type":"timestamp"},
+    "TooManyRequestsException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> You have made too many requests within a short period of time. Wait for a short time and then try your request again.</p>",
+      "exception":true
+    },
+    "TranslateTextRequest":{
+      "type":"structure",
+      "required":[
+        "Text",
+        "SourceLanguageCode",
+        "TargetLanguageCode"
+      ],
+      "members":{
+        "Text":{
+          "shape":"BoundedLengthString",
+          "documentation":"<p>The text to translate. The text string can be a maximum of 5,000 bytes long. Depending on your character set, this may be fewer than 5,000 characters.</p>"
+        },
+        "TerminologyNames":{
+          "shape":"ResourceNameList",
+          "documentation":"<p>The TerminologyNames list that is taken as input to the TranslateText request. This has a minimum length of 0 and a maximum length of 1.</p>"
+        },
+        "SourceLanguageCode":{
+          "shape":"LanguageCodeString",
+          "documentation":"<p>The language code for the language of the source text. The language must be a language supported by Amazon Translate. </p> <p>To have Amazon Translate determine the source language of your text, you can specify <code>auto</code> in the <code>SourceLanguageCode</code> field. If you specify <code>auto</code>, Amazon Translate will call Amazon Comprehend to determine the source language.</p>"
+        },
+        "TargetLanguageCode":{
+          "shape":"LanguageCodeString",
+          "documentation":"<p>The language code requested for the language of the target text. The language must be a language supported by Amazon Translate.</p>"
+        }
+      }
+    },
+    "TranslateTextResponse":{
+      "type":"structure",
+      "required":[
+        "TranslatedText",
+        "SourceLanguageCode",
+        "TargetLanguageCode"
+      ],
+      "members":{
+        "TranslatedText":{
+          "shape":"String",
+          "documentation":"<p>The the translated text. The maximum length of this text is 5kb.</p>"
+        },
+        "SourceLanguageCode":{
+          "shape":"LanguageCodeString",
+          "documentation":"<p>The language code for the language of the source text. </p>"
+        },
+        "TargetLanguageCode":{
+          "shape":"LanguageCodeString",
+          "documentation":"<p>The language code for the language of the target text. </p>"
+        },
+        "AppliedTerminologies":{
+          "shape":"AppliedTerminologyList",
+          "documentation":"<p>The names of the custom terminologies applied to the input text by Amazon Translate for the translated text response.</p>"
+        }
+      }
+    },
+    "UnsupportedLanguagePairException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "SourceLanguageCode":{
+          "shape":"LanguageCodeString",
+          "documentation":"<p>The language code for the language of the input text. </p>"
+        },
+        "TargetLanguageCode":{
+          "shape":"LanguageCodeString",
+          "documentation":"<p>The language code for the language of the translated text. </p>"
+        }
+      },
+      "documentation":"<p>Amazon Translate does not support translation from the language of the source text into the requested target language. For more information, see <a>how-to-error-msg</a>. </p>",
+      "exception":true
+    }
+  },
+  "documentation":"<p>Provides translation between one source language and another of the same set of languages.</p>"
+}

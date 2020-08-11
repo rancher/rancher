@@ -1,0 +1,34 @@
+{
+  "pagination": {
+    "ListEndpointsByPlatformApplication": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "result_key": "Endpoints"
+    },
+    "ListPlatformApplications": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "result_key": "PlatformApplications"
+    },
+    "ListSubscriptions": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "result_key": "Subscriptions"
+    },
+    "ListSubscriptionsByTopic": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "result_key": "Subscriptions"
+    },
+    "ListTopics": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "result_key": "Topics"
+    },
+    "ListPhoneNumbersOptedOut": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "result_key": "phoneNumbers"
+    }
+  }
+}

@@ -1,0 +1,1563 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2018-04-01",
+    "endpointPrefix":"quicksight",
+    "jsonVersion":"1.0",
+    "protocol":"rest-json",
+    "serviceFullName":"Amazon QuickSight",
+    "serviceId":"QuickSight",
+    "signatureVersion":"v4",
+    "uid":"quicksight-2018-04-01"
+  },
+  "operations":{
+    "CreateGroup":{
+      "name":"CreateGroup",
+      "http":{
+        "method":"POST",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/groups"
+      },
+      "input":{"shape":"CreateGroupRequest"},
+      "output":{"shape":"CreateGroupResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceExistsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Creates an Amazon QuickSight group.</p> <p>The permissions resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;relevant-aws-account-id&gt;</i>:group/default/<i>&lt;group-name&gt;</i> </code>.</p> <p>The response is a group object.</p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight create-group --aws-account-id=111122223333 --namespace=default --group-name=\"Sales-Management\" --description=\"Sales Management - Forecasting\" </code> </p>"
+    },
+    "CreateGroupMembership":{
+      "name":"CreateGroupMembership",
+      "http":{
+        "method":"PUT",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/groups/{GroupName}/members/{MemberName}"
+      },
+      "input":{"shape":"CreateGroupMembershipRequest"},
+      "output":{"shape":"CreateGroupMembershipResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Adds an Amazon QuickSight user to an Amazon QuickSight group. </p> <p>The permissions resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:group/default/<i>&lt;group-name&gt;</i> </code>.</p> <p>The condition resource is the user name.</p> <p>The condition key is <code>quicksight:UserName</code>.</p> <p>The response is the group member object.</p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight create-group-membership --aws-account-id=111122223333 --namespace=default --group-name=Sales --member-name=Pat </code> </p>"
+    },
+    "DeleteGroup":{
+      "name":"DeleteGroup",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/groups/{GroupName}"
+      },
+      "input":{"shape":"DeleteGroupRequest"},
+      "output":{"shape":"DeleteGroupResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Removes a user group from Amazon QuickSight. </p> <p>The permissions resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:group/default/<i>&lt;group-name&gt;</i> </code>.</p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight delete-group -\\-aws-account-id=111122223333 -\\-namespace=default -\\-group-name=Sales-Management </code> </p>"
+    },
+    "DeleteGroupMembership":{
+      "name":"DeleteGroupMembership",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/groups/{GroupName}/members/{MemberName}"
+      },
+      "input":{"shape":"DeleteGroupMembershipRequest"},
+      "output":{"shape":"DeleteGroupMembershipResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Removes a user from a group so that the user is no longer a member of the group.</p> <p>The permissions resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:group/default/<i>&lt;group-name&gt;</i> </code>.</p> <p>The condition resource is the user name.</p> <p>The condition key is <code>quicksight:UserName</code>.</p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight delete-group-membership --aws-account-id=111122223333 --namespace=default --group-name=Sales-Management --member-name=Charlie </code> </p>"
+    },
+    "DeleteUser":{
+      "name":"DeleteUser",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/users/{UserName}"
+      },
+      "input":{"shape":"DeleteUserRequest"},
+      "output":{"shape":"DeleteUserResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Deletes the Amazon QuickSight user that is associated with the identity of the AWS Identity and Access Management (IAM) user or role that's making the call. The IAM user isn't deleted as a result of this call. </p> <p>The permission resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:user/default/<i>&lt;user-name&gt; </i> </code>.</p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight delete-user --aws-account-id=111122223333 --namespace=default --user-name=Pat </code> </p>"
+    },
+    "DeleteUserByPrincipalId":{
+      "name":"DeleteUserByPrincipalId",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/user-principals/{PrincipalId}"
+      },
+      "input":{"shape":"DeleteUserByPrincipalIdRequest"},
+      "output":{"shape":"DeleteUserByPrincipalIdResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Deletes a user identified by its principal ID. </p> <p>The permission resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:user/default/<i>&lt;user-name&gt; </i> </code>.</p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight delete-user-by-principal-id --aws-account-id=111122223333 --namespace=default --principal-id=ABCDEFJA26JLI7EUUOEHS </code> </p>"
+    },
+    "DescribeGroup":{
+      "name":"DescribeGroup",
+      "http":{
+        "method":"GET",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/groups/{GroupName}"
+      },
+      "input":{"shape":"DescribeGroupRequest"},
+      "output":{"shape":"DescribeGroupResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Returns an Amazon QuickSight group's description and Amazon Resource Name (ARN). </p> <p>The permissions resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;relevant-aws-account-id&gt;</i>:group/default/<i>&lt;group-name&gt;</i> </code>.</p> <p>The response is the group object. </p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight describe-group -\\-aws-account-id=11112222333 -\\-namespace=default -\\-group-name=Sales </code> </p>"
+    },
+    "DescribeUser":{
+      "name":"DescribeUser",
+      "http":{
+        "method":"GET",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/users/{UserName}"
+      },
+      "input":{"shape":"DescribeUserRequest"},
+      "output":{"shape":"DescribeUserResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Returns information about a user, given the user name. </p> <p>The permission resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:user/default/<i>&lt;user-name&gt;</i> </code>. </p> <p>The response is a user object that contains the user's Amazon Resource Name (ARN), AWS Identity and Access Management (IAM) role, and email address. </p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight describe-user --aws-account-id=111122223333 --namespace=default --user-name=Pat </code> </p>"
+    },
+    "GetDashboardEmbedUrl":{
+      "name":"GetDashboardEmbedUrl",
+      "http":{
+        "method":"GET",
+        "requestUri":"/accounts/{AwsAccountId}/dashboards/{DashboardId}/embed-url"
+      },
+      "input":{"shape":"GetDashboardEmbedUrlRequest"},
+      "output":{"shape":"GetDashboardEmbedUrlResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceExistsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"DomainNotWhitelistedException"},
+        {"shape":"QuickSightUserNotFoundException"},
+        {"shape":"IdentityTypeNotSupportedException"},
+        {"shape":"SessionLifetimeInMinutesInvalidException"},
+        {"shape":"UnsupportedUserEditionException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Generates a server-side embeddable URL and authorization code. Before this can work properly, first you need to configure the dashboards and user permissions. For more information, see <a href=\"https://docs.aws.amazon.com/en_us/quicksight/latest/user/embedding.html\"> Embedding Amazon QuickSight Dashboards</a>.</p> <p>Currently, you can use <code>GetDashboardEmbedURL</code> only from the server, not from the user’s browser.</p> <p> <b>CLI Sample:</b> </p> <p>Assume the role with permissions enabled for actions: <code>quickSight:RegisterUser</code> and <code>quicksight:GetDashboardEmbedURL</code>. You can use assume-role, assume-role-with-web-identity, or assume-role-with-saml. </p> <p> <code>aws sts assume-role --role-arn \"arn:aws:iam::111122223333:role/embedding_quicksight_dashboard_role\" --role-session-name embeddingsession</code> </p> <p>If the user does not exist in QuickSight, register the user:</p> <p> <code>aws quicksight register-user --aws-account-id 111122223333 --namespace default --identity-type IAM --iam-arn \"arn:aws:iam::111122223333:role/embedding_quicksight_dashboard_role\" --user-role READER --session-name \"embeddingsession\" --email user123@example.com --region us-east-1</code> </p> <p>Get the URL for the embedded dashboard</p> <p> <code>aws quicksight get-dashboard-embed-url --aws-account-id 111122223333 --dashboard-id 1a1ac2b2-3fc3-4b44-5e5d-c6db6778df89 --identity-type IAM</code> </p>"
+    },
+    "ListGroupMemberships":{
+      "name":"ListGroupMemberships",
+      "http":{
+        "method":"GET",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/groups/{GroupName}/members"
+      },
+      "input":{"shape":"ListGroupMembershipsRequest"},
+      "output":{"shape":"ListGroupMembershipsResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InvalidNextTokenException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Lists member users in a group.</p> <p>The permissions resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:group/default/<i>&lt;group-name&gt;</i> </code>.</p> <p>The response is a list of group member objects.</p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight list-group-memberships -\\-aws-account-id=111122223333 -\\-namespace=default </code> </p>"
+    },
+    "ListGroups":{
+      "name":"ListGroups",
+      "http":{
+        "method":"GET",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/groups"
+      },
+      "input":{"shape":"ListGroupsRequest"},
+      "output":{"shape":"ListGroupsResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InvalidNextTokenException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Lists all user groups in Amazon QuickSight. </p> <p>The permissions resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:group/default/*</code>.</p> <p>The response is a list of group objects. </p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight list-groups -\\-aws-account-id=111122223333 -\\-namespace=default </code> </p>"
+    },
+    "ListUserGroups":{
+      "name":"ListUserGroups",
+      "http":{
+        "method":"GET",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/users/{UserName}/groups"
+      },
+      "input":{"shape":"ListUserGroupsRequest"},
+      "output":{"shape":"ListUserGroupsResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Lists the Amazon QuickSight groups that an Amazon QuickSight user is a member of.</p> <p>The permission resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:user/default/<i>&lt;user-name&gt;</i> </code>. </p> <p>The response is a one or more group objects. </p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight list-user-groups -\\-user-name=Pat -\\-aws-account-id=111122223333 -\\-namespace=default -\\-region=us-east-1 </code> </p>"
+    },
+    "ListUsers":{
+      "name":"ListUsers",
+      "http":{
+        "method":"GET",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/users"
+      },
+      "input":{"shape":"ListUsersRequest"},
+      "output":{"shape":"ListUsersResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InvalidNextTokenException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Returns a list of all of the Amazon QuickSight users belonging to this account. </p> <p>The permission resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:user/default/<i>*</i> </code>.</p> <p>The response is a list of user objects, containing each user's Amazon Resource Name (ARN), AWS Identity and Access Management (IAM) role, and email address. </p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight list-users --aws-account-id=111122223333 --namespace=default </code> </p>"
+    },
+    "RegisterUser":{
+      "name":"RegisterUser",
+      "http":{
+        "method":"POST",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/users"
+      },
+      "input":{"shape":"RegisterUserRequest"},
+      "output":{"shape":"RegisterUserResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceExistsException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Creates an Amazon QuickSight user, whose identity is associated with the AWS Identity and Access Management (IAM) identity or role specified in the request. </p> <p>The permission resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:user/default/<i>&lt;user-name&gt;</i> </code>.</p> <p>The condition resource is the Amazon Resource Name (ARN) for the IAM user or role, and the session name. </p> <p>The condition keys are <code>quicksight:IamArn</code> and <code>quicksight:SessionName</code>. </p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight register-user -\\-aws-account-id=111122223333 -\\-namespace=default -\\-email=pat@example.com -\\-identity-type=IAM -\\-user-role=AUTHOR -\\-iam-arn=arn:aws:iam::111122223333:user/Pat </code> </p>"
+    },
+    "UpdateGroup":{
+      "name":"UpdateGroup",
+      "http":{
+        "method":"PUT",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/groups/{GroupName}"
+      },
+      "input":{"shape":"UpdateGroupRequest"},
+      "output":{"shape":"UpdateGroupResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"PreconditionNotMetException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Changes a group description. </p> <p>The permissions resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:group/default/<i>&lt;group-name&gt;</i> </code>.</p> <p>The response is a group object.</p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight update-group --aws-account-id=111122223333 --namespace=default --group-name=Sales --description=\"Sales BI Dashboards\" </code> </p>"
+    },
+    "UpdateUser":{
+      "name":"UpdateUser",
+      "http":{
+        "method":"PUT",
+        "requestUri":"/accounts/{AwsAccountId}/namespaces/{Namespace}/users/{UserName}"
+      },
+      "input":{"shape":"UpdateUserRequest"},
+      "output":{"shape":"UpdateUserResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalFailureException"},
+        {"shape":"ResourceUnavailableException"}
+      ],
+      "documentation":"<p>Updates an Amazon QuickSight user.</p> <p>The permission resource is <code>arn:aws:quicksight:us-east-1:<i>&lt;aws-account-id&gt;</i>:user/default/<i>&lt;user-name&gt;</i> </code>. </p> <p>The response is a user object that contains the user's Amazon QuickSight user name, email address, active or inactive status in Amazon QuickSight, Amazon QuickSight role, and Amazon Resource Name (ARN). </p> <p> <b>CLI Sample:</b> </p> <p> <code>aws quicksight update-user --user-name=Pat --role=ADMIN --email=new_address@amazon.com --aws-account-id=111122223333 --namespace=default --region=us-east-1 </code> </p>"
+    }
+  },
+  "shapes":{
+    "AccessDeniedException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request id for this request.</p>"
+        }
+      },
+      "documentation":"<p>You don't have access to this. The provided credentials couldn't be validated. You might not be authorized to carry out the request. Ensure that your account is authorized to use the Amazon QuickSight service, that your policies have the correct permissions, and that you are using the correct access keys.</p>",
+      "error":{"httpStatusCode":401},
+      "exception":true
+    },
+    "Arn":{"type":"string"},
+    "AwsAccountId":{
+      "type":"string",
+      "max":12,
+      "min":12,
+      "pattern":"^[0-9]{12}$"
+    },
+    "Boolean":{"type":"boolean"},
+    "CreateGroupMembershipRequest":{
+      "type":"structure",
+      "required":[
+        "MemberName",
+        "GroupName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "MemberName":{
+          "shape":"GroupMemberName",
+          "documentation":"<p>The name of the user that you want to add to the group membership.</p>",
+          "location":"uri",
+          "locationName":"MemberName"
+        },
+        "GroupName":{
+          "shape":"GroupName",
+          "documentation":"<p>The name of the group that you want to add the user to.</p>",
+          "location":"uri",
+          "locationName":"GroupName"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the group is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "CreateGroupMembershipResponse":{
+      "type":"structure",
+      "members":{
+        "GroupMember":{
+          "shape":"GroupMember",
+          "documentation":"<p>The group member.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "CreateGroupRequest":{
+      "type":"structure",
+      "required":[
+        "GroupName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "GroupName":{
+          "shape":"GroupName",
+          "documentation":"<p>A name for the group that you want to create.</p>"
+        },
+        "Description":{
+          "shape":"GroupDescription",
+          "documentation":"<p>A description for the group that you want to create.</p>"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the group is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      },
+      "documentation":"<p>The request object for this operation. </p>"
+    },
+    "CreateGroupResponse":{
+      "type":"structure",
+      "members":{
+        "Group":{
+          "shape":"Group",
+          "documentation":"<p>The name of the group.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      },
+      "documentation":"<p>The response object for this operation.</p>"
+    },
+    "DeleteGroupMembershipRequest":{
+      "type":"structure",
+      "required":[
+        "MemberName",
+        "GroupName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "MemberName":{
+          "shape":"GroupMemberName",
+          "documentation":"<p>The name of the user that you want to delete from the group membership.</p>",
+          "location":"uri",
+          "locationName":"MemberName"
+        },
+        "GroupName":{
+          "shape":"GroupName",
+          "documentation":"<p>The name of the group that you want to delete the user from.</p>",
+          "location":"uri",
+          "locationName":"GroupName"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the group is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "DeleteGroupMembershipResponse":{
+      "type":"structure",
+      "members":{
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "DeleteGroupRequest":{
+      "type":"structure",
+      "required":[
+        "GroupName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "GroupName":{
+          "shape":"GroupName",
+          "documentation":"<p>The name of the group that you want to delete.</p>",
+          "location":"uri",
+          "locationName":"GroupName"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the group is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "DeleteGroupResponse":{
+      "type":"structure",
+      "members":{
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "DeleteUserByPrincipalIdRequest":{
+      "type":"structure",
+      "required":[
+        "PrincipalId",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "PrincipalId":{
+          "shape":"String",
+          "documentation":"<p>The principal ID of the user.</p>",
+          "location":"uri",
+          "locationName":"PrincipalId"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the user is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      },
+      "documentation":"<p/>"
+    },
+    "DeleteUserByPrincipalIdResponse":{
+      "type":"structure",
+      "members":{
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "DeleteUserRequest":{
+      "type":"structure",
+      "required":[
+        "UserName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The name of the user that you want to delete.</p>",
+          "location":"uri",
+          "locationName":"UserName"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the user is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "DeleteUserResponse":{
+      "type":"structure",
+      "members":{
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "DescribeGroupRequest":{
+      "type":"structure",
+      "required":[
+        "GroupName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "GroupName":{
+          "shape":"GroupName",
+          "documentation":"<p>The name of the group that you want to describe.</p>",
+          "location":"uri",
+          "locationName":"GroupName"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the group is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "DescribeGroupResponse":{
+      "type":"structure",
+      "members":{
+        "Group":{
+          "shape":"Group",
+          "documentation":"<p>The name of the group.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "DescribeUserRequest":{
+      "type":"structure",
+      "required":[
+        "UserName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The name of the user that you want to describe.</p>",
+          "location":"uri",
+          "locationName":"UserName"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the user is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "DescribeUserResponse":{
+      "type":"structure",
+      "members":{
+        "User":{
+          "shape":"User",
+          "documentation":"<p>The user name.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "DomainNotWhitelistedException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>The domain specified is not on the allowlist. All domains for embedded dashboards must be added to the approved list by an Amazon QuickSight admin.</p>",
+      "error":{"httpStatusCode":403},
+      "exception":true
+    },
+    "EmbeddingUrl":{
+      "type":"string",
+      "sensitive":true
+    },
+    "ExceptionResourceType":{
+      "type":"string",
+      "enum":[
+        "USER",
+        "GROUP",
+        "NAMESPACE",
+        "DATA_SOURCE",
+        "DATA_SET",
+        "VPC_CONNECTION",
+        "INGESTION"
+      ]
+    },
+    "GetDashboardEmbedUrlRequest":{
+      "type":"structure",
+      "required":[
+        "AwsAccountId",
+        "DashboardId",
+        "IdentityType"
+      ],
+      "members":{
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>AWS account ID that contains the dashboard you are embedding.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "DashboardId":{
+          "shape":"String",
+          "documentation":"<p>The ID for the dashboard, also added to IAM policy</p>",
+          "location":"uri",
+          "locationName":"DashboardId"
+        },
+        "IdentityType":{
+          "shape":"IdentityType",
+          "documentation":"<p>The authentication method the user uses to sign in (IAM only).</p>",
+          "location":"querystring",
+          "locationName":"creds-type"
+        },
+        "SessionLifetimeInMinutes":{
+          "shape":"SessionLifetimeInMinutes",
+          "documentation":"<p>How many minutes the session is valid. The session lifetime must be between 15 and 600 minutes.</p>",
+          "location":"querystring",
+          "locationName":"session-lifetime"
+        },
+        "UndoRedoDisabled":{
+          "shape":"boolean",
+          "documentation":"<p>Remove the undo/redo button on embedded dashboard. The default is FALSE, which enables the undo/redo button.</p>",
+          "location":"querystring",
+          "locationName":"undo-redo-disabled"
+        },
+        "ResetDisabled":{
+          "shape":"boolean",
+          "documentation":"<p>Remove the reset button on embedded dashboard. The default is FALSE, which allows the reset button.</p>",
+          "location":"querystring",
+          "locationName":"reset-disabled"
+        },
+        "UserArn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon QuickSight user's ARN, for use with <code>QUICKSIGHT</code> identity type. You can use this for any of the following:</p> <ul> <li> <p>Amazon QuickSight users in your account (readers, authors, or admins)</p> </li> <li> <p>AD users</p> </li> <li> <p>Invited non-federated users</p> </li> <li> <p>Federated IAM users</p> </li> <li> <p>Federated IAM role-based sessions</p> </li> </ul>",
+          "location":"querystring",
+          "locationName":"user-arn"
+        }
+      }
+    },
+    "GetDashboardEmbedUrlResponse":{
+      "type":"structure",
+      "members":{
+        "EmbedUrl":{
+          "shape":"EmbeddingUrl",
+          "documentation":"<p>URL that you can put into your server-side webpage to embed your dashboard. This URL is valid for 5 minutes, and the resulting session is valid for 10 hours. The API provides the URL with an auth_code that enables a single-signon session. </p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        }
+      }
+    },
+    "Group":{
+      "type":"structure",
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) for the group.</p>"
+        },
+        "GroupName":{
+          "shape":"GroupName",
+          "documentation":"<p>The name of the group.</p>"
+        },
+        "Description":{
+          "shape":"GroupDescription",
+          "documentation":"<p>The group description.</p>"
+        },
+        "PrincipalId":{
+          "shape":"String",
+          "documentation":"<p>The principal ID of the group.</p>"
+        }
+      },
+      "documentation":"<p>A <i>group</i> in Amazon QuickSight consists of a set of users. You can use groups to make it easier to manage access and security. Currently, an Amazon QuickSight subscription can't contain more than 500 Amazon QuickSight groups.</p>"
+    },
+    "GroupDescription":{
+      "type":"string",
+      "max":512,
+      "min":1
+    },
+    "GroupList":{
+      "type":"list",
+      "member":{"shape":"Group"}
+    },
+    "GroupMember":{
+      "type":"structure",
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) for the group member (user).</p>"
+        },
+        "MemberName":{
+          "shape":"GroupMemberName",
+          "documentation":"<p>The name of the group member (user).</p>"
+        }
+      },
+      "documentation":"<p>A member of an Amazon QuickSight group. Currently, group members must be users. Groups can't be members of another group. </p>"
+    },
+    "GroupMemberList":{
+      "type":"list",
+      "member":{"shape":"GroupMember"}
+    },
+    "GroupMemberName":{
+      "type":"string",
+      "max":256,
+      "min":1,
+      "pattern":"[\\u0020-\\u00FF]+"
+    },
+    "GroupName":{
+      "type":"string",
+      "min":1,
+      "pattern":"[\\u0020-\\u00FF]+"
+    },
+    "IdentityType":{
+      "type":"string",
+      "enum":[
+        "IAM",
+        "QUICKSIGHT"
+      ]
+    },
+    "IdentityTypeNotSupportedException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>The identity type specified is not supported. Supported identity types include IAM and QUICKSIGHT.</p>",
+      "error":{"httpStatusCode":403},
+      "exception":true
+    },
+    "InternalFailureException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>An internal failure occurred.</p>",
+      "error":{"httpStatusCode":500},
+      "exception":true,
+      "fault":true
+    },
+    "InvalidNextTokenException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>The <code>NextToken</code> value isn't valid.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "InvalidParameterValueException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>One or more parameters don't have a valid value.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "LimitExceededException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "ResourceType":{
+          "shape":"ExceptionResourceType",
+          "documentation":"<p>Limit exceeded.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>A limit is exceeded.</p>",
+      "error":{"httpStatusCode":409},
+      "exception":true
+    },
+    "ListGroupMembershipsRequest":{
+      "type":"structure",
+      "required":[
+        "GroupName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "GroupName":{
+          "shape":"GroupName",
+          "documentation":"<p>The name of the group that you want to see a membership list of.</p>",
+          "location":"uri",
+          "locationName":"GroupName"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>A pagination token that can be used in a subsequent request.</p>",
+          "location":"querystring",
+          "locationName":"next-token"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of results to return from this request.</p>",
+          "box":true,
+          "location":"querystring",
+          "locationName":"max-results"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the group is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "ListGroupMembershipsResponse":{
+      "type":"structure",
+      "members":{
+        "GroupMemberList":{
+          "shape":"GroupMemberList",
+          "documentation":"<p>The list of the members of the group.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>A pagination token that can be used in a subsequent request.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "ListGroupsRequest":{
+      "type":"structure",
+      "required":[
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the group is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>A pagination token that can be used in a subsequent request.</p>",
+          "location":"querystring",
+          "locationName":"next-token"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of results to return.</p>",
+          "box":true,
+          "location":"querystring",
+          "locationName":"max-results"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "ListGroupsResponse":{
+      "type":"structure",
+      "members":{
+        "GroupList":{
+          "shape":"GroupList",
+          "documentation":"<p>The list of the groups.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>A pagination token that can be used in a subsequent request.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "ListUserGroupsRequest":{
+      "type":"structure",
+      "required":[
+        "UserName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The Amazon QuickSight user name that you want to list group memberships for.</p>",
+          "location":"uri",
+          "locationName":"UserName"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The AWS Account ID that the user is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>A pagination token that can be used in a subsequent request.</p>",
+          "location":"querystring",
+          "locationName":"next-token"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of results to return from this request.</p>",
+          "box":true,
+          "location":"querystring",
+          "locationName":"max-results"
+        }
+      }
+    },
+    "ListUserGroupsResponse":{
+      "type":"structure",
+      "members":{
+        "GroupList":{
+          "shape":"GroupList",
+          "documentation":"<p>The list of groups the user is a member of.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>A pagination token that can be used in a subsequent request.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The HTTP status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "ListUsersRequest":{
+      "type":"structure",
+      "required":[
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the user is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>A pagination token that can be used in a subsequent request.</p>",
+          "location":"querystring",
+          "locationName":"next-token"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of results to return from this request.</p>",
+          "box":true,
+          "location":"querystring",
+          "locationName":"max-results"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "ListUsersResponse":{
+      "type":"structure",
+      "members":{
+        "UserList":{
+          "shape":"UserList",
+          "documentation":"<p>The list of users.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>A pagination token that can be used in a subsequent request.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "MaxResults":{
+      "type":"integer",
+      "max":100,
+      "min":1
+    },
+    "Namespace":{
+      "type":"string",
+      "pattern":"default"
+    },
+    "PreconditionNotMetException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>One or more preconditions aren't met.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "QuickSightUserNotFoundException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>The user is not found. This error can happen in any operation that requires finding a user based on a provided user name, such as <code>DeleteUser</code>, <code>DescribeUser</code>, and so on.</p>",
+      "error":{"httpStatusCode":404},
+      "exception":true
+    },
+    "RegisterUserRequest":{
+      "type":"structure",
+      "required":[
+        "IdentityType",
+        "Email",
+        "UserRole",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "IdentityType":{
+          "shape":"IdentityType",
+          "documentation":"<p>Amazon QuickSight supports several ways of managing the identity of users. This parameter accepts two values:</p> <ul> <li> <p> <code>IAM</code>: A user whose identity maps to an existing IAM user or role. </p> </li> <li> <p> <code>QUICKSIGHT</code>: A user whose identity is owned and managed internally by Amazon QuickSight. </p> </li> </ul>"
+        },
+        "Email":{
+          "shape":"String",
+          "documentation":"<p>The email address of the user that you want to register.</p>"
+        },
+        "UserRole":{
+          "shape":"UserRole",
+          "documentation":"<p>The Amazon QuickSight role of the user. The user role can be one of the following:</p> <ul> <li> <p> <code>READER</code>: A user who has read-only access to dashboards.</p> </li> <li> <p> <code>AUTHOR</code>: A user who can create data sources, data sets, analyses, and dashboards.</p> </li> <li> <p> <code>ADMIN</code>: A user who is an author, who can also manage Amazon QuickSight settings.</p> </li> </ul>"
+        },
+        "IamArn":{
+          "shape":"String",
+          "documentation":"<p>The ARN of the IAM user or role that you are registering with Amazon QuickSight. </p>"
+        },
+        "SessionName":{
+          "shape":"RoleSessionName",
+          "documentation":"<p>You need to use this parameter only when you register one or more users using an assumed IAM role. You don't need to provide the session name for other scenarios, for example when you are registering an IAM user or an Amazon QuickSight user. You can register multiple users using the same IAM role if each user has a different session name. For more information on assuming IAM roles, see <a href=\"https://docs.aws.amazon.com/cli/latest/reference/sts/assume-role.html\"> <code>assume-role</code> </a> in the <i>AWS CLI Reference.</i> </p>"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the user is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The Amazon QuickSight user name that you want to create for the user you are registering.</p>"
+        }
+      }
+    },
+    "RegisterUserResponse":{
+      "type":"structure",
+      "members":{
+        "User":{
+          "shape":"User",
+          "documentation":"<p>The user name.</p>"
+        },
+        "UserInvitationUrl":{
+          "shape":"String",
+          "documentation":"<p>The URL the user visits to complete registration and provide a password. This is returned only for users with an identity type of <code>QUICKSIGHT</code>.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "ResourceExistsException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "ResourceType":{
+          "shape":"ExceptionResourceType",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>The resource specified doesn't exist. </p>",
+      "error":{"httpStatusCode":409},
+      "exception":true
+    },
+    "ResourceNotFoundException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "ResourceType":{
+          "shape":"ExceptionResourceType",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>One or more resources can't be found.</p>",
+      "error":{"httpStatusCode":404},
+      "exception":true
+    },
+    "ResourceUnavailableException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "ResourceType":{
+          "shape":"ExceptionResourceType",
+          "documentation":"<p>The resource type for this request.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>This resource is currently unavailable.</p>",
+      "error":{"httpStatusCode":503},
+      "exception":true
+    },
+    "RoleSessionName":{
+      "type":"string",
+      "max":64,
+      "min":2,
+      "pattern":"[\\w+=.@-]*"
+    },
+    "SessionLifetimeInMinutes":{
+      "type":"long",
+      "max":600,
+      "min":15
+    },
+    "SessionLifetimeInMinutesInvalidException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>The number of minutes specified for the lifetime of a session is not valid. The session lifetime must be from 15 to 600 minutes.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "StatusCode":{"type":"integer"},
+    "String":{"type":"string"},
+    "ThrottlingException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>Access is throttled.</p>",
+      "error":{"httpStatusCode":429},
+      "exception":true
+    },
+    "UnsupportedUserEditionException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"},
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this request.</p>"
+        }
+      },
+      "documentation":"<p>This error indicates that you are calling an operation on an Amazon QuickSight subscription where the edition doesn't include support for that operation. Amazon QuickSight currently has Standard Edition and Enterprise Edition. Not every operation and capability is available in every edition.</p>",
+      "error":{"httpStatusCode":403},
+      "exception":true
+    },
+    "UpdateGroupRequest":{
+      "type":"structure",
+      "required":[
+        "GroupName",
+        "AwsAccountId",
+        "Namespace"
+      ],
+      "members":{
+        "GroupName":{
+          "shape":"GroupName",
+          "documentation":"<p>The name of the group that you want to update.</p>",
+          "location":"uri",
+          "locationName":"GroupName"
+        },
+        "Description":{
+          "shape":"GroupDescription",
+          "documentation":"<p>The description for the group that you want to update.</p>"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the group is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        }
+      }
+    },
+    "UpdateGroupResponse":{
+      "type":"structure",
+      "members":{
+        "Group":{
+          "shape":"Group",
+          "documentation":"<p>The name of the group.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "UpdateUserRequest":{
+      "type":"structure",
+      "required":[
+        "UserName",
+        "AwsAccountId",
+        "Namespace",
+        "Email",
+        "Role"
+      ],
+      "members":{
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The Amazon QuickSight user name that you want to update.</p>",
+          "location":"uri",
+          "locationName":"UserName"
+        },
+        "AwsAccountId":{
+          "shape":"AwsAccountId",
+          "documentation":"<p>The ID for the AWS account that the user is in. Currently, you use the ID for the AWS account that contains your Amazon QuickSight account.</p>",
+          "location":"uri",
+          "locationName":"AwsAccountId"
+        },
+        "Namespace":{
+          "shape":"Namespace",
+          "documentation":"<p>The namespace. Currently, you should set this to <code>default</code>.</p>",
+          "location":"uri",
+          "locationName":"Namespace"
+        },
+        "Email":{
+          "shape":"String",
+          "documentation":"<p>The email address of the user that you want to update.</p>"
+        },
+        "Role":{
+          "shape":"UserRole",
+          "documentation":"<p>The Amazon QuickSight role of the user. The user role can be one of the following:</p> <ul> <li> <p> <code>READER</code>: A user who has read-only access to dashboards.</p> </li> <li> <p> <code>AUTHOR</code>: A user who can create data sources, data sets, analyses, and dashboards.</p> </li> <li> <p> <code>ADMIN</code>: A user who is an author, who can also manage Amazon QuickSight settings.</p> </li> </ul>"
+        }
+      }
+    },
+    "UpdateUserResponse":{
+      "type":"structure",
+      "members":{
+        "User":{
+          "shape":"User",
+          "documentation":"<p>The Amazon QuickSight user.</p>"
+        },
+        "RequestId":{
+          "shape":"String",
+          "documentation":"<p>The AWS request ID for this operation.</p>"
+        },
+        "Status":{
+          "shape":"StatusCode",
+          "documentation":"<p>The http status of the request.</p>",
+          "location":"statusCode"
+        }
+      }
+    },
+    "User":{
+      "type":"structure",
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) for the user.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The user's user name.</p>"
+        },
+        "Email":{
+          "shape":"String",
+          "documentation":"<p>The user's email address.</p>"
+        },
+        "Role":{
+          "shape":"UserRole",
+          "documentation":"<p>The Amazon QuickSight role for the user.</p>"
+        },
+        "IdentityType":{
+          "shape":"IdentityType",
+          "documentation":"<p>The type of identity authentication used by the user.</p>"
+        },
+        "Active":{
+          "shape":"Boolean",
+          "documentation":"<p>Active status of user. When you create an Amazon QuickSight user that’s not an IAM user or an AD user, that user is inactive until they sign in and provide a password</p>"
+        },
+        "PrincipalId":{
+          "shape":"String",
+          "documentation":"<p>The principal ID of the user.</p>"
+        }
+      },
+      "documentation":"<p>A registered user of Amazon QuickSight. Currently, an Amazon QuickSight subscription can't contain more than 20 million users.</p>"
+    },
+    "UserList":{
+      "type":"list",
+      "member":{"shape":"User"}
+    },
+    "UserName":{
+      "type":"string",
+      "min":1,
+      "pattern":"[\\u0020-\\u00FF]+"
+    },
+    "UserRole":{
+      "type":"string",
+      "enum":[
+        "ADMIN",
+        "AUTHOR",
+        "READER",
+        "RESTRICTED_AUTHOR",
+        "RESTRICTED_READER"
+      ]
+    },
+    "boolean":{"type":"boolean"}
+  },
+  "documentation":"<fullname>Amazon QuickSight API Reference</fullname> <p>Amazon QuickSight is a fully managed, serverless, cloud business intelligence service that makes it easy to extend data and insights to every user in your organization. This API interface reference contains documentation for a programming interface that you can use to manage Amazon QuickSight. </p>"
+}

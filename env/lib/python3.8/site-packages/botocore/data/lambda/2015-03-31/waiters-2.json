@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "waiters": {
+    "FunctionExists": {
+      "delay": 1,
+      "operation": "GetFunction",
+      "maxAttempts": 20,
+      "acceptors": [
+        {
+          "state": "success",
+          "matcher": "status",
+          "expected": 200
+        },
+        {
+          "state": "retry",
+          "matcher": "error",
+          "expected": "ResourceNotFoundException"
+        }
+      ]
+    }
+  }
+}

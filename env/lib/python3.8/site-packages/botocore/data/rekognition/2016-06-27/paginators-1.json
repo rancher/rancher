@@ -1,0 +1,28 @@
+{
+  "pagination": {
+    "ListCollections": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": [
+        "CollectionIds",
+        "FaceModelVersions"
+      ]
+    },
+    "ListFaces": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Faces",
+      "non_aggregate_keys": [
+        "FaceModelVersion"
+      ]
+    },
+    "ListStreamProcessors": {
+      "result_key": "StreamProcessors",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "limit_key": "MaxResults"
+    }
+  }
+}

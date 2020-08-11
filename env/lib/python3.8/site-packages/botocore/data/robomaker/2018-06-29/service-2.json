@@ -1,0 +1,3429 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2018-06-29",
+    "endpointPrefix":"robomaker",
+    "jsonVersion":"1.1",
+    "protocol":"rest-json",
+    "serviceAbbreviation":"RoboMaker",
+    "serviceFullName":"AWS RoboMaker",
+    "serviceId":"RoboMaker",
+    "signatureVersion":"v4",
+    "signingName":"robomaker",
+    "uid":"robomaker-2018-06-29"
+  },
+  "operations":{
+    "BatchDescribeSimulationJob":{
+      "name":"BatchDescribeSimulationJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/batchDescribeSimulationJob"
+      },
+      "input":{"shape":"BatchDescribeSimulationJobRequest"},
+      "output":{"shape":"BatchDescribeSimulationJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Describes one or more simulation jobs.</p>"
+    },
+    "CancelDeploymentJob":{
+      "name":"CancelDeploymentJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/cancelDeploymentJob"
+      },
+      "input":{"shape":"CancelDeploymentJobRequest"},
+      "output":{"shape":"CancelDeploymentJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Cancels the specified deployment job.</p>"
+    },
+    "CancelSimulationJob":{
+      "name":"CancelSimulationJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/cancelSimulationJob"
+      },
+      "input":{"shape":"CancelSimulationJobRequest"},
+      "output":{"shape":"CancelSimulationJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Cancels the specified simulation job.</p>"
+    },
+    "CreateDeploymentJob":{
+      "name":"CreateDeploymentJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createDeploymentJob"
+      },
+      "input":{"shape":"CreateDeploymentJobRequest"},
+      "output":{"shape":"CreateDeploymentJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ConcurrentDeploymentException"},
+        {"shape":"IdempotentParameterMismatchException"}
+      ],
+      "documentation":"<p>Deploys a specific version of a robot application to robots in a fleet.</p> <p>The robot application must have a numbered <code>applicationVersion</code> for consistency reasons. To create a new version, use <code>CreateRobotApplicationVersion</code> or see <a href=\"https://docs.aws.amazon.com/robomaker/latest/dg/create-robot-application-version.html\">Creating a Robot Application Version</a>. </p> <note> <p>After 90 days, deployment jobs expire and will be deleted. They will no longer be accessible. </p> </note>"
+    },
+    "CreateFleet":{
+      "name":"CreateFleet",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createFleet"
+      },
+      "input":{"shape":"CreateFleetRequest"},
+      "output":{"shape":"CreateFleetResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Creates a fleet, a logical group of robots running the same robot application.</p>"
+    },
+    "CreateRobot":{
+      "name":"CreateRobot",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createRobot"
+      },
+      "input":{"shape":"CreateRobotRequest"},
+      "output":{"shape":"CreateRobotResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceAlreadyExistsException"}
+      ],
+      "documentation":"<p>Creates a robot.</p>"
+    },
+    "CreateRobotApplication":{
+      "name":"CreateRobotApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createRobotApplication"
+      },
+      "input":{"shape":"CreateRobotApplicationRequest"},
+      "output":{"shape":"CreateRobotApplicationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceAlreadyExistsException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"},
+        {"shape":"IdempotentParameterMismatchException"}
+      ],
+      "documentation":"<p>Creates a robot application. </p>"
+    },
+    "CreateRobotApplicationVersion":{
+      "name":"CreateRobotApplicationVersion",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createRobotApplicationVersion"
+      },
+      "input":{"shape":"CreateRobotApplicationVersionRequest"},
+      "output":{"shape":"CreateRobotApplicationVersionResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"IdempotentParameterMismatchException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Creates a version of a robot application.</p>"
+    },
+    "CreateSimulationApplication":{
+      "name":"CreateSimulationApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createSimulationApplication"
+      },
+      "input":{"shape":"CreateSimulationApplicationRequest"},
+      "output":{"shape":"CreateSimulationApplicationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceAlreadyExistsException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"},
+        {"shape":"IdempotentParameterMismatchException"}
+      ],
+      "documentation":"<p>Creates a simulation application.</p>"
+    },
+    "CreateSimulationApplicationVersion":{
+      "name":"CreateSimulationApplicationVersion",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createSimulationApplicationVersion"
+      },
+      "input":{"shape":"CreateSimulationApplicationVersionRequest"},
+      "output":{"shape":"CreateSimulationApplicationVersionResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"IdempotentParameterMismatchException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Creates a simulation application with a specific revision id.</p>"
+    },
+    "CreateSimulationJob":{
+      "name":"CreateSimulationJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createSimulationJob"
+      },
+      "input":{"shape":"CreateSimulationJobRequest"},
+      "output":{"shape":"CreateSimulationJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"IdempotentParameterMismatchException"},
+        {"shape":"ServiceUnavailableException"}
+      ],
+      "documentation":"<p>Creates a simulation job.</p> <note> <p>After 90 days, simulation jobs expire and will be deleted. They will no longer be accessible. </p> </note>"
+    },
+    "DeleteFleet":{
+      "name":"DeleteFleet",
+      "http":{
+        "method":"POST",
+        "requestUri":"/deleteFleet"
+      },
+      "input":{"shape":"DeleteFleetRequest"},
+      "output":{"shape":"DeleteFleetResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Deletes a fleet.</p>"
+    },
+    "DeleteRobot":{
+      "name":"DeleteRobot",
+      "http":{
+        "method":"POST",
+        "requestUri":"/deleteRobot"
+      },
+      "input":{"shape":"DeleteRobotRequest"},
+      "output":{"shape":"DeleteRobotResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Deletes a robot.</p>"
+    },
+    "DeleteRobotApplication":{
+      "name":"DeleteRobotApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/deleteRobotApplication"
+      },
+      "input":{"shape":"DeleteRobotApplicationRequest"},
+      "output":{"shape":"DeleteRobotApplicationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Deletes a robot application.</p>"
+    },
+    "DeleteSimulationApplication":{
+      "name":"DeleteSimulationApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/deleteSimulationApplication"
+      },
+      "input":{"shape":"DeleteSimulationApplicationRequest"},
+      "output":{"shape":"DeleteSimulationApplicationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Deletes a simulation application.</p>"
+    },
+    "DeregisterRobot":{
+      "name":"DeregisterRobot",
+      "http":{
+        "method":"POST",
+        "requestUri":"/deregisterRobot"
+      },
+      "input":{"shape":"DeregisterRobotRequest"},
+      "output":{"shape":"DeregisterRobotResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Deregisters a robot.</p>"
+    },
+    "DescribeDeploymentJob":{
+      "name":"DescribeDeploymentJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeDeploymentJob"
+      },
+      "input":{"shape":"DescribeDeploymentJobRequest"},
+      "output":{"shape":"DescribeDeploymentJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Describes a deployment job.</p>"
+    },
+    "DescribeFleet":{
+      "name":"DescribeFleet",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeFleet"
+      },
+      "input":{"shape":"DescribeFleetRequest"},
+      "output":{"shape":"DescribeFleetResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Describes a fleet.</p>"
+    },
+    "DescribeRobot":{
+      "name":"DescribeRobot",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeRobot"
+      },
+      "input":{"shape":"DescribeRobotRequest"},
+      "output":{"shape":"DescribeRobotResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Describes a robot.</p>"
+    },
+    "DescribeRobotApplication":{
+      "name":"DescribeRobotApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeRobotApplication"
+      },
+      "input":{"shape":"DescribeRobotApplicationRequest"},
+      "output":{"shape":"DescribeRobotApplicationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Describes a robot application.</p>"
+    },
+    "DescribeSimulationApplication":{
+      "name":"DescribeSimulationApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeSimulationApplication"
+      },
+      "input":{"shape":"DescribeSimulationApplicationRequest"},
+      "output":{"shape":"DescribeSimulationApplicationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Describes a simulation application.</p>"
+    },
+    "DescribeSimulationJob":{
+      "name":"DescribeSimulationJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeSimulationJob"
+      },
+      "input":{"shape":"DescribeSimulationJobRequest"},
+      "output":{"shape":"DescribeSimulationJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Describes a simulation job.</p>"
+    },
+    "ListDeploymentJobs":{
+      "name":"ListDeploymentJobs",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listDeploymentJobs"
+      },
+      "input":{"shape":"ListDeploymentJobsRequest"},
+      "output":{"shape":"ListDeploymentJobsResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Returns a list of deployment jobs for a fleet. You can optionally provide filters to retrieve specific deployment jobs. </p> <note> <p> </p> </note>"
+    },
+    "ListFleets":{
+      "name":"ListFleets",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listFleets"
+      },
+      "input":{"shape":"ListFleetsRequest"},
+      "output":{"shape":"ListFleetsResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Returns a list of fleets. You can optionally provide filters to retrieve specific fleets. </p>"
+    },
+    "ListRobotApplications":{
+      "name":"ListRobotApplications",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listRobotApplications"
+      },
+      "input":{"shape":"ListRobotApplicationsRequest"},
+      "output":{"shape":"ListRobotApplicationsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Returns a list of robot application. You can optionally provide filters to retrieve specific robot applications.</p>"
+    },
+    "ListRobots":{
+      "name":"ListRobots",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listRobots"
+      },
+      "input":{"shape":"ListRobotsRequest"},
+      "output":{"shape":"ListRobotsResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Returns a list of robots. You can optionally provide filters to retrieve specific robots.</p>"
+    },
+    "ListSimulationApplications":{
+      "name":"ListSimulationApplications",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listSimulationApplications"
+      },
+      "input":{"shape":"ListSimulationApplicationsRequest"},
+      "output":{"shape":"ListSimulationApplicationsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Returns a list of simulation applications. You can optionally provide filters to retrieve specific simulation applications. </p>"
+    },
+    "ListSimulationJobs":{
+      "name":"ListSimulationJobs",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listSimulationJobs"
+      },
+      "input":{"shape":"ListSimulationJobsRequest"},
+      "output":{"shape":"ListSimulationJobsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Returns a list of simulation jobs. You can optionally provide filters to retrieve specific simulation jobs. </p>"
+    },
+    "ListTagsForResource":{
+      "name":"ListTagsForResource",
+      "http":{
+        "method":"GET",
+        "requestUri":"/tags/{resourceArn}"
+      },
+      "input":{"shape":"ListTagsForResourceRequest"},
+      "output":{"shape":"ListTagsForResourceResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Lists all tags on a AWS RoboMaker resource.</p>"
+    },
+    "RegisterRobot":{
+      "name":"RegisterRobot",
+      "http":{
+        "method":"POST",
+        "requestUri":"/registerRobot"
+      },
+      "input":{"shape":"RegisterRobotRequest"},
+      "output":{"shape":"RegisterRobotResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Registers a robot with a fleet.</p>"
+    },
+    "RestartSimulationJob":{
+      "name":"RestartSimulationJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/restartSimulationJob"
+      },
+      "input":{"shape":"RestartSimulationJobRequest"},
+      "output":{"shape":"RestartSimulationJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Restarts a running simulation job.</p>"
+    },
+    "SyncDeploymentJob":{
+      "name":"SyncDeploymentJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/syncDeploymentJob"
+      },
+      "input":{"shape":"SyncDeploymentJobRequest"},
+      "output":{"shape":"SyncDeploymentJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ConcurrentDeploymentException"},
+        {"shape":"IdempotentParameterMismatchException"}
+      ],
+      "documentation":"<p>Syncrhonizes robots in a fleet to the latest deployment. This is helpful if robots were added after a deployment.</p>"
+    },
+    "TagResource":{
+      "name":"TagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/tags/{resourceArn}"
+      },
+      "input":{"shape":"TagResourceRequest"},
+      "output":{"shape":"TagResourceResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Adds or edits tags for a AWS RoboMaker resource.</p> <p>Each tag consists of a tag key and a tag value. Tag keys and tag values are both required, but tag values can be empty strings. </p> <p>For information about the rules that apply to tag keys and tag values, see <a href=\"https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/allocation-tag-restrictions.html\">User-Defined Tag Restrictions</a> in the <i>AWS Billing and Cost Management User Guide</i>. </p>"
+    },
+    "UntagResource":{
+      "name":"UntagResource",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/tags/{resourceArn}"
+      },
+      "input":{"shape":"UntagResourceRequest"},
+      "output":{"shape":"UntagResourceResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Removes the specified tags from the specified AWS RoboMaker resource.</p> <p>To remove a tag, specify the tag key. To change the tag value of an existing tag key, use <a href=\"https://docs.aws.amazon.com/robomaker/latest/dg/API_TagResource.html\"> <code>TagResource</code> </a>. </p>"
+    },
+    "UpdateRobotApplication":{
+      "name":"UpdateRobotApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/updateRobotApplication"
+      },
+      "input":{"shape":"UpdateRobotApplicationRequest"},
+      "output":{"shape":"UpdateRobotApplicationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Updates a robot application.</p>"
+    },
+    "UpdateSimulationApplication":{
+      "name":"UpdateSimulationApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/updateSimulationApplication"
+      },
+      "input":{"shape":"UpdateSimulationApplicationRequest"},
+      "output":{"shape":"UpdateSimulationApplicationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Updates a simulation application.</p>"
+    }
+  },
+  "shapes":{
+    "Architecture":{
+      "type":"string",
+      "enum":[
+        "X86_64",
+        "ARM64",
+        "ARMHF"
+      ]
+    },
+    "Arn":{
+      "type":"string",
+      "max":1224,
+      "min":1,
+      "pattern":"arn:.*"
+    },
+    "Arns":{
+      "type":"list",
+      "member":{"shape":"Arn"},
+      "max":100,
+      "min":1
+    },
+    "BatchDescribeSimulationJobRequest":{
+      "type":"structure",
+      "required":["jobs"],
+      "members":{
+        "jobs":{
+          "shape":"Arns",
+          "documentation":"<p>A list of Amazon Resource Names (ARNs) of simulation jobs to describe.</p>"
+        }
+      }
+    },
+    "BatchDescribeSimulationJobResponse":{
+      "type":"structure",
+      "members":{
+        "jobs":{
+          "shape":"SimulationJobs",
+          "documentation":"<p>A list of simulation jobs.</p>"
+        },
+        "unprocessedJobs":{
+          "shape":"Arns",
+          "documentation":"<p>A list of unprocessed simulation job Amazon Resource Names (ARNs).</p>"
+        }
+      }
+    },
+    "Boolean":{"type":"boolean"},
+    "BoxedBoolean":{"type":"boolean"},
+    "CancelDeploymentJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{
+          "shape":"Arn",
+          "documentation":"<p>The deployment job ARN to cancel.</p>"
+        }
+      }
+    },
+    "CancelDeploymentJobResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "CancelSimulationJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{
+          "shape":"Arn",
+          "documentation":"<p>The simulation job ARN to cancel.</p>"
+        }
+      }
+    },
+    "CancelSimulationJobResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "ClientRequestToken":{
+      "type":"string",
+      "max":64,
+      "min":1,
+      "pattern":"[a-zA-Z0-9_\\-=]*"
+    },
+    "Command":{
+      "type":"string",
+      "max":1024,
+      "min":1,
+      "pattern":"[a-zA-Z0-9_.\\-]*"
+    },
+    "ConcurrentDeploymentException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>The failure percentage threshold percentage was met.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "CreateDeploymentJobRequest":{
+      "type":"structure",
+      "required":[
+        "clientRequestToken",
+        "fleet",
+        "deploymentApplicationConfigs"
+      ],
+      "members":{
+        "deploymentConfig":{
+          "shape":"DeploymentConfig",
+          "documentation":"<p>The requested deployment configuration.</p>"
+        },
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "documentation":"<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+          "idempotencyToken":true
+        },
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet to deploy.</p>"
+        },
+        "deploymentApplicationConfigs":{
+          "shape":"DeploymentApplicationConfigs",
+          "documentation":"<p>The deployment application configuration.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>A map that contains tag keys and tag values that are attached to the deployment job.</p>"
+        }
+      }
+    },
+    "CreateDeploymentJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the deployment job.</p>"
+        },
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The target fleet for the deployment job.</p>"
+        },
+        "status":{
+          "shape":"DeploymentStatus",
+          "documentation":"<p>The status of the deployment job.</p>"
+        },
+        "deploymentApplicationConfigs":{
+          "shape":"DeploymentApplicationConfigs",
+          "documentation":"<p>The deployment application configuration.</p>"
+        },
+        "failureReason":{
+          "shape":"GenericString",
+          "documentation":"<p>The failure reason of the deployment job if it failed.</p>"
+        },
+        "failureCode":{
+          "shape":"DeploymentJobErrorCode",
+          "documentation":"<p>The failure code of the simulation job if it failed:</p> <dl> <dt>BadPermissionError</dt> <dd> <p>AWS Greengrass requires a service-level role permission to access other services. The role must include the <a href=\"https://console.aws.amazon.com/iam/home?#/policies/arn:aws:iam::aws:policy/service-role/AWSGreengrassResourceAccessRolePolicy$jsonEditor\"> <code>AWSGreengrassResourceAccessRolePolicy</code> managed policy</a>. </p> </dd> <dt>ExtractingBundleFailure</dt> <dd> <p>The robot application could not be extracted from the bundle.</p> </dd> <dt>FailureThresholdBreached</dt> <dd> <p>The percentage of robots that could not be updated exceeded the percentage set for the deployment.</p> </dd> <dt>GreengrassDeploymentFailed</dt> <dd> <p>The robot application could not be deployed to the robot.</p> </dd> <dt>GreengrassGroupVersionDoesNotExist</dt> <dd> <p>The AWS Greengrass group or version associated with a robot is missing.</p> </dd> <dt>InternalServerError</dt> <dd> <p>An internal error has occurred. Retry your request, but if the problem persists, contact us with details.</p> </dd> <dt>MissingRobotApplicationArchitecture</dt> <dd> <p>The robot application does not have a source that matches the architecture of the robot.</p> </dd> <dt>MissingRobotDeploymentResource</dt> <dd> <p>One or more of the resources specified for the robot application are missing. For example, does the robot application have the correct launch package and launch file?</p> </dd> <dt>PostLaunchFileFailure</dt> <dd> <p>The post-launch script failed.</p> </dd> <dt>PreLaunchFileFailure</dt> <dd> <p>The pre-launch script failed.</p> </dd> <dt>ResourceNotFound</dt> <dd> <p>One or more deployment resources are missing. For example, do robot application source bundles still exist? </p> </dd> <dt>RobotDeploymentNoResponse</dt> <dd> <p>There is no response from the robot. It might not be powered on or connected to the internet.</p> </dd> </dl>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the fleet was created.</p>"
+        },
+        "deploymentConfig":{
+          "shape":"DeploymentConfig",
+          "documentation":"<p>The deployment configuration.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the deployment job.</p>"
+        }
+      }
+    },
+    "CreateFleetRequest":{
+      "type":"structure",
+      "required":["name"],
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the fleet.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>A map that contains tag keys and tag values that are attached to the fleet.</p>"
+        }
+      }
+    },
+    "CreateFleetResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the fleet.</p>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the fleet was created.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the fleet.</p>"
+        }
+      }
+    },
+    "CreateRobotApplicationRequest":{
+      "type":"structure",
+      "required":[
+        "name",
+        "sources",
+        "robotSoftwareSuite"
+      ],
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot application.</p>"
+        },
+        "sources":{
+          "shape":"SourceConfigs",
+          "documentation":"<p>The sources of the robot application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>The robot software suite used by the robot application.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>A map that contains tag keys and tag values that are attached to the robot application.</p>"
+        }
+      }
+    },
+    "CreateRobotApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot application.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application.</p>"
+        },
+        "sources":{
+          "shape":"Sources",
+          "documentation":"<p>The sources of the robot application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>The robot software suite used by the robot application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>"
+        },
+        "revisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id of the robot application.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the robot application.</p>"
+        }
+      }
+    },
+    "CreateRobotApplicationVersionRequest":{
+      "type":"structure",
+      "required":["application"],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The application information for the robot application.</p>"
+        },
+        "currentRevisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The current revision id for the robot application. If you provide a value and it matches the latest revision ID, a new version will be created.</p>"
+        }
+      }
+    },
+    "CreateRobotApplicationVersionResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot application.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application.</p>"
+        },
+        "sources":{
+          "shape":"Sources",
+          "documentation":"<p>The sources of the robot application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>The robot software suite used by the robot application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>"
+        },
+        "revisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id of the robot application.</p>"
+        }
+      }
+    },
+    "CreateRobotRequest":{
+      "type":"structure",
+      "required":[
+        "name",
+        "architecture",
+        "greengrassGroupId"
+      ],
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name for the robot.</p>"
+        },
+        "architecture":{
+          "shape":"Architecture",
+          "documentation":"<p>The target architecture of the robot.</p>"
+        },
+        "greengrassGroupId":{
+          "shape":"Id",
+          "documentation":"<p>The Greengrass group id.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>A map that contains tag keys and tag values that are attached to the robot.</p>"
+        }
+      }
+    },
+    "CreateRobotResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot.</p>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the robot was created.</p>"
+        },
+        "greengrassGroupId":{
+          "shape":"Id",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the Greengrass group associated with the robot.</p>"
+        },
+        "architecture":{
+          "shape":"Architecture",
+          "documentation":"<p>The target architecture of the robot.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the robot.</p>"
+        }
+      }
+    },
+    "CreateSimulationApplicationRequest":{
+      "type":"structure",
+      "required":[
+        "name",
+        "sources",
+        "simulationSoftwareSuite",
+        "robotSoftwareSuite"
+      ],
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation application.</p>"
+        },
+        "sources":{
+          "shape":"SourceConfigs",
+          "documentation":"<p>The sources of the simulation application.</p>"
+        },
+        "simulationSoftwareSuite":{
+          "shape":"SimulationSoftwareSuite",
+          "documentation":"<p>The simulation software suite used by the simulation application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>The robot software suite of the simulation application.</p>"
+        },
+        "renderingEngine":{
+          "shape":"RenderingEngine",
+          "documentation":"<p>The rendering engine for the simulation application.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>A map that contains tag keys and tag values that are attached to the simulation application.</p>"
+        }
+      }
+    },
+    "CreateSimulationApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation application.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the simulation application.</p>"
+        },
+        "sources":{
+          "shape":"Sources",
+          "documentation":"<p>The sources of the simulation application.</p>"
+        },
+        "simulationSoftwareSuite":{
+          "shape":"SimulationSoftwareSuite",
+          "documentation":"<p>The simulation software suite used by the simulation application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>Information about the robot software suite.</p>"
+        },
+        "renderingEngine":{
+          "shape":"RenderingEngine",
+          "documentation":"<p>The rendering engine for the simulation application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>"
+        },
+        "revisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id of the simulation application.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the simulation application.</p>"
+        }
+      }
+    },
+    "CreateSimulationApplicationVersionRequest":{
+      "type":"structure",
+      "required":["application"],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The application information for the simulation application.</p>"
+        },
+        "currentRevisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The current revision id for the simulation application. If you provide a value and it matches the latest revision ID, a new version will be created.</p>"
+        }
+      }
+    },
+    "CreateSimulationApplicationVersionResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation application.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the simulation application.</p>"
+        },
+        "sources":{
+          "shape":"Sources",
+          "documentation":"<p>The sources of the simulation application.</p>"
+        },
+        "simulationSoftwareSuite":{
+          "shape":"SimulationSoftwareSuite",
+          "documentation":"<p>The simulation software suite used by the simulation application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>Information about the robot software suite.</p>"
+        },
+        "renderingEngine":{
+          "shape":"RenderingEngine",
+          "documentation":"<p>The rendering engine for the simulation application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>"
+        },
+        "revisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision ID of the simulation application.</p>"
+        }
+      }
+    },
+    "CreateSimulationJobRequest":{
+      "type":"structure",
+      "required":[
+        "maxJobDurationInSeconds",
+        "iamRole"
+      ],
+      "members":{
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "documentation":"<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+          "idempotencyToken":true
+        },
+        "outputLocation":{
+          "shape":"OutputLocation",
+          "documentation":"<p>Location for output files generated by the simulation job.</p>"
+        },
+        "loggingConfig":{
+          "shape":"LoggingConfig",
+          "documentation":"<p>The logging configuration.</p>"
+        },
+        "maxJobDurationInSeconds":{
+          "shape":"JobDuration",
+          "documentation":"<p>The maximum simulation job duration in seconds (up to 14 days or 1,209,600 seconds. When <code>maxJobDurationInSeconds</code> is reached, the simulation job will status will transition to <code>Completed</code>.</p>"
+        },
+        "iamRole":{
+          "shape":"IamRole",
+          "documentation":"<p>The IAM role name that allows the simulation instance to call the AWS APIs that are specified in its associated policies on your behalf. This is how credentials are passed in to your simulation job. </p>"
+        },
+        "failureBehavior":{
+          "shape":"FailureBehavior",
+          "documentation":"<p>The failure behavior the simulation job.</p> <dl> <dt>Continue</dt> <dd> <p>Restart the simulation job in the same host instance.</p> </dd> <dt>Fail</dt> <dd> <p>Stop the simulation job and terminate the instance.</p> </dd> </dl>"
+        },
+        "robotApplications":{
+          "shape":"RobotApplicationConfigs",
+          "documentation":"<p>The robot application to use in the simulation job.</p>"
+        },
+        "simulationApplications":{
+          "shape":"SimulationApplicationConfigs",
+          "documentation":"<p>The simulation application to use in the simulation job.</p>"
+        },
+        "dataSources":{
+          "shape":"DataSourceConfigs",
+          "documentation":"<p>The data sources for the simulation job.</p> <note> <p>There is a limit of 100 files and a combined size of 25GB for all <code>DataSourceConfig</code> objects. </p> </note>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>A map that contains tag keys and tag values that are attached to the simulation job.</p>"
+        },
+        "vpcConfig":{
+          "shape":"VPCConfig",
+          "documentation":"<p>If your simulation job accesses resources in a VPC, you provide this parameter identifying the list of security group IDs and subnet IDs. These must belong to the same VPC. You must provide at least one security group and one subnet ID. </p>"
+        }
+      }
+    },
+    "CreateSimulationJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation job.</p>"
+        },
+        "status":{
+          "shape":"SimulationJobStatus",
+          "documentation":"<p>The status of the simulation job.</p>"
+        },
+        "lastStartedAt":{
+          "shape":"LastStartedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation job was last started.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation job was last updated.</p>"
+        },
+        "failureBehavior":{
+          "shape":"FailureBehavior",
+          "documentation":"<p>the failure behavior for the simulation job.</p>"
+        },
+        "failureCode":{
+          "shape":"SimulationJobErrorCode",
+          "documentation":"<p>The failure code of the simulation job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>RobotApplicationCrash</dt> <dd> <p>Robot application exited abnormally.</p> </dd> <dt>SimulationApplicationCrash</dt> <dd> <p> Simulation application exited abnormally.</p> </dd> <dt>BadPermissionsRobotApplication</dt> <dd> <p>Robot application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsSimulationApplication</dt> <dd> <p>Simulation application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsS3Output</dt> <dd> <p>Unable to publish outputs to customer-provided S3 bucket.</p> </dd> <dt>BadPermissionsCloudwatchLogs</dt> <dd> <p>Unable to publish logs to customer-provided CloudWatch Logs resource.</p> </dd> <dt>SubnetIpLimitExceeded</dt> <dd> <p>Subnet IP limit exceeded.</p> </dd> <dt>ENILimitExceeded</dt> <dd> <p>ENI limit exceeded.</p> </dd> <dt>BadPermissionsUserCredentials</dt> <dd> <p>Unable to use the Role provided.</p> </dd> <dt>InvalidBundleRobotApplication</dt> <dd> <p>Robot bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>InvalidBundleSimulationApplication</dt> <dd> <p>Simulation bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>RobotApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for RobotApplication does not match value during version creation.</p> </dd> <dt>SimulationApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for SimulationApplication does not match value during version creation.</p> </dd> </dl>"
+        },
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "documentation":"<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>"
+        },
+        "outputLocation":{
+          "shape":"OutputLocation",
+          "documentation":"<p>Simulation job output files location.</p>"
+        },
+        "loggingConfig":{
+          "shape":"LoggingConfig",
+          "documentation":"<p>The logging configuration.</p>"
+        },
+        "maxJobDurationInSeconds":{
+          "shape":"JobDuration",
+          "documentation":"<p>The maximum simulation job duration in seconds. </p>"
+        },
+        "simulationTimeMillis":{
+          "shape":"SimulationTimeMillis",
+          "documentation":"<p>The simulation job execution duration in milliseconds.</p>"
+        },
+        "iamRole":{
+          "shape":"IamRole",
+          "documentation":"<p>The IAM role that allows the simulation job to call the AWS APIs that are specified in its associated policies on your behalf.</p>"
+        },
+        "robotApplications":{
+          "shape":"RobotApplicationConfigs",
+          "documentation":"<p>The robot application used by the simulation job.</p>"
+        },
+        "simulationApplications":{
+          "shape":"SimulationApplicationConfigs",
+          "documentation":"<p>The simulation application used by the simulation job.</p>"
+        },
+        "dataSources":{
+          "shape":"DataSources",
+          "documentation":"<p>The data sources for the simulation job.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the simulation job.</p>"
+        },
+        "vpcConfig":{
+          "shape":"VPCConfigResponse",
+          "documentation":"<p>Information about the vpc configuration.</p>"
+        }
+      }
+    },
+    "CreatedAt":{"type":"timestamp"},
+    "DataSource":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the data source.</p>"
+        },
+        "s3Bucket":{
+          "shape":"S3Bucket",
+          "documentation":"<p>The S3 bucket where the data files are located.</p>"
+        },
+        "s3Keys":{
+          "shape":"S3KeyOutputs",
+          "documentation":"<p>The list of S3 keys identifying the data source files.</p>"
+        }
+      },
+      "documentation":"<p>Information about a data source.</p>"
+    },
+    "DataSourceConfig":{
+      "type":"structure",
+      "required":[
+        "name",
+        "s3Bucket",
+        "s3Keys"
+      ],
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the data source.</p>"
+        },
+        "s3Bucket":{
+          "shape":"S3Bucket",
+          "documentation":"<p>The S3 bucket where the data files are located.</p>"
+        },
+        "s3Keys":{
+          "shape":"S3Keys",
+          "documentation":"<p>The list of S3 keys identifying the data source files.</p>"
+        }
+      },
+      "documentation":"<p>Information about a data source.</p>"
+    },
+    "DataSourceConfigs":{
+      "type":"list",
+      "member":{"shape":"DataSourceConfig"},
+      "max":5,
+      "min":1
+    },
+    "DataSourceNames":{
+      "type":"list",
+      "member":{"shape":"Name"}
+    },
+    "DataSources":{
+      "type":"list",
+      "member":{"shape":"DataSource"}
+    },
+    "DeleteFleetRequest":{
+      "type":"structure",
+      "required":["fleet"],
+      "members":{
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        }
+      }
+    },
+    "DeleteFleetResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeleteRobotApplicationRequest":{
+      "type":"structure",
+      "required":["application"],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the the robot application.</p>"
+        },
+        "applicationVersion":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application to delete.</p>"
+        }
+      }
+    },
+    "DeleteRobotApplicationResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeleteRobotRequest":{
+      "type":"structure",
+      "required":["robot"],
+      "members":{
+        "robot":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot.</p>"
+        }
+      }
+    },
+    "DeleteRobotResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeleteSimulationApplicationRequest":{
+      "type":"structure",
+      "required":["application"],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The application information for the simulation application to delete.</p>"
+        },
+        "applicationVersion":{
+          "shape":"Version",
+          "documentation":"<p>The version of the simulation application to delete.</p>"
+        }
+      }
+    },
+    "DeleteSimulationApplicationResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeploymentApplicationConfig":{
+      "type":"structure",
+      "required":[
+        "application",
+        "applicationVersion",
+        "launchConfig"
+      ],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot application.</p>"
+        },
+        "applicationVersion":{
+          "shape":"DeploymentVersion",
+          "documentation":"<p>The version of the application.</p>"
+        },
+        "launchConfig":{
+          "shape":"DeploymentLaunchConfig",
+          "documentation":"<p>The launch configuration.</p>"
+        }
+      },
+      "documentation":"<p>Information about a deployment application configuration.</p>"
+    },
+    "DeploymentApplicationConfigs":{
+      "type":"list",
+      "member":{"shape":"DeploymentApplicationConfig"},
+      "max":1,
+      "min":1
+    },
+    "DeploymentConfig":{
+      "type":"structure",
+      "members":{
+        "concurrentDeploymentPercentage":{
+          "shape":"Percentage",
+          "documentation":"<p>The percentage of robots receiving the deployment at the same time.</p>"
+        },
+        "failureThresholdPercentage":{
+          "shape":"Percentage",
+          "documentation":"<p>The percentage of deployments that need to fail before stopping deployment.</p>"
+        },
+        "robotDeploymentTimeoutInSeconds":{
+          "shape":"DeploymentTimeout",
+          "documentation":"<p>The amount of time, in seconds, to wait for deployment to a single robot to complete. Choose a time between 1 minute and 7 days. The default is 5 hours.</p>"
+        }
+      },
+      "documentation":"<p>Information about a deployment configuration.</p>"
+    },
+    "DeploymentJob":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the deployment job.</p>"
+        },
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "status":{
+          "shape":"DeploymentStatus",
+          "documentation":"<p>The status of the deployment job.</p>"
+        },
+        "deploymentApplicationConfigs":{
+          "shape":"DeploymentApplicationConfigs",
+          "documentation":"<p>The deployment application configuration.</p>"
+        },
+        "deploymentConfig":{
+          "shape":"DeploymentConfig",
+          "documentation":"<p>The deployment configuration.</p>"
+        },
+        "failureReason":{
+          "shape":"GenericString",
+          "documentation":"<p>A short description of the reason why the deployment job failed.</p>"
+        },
+        "failureCode":{
+          "shape":"DeploymentJobErrorCode",
+          "documentation":"<p>The deployment job failure code.</p>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the deployment job was created.</p>"
+        }
+      },
+      "documentation":"<p>Information about a deployment job.</p>"
+    },
+    "DeploymentJobErrorCode":{
+      "type":"string",
+      "enum":[
+        "ResourceNotFound",
+        "EnvironmentSetupError",
+        "EtagMismatch",
+        "FailureThresholdBreached",
+        "RobotDeploymentAborted",
+        "RobotDeploymentNoResponse",
+        "RobotAgentConnectionTimeout",
+        "GreengrassDeploymentFailed",
+        "MissingRobotArchitecture",
+        "MissingRobotApplicationArchitecture",
+        "MissingRobotDeploymentResource",
+        "GreengrassGroupVersionDoesNotExist",
+        "ExtractingBundleFailure",
+        "PreLaunchFileFailure",
+        "PostLaunchFileFailure",
+        "BadPermissionError",
+        "InternalServerError"
+      ]
+    },
+    "DeploymentJobs":{
+      "type":"list",
+      "member":{"shape":"DeploymentJob"},
+      "max":200,
+      "min":0
+    },
+    "DeploymentLaunchConfig":{
+      "type":"structure",
+      "required":[
+        "packageName",
+        "launchFile"
+      ],
+      "members":{
+        "packageName":{
+          "shape":"Command",
+          "documentation":"<p>The package name.</p>"
+        },
+        "preLaunchFile":{
+          "shape":"Path",
+          "documentation":"<p>The deployment pre-launch file. This file will be executed prior to the launch file.</p>"
+        },
+        "launchFile":{
+          "shape":"Command",
+          "documentation":"<p>The launch file name.</p>"
+        },
+        "postLaunchFile":{
+          "shape":"Path",
+          "documentation":"<p>The deployment post-launch file. This file will be executed after the launch file.</p>"
+        },
+        "environmentVariables":{
+          "shape":"EnvironmentVariableMap",
+          "documentation":"<p>An array of key/value pairs specifying environment variables for the robot application</p>"
+        }
+      },
+      "documentation":"<p>Configuration information for a deployment launch.</p>"
+    },
+    "DeploymentStatus":{
+      "type":"string",
+      "enum":[
+        "Pending",
+        "Preparing",
+        "InProgress",
+        "Failed",
+        "Succeeded",
+        "Canceled"
+      ]
+    },
+    "DeploymentTimeout":{"type":"long"},
+    "DeploymentVersion":{
+      "type":"string",
+      "max":255,
+      "min":1,
+      "pattern":"[0-9]*"
+    },
+    "DeregisterRobotRequest":{
+      "type":"structure",
+      "required":[
+        "fleet",
+        "robot"
+      ],
+      "members":{
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "robot":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot.</p>"
+        }
+      }
+    },
+    "DeregisterRobotResponse":{
+      "type":"structure",
+      "members":{
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "robot":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot.</p>"
+        }
+      }
+    },
+    "DescribeDeploymentJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the deployment job.</p>"
+        }
+      }
+    },
+    "DescribeDeploymentJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the deployment job.</p>"
+        },
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "status":{
+          "shape":"DeploymentStatus",
+          "documentation":"<p>The status of the deployment job.</p>"
+        },
+        "deploymentConfig":{
+          "shape":"DeploymentConfig",
+          "documentation":"<p>The deployment configuration.</p>"
+        },
+        "deploymentApplicationConfigs":{
+          "shape":"DeploymentApplicationConfigs",
+          "documentation":"<p>The deployment application configuration.</p>"
+        },
+        "failureReason":{
+          "shape":"GenericString",
+          "documentation":"<p>A short description of the reason why the deployment job failed.</p>"
+        },
+        "failureCode":{
+          "shape":"DeploymentJobErrorCode",
+          "documentation":"<p>The deployment job failure code.</p>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the deployment job was created.</p>"
+        },
+        "robotDeploymentSummary":{
+          "shape":"RobotDeploymentSummary",
+          "documentation":"<p>A list of robot deployment summaries.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the specified deployment job.</p>"
+        }
+      }
+    },
+    "DescribeFleetRequest":{
+      "type":"structure",
+      "required":["fleet"],
+      "members":{
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        }
+      }
+    },
+    "DescribeFleetResponse":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the fleet.</p>"
+        },
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "robots":{
+          "shape":"Robots",
+          "documentation":"<p>A list of robots.</p>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the fleet was created.</p>"
+        },
+        "lastDeploymentStatus":{
+          "shape":"DeploymentStatus",
+          "documentation":"<p>The status of the last deployment.</p>"
+        },
+        "lastDeploymentJob":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the last deployment job.</p>"
+        },
+        "lastDeploymentTime":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time of the last deployment.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the specified fleet.</p>"
+        }
+      }
+    },
+    "DescribeRobotApplicationRequest":{
+      "type":"structure",
+      "required":["application"],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot application.</p>"
+        },
+        "applicationVersion":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application to describe.</p>"
+        }
+      }
+    },
+    "DescribeRobotApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot application.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application.</p>"
+        },
+        "sources":{
+          "shape":"Sources",
+          "documentation":"<p>The sources of the robot application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>The robot software suite used by the robot application.</p>"
+        },
+        "revisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id of the robot application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the specified robot application.</p>"
+        }
+      }
+    },
+    "DescribeRobotRequest":{
+      "type":"structure",
+      "required":["robot"],
+      "members":{
+        "robot":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot to be described.</p>"
+        }
+      }
+    },
+    "DescribeRobotResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot.</p>"
+        },
+        "fleetArn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "status":{
+          "shape":"RobotStatus",
+          "documentation":"<p>The status of the fleet.</p>"
+        },
+        "greengrassGroupId":{
+          "shape":"Id",
+          "documentation":"<p>The Greengrass group id.</p>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the robot was created.</p>"
+        },
+        "architecture":{
+          "shape":"Architecture",
+          "documentation":"<p>The target architecture of the robot application.</p>"
+        },
+        "lastDeploymentJob":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the last deployment job.</p>"
+        },
+        "lastDeploymentTime":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time of the last deployment job.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the specified robot.</p>"
+        }
+      }
+    },
+    "DescribeSimulationApplicationRequest":{
+      "type":"structure",
+      "required":["application"],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The application information for the simulation application.</p>"
+        },
+        "applicationVersion":{
+          "shape":"Version",
+          "documentation":"<p>The version of the simulation application to describe.</p>"
+        }
+      }
+    },
+    "DescribeSimulationApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot simulation application.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the simulation application.</p>"
+        },
+        "sources":{
+          "shape":"Sources",
+          "documentation":"<p>The sources of the simulation application.</p>"
+        },
+        "simulationSoftwareSuite":{
+          "shape":"SimulationSoftwareSuite",
+          "documentation":"<p>The simulation software suite used by the simulation application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>Information about the robot software suite.</p>"
+        },
+        "renderingEngine":{
+          "shape":"RenderingEngine",
+          "documentation":"<p>The rendering engine for the simulation application.</p>"
+        },
+        "revisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id of the simulation application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the specified simulation application.</p>"
+        }
+      }
+    },
+    "DescribeSimulationJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation job to be described.</p>"
+        }
+      }
+    },
+    "DescribeSimulationJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation job.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation job.</p>"
+        },
+        "status":{
+          "shape":"SimulationJobStatus",
+          "documentation":"<p>The status of the simulation job.</p>"
+        },
+        "lastStartedAt":{
+          "shape":"LastStartedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation job was last started.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation job was last updated.</p>"
+        },
+        "failureBehavior":{
+          "shape":"FailureBehavior",
+          "documentation":"<p>The failure behavior for the simulation job.</p>"
+        },
+        "failureCode":{
+          "shape":"SimulationJobErrorCode",
+          "documentation":"<p>The failure code of the simulation job if it failed:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>RobotApplicationCrash</dt> <dd> <p>Robot application exited abnormally.</p> </dd> <dt>SimulationApplicationCrash</dt> <dd> <p> Simulation application exited abnormally.</p> </dd> <dt>BadPermissionsRobotApplication</dt> <dd> <p>Robot application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsSimulationApplication</dt> <dd> <p>Simulation application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsS3Output</dt> <dd> <p>Unable to publish outputs to customer-provided S3 bucket.</p> </dd> <dt>BadPermissionsCloudwatchLogs</dt> <dd> <p>Unable to publish logs to customer-provided CloudWatch Logs resource.</p> </dd> <dt>SubnetIpLimitExceeded</dt> <dd> <p>Subnet IP limit exceeded.</p> </dd> <dt>ENILimitExceeded</dt> <dd> <p>ENI limit exceeded.</p> </dd> <dt>BadPermissionsUserCredentials</dt> <dd> <p>Unable to use the Role provided.</p> </dd> <dt>InvalidBundleRobotApplication</dt> <dd> <p>Robot bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>InvalidBundleSimulationApplication</dt> <dd> <p>Simulation bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>RobotApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for RobotApplication does not match value during version creation.</p> </dd> <dt>SimulationApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for SimulationApplication does not match value during version creation.</p> </dd> </dl>"
+        },
+        "failureReason":{
+          "shape":"GenericString",
+          "documentation":"<p>Details about why the simulation job failed. For more information about troubleshooting, see <a href=\"https://docs.aws.amazon.com/robomaker/latest/dg/troubleshooting.html\">Troubleshooting</a>.</p>"
+        },
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "documentation":"<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>"
+        },
+        "outputLocation":{
+          "shape":"OutputLocation",
+          "documentation":"<p>Location for output files generated by the simulation job.</p>"
+        },
+        "loggingConfig":{
+          "shape":"LoggingConfig",
+          "documentation":"<p>The logging configuration.</p>"
+        },
+        "maxJobDurationInSeconds":{
+          "shape":"JobDuration",
+          "documentation":"<p>The maximum job duration in seconds. The value must be 8 days (691,200 seconds) or less.</p>"
+        },
+        "simulationTimeMillis":{
+          "shape":"SimulationTimeMillis",
+          "documentation":"<p>The simulation job execution duration in milliseconds.</p>"
+        },
+        "iamRole":{
+          "shape":"IamRole",
+          "documentation":"<p>The IAM role that allows the simulation instance to call the AWS APIs that are specified in its associated policies on your behalf.</p>"
+        },
+        "robotApplications":{
+          "shape":"RobotApplicationConfigs",
+          "documentation":"<p>A list of robot applications.</p>"
+        },
+        "simulationApplications":{
+          "shape":"SimulationApplicationConfigs",
+          "documentation":"<p>A list of simulation applications.</p>"
+        },
+        "dataSources":{
+          "shape":"DataSources",
+          "documentation":"<p>The data sources for the simulation job.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the specified simulation job.</p>"
+        },
+        "vpcConfig":{
+          "shape":"VPCConfigResponse",
+          "documentation":"<p>The VPC configuration.</p>"
+        },
+        "networkInterface":{
+          "shape":"NetworkInterface",
+          "documentation":"<p>The network interface information for the simulation job.</p>"
+        }
+      }
+    },
+    "EnvironmentVariableKey":{
+      "type":"string",
+      "max":1024,
+      "min":1,
+      "pattern":"[A-Z_][A-Z0-9_]*"
+    },
+    "EnvironmentVariableMap":{
+      "type":"map",
+      "key":{"shape":"EnvironmentVariableKey"},
+      "value":{"shape":"EnvironmentVariableValue"},
+      "max":16,
+      "min":0
+    },
+    "EnvironmentVariableValue":{
+      "type":"string",
+      "max":1024,
+      "min":1,
+      "pattern":".*"
+    },
+    "FailureBehavior":{
+      "type":"string",
+      "enum":[
+        "Fail",
+        "Continue"
+      ]
+    },
+    "Filter":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the filter.</p>"
+        },
+        "values":{
+          "shape":"FilterValues",
+          "documentation":"<p>A list of values.</p>"
+        }
+      },
+      "documentation":"<p>Information about a filter.</p>"
+    },
+    "FilterValues":{
+      "type":"list",
+      "member":{"shape":"Name"},
+      "max":1,
+      "min":1
+    },
+    "Filters":{
+      "type":"list",
+      "member":{"shape":"Filter"},
+      "max":1,
+      "min":1
+    },
+    "Fleet":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the fleet.</p>"
+        },
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the fleet was created.</p>"
+        },
+        "lastDeploymentStatus":{
+          "shape":"DeploymentStatus",
+          "documentation":"<p>The status of the last fleet deployment.</p>"
+        },
+        "lastDeploymentJob":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the last deployment job.</p>"
+        },
+        "lastDeploymentTime":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time of the last deployment.</p>"
+        }
+      },
+      "documentation":"<p>Information about a fleet.</p>"
+    },
+    "Fleets":{
+      "type":"list",
+      "member":{"shape":"Fleet"},
+      "max":200,
+      "min":0
+    },
+    "GenericInteger":{"type":"integer"},
+    "GenericString":{"type":"string"},
+    "IamRole":{
+      "type":"string",
+      "max":255,
+      "min":1,
+      "pattern":"arn:aws:iam::\\w+:role/.*"
+    },
+    "Id":{
+      "type":"string",
+      "max":1224,
+      "min":1,
+      "pattern":".*"
+    },
+    "IdempotentParameterMismatchException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>The request uses the same client token as a previous, but non-identical request. Do not reuse a client token with different requests, unless the requests are identical. </p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "InternalServerException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>AWS RoboMaker experienced a service issue. Try your call again.</p>",
+      "error":{"httpStatusCode":500},
+      "exception":true
+    },
+    "InvalidParameterException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>A parameter specified in a request is not valid, is unsupported, or cannot be used. The returned message provides an explanation of the error value.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "JobDuration":{"type":"long"},
+    "LastStartedAt":{"type":"timestamp"},
+    "LastUpdatedAt":{"type":"timestamp"},
+    "LaunchConfig":{
+      "type":"structure",
+      "required":[
+        "packageName",
+        "launchFile"
+      ],
+      "members":{
+        "packageName":{
+          "shape":"Command",
+          "documentation":"<p>The package name.</p>"
+        },
+        "launchFile":{
+          "shape":"Command",
+          "documentation":"<p>The launch file name.</p>"
+        },
+        "environmentVariables":{
+          "shape":"EnvironmentVariableMap",
+          "documentation":"<p>The environment variables for the application launch.</p>"
+        },
+        "portForwardingConfig":{
+          "shape":"PortForwardingConfig",
+          "documentation":"<p>The port forwarding configuration.</p>"
+        }
+      },
+      "documentation":"<p>Information about a launch configuration.</p>"
+    },
+    "LimitExceededException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "ListDeploymentJobsRequest":{
+      "type":"structure",
+      "members":{
+        "filters":{
+          "shape":"Filters",
+          "documentation":"<p>Optional filters to limit results.</p> <p>The filter names <code>status</code> and <code>fleetName</code> are supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters, but they must be for the same named item. For example, if you are looking for items with the status <code>InProgress</code> or the status <code>Pending</code>.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value returned from a previous paginated <code>ListDeploymentJobs</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. </p> <note> <p>This token should be treated as an opaque identifier that is only used to retrieve the next items in a list and not for other programmatic purposes.</p> </note>"
+        },
+        "maxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of deployment job results returned by <code>ListDeploymentJobs</code> in paginated output. When this parameter is used, <code>ListDeploymentJobs</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListDeploymentJobs</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListDeploymentJobs</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>"
+        }
+      }
+    },
+    "ListDeploymentJobsResponse":{
+      "type":"structure",
+      "members":{
+        "deploymentJobs":{
+          "shape":"DeploymentJobs",
+          "documentation":"<p>A list of deployment jobs that meet the criteria of the request.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value to include in a future <code>ListDeploymentJobs</code> request. When the results of a <code>ListDeploymentJobs</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+        }
+      }
+    },
+    "ListFleetsRequest":{
+      "type":"structure",
+      "members":{
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value returned from a previous paginated <code>ListFleets</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. </p> <note> <p>This token should be treated as an opaque identifier that is only used to retrieve the next items in a list and not for other programmatic purposes.</p> </note>"
+        },
+        "maxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of deployment job results returned by <code>ListFleets</code> in paginated output. When this parameter is used, <code>ListFleets</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListFleets</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListFleets</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>"
+        },
+        "filters":{
+          "shape":"Filters",
+          "documentation":"<p>Optional filters to limit results.</p> <p>The filter name <code>name</code> is supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters.</p>"
+        }
+      }
+    },
+    "ListFleetsResponse":{
+      "type":"structure",
+      "members":{
+        "fleetDetails":{
+          "shape":"Fleets",
+          "documentation":"<p>A list of fleet details meeting the request criteria.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value to include in a future <code>ListDeploymentJobs</code> request. When the results of a <code>ListFleets</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+        }
+      }
+    },
+    "ListRobotApplicationsRequest":{
+      "type":"structure",
+      "members":{
+        "versionQualifier":{
+          "shape":"VersionQualifier",
+          "documentation":"<p>The version qualifier of the robot application.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value returned from a previous paginated <code>ListRobotApplications</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. </p> <note> <p>This token should be treated as an opaque identifier that is only used to retrieve the next items in a list and not for other programmatic purposes.</p> </note>"
+        },
+        "maxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of deployment job results returned by <code>ListRobotApplications</code> in paginated output. When this parameter is used, <code>ListRobotApplications</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListRobotApplications</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListRobotApplications</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>"
+        },
+        "filters":{
+          "shape":"Filters",
+          "documentation":"<p>Optional filters to limit results.</p> <p>The filter name <code>name</code> is supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters.</p>"
+        }
+      }
+    },
+    "ListRobotApplicationsResponse":{
+      "type":"structure",
+      "members":{
+        "robotApplicationSummaries":{
+          "shape":"RobotApplicationSummaries",
+          "documentation":"<p>A list of robot application summaries that meet the criteria of the request.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value to include in a future <code>ListRobotApplications</code> request. When the results of a <code>ListRobotApplications</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+        }
+      }
+    },
+    "ListRobotsRequest":{
+      "type":"structure",
+      "members":{
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value returned from a previous paginated <code>ListRobots</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. </p> <note> <p>This token should be treated as an opaque identifier that is only used to retrieve the next items in a list and not for other programmatic purposes.</p> </note>"
+        },
+        "maxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of deployment job results returned by <code>ListRobots</code> in paginated output. When this parameter is used, <code>ListRobots</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListRobots</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListRobots</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>"
+        },
+        "filters":{
+          "shape":"Filters",
+          "documentation":"<p>Optional filters to limit results.</p> <p>The filter names <code>status</code> and <code>fleetName</code> are supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters, but they must be for the same named item. For example, if you are looking for items with the status <code>Registered</code> or the status <code>Available</code>.</p>"
+        }
+      }
+    },
+    "ListRobotsResponse":{
+      "type":"structure",
+      "members":{
+        "robots":{
+          "shape":"Robots",
+          "documentation":"<p>A list of robots that meet the criteria of the request.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value to include in a future <code>ListRobots</code> request. When the results of a <code>ListRobot</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+        }
+      }
+    },
+    "ListSimulationApplicationsRequest":{
+      "type":"structure",
+      "members":{
+        "versionQualifier":{
+          "shape":"VersionQualifier",
+          "documentation":"<p>The version qualifier of the simulation application.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value returned from a previous paginated <code>ListSimulationApplications</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. </p> <note> <p>This token should be treated as an opaque identifier that is only used to retrieve the next items in a list and not for other programmatic purposes.</p> </note>"
+        },
+        "maxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of deployment job results returned by <code>ListSimulationApplications</code> in paginated output. When this parameter is used, <code>ListSimulationApplications</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListSimulationApplications</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListSimulationApplications</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>"
+        },
+        "filters":{
+          "shape":"Filters",
+          "documentation":"<p>Optional list of filters to limit results.</p> <p>The filter name <code>name</code> is supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters.</p>"
+        }
+      }
+    },
+    "ListSimulationApplicationsResponse":{
+      "type":"structure",
+      "members":{
+        "simulationApplicationSummaries":{
+          "shape":"SimulationApplicationSummaries",
+          "documentation":"<p>A list of simulation application summaries that meet the criteria of the request.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value to include in a future <code>ListSimulationApplications</code> request. When the results of a <code>ListRobot</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+        }
+      }
+    },
+    "ListSimulationJobsRequest":{
+      "type":"structure",
+      "members":{
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value returned from a previous paginated <code>ListSimulationJobs</code> request where <code>maxResults</code> was used and the results exceeded the value of that parameter. Pagination continues from the end of the previous results that returned the <code>nextToken</code> value. </p> <note> <p>This token should be treated as an opaque identifier that is only used to retrieve the next items in a list and not for other programmatic purposes.</p> </note>"
+        },
+        "maxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of deployment job results returned by <code>ListSimulationJobs</code> in paginated output. When this parameter is used, <code>ListSimulationJobs</code> only returns <code>maxResults</code> results in a single page along with a <code>nextToken</code> response element. The remaining results of the initial request can be seen by sending another <code>ListSimulationJobs</code> request with the returned <code>nextToken</code> value. This value can be between 1 and 100. If this parameter is not used, then <code>ListSimulationJobs</code> returns up to 100 results and a <code>nextToken</code> value if applicable. </p>"
+        },
+        "filters":{
+          "shape":"Filters",
+          "documentation":"<p>Optional filters to limit results.</p> <p>The filter names <code>status</code> and <code>simulationApplicationName</code> and <code>robotApplicationName</code> are supported. When filtering, you must use the complete value of the filtered item. You can use up to three filters, but they must be for the same named item. For example, if you are looking for items with the status <code>Preparing</code> or the status <code>Running</code>.</p>"
+        }
+      }
+    },
+    "ListSimulationJobsResponse":{
+      "type":"structure",
+      "required":["simulationJobSummaries"],
+      "members":{
+        "simulationJobSummaries":{
+          "shape":"SimulationJobSummaries",
+          "documentation":"<p>A list of simulation job summaries that meet the criteria of the request.</p>"
+        },
+        "nextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The <code>nextToken</code> value to include in a future <code>ListSimulationJobs</code> request. When the results of a <code>ListRobot</code> request exceed <code>maxResults</code>, this value can be used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+        }
+      }
+    },
+    "ListTagsForResourceRequest":{
+      "type":"structure",
+      "required":["resourceArn"],
+      "members":{
+        "resourceArn":{
+          "shape":"Arn",
+          "documentation":"<p>The AWS RoboMaker Amazon Resource Name (ARN) with tags to be listed.</p>",
+          "location":"uri",
+          "locationName":"resourceArn"
+        }
+      }
+    },
+    "ListTagsForResourceResponse":{
+      "type":"structure",
+      "members":{
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The list of all tags added to the specified resource.</p>"
+        }
+      }
+    },
+    "LoggingConfig":{
+      "type":"structure",
+      "required":["recordAllRosTopics"],
+      "members":{
+        "recordAllRosTopics":{
+          "shape":"BoxedBoolean",
+          "documentation":"<p>A boolean indicating whether to record all ROS topics.</p>"
+        }
+      },
+      "documentation":"<p>The logging configuration.</p>"
+    },
+    "MaxResults":{"type":"integer"},
+    "Name":{
+      "type":"string",
+      "max":255,
+      "min":1,
+      "pattern":"[a-zA-Z0-9_\\-]*"
+    },
+    "NetworkInterface":{
+      "type":"structure",
+      "members":{
+        "networkInterfaceId":{
+          "shape":"GenericString",
+          "documentation":"<p>The ID of the network interface.</p>"
+        },
+        "privateIpAddress":{
+          "shape":"GenericString",
+          "documentation":"<p>The IPv4 address of the network interface within the subnet.</p>"
+        },
+        "publicIpAddress":{
+          "shape":"GenericString",
+          "documentation":"<p>The IPv4 public address of the network interface.</p>"
+        }
+      },
+      "documentation":"<p>Describes a network interface.</p>"
+    },
+    "NonEmptyString":{
+      "type":"string",
+      "min":1
+    },
+    "NonSystemPort":{
+      "type":"integer",
+      "max":65535,
+      "min":1024
+    },
+    "OutputLocation":{
+      "type":"structure",
+      "members":{
+        "s3Bucket":{
+          "shape":"S3Bucket",
+          "documentation":"<p>The S3 bucket for output.</p>"
+        },
+        "s3Prefix":{
+          "shape":"S3Key",
+          "documentation":"<p>The S3 folder in the <code>s3Bucket</code> where output files will be placed.</p>"
+        }
+      },
+      "documentation":"<p>The output location.</p>"
+    },
+    "PaginationToken":{
+      "type":"string",
+      "max":2048,
+      "min":1,
+      "pattern":"[a-zA-Z0-9_.\\-\\/+=]*"
+    },
+    "Path":{
+      "type":"string",
+      "max":1024,
+      "min":1,
+      "pattern":".*"
+    },
+    "PercentDone":{
+      "type":"float",
+      "max":100.0,
+      "min":0.0
+    },
+    "Percentage":{
+      "type":"integer",
+      "max":100,
+      "min":1
+    },
+    "Port":{
+      "type":"integer",
+      "max":65535,
+      "min":1
+    },
+    "PortForwardingConfig":{
+      "type":"structure",
+      "members":{
+        "portMappings":{
+          "shape":"PortMappingList",
+          "documentation":"<p>The port mappings for the configuration.</p>"
+        }
+      },
+      "documentation":"<p>Configuration information for port forwarding.</p>"
+    },
+    "PortMapping":{
+      "type":"structure",
+      "required":[
+        "jobPort",
+        "applicationPort"
+      ],
+      "members":{
+        "jobPort":{
+          "shape":"Port",
+          "documentation":"<p>The port number on the simulation job instance to use as a remote connection point. </p>"
+        },
+        "applicationPort":{
+          "shape":"NonSystemPort",
+          "documentation":"<p>The port number on the application.</p>"
+        },
+        "enableOnPublicIp":{
+          "shape":"Boolean",
+          "documentation":"<p>A Boolean indicating whether to enable this port mapping on public IP.</p>"
+        }
+      },
+      "documentation":"<p>An object representing a port mapping.</p>"
+    },
+    "PortMappingList":{
+      "type":"list",
+      "member":{"shape":"PortMapping"},
+      "max":10,
+      "min":0
+    },
+    "ProgressDetail":{
+      "type":"structure",
+      "members":{
+        "currentProgress":{
+          "shape":"RobotDeploymentStep",
+          "documentation":"<p>The current progress status.</p> <dl> <dt>Validating</dt> <dd> <p>Validating the deployment.</p> </dd> <dt>DownloadingExtracting</dt> <dd> <p>Downloading and extracting the bundle on the robot.</p> </dd> <dt>ExecutingPreLaunch</dt> <dd> <p>Executing pre-launch script(s) if provided.</p> </dd> <dt>Launching</dt> <dd> <p>Launching the robot application.</p> </dd> <dt>ExecutingPostLaunch</dt> <dd> <p>Executing post-launch script(s) if provided.</p> </dd> <dt>Finished</dt> <dd> <p>Deployment is complete.</p> </dd> </dl>"
+        },
+        "percentDone":{
+          "shape":"PercentDone",
+          "documentation":"<p>Precentage of the step that is done. This currently only applies to the <code>Downloading/Extracting</code> step of the deployment. It is empty for other steps.</p>"
+        },
+        "estimatedTimeRemainingSeconds":{
+          "shape":"GenericInteger",
+          "documentation":"<p>Estimated amount of time in seconds remaining in the step. This currently only applies to the <code>Downloading/Extracting</code> step of the deployment. It is empty for other steps.</p>"
+        },
+        "targetResource":{
+          "shape":"GenericString",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the deployment job.</p>"
+        }
+      },
+      "documentation":"<p>Information about the progress of a deployment job.</p>"
+    },
+    "RegisterRobotRequest":{
+      "type":"structure",
+      "required":[
+        "fleet",
+        "robot"
+      ],
+      "members":{
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "robot":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot.</p>"
+        }
+      }
+    },
+    "RegisterRobotResponse":{
+      "type":"structure",
+      "members":{
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet that the robot will join.</p>"
+        },
+        "robot":{
+          "shape":"Arn",
+          "documentation":"<p>Information about the robot registration.</p>"
+        }
+      }
+    },
+    "RenderingEngine":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"RenderingEngineType",
+          "documentation":"<p>The name of the rendering engine.</p>"
+        },
+        "version":{
+          "shape":"RenderingEngineVersionType",
+          "documentation":"<p>The version of the rendering engine.</p>"
+        }
+      },
+      "documentation":"<p>Information about a rendering engine.</p>"
+    },
+    "RenderingEngineType":{
+      "type":"string",
+      "enum":["OGRE"]
+    },
+    "RenderingEngineVersionType":{
+      "type":"string",
+      "pattern":"1.x"
+    },
+    "ResourceAlreadyExistsException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>The specified resource already exists.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "ResourceNotFoundException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>The specified resource does not exist.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "RestartSimulationJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation job.</p>"
+        }
+      }
+    },
+    "RestartSimulationJobResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "RevisionId":{
+      "type":"string",
+      "max":40,
+      "min":1,
+      "pattern":"[a-zA-Z0-9_.\\-]*"
+    },
+    "Robot":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot.</p>"
+        },
+        "fleetArn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "status":{
+          "shape":"RobotStatus",
+          "documentation":"<p>The status of the robot.</p>"
+        },
+        "greenGrassGroupId":{
+          "shape":"Id",
+          "documentation":"<p>The Greengrass group associated with the robot.</p>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the robot was created.</p>"
+        },
+        "architecture":{
+          "shape":"Architecture",
+          "documentation":"<p>The architecture of the robot.</p>"
+        },
+        "lastDeploymentJob":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the last deployment job.</p>"
+        },
+        "lastDeploymentTime":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time of the last deployment.</p>"
+        }
+      },
+      "documentation":"<p>Information about a robot.</p>"
+    },
+    "RobotApplicationConfig":{
+      "type":"structure",
+      "required":[
+        "application",
+        "launchConfig"
+      ],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The application information for the robot application.</p>"
+        },
+        "applicationVersion":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application.</p>"
+        },
+        "launchConfig":{
+          "shape":"LaunchConfig",
+          "documentation":"<p>The launch configuration for the robot application.</p>"
+        }
+      },
+      "documentation":"<p>Application configuration information for a robot.</p>"
+    },
+    "RobotApplicationConfigs":{
+      "type":"list",
+      "member":{"shape":"RobotApplicationConfig"},
+      "max":1,
+      "min":1
+    },
+    "RobotApplicationNames":{
+      "type":"list",
+      "member":{"shape":"Name"}
+    },
+    "RobotApplicationSummaries":{
+      "type":"list",
+      "member":{"shape":"RobotApplicationSummary"},
+      "max":100,
+      "min":0
+    },
+    "RobotApplicationSummary":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot application.</p>"
+        },
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the robot.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>Information about a robot software suite.</p>"
+        }
+      },
+      "documentation":"<p>Summary information for a robot application.</p>"
+    },
+    "RobotDeployment":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The robot deployment Amazon Resource Name (ARN).</p>"
+        },
+        "deploymentStartTime":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the deployment was started.</p>"
+        },
+        "deploymentFinishTime":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the deployment finished.</p>"
+        },
+        "status":{
+          "shape":"RobotStatus",
+          "documentation":"<p>The status of the robot deployment.</p>"
+        },
+        "progressDetail":{
+          "shape":"ProgressDetail",
+          "documentation":"<p>Information about how the deployment is progressing.</p>"
+        },
+        "failureReason":{
+          "shape":"GenericString",
+          "documentation":"<p>A short description of the reason why the robot deployment failed.</p>"
+        },
+        "failureCode":{
+          "shape":"DeploymentJobErrorCode",
+          "documentation":"<p>The robot deployment failure code.</p>"
+        }
+      },
+      "documentation":"<p>Information about a robot deployment.</p>"
+    },
+    "RobotDeploymentStep":{
+      "type":"string",
+      "enum":[
+        "Validating",
+        "DownloadingExtracting",
+        "ExecutingPreLaunch",
+        "Launching",
+        "ExecutingPostLaunch",
+        "Finished"
+      ]
+    },
+    "RobotDeploymentSummary":{
+      "type":"list",
+      "member":{"shape":"RobotDeployment"}
+    },
+    "RobotSoftwareSuite":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"RobotSoftwareSuiteType",
+          "documentation":"<p>The name of the robot software suite.</p>"
+        },
+        "version":{
+          "shape":"RobotSoftwareSuiteVersionType",
+          "documentation":"<p>The version of the robot software suite.</p>"
+        }
+      },
+      "documentation":"<p>Information about a robot software suite.</p>"
+    },
+    "RobotSoftwareSuiteType":{
+      "type":"string",
+      "enum":[
+        "ROS",
+        "ROS2"
+      ]
+    },
+    "RobotSoftwareSuiteVersionType":{
+      "type":"string",
+      "enum":[
+        "Kinetic",
+        "Melodic",
+        "Dashing"
+      ]
+    },
+    "RobotStatus":{
+      "type":"string",
+      "enum":[
+        "Available",
+        "Registered",
+        "PendingNewDeployment",
+        "Deploying",
+        "Failed",
+        "InSync",
+        "NoResponse"
+      ]
+    },
+    "Robots":{
+      "type":"list",
+      "member":{"shape":"Robot"},
+      "max":1000,
+      "min":0
+    },
+    "S3Bucket":{
+      "type":"string",
+      "max":63,
+      "min":3,
+      "pattern":"[a-z0-9][a-z0-9.\\-]*[a-z0-9]"
+    },
+    "S3Etag":{"type":"string"},
+    "S3Key":{
+      "type":"string",
+      "max":1024,
+      "min":1,
+      "pattern":".*"
+    },
+    "S3KeyOutput":{
+      "type":"structure",
+      "members":{
+        "s3Key":{
+          "shape":"S3Key",
+          "documentation":"<p>The S3 key.</p>"
+        },
+        "etag":{
+          "shape":"S3Etag",
+          "documentation":"<p>The etag for the object.</p>"
+        }
+      },
+      "documentation":"<p>Information about S3 keys.</p>"
+    },
+    "S3KeyOutputs":{
+      "type":"list",
+      "member":{"shape":"S3KeyOutput"}
+    },
+    "S3Keys":{
+      "type":"list",
+      "member":{"shape":"S3Key"},
+      "max":100,
+      "min":1
+    },
+    "SecurityGroups":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"},
+      "max":5,
+      "min":1
+    },
+    "ServiceUnavailableException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>The request has failed due to a temporary failure of the server.</p>",
+      "error":{"httpStatusCode":503},
+      "exception":true
+    },
+    "SimulationApplicationConfig":{
+      "type":"structure",
+      "required":[
+        "application",
+        "launchConfig"
+      ],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The application information for the simulation application.</p>"
+        },
+        "applicationVersion":{
+          "shape":"Version",
+          "documentation":"<p>The version of the simulation application.</p>"
+        },
+        "launchConfig":{
+          "shape":"LaunchConfig",
+          "documentation":"<p>The launch configuration for the simulation application.</p>"
+        }
+      },
+      "documentation":"<p>Information about a simulation application configuration.</p>"
+    },
+    "SimulationApplicationConfigs":{
+      "type":"list",
+      "member":{"shape":"SimulationApplicationConfig"},
+      "max":1,
+      "min":1
+    },
+    "SimulationApplicationNames":{
+      "type":"list",
+      "member":{"shape":"Name"}
+    },
+    "SimulationApplicationSummaries":{
+      "type":"list",
+      "member":{"shape":"SimulationApplicationSummary"},
+      "max":100,
+      "min":0
+    },
+    "SimulationApplicationSummary":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation application.</p>"
+        },
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the simulation application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>Information about a robot software suite.</p>"
+        },
+        "simulationSoftwareSuite":{
+          "shape":"SimulationSoftwareSuite",
+          "documentation":"<p>Information about a simulation software suite.</p>"
+        }
+      },
+      "documentation":"<p>Summary information for a simulation application.</p>"
+    },
+    "SimulationJob":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation job.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation job.</p>"
+        },
+        "status":{
+          "shape":"SimulationJobStatus",
+          "documentation":"<p>Status of the simulation job.</p>"
+        },
+        "lastStartedAt":{
+          "shape":"LastStartedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation job was last started.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation job was last updated.</p>"
+        },
+        "failureBehavior":{
+          "shape":"FailureBehavior",
+          "documentation":"<p>The failure behavior the simulation job.</p> <dl> <dt>Continue</dt> <dd> <p>Restart the simulation job in the same host instance.</p> </dd> <dt>Fail</dt> <dd> <p>Stop the simulation job and terminate the instance.</p> </dd> </dl>"
+        },
+        "failureCode":{
+          "shape":"SimulationJobErrorCode",
+          "documentation":"<p>The failure code of the simulation job if it failed.</p>"
+        },
+        "failureReason":{
+          "shape":"GenericString",
+          "documentation":"<p>The reason why the simulation job failed.</p>"
+        },
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "documentation":"<p>A unique identifier for this <code>SimulationJob</code> request.</p>"
+        },
+        "outputLocation":{
+          "shape":"OutputLocation",
+          "documentation":"<p>Location for output files generated by the simulation job.</p>"
+        },
+        "loggingConfig":{
+          "shape":"LoggingConfig",
+          "documentation":"<p>The logging configuration.</p>"
+        },
+        "maxJobDurationInSeconds":{
+          "shape":"JobDuration",
+          "documentation":"<p>The maximum simulation job duration in seconds. The value must be 8 days (691,200 seconds) or less.</p>"
+        },
+        "simulationTimeMillis":{
+          "shape":"SimulationTimeMillis",
+          "documentation":"<p>The simulation job execution duration in milliseconds.</p>"
+        },
+        "iamRole":{
+          "shape":"IamRole",
+          "documentation":"<p>The IAM role that allows the simulation instance to call the AWS APIs that are specified in its associated policies on your behalf. This is how credentials are passed in to your simulation job. </p>"
+        },
+        "robotApplications":{
+          "shape":"RobotApplicationConfigs",
+          "documentation":"<p>A list of robot applications.</p>"
+        },
+        "simulationApplications":{
+          "shape":"SimulationApplicationConfigs",
+          "documentation":"<p>A list of simulation applications.</p>"
+        },
+        "dataSources":{
+          "shape":"DataSources",
+          "documentation":"<p>The data sources for the simulation job.</p>"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>A map that contains tag keys and tag values that are attached to the simulation job.</p>"
+        },
+        "vpcConfig":{
+          "shape":"VPCConfigResponse",
+          "documentation":"<p>VPC configuration information.</p>"
+        },
+        "networkInterface":{
+          "shape":"NetworkInterface",
+          "documentation":"<p/>"
+        }
+      },
+      "documentation":"<p>Information about a simulation job.</p>"
+    },
+    "SimulationJobErrorCode":{
+      "type":"string",
+      "enum":[
+        "InternalServiceError",
+        "RobotApplicationCrash",
+        "SimulationApplicationCrash",
+        "BadPermissionsRobotApplication",
+        "BadPermissionsSimulationApplication",
+        "BadPermissionsS3Object",
+        "BadPermissionsS3Output",
+        "BadPermissionsCloudwatchLogs",
+        "SubnetIpLimitExceeded",
+        "ENILimitExceeded",
+        "BadPermissionsUserCredentials",
+        "InvalidBundleRobotApplication",
+        "InvalidBundleSimulationApplication",
+        "InvalidS3Resource",
+        "MismatchedEtag",
+        "RobotApplicationVersionMismatchedEtag",
+        "SimulationApplicationVersionMismatchedEtag",
+        "ResourceNotFound",
+        "InvalidInput",
+        "WrongRegionS3Bucket",
+        "WrongRegionS3Output",
+        "WrongRegionRobotApplication",
+        "WrongRegionSimulationApplication"
+      ]
+    },
+    "SimulationJobStatus":{
+      "type":"string",
+      "enum":[
+        "Pending",
+        "Preparing",
+        "Running",
+        "Restarting",
+        "Completed",
+        "Failed",
+        "RunningFailed",
+        "Terminating",
+        "Terminated",
+        "Canceled"
+      ]
+    },
+    "SimulationJobSummaries":{
+      "type":"list",
+      "member":{"shape":"SimulationJobSummary"},
+      "max":100,
+      "min":0
+    },
+    "SimulationJobSummary":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the simulation job.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation job was last updated.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation job.</p>"
+        },
+        "status":{
+          "shape":"SimulationJobStatus",
+          "documentation":"<p>The status of the simulation job.</p>"
+        },
+        "simulationApplicationNames":{
+          "shape":"SimulationApplicationNames",
+          "documentation":"<p>A list of simulation job simulation application names.</p>"
+        },
+        "robotApplicationNames":{
+          "shape":"RobotApplicationNames",
+          "documentation":"<p>A list of simulation job robot application names.</p>"
+        },
+        "dataSourceNames":{
+          "shape":"DataSourceNames",
+          "documentation":"<p>The names of the data sources.</p>"
+        }
+      },
+      "documentation":"<p>Summary information for a simulation job.</p>"
+    },
+    "SimulationJobs":{
+      "type":"list",
+      "member":{"shape":"SimulationJob"}
+    },
+    "SimulationSoftwareSuite":{
+      "type":"structure",
+      "members":{
+        "name":{
+          "shape":"SimulationSoftwareSuiteType",
+          "documentation":"<p>The name of the simulation software suite.</p>"
+        },
+        "version":{
+          "shape":"SimulationSoftwareSuiteVersionType",
+          "documentation":"<p>The version of the simulation software suite.</p>"
+        }
+      },
+      "documentation":"<p>Information about a simulation software suite.</p>"
+    },
+    "SimulationSoftwareSuiteType":{
+      "type":"string",
+      "enum":[
+        "Gazebo",
+        "RosbagPlay"
+      ]
+    },
+    "SimulationSoftwareSuiteVersionType":{
+      "type":"string",
+      "pattern":"7|9|Kinetic|Melodic|Dashing"
+    },
+    "SimulationTimeMillis":{"type":"long"},
+    "Source":{
+      "type":"structure",
+      "members":{
+        "s3Bucket":{
+          "shape":"S3Bucket",
+          "documentation":"<p>The s3 bucket name.</p>"
+        },
+        "s3Key":{
+          "shape":"S3Key",
+          "documentation":"<p>The s3 object key.</p>"
+        },
+        "etag":{
+          "shape":"S3Etag",
+          "documentation":"<p>A hash of the object specified by <code>s3Bucket</code> and <code>s3Key</code>.</p>"
+        },
+        "architecture":{
+          "shape":"Architecture",
+          "documentation":"<p>The taget processor architecture for the application.</p>"
+        }
+      },
+      "documentation":"<p>Information about a source.</p>"
+    },
+    "SourceConfig":{
+      "type":"structure",
+      "members":{
+        "s3Bucket":{
+          "shape":"S3Bucket",
+          "documentation":"<p>The Amazon S3 bucket name.</p>"
+        },
+        "s3Key":{
+          "shape":"S3Key",
+          "documentation":"<p>The s3 object key.</p>"
+        },
+        "architecture":{
+          "shape":"Architecture",
+          "documentation":"<p>The target processor architecture for the application.</p>"
+        }
+      },
+      "documentation":"<p>Information about a source configuration.</p>"
+    },
+    "SourceConfigs":{
+      "type":"list",
+      "member":{"shape":"SourceConfig"}
+    },
+    "Sources":{
+      "type":"list",
+      "member":{"shape":"Source"}
+    },
+    "Subnets":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"},
+      "max":16,
+      "min":1
+    },
+    "SyncDeploymentJobRequest":{
+      "type":"structure",
+      "required":[
+        "clientRequestToken",
+        "fleet"
+      ],
+      "members":{
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "documentation":"<p>Unique, case-sensitive identifier that you provide to ensure the idempotency of the request.</p>",
+          "idempotencyToken":true
+        },
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The target fleet for the synchronization.</p>"
+        }
+      }
+    },
+    "SyncDeploymentJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the synchronization request.</p>"
+        },
+        "fleet":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
+        },
+        "status":{
+          "shape":"DeploymentStatus",
+          "documentation":"<p>The status of the synchronization job.</p>"
+        },
+        "deploymentConfig":{
+          "shape":"DeploymentConfig",
+          "documentation":"<p>Information about the deployment configuration.</p>"
+        },
+        "deploymentApplicationConfigs":{
+          "shape":"DeploymentApplicationConfigs",
+          "documentation":"<p>Information about the deployment application configurations.</p>"
+        },
+        "failureReason":{
+          "shape":"GenericString",
+          "documentation":"<p>The failure reason if the job fails.</p>"
+        },
+        "failureCode":{
+          "shape":"DeploymentJobErrorCode",
+          "documentation":"<p>The failure code if the job fails:</p> <dl> <dt>InternalServiceError</dt> <dd> <p>Internal service error.</p> </dd> <dt>RobotApplicationCrash</dt> <dd> <p>Robot application exited abnormally.</p> </dd> <dt>SimulationApplicationCrash</dt> <dd> <p> Simulation application exited abnormally.</p> </dd> <dt>BadPermissionsRobotApplication</dt> <dd> <p>Robot application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsSimulationApplication</dt> <dd> <p>Simulation application bundle could not be downloaded.</p> </dd> <dt>BadPermissionsS3Output</dt> <dd> <p>Unable to publish outputs to customer-provided S3 bucket.</p> </dd> <dt>BadPermissionsCloudwatchLogs</dt> <dd> <p>Unable to publish logs to customer-provided CloudWatch Logs resource.</p> </dd> <dt>SubnetIpLimitExceeded</dt> <dd> <p>Subnet IP limit exceeded.</p> </dd> <dt>ENILimitExceeded</dt> <dd> <p>ENI limit exceeded.</p> </dd> <dt>BadPermissionsUserCredentials</dt> <dd> <p>Unable to use the Role provided.</p> </dd> <dt>InvalidBundleRobotApplication</dt> <dd> <p>Robot bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>InvalidBundleSimulationApplication</dt> <dd> <p>Simulation bundle cannot be extracted (invalid format, bundling error, or other issue).</p> </dd> <dt>RobotApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for RobotApplication does not match value during version creation.</p> </dd> <dt>SimulationApplicationVersionMismatchedEtag</dt> <dd> <p>Etag for SimulationApplication does not match value during version creation.</p> </dd> </dl>"
+        },
+        "createdAt":{
+          "shape":"CreatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the fleet was created.</p>"
+        }
+      }
+    },
+    "TagKey":{
+      "type":"string",
+      "max":128,
+      "min":1,
+      "pattern":"[a-zA-Z0-9 _.\\-\\/+=:]*"
+    },
+    "TagKeyList":{
+      "type":"list",
+      "member":{"shape":"TagKey"}
+    },
+    "TagMap":{
+      "type":"map",
+      "key":{"shape":"TagKey"},
+      "value":{"shape":"TagValue"},
+      "max":50,
+      "min":0
+    },
+    "TagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "resourceArn",
+        "tags"
+      ],
+      "members":{
+        "resourceArn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the AWS RoboMaker resource you are tagging.</p>",
+          "location":"uri",
+          "locationName":"resourceArn"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "documentation":"<p>A map that contains tag keys and tag values that are attached to the resource.</p>"
+        }
+      }
+    },
+    "TagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "TagValue":{
+      "type":"string",
+      "max":256,
+      "min":0,
+      "pattern":"[a-zA-Z0-9 _.\\-\\/+=:]*"
+    },
+    "ThrottlingException":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"errorMessage"}
+      },
+      "documentation":"<p>AWS RoboMaker is temporarily unable to process the request. Try your call again.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "UntagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "resourceArn",
+        "tagKeys"
+      ],
+      "members":{
+        "resourceArn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the AWS RoboMaker resource you are removing tags.</p>",
+          "location":"uri",
+          "locationName":"resourceArn"
+        },
+        "tagKeys":{
+          "shape":"TagKeyList",
+          "documentation":"<p>A map that contains tag keys and tag values that will be unattached from the resource.</p>",
+          "location":"querystring",
+          "locationName":"tagKeys"
+        }
+      }
+    },
+    "UntagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateRobotApplicationRequest":{
+      "type":"structure",
+      "required":[
+        "application",
+        "sources",
+        "robotSoftwareSuite"
+      ],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The application information for the robot application.</p>"
+        },
+        "sources":{
+          "shape":"SourceConfigs",
+          "documentation":"<p>The sources of the robot application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>The robot software suite used by the robot application.</p>"
+        },
+        "currentRevisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id for the robot application.</p>"
+        }
+      }
+    },
+    "UpdateRobotApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the updated robot application.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the robot application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application.</p>"
+        },
+        "sources":{
+          "shape":"Sources",
+          "documentation":"<p>The sources of the robot application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>The robot software suite used by the robot application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the robot application was last updated.</p>"
+        },
+        "revisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id of the robot application.</p>"
+        }
+      }
+    },
+    "UpdateSimulationApplicationRequest":{
+      "type":"structure",
+      "required":[
+        "application",
+        "sources",
+        "simulationSoftwareSuite",
+        "robotSoftwareSuite"
+      ],
+      "members":{
+        "application":{
+          "shape":"Arn",
+          "documentation":"<p>The application information for the simulation application.</p>"
+        },
+        "sources":{
+          "shape":"SourceConfigs",
+          "documentation":"<p>The sources of the simulation application.</p>"
+        },
+        "simulationSoftwareSuite":{
+          "shape":"SimulationSoftwareSuite",
+          "documentation":"<p>The simulation software suite used by the simulation application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>Information about the robot software suite.</p>"
+        },
+        "renderingEngine":{
+          "shape":"RenderingEngine",
+          "documentation":"<p>The rendering engine for the simulation application.</p>"
+        },
+        "currentRevisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id for the robot application.</p>"
+        }
+      }
+    },
+    "UpdateSimulationApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{
+          "shape":"Arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the updated simulation application.</p>"
+        },
+        "name":{
+          "shape":"Name",
+          "documentation":"<p>The name of the simulation application.</p>"
+        },
+        "version":{
+          "shape":"Version",
+          "documentation":"<p>The version of the robot application.</p>"
+        },
+        "sources":{
+          "shape":"Sources",
+          "documentation":"<p>The sources of the simulation application.</p>"
+        },
+        "simulationSoftwareSuite":{
+          "shape":"SimulationSoftwareSuite",
+          "documentation":"<p>The simulation software suite used by the simulation application.</p>"
+        },
+        "robotSoftwareSuite":{
+          "shape":"RobotSoftwareSuite",
+          "documentation":"<p>Information about the robot software suite.</p>"
+        },
+        "renderingEngine":{
+          "shape":"RenderingEngine",
+          "documentation":"<p>The rendering engine for the simulation application.</p>"
+        },
+        "lastUpdatedAt":{
+          "shape":"LastUpdatedAt",
+          "documentation":"<p>The time, in milliseconds since the epoch, when the simulation application was last updated.</p>"
+        },
+        "revisionId":{
+          "shape":"RevisionId",
+          "documentation":"<p>The revision id of the simulation application.</p>"
+        }
+      }
+    },
+    "VPCConfig":{
+      "type":"structure",
+      "required":["subnets"],
+      "members":{
+        "subnets":{
+          "shape":"Subnets",
+          "documentation":"<p>A list of one or more subnet IDs in your VPC.</p>"
+        },
+        "securityGroups":{
+          "shape":"SecurityGroups",
+          "documentation":"<p>A list of one or more security groups IDs in your VPC.</p>"
+        },
+        "assignPublicIp":{
+          "shape":"Boolean",
+          "documentation":"<p>A boolean indicating whether to assign a public IP address.</p>"
+        }
+      },
+      "documentation":"<p>If your simulation job accesses resources in a VPC, you provide this parameter identifying the list of security group IDs and subnet IDs. These must belong to the same VPC. You must provide at least one security group and two subnet IDs.</p>"
+    },
+    "VPCConfigResponse":{
+      "type":"structure",
+      "members":{
+        "subnets":{
+          "shape":"Subnets",
+          "documentation":"<p>A list of subnet IDs associated with the simulation job.</p>"
+        },
+        "securityGroups":{
+          "shape":"SecurityGroups",
+          "documentation":"<p>A list of security group IDs associated with the simulation job.</p>"
+        },
+        "vpcId":{
+          "shape":"GenericString",
+          "documentation":"<p>The VPC ID associated with your simulation job.</p>"
+        },
+        "assignPublicIp":{
+          "shape":"Boolean",
+          "documentation":"<p>A boolean indicating if a public IP was assigned.</p>"
+        }
+      },
+      "documentation":"<p>VPC configuration associated with your simulation job.</p>"
+    },
+    "Version":{
+      "type":"string",
+      "max":255,
+      "min":1,
+      "pattern":"(\\$LATEST)|[0-9]*"
+    },
+    "VersionQualifier":{
+      "type":"string",
+      "pattern":"ALL"
+    },
+    "errorMessage":{"type":"string"}
+  },
+  "documentation":"<p>This section provides documentation for the AWS RoboMaker API operations.</p>"
+}

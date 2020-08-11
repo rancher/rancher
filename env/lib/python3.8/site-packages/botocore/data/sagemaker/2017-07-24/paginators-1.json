@@ -1,0 +1,118 @@
+{
+  "pagination": {
+    "ListTrainingJobs": {
+      "result_key": "TrainingJobSummaries",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListEndpoints": {
+      "result_key": "Endpoints",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListEndpointConfigs": {
+      "result_key": "EndpointConfigs",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListNotebookInstances": {
+      "result_key": "NotebookInstances",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListTags": {
+      "result_key": "Tags",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListModels": {
+      "result_key": "Models",
+      "output_token": "NextToken",
+      "input_token": "NextToken",
+      "limit_key": "MaxResults"
+    },
+    "ListAlgorithms": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "AlgorithmSummaryList"
+    },
+    "ListCodeRepositories": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "CodeRepositorySummaryList"
+    },
+    "ListCompilationJobs": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "CompilationJobSummaries"
+    },
+    "ListHyperParameterTuningJobs": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "HyperParameterTuningJobSummaries"
+    },
+    "ListLabelingJobs": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "LabelingJobSummaryList"
+    },
+    "ListLabelingJobsForWorkteam": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "LabelingJobSummaryList"
+    },
+    "ListModelPackages": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "ModelPackageSummaryList"
+    },
+    "ListNotebookInstanceLifecycleConfigs": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "NotebookInstanceLifecycleConfigs"
+    },
+    "ListSubscribedWorkteams": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "SubscribedWorkteams"
+    },
+    "ListTrainingJobsForHyperParameterTuningJob": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "TrainingJobSummaries"
+    },
+    "ListTransformJobs": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "TransformJobSummaries"
+    },
+    "ListWorkteams": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Workteams"
+    },
+    "Search": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Results"
+    }
+  }
+}

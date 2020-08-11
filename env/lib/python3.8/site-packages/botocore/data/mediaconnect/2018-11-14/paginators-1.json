@@ -1,0 +1,16 @@
+{
+  "pagination": {
+    "ListFlows": {
+      "input_token": "NextToken",
+      "output_token": "NextToken",
+      "limit_key": "MaxResults",
+      "result_key": "Flows"
+    },
+    "ListEntitlements": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Entitlements"
+    }
+  }
+}

@@ -1,0 +1,110 @@
+Metadata-Version: 2.0
+Name: netaddr
+Version: 0.7.19
+Summary: A network address manipulation library for Python
+Home-page: https://github.com/drkjam/netaddr/
+Author: Stefan Nordhausen
+Author-email: stefan.nordhausen@immobilienscout24.de
+License: BSD License
+Download-URL: https://pypi.python.org/pypi/netaddr/
+Keywords: Networking,Systems Administration,IANA,IEEE,CIDR,IP,IPv4,IPv6,CIDR,EUI,MAC,MAC-48,EUI-48,EUI-64
+Platform: OS Independent
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Education
+Classifier: Intended Audience :: Information Technology
+Classifier: Intended Audience :: Science/Research
+Classifier: Intended Audience :: System Administrators
+Classifier: Intended Audience :: Telecommunications Industry
+Classifier: License :: OSI Approved :: BSD License
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.5
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.0
+Classifier: Programming Language :: Python :: 3.1
+Classifier: Programming Language :: Python :: 3.2
+Classifier: Programming Language :: Python :: 3.3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Topic :: Communications
+Classifier: Topic :: Documentation
+Classifier: Topic :: Education
+Classifier: Topic :: Education :: Testing
+Classifier: Topic :: Home Automation
+Classifier: Topic :: Internet
+Classifier: Topic :: Internet :: Log Analysis
+Classifier: Topic :: Internet :: Name Service (DNS)
+Classifier: Topic :: Internet :: Proxy Servers
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Topic :: Internet :: WWW/HTTP :: Indexing/Search
+Classifier: Topic :: Internet :: WWW/HTTP :: Site Management
+Classifier: Topic :: Security
+Classifier: Topic :: Software Development
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Software Development :: Quality Assurance
+Classifier: Topic :: Software Development :: Testing
+Classifier: Topic :: Software Development :: Testing :: Traffic Generation
+Classifier: Topic :: System :: Benchmark
+Classifier: Topic :: System :: Clustering
+Classifier: Topic :: System :: Distributed Computing
+Classifier: Topic :: System :: Installation/Setup
+Classifier: Topic :: System :: Logging
+Classifier: Topic :: System :: Monitoring
+Classifier: Topic :: System :: Networking
+Classifier: Topic :: System :: Networking :: Firewalls
+Classifier: Topic :: System :: Networking :: Monitoring
+Classifier: Topic :: System :: Networking :: Time Synchronization
+Classifier: Topic :: System :: Recovery Tools
+Classifier: Topic :: System :: Shells
+Classifier: Topic :: System :: Software Distribution
+Classifier: Topic :: System :: Systems Administration
+Classifier: Topic :: System :: System Shells
+Classifier: Topic :: Text Processing
+Classifier: Topic :: Text Processing :: Filters
+Classifier: Topic :: Utilities
+
+Provides support for:
+
+Layer 3 addresses
+-----------------
+
+- IPv4 and IPv6 addresses, subnets, masks, prefixes
+- iterating, slicing, sorting, summarizing and classifying IP networks
+- dealing with various ranges formats (CIDR, arbitrary ranges and globs, nmap)
+- set based operations (unions, intersections etc) over IP addresses and subnets
+- parsing a large variety of different formats and notations
+- looking up IANA IP block information
+- generating DNS reverse lookups
+- supernetting and subnetting
+
+Layer 2 addresses
+-----------------
+
+- representation and manipulation MAC addresses and EUI-64 identifiers
+- looking up IEEE organisational information (OUI, IAB)
+- generating derived IPv6 addresses
+
+Changes
+-------
+
+For details on the latest changes and updates, see :-
+
+http://netaddr.readthedocs.io/en/latest/changes.html
+
+Requirements
+------------
+
+Supports Python version 2.5 through 3.5
+
+Share and enjoy!
+
+

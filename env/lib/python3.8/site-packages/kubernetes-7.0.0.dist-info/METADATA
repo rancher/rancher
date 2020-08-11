@@ -1,0 +1,39 @@
+Metadata-Version: 2.1
+Name: kubernetes
+Version: 7.0.0
+Summary: Kubernetes python client
+Home-page: https://github.com/kubernetes-client/python
+Author: Kubernetes
+Author-email: UNKNOWN
+License: Apache License Version 2.0
+Keywords: Swagger,OpenAPI,Kubernetes
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Topic :: Utilities
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Information Technology
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Requires-Dist: certifi (>=14.05.14)
+Requires-Dist: six (>=1.9.0)
+Requires-Dist: python-dateutil (>=2.5.3)
+Requires-Dist: setuptools (>=21.0.0)
+Requires-Dist: urllib3 (!=1.21,>=1.19.1)
+Requires-Dist: pyyaml (>=3.12)
+Requires-Dist: google-auth (>=1.0.1)
+Requires-Dist: websocket-client (!=0.40.0,!=0.41.*,!=0.42.*,>=0.32.0)
+Requires-Dist: requests
+Requires-Dist: requests-oauthlib
+Requires-Dist: adal (>=1.0.2)
+Requires-Dist: ipaddress (>=1.0.17); python_version=="2.7"
+
+Python client for kubernetes http://kubernetes.io/
+
+

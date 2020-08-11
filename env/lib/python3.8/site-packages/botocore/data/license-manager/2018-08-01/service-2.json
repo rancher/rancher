@@ -1,0 +1,1168 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2018-08-01",
+    "endpointPrefix":"license-manager",
+    "jsonVersion":"1.1",
+    "protocol":"json",
+    "serviceFullName":"AWS License Manager",
+    "serviceId":"License Manager",
+    "signatureVersion":"v4",
+    "targetPrefix":"AWSLicenseManager",
+    "uid":"license-manager-2018-08-01"
+  },
+  "operations":{
+    "CreateLicenseConfiguration":{
+      "name":"CreateLicenseConfiguration",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"CreateLicenseConfigurationRequest"},
+      "output":{"shape":"CreateLicenseConfigurationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"ResourceLimitExceededException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Creates a new license configuration object. A license configuration is an abstraction of a customer license agreement that can be consumed and enforced by License Manager. Components include specifications for the license type (licensing by instance, socket, CPU, or VCPU), tenancy (shared tenancy, Amazon EC2 Dedicated Instance, Amazon EC2 Dedicated Host, or any of these), host affinity (how long a VM must be associated with a host), the number of licenses purchased and used.</p>"
+    },
+    "DeleteLicenseConfiguration":{
+      "name":"DeleteLicenseConfiguration",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DeleteLicenseConfigurationRequest"},
+      "output":{"shape":"DeleteLicenseConfigurationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Deletes an existing license configuration. This action fails if the configuration is in use.</p>"
+    },
+    "GetLicenseConfiguration":{
+      "name":"GetLicenseConfiguration",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"GetLicenseConfigurationRequest"},
+      "output":{"shape":"GetLicenseConfigurationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Returns a detailed description of a license configuration.</p>"
+    },
+    "GetServiceSettings":{
+      "name":"GetServiceSettings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"GetServiceSettingsRequest"},
+      "output":{"shape":"GetServiceSettingsResponse"},
+      "errors":[
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Gets License Manager settings for a region. Exposes the configured S3 bucket, SNS topic, etc., for inspection. </p>"
+    },
+    "ListAssociationsForLicenseConfiguration":{
+      "name":"ListAssociationsForLicenseConfiguration",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListAssociationsForLicenseConfigurationRequest"},
+      "output":{"shape":"ListAssociationsForLicenseConfigurationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"FilterLimitExceededException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Lists the resource associations for a license configuration. Resource associations need not consume licenses from a license configuration. For example, an AMI or a stopped instance may not consume a license (depending on the license rules). Use this operation to find all resources associated with a license configuration.</p>"
+    },
+    "ListLicenseConfigurations":{
+      "name":"ListLicenseConfigurations",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListLicenseConfigurationsRequest"},
+      "output":{"shape":"ListLicenseConfigurationsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"FilterLimitExceededException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Lists license configuration objects for an account, each containing the name, description, license type, and other license terms modeled from a license agreement.</p>"
+    },
+    "ListLicenseSpecificationsForResource":{
+      "name":"ListLicenseSpecificationsForResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListLicenseSpecificationsForResourceRequest"},
+      "output":{"shape":"ListLicenseSpecificationsForResourceResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Returns the license configuration for a resource.</p>"
+    },
+    "ListResourceInventory":{
+      "name":"ListResourceInventory",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListResourceInventoryRequest"},
+      "output":{"shape":"ListResourceInventoryResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"FilterLimitExceededException"},
+        {"shape":"FailedDependencyException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Returns a detailed list of resources.</p>"
+    },
+    "ListTagsForResource":{
+      "name":"ListTagsForResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListTagsForResourceRequest"},
+      "output":{"shape":"ListTagsForResourceResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Lists tags attached to a resource.</p>"
+    },
+    "ListUsageForLicenseConfiguration":{
+      "name":"ListUsageForLicenseConfiguration",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListUsageForLicenseConfigurationRequest"},
+      "output":{"shape":"ListUsageForLicenseConfigurationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"FilterLimitExceededException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Lists all license usage records for a license configuration, displaying license consumption details by resource at a selected point in time. Use this action to audit the current license consumption for any license inventory and configuration.</p>"
+    },
+    "TagResource":{
+      "name":"TagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"TagResourceRequest"},
+      "output":{"shape":"TagResourceResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Attach one of more tags to any resource.</p>"
+    },
+    "UntagResource":{
+      "name":"UntagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UntagResourceRequest"},
+      "output":{"shape":"UntagResourceResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Remove tags from a resource.</p>"
+    },
+    "UpdateLicenseConfiguration":{
+      "name":"UpdateLicenseConfiguration",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UpdateLicenseConfigurationRequest"},
+      "output":{"shape":"UpdateLicenseConfigurationResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Modifies the attributes of an existing license configuration object. A license configuration is an abstraction of a customer license agreement that can be consumed and enforced by License Manager. Components include specifications for the license type (Instances, cores, sockets, VCPUs), tenancy (shared or Dedicated Host), host affinity (how long a VM is associated with a host), the number of licenses purchased and used.</p>"
+    },
+    "UpdateLicenseSpecificationsForResource":{
+      "name":"UpdateLicenseSpecificationsForResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UpdateLicenseSpecificationsForResourceRequest"},
+      "output":{"shape":"UpdateLicenseSpecificationsForResourceResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"InvalidResourceStateException"},
+        {"shape":"LicenseUsageException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Adds or removes license configurations for a specified AWS resource. This operation currently supports updating the license specifications of AMIs, instances, and hosts. Launch templates and AWS CloudFormation templates are not managed from this operation as those resources send the license configurations directly to a resource creation operation, such as <code>RunInstances</code>.</p>"
+    },
+    "UpdateServiceSettings":{
+      "name":"UpdateServiceSettings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UpdateServiceSettingsRequest"},
+      "output":{"shape":"UpdateServiceSettingsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterValueException"},
+        {"shape":"ServerInternalException"},
+        {"shape":"AuthorizationException"},
+        {"shape":"AccessDeniedException"},
+        {"shape":"RateLimitExceededException"}
+      ],
+      "documentation":"<p>Updates License Manager service settings.</p>"
+    }
+  },
+  "shapes":{
+    "AccessDeniedException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>Access to resource denied.</p>",
+      "exception":true
+    },
+    "AuthorizationException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>The AWS user account does not have permission to perform the action. Check the IAM policy associated with this account.</p>",
+      "exception":true
+    },
+    "Boolean":{"type":"boolean"},
+    "BoxBoolean":{"type":"boolean"},
+    "BoxInteger":{"type":"integer"},
+    "BoxLong":{"type":"long"},
+    "ConsumedLicenseSummary":{
+      "type":"structure",
+      "members":{
+        "ResourceType":{
+          "shape":"ResourceType",
+          "documentation":"<p>Resource type of the resource consuming a license (instance, host, or AMI).</p>"
+        },
+        "ConsumedLicenses":{
+          "shape":"BoxLong",
+          "documentation":"<p>Number of licenses consumed by a resource.</p>"
+        }
+      },
+      "documentation":"<p>Details about license consumption.</p>"
+    },
+    "ConsumedLicenseSummaryList":{
+      "type":"list",
+      "member":{"shape":"ConsumedLicenseSummary"}
+    },
+    "CreateLicenseConfigurationRequest":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "LicenseCountingType"
+      ],
+      "members":{
+        "Name":{
+          "shape":"String",
+          "documentation":"<p>Name of the license configuration.</p>"
+        },
+        "Description":{
+          "shape":"String",
+          "documentation":"<p>Human-friendly description of the license configuration.</p>"
+        },
+        "LicenseCountingType":{
+          "shape":"LicenseCountingType",
+          "documentation":"<p>Dimension to use to track the license inventory.</p>"
+        },
+        "LicenseCount":{
+          "shape":"BoxLong",
+          "documentation":"<p>Number of licenses managed by the license configuration.</p>"
+        },
+        "LicenseCountHardLimit":{
+          "shape":"BoxBoolean",
+          "documentation":"<p>Flag indicating whether hard or soft license enforcement is used. Exceeding a hard limit results in the blocked deployment of new instances.</p>"
+        },
+        "LicenseRules":{
+          "shape":"StringList",
+          "documentation":"<p>Array of configured License Manager rules.</p>"
+        },
+        "Tags":{
+          "shape":"TagList",
+          "documentation":"<p>The tags to apply to the resources during launch. You can only tag instances and volumes on launch. The specified tags are applied to all instances or volumes that are created during launch. To tag a resource after it has been created, see CreateTags .</p> <p/>"
+        }
+      }
+    },
+    "CreateLicenseConfigurationResponse":{
+      "type":"structure",
+      "members":{
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the license configuration object after its creation.</p>"
+        }
+      }
+    },
+    "DateTime":{"type":"timestamp"},
+    "DeleteLicenseConfigurationRequest":{
+      "type":"structure",
+      "required":["LicenseConfigurationArn"],
+      "members":{
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>Unique ID of the configuration object to delete.</p>"
+        }
+      }
+    },
+    "DeleteLicenseConfigurationResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "FailedDependencyException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>A dependency required to run the API is missing.</p>",
+      "exception":true,
+      "fault":true
+    },
+    "Filter":{
+      "type":"structure",
+      "members":{
+        "Name":{
+          "shape":"FilterName",
+          "documentation":"<p>Name of the filter. Filter names are case-sensitive.</p>"
+        },
+        "Values":{
+          "shape":"FilterValues",
+          "documentation":"<p>One or more filter values. Filter values are case-sensitive.</p>"
+        }
+      },
+      "documentation":"<p>A filter name and value pair that is used to return a more specific list of results from a describe operation. Filters can be used to match a set of resources by specific criteria, such as tags, attributes, or IDs. The filters supported by a <code>Describe</code> operation are documented with the <code>Describe</code> operation.</p>"
+    },
+    "FilterLimitExceededException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>The request uses too many filters or too many filter values.</p>",
+      "exception":true
+    },
+    "FilterName":{"type":"string"},
+    "FilterValue":{"type":"string"},
+    "FilterValues":{
+      "type":"list",
+      "member":{"shape":"FilterValue"}
+    },
+    "Filters":{
+      "type":"list",
+      "member":{"shape":"Filter"}
+    },
+    "GetLicenseConfigurationRequest":{
+      "type":"structure",
+      "required":["LicenseConfigurationArn"],
+      "members":{
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the license configuration being requested.</p>"
+        }
+      }
+    },
+    "GetLicenseConfigurationResponse":{
+      "type":"structure",
+      "members":{
+        "LicenseConfigurationId":{
+          "shape":"String",
+          "documentation":"<p>Unique ID for the license configuration.</p>"
+        },
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the license configuration requested.</p>"
+        },
+        "Name":{
+          "shape":"String",
+          "documentation":"<p>Name of the license configuration.</p>"
+        },
+        "Description":{
+          "shape":"String",
+          "documentation":"<p>Description of the license configuration.</p>"
+        },
+        "LicenseCountingType":{
+          "shape":"LicenseCountingType",
+          "documentation":"<p>Dimension on which the licenses are counted (for example, instances, cores, sockets, or VCPUs).</p>"
+        },
+        "LicenseRules":{
+          "shape":"StringList",
+          "documentation":"<p>List of flexible text strings designating license rules.</p>"
+        },
+        "LicenseCount":{
+          "shape":"BoxLong",
+          "documentation":"<p>Number of available licenses.</p>"
+        },
+        "LicenseCountHardLimit":{
+          "shape":"BoxBoolean",
+          "documentation":"<p>Sets the number of available licenses as a hard limit.</p>"
+        },
+        "ConsumedLicenses":{
+          "shape":"BoxLong",
+          "documentation":"<p>Number of licenses assigned to resources.</p>"
+        },
+        "Status":{
+          "shape":"String",
+          "documentation":"<p>License configuration status (active, etc.).</p>"
+        },
+        "OwnerAccountId":{
+          "shape":"String",
+          "documentation":"<p>Owner account ID for the license configuration.</p>"
+        },
+        "ConsumedLicenseSummaryList":{
+          "shape":"ConsumedLicenseSummaryList",
+          "documentation":"<p>List of summaries for consumed licenses used by various resources.</p>"
+        },
+        "ManagedResourceSummaryList":{
+          "shape":"ManagedResourceSummaryList",
+          "documentation":"<p>List of summaries of managed resources.</p>"
+        },
+        "Tags":{
+          "shape":"TagList",
+          "documentation":"<p>List of tags attached to the license configuration.</p>"
+        }
+      }
+    },
+    "GetServiceSettingsRequest":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "GetServiceSettingsResponse":{
+      "type":"structure",
+      "members":{
+        "S3BucketArn":{
+          "shape":"String",
+          "documentation":"<p>Regional S3 bucket path for storing reports, license trail event data, discovery data, etc.</p>"
+        },
+        "SnsTopicArn":{
+          "shape":"String",
+          "documentation":"<p>SNS topic configured to receive notifications from License Manager.</p>"
+        },
+        "OrganizationConfiguration":{
+          "shape":"OrganizationConfiguration",
+          "documentation":"<p>Indicates whether AWS Organizations has been integrated with License Manager for cross-account discovery.</p>"
+        },
+        "EnableCrossAccountsDiscovery":{
+          "shape":"BoxBoolean",
+          "documentation":"<p>Indicates whether cross-account discovery has been enabled.</p>"
+        }
+      }
+    },
+    "InvalidParameterValueException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>One or more parameter values are not valid.</p>",
+      "exception":true,
+      "synthetic":true
+    },
+    "InvalidResourceStateException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>License Manager cannot allocate a license to a resource because of its state. </p> <p>For example, you cannot allocate a license to an instance in the process of shutting down.</p>",
+      "exception":true
+    },
+    "InventoryFilter":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "Condition"
+      ],
+      "members":{
+        "Name":{
+          "shape":"String",
+          "documentation":"<p>The name of the filter.</p>"
+        },
+        "Condition":{
+          "shape":"InventoryFilterCondition",
+          "documentation":"<p>The condition of the filter.</p>"
+        },
+        "Value":{
+          "shape":"String",
+          "documentation":"<p>Value of the filter.</p>"
+        }
+      },
+      "documentation":"<p>An inventory filter object.</p>"
+    },
+    "InventoryFilterCondition":{
+      "type":"string",
+      "enum":[
+        "EQUALS",
+        "NOT_EQUALS",
+        "BEGINS_WITH",
+        "CONTAINS"
+      ]
+    },
+    "InventoryFilterList":{
+      "type":"list",
+      "member":{"shape":"InventoryFilter"}
+    },
+    "LicenseConfiguration":{
+      "type":"structure",
+      "members":{
+        "LicenseConfigurationId":{
+          "shape":"String",
+          "documentation":"<p>Unique ID of the <code>LicenseConfiguration</code> object.</p>"
+        },
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the <code>LicenseConfiguration</code> object.</p>"
+        },
+        "Name":{
+          "shape":"String",
+          "documentation":"<p>Name of the license configuration.</p>"
+        },
+        "Description":{
+          "shape":"String",
+          "documentation":"<p>Description of the license configuration.</p>"
+        },
+        "LicenseCountingType":{
+          "shape":"LicenseCountingType",
+          "documentation":"<p>Dimension to use to track license inventory.</p>"
+        },
+        "LicenseRules":{
+          "shape":"StringList",
+          "documentation":"<p>Array of configured License Manager rules.</p>"
+        },
+        "LicenseCount":{
+          "shape":"BoxLong",
+          "documentation":"<p>Number of licenses managed by the license configuration.</p>"
+        },
+        "LicenseCountHardLimit":{
+          "shape":"BoxBoolean",
+          "documentation":"<p>Sets the number of available licenses as a hard limit.</p>"
+        },
+        "ConsumedLicenses":{
+          "shape":"BoxLong",
+          "documentation":"<p>Number of licenses consumed. </p>"
+        },
+        "Status":{
+          "shape":"String",
+          "documentation":"<p>Status of the license configuration.</p>"
+        },
+        "OwnerAccountId":{
+          "shape":"String",
+          "documentation":"<p>Account ID of the license configuration's owner.</p>"
+        },
+        "ConsumedLicenseSummaryList":{
+          "shape":"ConsumedLicenseSummaryList",
+          "documentation":"<p>List of summaries for licenses consumed by various resources.</p>"
+        },
+        "ManagedResourceSummaryList":{
+          "shape":"ManagedResourceSummaryList",
+          "documentation":"<p>List of summaries for managed resources.</p>"
+        }
+      },
+      "documentation":"<p>A license configuration is an abstraction of a customer license agreement that can be consumed and enforced by License Manager. Components include specifications for the license type (licensing by instance, socket, CPU, or VCPU), tenancy (shared tenancy, Amazon EC2 Dedicated Instance, Amazon EC2 Dedicated Host, or any of these), host affinity (how long a VM must be associated with a host), the number of licenses purchased and used.</p>"
+    },
+    "LicenseConfigurationAssociation":{
+      "type":"structure",
+      "members":{
+        "ResourceArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the resource associated with the license configuration.</p>"
+        },
+        "ResourceType":{
+          "shape":"ResourceType",
+          "documentation":"<p>Type of server resource.</p>"
+        },
+        "ResourceOwnerId":{
+          "shape":"String",
+          "documentation":"<p>ID of the AWS account that owns the resource consuming licenses.</p>"
+        },
+        "AssociationTime":{
+          "shape":"DateTime",
+          "documentation":"<p>Time when the license configuration was associated with the resource.</p>"
+        }
+      },
+      "documentation":"<p>Describes a server resource that is associated with a license configuration.</p>"
+    },
+    "LicenseConfigurationAssociations":{
+      "type":"list",
+      "member":{"shape":"LicenseConfigurationAssociation"}
+    },
+    "LicenseConfigurationStatus":{
+      "type":"string",
+      "enum":[
+        "AVAILABLE",
+        "DISABLED"
+      ]
+    },
+    "LicenseConfigurationUsage":{
+      "type":"structure",
+      "members":{
+        "ResourceArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the resource associated with a license configuration.</p>"
+        },
+        "ResourceType":{
+          "shape":"ResourceType",
+          "documentation":"<p>Type of resource associated with athe license configuration.</p>"
+        },
+        "ResourceStatus":{
+          "shape":"String",
+          "documentation":"<p>Status of a resource associated with the license configuration.</p>"
+        },
+        "ResourceOwnerId":{
+          "shape":"String",
+          "documentation":"<p>ID of the account that owns a resource that is associated with the license configuration.</p>"
+        },
+        "AssociationTime":{
+          "shape":"DateTime",
+          "documentation":"<p>Time when the license configuration was initially associated with a resource.</p>"
+        },
+        "ConsumedLicenses":{
+          "shape":"BoxLong",
+          "documentation":"<p>Number of licenses consumed out of the total provisioned in the license configuration.</p>"
+        }
+      },
+      "documentation":"<p>Contains details of the usage of each resource from the license pool.</p>"
+    },
+    "LicenseConfigurationUsageList":{
+      "type":"list",
+      "member":{"shape":"LicenseConfigurationUsage"}
+    },
+    "LicenseConfigurations":{
+      "type":"list",
+      "member":{"shape":"LicenseConfiguration"}
+    },
+    "LicenseCountingType":{
+      "type":"string",
+      "enum":[
+        "vCPU",
+        "Instance",
+        "Core",
+        "Socket"
+      ]
+    },
+    "LicenseSpecification":{
+      "type":"structure",
+      "required":["LicenseConfigurationArn"],
+      "members":{
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the <code>LicenseConfiguration</code> object.</p>"
+        }
+      },
+      "documentation":"<p>Object used for associating a license configuration with a resource.</p>"
+    },
+    "LicenseSpecifications":{
+      "type":"list",
+      "member":{"shape":"LicenseSpecification"}
+    },
+    "LicenseUsageException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>You do not have enough licenses available to support a new resource launch.</p>",
+      "exception":true
+    },
+    "ListAssociationsForLicenseConfigurationRequest":{
+      "type":"structure",
+      "required":["LicenseConfigurationArn"],
+      "members":{
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of a <code>LicenseConfiguration</code> object.</p>"
+        },
+        "MaxResults":{
+          "shape":"BoxInteger",
+          "documentation":"<p>Maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        }
+      }
+    },
+    "ListAssociationsForLicenseConfigurationResponse":{
+      "type":"structure",
+      "members":{
+        "LicenseConfigurationAssociations":{
+          "shape":"LicenseConfigurationAssociations",
+          "documentation":"<p>Lists association objects for the license configuration, each containing the association time, number of consumed licenses, resource ARN, resource ID, account ID that owns the resource, resource size, and resource type.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        }
+      }
+    },
+    "ListLicenseConfigurationsRequest":{
+      "type":"structure",
+      "members":{
+        "LicenseConfigurationArns":{
+          "shape":"StringList",
+          "documentation":"<p>An array of ARNs for the calling account’s license configurations.</p>"
+        },
+        "MaxResults":{
+          "shape":"BoxInteger",
+          "documentation":"<p>Maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        },
+        "Filters":{
+          "shape":"Filters",
+          "documentation":"<p>One or more filters.</p>"
+        }
+      }
+    },
+    "ListLicenseConfigurationsResponse":{
+      "type":"structure",
+      "members":{
+        "LicenseConfigurations":{
+          "shape":"LicenseConfigurations",
+          "documentation":"<p>Array of license configuration objects.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        }
+      }
+    },
+    "ListLicenseSpecificationsForResourceRequest":{
+      "type":"structure",
+      "required":["ResourceArn"],
+      "members":{
+        "ResourceArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of an AMI or Amazon EC2 instance that has an associated license configuration.</p>"
+        },
+        "MaxResults":{
+          "shape":"BoxInteger",
+          "documentation":"<p>Maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        }
+      }
+    },
+    "ListLicenseSpecificationsForResourceResponse":{
+      "type":"structure",
+      "members":{
+        "LicenseSpecifications":{
+          "shape":"LicenseSpecifications",
+          "documentation":"<p>License configurations associated with a resource.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        }
+      }
+    },
+    "ListResourceInventoryRequest":{
+      "type":"structure",
+      "members":{
+        "MaxResults":{
+          "shape":"BoxInteger",
+          "documentation":"<p>Maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        },
+        "Filters":{
+          "shape":"InventoryFilterList",
+          "documentation":"<p>One or more filters.</p>"
+        }
+      }
+    },
+    "ListResourceInventoryResponse":{
+      "type":"structure",
+      "members":{
+        "ResourceInventoryList":{
+          "shape":"ResourceInventoryList",
+          "documentation":"<p>The detailed list of resources.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        }
+      }
+    },
+    "ListTagsForResourceRequest":{
+      "type":"structure",
+      "required":["ResourceArn"],
+      "members":{
+        "ResourceArn":{
+          "shape":"String",
+          "documentation":"<p>ARN for the resource.</p>"
+        }
+      }
+    },
+    "ListTagsForResourceResponse":{
+      "type":"structure",
+      "members":{
+        "Tags":{
+          "shape":"TagList",
+          "documentation":"<p>List of tags attached to the resource.</p>"
+        }
+      }
+    },
+    "ListUsageForLicenseConfigurationRequest":{
+      "type":"structure",
+      "required":["LicenseConfigurationArn"],
+      "members":{
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the targeted <code>LicenseConfiguration</code> object.</p>"
+        },
+        "MaxResults":{
+          "shape":"BoxInteger",
+          "documentation":"<p>Maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        },
+        "Filters":{
+          "shape":"Filters",
+          "documentation":"<p>List of filters to apply.</p>"
+        }
+      }
+    },
+    "ListUsageForLicenseConfigurationResponse":{
+      "type":"structure",
+      "members":{
+        "LicenseConfigurationUsageList":{
+          "shape":"LicenseConfigurationUsageList",
+          "documentation":"<p>An array of <code>LicenseConfigurationUsage</code> objects.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Token for the next set of results.</p>"
+        }
+      }
+    },
+    "ManagedResourceSummary":{
+      "type":"structure",
+      "members":{
+        "ResourceType":{
+          "shape":"ResourceType",
+          "documentation":"<p>Type of resource associated with a license (instance, host, or AMI).</p>"
+        },
+        "AssociationCount":{
+          "shape":"BoxLong",
+          "documentation":"<p>Number of resources associated with licenses.</p>"
+        }
+      },
+      "documentation":"<p>Summary for a resource.</p>"
+    },
+    "ManagedResourceSummaryList":{
+      "type":"list",
+      "member":{"shape":"ManagedResourceSummary"}
+    },
+    "Message":{"type":"string"},
+    "OrganizationConfiguration":{
+      "type":"structure",
+      "required":["EnableIntegration"],
+      "members":{
+        "EnableIntegration":{
+          "shape":"Boolean",
+          "documentation":"<p>Flag to activate AWS Organization integration.</p>"
+        }
+      },
+      "documentation":"<p>Object containing configuration information for AWS Organizations.</p>"
+    },
+    "RateLimitExceededException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>Too many requests have been submitted. Try again after a brief wait.</p>",
+      "exception":true
+    },
+    "ResourceInventory":{
+      "type":"structure",
+      "members":{
+        "ResourceId":{
+          "shape":"String",
+          "documentation":"<p>Unique ID of the resource.</p>"
+        },
+        "ResourceType":{
+          "shape":"ResourceType",
+          "documentation":"<p>The type of resource.</p>"
+        },
+        "ResourceArn":{
+          "shape":"String",
+          "documentation":"<p>The ARN of the resource.</p>"
+        },
+        "Platform":{
+          "shape":"String",
+          "documentation":"<p>The platform of the resource.</p>"
+        },
+        "PlatformVersion":{
+          "shape":"String",
+          "documentation":"<p>Platform version of the resource in the inventory.</p>"
+        },
+        "ResourceOwningAccountId":{
+          "shape":"String",
+          "documentation":"<p>Unique ID of the account that owns the resource.</p>"
+        }
+      },
+      "documentation":"<p>A set of attributes that describe a resource.</p>"
+    },
+    "ResourceInventoryList":{
+      "type":"list",
+      "member":{"shape":"ResourceInventory"}
+    },
+    "ResourceLimitExceededException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>Your resource limits have been exceeded.</p>",
+      "exception":true
+    },
+    "ResourceType":{
+      "type":"string",
+      "enum":[
+        "EC2_INSTANCE",
+        "EC2_HOST",
+        "EC2_AMI"
+      ]
+    },
+    "ServerInternalException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>The server experienced an internal error. Try again.</p>",
+      "exception":true,
+      "fault":true
+    },
+    "String":{"type":"string"},
+    "StringList":{
+      "type":"list",
+      "member":{"shape":"String"}
+    },
+    "Tag":{
+      "type":"structure",
+      "members":{
+        "Key":{
+          "shape":"String",
+          "documentation":"<p>Key for the resource tag.</p>"
+        },
+        "Value":{
+          "shape":"String",
+          "documentation":"<p>Value for the resource tag.</p>"
+        }
+      },
+      "documentation":"<p>Tag for a resource in a key-value format.</p>"
+    },
+    "TagKeyList":{
+      "type":"list",
+      "member":{"shape":"String"}
+    },
+    "TagList":{
+      "type":"list",
+      "member":{"shape":"Tag"}
+    },
+    "TagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceArn",
+        "Tags"
+      ],
+      "members":{
+        "ResourceArn":{
+          "shape":"String",
+          "documentation":"<p>Resource of the ARN to be tagged.</p>"
+        },
+        "Tags":{
+          "shape":"TagList",
+          "documentation":"<p>Names of the tags to attach to the resource.</p>"
+        }
+      }
+    },
+    "TagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UntagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceArn",
+        "TagKeys"
+      ],
+      "members":{
+        "ResourceArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the resource.</p>"
+        },
+        "TagKeys":{
+          "shape":"TagKeyList",
+          "documentation":"<p>List keys identifying tags to remove.</p>"
+        }
+      }
+    },
+    "UntagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateLicenseConfigurationRequest":{
+      "type":"structure",
+      "required":["LicenseConfigurationArn"],
+      "members":{
+        "LicenseConfigurationArn":{
+          "shape":"String",
+          "documentation":"<p>ARN for a license configuration.</p>"
+        },
+        "LicenseConfigurationStatus":{
+          "shape":"LicenseConfigurationStatus",
+          "documentation":"<p>New status of the license configuration (<code>ACTIVE</code> or <code>INACTIVE</code>).</p>"
+        },
+        "LicenseRules":{
+          "shape":"StringList",
+          "documentation":"<p>List of flexible text strings designating license rules.</p>"
+        },
+        "LicenseCount":{
+          "shape":"BoxLong",
+          "documentation":"<p>New number of licenses managed by the license configuration.</p>"
+        },
+        "LicenseCountHardLimit":{
+          "shape":"BoxBoolean",
+          "documentation":"<p>Sets the number of available licenses as a hard limit.</p>"
+        },
+        "Name":{
+          "shape":"String",
+          "documentation":"<p>New name of the license configuration.</p>"
+        },
+        "Description":{
+          "shape":"String",
+          "documentation":"<p>New human-friendly description of the license configuration.</p>"
+        }
+      }
+    },
+    "UpdateLicenseConfigurationResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateLicenseSpecificationsForResourceRequest":{
+      "type":"structure",
+      "required":["ResourceArn"],
+      "members":{
+        "ResourceArn":{
+          "shape":"String",
+          "documentation":"<p>ARN for an AWS server resource.</p>"
+        },
+        "AddLicenseSpecifications":{
+          "shape":"LicenseSpecifications",
+          "documentation":"<p>License configuration ARNs to be added to a resource.</p>"
+        },
+        "RemoveLicenseSpecifications":{
+          "shape":"LicenseSpecifications",
+          "documentation":"<p>License configuration ARNs to be removed from a resource.</p>"
+        }
+      }
+    },
+    "UpdateLicenseSpecificationsForResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateServiceSettingsRequest":{
+      "type":"structure",
+      "members":{
+        "S3BucketArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the Amazon S3 bucket where License Manager information is stored.</p>"
+        },
+        "SnsTopicArn":{
+          "shape":"String",
+          "documentation":"<p>ARN of the Amazon SNS topic used for License Manager alerts.</p>"
+        },
+        "OrganizationConfiguration":{
+          "shape":"OrganizationConfiguration",
+          "documentation":"<p>Integrates AWS Organizations with License Manager for cross-account discovery.</p>"
+        },
+        "EnableCrossAccountsDiscovery":{
+          "shape":"BoxBoolean",
+          "documentation":"<p>Activates cross-account discovery.</p>"
+        }
+      }
+    },
+    "UpdateServiceSettingsResponse":{
+      "type":"structure",
+      "members":{
+      }
+    }
+  },
+  "documentation":"<fullname> AWS License Manager </fullname> <p> <i>This is the AWS License Manager API Reference.</i> It provides descriptions, syntax, and usage examples for each of the actions and data types for License Manager. The topic for each action shows the Query API request parameters and the XML response. You can also view the XML request elements in the WSDL. </p> <p> Alternatively, you can use one of the AWS SDKs to access an API that's tailored to the programming language or platform that you're using. For more information, see <a href=\"http://aws.amazon.com/tools/#SDKs\">AWS SDKs</a>. </p>"
+}

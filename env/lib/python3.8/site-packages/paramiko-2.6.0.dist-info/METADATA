@@ -1,0 +1,48 @@
+Metadata-Version: 2.0
+Name: paramiko
+Version: 2.6.0
+Summary: SSH2 protocol library
+Home-page: https://github.com/paramiko/paramiko/
+Author: Jeff Forcier
+Author-email: jeff@bitprophet.org
+License: LGPL
+Description-Content-Type: UNKNOWN
+Platform: Posix; MacOS X; Windows
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet
+Classifier: Topic :: Security :: Cryptography
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Requires-Dist: bcrypt (>=3.1.3)
+Requires-Dist: cryptography (>=2.5)
+Requires-Dist: pynacl (>=1.0.1)
+Provides-Extra: gssapi
+Requires-Dist: pyasn1 (>=0.1.7); extra == 'gssapi'
+Provides-Extra: gssapi
+Requires-Dist: gssapi (>=1.4.1); platform_system != "Windows" and extra == 'gssapi'
+Provides-Extra: gssapi
+Requires-Dist: pywin32 (>=2.1.8); platform_system == "Windows" and extra == 'gssapi'
+
+
+This is a library for making SSH2 connections (client or server).
+Emphasis is on using SSH2 as an alternative to SSL for making secure
+connections between python scripts.  All major ciphers and hash methods
+are supported.  SFTP client and server mode are both supported too.
+
+Required packages:
+    Cryptography
+
+To install the development version, ``pip install -e
+git+https://github.com/paramiko/paramiko/#egg=paramiko``.
+
+

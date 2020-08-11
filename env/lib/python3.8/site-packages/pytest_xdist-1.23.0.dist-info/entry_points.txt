@@ -1,0 +1,4 @@
+[pytest11]
+xdist = xdist.plugin
+xdist.looponfail = xdist.looponfail
+

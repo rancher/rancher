@@ -1,0 +1,3179 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2018-10-26",
+    "endpointPrefix":"securityhub",
+    "jsonVersion":"1.1",
+    "protocol":"rest-json",
+    "serviceFullName":"AWS SecurityHub",
+    "serviceId":"SecurityHub",
+    "signatureVersion":"v4",
+    "signingName":"securityhub",
+    "uid":"securityhub-2018-10-26"
+  },
+  "operations":{
+    "AcceptInvitation":{
+      "name":"AcceptInvitation",
+      "http":{
+        "method":"POST",
+        "requestUri":"/master"
+      },
+      "input":{"shape":"AcceptInvitationRequest"},
+      "output":{"shape":"AcceptInvitationResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidAccessException"}
+      ],
+      "documentation":"<p>Accepts the invitation to be a member account and be monitored by the Security Hub master account that the invitation was sent from. When the member account accepts the invitation, permission is granted to the master account to view findings generated in the member account.</p>"
+    },
+    "BatchDisableStandards":{
+      "name":"BatchDisableStandards",
+      "http":{
+        "method":"POST",
+        "requestUri":"/standards/deregister"
+      },
+      "input":{"shape":"BatchDisableStandardsRequest"},
+      "output":{"shape":"BatchDisableStandardsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Disables the standards specified by the provided <code>StandardsSubscriptionArns</code>. For more information, see <a href=\"https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards.html\">Standards Supported in AWS Security Hub</a>.</p>"
+    },
+    "BatchEnableStandards":{
+      "name":"BatchEnableStandards",
+      "http":{
+        "method":"POST",
+        "requestUri":"/standards/register"
+      },
+      "input":{"shape":"BatchEnableStandardsRequest"},
+      "output":{"shape":"BatchEnableStandardsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Enables the standards specified by the provided <code>standardsArn</code>. In this release, only CIS AWS Foundations standards are supported. For more information, see <a href=\"https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards.html\">Standards Supported in AWS Security Hub</a>.</p>"
+    },
+    "BatchImportFindings":{
+      "name":"BatchImportFindings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/findings/import"
+      },
+      "input":{"shape":"BatchImportFindingsRequest"},
+      "output":{"shape":"BatchImportFindingsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"}
+      ],
+      "documentation":"<p>Imports security findings generated from an integrated third-party product into Security Hub. This action is requested by the integrated product to import its findings into Security Hub. The maximum allowed size for a finding is 240 Kb. An error is returned for any finding larger than 240 Kb.</p>"
+    },
+    "CreateActionTarget":{
+      "name":"CreateActionTarget",
+      "http":{
+        "method":"POST",
+        "requestUri":"/actionTargets"
+      },
+      "input":{"shape":"CreateActionTargetRequest"},
+      "output":{"shape":"CreateActionTargetResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceConflictException"}
+      ],
+      "documentation":"<p>Creates a custom action target in Security Hub. You can use custom actions on findings and insights in Security Hub to trigger target actions in Amazon CloudWatch Events.</p>"
+    },
+    "CreateInsight":{
+      "name":"CreateInsight",
+      "http":{
+        "method":"POST",
+        "requestUri":"/insights"
+      },
+      "input":{"shape":"CreateInsightRequest"},
+      "output":{"shape":"CreateInsightResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceConflictException"}
+      ],
+      "documentation":"<p>Creates a custom insight in Security Hub. An insight is a consolidation of findings that relate to a security issue that requires attention or remediation. Use the <code>GroupByAttribute</code> to group the related findings in the insight.</p>"
+    },
+    "CreateMembers":{
+      "name":"CreateMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/members"
+      },
+      "input":{"shape":"CreateMembersRequest"},
+      "output":{"shape":"CreateMembersResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceConflictException"}
+      ],
+      "documentation":"<p>Creates a member association in Security Hub between the specified accounts and the account used to make the request, which is the master account. To successfully create a member, you must use this action from an account that already has Security Hub enabled. You can use the <a>EnableSecurityHub</a> to enable Security Hub.</p> <p>After you use <code>CreateMembers</code> to create member account associations in Security Hub, you need to use the <a>InviteMembers</a> action, which invites the accounts to enable Security Hub and become member accounts in Security Hub. If the invitation is accepted by the account owner, the account becomes a member account in Security Hub, and a permission policy is added that permits the master account to view the findings generated in the member account. When Security Hub is enabled in the invited account, findings start being sent to both the member and master accounts.</p> <p>You can remove the association between the master and member accounts by using the <a>DisassociateFromMasterAccount</a> or <a>DisassociateMembers</a> operation.</p>"
+    },
+    "DeclineInvitations":{
+      "name":"DeclineInvitations",
+      "http":{
+        "method":"POST",
+        "requestUri":"/invitations/decline"
+      },
+      "input":{"shape":"DeclineInvitationsRequest"},
+      "output":{"shape":"DeclineInvitationsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Declines invitations to become a member account.</p>"
+    },
+    "DeleteActionTarget":{
+      "name":"DeleteActionTarget",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/actionTargets/{ActionTargetArn+}"
+      },
+      "input":{"shape":"DeleteActionTargetRequest"},
+      "output":{"shape":"DeleteActionTargetResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Deletes a custom action target from Security Hub. Deleting a custom action target doesn't affect any findings or insights that were already sent to Amazon CloudWatch Events using the custom action.</p>"
+    },
+    "DeleteInsight":{
+      "name":"DeleteInsight",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/insights/{InsightArn+}"
+      },
+      "input":{"shape":"DeleteInsightRequest"},
+      "output":{"shape":"DeleteInsightResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Deletes the insight specified by the <code>InsightArn</code>.</p>"
+    },
+    "DeleteInvitations":{
+      "name":"DeleteInvitations",
+      "http":{
+        "method":"POST",
+        "requestUri":"/invitations/delete"
+      },
+      "input":{"shape":"DeleteInvitationsRequest"},
+      "output":{"shape":"DeleteInvitationsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidAccessException"}
+      ],
+      "documentation":"<p>Deletes invitations received by the AWS account to become a member account.</p>"
+    },
+    "DeleteMembers":{
+      "name":"DeleteMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/members/delete"
+      },
+      "input":{"shape":"DeleteMembersRequest"},
+      "output":{"shape":"DeleteMembersResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Deletes the specified member accounts from Security Hub.</p>"
+    },
+    "DescribeActionTargets":{
+      "name":"DescribeActionTargets",
+      "http":{
+        "method":"POST",
+        "requestUri":"/actionTargets/get"
+      },
+      "input":{"shape":"DescribeActionTargetsRequest"},
+      "output":{"shape":"DescribeActionTargetsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Returns a list of the custom action targets in Security Hub in your account.</p>"
+    },
+    "DescribeHub":{
+      "name":"DescribeHub",
+      "http":{
+        "method":"GET",
+        "requestUri":"/accounts"
+      },
+      "input":{"shape":"DescribeHubRequest"},
+      "output":{"shape":"DescribeHubResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Returns details about the Hub resource in your account, including the <code>HubArn</code> and the time when you enabled Security Hub.</p>"
+    },
+    "DescribeProducts":{
+      "name":"DescribeProducts",
+      "http":{
+        "method":"GET",
+        "requestUri":"/products"
+      },
+      "input":{"shape":"DescribeProductsRequest"},
+      "output":{"shape":"DescribeProductsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"InvalidInputException"}
+      ],
+      "documentation":"<p>Returns information about the products available that you can subscribe to and integrate with Security Hub to consolidate findings.</p>"
+    },
+    "DisableImportFindingsForProduct":{
+      "name":"DisableImportFindingsForProduct",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/productSubscriptions/{ProductSubscriptionArn+}"
+      },
+      "input":{"shape":"DisableImportFindingsForProductRequest"},
+      "output":{"shape":"DisableImportFindingsForProductResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Disables the integration of the specified product with Security Hub. Findings from that product are no longer sent to Security Hub after the integration is disabled.</p>"
+    },
+    "DisableSecurityHub":{
+      "name":"DisableSecurityHub",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/accounts"
+      },
+      "input":{"shape":"DisableSecurityHubRequest"},
+      "output":{"shape":"DisableSecurityHubResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Disables Security Hub in your account only in the current Region. To disable Security Hub in all Regions, you must submit one request per Region where you have enabled Security Hub. When you disable Security Hub for a master account, it doesn't disable Security Hub for any associated member accounts.</p> <p>When you disable Security Hub, your existing findings and insights and any Security Hub configuration settings are deleted after 90 days and can't be recovered. Any standards that were enabled are disabled, and your master and member account associations are removed. If you want to save your existing findings, you must export them before you disable Security Hub.</p>"
+    },
+    "DisassociateFromMasterAccount":{
+      "name":"DisassociateFromMasterAccount",
+      "http":{
+        "method":"POST",
+        "requestUri":"/master/disassociate"
+      },
+      "input":{"shape":"DisassociateFromMasterAccountRequest"},
+      "output":{"shape":"DisassociateFromMasterAccountResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Disassociates the current Security Hub member account from the associated master account.</p>"
+    },
+    "DisassociateMembers":{
+      "name":"DisassociateMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/members/disassociate"
+      },
+      "input":{"shape":"DisassociateMembersRequest"},
+      "output":{"shape":"DisassociateMembersResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Disassociates the specified member accounts from the associated master account.</p>"
+    },
+    "EnableImportFindingsForProduct":{
+      "name":"EnableImportFindingsForProduct",
+      "http":{
+        "method":"POST",
+        "requestUri":"/productSubscriptions"
+      },
+      "input":{"shape":"EnableImportFindingsForProductRequest"},
+      "output":{"shape":"EnableImportFindingsForProductResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceConflictException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Enables the integration of a partner product with Security Hub. Integrated products send findings to Security Hub. When you enable a product integration, a permission policy that grants permission for the product to send findings to Security Hub is applied.</p>"
+    },
+    "EnableSecurityHub":{
+      "name":"EnableSecurityHub",
+      "http":{
+        "method":"POST",
+        "requestUri":"/accounts"
+      },
+      "input":{"shape":"EnableSecurityHubRequest"},
+      "output":{"shape":"EnableSecurityHubResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceConflictException"},
+        {"shape":"AccessDeniedException"}
+      ],
+      "documentation":"<p>Enables Security Hub for your account in the current Region or the Region you specify in the request. When you enable Security Hub, you grant to Security Hub the permissions necessary to gather findings from AWS Config, Amazon GuardDuty, Amazon Inspector, and Amazon Macie. To learn more, see <a href=\"https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-settingup.html\">Setting Up AWS Security Hub</a>.</p>"
+    },
+    "GetEnabledStandards":{
+      "name":"GetEnabledStandards",
+      "http":{
+        "method":"POST",
+        "requestUri":"/standards/get"
+      },
+      "input":{"shape":"GetEnabledStandardsRequest"},
+      "output":{"shape":"GetEnabledStandardsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Returns a list of the standards that are currently enabled.</p>"
+    },
+    "GetFindings":{
+      "name":"GetFindings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/findings"
+      },
+      "input":{"shape":"GetFindingsRequest"},
+      "output":{"shape":"GetFindingsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Returns a list of findings that match the specified criteria.</p>"
+    },
+    "GetInsightResults":{
+      "name":"GetInsightResults",
+      "http":{
+        "method":"GET",
+        "requestUri":"/insights/results/{InsightArn+}"
+      },
+      "input":{"shape":"GetInsightResultsRequest"},
+      "output":{"shape":"GetInsightResultsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Lists the results of the Security Hub insight that the insight ARN specifies.</p>"
+    },
+    "GetInsights":{
+      "name":"GetInsights",
+      "http":{
+        "method":"POST",
+        "requestUri":"/insights/get"
+      },
+      "input":{"shape":"GetInsightsRequest"},
+      "output":{"shape":"GetInsightsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Lists and describes insights that insight ARNs specify.</p>"
+    },
+    "GetInvitationsCount":{
+      "name":"GetInvitationsCount",
+      "http":{
+        "method":"GET",
+        "requestUri":"/invitations/count"
+      },
+      "input":{"shape":"GetInvitationsCountRequest"},
+      "output":{"shape":"GetInvitationsCountResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Returns the count of all Security Hub membership invitations that were sent to the current member account, not including the currently accepted invitation. </p>"
+    },
+    "GetMasterAccount":{
+      "name":"GetMasterAccount",
+      "http":{
+        "method":"GET",
+        "requestUri":"/master"
+      },
+      "input":{"shape":"GetMasterAccountRequest"},
+      "output":{"shape":"GetMasterAccountResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Provides the details for the Security Hub master account to the current member account. </p>"
+    },
+    "GetMembers":{
+      "name":"GetMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/members/get"
+      },
+      "input":{"shape":"GetMembersRequest"},
+      "output":{"shape":"GetMembersResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Returns the details on the Security Hub member accounts that the account IDs specify.</p>"
+    },
+    "InviteMembers":{
+      "name":"InviteMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/members/invite"
+      },
+      "input":{"shape":"InviteMembersRequest"},
+      "output":{"shape":"InviteMembersResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Invites other AWS accounts to become member accounts for the Security Hub master account that the invitation is sent from. Before you can use this action to invite a member, you must first create the member account in Security Hub by using the <a>CreateMembers</a> action. When the account owner accepts the invitation to become a member account and enables Security Hub, the master account can view the findings generated from member account.</p>"
+    },
+    "ListEnabledProductsForImport":{
+      "name":"ListEnabledProductsForImport",
+      "http":{
+        "method":"GET",
+        "requestUri":"/productSubscriptions"
+      },
+      "input":{"shape":"ListEnabledProductsForImportRequest"},
+      "output":{"shape":"ListEnabledProductsForImportResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"}
+      ],
+      "documentation":"<p>Lists all findings-generating solutions (products) whose findings you have subscribed to receive in Security Hub.</p>"
+    },
+    "ListInvitations":{
+      "name":"ListInvitations",
+      "http":{
+        "method":"GET",
+        "requestUri":"/invitations"
+      },
+      "input":{"shape":"ListInvitationsRequest"},
+      "output":{"shape":"ListInvitationsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Lists all Security Hub membership invitations that were sent to the current AWS account. </p>"
+    },
+    "ListMembers":{
+      "name":"ListMembers",
+      "http":{
+        "method":"GET",
+        "requestUri":"/members"
+      },
+      "input":{"shape":"ListMembersRequest"},
+      "output":{"shape":"ListMembersResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"}
+      ],
+      "documentation":"<p>Lists details about all member accounts for the current Security Hub master account.</p>"
+    },
+    "ListTagsForResource":{
+      "name":"ListTagsForResource",
+      "http":{
+        "method":"GET",
+        "requestUri":"/tags/{ResourceArn}"
+      },
+      "input":{"shape":"ListTagsForResourceRequest"},
+      "output":{"shape":"ListTagsForResourceResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Returns a list of tags associated with a resource.</p>"
+    },
+    "TagResource":{
+      "name":"TagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/tags/{ResourceArn}"
+      },
+      "input":{"shape":"TagResourceRequest"},
+      "output":{"shape":"TagResourceResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Adds one or more tags to a resource.</p>"
+    },
+    "UntagResource":{
+      "name":"UntagResource",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/tags/{ResourceArn}"
+      },
+      "input":{"shape":"UntagResourceRequest"},
+      "output":{"shape":"UntagResourceResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Removes one or more tags from a resource.</p>"
+    },
+    "UpdateActionTarget":{
+      "name":"UpdateActionTarget",
+      "http":{
+        "method":"PATCH",
+        "requestUri":"/actionTargets/{ActionTargetArn+}"
+      },
+      "input":{"shape":"UpdateActionTargetRequest"},
+      "output":{"shape":"UpdateActionTargetResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Updates the name and description of a custom action target in Security Hub.</p>"
+    },
+    "UpdateFindings":{
+      "name":"UpdateFindings",
+      "http":{
+        "method":"PATCH",
+        "requestUri":"/findings"
+      },
+      "input":{"shape":"UpdateFindingsRequest"},
+      "output":{"shape":"UpdateFindingsResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Updates the <code>Note</code> and <code>RecordState</code> of the Security Hub-aggregated findings that the filter attributes specify. Any member account that can view the finding also sees the update to the finding.</p>"
+    },
+    "UpdateInsight":{
+      "name":"UpdateInsight",
+      "http":{
+        "method":"PATCH",
+        "requestUri":"/insights/{InsightArn+}"
+      },
+      "input":{"shape":"UpdateInsightRequest"},
+      "output":{"shape":"UpdateInsightResponse"},
+      "errors":[
+        {"shape":"InternalException"},
+        {"shape":"InvalidInputException"},
+        {"shape":"InvalidAccessException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Updates the Security Hub insight that the insight ARN specifies.</p>"
+    }
+  },
+  "shapes":{
+    "AcceptInvitationRequest":{
+      "type":"structure",
+      "required":[
+        "MasterId",
+        "InvitationId"
+      ],
+      "members":{
+        "MasterId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The account ID of the Security Hub master account that sent the invitation.</p>"
+        },
+        "InvitationId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ID of the invitation sent from the Security Hub master account.</p>"
+        }
+      }
+    },
+    "AcceptInvitationResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "AccessDeniedException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"NonEmptyString"},
+        "Code":{"shape":"NonEmptyString"}
+      },
+      "documentation":"<p>You don't have permission to perform the action specified in the request.</p>",
+      "error":{"httpStatusCode":403},
+      "exception":true
+    },
+    "AccountDetails":{
+      "type":"structure",
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>The ID of an AWS account.</p>"
+        },
+        "Email":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The email of an AWS account.</p>"
+        }
+      },
+      "documentation":"<p>The details of an AWS account.</p>"
+    },
+    "AccountDetailsList":{
+      "type":"list",
+      "member":{"shape":"AccountDetails"}
+    },
+    "AccountId":{"type":"string"},
+    "AccountIdList":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"}
+    },
+    "ActionTarget":{
+      "type":"structure",
+      "required":[
+        "ActionTargetArn",
+        "Name",
+        "Description"
+      ],
+      "members":{
+        "ActionTargetArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN for the target action.</p>"
+        },
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the action target.</p>"
+        },
+        "Description":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The description of the target action.</p>"
+        }
+      },
+      "documentation":"<p>An <code>ActionTarget</code> object.</p>"
+    },
+    "ActionTargetList":{
+      "type":"list",
+      "member":{"shape":"ActionTarget"}
+    },
+    "ArnList":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"}
+    },
+    "AwsEc2InstanceDetails":{
+      "type":"structure",
+      "members":{
+        "Type":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The instance type of the instance. </p>"
+        },
+        "ImageId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The Amazon Machine Image (AMI) ID of the instance.</p>"
+        },
+        "IpV4Addresses":{
+          "shape":"StringList",
+          "documentation":"<p>The IPv4 addresses associated with the instance.</p>"
+        },
+        "IpV6Addresses":{
+          "shape":"StringList",
+          "documentation":"<p>The IPv6 addresses associated with the instance.</p>"
+        },
+        "KeyName":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The key name associated with the instance.</p>"
+        },
+        "IamInstanceProfileArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The IAM profile ARN of the instance.</p>"
+        },
+        "VpcId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The identifier of the VPC that the instance was launched in.</p>"
+        },
+        "SubnetId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The identifier of the subnet that the instance was launched in.</p>"
+        },
+        "LaunchedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The date/time the instance was launched.</p>"
+        }
+      },
+      "documentation":"<p>The details of an Amazon EC2 instance.</p>"
+    },
+    "AwsIamAccessKeyDetails":{
+      "type":"structure",
+      "members":{
+        "UserName":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The user associated with the IAM access key related to a finding.</p>"
+        },
+        "Status":{
+          "shape":"AwsIamAccessKeyStatus",
+          "documentation":"<p>The status of the IAM access key related to a finding.</p>"
+        },
+        "CreatedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The creation date/time of the IAM access key related to a finding.</p>"
+        }
+      },
+      "documentation":"<p>IAM access key details related to a finding.</p>"
+    },
+    "AwsIamAccessKeyStatus":{
+      "type":"string",
+      "enum":[
+        "Active",
+        "Inactive"
+      ]
+    },
+    "AwsS3BucketDetails":{
+      "type":"structure",
+      "members":{
+        "OwnerId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The canonical user ID of the owner of the S3 bucket.</p>"
+        },
+        "OwnerName":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The display name of the owner of the S3 bucket.</p>"
+        }
+      },
+      "documentation":"<p>The details of an Amazon S3 bucket.</p>"
+    },
+    "AwsSecurityFinding":{
+      "type":"structure",
+      "required":[
+        "SchemaVersion",
+        "Id",
+        "ProductArn",
+        "GeneratorId",
+        "AwsAccountId",
+        "Types",
+        "CreatedAt",
+        "UpdatedAt",
+        "Severity",
+        "Title",
+        "Description",
+        "Resources"
+      ],
+      "members":{
+        "SchemaVersion":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The schema version that a finding is formatted for.</p>"
+        },
+        "Id":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The security findings provider-specific identifier for a finding.</p>"
+        },
+        "ProductArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN generated by Security Hub that uniquely identifies a third-party company (security-findings provider) after this provider's product (solution that generates findings) is registered with Security Hub. </p>"
+        },
+        "GeneratorId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The identifier for the solution-specific component (a discrete unit of logic) that generated a finding. In various security-findings providers' solutions, this generator can be called a rule, a check, a detector, a plug-in, etc. </p>"
+        },
+        "AwsAccountId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The AWS account ID that a finding is generated in.</p>"
+        },
+        "Types":{
+          "shape":"TypeList",
+          "documentation":"<p>One or more finding types in the format of <code>namespace/category/classifier</code> that classify a finding.</p> <p>Valid namespace values are: Software and Configuration Checks | TTPs | Effects | Unusual Behaviors | Sensitive Data Identifications</p>"
+        },
+        "FirstObservedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>An ISO8601-formatted timestamp that indicates when the security-findings provider first observed the potential security issue that a finding captured.</p>"
+        },
+        "LastObservedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>An ISO8601-formatted timestamp that indicates when the security-findings provider most recently observed the potential security issue that a finding captured.</p>"
+        },
+        "CreatedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>An ISO8601-formatted timestamp that indicates when the security-findings provider created the potential security issue that a finding captured.</p>"
+        },
+        "UpdatedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>An ISO8601-formatted timestamp that indicates when the security-findings provider last updated the finding record. </p>"
+        },
+        "Severity":{
+          "shape":"Severity",
+          "documentation":"<p>A finding's severity.</p>"
+        },
+        "Confidence":{
+          "shape":"Integer",
+          "documentation":"<p>A finding's confidence. Confidence is defined as the likelihood that a finding accurately identifies the behavior or issue that it was intended to identify. Confidence is scored on a 0-100 basis using a ratio scale, where 0 means zero percent confidence and 100 means 100 percent confidence.</p>"
+        },
+        "Criticality":{
+          "shape":"Integer",
+          "documentation":"<p>The level of importance assigned to the resources associated with the finding. A score of 0 means that the underlying resources have no criticality, and a score of 100 is reserved for the most critical resources.</p>"
+        },
+        "Title":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>A finding's title.</p> <note> <p>In this release, <code>Title</code> is a required property.</p> </note>"
+        },
+        "Description":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>A finding's description.</p> <note> <p>In this release, <code>Description</code> is a required property.</p> </note>"
+        },
+        "Remediation":{
+          "shape":"Remediation",
+          "documentation":"<p>A data type that describes the remediation options for a finding.</p>"
+        },
+        "SourceUrl":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>A URL that links to a page about the current finding in the security-findings provider's solution.</p>"
+        },
+        "ProductFields":{
+          "shape":"FieldMap",
+          "documentation":"<p>A data type where security-findings providers can include additional solution-specific details that aren't part of the defined <code>AwsSecurityFinding</code> format.</p>"
+        },
+        "UserDefinedFields":{
+          "shape":"FieldMap",
+          "documentation":"<p>A list of name/value string pairs associated with the finding. These are custom, user-defined fields added to a finding. </p>"
+        },
+        "Malware":{
+          "shape":"MalwareList",
+          "documentation":"<p>A list of malware related to a finding.</p>"
+        },
+        "Network":{
+          "shape":"Network",
+          "documentation":"<p>The details of network-related information about a finding.</p>"
+        },
+        "Process":{
+          "shape":"ProcessDetails",
+          "documentation":"<p>The details of process-related information about a finding.</p>"
+        },
+        "ThreatIntelIndicators":{
+          "shape":"ThreatIntelIndicatorList",
+          "documentation":"<p>Threat intel details related to a finding.</p>"
+        },
+        "Resources":{
+          "shape":"ResourceList",
+          "documentation":"<p>A set of resource data types that describe the resources that the finding refers to.</p>"
+        },
+        "Compliance":{
+          "shape":"Compliance",
+          "documentation":"<p>This data type is exclusive to findings that are generated as the result of a check run against a specific rule in a supported standard (for example, CIS AWS Foundations). Contains compliance-related finding details.</p>"
+        },
+        "VerificationState":{
+          "shape":"VerificationState",
+          "documentation":"<p>Indicates the veracity of a finding. </p>"
+        },
+        "WorkflowState":{
+          "shape":"WorkflowState",
+          "documentation":"<p>The workflow state of a finding. </p>"
+        },
+        "RecordState":{
+          "shape":"RecordState",
+          "documentation":"<p>The record state of a finding.</p>"
+        },
+        "RelatedFindings":{
+          "shape":"RelatedFindingList",
+          "documentation":"<p>A list of related findings.</p>"
+        },
+        "Note":{
+          "shape":"Note",
+          "documentation":"<p>A user-defined note added to a finding.</p>"
+        }
+      },
+      "documentation":"<p>Provides consistent format for the contents of the Security Hub-aggregated findings. <code>AwsSecurityFinding</code> format enables you to share findings between AWS security services and third-party solutions, and compliance checks.</p> <note> <p>A finding is a potential security issue generated either by AWS services (Amazon GuardDuty, Amazon Inspector, and Amazon Macie) or by the integrated third-party solutions and compliance checks.</p> </note>"
+    },
+    "AwsSecurityFindingFilters":{
+      "type":"structure",
+      "members":{
+        "ProductArn":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The ARN generated by Security Hub that uniquely identifies a third-party company (security findings provider) after this provider's product (solution that generates findings) is registered with Security Hub.</p>"
+        },
+        "AwsAccountId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The AWS account ID that a finding is generated in.</p>"
+        },
+        "Id":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The security findings provider-specific identifier for a finding.</p>"
+        },
+        "GeneratorId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The identifier for the solution-specific component (a discrete unit of logic) that generated a finding. In various security-findings providers' solutions, this generator can be called a rule, a check, a detector, a plug-in, etc.</p>"
+        },
+        "Type":{
+          "shape":"StringFilterList",
+          "documentation":"<p>A finding type in the format of <code>namespace/category/classifier</code> that classifies a finding.</p>"
+        },
+        "FirstObservedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>An ISO8601-formatted timestamp that indicates when the security-findings provider first observed the potential security issue that a finding captured.</p>"
+        },
+        "LastObservedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>An ISO8601-formatted timestamp that indicates when the security-findings provider most recently observed the potential security issue that a finding captured.</p>"
+        },
+        "CreatedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>An ISO8601-formatted timestamp that indicates when the security-findings provider captured the potential security issue that a finding captured.</p>"
+        },
+        "UpdatedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>An ISO8601-formatted timestamp that indicates when the security-findings provider last updated the finding record. </p>"
+        },
+        "SeverityProduct":{
+          "shape":"NumberFilterList",
+          "documentation":"<p>The native severity as defined by the security-findings provider's solution that generated the finding.</p>"
+        },
+        "SeverityNormalized":{
+          "shape":"NumberFilterList",
+          "documentation":"<p>The normalized severity of a finding.</p>"
+        },
+        "SeverityLabel":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The label of a finding's severity.</p>"
+        },
+        "Confidence":{
+          "shape":"NumberFilterList",
+          "documentation":"<p>A finding's confidence. Confidence is defined as the likelihood that a finding accurately identifies the behavior or issue that it was intended to identify. Confidence is scored on a 0-100 basis using a ratio scale, where 0 means zero percent confidence and 100 means 100 percent confidence.</p>"
+        },
+        "Criticality":{
+          "shape":"NumberFilterList",
+          "documentation":"<p>The level of importance assigned to the resources associated with the finding. A score of 0 means that the underlying resources have no criticality, and a score of 100 is reserved for the most critical resources.</p>"
+        },
+        "Title":{
+          "shape":"StringFilterList",
+          "documentation":"<p>A finding's title.</p>"
+        },
+        "Description":{
+          "shape":"StringFilterList",
+          "documentation":"<p>A finding's description.</p>"
+        },
+        "RecommendationText":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The recommendation of what to do about the issue described in a finding.</p>"
+        },
+        "SourceUrl":{
+          "shape":"StringFilterList",
+          "documentation":"<p>A URL that links to a page about the current finding in the security-findings provider's solution.</p>"
+        },
+        "ProductFields":{
+          "shape":"MapFilterList",
+          "documentation":"<p>A data type where security-findings providers can include additional solution-specific details that aren't part of the defined <code>AwsSecurityFinding</code> format.</p>"
+        },
+        "ProductName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The name of the solution (product) that generates findings.</p>"
+        },
+        "CompanyName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The name of the findings provider (company) that owns the solution (product) that generates findings.</p>"
+        },
+        "UserDefinedFields":{
+          "shape":"MapFilterList",
+          "documentation":"<p>A list of name/value string pairs associated with the finding. These are custom, user-defined fields added to a finding. </p>"
+        },
+        "MalwareName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The name of the malware that was observed.</p>"
+        },
+        "MalwareType":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The type of the malware that was observed.</p>"
+        },
+        "MalwarePath":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The filesystem path of the malware that was observed.</p>"
+        },
+        "MalwareState":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The state of the malware that was observed.</p>"
+        },
+        "NetworkDirection":{
+          "shape":"StringFilterList",
+          "documentation":"<p>Indicates the direction of network traffic associated with a finding.</p>"
+        },
+        "NetworkProtocol":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The protocol of network-related information about a finding.</p>"
+        },
+        "NetworkSourceIpV4":{
+          "shape":"IpFilterList",
+          "documentation":"<p>The source IPv4 address of network-related information about a finding.</p>"
+        },
+        "NetworkSourceIpV6":{
+          "shape":"IpFilterList",
+          "documentation":"<p>The source IPv6 address of network-related information about a finding.</p>"
+        },
+        "NetworkSourcePort":{
+          "shape":"NumberFilterList",
+          "documentation":"<p>The source port of network-related information about a finding.</p>"
+        },
+        "NetworkSourceDomain":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The source domain of network-related information about a finding.</p>"
+        },
+        "NetworkSourceMac":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The source media access control (MAC) address of network-related information about a finding.</p>"
+        },
+        "NetworkDestinationIpV4":{
+          "shape":"IpFilterList",
+          "documentation":"<p>The destination IPv4 address of network-related information about a finding.</p>"
+        },
+        "NetworkDestinationIpV6":{
+          "shape":"IpFilterList",
+          "documentation":"<p>The destination IPv6 address of network-related information about a finding.</p>"
+        },
+        "NetworkDestinationPort":{
+          "shape":"NumberFilterList",
+          "documentation":"<p>The destination port of network-related information about a finding.</p>"
+        },
+        "NetworkDestinationDomain":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The destination domain of network-related information about a finding.</p>"
+        },
+        "ProcessName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The name of the process.</p>"
+        },
+        "ProcessPath":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The path to the process executable.</p>"
+        },
+        "ProcessPid":{
+          "shape":"NumberFilterList",
+          "documentation":"<p>The process ID.</p>"
+        },
+        "ProcessParentPid":{
+          "shape":"NumberFilterList",
+          "documentation":"<p>The parent process ID.</p>"
+        },
+        "ProcessLaunchedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>The date/time that the process was launched.</p>"
+        },
+        "ProcessTerminatedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>The date/time that the process was terminated.</p>"
+        },
+        "ThreatIntelIndicatorType":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The type of a threat intel indicator.</p>"
+        },
+        "ThreatIntelIndicatorValue":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The value of a threat intel indicator.</p>"
+        },
+        "ThreatIntelIndicatorCategory":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The category of a threat intel indicator.</p>"
+        },
+        "ThreatIntelIndicatorLastObservedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>The date/time of the last observation of a threat intel indicator.</p>"
+        },
+        "ThreatIntelIndicatorSource":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The source of the threat intel.</p>"
+        },
+        "ThreatIntelIndicatorSourceUrl":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The URL for more details from the source of the threat intel.</p>"
+        },
+        "ResourceType":{
+          "shape":"StringFilterList",
+          "documentation":"<p>Specifies the type of the resource that details are provided for.</p>"
+        },
+        "ResourceId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The canonical identifier for the given resource type.</p>"
+        },
+        "ResourcePartition":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The canonical AWS partition name that the Region is assigned to.</p>"
+        },
+        "ResourceRegion":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The canonical AWS external Region name where this resource is located.</p>"
+        },
+        "ResourceTags":{
+          "shape":"MapFilterList",
+          "documentation":"<p>A list of AWS tags associated with a resource at the time the finding was processed.</p>"
+        },
+        "ResourceAwsEc2InstanceType":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The instance type of the instance.</p>"
+        },
+        "ResourceAwsEc2InstanceImageId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The Amazon Machine Image (AMI) ID of the instance.</p>"
+        },
+        "ResourceAwsEc2InstanceIpV4Addresses":{
+          "shape":"IpFilterList",
+          "documentation":"<p>The IPv4 addresses associated with the instance.</p>"
+        },
+        "ResourceAwsEc2InstanceIpV6Addresses":{
+          "shape":"IpFilterList",
+          "documentation":"<p>The IPv6 addresses associated with the instance.</p>"
+        },
+        "ResourceAwsEc2InstanceKeyName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The key name associated with the instance.</p>"
+        },
+        "ResourceAwsEc2InstanceIamInstanceProfileArn":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The IAM profile ARN of the instance.</p>"
+        },
+        "ResourceAwsEc2InstanceVpcId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The identifier of the VPC that the instance was launched in.</p>"
+        },
+        "ResourceAwsEc2InstanceSubnetId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The identifier of the subnet that the instance was launched in.</p>"
+        },
+        "ResourceAwsEc2InstanceLaunchedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>The date/time the instance was launched.</p>"
+        },
+        "ResourceAwsS3BucketOwnerId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The canonical user ID of the owner of the S3 bucket.</p>"
+        },
+        "ResourceAwsS3BucketOwnerName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The display name of the owner of the S3 bucket.</p>"
+        },
+        "ResourceAwsIamAccessKeyUserName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The user associated with the IAM access key related to a finding.</p>"
+        },
+        "ResourceAwsIamAccessKeyStatus":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The status of the IAM access key related to a finding.</p>"
+        },
+        "ResourceAwsIamAccessKeyCreatedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>The creation date/time of the IAM access key related to a finding.</p>"
+        },
+        "ResourceContainerName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The name of the container related to a finding.</p>"
+        },
+        "ResourceContainerImageId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The identifier of the image related to a finding.</p>"
+        },
+        "ResourceContainerImageName":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The name of the image related to a finding.</p>"
+        },
+        "ResourceContainerLaunchedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>The date/time that the container was started.</p>"
+        },
+        "ResourceDetailsOther":{
+          "shape":"MapFilterList",
+          "documentation":"<p>The details of a resource that doesn't have a specific subfield for the resource type defined.</p>"
+        },
+        "ComplianceStatus":{
+          "shape":"StringFilterList",
+          "documentation":"<p>Exclusive to findings that are generated as the result of a check run against a specific rule in a supported standard (for example, CIS AWS Foundations). Contains compliance-related finding details.</p>"
+        },
+        "VerificationState":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The veracity of a finding.</p>"
+        },
+        "WorkflowState":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The workflow state of a finding.</p>"
+        },
+        "RecordState":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The updated record state for the finding.</p>"
+        },
+        "RelatedFindingsProductArn":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The ARN of the solution that generated a related finding.</p>"
+        },
+        "RelatedFindingsId":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The solution-generated identifier for a related finding.</p>"
+        },
+        "NoteText":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The text of a note.</p>"
+        },
+        "NoteUpdatedAt":{
+          "shape":"DateFilterList",
+          "documentation":"<p>The timestamp of when the note was updated.</p>"
+        },
+        "NoteUpdatedBy":{
+          "shape":"StringFilterList",
+          "documentation":"<p>The principal that created a note.</p>"
+        },
+        "Keyword":{
+          "shape":"KeywordFilterList",
+          "documentation":"<p>A keyword for a finding.</p>"
+        }
+      },
+      "documentation":"<p>A collection of attributes that are applied to all active Security Hub-aggregated findings and that result in a subset of findings that are included in this insight. </p>"
+    },
+    "AwsSecurityFindingList":{
+      "type":"list",
+      "member":{"shape":"AwsSecurityFinding"}
+    },
+    "BatchDisableStandardsRequest":{
+      "type":"structure",
+      "required":["StandardsSubscriptionArns"],
+      "members":{
+        "StandardsSubscriptionArns":{
+          "shape":"StandardsSubscriptionArns",
+          "documentation":"<p>The ARNs of the standards subscriptions to disable.</p>"
+        }
+      }
+    },
+    "BatchDisableStandardsResponse":{
+      "type":"structure",
+      "members":{
+        "StandardsSubscriptions":{
+          "shape":"StandardsSubscriptions",
+          "documentation":"<p>The details of the standards subscriptions that were disabled.</p>"
+        }
+      }
+    },
+    "BatchEnableStandardsRequest":{
+      "type":"structure",
+      "required":["StandardsSubscriptionRequests"],
+      "members":{
+        "StandardsSubscriptionRequests":{
+          "shape":"StandardsSubscriptionRequests",
+          "documentation":"<p>The list of standards compliance checks to enable.</p> <important> <p>In this release, Security Hub supports only the CIS AWS Foundations standard.</p> <p>The ARN for the standard is <code>arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0</code>.</p> </important>"
+        }
+      }
+    },
+    "BatchEnableStandardsResponse":{
+      "type":"structure",
+      "members":{
+        "StandardsSubscriptions":{
+          "shape":"StandardsSubscriptions",
+          "documentation":"<p>The details of the standards subscriptions that were enabled.</p>"
+        }
+      }
+    },
+    "BatchImportFindingsRequest":{
+      "type":"structure",
+      "required":["Findings"],
+      "members":{
+        "Findings":{
+          "shape":"AwsSecurityFindingList",
+          "documentation":"<p>A list of findings to import. To successfully import a finding, it must follow the <a href=\"https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-findings-format.html\">AWS Security Finding Format</a>.</p>"
+        }
+      }
+    },
+    "BatchImportFindingsResponse":{
+      "type":"structure",
+      "required":[
+        "FailedCount",
+        "SuccessCount"
+      ],
+      "members":{
+        "FailedCount":{
+          "shape":"Integer",
+          "documentation":"<p>The number of findings that failed to import.</p>"
+        },
+        "SuccessCount":{
+          "shape":"Integer",
+          "documentation":"<p>The number of findings that were successfully imported.</p>"
+        },
+        "FailedFindings":{
+          "shape":"ImportFindingsErrorList",
+          "documentation":"<p>The list of the findings that failed to import.</p>"
+        }
+      }
+    },
+    "Boolean":{"type":"boolean"},
+    "CategoryList":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"}
+    },
+    "Compliance":{
+      "type":"structure",
+      "members":{
+        "Status":{
+          "shape":"ComplianceStatus",
+          "documentation":"<p>The result of a compliance check.</p>"
+        }
+      },
+      "documentation":"<p>Exclusive to findings that are generated as the result of a check run against a specific rule in a supported standard (for example, CIS AWS Foundations). Contains compliance-related finding details.</p>"
+    },
+    "ComplianceStatus":{
+      "type":"string",
+      "enum":[
+        "PASSED",
+        "WARNING",
+        "FAILED",
+        "NOT_AVAILABLE"
+      ]
+    },
+    "ContainerDetails":{
+      "type":"structure",
+      "members":{
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the container related to a finding.</p>"
+        },
+        "ImageId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The identifier of the image related to a finding.</p>"
+        },
+        "ImageName":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the image related to a finding.</p>"
+        },
+        "LaunchedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The date and time when the container started.</p>"
+        }
+      },
+      "documentation":"<p>Container details related to a finding.</p>"
+    },
+    "CreateActionTargetRequest":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "Description",
+        "Id"
+      ],
+      "members":{
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the custom action target.</p>"
+        },
+        "Description":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The description for the custom action target.</p>"
+        },
+        "Id":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ID for the custom action target.</p>"
+        }
+      }
+    },
+    "CreateActionTargetResponse":{
+      "type":"structure",
+      "required":["ActionTargetArn"],
+      "members":{
+        "ActionTargetArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN for the custom action target.</p>"
+        }
+      }
+    },
+    "CreateInsightRequest":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "Filters",
+        "GroupByAttribute"
+      ],
+      "members":{
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the custom insight to create.</p>"
+        },
+        "Filters":{
+          "shape":"AwsSecurityFindingFilters",
+          "documentation":"<p>One or more attributes used to filter the findings included in the insight. Only findings that match the criteria defined in the filters are included in the insight.</p>"
+        },
+        "GroupByAttribute":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The attribute used as the aggregator to group related findings for the insight.</p>"
+        }
+      }
+    },
+    "CreateInsightResponse":{
+      "type":"structure",
+      "required":["InsightArn"],
+      "members":{
+        "InsightArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the insight created.</p>"
+        }
+      }
+    },
+    "CreateMembersRequest":{
+      "type":"structure",
+      "members":{
+        "AccountDetails":{
+          "shape":"AccountDetailsList",
+          "documentation":"<p>A list of account ID and email address pairs of the accounts to associate with the Security Hub master account.</p>"
+        }
+      }
+    },
+    "CreateMembersResponse":{
+      "type":"structure",
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"ResultList",
+          "documentation":"<p>A list of account ID and email address pairs of the AWS accounts that weren't processed.</p>"
+        }
+      }
+    },
+    "DateFilter":{
+      "type":"structure",
+      "members":{
+        "Start":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>A start date for the date filter.</p>"
+        },
+        "End":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>An end date for the date filter.</p>"
+        },
+        "DateRange":{
+          "shape":"DateRange",
+          "documentation":"<p>A date range for the date filter.</p>"
+        }
+      },
+      "documentation":"<p>A date filter for querying findings.</p>"
+    },
+    "DateFilterList":{
+      "type":"list",
+      "member":{"shape":"DateFilter"}
+    },
+    "DateRange":{
+      "type":"structure",
+      "members":{
+        "Value":{
+          "shape":"Integer",
+          "documentation":"<p>A date range value for the date filter.</p>"
+        },
+        "Unit":{
+          "shape":"DateRangeUnit",
+          "documentation":"<p>A date range unit for the date filter.</p>"
+        }
+      },
+      "documentation":"<p>A date range for the date filter.</p>"
+    },
+    "DateRangeUnit":{
+      "type":"string",
+      "enum":["DAYS"]
+    },
+    "DeclineInvitationsRequest":{
+      "type":"structure",
+      "required":["AccountIds"],
+      "members":{
+        "AccountIds":{
+          "shape":"AccountIdList",
+          "documentation":"<p>A list of account IDs that specify the accounts that invitations to Security Hub are declined from.</p>"
+        }
+      }
+    },
+    "DeclineInvitationsResponse":{
+      "type":"structure",
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"ResultList",
+          "documentation":"<p>A list of account ID and email address pairs of the AWS accounts that weren't processed.</p>"
+        }
+      }
+    },
+    "DeleteActionTargetRequest":{
+      "type":"structure",
+      "required":["ActionTargetArn"],
+      "members":{
+        "ActionTargetArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the custom action target to delete.</p>",
+          "location":"uri",
+          "locationName":"ActionTargetArn"
+        }
+      }
+    },
+    "DeleteActionTargetResponse":{
+      "type":"structure",
+      "required":["ActionTargetArn"],
+      "members":{
+        "ActionTargetArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the custom action target that was deleted.</p>"
+        }
+      }
+    },
+    "DeleteInsightRequest":{
+      "type":"structure",
+      "required":["InsightArn"],
+      "members":{
+        "InsightArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the insight to delete.</p>",
+          "location":"uri",
+          "locationName":"InsightArn"
+        }
+      }
+    },
+    "DeleteInsightResponse":{
+      "type":"structure",
+      "required":["InsightArn"],
+      "members":{
+        "InsightArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the insight that was deleted.</p>"
+        }
+      }
+    },
+    "DeleteInvitationsRequest":{
+      "type":"structure",
+      "required":["AccountIds"],
+      "members":{
+        "AccountIds":{
+          "shape":"AccountIdList",
+          "documentation":"<p>A list of the account IDs that sent the invitations to delete.</p>"
+        }
+      }
+    },
+    "DeleteInvitationsResponse":{
+      "type":"structure",
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"ResultList",
+          "documentation":"<p>A list of account ID and email address pairs of the AWS accounts that invitations weren't deleted for.</p>"
+        }
+      }
+    },
+    "DeleteMembersRequest":{
+      "type":"structure",
+      "members":{
+        "AccountIds":{
+          "shape":"AccountIdList",
+          "documentation":"<p>A list of account IDs of the member accounts to delete.</p>"
+        }
+      }
+    },
+    "DeleteMembersResponse":{
+      "type":"structure",
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"ResultList",
+          "documentation":"<p>A list of account ID and email address pairs of the AWS accounts that weren't deleted.</p>"
+        }
+      }
+    },
+    "DescribeActionTargetsRequest":{
+      "type":"structure",
+      "members":{
+        "ActionTargetArns":{
+          "shape":"ArnList",
+          "documentation":"<p>A list of custom action target ARNs for the custom action targets to retrieve.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of results to return.</p>"
+        }
+      }
+    },
+    "DescribeActionTargetsResponse":{
+      "type":"structure",
+      "required":["ActionTargets"],
+      "members":{
+        "ActionTargets":{
+          "shape":"ActionTargetList",
+          "documentation":"<p>A list of <code>ActionTarget</code> objects. Each object includes the <code>ActionTargetArn</code>, <code>Description</code>, and <code>Name</code> of a custom action target available in Security Hub.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        }
+      }
+    },
+    "DescribeHubRequest":{
+      "type":"structure",
+      "members":{
+        "HubArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the Hub resource to retrieve.</p>",
+          "location":"querystring",
+          "locationName":"HubArn"
+        }
+      }
+    },
+    "DescribeHubResponse":{
+      "type":"structure",
+      "members":{
+        "HubArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the Hub resource retrieved.</p>"
+        },
+        "SubscribedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The date and time when Security Hub was enabled in the account.</p>"
+        }
+      }
+    },
+    "DescribeProductsRequest":{
+      "type":"structure",
+      "members":{
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token that is required for pagination.</p>",
+          "location":"querystring",
+          "locationName":"NextToken"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of results to return.</p>",
+          "location":"querystring",
+          "locationName":"MaxResults"
+        }
+      }
+    },
+    "DescribeProductsResponse":{
+      "type":"structure",
+      "required":["Products"],
+      "members":{
+        "Products":{
+          "shape":"ProductsList",
+          "documentation":"<p>A list of products, including details for each product.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        }
+      }
+    },
+    "DisableImportFindingsForProductRequest":{
+      "type":"structure",
+      "required":["ProductSubscriptionArn"],
+      "members":{
+        "ProductSubscriptionArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the integrated product to disable the integration for.</p>",
+          "location":"uri",
+          "locationName":"ProductSubscriptionArn"
+        }
+      }
+    },
+    "DisableImportFindingsForProductResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DisableSecurityHubRequest":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DisableSecurityHubResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DisassociateFromMasterAccountRequest":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DisassociateFromMasterAccountResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DisassociateMembersRequest":{
+      "type":"structure",
+      "members":{
+        "AccountIds":{
+          "shape":"AccountIdList",
+          "documentation":"<p>The account IDs of the member accounts to disassociate from the master account.</p>"
+        }
+      }
+    },
+    "DisassociateMembersResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "Double":{"type":"double"},
+    "EnableImportFindingsForProductRequest":{
+      "type":"structure",
+      "required":["ProductArn"],
+      "members":{
+        "ProductArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the product to enable the integration for.</p>"
+        }
+      }
+    },
+    "EnableImportFindingsForProductResponse":{
+      "type":"structure",
+      "members":{
+        "ProductSubscriptionArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of your subscription to the product to enable integrations for.</p>"
+        }
+      }
+    },
+    "EnableSecurityHubRequest":{
+      "type":"structure",
+      "members":{
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags to add to the Hub resource when you enable Security Hub.</p>"
+        }
+      }
+    },
+    "EnableSecurityHubResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "FieldMap":{
+      "type":"map",
+      "key":{"shape":"NonEmptyString"},
+      "value":{"shape":"NonEmptyString"}
+    },
+    "GetEnabledStandardsRequest":{
+      "type":"structure",
+      "members":{
+        "StandardsSubscriptionArns":{
+          "shape":"StandardsSubscriptionArns",
+          "documentation":"<p>A list of the standards subscription ARNs for the standards to retrieve.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>Paginates results. On your first call to the <code>GetEnabledStandards</code> operation, set the value of this parameter to <code>NULL</code>. For subsequent calls to the operation, fill <code>nextToken</code> in the request with the value of <code>nextToken</code> from the previous response to continue listing data.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of results to return in the response.</p>"
+        }
+      }
+    },
+    "GetEnabledStandardsResponse":{
+      "type":"structure",
+      "members":{
+        "StandardsSubscriptions":{
+          "shape":"StandardsSubscriptions",
+          "documentation":"<p>A list of <code>StandardsSubscriptions</code> objects that include information about the enabled standards.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        }
+      }
+    },
+    "GetFindingsRequest":{
+      "type":"structure",
+      "members":{
+        "Filters":{
+          "shape":"AwsSecurityFindingFilters",
+          "documentation":"<p>The findings attributes used to define a condition to filter the findings returned.</p>"
+        },
+        "SortCriteria":{
+          "shape":"SortCriteria",
+          "documentation":"<p>Findings attributes used to sort the list of findings returned.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>Paginates results. On your first call to the <code>GetFindings</code> operation, set the value of this parameter to <code>NULL</code>. For subsequent calls to the operation, fill <code>nextToken</code> in the request with the value of <code>nextToken</code> from the previous response to continue listing data.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of findings to return.</p>"
+        }
+      }
+    },
+    "GetFindingsResponse":{
+      "type":"structure",
+      "required":["Findings"],
+      "members":{
+        "Findings":{
+          "shape":"AwsSecurityFindingList",
+          "documentation":"<p>The findings that matched the filters specified in the request.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        }
+      }
+    },
+    "GetInsightResultsRequest":{
+      "type":"structure",
+      "required":["InsightArn"],
+      "members":{
+        "InsightArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the insight whose results you want to see.</p>",
+          "location":"uri",
+          "locationName":"InsightArn"
+        }
+      }
+    },
+    "GetInsightResultsResponse":{
+      "type":"structure",
+      "required":["InsightResults"],
+      "members":{
+        "InsightResults":{
+          "shape":"InsightResults",
+          "documentation":"<p>The insight results returned by the operation.</p>"
+        }
+      }
+    },
+    "GetInsightsRequest":{
+      "type":"structure",
+      "members":{
+        "InsightArns":{
+          "shape":"ArnList",
+          "documentation":"<p>The ARNs of the insights that you want to describe.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>Paginates results. On your first call to the <code>GetInsights</code> operation, set the value of this parameter to <code>NULL</code>. For subsequent calls to the operation, fill <code>nextToken</code> in the request with the value of <code>nextToken</code> from the previous response to continue listing data.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of items that you want in the response.</p>"
+        }
+      }
+    },
+    "GetInsightsResponse":{
+      "type":"structure",
+      "required":["Insights"],
+      "members":{
+        "Insights":{
+          "shape":"InsightList",
+          "documentation":"<p>The insights returned by the operation.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        }
+      }
+    },
+    "GetInvitationsCountRequest":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "GetInvitationsCountResponse":{
+      "type":"structure",
+      "members":{
+        "InvitationsCount":{
+          "shape":"Integer",
+          "documentation":"<p>The number of all membership invitations sent to this Security Hub member account, not including the currently accepted invitation. </p>"
+        }
+      }
+    },
+    "GetMasterAccountRequest":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "GetMasterAccountResponse":{
+      "type":"structure",
+      "members":{
+        "Master":{
+          "shape":"Invitation",
+          "documentation":"<p>A list of details about the Security Hub master account for the current member account. </p>"
+        }
+      }
+    },
+    "GetMembersRequest":{
+      "type":"structure",
+      "required":["AccountIds"],
+      "members":{
+        "AccountIds":{
+          "shape":"AccountIdList",
+          "documentation":"<p>A list of account IDs for the Security Hub member accounts that you want to return the details for. </p>"
+        }
+      }
+    },
+    "GetMembersResponse":{
+      "type":"structure",
+      "members":{
+        "Members":{
+          "shape":"MemberList",
+          "documentation":"<p>A list of details about the Security Hub member accounts.</p>"
+        },
+        "UnprocessedAccounts":{
+          "shape":"ResultList",
+          "documentation":"<p>A list of account ID and email address pairs of the AWS accounts that couldn't be processed.</p>"
+        }
+      }
+    },
+    "ImportFindingsError":{
+      "type":"structure",
+      "required":[
+        "Id",
+        "ErrorCode",
+        "ErrorMessage"
+      ],
+      "members":{
+        "Id":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ID of the error made during the <code>BatchImportFindings</code> operation.</p>"
+        },
+        "ErrorCode":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The code of the error made during the <code>BatchImportFindings</code> operation.</p>"
+        },
+        "ErrorMessage":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The message of the error made during the <code>BatchImportFindings</code> operation.</p>"
+        }
+      },
+      "documentation":"<p>Includes details of the list of the findings that can't be imported.</p>"
+    },
+    "ImportFindingsErrorList":{
+      "type":"list",
+      "member":{"shape":"ImportFindingsError"}
+    },
+    "Insight":{
+      "type":"structure",
+      "required":[
+        "InsightArn",
+        "Name",
+        "Filters",
+        "GroupByAttribute"
+      ],
+      "members":{
+        "InsightArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of a Security Hub insight.</p>"
+        },
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of a Security Hub insight.</p>"
+        },
+        "Filters":{
+          "shape":"AwsSecurityFindingFilters",
+          "documentation":"<p>One or more attributes used to filter the findings included in the insight. Only findings that match the criteria defined in the filters are included in the insight.</p>"
+        },
+        "GroupByAttribute":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The attribute that the insight's findings are grouped by. This attribute is used as a findings aggregator for the purposes of viewing and managing multiple related findings under a single operand.</p>"
+        }
+      },
+      "documentation":"<p>Contains information about a Security Hub insight.</p>"
+    },
+    "InsightList":{
+      "type":"list",
+      "member":{"shape":"Insight"}
+    },
+    "InsightResultValue":{
+      "type":"structure",
+      "required":[
+        "GroupByAttributeValue",
+        "Count"
+      ],
+      "members":{
+        "GroupByAttributeValue":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The value of the attribute that the findings are grouped by for the insight whose results are returned by the <code>GetInsightResults</code> operation.</p>"
+        },
+        "Count":{
+          "shape":"Integer",
+          "documentation":"<p>The number of findings returned for each <code>GroupByAttributeValue</code>.</p>"
+        }
+      },
+      "documentation":"<p>The insight result values returned by the <code>GetInsightResults</code> operation.</p>"
+    },
+    "InsightResultValueList":{
+      "type":"list",
+      "member":{"shape":"InsightResultValue"}
+    },
+    "InsightResults":{
+      "type":"structure",
+      "required":[
+        "InsightArn",
+        "GroupByAttribute",
+        "ResultValues"
+      ],
+      "members":{
+        "InsightArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the insight whose results are returned by the <code>GetInsightResults</code> operation.</p>"
+        },
+        "GroupByAttribute":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The attribute that the findings are grouped by for the insight whose results are returned by the <code>GetInsightResults</code> operation.</p>"
+        },
+        "ResultValues":{
+          "shape":"InsightResultValueList",
+          "documentation":"<p>The list of insight result values returned by the <code>GetInsightResults</code> operation.</p>"
+        }
+      },
+      "documentation":"<p>The insight results returned by the <code>GetInsightResults</code> operation.</p>"
+    },
+    "Integer":{"type":"integer"},
+    "InternalException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"NonEmptyString"},
+        "Code":{"shape":"NonEmptyString"}
+      },
+      "documentation":"<p>Internal server error.</p>",
+      "error":{"httpStatusCode":500},
+      "exception":true
+    },
+    "InvalidAccessException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"NonEmptyString"},
+        "Code":{"shape":"NonEmptyString"}
+      },
+      "documentation":"<p>AWS Security Hub isn't enabled for the account used to make this request.</p>",
+      "error":{"httpStatusCode":401},
+      "exception":true
+    },
+    "InvalidInputException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"NonEmptyString"},
+        "Code":{"shape":"NonEmptyString"}
+      },
+      "documentation":"<p>The request was rejected because you supplied an invalid or out-of-range value for an input parameter.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "Invitation":{
+      "type":"structure",
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>The account ID of the Security Hub master account that the invitation was sent from.</p>"
+        },
+        "InvitationId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ID of the invitation sent to the member account.</p>"
+        },
+        "InvitedAt":{
+          "shape":"Timestamp",
+          "documentation":"<p>The timestamp of when the invitation was sent.</p>"
+        },
+        "MemberStatus":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The current status of the association between member and master accounts.</p>"
+        }
+      },
+      "documentation":"<p>Details about an invitation.</p>"
+    },
+    "InvitationList":{
+      "type":"list",
+      "member":{"shape":"Invitation"}
+    },
+    "InviteMembersRequest":{
+      "type":"structure",
+      "members":{
+        "AccountIds":{
+          "shape":"AccountIdList",
+          "documentation":"<p>A list of IDs of the AWS accounts that you want to invite to Security Hub as members. </p>"
+        }
+      }
+    },
+    "InviteMembersResponse":{
+      "type":"structure",
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"ResultList",
+          "documentation":"<p>A list of account ID and email address pairs of the AWS accounts that couldn't be processed. </p>"
+        }
+      }
+    },
+    "IpFilter":{
+      "type":"structure",
+      "members":{
+        "Cidr":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>A finding's CIDR value.</p>"
+        }
+      },
+      "documentation":"<p>The IP filter for querying findings.</p>"
+    },
+    "IpFilterList":{
+      "type":"list",
+      "member":{"shape":"IpFilter"}
+    },
+    "KeywordFilter":{
+      "type":"structure",
+      "members":{
+        "Value":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>A value for the keyword.</p>"
+        }
+      },
+      "documentation":"<p>A keyword filter for querying findings.</p>"
+    },
+    "KeywordFilterList":{
+      "type":"list",
+      "member":{"shape":"KeywordFilter"}
+    },
+    "LimitExceededException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"NonEmptyString"},
+        "Code":{"shape":"NonEmptyString"}
+      },
+      "documentation":"<p>The request was rejected because it attempted to create resources beyond the current AWS account limits. The error code describes the limit exceeded.</p>",
+      "error":{"httpStatusCode":429},
+      "exception":true
+    },
+    "ListEnabledProductsForImportRequest":{
+      "type":"structure",
+      "members":{
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>Paginates results. On your first call to the <code>ListEnabledProductsForImport</code> operation, set the value of this parameter to <code>NULL</code>. For subsequent calls to the operation, fill <code>nextToken</code> in the request with the value of <code>NextToken</code> from the previous response to continue listing data.</p>",
+          "location":"querystring",
+          "locationName":"NextToken"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of items that you want in the response.</p>",
+          "location":"querystring",
+          "locationName":"MaxResults"
+        }
+      }
+    },
+    "ListEnabledProductsForImportResponse":{
+      "type":"structure",
+      "members":{
+        "ProductSubscriptions":{
+          "shape":"ProductSubscriptionArnList",
+          "documentation":"<p>A list of ARNs for the resources that represent your subscriptions to products. </p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        }
+      }
+    },
+    "ListInvitationsRequest":{
+      "type":"structure",
+      "members":{
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of items that you want in the response. </p>",
+          "location":"querystring",
+          "locationName":"MaxResults"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>Paginates results. On your first call to the <code>ListInvitations</code> operation, set the value of this parameter to <code>NULL</code>. For subsequent calls to the operation, fill <code>nextToken</code> in the request with the value of <code>NextToken</code> from the previous response to continue listing data. </p>",
+          "location":"querystring",
+          "locationName":"NextToken"
+        }
+      }
+    },
+    "ListInvitationsResponse":{
+      "type":"structure",
+      "members":{
+        "Invitations":{
+          "shape":"InvitationList",
+          "documentation":"<p>The details of the invitations returned by the operation.</p>"
+        },
+        "NextToken":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        }
+      }
+    },
+    "ListMembersRequest":{
+      "type":"structure",
+      "members":{
+        "OnlyAssociated":{
+          "shape":"Boolean",
+          "documentation":"<p>Specifies which member accounts the response includes based on their relationship status with the master account. The default value is <code>TRUE</code>. If <code>onlyAssociated</code> is set to <code>TRUE</code>, the response includes member accounts whose relationship status with the master is set to <code>ENABLED</code> or <code>DISABLED</code>. If <code>onlyAssociated</code> is set to <code>FALSE</code>, the response includes all existing member accounts. </p>",
+          "location":"querystring",
+          "locationName":"OnlyAssociated"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>The maximum number of items that you want in the response. </p>",
+          "location":"querystring",
+          "locationName":"MaxResults"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>Paginates results. Set the value of this parameter to <code>NULL</code> on your first call to the <code>ListMembers</code> operation. For subsequent calls to the operation, fill <code>nextToken</code> in the request with the value of <code>nextToken</code> from the previous response to continue listing data. </p>",
+          "location":"querystring",
+          "locationName":"NextToken"
+        }
+      }
+    },
+    "ListMembersResponse":{
+      "type":"structure",
+      "members":{
+        "Members":{
+          "shape":"MemberList",
+          "documentation":"<p>Member details returned by the operation.</p>"
+        },
+        "NextToken":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The token that is required for pagination.</p>"
+        }
+      }
+    },
+    "ListTagsForResourceRequest":{
+      "type":"structure",
+      "required":["ResourceArn"],
+      "members":{
+        "ResourceArn":{
+          "shape":"ResourceArn",
+          "documentation":"<p>The ARN of the resource to retrieve tags for.</p>",
+          "location":"uri",
+          "locationName":"ResourceArn"
+        }
+      }
+    },
+    "ListTagsForResourceResponse":{
+      "type":"structure",
+      "members":{
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags associated with a resource.</p>"
+        }
+      }
+    },
+    "Malware":{
+      "type":"structure",
+      "required":["Name"],
+      "members":{
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the malware that was observed.</p>"
+        },
+        "Type":{
+          "shape":"MalwareType",
+          "documentation":"<p>The type of the malware that was observed.</p>"
+        },
+        "Path":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The file system path of the malware that was observed.</p>"
+        },
+        "State":{
+          "shape":"MalwareState",
+          "documentation":"<p>The state of the malware that was observed.</p>"
+        }
+      },
+      "documentation":"<p>A list of malware related to a finding.</p>"
+    },
+    "MalwareList":{
+      "type":"list",
+      "member":{"shape":"Malware"}
+    },
+    "MalwareState":{
+      "type":"string",
+      "enum":[
+        "OBSERVED",
+        "REMOVAL_FAILED",
+        "REMOVED"
+      ]
+    },
+    "MalwareType":{
+      "type":"string",
+      "enum":[
+        "ADWARE",
+        "BLENDED_THREAT",
+        "BOTNET_AGENT",
+        "COIN_MINER",
+        "EXPLOIT_KIT",
+        "KEYLOGGER",
+        "MACRO",
+        "POTENTIALLY_UNWANTED",
+        "SPYWARE",
+        "RANSOMWARE",
+        "REMOTE_ACCESS",
+        "ROOTKIT",
+        "TROJAN",
+        "VIRUS",
+        "WORM"
+      ]
+    },
+    "MapFilter":{
+      "type":"structure",
+      "members":{
+        "Key":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The key of the map filter.</p>"
+        },
+        "Value":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The value for the key in the map filter.</p>"
+        },
+        "Comparison":{
+          "shape":"MapFilterComparison",
+          "documentation":"<p>The condition to apply to a key value when querying for findings with a map filter.</p>"
+        }
+      },
+      "documentation":"<p>The map filter for querying findings.</p>"
+    },
+    "MapFilterComparison":{
+      "type":"string",
+      "enum":["EQUALS"]
+    },
+    "MapFilterList":{
+      "type":"list",
+      "member":{"shape":"MapFilter"}
+    },
+    "MaxResults":{
+      "type":"integer",
+      "max":100,
+      "min":1
+    },
+    "Member":{
+      "type":"structure",
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>The AWS account ID of the member account.</p>"
+        },
+        "Email":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The email address of the member account.</p>"
+        },
+        "MasterId":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The AWS account ID of the Security Hub master account associated with this member account.</p>"
+        },
+        "MemberStatus":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The status of the relationship between the member account and its master account. </p>"
+        },
+        "InvitedAt":{
+          "shape":"Timestamp",
+          "documentation":"<p>A timestamp for the date and time when the invitation was sent to the member account.</p>"
+        },
+        "UpdatedAt":{
+          "shape":"Timestamp",
+          "documentation":"<p>The timestamp for the date and time when the member account was updated.</p>"
+        }
+      },
+      "documentation":"<p>The details about a member account.</p>"
+    },
+    "MemberList":{
+      "type":"list",
+      "member":{"shape":"Member"}
+    },
+    "Network":{
+      "type":"structure",
+      "members":{
+        "Direction":{
+          "shape":"NetworkDirection",
+          "documentation":"<p>The direction of network traffic associated with a finding.</p>"
+        },
+        "Protocol":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The protocol of network-related information about a finding.</p>"
+        },
+        "SourceIpV4":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The source IPv4 address of network-related information about a finding.</p>"
+        },
+        "SourceIpV6":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The source IPv6 address of network-related information about a finding.</p>"
+        },
+        "SourcePort":{
+          "shape":"Integer",
+          "documentation":"<p>The source port of network-related information about a finding.</p>"
+        },
+        "SourceDomain":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The source domain of network-related information about a finding.</p>"
+        },
+        "SourceMac":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The source media access control (MAC) address of network-related information about a finding.</p>"
+        },
+        "DestinationIpV4":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The destination IPv4 address of network-related information about a finding.</p>"
+        },
+        "DestinationIpV6":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The destination IPv6 address of network-related information about a finding.</p>"
+        },
+        "DestinationPort":{
+          "shape":"Integer",
+          "documentation":"<p>The destination port of network-related information about a finding.</p>"
+        },
+        "DestinationDomain":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The destination domain of network-related information about a finding.</p>"
+        }
+      },
+      "documentation":"<p>The details of network-related information about a finding.</p>"
+    },
+    "NetworkDirection":{
+      "type":"string",
+      "enum":[
+        "IN",
+        "OUT"
+      ]
+    },
+    "NextToken":{"type":"string"},
+    "NonEmptyString":{
+      "type":"string",
+      "pattern":".*\\S.*"
+    },
+    "Note":{
+      "type":"structure",
+      "required":[
+        "Text",
+        "UpdatedBy",
+        "UpdatedAt"
+      ],
+      "members":{
+        "Text":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The text of a note.</p>"
+        },
+        "UpdatedBy":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The principal that created a note.</p>"
+        },
+        "UpdatedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The timestamp of when the note was updated.</p>"
+        }
+      },
+      "documentation":"<p>A user-defined note added to a finding.</p>"
+    },
+    "NoteUpdate":{
+      "type":"structure",
+      "required":[
+        "Text",
+        "UpdatedBy"
+      ],
+      "members":{
+        "Text":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The updated note text.</p>"
+        },
+        "UpdatedBy":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The principal that updated the note.</p>"
+        }
+      },
+      "documentation":"<p>The updated note.</p>"
+    },
+    "NumberFilter":{
+      "type":"structure",
+      "members":{
+        "Gte":{
+          "shape":"Double",
+          "documentation":"<p>The greater-than-equal condition to be applied to a single field when querying for findings. </p>"
+        },
+        "Lte":{
+          "shape":"Double",
+          "documentation":"<p>The less-than-equal condition to be applied to a single field when querying for findings. </p>"
+        },
+        "Eq":{
+          "shape":"Double",
+          "documentation":"<p>The equal-to condition to be applied to a single field when querying for findings.</p>"
+        }
+      },
+      "documentation":"<p>A number filter for querying findings.</p>"
+    },
+    "NumberFilterList":{
+      "type":"list",
+      "member":{"shape":"NumberFilter"}
+    },
+    "Partition":{
+      "type":"string",
+      "enum":[
+        "aws",
+        "aws-cn",
+        "aws-us-gov"
+      ]
+    },
+    "ProcessDetails":{
+      "type":"structure",
+      "members":{
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the process.</p>"
+        },
+        "Path":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The path to the process executable.</p>"
+        },
+        "Pid":{
+          "shape":"Integer",
+          "documentation":"<p>The process ID.</p>"
+        },
+        "ParentPid":{
+          "shape":"Integer",
+          "documentation":"<p>The parent process ID.</p>"
+        },
+        "LaunchedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The date/time that the process was launched.</p>"
+        },
+        "TerminatedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The date and time when the process was terminated.</p>"
+        }
+      },
+      "documentation":"<p>The details of process-related information about a finding.</p>"
+    },
+    "Product":{
+      "type":"structure",
+      "required":["ProductArn"],
+      "members":{
+        "ProductArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN assigned to the product.</p>"
+        },
+        "ProductName":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the product.</p>"
+        },
+        "CompanyName":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The name of the company that provides the product.</p>"
+        },
+        "Description":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>A description of the product.</p>"
+        },
+        "Categories":{
+          "shape":"CategoryList",
+          "documentation":"<p>The categories assigned to the product.</p>"
+        },
+        "MarketplaceUrl":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The URL for the page that contains more information about the product.</p>"
+        },
+        "ActivationUrl":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The URL used to activate the product.</p>"
+        },
+        "ProductSubscriptionResourcePolicy":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The resource policy associated with the product.</p>"
+        }
+      },
+      "documentation":"<p>Contains details about a product.</p>"
+    },
+    "ProductSubscriptionArnList":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"}
+    },
+    "ProductsList":{
+      "type":"list",
+      "member":{"shape":"Product"}
+    },
+    "Recommendation":{
+      "type":"structure",
+      "members":{
+        "Text":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>Describes the recommended steps to take to remediate an issue identified in a finding.</p>"
+        },
+        "Url":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>A URL to a page or site that contains information about how to remediate a finding.</p>"
+        }
+      },
+      "documentation":"<p>A recommendation on how to remediate the issue identified in a finding.</p>"
+    },
+    "RecordState":{
+      "type":"string",
+      "enum":[
+        "ACTIVE",
+        "ARCHIVED"
+      ]
+    },
+    "RelatedFinding":{
+      "type":"structure",
+      "required":[
+        "ProductArn",
+        "Id"
+      ],
+      "members":{
+        "ProductArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the product that generated a related finding.</p>"
+        },
+        "Id":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The product-generated identifier for a related finding.</p>"
+        }
+      },
+      "documentation":"<p>Details about a related finding.</p>"
+    },
+    "RelatedFindingList":{
+      "type":"list",
+      "member":{"shape":"RelatedFinding"}
+    },
+    "Remediation":{
+      "type":"structure",
+      "members":{
+        "Recommendation":{
+          "shape":"Recommendation",
+          "documentation":"<p>A recommendation on the steps to take to remediate the issue identified by a finding.</p>"
+        }
+      },
+      "documentation":"<p>Details about the remediation steps for a finding.</p>"
+    },
+    "Resource":{
+      "type":"structure",
+      "required":[
+        "Type",
+        "Id"
+      ],
+      "members":{
+        "Type":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The type of the resource that details are provided for.</p>"
+        },
+        "Id":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The canonical identifier for the given resource type.</p>"
+        },
+        "Partition":{
+          "shape":"Partition",
+          "documentation":"<p>The canonical AWS partition name that the Region is assigned to.</p>"
+        },
+        "Region":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The canonical AWS external Region name where this resource is located.</p>"
+        },
+        "Tags":{
+          "shape":"FieldMap",
+          "documentation":"<p>A list of AWS tags associated with a resource at the time the finding was processed.</p>"
+        },
+        "Details":{
+          "shape":"ResourceDetails",
+          "documentation":"<p>Additional details about the resource related to a finding.</p>"
+        }
+      },
+      "documentation":"<p>A resource related to a finding.</p>"
+    },
+    "ResourceArn":{
+      "type":"string",
+      "pattern":"^arn:aws:securityhub:.*"
+    },
+    "ResourceConflictException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"NonEmptyString"},
+        "Code":{"shape":"NonEmptyString"}
+      },
+      "documentation":"<p>The resource specified in the request conflicts with an existing resource.</p>",
+      "error":{"httpStatusCode":409},
+      "exception":true
+    },
+    "ResourceDetails":{
+      "type":"structure",
+      "members":{
+        "AwsEc2Instance":{
+          "shape":"AwsEc2InstanceDetails",
+          "documentation":"<p>Details about an Amazon EC2 instance related to a finding.</p>"
+        },
+        "AwsS3Bucket":{
+          "shape":"AwsS3BucketDetails",
+          "documentation":"<p>Details about an Amazon S3 Bucket related to a finding.</p>"
+        },
+        "AwsIamAccessKey":{
+          "shape":"AwsIamAccessKeyDetails",
+          "documentation":"<p>Details about an IAM access key related to a finding.</p>"
+        },
+        "Container":{
+          "shape":"ContainerDetails",
+          "documentation":"<p>Details about a container resource related to a finding.</p>"
+        },
+        "Other":{
+          "shape":"FieldMap",
+          "documentation":"<p>Details about a resource that doesn't have a specific type defined.</p>"
+        }
+      },
+      "documentation":"<p>Additional details about a resource related to a finding.</p>"
+    },
+    "ResourceList":{
+      "type":"list",
+      "member":{"shape":"Resource"}
+    },
+    "ResourceNotFoundException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"NonEmptyString"},
+        "Code":{"shape":"NonEmptyString"}
+      },
+      "documentation":"<p>The request was rejected because we can't find the specified resource.</p>",
+      "error":{"httpStatusCode":404},
+      "exception":true
+    },
+    "Result":{
+      "type":"structure",
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>An AWS account ID of the account that wasn't be processed.</p>"
+        },
+        "ProcessingResult":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The reason that the account wasn't be processed.</p>"
+        }
+      },
+      "documentation":"<p>Details about the account that wasn't processed.</p>"
+    },
+    "ResultList":{
+      "type":"list",
+      "member":{"shape":"Result"}
+    },
+    "Severity":{
+      "type":"structure",
+      "required":["Normalized"],
+      "members":{
+        "Product":{
+          "shape":"Double",
+          "documentation":"<p>The native severity as defined by the AWS service or integrated partner product that generated the finding.</p>"
+        },
+        "Normalized":{
+          "shape":"Integer",
+          "documentation":"<p>The normalized severity of a finding.</p>"
+        }
+      },
+      "documentation":"<p>The severity of the finding.</p>"
+    },
+    "SortCriteria":{
+      "type":"list",
+      "member":{"shape":"SortCriterion"}
+    },
+    "SortCriterion":{
+      "type":"structure",
+      "members":{
+        "Field":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The finding attribute used to sort findings.</p>"
+        },
+        "SortOrder":{
+          "shape":"SortOrder",
+          "documentation":"<p>The order used to sort findings.</p>"
+        }
+      },
+      "documentation":"<p>A collection of finding attributes used to sort findings.</p>"
+    },
+    "SortOrder":{
+      "type":"string",
+      "enum":[
+        "asc",
+        "desc"
+      ]
+    },
+    "StandardsInputParameterMap":{
+      "type":"map",
+      "key":{"shape":"NonEmptyString"},
+      "value":{"shape":"NonEmptyString"}
+    },
+    "StandardsStatus":{
+      "type":"string",
+      "enum":[
+        "PENDING",
+        "READY",
+        "FAILED",
+        "DELETING",
+        "INCOMPLETE"
+      ]
+    },
+    "StandardsSubscription":{
+      "type":"structure",
+      "required":[
+        "StandardsSubscriptionArn",
+        "StandardsArn",
+        "StandardsInput",
+        "StandardsStatus"
+      ],
+      "members":{
+        "StandardsSubscriptionArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of a resource that represents your subscription to a supported standard.</p>"
+        },
+        "StandardsArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of a standard.</p> <p>In this release, Security Hub supports only the CIS AWS Foundations standard, which uses the following ARN: <code>arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0.</code> </p>"
+        },
+        "StandardsInput":{
+          "shape":"StandardsInputParameterMap",
+          "documentation":"<p>A key-value pair of input for the standard.</p>"
+        },
+        "StandardsStatus":{
+          "shape":"StandardsStatus",
+          "documentation":"<p>The status of the standards subscription.</p>"
+        }
+      },
+      "documentation":"<p>A resource that represents your subscription to a supported standard.</p>"
+    },
+    "StandardsSubscriptionArns":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"},
+      "max":25,
+      "min":1
+    },
+    "StandardsSubscriptionRequest":{
+      "type":"structure",
+      "required":["StandardsArn"],
+      "members":{
+        "StandardsArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the standard that you want to enable.</p> <important> <p>In this release, Security Hub only supports the CIS AWS Foundations standard. </p> <p>Its ARN is <code>arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0</code>.</p> </important>"
+        },
+        "StandardsInput":{
+          "shape":"StandardsInputParameterMap",
+          "documentation":"<p>A key-value pair of input for the standard.</p>"
+        }
+      },
+      "documentation":"<p>The standard that you want to enable.</p>"
+    },
+    "StandardsSubscriptionRequests":{
+      "type":"list",
+      "member":{"shape":"StandardsSubscriptionRequest"},
+      "max":25,
+      "min":1
+    },
+    "StandardsSubscriptions":{
+      "type":"list",
+      "member":{"shape":"StandardsSubscription"}
+    },
+    "StringFilter":{
+      "type":"structure",
+      "members":{
+        "Value":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The string filter value.</p>"
+        },
+        "Comparison":{
+          "shape":"StringFilterComparison",
+          "documentation":"<p>The condition to be applied to a string value when querying for findings. </p>"
+        }
+      },
+      "documentation":"<p>A string filter for querying findings.</p>"
+    },
+    "StringFilterComparison":{
+      "type":"string",
+      "enum":[
+        "EQUALS",
+        "PREFIX"
+      ]
+    },
+    "StringFilterList":{
+      "type":"list",
+      "member":{"shape":"StringFilter"}
+    },
+    "StringList":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"}
+    },
+    "TagKey":{
+      "type":"string",
+      "max":128,
+      "min":1,
+      "pattern":"^(?!aws:)[a-zA-Z+-=._:/]+$"
+    },
+    "TagKeyList":{
+      "type":"list",
+      "member":{"shape":"TagKey"},
+      "max":50,
+      "min":1
+    },
+    "TagMap":{
+      "type":"map",
+      "key":{"shape":"TagKey"},
+      "value":{"shape":"TagValue"},
+      "max":50,
+      "min":1
+    },
+    "TagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceArn",
+        "Tags"
+      ],
+      "members":{
+        "ResourceArn":{
+          "shape":"ResourceArn",
+          "documentation":"<p>The ARN of the resource to apply the tags to.</p>",
+          "location":"uri",
+          "locationName":"ResourceArn"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags to add to the resource.</p>"
+        }
+      }
+    },
+    "TagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "TagValue":{
+      "type":"string",
+      "max":256
+    },
+    "ThreatIntelIndicator":{
+      "type":"structure",
+      "members":{
+        "Type":{
+          "shape":"ThreatIntelIndicatorType",
+          "documentation":"<p>The type of a threat intel indicator.</p>"
+        },
+        "Value":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The value of a threat intel indicator.</p>"
+        },
+        "Category":{
+          "shape":"ThreatIntelIndicatorCategory",
+          "documentation":"<p>The category of a threat intel indicator.</p>"
+        },
+        "LastObservedAt":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The date and time when the most recent instance of a threat intel indicator was observed.</p>"
+        },
+        "Source":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The source of the threat intel indicator.</p>"
+        },
+        "SourceUrl":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The URL to the page or site where you can get more information about the threat intel indicator.</p>"
+        }
+      },
+      "documentation":"<p>Details about the threat intel related to a finding.</p>"
+    },
+    "ThreatIntelIndicatorCategory":{
+      "type":"string",
+      "enum":[
+        "BACKDOOR",
+        "CARD_STEALER",
+        "COMMAND_AND_CONTROL",
+        "DROP_SITE",
+        "EXPLOIT_SITE",
+        "KEYLOGGER"
+      ]
+    },
+    "ThreatIntelIndicatorList":{
+      "type":"list",
+      "member":{"shape":"ThreatIntelIndicator"}
+    },
+    "ThreatIntelIndicatorType":{
+      "type":"string",
+      "enum":[
+        "DOMAIN",
+        "EMAIL_ADDRESS",
+        "HASH_MD5",
+        "HASH_SHA1",
+        "HASH_SHA256",
+        "HASH_SHA512",
+        "IPV4_ADDRESS",
+        "IPV6_ADDRESS",
+        "MUTEX",
+        "PROCESS",
+        "URL"
+      ]
+    },
+    "Timestamp":{
+      "type":"timestamp",
+      "timestampFormat":"iso8601"
+    },
+    "TypeList":{
+      "type":"list",
+      "member":{"shape":"NonEmptyString"}
+    },
+    "UntagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceArn",
+        "TagKeys"
+      ],
+      "members":{
+        "ResourceArn":{
+          "shape":"ResourceArn",
+          "documentation":"<p>The ARN of the resource to remove the tags from.</p>",
+          "location":"uri",
+          "locationName":"ResourceArn"
+        },
+        "TagKeys":{
+          "shape":"TagKeyList",
+          "documentation":"<p>The tag keys associated with the tags to remove from the resource.</p>",
+          "location":"querystring",
+          "locationName":"tagKeys"
+        }
+      }
+    },
+    "UntagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateActionTargetRequest":{
+      "type":"structure",
+      "required":["ActionTargetArn"],
+      "members":{
+        "ActionTargetArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the custom action target to update.</p>",
+          "location":"uri",
+          "locationName":"ActionTargetArn"
+        },
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The updated name of the custom action target.</p>"
+        },
+        "Description":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The updated description for the custom action target.</p>"
+        }
+      }
+    },
+    "UpdateActionTargetResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateFindingsRequest":{
+      "type":"structure",
+      "required":["Filters"],
+      "members":{
+        "Filters":{
+          "shape":"AwsSecurityFindingFilters",
+          "documentation":"<p>A collection of attributes that specify which findings you want to update.</p>"
+        },
+        "Note":{
+          "shape":"NoteUpdate",
+          "documentation":"<p>The updated note for the finding.</p>"
+        },
+        "RecordState":{
+          "shape":"RecordState",
+          "documentation":"<p>The updated record state for the finding.</p>"
+        }
+      }
+    },
+    "UpdateFindingsResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateInsightRequest":{
+      "type":"structure",
+      "required":["InsightArn"],
+      "members":{
+        "InsightArn":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The ARN of the insight that you want to update.</p>",
+          "location":"uri",
+          "locationName":"InsightArn"
+        },
+        "Name":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The updated name for the insight.</p>"
+        },
+        "Filters":{
+          "shape":"AwsSecurityFindingFilters",
+          "documentation":"<p>The updated filters that define this insight.</p>"
+        },
+        "GroupByAttribute":{
+          "shape":"NonEmptyString",
+          "documentation":"<p>The updated <code>GroupBy</code> attribute that defines this insight.</p>"
+        }
+      }
+    },
+    "UpdateInsightResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "VerificationState":{
+      "type":"string",
+      "enum":[
+        "UNKNOWN",
+        "TRUE_POSITIVE",
+        "FALSE_POSITIVE",
+        "BENIGN_POSITIVE"
+      ]
+    },
+    "WorkflowState":{
+      "type":"string",
+      "enum":[
+        "NEW",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "DEFERRED",
+        "RESOLVED"
+      ]
+    }
+  },
+  "documentation":"<p>Security Hub provides you with a comprehensive view of the security state of your AWS environment and resources. It also provides you with the compliance status of your environment based on CIS AWS Foundations compliance checks. Security Hub collects security data from AWS accounts, services, and integrated third-party products and helps you analyze security trends in your environment to identify the highest priority security issues. For more information about Security Hub, see the <i> <a href=\"https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html\">AWS Security Hub User Guide</a> </i>.</p> <p>When you use operations in the Security Hub API, the requests are executed only in the AWS Region that is currently active or in the specific AWS Region that you specify in your request. Any configuration or settings change that results from the operation is applied only to that Region. To make the same change in other Regions, execute the same command for each Region to apply the change to. For example, if your Region is set to <code>us-west-2</code>, when you use <code>CreateMembers</code> to add a member account to Security Hub, the association of the member account with the master account is created only in the us-west-2 Region. Security Hub must be enabled for the member account in the same Region that the invite was sent from.</p>"
+}

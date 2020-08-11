@@ -1,0 +1,3 @@
+[pytest11]
+metadata = pytest_metadata.plugin
+

@@ -1,0 +1,39 @@
+Metadata-Version: 2.0
+Name: s3transfer
+Version: 0.2.1
+Summary: An Amazon S3 Transfer Manager
+Home-page: https://github.com/boto/s3transfer
+Author: Amazon Web Services
+Author-email: kyknapp1@gmail.com
+License: Apache License 2.0
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Natural Language :: English
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Requires-Dist: botocore>=1.12.36,<2.0.0
+Requires-Dist: futures>=2.2.0,<4.0.0; python_version=="2.6" or python_version=="2.7"
+
+=====================================================
+s3transfer - An Amazon S3 Transfer Manager for Python
+=====================================================
+
+S3transfer is a Python library for managing Amazon S3 transfers.
+
+.. note::
+
+  This project is not currently GA. If you are planning to use this code in
+  production, make sure to lock to a minor version as interfaces may break
+  from minor version to minor version. For a basic, stable interface of
+  s3transfer, try the interfaces exposed in `boto3 <https://boto3.readthedocs.io/en/latest/guide/s3.html#using-the-transfer-manager>`__
+
+

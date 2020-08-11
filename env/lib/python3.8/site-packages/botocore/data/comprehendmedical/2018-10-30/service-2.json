@@ -1,0 +1,978 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2018-10-30",
+    "endpointPrefix":"comprehendmedical",
+    "jsonVersion":"1.1",
+    "protocol":"json",
+    "serviceAbbreviation":"ComprehendMedical",
+    "serviceFullName":"AWS Comprehend Medical",
+    "serviceId":"ComprehendMedical",
+    "signatureVersion":"v4",
+    "signingName":"comprehendmedical",
+    "targetPrefix":"ComprehendMedical_20181030",
+    "uid":"comprehendmedical-2018-10-30"
+  },
+  "operations":{
+    "DescribeEntitiesDetectionV2Job":{
+      "name":"DescribeEntitiesDetectionV2Job",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeEntitiesDetectionV2JobRequest"},
+      "output":{"shape":"DescribeEntitiesDetectionV2JobResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Gets the properties associated with a medical entities detection job. Use this operation to get the status of a detection job.</p>"
+    },
+    "DescribePHIDetectionJob":{
+      "name":"DescribePHIDetectionJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribePHIDetectionJobRequest"},
+      "output":{"shape":"DescribePHIDetectionJobResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Gets the properties associated with a protected health information (PHI) detection job. Use this operation to get the status of a detection job.</p>"
+    },
+    "DetectEntities":{
+      "name":"DetectEntities",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DetectEntitiesRequest"},
+      "output":{"shape":"DetectEntitiesResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"InvalidEncodingException"},
+        {"shape":"TextSizeLimitExceededException"}
+      ],
+      "documentation":"<p>The <code>DetectEntities</code> operation is deprecated. You should use the <a>DetectEntitiesV2</a> operation instead.</p> <p> Inspects the clinical text for a variety of medical entities and returns specific information about them such as entity category, location, and confidence score on that information .</p>",
+      "deprecated":true,
+      "deprecatedMessage":"This operation is deprecated, use DetectEntitiesV2 instead."
+    },
+    "DetectEntitiesV2":{
+      "name":"DetectEntitiesV2",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DetectEntitiesV2Request"},
+      "output":{"shape":"DetectEntitiesV2Response"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"InvalidEncodingException"},
+        {"shape":"TextSizeLimitExceededException"}
+      ],
+      "documentation":"<p>Inspects the clinical text for a variety of medical entities and returns specific information about them such as entity category, location, and confidence score on that information.</p> <p>The <code>DetectEntitiesV2</code> operation replaces the <a>DetectEntities</a> operation. This new action uses a different model for determining the entities in your medical text and changes the way that some entities are returned in the output. You should use the <code>DetectEntitiesV2</code> operation in all new applications.</p> <p>The <code>DetectEntitiesV2</code> operation returns the <code>Acuity</code> and <code>Direction</code> entities as attributes instead of types. It does not return the <code>Quality</code> or <code>Quantity</code> entities.</p>"
+    },
+    "DetectPHI":{
+      "name":"DetectPHI",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DetectPHIRequest"},
+      "output":{"shape":"DetectPHIResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"InvalidEncodingException"},
+        {"shape":"TextSizeLimitExceededException"}
+      ],
+      "documentation":"<p> Inspects the clinical text for protected health information (PHI) entities and entity category, location, and confidence score on that information.</p>"
+    },
+    "ListEntitiesDetectionV2Jobs":{
+      "name":"ListEntitiesDetectionV2Jobs",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListEntitiesDetectionV2JobsRequest"},
+      "output":{"shape":"ListEntitiesDetectionV2JobsResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"ValidationException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Gets a list of medical entity detection jobs that you have submitted.</p>"
+    },
+    "ListPHIDetectionJobs":{
+      "name":"ListPHIDetectionJobs",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListPHIDetectionJobsRequest"},
+      "output":{"shape":"ListPHIDetectionJobsResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"ValidationException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Gets a list of protected health information (PHI) detection jobs that you have submitted.</p>"
+    },
+    "StartEntitiesDetectionV2Job":{
+      "name":"StartEntitiesDetectionV2Job",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"StartEntitiesDetectionV2JobRequest"},
+      "output":{"shape":"StartEntitiesDetectionV2JobResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Starts an asynchronous medical entity detection job for a collection of documents. Use the <code>DescribeEntitiesDetectionV2Job</code> operation to track the status of a job.</p>"
+    },
+    "StartPHIDetectionJob":{
+      "name":"StartPHIDetectionJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"StartPHIDetectionJobRequest"},
+      "output":{"shape":"StartPHIDetectionJobResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"TooManyRequestsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Starts an asynchronous job to detect protected health information (PHI). Use the <code>DescribePHIDetectionJob</code> operation to track the status of a job.</p>"
+    },
+    "StopEntitiesDetectionV2Job":{
+      "name":"StopEntitiesDetectionV2Job",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"StopEntitiesDetectionV2JobRequest"},
+      "output":{"shape":"StopEntitiesDetectionV2JobResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Stops a medical entities detection job in progress.</p>"
+    },
+    "StopPHIDetectionJob":{
+      "name":"StopPHIDetectionJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"StopPHIDetectionJobRequest"},
+      "output":{"shape":"StopPHIDetectionJobResponse"},
+      "errors":[
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Stops a protected health information (PHI) detection job in progress.</p>"
+    }
+  },
+  "shapes":{
+    "AnyLengthString":{"type":"string"},
+    "Attribute":{
+      "type":"structure",
+      "members":{
+        "Type":{
+          "shape":"EntitySubType",
+          "documentation":"<p> The type of attribute. </p>"
+        },
+        "Score":{
+          "shape":"Float",
+          "documentation":"<p> The level of confidence that Amazon Comprehend Medical has that the segment of text is correctly recognized as an attribute. </p>"
+        },
+        "RelationshipScore":{
+          "shape":"Float",
+          "documentation":"<p> The level of confidence that Amazon Comprehend Medical has that this attribute is correctly related to this entity. </p>"
+        },
+        "Id":{
+          "shape":"Integer",
+          "documentation":"<p> The numeric identifier for this attribute. This is a monotonically increasing id unique within this response rather than a global unique identifier. </p>"
+        },
+        "BeginOffset":{
+          "shape":"Integer",
+          "documentation":"<p> The 0-based character offset in the input text that shows where the attribute begins. The offset returns the UTF-8 code point in the string. </p>"
+        },
+        "EndOffset":{
+          "shape":"Integer",
+          "documentation":"<p> The 0-based character offset in the input text that shows where the attribute ends. The offset returns the UTF-8 code point in the string. </p>"
+        },
+        "Text":{
+          "shape":"String",
+          "documentation":"<p> The segment of input text extracted as this attribute.</p>"
+        },
+        "Traits":{
+          "shape":"TraitList",
+          "documentation":"<p> Contextual information for this attribute. </p>"
+        }
+      },
+      "documentation":"<p> An extracted segment of the text that is an attribute of an entity, or otherwise related to an entity, such as the dosage of a medication taken. It contains information about the attribute such as id, begin and end offset within the input text, and the segment of the input text. </p>"
+    },
+    "AttributeList":{
+      "type":"list",
+      "member":{"shape":"Attribute"}
+    },
+    "AttributeName":{
+      "type":"string",
+      "enum":[
+        "SIGN",
+        "SYMPTOM",
+        "DIAGNOSIS",
+        "NEGATION"
+      ]
+    },
+    "BoundedLengthString":{
+      "type":"string",
+      "max":20000,
+      "min":1
+    },
+    "ClientRequestTokenString":{
+      "type":"string",
+      "max":64,
+      "min":1,
+      "pattern":"^[a-zA-Z0-9-]+$"
+    },
+    "ComprehendMedicalAsyncJobFilter":{
+      "type":"structure",
+      "members":{
+        "JobName":{
+          "shape":"JobName",
+          "documentation":"<p>Filters on the name of the job.</p>"
+        },
+        "JobStatus":{
+          "shape":"JobStatus",
+          "documentation":"<p>Filters the list of jobs based on job status. Returns only jobs with the specified status.</p>"
+        },
+        "SubmitTimeBefore":{
+          "shape":"Timestamp",
+          "documentation":"<p>Filters the list of jobs based on the time that the job was submitted for processing. Returns only jobs submitted before the specified time. Jobs are returned in ascending order, oldest to newest.</p>"
+        },
+        "SubmitTimeAfter":{
+          "shape":"Timestamp",
+          "documentation":"<p>Filters the list of jobs based on the time that the job was submitted for processing. Returns only jobs submitted after the specified time. Jobs are returned in descending order, newest to oldest.</p>"
+        }
+      },
+      "documentation":"<p>Provides information for filtering a list of detection jobs.</p>"
+    },
+    "ComprehendMedicalAsyncJobProperties":{
+      "type":"structure",
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier assigned to the detection job.</p>"
+        },
+        "JobName":{
+          "shape":"JobName",
+          "documentation":"<p>The name that you assigned to the detection job.</p>"
+        },
+        "JobStatus":{
+          "shape":"JobStatus",
+          "documentation":"<p>The current status of the detection job. If the status is <code>FAILED</code>, the <code>Message</code> field shows the reason for the failure.</p>"
+        },
+        "Message":{
+          "shape":"AnyLengthString",
+          "documentation":"<p>A description of the status of a job.</p>"
+        },
+        "SubmitTime":{
+          "shape":"Timestamp",
+          "documentation":"<p>The time that the detection job was submitted for processing.</p>"
+        },
+        "EndTime":{
+          "shape":"Timestamp",
+          "documentation":"<p>The time that the detection job completed.</p>"
+        },
+        "ExpirationTime":{
+          "shape":"Timestamp",
+          "documentation":"<p>The date and time that job metadata is deleted from the server. Output files in your S3 bucket will not be deleted. After the metadata is deleted, the job will no longer appear in the results of the <code>ListEntitiesDetectionV2Job</code> or the <code>ListPHIDetectionJobs</code> operation.</p>"
+        },
+        "InputDataConfig":{
+          "shape":"InputDataConfig",
+          "documentation":"<p>The input data configuration that you supplied when you created the detection job.</p>"
+        },
+        "OutputDataConfig":{
+          "shape":"OutputDataConfig",
+          "documentation":"<p>The output data configuration that you supplied when you created the detection job.</p>"
+        },
+        "LanguageCode":{
+          "shape":"LanguageCode",
+          "documentation":"<p>The language code of the input documents.</p>"
+        },
+        "DataAccessRoleArn":{
+          "shape":"IamRoleArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) that gives Amazon Comprehend Medical read access to your input data.</p>"
+        },
+        "ManifestFilePath":{
+          "shape":"ManifestFilePath",
+          "documentation":"<p>The path to the file that describes the results of a batch job.</p>"
+        },
+        "KMSKey":{
+          "shape":"KMSKey",
+          "documentation":"<p>The AWS Key Management Service key, if any, used to encrypt the output files. </p>"
+        },
+        "ModelVersion":{
+          "shape":"ModelVersion",
+          "documentation":"<p>The version of the model used to analyze the documents. The version number looks like X.X.X. You can use this information to track the model used for a particular batch of documents.</p>"
+        }
+      },
+      "documentation":"<p>Provides information about a detection job.</p>"
+    },
+    "ComprehendMedicalAsyncJobPropertiesList":{
+      "type":"list",
+      "member":{"shape":"ComprehendMedicalAsyncJobProperties"}
+    },
+    "DescribeEntitiesDetectionV2JobRequest":{
+      "type":"structure",
+      "required":["JobId"],
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier that Amazon Comprehend Medical generated for the job. The <code>StartEntitiesDetectionV2Job</code> operation returns this identifier in its response.</p>"
+        }
+      }
+    },
+    "DescribeEntitiesDetectionV2JobResponse":{
+      "type":"structure",
+      "members":{
+        "ComprehendMedicalAsyncJobProperties":{
+          "shape":"ComprehendMedicalAsyncJobProperties",
+          "documentation":"<p>An object that contains the properties associated with a detection job.</p>"
+        }
+      }
+    },
+    "DescribePHIDetectionJobRequest":{
+      "type":"structure",
+      "required":["JobId"],
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier that Amazon Comprehend Medical generated for the job. The <code>StartPHIDetectionJob</code> operation returns this identifier in its response.</p>"
+        }
+      }
+    },
+    "DescribePHIDetectionJobResponse":{
+      "type":"structure",
+      "members":{
+        "ComprehendMedicalAsyncJobProperties":{
+          "shape":"ComprehendMedicalAsyncJobProperties",
+          "documentation":"<p>An object that contains the properties associated with a detection job.</p>"
+        }
+      }
+    },
+    "DetectEntitiesRequest":{
+      "type":"structure",
+      "required":["Text"],
+      "members":{
+        "Text":{
+          "shape":"BoundedLengthString",
+          "documentation":"<p> A UTF-8 text string containing the clinical content being examined for entities. Each string must contain fewer than 20,000 bytes of characters.</p>"
+        }
+      }
+    },
+    "DetectEntitiesResponse":{
+      "type":"structure",
+      "required":[
+        "Entities",
+        "ModelVersion"
+      ],
+      "members":{
+        "Entities":{
+          "shape":"EntityList",
+          "documentation":"<p> The collection of medical entities extracted from the input text and their associated information. For each entity, the response provides the entity text, the entity category, where the entity text begins and ends, and the level of confidence that Amazon Comprehend Medical has in the detection and analysis. Attributes and traits of the entity are also returned.</p>"
+        },
+        "UnmappedAttributes":{
+          "shape":"UnmappedAttributeList",
+          "documentation":"<p> Attributes extracted from the input text that we were unable to relate to an entity.</p>"
+        },
+        "PaginationToken":{
+          "shape":"String",
+          "documentation":"<p> If the result of the previous request to <code>DetectEntities</code> was truncated, include the <code>PaginationToken</code> to fetch the next page of entities.</p>"
+        },
+        "ModelVersion":{
+          "shape":"String",
+          "documentation":"<p>The version of the model used to analyze the documents. The version number looks like X.X.X. You can use this information to track the model used for a particular batch of documents.</p>"
+        }
+      }
+    },
+    "DetectEntitiesV2Request":{
+      "type":"structure",
+      "required":["Text"],
+      "members":{
+        "Text":{
+          "shape":"BoundedLengthString",
+          "documentation":"<p>A UTF-8 string containing the clinical content being examined for entities. Each string must contain fewer than 20,000 bytes of characters.</p>"
+        }
+      }
+    },
+    "DetectEntitiesV2Response":{
+      "type":"structure",
+      "required":[
+        "Entities",
+        "ModelVersion"
+      ],
+      "members":{
+        "Entities":{
+          "shape":"EntityList",
+          "documentation":"<p>The collection of medical entities extracted from the input text and their associated information. For each entity, the response provides the entity text, the entity category, where the entity text begins and ends, and the level of confidence in the detection and analysis. Attributes and traits of the entity are also returned.</p>"
+        },
+        "UnmappedAttributes":{
+          "shape":"UnmappedAttributeList",
+          "documentation":"<p>Attributes extracted from the input text that couldn't be related to an entity.</p>"
+        },
+        "PaginationToken":{
+          "shape":"String",
+          "documentation":"<p>If the result to the <code>DetectEntitiesV2</code> operation was truncated, include the <code>PaginationToken</code> to fetch the next page of entities.</p>"
+        },
+        "ModelVersion":{
+          "shape":"String",
+          "documentation":"<p>The version of the model used to analyze the documents. The version number looks like X.X.X. You can use this information to track the model used for a particular batch of documents.</p>"
+        }
+      }
+    },
+    "DetectPHIRequest":{
+      "type":"structure",
+      "required":["Text"],
+      "members":{
+        "Text":{
+          "shape":"BoundedLengthString",
+          "documentation":"<p> A UTF-8 text string containing the clinical content being examined for PHI entities. Each string must contain fewer than 20,000 bytes of characters. </p>"
+        }
+      }
+    },
+    "DetectPHIResponse":{
+      "type":"structure",
+      "required":[
+        "Entities",
+        "ModelVersion"
+      ],
+      "members":{
+        "Entities":{
+          "shape":"EntityList",
+          "documentation":"<p> The collection of PHI entities extracted from the input text and their associated information. For each entity, the response provides the entity text, the entity category, where the entity text begins and ends, and the level of confidence that Amazon Comprehend Medical has in its detection. </p>"
+        },
+        "PaginationToken":{
+          "shape":"String",
+          "documentation":"<p> If the result of the previous request to <code>DetectPHI</code> was truncated, include the <code>PaginationToken</code> to fetch the next page of PHI entities. </p>"
+        },
+        "ModelVersion":{
+          "shape":"String",
+          "documentation":"<p>The version of the model used to analyze the documents. The version number looks like X.X.X. You can use this information to track the model used for a particular batch of documents.</p>"
+        }
+      }
+    },
+    "Entity":{
+      "type":"structure",
+      "members":{
+        "Id":{
+          "shape":"Integer",
+          "documentation":"<p> The numeric identifier for the entity. This is a monotonically increasing id unique within this response rather than a global unique identifier. </p>"
+        },
+        "BeginOffset":{
+          "shape":"Integer",
+          "documentation":"<p> The 0-based character offset in the input text that shows where the entity begins. The offset returns the UTF-8 code point in the string. </p>"
+        },
+        "EndOffset":{
+          "shape":"Integer",
+          "documentation":"<p> The 0-based character offset in the input text that shows where the entity ends. The offset returns the UTF-8 code point in the string. </p>"
+        },
+        "Score":{
+          "shape":"Float",
+          "documentation":"<p>The level of confidence that Amazon Comprehend Medical has in the accuracy of the detection.</p>"
+        },
+        "Text":{
+          "shape":"String",
+          "documentation":"<p> The segment of input text extracted as this entity.</p>"
+        },
+        "Category":{
+          "shape":"EntityType",
+          "documentation":"<p> The category of the entity.</p>"
+        },
+        "Type":{
+          "shape":"EntitySubType",
+          "documentation":"<p> Describes the specific type of entity with category of entities. </p>"
+        },
+        "Traits":{
+          "shape":"TraitList",
+          "documentation":"<p>Contextual information for the entity</p>"
+        },
+        "Attributes":{
+          "shape":"AttributeList",
+          "documentation":"<p> The extracted attributes that relate to this entity.</p>"
+        }
+      },
+      "documentation":"<p> Provides information about an extracted medical entity.</p>"
+    },
+    "EntityList":{
+      "type":"list",
+      "member":{"shape":"Entity"}
+    },
+    "EntitySubType":{
+      "type":"string",
+      "enum":[
+        "NAME",
+        "DOSAGE",
+        "ROUTE_OR_MODE",
+        "FORM",
+        "FREQUENCY",
+        "DURATION",
+        "GENERIC_NAME",
+        "BRAND_NAME",
+        "STRENGTH",
+        "RATE",
+        "ACUITY",
+        "TEST_NAME",
+        "TEST_VALUE",
+        "TEST_UNITS",
+        "PROCEDURE_NAME",
+        "TREATMENT_NAME",
+        "DATE",
+        "AGE",
+        "CONTACT_POINT",
+        "EMAIL",
+        "IDENTIFIER",
+        "URL",
+        "ADDRESS",
+        "PROFESSION",
+        "SYSTEM_ORGAN_SITE",
+        "DIRECTION",
+        "QUALITY",
+        "QUANTITY"
+      ]
+    },
+    "EntityType":{
+      "type":"string",
+      "enum":[
+        "MEDICATION",
+        "MEDICAL_CONDITION",
+        "PROTECTED_HEALTH_INFORMATION",
+        "TEST_TREATMENT_PROCEDURE",
+        "ANATOMY"
+      ]
+    },
+    "Float":{"type":"float"},
+    "IamRoleArn":{
+      "type":"string",
+      "max":2048,
+      "min":20,
+      "pattern":"arn:aws(-[^:]+)?:iam::[0-9]{12}:role/.+"
+    },
+    "InputDataConfig":{
+      "type":"structure",
+      "required":["S3Bucket"],
+      "members":{
+        "S3Bucket":{
+          "shape":"S3Bucket",
+          "documentation":"<p>The URI of the S3 bucket that contains the input data. The bucket must be in the same region as the API endpoint that you are calling.</p> <p>Each file in the document collection must be less than 40 KB. You can store a maximum of 30 GB in the bucket.</p>"
+        },
+        "S3Key":{
+          "shape":"S3Key",
+          "documentation":"<p>The path to the input data files in the S3 bucket.</p>"
+        }
+      },
+      "documentation":"<p>The input properties for an entities detection job</p>"
+    },
+    "Integer":{"type":"integer"},
+    "InternalServerException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> An internal server error occurred. Retry your request. </p>",
+      "exception":true,
+      "fault":true
+    },
+    "InvalidEncodingException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> The input text was not in valid UTF-8 character encoding. Check your text then retry your request.</p>",
+      "exception":true
+    },
+    "InvalidRequestException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> The request that you made is invalid. Check your request to determine why it's invalid and then retry the request.</p>",
+      "exception":true
+    },
+    "JobId":{
+      "type":"string",
+      "max":32,
+      "min":1,
+      "pattern":"^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-%@]*)$"
+    },
+    "JobName":{
+      "type":"string",
+      "max":256,
+      "min":1,
+      "pattern":"^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-%@]*)$"
+    },
+    "JobStatus":{
+      "type":"string",
+      "enum":[
+        "SUBMITTED",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "PARTIAL_SUCCESS",
+        "FAILED",
+        "STOP_REQUESTED",
+        "STOPPED"
+      ]
+    },
+    "KMSKey":{
+      "type":"string",
+      "max":2048,
+      "min":1,
+      "pattern":".*"
+    },
+    "LanguageCode":{
+      "type":"string",
+      "enum":["en"]
+    },
+    "ListEntitiesDetectionV2JobsRequest":{
+      "type":"structure",
+      "members":{
+        "Filter":{
+          "shape":"ComprehendMedicalAsyncJobFilter",
+          "documentation":"<p>Filters the jobs that are returned. You can filter jobs based on their names, status, or the date and time that they were submitted. You can only set one filter at a time.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Identifies the next page of results to return.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxResultsInteger",
+          "documentation":"<p>The maximum number of results to return in each page. The default is 100.</p>"
+        }
+      }
+    },
+    "ListEntitiesDetectionV2JobsResponse":{
+      "type":"structure",
+      "members":{
+        "ComprehendMedicalAsyncJobPropertiesList":{
+          "shape":"ComprehendMedicalAsyncJobPropertiesList",
+          "documentation":"<p>A list containing the properties of each job returned.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Identifies the next page of results to return.</p>"
+        }
+      }
+    },
+    "ListPHIDetectionJobsRequest":{
+      "type":"structure",
+      "members":{
+        "Filter":{
+          "shape":"ComprehendMedicalAsyncJobFilter",
+          "documentation":"<p>Filters the jobs that are returned. You can filter jobs based on their names, status, or the date and time that they were submitted. You can only set one filter at a time.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Identifies the next page of results to return.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxResultsInteger",
+          "documentation":"<p>The maximum number of results to return in each page. The default is 100.</p>"
+        }
+      }
+    },
+    "ListPHIDetectionJobsResponse":{
+      "type":"structure",
+      "members":{
+        "ComprehendMedicalAsyncJobPropertiesList":{
+          "shape":"ComprehendMedicalAsyncJobPropertiesList",
+          "documentation":"<p>A list containing the properties of each job returned.</p>"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Identifies the next page of results to return.</p>"
+        }
+      }
+    },
+    "ManifestFilePath":{
+      "type":"string",
+      "max":4096,
+      "min":1
+    },
+    "MaxResultsInteger":{
+      "type":"integer",
+      "max":500,
+      "min":1
+    },
+    "ModelVersion":{"type":"string"},
+    "OutputDataConfig":{
+      "type":"structure",
+      "required":["S3Bucket"],
+      "members":{
+        "S3Bucket":{
+          "shape":"S3Bucket",
+          "documentation":"<p>When you use the <code>OutputDataConfig</code> object with asynchronous operations, you specify the Amazon S3 location where you want to write the output data. The URI must be in the same region as the API endpoint that you are calling. The location is used as the prefix for the actual location of the output.</p>"
+        },
+        "S3Key":{
+          "shape":"S3Key",
+          "documentation":"<p>The path to the output data files in the S3 bucket. Amazon Comprehend Medical creates an output directory using the job ID so that the output from one job does not overwrite the output of another.</p>"
+        }
+      },
+      "documentation":"<p>The output properties for a detection job.</p>"
+    },
+    "ResourceNotFoundException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p>The resource identified by the specified Amazon Resource Name (ARN) was not found. Check the ARN and try your request again.</p>",
+      "exception":true
+    },
+    "S3Bucket":{
+      "type":"string",
+      "max":63,
+      "min":3,
+      "pattern":"^[0-9a-z\\.\\-_]*(?!\\.)$"
+    },
+    "S3Key":{
+      "type":"string",
+      "max":1024,
+      "pattern":".*"
+    },
+    "ServiceUnavailableException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> The Amazon Comprehend Medical service is temporarily unavailable. Please wait and then retry your request. </p>",
+      "exception":true
+    },
+    "StartEntitiesDetectionV2JobRequest":{
+      "type":"structure",
+      "required":[
+        "InputDataConfig",
+        "OutputDataConfig",
+        "DataAccessRoleArn",
+        "LanguageCode"
+      ],
+      "members":{
+        "InputDataConfig":{
+          "shape":"InputDataConfig",
+          "documentation":"<p>Specifies the format and location of the input data for the job.</p>"
+        },
+        "OutputDataConfig":{
+          "shape":"OutputDataConfig",
+          "documentation":"<p>Specifies where to send the output files.</p>"
+        },
+        "DataAccessRoleArn":{
+          "shape":"IamRoleArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the AWS Identity and Access Management (IAM) role that grants Amazon Comprehend Medical read access to your input data. For more information, see <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/access-control-managing-permissions-med.html#auth-role-permissions-med\"> Role-Based Permissions Required for Asynchronous Operations</a>.</p>"
+        },
+        "JobName":{
+          "shape":"JobName",
+          "documentation":"<p>The identifier of the job.</p>"
+        },
+        "ClientRequestToken":{
+          "shape":"ClientRequestTokenString",
+          "documentation":"<p>A unique identifier for the request. If you don't set the client request token, Amazon Comprehend Medical generates one.</p>",
+          "idempotencyToken":true
+        },
+        "KMSKey":{
+          "shape":"KMSKey",
+          "documentation":"<p>An AWS Key Management Service key to encrypt your output files. If you do not specify a key, the files are written in plain text.</p>"
+        },
+        "LanguageCode":{
+          "shape":"LanguageCode",
+          "documentation":"<p>The language of the input documents. All documents must be in the same language.</p>"
+        }
+      }
+    },
+    "StartEntitiesDetectionV2JobResponse":{
+      "type":"structure",
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier generated for the job. To get the status of a job, use this identifier with the <code>DescribeEntitiesDetectionV2Job</code> operation.</p>"
+        }
+      }
+    },
+    "StartPHIDetectionJobRequest":{
+      "type":"structure",
+      "required":[
+        "InputDataConfig",
+        "OutputDataConfig",
+        "DataAccessRoleArn",
+        "LanguageCode"
+      ],
+      "members":{
+        "InputDataConfig":{
+          "shape":"InputDataConfig",
+          "documentation":"<p>Specifies the format and location of the input data for the job.</p>"
+        },
+        "OutputDataConfig":{
+          "shape":"OutputDataConfig",
+          "documentation":"<p>Specifies where to send the output files.</p>"
+        },
+        "DataAccessRoleArn":{
+          "shape":"IamRoleArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the AWS Identity and Access Management (IAM) role that grants Amazon Comprehend Medical read access to your input data. For more information, see <a href=\"https://docs.aws.amazon.com/comprehend/latest/dg/access-control-managing-permissions-med.html#auth-role-permissions-med\"> Role-Based Permissions Required for Asynchronous Operations</a>.</p>"
+        },
+        "JobName":{
+          "shape":"JobName",
+          "documentation":"<p>The identifier of the job.</p>"
+        },
+        "ClientRequestToken":{
+          "shape":"ClientRequestTokenString",
+          "documentation":"<p>A unique identifier for the request. If you don't set the client request token, Amazon Comprehend Medical generates one.</p>",
+          "idempotencyToken":true
+        },
+        "KMSKey":{
+          "shape":"KMSKey",
+          "documentation":"<p>An AWS Key Management Service key to encrypt your output files. If you do not specify a key, the files are written in plain text.</p>"
+        },
+        "LanguageCode":{
+          "shape":"LanguageCode",
+          "documentation":"<p>The language of the input documents. All documents must be in the same language.</p>"
+        }
+      }
+    },
+    "StartPHIDetectionJobResponse":{
+      "type":"structure",
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier generated for the job. To get the status of a job, use this identifier with the <code>DescribePHIDetectionJob</code> operation.</p>"
+        }
+      }
+    },
+    "StopEntitiesDetectionV2JobRequest":{
+      "type":"structure",
+      "required":["JobId"],
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier of the medical entities job to stop.</p>"
+        }
+      }
+    },
+    "StopEntitiesDetectionV2JobResponse":{
+      "type":"structure",
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier of the medical entities detection job that was stopped.</p>"
+        }
+      }
+    },
+    "StopPHIDetectionJobRequest":{
+      "type":"structure",
+      "required":["JobId"],
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier of the PHI detection job to stop.</p>"
+        }
+      }
+    },
+    "StopPHIDetectionJobResponse":{
+      "type":"structure",
+      "members":{
+        "JobId":{
+          "shape":"JobId",
+          "documentation":"<p>The identifier of the PHI detection job that was stopped.</p>"
+        }
+      }
+    },
+    "String":{
+      "type":"string",
+      "min":1
+    },
+    "TextSizeLimitExceededException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> The size of the text you submitted exceeds the size limit. Reduce the size of the text or use a smaller document and then retry your request. </p>",
+      "exception":true
+    },
+    "Timestamp":{"type":"timestamp"},
+    "TooManyRequestsException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p> You have made too many requests within a short period of time. Wait for a short time and then try your request again. Contact customer support for more information about a service limit increase. </p>",
+      "exception":true
+    },
+    "Trait":{
+      "type":"structure",
+      "members":{
+        "Name":{
+          "shape":"AttributeName",
+          "documentation":"<p> Provides a name or contextual description about the trait. </p>"
+        },
+        "Score":{
+          "shape":"Float",
+          "documentation":"<p> The level of confidence that Amazon Comprehend Medical has in the accuracy of this trait.</p>"
+        }
+      },
+      "documentation":"<p> Provides contextual information about the extracted entity. </p>"
+    },
+    "TraitList":{
+      "type":"list",
+      "member":{"shape":"Trait"}
+    },
+    "UnmappedAttribute":{
+      "type":"structure",
+      "members":{
+        "Type":{
+          "shape":"EntityType",
+          "documentation":"<p> The type of the attribute, could be one of the following values: \"MEDICATION\", \"MEDICAL_CONDITION\", \"ANATOMY\", \"TEST_AND_TREATMENT_PROCEDURE\" or \"PROTECTED_HEALTH_INFORMATION\". </p>"
+        },
+        "Attribute":{
+          "shape":"Attribute",
+          "documentation":"<p> The specific attribute that has been extracted but not mapped to an entity. </p>"
+        }
+      },
+      "documentation":"<p> An attribute that we extracted, but were unable to relate to an entity. </p>"
+    },
+    "UnmappedAttributeList":{
+      "type":"list",
+      "member":{"shape":"UnmappedAttribute"}
+    },
+    "ValidationException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"String"}
+      },
+      "documentation":"<p>The filter that you specified for the operation is invalid. Check the filter values that you entered and try your request again.</p>",
+      "exception":true
+    }
+  },
+  "documentation":"<p> Amazon Comprehend Medical extracts structured information from unstructured clinical text. Use these actions to gain insight in your documents. </p>"
+}

@@ -1,0 +1,1354 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2018-11-05",
+    "endpointPrefix":"transfer",
+    "jsonVersion":"1.1",
+    "protocol":"json",
+    "serviceAbbreviation":"AWS Transfer",
+    "serviceFullName":"AWS Transfer for SFTP",
+    "serviceId":"Transfer",
+    "signatureVersion":"v4",
+    "signingName":"transfer",
+    "targetPrefix":"TransferService",
+    "uid":"transfer-2018-11-05"
+  },
+  "operations":{
+    "CreateServer":{
+      "name":"CreateServer",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"CreateServerRequest"},
+      "output":{"shape":"CreateServerResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceExistsException"}
+      ],
+      "documentation":"<p>Instantiates an autoscaling virtual server based on Secure File Transfer Protocol (SFTP) in AWS. When you make updates to your server or when you work with users, use the service-generated <code>ServerId</code> property that is assigned to the newly created server.</p>"
+    },
+    "CreateUser":{
+      "name":"CreateUser",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"CreateUserRequest"},
+      "output":{"shape":"CreateUserResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceExistsException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Creates a user and associates them with an existing Secure File Transfer Protocol (SFTP) server. You can only create and associate users with SFTP servers that have the <code>IdentityProviderType</code> set to <code>SERVICE_MANAGED</code>. Using parameters for <code>CreateUser</code>, you can specify the user name, set the home directory, store the user's public key, and assign the user's AWS Identity and Access Management (IAM) role. You can also optionally add a scope-down policy, and assign metadata with tags that can be used to group and search for users.</p>"
+    },
+    "DeleteServer":{
+      "name":"DeleteServer",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DeleteServerRequest"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Deletes the Secure File Transfer Protocol (SFTP) server that you specify.</p> <p>No response returns from this operation.</p>"
+    },
+    "DeleteSshPublicKey":{
+      "name":"DeleteSshPublicKey",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DeleteSshPublicKeyRequest"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Deletes a user's Secure Shell (SSH) public key.</p> <p>No response is returned from this operation.</p>"
+    },
+    "DeleteUser":{
+      "name":"DeleteUser",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DeleteUserRequest"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Deletes the user belonging to the server you specify.</p> <p>No response returns from this operation.</p> <note> <p>When you delete a user from a server, the user's information is lost.</p> </note>"
+    },
+    "DescribeServer":{
+      "name":"DescribeServer",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeServerRequest"},
+      "output":{"shape":"DescribeServerResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Describes the server that you specify by passing the <code>ServerId</code> parameter.</p> <p>The response contains a description of the server's properties.</p>"
+    },
+    "DescribeUser":{
+      "name":"DescribeUser",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeUserRequest"},
+      "output":{"shape":"DescribeUserResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Describes the user assigned to a specific server, as identified by its <code>ServerId</code> property.</p> <p>The response from this call returns the properties of the user associated with the <code>ServerId</code> value that was specified.</p>"
+    },
+    "ImportSshPublicKey":{
+      "name":"ImportSshPublicKey",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ImportSshPublicKeyRequest"},
+      "output":{"shape":"ImportSshPublicKeyResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceExistsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Adds a Secure Shell (SSH) public key to a user account identified by a <code>UserName</code> value assigned to a specific server, identified by <code>ServerId</code>.</p> <p>The response returns the <code>UserName</code> value, the <code>ServerId</code> value, and the name of the <code>SshPublicKeyId</code>.</p>"
+    },
+    "ListServers":{
+      "name":"ListServers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListServersRequest"},
+      "output":{"shape":"ListServersResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidNextTokenException"},
+        {"shape":"InvalidRequestException"}
+      ],
+      "documentation":"<p>Lists the Secure File Transfer Protocol (SFTP) servers that are associated with your AWS account.</p>"
+    },
+    "ListTagsForResource":{
+      "name":"ListTagsForResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListTagsForResourceRequest"},
+      "output":{"shape":"ListTagsForResourceResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidNextTokenException"},
+        {"shape":"InvalidRequestException"}
+      ],
+      "documentation":"<p>Lists all of the tags associated with the Amazon Resource Number (ARN) you specify. The resource can be a user, server, or role.</p>"
+    },
+    "ListUsers":{
+      "name":"ListUsers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListUsersRequest"},
+      "output":{"shape":"ListUsersResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidNextTokenException"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Lists the users for the server that you specify by passing the <code>ServerId</code> parameter.</p>"
+    },
+    "StartServer":{
+      "name":"StartServer",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"StartServerRequest"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Changes the state of a Secure File Transfer Protocol (SFTP) server from <code>OFFLINE</code> to <code>ONLINE</code>. It has no impact on an SFTP server that is already <code>ONLINE</code>. An <code>ONLINE</code> server can accept and process file transfer jobs.</p> <p>The state of <code>STARTING</code> indicates that the server is in an intermediate state, either not fully able to respond, or not fully online. The values of <code>START_FAILED</code> can indicate an error condition. </p> <p>No response is returned from this call.</p>"
+    },
+    "StopServer":{
+      "name":"StopServer",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"StopServerRequest"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Changes the state of an SFTP server from <code>ONLINE</code> to <code>OFFLINE</code>. An <code>OFFLINE</code> server cannot accept and process file transfer jobs. Information tied to your server such as server and user properties are not affected by stopping your server. Stopping a server will not reduce or impact your Secure File Transfer Protocol (SFTP) endpoint billing.</p> <p>The state of <code>STOPPING</code> indicates that the server is in an intermediate state, either not fully able to respond, or not fully offline. The values of <code>STOP_FAILED</code> can indicate an error condition.</p> <p>No response is returned from this call.</p>"
+    },
+    "TagResource":{
+      "name":"TagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"TagResourceRequest"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Attaches a key-value pair to a resource, as identified by its Amazon Resource Name (ARN). Resources are users, servers, roles, and other entities.</p> <p>There is no response returned from this call.</p>"
+    },
+    "TestIdentityProvider":{
+      "name":"TestIdentityProvider",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"TestIdentityProviderRequest"},
+      "output":{"shape":"TestIdentityProviderResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>If the <code>IdentityProviderType</code> of the server is <code>API_Gateway</code>, tests whether your API Gateway is set up successfully. We highly recommend that you call this operation to test your authentication method as soon as you create your server. By doing so, you can troubleshoot issues with the API Gateway integration to ensure that your users can successfully use the service.</p>"
+    },
+    "UntagResource":{
+      "name":"UntagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UntagResourceRequest"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Detaches a key-value pair from a resource, as identified by its Amazon Resource Name (ARN). Resources are users, servers, roles, and other entities.</p> <p>No response is returned from this call.</p>"
+    },
+    "UpdateServer":{
+      "name":"UpdateServer",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UpdateServerRequest"},
+      "output":{"shape":"UpdateServerResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceExistsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Updates the server properties after that server has been created.</p> <p>The <code>UpdateServer</code> call returns the <code>ServerId</code> of the Secure File Transfer Protocol (SFTP) server you updated.</p>"
+    },
+    "UpdateUser":{
+      "name":"UpdateUser",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UpdateUserRequest"},
+      "output":{"shape":"UpdateUserResponse"},
+      "errors":[
+        {"shape":"ServiceUnavailableException"},
+        {"shape":"InternalServiceError"},
+        {"shape":"InvalidRequestException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"}
+      ],
+      "documentation":"<p>Assigns new properties to a user. Parameters you pass modify any or all of the following: the home directory, role, and policy for the <code>UserName</code> and <code>ServerId</code> you specify.</p> <p>The response returns the <code>ServerId</code> and the <code>UserName</code> for the updated user.</p>"
+    }
+  },
+  "shapes":{
+    "Arn":{
+      "type":"string",
+      "max":1600,
+      "min":20,
+      "pattern":"arn:.*"
+    },
+    "CreateServerRequest":{
+      "type":"structure",
+      "members":{
+        "EndpointDetails":{
+          "shape":"EndpointDetails",
+          "documentation":"<p>The virtual private cloud (VPC) endpoint settings that you want to configure for your SFTP server. This parameter is required when you specify a value for the <code>EndpointType</code> parameter.</p>"
+        },
+        "EndpointType":{
+          "shape":"EndpointType",
+          "documentation":"<p>The type of VPC endpoint that you want your SFTP server to connect to. If you connect to a VPC endpoint, your SFTP server isn't accessible over the public internet.</p>"
+        },
+        "HostKey":{
+          "shape":"HostKey",
+          "documentation":"<p>The RSA private key as generated by the <code>ssh-keygen -N \"\" -f my-new-server-key</code> command.</p> <important> <p>If you aren't planning to migrate existing users from an existing SFTP server to a new AWS SFTP server, don't update the host key. Accidentally changing a server's host key can be disruptive.</p> </important> <p> For more information, see \"https://alpha-docs-aws.amazon.com/transfer/latest/userguide/configuring-servers.html#change-host-key\" in the <i>AWS SFTP User Guide.</i> </p>"
+        },
+        "IdentityProviderDetails":{
+          "shape":"IdentityProviderDetails",
+          "documentation":"<p>This parameter is required when the <code>IdentityProviderType</code> is set to <code>API_GATEWAY</code>. Accepts an array containing all of the information required to call a customer-supplied authentication API, including the API Gateway URL. This property is not required when the <code>IdentityProviderType</code> is set to <code>SERVICE_MANAGED</code>.</p>"
+        },
+        "IdentityProviderType":{
+          "shape":"IdentityProviderType",
+          "documentation":"<p>Specifies the mode of authentication for the SFTP server. The default value is <code>SERVICE_MANAGED</code>, which allows you to store and access SFTP user credentials within the AWS Transfer for SFTP service. Use the <code>API_GATEWAY</code> value to integrate with an identity provider of your choosing. The <code>API_GATEWAY</code> setting requires you to provide an API Gateway endpoint URL to call for authentication using the <code>IdentityProviderDetails</code> parameter.</p>"
+        },
+        "LoggingRole":{
+          "shape":"Role",
+          "documentation":"<p>A value that allows the service to write your SFTP users' activity to your Amazon CloudWatch logs for monitoring and auditing purposes.</p>"
+        },
+        "Tags":{
+          "shape":"Tags",
+          "documentation":"<p>Key-value pairs that can be used to group and search for servers.</p>"
+        }
+      }
+    },
+    "CreateServerResponse":{
+      "type":"structure",
+      "required":["ServerId"],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>The service-assigned ID of the SFTP server that is created.</p>"
+        }
+      }
+    },
+    "CreateUserRequest":{
+      "type":"structure",
+      "required":[
+        "Role",
+        "ServerId",
+        "UserName"
+      ],
+      "members":{
+        "HomeDirectory":{
+          "shape":"HomeDirectory",
+          "documentation":"<p>The landing directory (folder) for a user when they log in to the server using their SFTP client. </p> <p>An example is &lt;<code>your-Amazon-S3-bucket-name&gt;/home/username</code>.</p>"
+        },
+        "HomeDirectoryType":{
+          "shape":"HomeDirectoryType",
+          "documentation":"<p>The type of landing directory (folder) you want your users' home directory to be when they log into the SFTP server. If you set it to <code>PATH</code>, the user will see the absolute Amazon S3 bucket paths as is in their SFTP clients. If you set it <code>LOGICAL</code>, you will need to provide mappings in the <code>HomeDirectoryMappings</code> for how you want to make S3 paths visible to your user.</p>"
+        },
+        "HomeDirectoryMappings":{
+          "shape":"HomeDirectoryMappings",
+          "documentation":"<p>Logical directory mappings that specify what S3 paths and keys should be visible to your user and how you want to make them visible. You will need to specify the \"<code>Entry</code>\" and \"<code>Target</code>\" pair, where <code>Entry</code> shows how the path is made visible and <code>Target</code> is the actual S3 path. If you only specify a target, it will be displayed as is. You will need to also make sure that your AWS IAM Role provides access to paths in <code>Target</code>. The following is an example.</p> <p> <code>'[ \"/bucket2/documentation\", { \"Entry\": \"your-personal-report.pdf\", \"Target\": \"/bucket3/customized-reports/${transfer:UserName}.pdf\" } ]'</code> </p> <p>In most cases, you can use this value instead of the scope down policy to lock your user down to the designated home directory (\"chroot\"). To do this, you can set <code>Entry</code> to '/' and set <code>Target</code> to the HomeDirectory parameter value. </p>"
+        },
+        "Policy":{
+          "shape":"Policy",
+          "documentation":"<p>A scope-down policy for your user so you can use the same IAM role across multiple users. This policy scopes down user access to portions of their Amazon S3 bucket. Variables that you can use inside this policy include <code>${Transfer:UserName}</code>, <code>${Transfer:HomeDirectory}</code>, and <code>${Transfer:HomeBucket}</code>.</p> <note> <p>For scope-down policies, AWS Transfer for SFTP stores the policy as a JSON blob, instead of the Amazon Resource Name (ARN) of the policy. You save the policy as a JSON blob and pass it in the <code>Policy</code> argument.</p> <p>For an example of a scope-down policy, see \"https://docs.aws.amazon.com/transfer/latest/userguide/users.html#users-policies-scope-down\"&gt;Creating a Scope-Down Policy.</p> <p>For more information, see \"https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html\" in the <i>AWS Security Token Service API Reference</i>.</p> </note>"
+        },
+        "Role":{
+          "shape":"Role",
+          "documentation":"<p>The IAM role that controls your user's access to your Amazon S3 bucket. The policies attached to this role will determine the level of access you want to provide your users when transferring files into and out of your Amazon S3 bucket or buckets. The IAM role should also contain a trust relationship that allows the SFTP server to access your resources when servicing your SFTP user's transfer requests.</p>"
+        },
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server instance. This is the specific SFTP server that you added your user to.</p>"
+        },
+        "SshPublicKeyBody":{
+          "shape":"SshPublicKeyBody",
+          "documentation":"<p>The public portion of the Secure Shell (SSH) key used to authenticate the user to the SFTP server.</p>"
+        },
+        "Tags":{
+          "shape":"Tags",
+          "documentation":"<p>Key-value pairs that can be used to group and search for users. Tags are metadata attached to users for any purpose.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>A unique string that identifies a user and is associated with a server as specified by the <code>ServerId</code>. This user name must be a minimum of 3 and a maximum of 32 characters long. The following are valid characters: a-z, A-Z, 0-9, underscore, and hyphen. The user name can't start with a hyphen.</p>"
+        }
+      }
+    },
+    "CreateUserResponse":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "UserName"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>The ID of the SFTP server that the user is attached to.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>A unique string that identifies a user account associated with an SFTP server.</p>"
+        }
+      }
+    },
+    "DateImported":{"type":"timestamp"},
+    "DeleteServerRequest":{
+      "type":"structure",
+      "required":["ServerId"],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A unique system-assigned identifier for an SFTP server instance.</p>"
+        }
+      }
+    },
+    "DeleteSshPublicKeyRequest":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "SshPublicKeyId",
+        "UserName"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for a Secure File Transfer Protocol (SFTP) server instance that has the user assigned to it.</p>"
+        },
+        "SshPublicKeyId":{
+          "shape":"SshPublicKeyId",
+          "documentation":"<p>A unique identifier used to reference your user's specific SSH key.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>A unique string that identifies a user whose public key is being deleted.</p>"
+        }
+      }
+    },
+    "DeleteUserRequest":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "UserName"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server instance that has the user assigned to it.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>A unique string that identifies a user that is being deleted from the server.</p>"
+        }
+      }
+    },
+    "DescribeServerRequest":{
+      "type":"structure",
+      "required":["ServerId"],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server.</p>"
+        }
+      }
+    },
+    "DescribeServerResponse":{
+      "type":"structure",
+      "required":["Server"],
+      "members":{
+        "Server":{
+          "shape":"DescribedServer",
+          "documentation":"<p>An array containing the properties of the server with the <code>ServerID</code> you specified.</p>"
+        }
+      }
+    },
+    "DescribeUserRequest":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "UserName"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server that has this user assigned.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The name of the user assigned to one or more servers. User names are part of the sign-in credentials to use the AWS Transfer for SFTP service and perform file transfer tasks.</p>"
+        }
+      }
+    },
+    "DescribeUserResponse":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "User"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server that has this user assigned.</p>"
+        },
+        "User":{
+          "shape":"DescribedUser",
+          "documentation":"<p>An array containing the properties of the user account for the <code>ServerID</code> value that you specified.</p>"
+        }
+      }
+    },
+    "DescribedServer":{
+      "type":"structure",
+      "required":["Arn"],
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>Specifies the unique Amazon Resource Name (ARN) for the server to be described.</p>"
+        },
+        "EndpointDetails":{
+          "shape":"EndpointDetails",
+          "documentation":"<p>The virtual private cloud (VPC) endpoint settings that you configured for your SFTP server.</p>"
+        },
+        "EndpointType":{
+          "shape":"EndpointType",
+          "documentation":"<p>The type of endpoint that your SFTP server is connected to. If your SFTP server is connected to a VPC endpoint, your server isn't accessible over the public internet.</p>"
+        },
+        "HostKeyFingerprint":{
+          "shape":"HostKeyFingerprint",
+          "documentation":"<p>This value contains the message-digest algorithm (MD5) hash of the server's host key. This value is equivalent to the output of the <code>ssh-keygen -l -E md5 -f my-new-server-key</code> command.</p>"
+        },
+        "IdentityProviderDetails":{
+          "shape":"IdentityProviderDetails",
+          "documentation":"<p>Specifies information to call a customer-supplied authentication API. This field is not populated when the <code>IdentityProviderType</code> of the server is <code>SERVICE_MANAGED</code>&gt;.</p>"
+        },
+        "IdentityProviderType":{
+          "shape":"IdentityProviderType",
+          "documentation":"<p>This property defines the mode of authentication method enabled for this service. A value of <code>SERVICE_MANAGED</code> means that you are using this server to store and access SFTP user credentials within the service. A value of <code>API_GATEWAY</code> indicates that you have integrated an API Gateway endpoint that will be invoked for authenticating your user into the service.</p>"
+        },
+        "LoggingRole":{
+          "shape":"Role",
+          "documentation":"<p>This property is an AWS Identity and Access Management (IAM) entity that allows the server to turn on Amazon CloudWatch logging for Amazon S3 events. When set, user activity can be viewed in your CloudWatch logs.</p>"
+        },
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>This property is a unique system-assigned identifier for the SFTP server that you instantiate.</p>"
+        },
+        "State":{
+          "shape":"State",
+          "documentation":"<p>The condition of the SFTP server for the server that was described. A value of <code>ONLINE</code> indicates that the server can accept jobs and transfer files. A <code>State</code> value of <code>OFFLINE</code> means that the server cannot perform file transfer operations.</p> <p>The states of <code>STARTING</code> and <code>STOPPING</code> indicate that the server is in an intermediate state, either not fully able to respond, or not fully offline. The values of <code>START_FAILED</code> or <code>STOP_FAILED</code> can indicate an error condition.</p>"
+        },
+        "Tags":{
+          "shape":"Tags",
+          "documentation":"<p>This property contains the key-value pairs that you can use to search for and group servers that were assigned to the server that was described.</p>"
+        },
+        "UserCount":{
+          "shape":"UserCount",
+          "documentation":"<p>The number of users that are assigned to the SFTP server you specified with the <code>ServerId</code>.</p>"
+        }
+      },
+      "documentation":"<p>Describes the properties of the server that was specified. Information returned includes the following: the server Amazon Resource Name (ARN), the authentication configuration and type, the logging role, the server ID and state, and assigned tags or metadata. </p>"
+    },
+    "DescribedUser":{
+      "type":"structure",
+      "required":["Arn"],
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>This property contains the unique Amazon Resource Name (ARN) for the user that was requested to be described.</p>"
+        },
+        "HomeDirectory":{
+          "shape":"HomeDirectory",
+          "documentation":"<p>This property specifies the landing directory (or folder), which is the location that files are written to or read from in an Amazon S3 bucket for the described user. An example is <code>/<i>your s3 bucket name</i>/home/<i>username</i> </code>.</p>"
+        },
+        "HomeDirectoryMappings":{
+          "shape":"HomeDirectoryMappings",
+          "documentation":"<p>Logical directory mappings that you specified for what S3 paths and keys should be visible to your user and how you want to make them visible. You will need to specify the \"<code>Entry</code>\" and \"<code>Target</code>\" pair, where <code>Entry</code> shows how the path is made visible and <code>Target</code> is the actual S3 path. If you only specify a target, it will be displayed as is. You will need to also make sure that your AWS IAM Role provides access to paths in <code>Target</code>.</p> <p>In most cases, you can use this value instead of the scope down policy to lock your user down to the designated home directory (\"chroot\"). To do this, you can set <code>Entry</code> to '/' and set <code>Target</code> to the HomeDirectory parameter value. </p> <p>In most cases, you can use this value instead of the scope down policy to lock your user down to the designated home directory (\"chroot\"). To do this, you can set <code>Entry</code> to '/' and set <code>Target</code> to the HomeDirectory parameter value.</p>"
+        },
+        "HomeDirectoryType":{
+          "shape":"HomeDirectoryType",
+          "documentation":"<p>The type of landing directory (folder) you mapped for your users' to see when they log into the SFTP server. If you set it to <code>PATH</code>, the user will see the absolute Amazon S3 bucket paths as is in their SFTP clients. If you set it <code>LOGICAL</code>, you will need to provide mappings in the <code>HomeDirectoryMappings</code> for how you want to make S3 paths visible to your user.</p>"
+        },
+        "Policy":{
+          "shape":"Policy",
+          "documentation":"<p>Specifies the name of the policy in use for the described user.</p>"
+        },
+        "Role":{
+          "shape":"Role",
+          "documentation":"<p>This property specifies the IAM role that controls your user's access to your Amazon S3 bucket. The policies attached to this role will determine the level of access you want to provide your users when transferring files into and out of your Amazon S3 bucket or buckets. The IAM role should also contain a trust relationship that allows the SFTP server to access your resources when servicing your SFTP user's transfer requests.</p>"
+        },
+        "SshPublicKeys":{
+          "shape":"SshPublicKeys",
+          "documentation":"<p>This property contains the public key portion of the Secure Shell (SSH) keys stored for the described user.</p>"
+        },
+        "Tags":{
+          "shape":"Tags",
+          "documentation":"<p>This property contains the key-value pairs for the user requested. Tag can be used to search for and group users for a variety of purposes.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>This property is the name of the user that was requested to be described. User names are used for authentication purposes. This is the string that will be used by your user when they log in to your SFTP server.</p>"
+        }
+      },
+      "documentation":"<p>Returns properties of the user that you want to describe.</p>"
+    },
+    "EndpointDetails":{
+      "type":"structure",
+      "members":{
+        "VpcEndpointId":{
+          "shape":"VpcEndpointId",
+          "documentation":"<p>The ID of the VPC endpoint.</p>"
+        }
+      },
+      "documentation":"<p>The configuration settings for the virtual private cloud (VPC) endpoint for your SFTP server.</p>"
+    },
+    "EndpointType":{
+      "type":"string",
+      "enum":[
+        "PUBLIC",
+        "VPC_ENDPOINT"
+      ]
+    },
+    "HomeDirectory":{
+      "type":"string",
+      "max":1024,
+      "pattern":"^$|/.*"
+    },
+    "HomeDirectoryMapEntry":{
+      "type":"structure",
+      "required":[
+        "Entry",
+        "Target"
+      ],
+      "members":{
+        "Entry":{
+          "shape":"MapEntry",
+          "documentation":"<p>Represents an entry and a target for <code>HomeDirectoryMappings</code>.</p>"
+        },
+        "Target":{
+          "shape":"MapTarget",
+          "documentation":"<p>Represents the map target that is used in a <code>HomeDirectorymapEntry</code>.</p>"
+        }
+      },
+      "documentation":"<p>Represents an object that contains entries and a targets for <code>HomeDirectoryMappings</code>.</p>"
+    },
+    "HomeDirectoryMappings":{
+      "type":"list",
+      "member":{"shape":"HomeDirectoryMapEntry"},
+      "max":50,
+      "min":1
+    },
+    "HomeDirectoryType":{
+      "type":"string",
+      "enum":[
+        "PATH",
+        "LOGICAL"
+      ]
+    },
+    "HostKey":{
+      "type":"string",
+      "max":4096,
+      "sensitive":true
+    },
+    "HostKeyFingerprint":{"type":"string"},
+    "IdentityProviderDetails":{
+      "type":"structure",
+      "members":{
+        "Url":{
+          "shape":"Url",
+          "documentation":"<p>The <code>Url</code> parameter provides contains the location of the service endpoint used to authenticate users.</p>"
+        },
+        "InvocationRole":{
+          "shape":"Role",
+          "documentation":"<p>The <code>InvocationRole</code> parameter provides the type of <code>InvocationRole</code> used to authenticate the user account.</p>"
+        }
+      },
+      "documentation":"<p>Returns information related to the type of user authentication that is in use for a server's users. A server can have only one method of authentication.</p>"
+    },
+    "IdentityProviderType":{
+      "type":"string",
+      "documentation":"<p>Returns information related to the type of user authentication that is in use for a server's users. For <code>SERVICE_MANAGED</code> authentication, the Secure Shell (SSH) public keys are stored with a user on an SFTP server instance. For <code>API_GATEWAY</code> authentication, your custom authentication method is implemented by using an API call. A server can have only one method of authentication.</p>",
+      "enum":[
+        "SERVICE_MANAGED",
+        "API_GATEWAY"
+      ]
+    },
+    "ImportSshPublicKeyRequest":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "SshPublicKeyBody",
+        "UserName"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server.</p>"
+        },
+        "SshPublicKeyBody":{
+          "shape":"SshPublicKeyBody",
+          "documentation":"<p>The public key portion of an SSH key pair.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The name of the user account that is assigned to one or more servers.</p>"
+        }
+      }
+    },
+    "ImportSshPublicKeyResponse":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "SshPublicKeyId",
+        "UserName"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server.</p>"
+        },
+        "SshPublicKeyId":{
+          "shape":"SshPublicKeyId",
+          "documentation":"<p>This identifier is the name given to a public key by the system that was imported.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>A user name assigned to the <code>ServerID</code> value that you specified.</p>"
+        }
+      },
+      "documentation":"<p>This response identifies the user, the server they belong to, and the identifier of the SSH public key associated with that user. A user can have more than one key on each server that they are associated with.</p>"
+    },
+    "InternalServiceError":{
+      "type":"structure",
+      "required":["Message"],
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>This exception is thrown when an error occurs in the AWS Transfer for SFTP service.</p>",
+      "exception":true,
+      "fault":true
+    },
+    "InvalidNextTokenException":{
+      "type":"structure",
+      "required":["Message"],
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>The <code>NextToken</code> parameter that was passed is invalid.</p>",
+      "exception":true
+    },
+    "InvalidRequestException":{
+      "type":"structure",
+      "required":["Message"],
+      "members":{
+        "Message":{"shape":"Message"}
+      },
+      "documentation":"<p>This exception is thrown when the client submits a malformed request.</p>",
+      "exception":true
+    },
+    "ListServersRequest":{
+      "type":"structure",
+      "members":{
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>Specifies the number of servers to return as a response to the <code>ListServers</code> query.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>When additional results are obtained from the <code>ListServers</code> command, a <code>NextToken</code> parameter is returned in the output. You can then pass the <code>NextToken</code> parameter in a subsequent command to continue listing additional servers.</p>"
+        }
+      }
+    },
+    "ListServersResponse":{
+      "type":"structure",
+      "required":["Servers"],
+      "members":{
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>When you can get additional results from the <code>ListServers</code> operation, a <code>NextToken</code> parameter is returned in the output. In a following command, you can pass in the <code>NextToken</code> parameter to continue listing additional servers.</p>"
+        },
+        "Servers":{
+          "shape":"ListedServers",
+          "documentation":"<p>An array of servers that were listed.</p>"
+        }
+      }
+    },
+    "ListTagsForResourceRequest":{
+      "type":"structure",
+      "required":["Arn"],
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>Requests the tags associated with a particular Amazon Resource Name (ARN). An ARN is an identifier for a specific AWS resource, such as a server, user, or role.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>Specifies the number of tags to return as a response to the <code>ListTagsForResource</code> request.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>When you request additional results from the <code>ListTagsForResource</code> operation, a <code>NextToken</code> parameter is returned in the input. You can then pass in a subsequent command to the <code>NextToken</code> parameter to continue listing additional tags.</p>"
+        }
+      }
+    },
+    "ListTagsForResourceResponse":{
+      "type":"structure",
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>This value is the ARN you specified to list the tags of.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>When you can get additional results from the <code>ListTagsForResource</code> call, a <code>NextToken</code> parameter is returned in the output. You can then pass in a subsequent command to the <code>NextToken</code> parameter to continue listing additional tags.</p>"
+        },
+        "Tags":{
+          "shape":"Tags",
+          "documentation":"<p>Key-value pairs that are assigned to a resource, usually for the purpose of grouping and searching for items. Tags are metadata that you define.</p>"
+        }
+      }
+    },
+    "ListUsersRequest":{
+      "type":"structure",
+      "required":["ServerId"],
+      "members":{
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>Specifies the number of users to return as a response to the <code>ListUsers</code> request.</p>"
+        },
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>When you can get additional results from the <code>ListUsers</code> call, a <code>NextToken</code> parameter is returned in the output. You can then pass in a subsequent command to the <code>NextToken</code> parameter to continue listing additional users.</p>"
+        },
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for a Secure File Transfer Protocol (SFTP) server that has users assigned to it.</p>"
+        }
+      }
+    },
+    "ListUsersResponse":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "Users"
+      ],
+      "members":{
+        "NextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>When you can get additional results from the <code>ListUsers</code> call, a <code>NextToken</code> parameter is returned in the output. You can then pass in a subsequent command to the <code>NextToken</code> parameter to continue listing additional users.</p>"
+        },
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server that the users are assigned to.</p>"
+        },
+        "Users":{
+          "shape":"ListedUsers",
+          "documentation":"<p>Returns the user accounts and their properties for the <code>ServerId</code> value that you specify.</p>"
+        }
+      }
+    },
+    "ListedServer":{
+      "type":"structure",
+      "required":["Arn"],
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>The unique Amazon Resource Name (ARN) for the server to be listed.</p>"
+        },
+        "IdentityProviderType":{
+          "shape":"IdentityProviderType",
+          "documentation":"<p>The authentication method used to validate a user for the server that was specified. This can include Secure Shell (SSH), user name and password combinations, or your own custom authentication method. Valid values include <code>SERVICE_MANAGED</code> or <code>API_GATEWAY</code>.</p>"
+        },
+        "EndpointType":{
+          "shape":"EndpointType",
+          "documentation":"<p>The type of VPC endpoint that your SFTP server is connected to. If your SFTP server is connected to a VPC endpoint, your server isn't accessible over the public internet.</p>"
+        },
+        "LoggingRole":{
+          "shape":"Role",
+          "documentation":"<p>The AWS Identity and Access Management entity that allows the server to turn on Amazon CloudWatch logging.</p>"
+        },
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>This value is the unique system assigned identifier for the SFTP servers that were listed.</p>"
+        },
+        "State":{
+          "shape":"State",
+          "documentation":"<p>This property describes the condition of the SFTP server for the server that was described. A value of <code>ONLINE</code>&gt; indicates that the server can accept jobs and transfer files. A <code>State</code> value of <code>OFFLINE</code> means that the server cannot perform file transfer operations.</p> <p>The states of <code>STARTING</code> and <code>STOPPING</code> indicate that the server is in an intermediate state, either not fully able to respond, or not fully offline. The values of <code>START_FAILED</code> or <code>STOP_FAILED</code> can indicate an error condition.</p>"
+        },
+        "UserCount":{
+          "shape":"UserCount",
+          "documentation":"<p>This property is a numeric value that indicates the number of users that are assigned to the SFTP server you specified with the <code>ServerId</code>.</p>"
+        }
+      },
+      "documentation":"<p>Returns properties of the server that was specified.</p>"
+    },
+    "ListedServers":{
+      "type":"list",
+      "member":{"shape":"ListedServer"}
+    },
+    "ListedUser":{
+      "type":"structure",
+      "required":["Arn"],
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>This property is the unique Amazon Resource Name (ARN) for the user that you want to learn about.</p>"
+        },
+        "HomeDirectory":{
+          "shape":"HomeDirectory",
+          "documentation":"<p>This value specifies the location that files are written to or read from an Amazon S3 bucket for the user you specify by their ARN.</p>"
+        },
+        "HomeDirectoryType":{
+          "shape":"HomeDirectoryType",
+          "documentation":"<p>The type of landing directory (folder) you mapped for your users' home directory. If you set it to <code>PATH</code>, the user will see the absolute Amazon S3 bucket paths as is in their SFTP clients. If you set it <code>LOGICAL</code>, you will need to provide mappings in the <code>HomeDirectoryMappings</code> for how you want to make S3 paths visible to your user.</p>"
+        },
+        "Role":{
+          "shape":"Role",
+          "documentation":"<p>The role in use by this user. A <i>role</i> is an AWS Identity and Access Management (IAM) entity that, in this case, allows the SFTP server to act on a user's behalf. It allows the server to inherit the trust relationship that enables that user to perform file operations to their Amazon S3 bucket.</p>"
+        },
+        "SshPublicKeyCount":{
+          "shape":"SshPublicKeyCount",
+          "documentation":"<p>This value is the number of SSH public keys stored for the user you specified.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The name of the user whose ARN was specified. User names are used for authentication purposes.</p>"
+        }
+      },
+      "documentation":"<p>Returns properties of the user that you specify.</p>"
+    },
+    "ListedUsers":{
+      "type":"list",
+      "member":{"shape":"ListedUser"}
+    },
+    "MapEntry":{
+      "type":"string",
+      "max":1024,
+      "pattern":"^/.*"
+    },
+    "MapTarget":{
+      "type":"string",
+      "max":1024,
+      "pattern":"^/.*"
+    },
+    "MaxResults":{
+      "type":"integer",
+      "max":1000,
+      "min":1
+    },
+    "Message":{"type":"string"},
+    "NextToken":{
+      "type":"string",
+      "max":6144,
+      "min":1
+    },
+    "NullableRole":{
+      "type":"string",
+      "max":2048,
+      "pattern":"^$|arn:.*role/.*"
+    },
+    "Policy":{
+      "type":"string",
+      "max":2048
+    },
+    "Resource":{"type":"string"},
+    "ResourceExistsException":{
+      "type":"structure",
+      "required":[
+        "Message",
+        "Resource",
+        "ResourceType"
+      ],
+      "members":{
+        "Message":{"shape":"Message"},
+        "Resource":{"shape":"Resource"},
+        "ResourceType":{"shape":"ResourceType"}
+      },
+      "documentation":"<p>The requested resource does not exist.</p>",
+      "exception":true
+    },
+    "ResourceNotFoundException":{
+      "type":"structure",
+      "required":[
+        "Message",
+        "Resource",
+        "ResourceType"
+      ],
+      "members":{
+        "Message":{"shape":"Message"},
+        "Resource":{"shape":"Resource"},
+        "ResourceType":{"shape":"ResourceType"}
+      },
+      "documentation":"<p>This exception is thrown when a resource is not found by the AWS Transfer for SFTP service.</p>",
+      "exception":true
+    },
+    "ResourceType":{"type":"string"},
+    "Response":{"type":"string"},
+    "RetryAfterSeconds":{"type":"string"},
+    "Role":{
+      "type":"string",
+      "max":2048,
+      "min":20,
+      "pattern":"arn:.*role/.*"
+    },
+    "ServerId":{
+      "type":"string",
+      "max":19,
+      "min":19,
+      "pattern":"^s-([0-9a-f]{17})$"
+    },
+    "ServiceErrorMessage":{"type":"string"},
+    "ServiceUnavailableException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"ServiceErrorMessage"}
+      },
+      "documentation":"<p>The request has failed because the AWS Transfer for SFTP service is not available.</p>",
+      "exception":true,
+      "fault":true,
+      "synthetic":true
+    },
+    "SshPublicKey":{
+      "type":"structure",
+      "required":[
+        "DateImported",
+        "SshPublicKeyBody",
+        "SshPublicKeyId"
+      ],
+      "members":{
+        "DateImported":{
+          "shape":"DateImported",
+          "documentation":"<p>The date that the public key was added to the user account.</p>"
+        },
+        "SshPublicKeyBody":{
+          "shape":"SshPublicKeyBody",
+          "documentation":"<p>The content of the SSH public key as specified by the <code>PublicKeyId</code>.</p>"
+        },
+        "SshPublicKeyId":{
+          "shape":"SshPublicKeyId",
+          "documentation":"<p>The <code>SshPublicKeyId</code> parameter contains the identifier of the public key.</p>"
+        }
+      },
+      "documentation":"<p>Provides information about the public Secure Shell (SSH) key that is associated with a user account for a specific server (as identified by <code>ServerId</code>). The information returned includes the date the key was imported, the public key contents, and the public key ID. A user can store more than one SSH public key associated with their user name on a specific SFTP server.</p>"
+    },
+    "SshPublicKeyBody":{
+      "type":"string",
+      "max":2048,
+      "pattern":"^ssh-rsa\\s+[A-Za-z0-9+/]+[=]{0,3}(\\s+.+)?\\s*$"
+    },
+    "SshPublicKeyCount":{"type":"integer"},
+    "SshPublicKeyId":{
+      "type":"string",
+      "max":21,
+      "min":21,
+      "pattern":"^key-[0-9a-f]{17}$"
+    },
+    "SshPublicKeys":{
+      "type":"list",
+      "member":{"shape":"SshPublicKey"},
+      "max":5
+    },
+    "StartServerRequest":{
+      "type":"structure",
+      "required":["ServerId"],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server that you start.</p>"
+        }
+      }
+    },
+    "State":{
+      "type":"string",
+      "documentation":"<p>Describes the condition of the SFTP server with respect to its ability to perform file operations. There are six possible states: <code>OFFLINE</code>, <code>ONLINE</code>, <code>STARTING</code>, <code>STOPPING</code>, <code>START_FAILED</code>, and <code>STOP_FAILED</code>.</p> <p> <code>OFFLINE</code> indicates that the SFTP server exists, but that it is not available for file operations. <code>ONLINE</code> indicates that the SFTP server is available to perform file operations. <code>STARTING</code> indicates that the SFTP server's was instantiated, but the server is not yet available to perform file operations. Under normal conditions, it can take a couple of minutes for an SFTP server to be completely operational. Both <code>START_FAILED</code> and <code>STOP_FAILED</code> are error conditions.</p>",
+      "enum":[
+        "OFFLINE",
+        "ONLINE",
+        "STARTING",
+        "STOPPING",
+        "START_FAILED",
+        "STOP_FAILED"
+      ]
+    },
+    "StatusCode":{"type":"integer"},
+    "StopServerRequest":{
+      "type":"structure",
+      "required":["ServerId"],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server that you stopped.</p>"
+        }
+      }
+    },
+    "Tag":{
+      "type":"structure",
+      "required":[
+        "Key",
+        "Value"
+      ],
+      "members":{
+        "Key":{
+          "shape":"TagKey",
+          "documentation":"<p>The name assigned to the tag that you create.</p>"
+        },
+        "Value":{
+          "shape":"TagValue",
+          "documentation":"<p>This property contains one or more values that you assigned to the key name you create.</p>"
+        }
+      },
+      "documentation":"<p>Creates a key-value pair for a specific resource. Tags are metadata that you can use to search for and group a resource for various purposes. You can apply tags to servers, users, and roles. A tag key can take more than one value. For example, to group servers for accounting purposes, you might create a tag called <code>Group</code> and assign the values <code>Research</code> and <code>Accounting</code> to that group.</p>"
+    },
+    "TagKey":{
+      "type":"string",
+      "max":128
+    },
+    "TagKeys":{
+      "type":"list",
+      "member":{"shape":"TagKey"},
+      "max":50,
+      "min":1
+    },
+    "TagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "Arn",
+        "Tags"
+      ],
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>An Amazon Resource Name (ARN) for a specific AWS resource, such as a server, user, or role.</p>"
+        },
+        "Tags":{
+          "shape":"Tags",
+          "documentation":"<p>Key-value pairs assigned to ARNs that you can use to group and search for resources by type. You can attach this metadata to user accounts for any purpose.</p>"
+        }
+      }
+    },
+    "TagValue":{
+      "type":"string",
+      "max":256
+    },
+    "Tags":{
+      "type":"list",
+      "member":{"shape":"Tag"},
+      "max":50,
+      "min":1
+    },
+    "TestIdentityProviderRequest":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "UserName"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned identifier for a specific server. That server's user authentication method is tested with a user name and password.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>This request parameter is the name of the user account to be tested.</p>"
+        },
+        "UserPassword":{
+          "shape":"UserPassword",
+          "documentation":"<p>The password of the user account to be tested.</p>"
+        }
+      }
+    },
+    "TestIdentityProviderResponse":{
+      "type":"structure",
+      "required":[
+        "StatusCode",
+        "Url"
+      ],
+      "members":{
+        "Response":{
+          "shape":"Response",
+          "documentation":"<p>The response that is returned from your API Gateway.</p>"
+        },
+        "StatusCode":{
+          "shape":"StatusCode",
+          "documentation":"<p>The HTTP status code that is the response from your API Gateway.</p>"
+        },
+        "Message":{
+          "shape":"Message",
+          "documentation":"<p>A message that indicates whether the test was successful or not. </p>"
+        },
+        "Url":{
+          "shape":"Url",
+          "documentation":"<p>The endpoint of the service used to authenticate a user.</p>"
+        }
+      }
+    },
+    "ThrottlingException":{
+      "type":"structure",
+      "members":{
+        "RetryAfterSeconds":{"shape":"RetryAfterSeconds"}
+      },
+      "documentation":"<p>The request was denied due to request throttling.</p> <p> HTTP Status Code: 400</p>",
+      "exception":true
+    },
+    "UntagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "Arn",
+        "TagKeys"
+      ],
+      "members":{
+        "Arn":{
+          "shape":"Arn",
+          "documentation":"<p>This is the value of the resource that will have the tag removed. An Amazon Resource Name (ARN) is an identifier for a specific AWS resource, such as a server, user, or role.</p>"
+        },
+        "TagKeys":{
+          "shape":"TagKeys",
+          "documentation":"<p>TagKeys are key-value pairs assigned to ARNs that can be used to group and search for resources by type. This metadata can be attached to resources for any purpose.</p>"
+        }
+      }
+    },
+    "UpdateServerRequest":{
+      "type":"structure",
+      "required":["ServerId"],
+      "members":{
+        "EndpointDetails":{
+          "shape":"EndpointDetails",
+          "documentation":"<p>The virtual private cloud (VPC) endpoint settings that are configured for your SFTP server. With a VPC endpoint, your SFTP server isn't accessible over the public internet.</p>"
+        },
+        "EndpointType":{
+          "shape":"EndpointType",
+          "documentation":"<p>The type of endpoint that you want your SFTP server to connect to. You can choose to connect to the public internet or a virtual private cloud (VPC) endpoint. With a VPC endpoint, your SFTP server isn't accessible over the public internet. </p>"
+        },
+        "HostKey":{
+          "shape":"HostKey",
+          "documentation":"<p>The RSA private key as generated by <code>ssh-keygen -N \"\" -f my-new-server-key</code>.</p> <important> <p>If you aren't planning to migrate existing users from an existing SFTP server to a new AWS SFTP server, don't update the host key. Accidentally changing a server's host key can be disruptive.</p> </important> <p> For more information, see \"https://docs.aws.amazon.com/transfer/latest/userguide/configuring-servers.html#change-host-key\" in the <i>AWS SFTP User Guide.</i> </p>"
+        },
+        "IdentityProviderDetails":{
+          "shape":"IdentityProviderDetails",
+          "documentation":"<p>This response parameter is an array containing all of the information required to call a customer's authentication API method.</p>"
+        },
+        "LoggingRole":{
+          "shape":"NullableRole",
+          "documentation":"<p>A value that changes the AWS Identity and Access Management (IAM) role that allows Amazon S3 events to be logged in Amazon CloudWatch, turning logging on or off.</p>"
+        },
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server instance that the user account is assigned to.</p>"
+        }
+      }
+    },
+    "UpdateServerResponse":{
+      "type":"structure",
+      "required":["ServerId"],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server that the user account is assigned to.</p>"
+        }
+      }
+    },
+    "UpdateUserRequest":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "UserName"
+      ],
+      "members":{
+        "HomeDirectory":{
+          "shape":"HomeDirectory",
+          "documentation":"<p>A parameter that specifies the landing directory (folder) for a user when they log in to the server using their client. </p> <p>An example is <code>&lt;your-Amazon-S3-bucket-name&gt;/home/username</code>.</p>"
+        },
+        "HomeDirectoryType":{
+          "shape":"HomeDirectoryType",
+          "documentation":"<p>The type of landing directory (folder) you want your users' home directory to be when they log into the SFTP serve. If you set it to <code>PATH</code>, the user will see the absolute Amazon S3 bucket paths as is in their SFTP clients. If you set it <code>LOGICAL</code>, you will need to provide mappings in the <code>HomeDirectoryMappings</code> for how you want to make S3 paths visible to your user.</p>"
+        },
+        "HomeDirectoryMappings":{
+          "shape":"HomeDirectoryMappings",
+          "documentation":"<p>Logical directory mappings that specify what S3 paths and keys should be visible to your user and how you want to make them visible. You will need to specify the \"<code>Entry</code>\" and \"<code>Target</code>\" pair, where <code>Entry</code> shows how the path is made visible and <code>Target</code> is the actual S3 path. If you only specify a target, it will be displayed as is. You will need to also make sure that your AWS IAM Role provides access to paths in <code>Target</code>. The following is an example.</p> <p> <code>'[ \"/bucket2/documentation\", { \"Entry\": \"your-personal-report.pdf\", \"Target\": \"/bucket3/customized-reports/${transfer:UserName}.pdf\" } ]'</code> </p> <p>In most cases, you can use this value instead of the scope down policy to lock your user down to the designated home directory (\"chroot\"). To do this, you can set <code>Entry</code> to '/' and set <code>Target</code> to the HomeDirectory parameter value. </p> <p> </p>"
+        },
+        "Policy":{
+          "shape":"Policy",
+          "documentation":"<p>Allows you to supply a scope-down policy for your user so you can use the same AWS Identity and Access Management (IAM) role across multiple users. The policy scopes down user access to portions of your Amazon S3 bucket. Variables you can use inside this policy include <code>${Transfer:UserName}</code>, <code>${Transfer:HomeDirectory}</code>, and <code>${Transfer:HomeBucket}</code>.</p> <note> <p>For scope-down policies, AWS Transfer for SFTP stores the policy as a JSON blob, instead of the Amazon Resource Name (ARN) of the policy. You save the policy as a JSON blob and pass it in the <code>Policy</code> argument.</p> <p>For an example of a scope-down policy, see \"https://docs.aws.amazon.com/transfer/latest/userguide/users.html#users-policies-scope-down\"&gt;Creating a Scope-Down Policy.</p> <p>For more information, see \"https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html\" in the <i>AWS Security Token Service API Reference</i>.</p> </note>"
+        },
+        "Role":{
+          "shape":"Role",
+          "documentation":"<p>The IAM role that controls your user's access to your Amazon S3 bucket. The policies attached to this role will determine the level of access you want to provide your users when transferring files into and out of your Amazon S3 bucket or buckets. The IAM role should also contain a trust relationship that allows the Secure File Transfer Protocol (SFTP) server to access your resources when servicing your SFTP user's transfer requests.</p>"
+        },
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server instance that the user account is assigned to.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>A unique string that identifies a user and is associated with a server as specified by the <code>ServerId</code>. This is the string that will be used by your user when they log in to your SFTP server. This user name is a minimum of 3 and a maximum of 32 characters long. The following are valid characters: a-z, A-Z, 0-9, underscore, and hyphen. The user name can't start with a hyphen.</p>"
+        }
+      }
+    },
+    "UpdateUserResponse":{
+      "type":"structure",
+      "required":[
+        "ServerId",
+        "UserName"
+      ],
+      "members":{
+        "ServerId":{
+          "shape":"ServerId",
+          "documentation":"<p>A system-assigned unique identifier for an SFTP server instance that the user account is assigned to.</p>"
+        },
+        "UserName":{
+          "shape":"UserName",
+          "documentation":"<p>The unique identifier for a user that is assigned to the SFTP server instance that was specified in the request.</p>"
+        }
+      },
+      "documentation":"<p> <code>UpdateUserResponse</code> returns the user name and server identifier for the request to update a user's properties.</p>"
+    },
+    "Url":{
+      "type":"string",
+      "max":255
+    },
+    "UserCount":{"type":"integer"},
+    "UserName":{
+      "type":"string",
+      "max":32,
+      "min":3,
+      "pattern":"^[a-zA-Z0-9_][a-zA-Z0-9_-]{2,31}$"
+    },
+    "UserPassword":{
+      "type":"string",
+      "max":2048,
+      "sensitive":true
+    },
+    "VpcEndpointId":{
+      "type":"string",
+      "max":22,
+      "min":22,
+      "pattern":"^vpce-[0-9a-f]{17}$"
+    }
+  },
+  "documentation":"<p>AWS Transfer for SFTP is a fully managed service that enables the transfer of files directly into and out of Amazon S3 using the Secure File Transfer Protocol (SFTP)—also known as Secure Shell (SSH) File Transfer Protocol. AWS helps you seamlessly migrate your file transfer workflows to AWS Transfer for SFTP—by integrating with existing authentication systems, and providing DNS routing with Amazon Route 53—so nothing changes for your customers and partners, or their applications. With your data in S3, you can use it with AWS services for processing, analytics, machine learning, and archiving. Getting started with AWS Transfer for SFTP (AWS SFTP) is easy; there is no infrastructure to buy and set up. </p>"
+}

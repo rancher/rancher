@@ -1,0 +1,3615 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2017-11-28",
+    "endpointPrefix":"guardduty",
+    "jsonVersion":"1.1",
+    "protocol":"rest-json",
+    "serviceFullName":"Amazon GuardDuty",
+    "serviceId":"GuardDuty",
+    "signatureVersion":"v4",
+    "signingName":"guardduty",
+    "uid":"guardduty-2017-11-28"
+  },
+  "operations":{
+    "AcceptInvitation":{
+      "name":"AcceptInvitation",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/master",
+        "responseCode":200
+      },
+      "input":{"shape":"AcceptInvitationRequest"},
+      "output":{"shape":"AcceptInvitationResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Accepts the invitation to be monitored by a master GuardDuty account.</p>"
+    },
+    "ArchiveFindings":{
+      "name":"ArchiveFindings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/findings/archive",
+        "responseCode":200
+      },
+      "input":{"shape":"ArchiveFindingsRequest"},
+      "output":{"shape":"ArchiveFindingsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Archives GuardDuty findings specified by the list of finding IDs.</p> <note> <p>Only the master account can archive findings. Member accounts do not have permission to archive findings from their accounts.</p> </note>"
+    },
+    "CreateDetector":{
+      "name":"CreateDetector",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector",
+        "responseCode":200
+      },
+      "input":{"shape":"CreateDetectorRequest"},
+      "output":{"shape":"CreateDetectorResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Creates a single Amazon GuardDuty detector. A detector is a resource that represents the GuardDuty service. To start using GuardDuty, you must create a detector in each region that you enable the service. You can have only one detector per account per region.</p>"
+    },
+    "CreateFilter":{
+      "name":"CreateFilter",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/filter",
+        "responseCode":200
+      },
+      "input":{"shape":"CreateFilterRequest"},
+      "output":{"shape":"CreateFilterResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Creates a filter using the specified finding criteria.</p>"
+    },
+    "CreateIPSet":{
+      "name":"CreateIPSet",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/ipset",
+        "responseCode":200
+      },
+      "input":{"shape":"CreateIPSetRequest"},
+      "output":{"shape":"CreateIPSetResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Creates a new IPSet - a list of trusted IP addresses that have been whitelisted for secure communication with AWS infrastructure and applications.</p>"
+    },
+    "CreateMembers":{
+      "name":"CreateMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/member",
+        "responseCode":200
+      },
+      "input":{"shape":"CreateMembersRequest"},
+      "output":{"shape":"CreateMembersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Creates member accounts of the current AWS account by specifying a list of AWS account IDs. The current AWS account can then invite these members to manage GuardDuty in their accounts.</p>"
+    },
+    "CreateSampleFindings":{
+      "name":"CreateSampleFindings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/findings/create",
+        "responseCode":200
+      },
+      "input":{"shape":"CreateSampleFindingsRequest"},
+      "output":{"shape":"CreateSampleFindingsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Generates example findings of types specified by the list of finding types. If 'NULL' is specified for findingTypes, the API generates example findings of all supported finding types.</p>"
+    },
+    "CreateThreatIntelSet":{
+      "name":"CreateThreatIntelSet",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/threatintelset",
+        "responseCode":200
+      },
+      "input":{"shape":"CreateThreatIntelSetRequest"},
+      "output":{"shape":"CreateThreatIntelSetResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Create a new ThreatIntelSet. ThreatIntelSets consist of known malicious IP addresses. GuardDuty generates findings based on ThreatIntelSets.</p>"
+    },
+    "DeclineInvitations":{
+      "name":"DeclineInvitations",
+      "http":{
+        "method":"POST",
+        "requestUri":"/invitation/decline",
+        "responseCode":200
+      },
+      "input":{"shape":"DeclineInvitationsRequest"},
+      "output":{"shape":"DeclineInvitationsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Declines invitations sent to the current member account by AWS account specified by their account IDs.</p>"
+    },
+    "DeleteDetector":{
+      "name":"DeleteDetector",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/detector/{detectorId}",
+        "responseCode":200
+      },
+      "input":{"shape":"DeleteDetectorRequest"},
+      "output":{"shape":"DeleteDetectorResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Deletes a Amazon GuardDuty detector specified by the detector ID.</p>"
+    },
+    "DeleteFilter":{
+      "name":"DeleteFilter",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/detector/{detectorId}/filter/{filterName}",
+        "responseCode":200
+      },
+      "input":{"shape":"DeleteFilterRequest"},
+      "output":{"shape":"DeleteFilterResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Deletes the filter specified by the filter name.</p>"
+    },
+    "DeleteIPSet":{
+      "name":"DeleteIPSet",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/detector/{detectorId}/ipset/{ipSetId}",
+        "responseCode":200
+      },
+      "input":{"shape":"DeleteIPSetRequest"},
+      "output":{"shape":"DeleteIPSetResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Deletes the IPSet specified by the IPSet ID.</p>"
+    },
+    "DeleteInvitations":{
+      "name":"DeleteInvitations",
+      "http":{
+        "method":"POST",
+        "requestUri":"/invitation/delete",
+        "responseCode":200
+      },
+      "input":{"shape":"DeleteInvitationsRequest"},
+      "output":{"shape":"DeleteInvitationsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Deletes invitations sent to the current member account by AWS accounts specified by their account IDs.</p>"
+    },
+    "DeleteMembers":{
+      "name":"DeleteMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/member/delete",
+        "responseCode":200
+      },
+      "input":{"shape":"DeleteMembersRequest"},
+      "output":{"shape":"DeleteMembersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Deletes GuardDuty member accounts (to the current GuardDuty master account) specified by the account IDs.</p>"
+    },
+    "DeleteThreatIntelSet":{
+      "name":"DeleteThreatIntelSet",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/detector/{detectorId}/threatintelset/{threatIntelSetId}",
+        "responseCode":200
+      },
+      "input":{"shape":"DeleteThreatIntelSetRequest"},
+      "output":{"shape":"DeleteThreatIntelSetResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Deletes ThreatIntelSet specified by the ThreatIntelSet ID.</p>"
+    },
+    "DisassociateFromMasterAccount":{
+      "name":"DisassociateFromMasterAccount",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/master/disassociate",
+        "responseCode":200
+      },
+      "input":{"shape":"DisassociateFromMasterAccountRequest"},
+      "output":{"shape":"DisassociateFromMasterAccountResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Disassociates the current GuardDuty member account from its master account.</p>"
+    },
+    "DisassociateMembers":{
+      "name":"DisassociateMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/member/disassociate",
+        "responseCode":200
+      },
+      "input":{"shape":"DisassociateMembersRequest"},
+      "output":{"shape":"DisassociateMembersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Disassociates GuardDuty member accounts (to the current GuardDuty master account) specified by the account IDs.</p>"
+    },
+    "GetDetector":{
+      "name":"GetDetector",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}",
+        "responseCode":200
+      },
+      "input":{"shape":"GetDetectorRequest"},
+      "output":{"shape":"GetDetectorResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Retrieves an Amazon GuardDuty detector specified by the detectorId.</p>"
+    },
+    "GetFilter":{
+      "name":"GetFilter",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}/filter/{filterName}",
+        "responseCode":200
+      },
+      "input":{"shape":"GetFilterRequest"},
+      "output":{"shape":"GetFilterResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Returns the details of the filter specified by the filter name.</p>"
+    },
+    "GetFindings":{
+      "name":"GetFindings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/findings/get",
+        "responseCode":200
+      },
+      "input":{"shape":"GetFindingsRequest"},
+      "output":{"shape":"GetFindingsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Describes Amazon GuardDuty findings specified by finding IDs.</p>"
+    },
+    "GetFindingsStatistics":{
+      "name":"GetFindingsStatistics",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/findings/statistics",
+        "responseCode":200
+      },
+      "input":{"shape":"GetFindingsStatisticsRequest"},
+      "output":{"shape":"GetFindingsStatisticsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Lists Amazon GuardDuty findings' statistics for the specified detector ID.</p>"
+    },
+    "GetIPSet":{
+      "name":"GetIPSet",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}/ipset/{ipSetId}",
+        "responseCode":200
+      },
+      "input":{"shape":"GetIPSetRequest"},
+      "output":{"shape":"GetIPSetResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Retrieves the IPSet specified by the IPSet ID.</p>"
+    },
+    "GetInvitationsCount":{
+      "name":"GetInvitationsCount",
+      "http":{
+        "method":"GET",
+        "requestUri":"/invitation/count",
+        "responseCode":200
+      },
+      "input":{"shape":"GetInvitationsCountRequest"},
+      "output":{"shape":"GetInvitationsCountResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Returns the count of all GuardDuty membership invitations that were sent to the current member account except the currently accepted invitation.</p>"
+    },
+    "GetMasterAccount":{
+      "name":"GetMasterAccount",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}/master",
+        "responseCode":200
+      },
+      "input":{"shape":"GetMasterAccountRequest"},
+      "output":{"shape":"GetMasterAccountResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Provides the details for the GuardDuty master account associated with the current GuardDuty member account.</p>"
+    },
+    "GetMembers":{
+      "name":"GetMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/member/get",
+        "responseCode":200
+      },
+      "input":{"shape":"GetMembersRequest"},
+      "output":{"shape":"GetMembersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Retrieves GuardDuty member accounts (to the current GuardDuty master account) specified by the account IDs.</p>"
+    },
+    "GetThreatIntelSet":{
+      "name":"GetThreatIntelSet",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}/threatintelset/{threatIntelSetId}",
+        "responseCode":200
+      },
+      "input":{"shape":"GetThreatIntelSetRequest"},
+      "output":{"shape":"GetThreatIntelSetResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Retrieves the ThreatIntelSet that is specified by the ThreatIntelSet ID.</p>"
+    },
+    "InviteMembers":{
+      "name":"InviteMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/member/invite",
+        "responseCode":200
+      },
+      "input":{"shape":"InviteMembersRequest"},
+      "output":{"shape":"InviteMembersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Invites other AWS accounts (created as members of the current AWS account by CreateMembers) to enable GuardDuty and allow the current AWS account to view and manage these accounts' GuardDuty findings on their behalf as the master account.</p>"
+    },
+    "ListDetectors":{
+      "name":"ListDetectors",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector",
+        "responseCode":200
+      },
+      "input":{"shape":"ListDetectorsRequest"},
+      "output":{"shape":"ListDetectorsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Lists detectorIds of all the existing Amazon GuardDuty detector resources.</p>"
+    },
+    "ListFilters":{
+      "name":"ListFilters",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}/filter",
+        "responseCode":200
+      },
+      "input":{"shape":"ListFiltersRequest"},
+      "output":{"shape":"ListFiltersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Returns a paginated list of the current filters.</p>"
+    },
+    "ListFindings":{
+      "name":"ListFindings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/findings",
+        "responseCode":200
+      },
+      "input":{"shape":"ListFindingsRequest"},
+      "output":{"shape":"ListFindingsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Lists Amazon GuardDuty findings for the specified detector ID.</p>"
+    },
+    "ListIPSets":{
+      "name":"ListIPSets",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}/ipset",
+        "responseCode":200
+      },
+      "input":{"shape":"ListIPSetsRequest"},
+      "output":{"shape":"ListIPSetsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Lists the IPSets of the GuardDuty service specified by the detector ID.</p>"
+    },
+    "ListInvitations":{
+      "name":"ListInvitations",
+      "http":{
+        "method":"GET",
+        "requestUri":"/invitation",
+        "responseCode":200
+      },
+      "input":{"shape":"ListInvitationsRequest"},
+      "output":{"shape":"ListInvitationsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Lists all GuardDuty membership invitations that were sent to the current AWS account.</p>"
+    },
+    "ListMembers":{
+      "name":"ListMembers",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}/member",
+        "responseCode":200
+      },
+      "input":{"shape":"ListMembersRequest"},
+      "output":{"shape":"ListMembersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Lists details about all member accounts for the current GuardDuty master account.</p>"
+    },
+    "ListTagsForResource":{
+      "name":"ListTagsForResource",
+      "http":{
+        "method":"GET",
+        "requestUri":"/tags/{resourceArn}",
+        "responseCode":200
+      },
+      "input":{"shape":"ListTagsForResourceRequest"},
+      "output":{"shape":"ListTagsForResourceResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Lists tags for a resource. Tagging is currently supported for detectors, finding filters, IP sets, and Threat Intel sets, with a limit of 50 tags per resource. When invoked, this operation returns all assigned tags for a given resource..</p>"
+    },
+    "ListThreatIntelSets":{
+      "name":"ListThreatIntelSets",
+      "http":{
+        "method":"GET",
+        "requestUri":"/detector/{detectorId}/threatintelset",
+        "responseCode":200
+      },
+      "input":{"shape":"ListThreatIntelSetsRequest"},
+      "output":{"shape":"ListThreatIntelSetsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Lists the ThreatIntelSets of the GuardDuty service specified by the detector ID.</p>"
+    },
+    "StartMonitoringMembers":{
+      "name":"StartMonitoringMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/member/start",
+        "responseCode":200
+      },
+      "input":{"shape":"StartMonitoringMembersRequest"},
+      "output":{"shape":"StartMonitoringMembersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Re-enables GuardDuty to monitor findings of the member accounts specified by the account IDs. A master GuardDuty account can run this command after disabling GuardDuty from monitoring these members' findings by running StopMonitoringMembers.</p>"
+    },
+    "StopMonitoringMembers":{
+      "name":"StopMonitoringMembers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/member/stop",
+        "responseCode":200
+      },
+      "input":{"shape":"StopMonitoringMembersRequest"},
+      "output":{"shape":"StopMonitoringMembersResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Disables GuardDuty from monitoring findings of the member accounts specified by the account IDs. After running this command, a master GuardDuty account can run StartMonitoringMembers to re-enable GuardDuty to monitor these members’ findings.</p>"
+    },
+    "TagResource":{
+      "name":"TagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/tags/{resourceArn}",
+        "responseCode":204
+      },
+      "input":{"shape":"TagResourceRequest"},
+      "output":{"shape":"TagResourceResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Adds tags to a resource.</p>"
+    },
+    "UnarchiveFindings":{
+      "name":"UnarchiveFindings",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/findings/unarchive",
+        "responseCode":200
+      },
+      "input":{"shape":"UnarchiveFindingsRequest"},
+      "output":{"shape":"UnarchiveFindingsResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Unarchives Amazon GuardDuty findings specified by the list of finding IDs.</p>"
+    },
+    "UntagResource":{
+      "name":"UntagResource",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/tags/{resourceArn}",
+        "responseCode":204
+      },
+      "input":{"shape":"UntagResourceRequest"},
+      "output":{"shape":"UntagResourceResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Removes tags from a resource.</p>"
+    },
+    "UpdateDetector":{
+      "name":"UpdateDetector",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}",
+        "responseCode":200
+      },
+      "input":{"shape":"UpdateDetectorRequest"},
+      "output":{"shape":"UpdateDetectorResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Updates an Amazon GuardDuty detector specified by the detectorId.</p>"
+    },
+    "UpdateFilter":{
+      "name":"UpdateFilter",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/filter/{filterName}",
+        "responseCode":200
+      },
+      "input":{"shape":"UpdateFilterRequest"},
+      "output":{"shape":"UpdateFilterResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Updates the filter specified by the filter name.</p>"
+    },
+    "UpdateFindingsFeedback":{
+      "name":"UpdateFindingsFeedback",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/findings/feedback",
+        "responseCode":200
+      },
+      "input":{"shape":"UpdateFindingsFeedbackRequest"},
+      "output":{"shape":"UpdateFindingsFeedbackResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Marks specified Amazon GuardDuty findings as useful or not useful.</p>"
+    },
+    "UpdateIPSet":{
+      "name":"UpdateIPSet",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/ipset/{ipSetId}",
+        "responseCode":200
+      },
+      "input":{"shape":"UpdateIPSetRequest"},
+      "output":{"shape":"UpdateIPSetResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Updates the IPSet specified by the IPSet ID.</p>"
+    },
+    "UpdateThreatIntelSet":{
+      "name":"UpdateThreatIntelSet",
+      "http":{
+        "method":"POST",
+        "requestUri":"/detector/{detectorId}/threatintelset/{threatIntelSetId}",
+        "responseCode":200
+      },
+      "input":{"shape":"UpdateThreatIntelSetRequest"},
+      "output":{"shape":"UpdateThreatIntelSetResponse"},
+      "errors":[
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerErrorException"}
+      ],
+      "documentation":"<p>Updates the ThreatIntelSet specified by ThreatIntelSet ID.</p>"
+    }
+  },
+  "shapes":{
+    "AcceptInvitationRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "MasterId",
+        "InvitationId"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty member account.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "MasterId":{
+          "shape":"String",
+          "documentation":"<p>The account ID of the master GuardDuty account whose invitation you're accepting.</p>",
+          "locationName":"masterId"
+        },
+        "InvitationId":{
+          "shape":"String",
+          "documentation":"<p>This value is used to validate the master account to the member account.</p>",
+          "locationName":"invitationId"
+        }
+      }
+    },
+    "AcceptInvitationResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "AccessKeyDetails":{
+      "type":"structure",
+      "members":{
+        "AccessKeyId":{
+          "shape":"String",
+          "documentation":"<p>Access key ID of the user.</p>",
+          "locationName":"accessKeyId"
+        },
+        "PrincipalId":{
+          "shape":"String",
+          "documentation":"<p>The principal ID of the user.</p>",
+          "locationName":"principalId"
+        },
+        "UserName":{
+          "shape":"String",
+          "documentation":"<p>The name of the user.</p>",
+          "locationName":"userName"
+        },
+        "UserType":{
+          "shape":"String",
+          "documentation":"<p>The type of the user.</p>",
+          "locationName":"userType"
+        }
+      },
+      "documentation":"<p>Contains information about the access keys.</p>"
+    },
+    "AccountDetail":{
+      "type":"structure",
+      "required":[
+        "AccountId",
+        "Email"
+      ],
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>Member account ID.</p>",
+          "locationName":"accountId"
+        },
+        "Email":{
+          "shape":"Email",
+          "documentation":"<p>Member account's email address.</p>",
+          "locationName":"email"
+        }
+      },
+      "documentation":"<p>Contains information about the account.</p>"
+    },
+    "AccountDetails":{
+      "type":"list",
+      "member":{"shape":"AccountDetail"},
+      "max":50,
+      "min":1
+    },
+    "AccountId":{
+      "type":"string",
+      "max":12,
+      "min":12
+    },
+    "AccountIds":{
+      "type":"list",
+      "member":{"shape":"AccountId"},
+      "max":50,
+      "min":1
+    },
+    "Action":{
+      "type":"structure",
+      "members":{
+        "ActionType":{
+          "shape":"String",
+          "documentation":"<p>GuardDuty Finding activity type.</p>",
+          "locationName":"actionType"
+        },
+        "AwsApiCallAction":{
+          "shape":"AwsApiCallAction",
+          "documentation":"<p>Information about the AWS_API_CALL action described in this finding.</p>",
+          "locationName":"awsApiCallAction"
+        },
+        "DnsRequestAction":{
+          "shape":"DnsRequestAction",
+          "documentation":"<p>Information about the DNS_REQUEST action described in this finding.</p>",
+          "locationName":"dnsRequestAction"
+        },
+        "NetworkConnectionAction":{
+          "shape":"NetworkConnectionAction",
+          "documentation":"<p>Information about the NETWORK_CONNECTION action described in this finding.</p>",
+          "locationName":"networkConnectionAction"
+        },
+        "PortProbeAction":{
+          "shape":"PortProbeAction",
+          "documentation":"<p>Information about the PORT_PROBE action described in this finding.</p>",
+          "locationName":"portProbeAction"
+        }
+      },
+      "documentation":"<p>Contains information about action.</p>"
+    },
+    "ArchiveFindingsRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "FindingIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The ID of the detector that specifies the GuardDuty service whose findings you want to archive.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FindingIds":{
+          "shape":"FindingIds",
+          "documentation":"<p>IDs of the findings that you want to archive.</p>",
+          "locationName":"findingIds"
+        }
+      }
+    },
+    "ArchiveFindingsResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "AwsApiCallAction":{
+      "type":"structure",
+      "members":{
+        "Api":{
+          "shape":"String",
+          "documentation":"<p>AWS API name.</p>",
+          "locationName":"api"
+        },
+        "CallerType":{
+          "shape":"String",
+          "documentation":"<p>AWS API caller type.</p>",
+          "locationName":"callerType"
+        },
+        "DomainDetails":{
+          "shape":"DomainDetails",
+          "documentation":"<p>Domain information for the AWS API call.</p>",
+          "locationName":"domainDetails"
+        },
+        "RemoteIpDetails":{
+          "shape":"RemoteIpDetails",
+          "documentation":"<p>Remote IP information of the connection.</p>",
+          "locationName":"remoteIpDetails"
+        },
+        "ServiceName":{
+          "shape":"String",
+          "documentation":"<p>AWS service name whose API was invoked.</p>",
+          "locationName":"serviceName"
+        }
+      },
+      "documentation":"<p>Contains information about the API operation.</p>"
+    },
+    "BadRequestException":{
+      "type":"structure",
+      "members":{
+        "Message":{
+          "shape":"String",
+          "documentation":"<p>The error message.</p>",
+          "locationName":"message"
+        },
+        "Type":{
+          "shape":"String",
+          "documentation":"<p>The error type.</p>",
+          "locationName":"__type"
+        }
+      },
+      "documentation":"<p>Bad request exception object.</p>",
+      "error":{"httpStatusCode":400},
+      "exception":true
+    },
+    "Boolean":{"type":"boolean"},
+    "City":{
+      "type":"structure",
+      "members":{
+        "CityName":{
+          "shape":"String",
+          "documentation":"<p>City name of the remote IP address.</p>",
+          "locationName":"cityName"
+        }
+      },
+      "documentation":"<p>Contains information about the city associated with the IP address.</p>"
+    },
+    "ClientToken":{
+      "type":"string",
+      "max":64,
+      "min":0
+    },
+    "Condition":{
+      "type":"structure",
+      "members":{
+        "Eq":{
+          "shape":"Eq",
+          "documentation":"<p>Deprecated. Represents the equal condition to be applied to a single field when querying for findings.</p>",
+          "deprecated":true,
+          "locationName":"eq"
+        },
+        "Neq":{
+          "shape":"Neq",
+          "documentation":"<p>Deprecated. Represents the not equal condition to be applied to a single field when querying for findings.</p>",
+          "deprecated":true,
+          "locationName":"neq"
+        },
+        "Gt":{
+          "shape":"Integer",
+          "documentation":"<p>Deprecated. Represents a greater than condition to be applied to a single field when querying for findings.</p>",
+          "deprecated":true,
+          "locationName":"gt"
+        },
+        "Gte":{
+          "shape":"Integer",
+          "documentation":"<p>Deprecated. Represents a greater than equal condition to be applied to a single field when querying for findings.</p>",
+          "deprecated":true,
+          "locationName":"gte"
+        },
+        "Lt":{
+          "shape":"Integer",
+          "documentation":"<p>Deprecated. Represents a less than condition to be applied to a single field when querying for findings.</p>",
+          "deprecated":true,
+          "locationName":"lt"
+        },
+        "Lte":{
+          "shape":"Integer",
+          "documentation":"<p>Deprecated. Represents a less than equal condition to be applied to a single field when querying for findings.</p>",
+          "deprecated":true,
+          "locationName":"lte"
+        },
+        "Equals":{
+          "shape":"Equals",
+          "documentation":"<p>Represents an <b>equal</b> condition to be applied to a single field when querying for findings.</p>",
+          "locationName":"equals"
+        },
+        "NotEquals":{
+          "shape":"NotEquals",
+          "documentation":"<p>Represents an <b>not equal</b> condition to be applied to a single field when querying for findings.</p>",
+          "locationName":"notEquals"
+        },
+        "GreaterThan":{
+          "shape":"Long",
+          "documentation":"<p>Represents a greater than condition to be applied to a single field when querying for findings.</p>",
+          "locationName":"greaterThan"
+        },
+        "GreaterThanOrEqual":{
+          "shape":"Long",
+          "documentation":"<p>Represents a greater than equal condition to be applied to a single field when querying for findings.</p>",
+          "locationName":"greaterThanOrEqual"
+        },
+        "LessThan":{
+          "shape":"Long",
+          "documentation":"<p>Represents a less than condition to be applied to a single field when querying for findings.</p>",
+          "locationName":"lessThan"
+        },
+        "LessThanOrEqual":{
+          "shape":"Long",
+          "documentation":"<p>Represents a less than equal condition to be applied to a single field when querying for findings.</p>",
+          "locationName":"lessThanOrEqual"
+        }
+      },
+      "documentation":"<p>Contains information about the condition.</p>"
+    },
+    "CountBySeverity":{
+      "type":"map",
+      "key":{"shape":"String"},
+      "value":{"shape":"Integer"}
+    },
+    "Country":{
+      "type":"structure",
+      "members":{
+        "CountryCode":{
+          "shape":"String",
+          "documentation":"<p>Country code of the remote IP address.</p>",
+          "locationName":"countryCode"
+        },
+        "CountryName":{
+          "shape":"String",
+          "documentation":"<p>Country name of the remote IP address.</p>",
+          "locationName":"countryName"
+        }
+      },
+      "documentation":"<p>Contains information about the country.</p>"
+    },
+    "CreateDetectorRequest":{
+      "type":"structure",
+      "required":["Enable"],
+      "members":{
+        "Enable":{
+          "shape":"Boolean",
+          "documentation":"<p>A boolean value that specifies whether the detector is to be enabled.</p>",
+          "locationName":"enable"
+        },
+        "ClientToken":{
+          "shape":"ClientToken",
+          "documentation":"<p>The idempotency token for the create request.</p>",
+          "idempotencyToken":true,
+          "locationName":"clientToken"
+        },
+        "FindingPublishingFrequency":{
+          "shape":"FindingPublishingFrequency",
+          "documentation":"<p>A enum value that specifies how frequently customer got Finding updates published.</p>",
+          "locationName":"findingPublishingFrequency"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags to be added to a new detector resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "CreateDetectorResponse":{
+      "type":"structure",
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the created detector.</p>",
+          "locationName":"detectorId"
+        }
+      }
+    },
+    "CreateFilterRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "Name",
+        "FindingCriteria"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account for which you want to create a filter.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "Name":{
+          "shape":"FilterName",
+          "documentation":"<p>The name of the filter.</p>",
+          "locationName":"name"
+        },
+        "Description":{
+          "shape":"FilterDescription",
+          "documentation":"<p>The description of the filter.</p>",
+          "locationName":"description"
+        },
+        "Action":{
+          "shape":"FilterAction",
+          "documentation":"<p>Specifies the action that is to be applied to the findings that match the filter.</p>",
+          "locationName":"action"
+        },
+        "Rank":{
+          "shape":"FilterRank",
+          "documentation":"<p>Specifies the position of the filter in the list of current filters. Also specifies the order in which this filter is applied to the findings.</p>",
+          "locationName":"rank"
+        },
+        "FindingCriteria":{
+          "shape":"FindingCriteria",
+          "documentation":"<p>Represents the criteria to be used in the filter for querying findings.</p>",
+          "locationName":"findingCriteria"
+        },
+        "ClientToken":{
+          "shape":"ClientToken",
+          "documentation":"<p>The idempotency token for the create request.</p>",
+          "idempotencyToken":true,
+          "locationName":"clientToken"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags to be added to a new filter resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "CreateFilterResponse":{
+      "type":"structure",
+      "required":["Name"],
+      "members":{
+        "Name":{
+          "shape":"FilterName",
+          "documentation":"<p>The name of the successfully created filter.</p>",
+          "locationName":"name"
+        }
+      }
+    },
+    "CreateIPSetRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "Name",
+        "Format",
+        "Location",
+        "Activate"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account for which you want to create an IPSet.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "Name":{
+          "shape":"Name",
+          "documentation":"<p>The user friendly name to identify the IPSet. This name is displayed in all findings that are triggered by activity that involves IP addresses included in this IPSet.</p>",
+          "locationName":"name"
+        },
+        "Format":{
+          "shape":"IpSetFormat",
+          "documentation":"<p>The format of the file that contains the IPSet.</p>",
+          "locationName":"format"
+        },
+        "Location":{
+          "shape":"Location",
+          "documentation":"<p>The URI of the file that contains the IPSet. For example (https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key)</p>",
+          "locationName":"location"
+        },
+        "Activate":{
+          "shape":"Boolean",
+          "documentation":"<p>A boolean value that indicates whether GuardDuty is to start using the uploaded IPSet.</p>",
+          "locationName":"activate"
+        },
+        "ClientToken":{
+          "shape":"ClientToken",
+          "documentation":"<p>The idempotency token for the create request.</p>",
+          "idempotencyToken":true,
+          "locationName":"clientToken"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags to be added to a new IP set resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "CreateIPSetResponse":{
+      "type":"structure",
+      "required":["IpSetId"],
+      "members":{
+        "IpSetId":{
+          "shape":"String",
+          "documentation":"<p>The ID of the IPSet resource.</p>",
+          "locationName":"ipSetId"
+        }
+      }
+    },
+    "CreateMembersRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "AccountDetails"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account with which you want to associate member accounts.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "AccountDetails":{
+          "shape":"AccountDetails",
+          "documentation":"<p>A list of account ID and email address pairs of the accounts that you want to associate with the master GuardDuty account.</p>",
+          "locationName":"accountDetails"
+        }
+      }
+    },
+    "CreateMembersResponse":{
+      "type":"structure",
+      "required":["UnprocessedAccounts"],
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>A list of objects containing the unprocessed account and a result string explaining why it was unprocessed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "CreateSampleFindingsRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The ID of the detector to create sample findings for.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FindingTypes":{
+          "shape":"FindingTypes",
+          "documentation":"<p>Types of sample findings that you want to generate.</p>",
+          "locationName":"findingTypes"
+        }
+      }
+    },
+    "CreateSampleFindingsResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "CreateThreatIntelSetRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "Name",
+        "Format",
+        "Location",
+        "Activate"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account for which you want to create a threatIntelSet.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "Name":{
+          "shape":"Name",
+          "documentation":"<p>A user-friendly ThreatIntelSet name that is displayed in all finding generated by activity that involves IP addresses included in this ThreatIntelSet.</p>",
+          "locationName":"name"
+        },
+        "Format":{
+          "shape":"ThreatIntelSetFormat",
+          "documentation":"<p>The format of the file that contains the ThreatIntelSet.</p>",
+          "locationName":"format"
+        },
+        "Location":{
+          "shape":"Location",
+          "documentation":"<p>The URI of the file that contains the ThreatIntelSet. For example (https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key).</p>",
+          "locationName":"location"
+        },
+        "Activate":{
+          "shape":"Boolean",
+          "documentation":"<p>A boolean value that indicates whether GuardDuty is to start using the uploaded ThreatIntelSet.</p>",
+          "locationName":"activate"
+        },
+        "ClientToken":{
+          "shape":"ClientToken",
+          "documentation":"<p>The idempotency token for the create request.</p>",
+          "idempotencyToken":true,
+          "locationName":"clientToken"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags to be added to a new Threat List resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "CreateThreatIntelSetResponse":{
+      "type":"structure",
+      "required":["ThreatIntelSetId"],
+      "members":{
+        "ThreatIntelSetId":{
+          "shape":"String",
+          "documentation":"<p>The ID of the ThreatIntelSet resource.</p>",
+          "locationName":"threatIntelSetId"
+        }
+      }
+    },
+    "Criterion":{
+      "type":"map",
+      "key":{"shape":"String"},
+      "value":{"shape":"Condition"}
+    },
+    "DeclineInvitationsRequest":{
+      "type":"structure",
+      "required":["AccountIds"],
+      "members":{
+        "AccountIds":{
+          "shape":"AccountIds",
+          "documentation":"<p>A list of account IDs of the AWS accounts that sent invitations to the current member account that you want to decline invitations from.</p>",
+          "locationName":"accountIds"
+        }
+      }
+    },
+    "DeclineInvitationsResponse":{
+      "type":"structure",
+      "required":["UnprocessedAccounts"],
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>A list of objects containing the unprocessed account and a result string explaining why it was unprocessed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "DeleteDetectorRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector that you want to delete.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        }
+      }
+    },
+    "DeleteDetectorResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeleteFilterRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "FilterName"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the filter is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FilterName":{
+          "shape":"String",
+          "documentation":"<p>The name of the filter you want to delete.</p>",
+          "location":"uri",
+          "locationName":"filterName"
+        }
+      }
+    },
+    "DeleteFilterResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeleteIPSetRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "IpSetId"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the ipSet is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "IpSetId":{
+          "shape":"String",
+          "documentation":"<p>The unique ID of the ipSet you want to delete.</p>",
+          "location":"uri",
+          "locationName":"ipSetId"
+        }
+      }
+    },
+    "DeleteIPSetResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeleteInvitationsRequest":{
+      "type":"structure",
+      "required":["AccountIds"],
+      "members":{
+        "AccountIds":{
+          "shape":"AccountIds",
+          "documentation":"<p>A list of account IDs of the AWS accounts that sent invitations to the current member account that you want to delete invitations from.</p>",
+          "locationName":"accountIds"
+        }
+      }
+    },
+    "DeleteInvitationsResponse":{
+      "type":"structure",
+      "required":["UnprocessedAccounts"],
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>A list of objects containing the unprocessed account and a result string explaining why it was unprocessed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "DeleteMembersRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "AccountIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account whose members you want to delete.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "AccountIds":{
+          "shape":"AccountIds",
+          "documentation":"<p>A list of account IDs of the GuardDuty member accounts that you want to delete.</p>",
+          "locationName":"accountIds"
+        }
+      }
+    },
+    "DeleteMembersResponse":{
+      "type":"structure",
+      "required":["UnprocessedAccounts"],
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>The accounts that could not be processed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "DeleteThreatIntelSetRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "ThreatIntelSetId"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the threatIntelSet is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "ThreatIntelSetId":{
+          "shape":"String",
+          "documentation":"<p>The unique ID of the threatIntelSet you want to delete.</p>",
+          "location":"uri",
+          "locationName":"threatIntelSetId"
+        }
+      }
+    },
+    "DeleteThreatIntelSetResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DetectorId":{
+      "type":"string",
+      "max":300,
+      "min":1
+    },
+    "DetectorIds":{
+      "type":"list",
+      "member":{"shape":"DetectorId"},
+      "max":50,
+      "min":0
+    },
+    "DetectorStatus":{
+      "type":"string",
+      "enum":[
+        "ENABLED",
+        "DISABLED"
+      ],
+      "max":300,
+      "min":1
+    },
+    "DisassociateFromMasterAccountRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty member account.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        }
+      }
+    },
+    "DisassociateFromMasterAccountResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DisassociateMembersRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "AccountIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account whose members you want to disassociate from master.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "AccountIds":{
+          "shape":"AccountIds",
+          "documentation":"<p>A list of account IDs of the GuardDuty member accounts that you want to disassociate from master.</p>",
+          "locationName":"accountIds"
+        }
+      }
+    },
+    "DisassociateMembersResponse":{
+      "type":"structure",
+      "required":["UnprocessedAccounts"],
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>A list of objects containing the unprocessed account and a result string explaining why it was unprocessed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "DnsRequestAction":{
+      "type":"structure",
+      "members":{
+        "Domain":{
+          "shape":"String",
+          "documentation":"<p>Domain information for the DNS request.</p>",
+          "locationName":"domain"
+        }
+      },
+      "documentation":"<p>Contains information about the DNS request.</p>"
+    },
+    "DomainDetails":{
+      "type":"structure",
+      "members":{
+        "Domain":{
+          "shape":"String",
+          "documentation":"<p>Domain information for the AWS API call.</p>",
+          "locationName":"domain"
+        }
+      },
+      "documentation":"<p>Contains information about the domain.</p>"
+    },
+    "Double":{"type":"double"},
+    "Email":{
+      "type":"string",
+      "max":64,
+      "min":1
+    },
+    "Eq":{
+      "type":"list",
+      "member":{"shape":"String"}
+    },
+    "Equals":{
+      "type":"list",
+      "member":{"shape":"String"}
+    },
+    "Evidence":{
+      "type":"structure",
+      "members":{
+        "ThreatIntelligenceDetails":{
+          "shape":"ThreatIntelligenceDetails",
+          "documentation":"<p>A list of threat intelligence details related to the evidence.</p>",
+          "locationName":"threatIntelligenceDetails"
+        }
+      },
+      "documentation":"<p>Contains information about the reason that the finding was generated.</p>"
+    },
+    "Feedback":{
+      "type":"string",
+      "enum":[
+        "USEFUL",
+        "NOT_USEFUL"
+      ]
+    },
+    "FilterAction":{
+      "type":"string",
+      "enum":[
+        "NOOP",
+        "ARCHIVE"
+      ],
+      "max":300,
+      "min":1
+    },
+    "FilterDescription":{
+      "type":"string",
+      "max":512,
+      "min":0
+    },
+    "FilterName":{
+      "type":"string",
+      "max":64,
+      "min":3
+    },
+    "FilterNames":{
+      "type":"list",
+      "member":{"shape":"FilterName"},
+      "max":50,
+      "min":0
+    },
+    "FilterRank":{
+      "type":"integer",
+      "max":100,
+      "min":1
+    },
+    "Finding":{
+      "type":"structure",
+      "required":[
+        "AccountId",
+        "Arn",
+        "CreatedAt",
+        "Id",
+        "Region",
+        "Resource",
+        "SchemaVersion",
+        "Severity",
+        "Type",
+        "UpdatedAt"
+      ],
+      "members":{
+        "AccountId":{
+          "shape":"String",
+          "documentation":"<p>The ID of the account in which the finding was generated.</p>",
+          "locationName":"accountId"
+        },
+        "Arn":{
+          "shape":"String",
+          "documentation":"<p>The ARN for the finding.</p>",
+          "locationName":"arn"
+        },
+        "Confidence":{
+          "shape":"Double",
+          "documentation":"<p>The confidence score for the finding.</p>",
+          "locationName":"confidence"
+        },
+        "CreatedAt":{
+          "shape":"String",
+          "documentation":"<p>The time and date at which the finding was created.</p>",
+          "locationName":"createdAt"
+        },
+        "Description":{
+          "shape":"String",
+          "documentation":"<p>The description of the finding.</p>",
+          "locationName":"description"
+        },
+        "Id":{
+          "shape":"String",
+          "documentation":"<p>The ID of the finding.</p>",
+          "locationName":"id"
+        },
+        "Partition":{
+          "shape":"String",
+          "documentation":"<p>The partition associated with the finding.</p>",
+          "locationName":"partition"
+        },
+        "Region":{
+          "shape":"String",
+          "documentation":"<p>The Region in which the finding was generated.</p>",
+          "locationName":"region"
+        },
+        "Resource":{
+          "shape":"Resource",
+          "locationName":"resource"
+        },
+        "SchemaVersion":{
+          "shape":"String",
+          "documentation":"<p>The version of the schema used for the finding.</p>",
+          "locationName":"schemaVersion"
+        },
+        "Service":{
+          "shape":"Service",
+          "locationName":"service"
+        },
+        "Severity":{
+          "shape":"Double",
+          "documentation":"<p>The severity of the finding.</p>",
+          "locationName":"severity"
+        },
+        "Title":{
+          "shape":"String",
+          "documentation":"<p>The title for the finding.</p>",
+          "locationName":"title"
+        },
+        "Type":{
+          "shape":"FindingType",
+          "documentation":"<p>The type of the finding.</p>",
+          "locationName":"type"
+        },
+        "UpdatedAt":{
+          "shape":"String",
+          "documentation":"<p>The time and date at which the finding was laste updated.</p>",
+          "locationName":"updatedAt"
+        }
+      },
+      "documentation":"<p>Contains information about the finding.</p>"
+    },
+    "FindingCriteria":{
+      "type":"structure",
+      "members":{
+        "Criterion":{
+          "shape":"Criterion",
+          "documentation":"<p>Represents a map of finding properties that match specified conditions and values when querying findings.</p>",
+          "locationName":"criterion"
+        }
+      },
+      "documentation":"<p>Contains finding criteria information.</p>"
+    },
+    "FindingId":{
+      "type":"string",
+      "max":300,
+      "min":1
+    },
+    "FindingIds":{
+      "type":"list",
+      "member":{"shape":"FindingId"},
+      "max":50,
+      "min":0
+    },
+    "FindingPublishingFrequency":{
+      "type":"string",
+      "enum":[
+        "FIFTEEN_MINUTES",
+        "ONE_HOUR",
+        "SIX_HOURS"
+      ]
+    },
+    "FindingStatisticType":{
+      "type":"string",
+      "enum":["COUNT_BY_SEVERITY"]
+    },
+    "FindingStatisticTypes":{
+      "type":"list",
+      "member":{"shape":"FindingStatisticType"},
+      "max":10,
+      "min":0
+    },
+    "FindingStatistics":{
+      "type":"structure",
+      "members":{
+        "CountBySeverity":{
+          "shape":"CountBySeverity",
+          "documentation":"<p>Represents a map of severity to count statistic for a set of findings</p>",
+          "locationName":"countBySeverity"
+        }
+      },
+      "documentation":"<p>Contains information about finding statistics.</p>"
+    },
+    "FindingType":{
+      "type":"string",
+      "max":50,
+      "min":1
+    },
+    "FindingTypes":{
+      "type":"list",
+      "member":{"shape":"FindingType"},
+      "max":50,
+      "min":0
+    },
+    "Findings":{
+      "type":"list",
+      "member":{"shape":"Finding"},
+      "max":50,
+      "min":0
+    },
+    "GeoLocation":{
+      "type":"structure",
+      "members":{
+        "Lat":{
+          "shape":"Double",
+          "documentation":"<p>Latitude information of remote IP address.</p>",
+          "locationName":"lat"
+        },
+        "Lon":{
+          "shape":"Double",
+          "documentation":"<p>Longitude information of remote IP address.</p>",
+          "locationName":"lon"
+        }
+      },
+      "documentation":"<p>Contains information about the </p>"
+    },
+    "GetDetectorRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector that you want to get.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        }
+      }
+    },
+    "GetDetectorResponse":{
+      "type":"structure",
+      "required":[
+        "ServiceRole",
+        "Status"
+      ],
+      "members":{
+        "CreatedAt":{
+          "shape":"String",
+          "documentation":"<p>Detector creation timestamp.</p>",
+          "locationName":"createdAt"
+        },
+        "FindingPublishingFrequency":{
+          "shape":"FindingPublishingFrequency",
+          "documentation":"<p>Finding publishing frequency.</p>",
+          "locationName":"findingPublishingFrequency"
+        },
+        "ServiceRole":{
+          "shape":"String",
+          "documentation":"<p>The GuardDuty service role.</p>",
+          "locationName":"serviceRole"
+        },
+        "Status":{
+          "shape":"DetectorStatus",
+          "documentation":"<p>The detector status.</p>",
+          "locationName":"status"
+        },
+        "UpdatedAt":{
+          "shape":"String",
+          "documentation":"<p>Detector last update timestamp.</p>",
+          "locationName":"updatedAt"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags of the detector resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "GetFilterRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "FilterName"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the filter is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FilterName":{
+          "shape":"String",
+          "documentation":"<p>The name of the filter you want to get.</p>",
+          "location":"uri",
+          "locationName":"filterName"
+        }
+      }
+    },
+    "GetFilterResponse":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "Action",
+        "FindingCriteria"
+      ],
+      "members":{
+        "Name":{
+          "shape":"FilterName",
+          "documentation":"<p>The name of the filter.</p>",
+          "locationName":"name"
+        },
+        "Description":{
+          "shape":"FilterDescription",
+          "documentation":"<p>The description of the filter.</p>",
+          "locationName":"description"
+        },
+        "Action":{
+          "shape":"FilterAction",
+          "documentation":"<p>Specifies the action that is to be applied to the findings that match the filter.</p>",
+          "locationName":"action"
+        },
+        "Rank":{
+          "shape":"FilterRank",
+          "documentation":"<p>Specifies the position of the filter in the list of current filters. Also specifies the order in which this filter is applied to the findings.</p>",
+          "locationName":"rank"
+        },
+        "FindingCriteria":{
+          "shape":"FindingCriteria",
+          "documentation":"<p>Represents the criteria to be used in the filter for querying findings.</p>",
+          "locationName":"findingCriteria"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags of the filter resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "GetFindingsRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "FindingIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The ID of the detector that specifies the GuardDuty service whose findings you want to retrieve.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FindingIds":{
+          "shape":"FindingIds",
+          "documentation":"<p>IDs of the findings that you want to retrieve.</p>",
+          "locationName":"findingIds"
+        },
+        "SortCriteria":{
+          "shape":"SortCriteria",
+          "documentation":"<p>Represents the criteria used for sorting findings.</p>",
+          "locationName":"sortCriteria"
+        }
+      }
+    },
+    "GetFindingsResponse":{
+      "type":"structure",
+      "required":["Findings"],
+      "members":{
+        "Findings":{
+          "shape":"Findings",
+          "documentation":"<p>A list of findings.</p>",
+          "locationName":"findings"
+        }
+      }
+    },
+    "GetFindingsStatisticsRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "FindingStatisticTypes"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The ID of the detector that specifies the GuardDuty service whose findings' statistics you want to retrieve.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FindingStatisticTypes":{
+          "shape":"FindingStatisticTypes",
+          "documentation":"<p>Types of finding statistics to retrieve.</p>",
+          "locationName":"findingStatisticTypes"
+        },
+        "FindingCriteria":{
+          "shape":"FindingCriteria",
+          "documentation":"<p>Represents the criteria used for querying findings.</p>",
+          "locationName":"findingCriteria"
+        }
+      }
+    },
+    "GetFindingsStatisticsResponse":{
+      "type":"structure",
+      "required":["FindingStatistics"],
+      "members":{
+        "FindingStatistics":{
+          "shape":"FindingStatistics",
+          "documentation":"<p>Finding statistics object.</p>",
+          "locationName":"findingStatistics"
+        }
+      }
+    },
+    "GetIPSetRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "IpSetId"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the ipSet is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "IpSetId":{
+          "shape":"String",
+          "documentation":"<p>The unique ID of the ipSet you want to get.</p>",
+          "location":"uri",
+          "locationName":"ipSetId"
+        }
+      }
+    },
+    "GetIPSetResponse":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "Format",
+        "Location",
+        "Status"
+      ],
+      "members":{
+        "Name":{
+          "shape":"Name",
+          "documentation":"<p>The user friendly name to identify the IPSet. This name is displayed in all findings that are triggered by activity that involves IP addresses included in this IPSet.</p>",
+          "locationName":"name"
+        },
+        "Format":{
+          "shape":"IpSetFormat",
+          "documentation":"<p>The format of the file that contains the IPSet.</p>",
+          "locationName":"format"
+        },
+        "Location":{
+          "shape":"Location",
+          "documentation":"<p>The URI of the file that contains the IPSet. For example (https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key)</p>",
+          "locationName":"location"
+        },
+        "Status":{
+          "shape":"IpSetStatus",
+          "documentation":"<p>The status of ipSet file uploaded.</p>",
+          "locationName":"status"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags of the IP set resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "GetInvitationsCountRequest":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "GetInvitationsCountResponse":{
+      "type":"structure",
+      "members":{
+        "InvitationsCount":{
+          "shape":"Integer",
+          "documentation":"<p>The number of received invitations.</p>",
+          "locationName":"invitationsCount"
+        }
+      }
+    },
+    "GetMasterAccountRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty member account.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        }
+      }
+    },
+    "GetMasterAccountResponse":{
+      "type":"structure",
+      "required":["Master"],
+      "members":{
+        "Master":{
+          "shape":"Master",
+          "documentation":"<p>Master account details.</p>",
+          "locationName":"master"
+        }
+      }
+    },
+    "GetMembersRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "AccountIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account whose members you want to retrieve.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "AccountIds":{
+          "shape":"AccountIds",
+          "documentation":"<p>A list of account IDs of the GuardDuty member accounts that you want to describe.</p>",
+          "locationName":"accountIds"
+        }
+      }
+    },
+    "GetMembersResponse":{
+      "type":"structure",
+      "required":[
+        "Members",
+        "UnprocessedAccounts"
+      ],
+      "members":{
+        "Members":{
+          "shape":"Members",
+          "documentation":"<p>A list of members.</p>",
+          "locationName":"members"
+        },
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>A list of objects containing the unprocessed account and a result string explaining why it was unprocessed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "GetThreatIntelSetRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "ThreatIntelSetId"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the threatIntelSet is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "ThreatIntelSetId":{
+          "shape":"String",
+          "documentation":"<p>The unique ID of the threatIntelSet you want to get.</p>",
+          "location":"uri",
+          "locationName":"threatIntelSetId"
+        }
+      }
+    },
+    "GetThreatIntelSetResponse":{
+      "type":"structure",
+      "required":[
+        "Name",
+        "Format",
+        "Location",
+        "Status"
+      ],
+      "members":{
+        "Name":{
+          "shape":"Name",
+          "documentation":"<p>A user-friendly ThreatIntelSet name that is displayed in all finding generated by activity that involves IP addresses included in this ThreatIntelSet.</p>",
+          "locationName":"name"
+        },
+        "Format":{
+          "shape":"ThreatIntelSetFormat",
+          "documentation":"<p>The format of the threatIntelSet.</p>",
+          "locationName":"format"
+        },
+        "Location":{
+          "shape":"Location",
+          "documentation":"<p>The URI of the file that contains the ThreatIntelSet. For example (https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key).</p>",
+          "locationName":"location"
+        },
+        "Status":{
+          "shape":"ThreatIntelSetStatus",
+          "documentation":"<p>The status of threatIntelSet file uploaded.</p>",
+          "locationName":"status"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags of the Threat List resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "GuardDutyArn":{
+      "type":"string",
+      "pattern":"^arn:[A-Za-z_.-]{1,20}:guardduty:[A-Za-z0-9_/.-]{0,63}:\\d+:detector/[A-Za-z0-9_/.-]{32,264}$"
+    },
+    "IamInstanceProfile":{
+      "type":"structure",
+      "members":{
+        "Arn":{
+          "shape":"String",
+          "documentation":"<p>AWS EC2 instance profile ARN.</p>",
+          "locationName":"arn"
+        },
+        "Id":{
+          "shape":"String",
+          "documentation":"<p>AWS EC2 instance profile ID.</p>",
+          "locationName":"id"
+        }
+      },
+      "documentation":"<p>Contains information about the instance profile.</p>"
+    },
+    "InstanceDetails":{
+      "type":"structure",
+      "members":{
+        "AvailabilityZone":{
+          "shape":"String",
+          "documentation":"<p>The availability zone of the EC2 instance.</p>",
+          "locationName":"availabilityZone"
+        },
+        "IamInstanceProfile":{
+          "shape":"IamInstanceProfile",
+          "documentation":"<p>The profile information of the EC2 instance.</p>",
+          "locationName":"iamInstanceProfile"
+        },
+        "ImageDescription":{
+          "shape":"String",
+          "documentation":"<p>The image description of the EC2 instance.</p>",
+          "locationName":"imageDescription"
+        },
+        "ImageId":{
+          "shape":"String",
+          "documentation":"<p>The image ID of the EC2 instance.</p>",
+          "locationName":"imageId"
+        },
+        "InstanceId":{
+          "shape":"String",
+          "documentation":"<p>The ID of the EC2 instance.</p>",
+          "locationName":"instanceId"
+        },
+        "InstanceState":{
+          "shape":"String",
+          "documentation":"<p>The state of the EC2 instance.</p>",
+          "locationName":"instanceState"
+        },
+        "InstanceType":{
+          "shape":"String",
+          "documentation":"<p>The type of the EC2 instance.</p>",
+          "locationName":"instanceType"
+        },
+        "LaunchTime":{
+          "shape":"String",
+          "documentation":"<p>The launch time of the EC2 instance.</p>",
+          "locationName":"launchTime"
+        },
+        "NetworkInterfaces":{
+          "shape":"NetworkInterfaces",
+          "documentation":"<p>The network interface information of the EC2 instance.</p>",
+          "locationName":"networkInterfaces"
+        },
+        "Platform":{
+          "shape":"String",
+          "documentation":"<p>The platform of the EC2 instance.</p>",
+          "locationName":"platform"
+        },
+        "ProductCodes":{
+          "shape":"ProductCodes",
+          "documentation":"<p>The product code of the EC2 instance.</p>",
+          "locationName":"productCodes"
+        },
+        "Tags":{
+          "shape":"Tags",
+          "documentation":"<p>The tags of the EC2 instance.</p>",
+          "locationName":"tags"
+        }
+      },
+      "documentation":"<p>Contains information about the details of an instance.</p>"
+    },
+    "Integer":{"type":"integer"},
+    "InternalServerErrorException":{
+      "type":"structure",
+      "members":{
+        "Message":{
+          "shape":"String",
+          "documentation":"<p>The error message.</p>",
+          "locationName":"message"
+        },
+        "Type":{
+          "shape":"String",
+          "documentation":"<p>The error type.</p>",
+          "locationName":"__type"
+        }
+      },
+      "documentation":"<p>Internal server error exception object.</p>",
+      "error":{"httpStatusCode":500},
+      "exception":true
+    },
+    "Invitation":{
+      "type":"structure",
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>Inviter account ID</p>",
+          "locationName":"accountId"
+        },
+        "InvitationId":{
+          "shape":"String",
+          "documentation":"<p>This value is used to validate the inviter account to the member account.</p>",
+          "locationName":"invitationId"
+        },
+        "RelationshipStatus":{
+          "shape":"String",
+          "documentation":"<p>The status of the relationship between the inviter and invitee accounts.</p>",
+          "locationName":"relationshipStatus"
+        },
+        "InvitedAt":{
+          "shape":"String",
+          "documentation":"<p>Timestamp at which the invitation was sent</p>",
+          "locationName":"invitedAt"
+        }
+      },
+      "documentation":"<p>Contains information about the invitation.</p>"
+    },
+    "Invitations":{
+      "type":"list",
+      "member":{"shape":"Invitation"},
+      "max":50,
+      "min":0
+    },
+    "InviteMembersRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "AccountIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account with which you want to invite members.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "AccountIds":{
+          "shape":"AccountIds",
+          "documentation":"<p>A list of account IDs of the accounts that you want to invite to GuardDuty as members.</p>",
+          "locationName":"accountIds"
+        },
+        "DisableEmailNotification":{
+          "shape":"Boolean",
+          "documentation":"<p>A boolean value that specifies whether you want to disable email notification to the accounts that you’re inviting to GuardDuty as members.</p>",
+          "locationName":"disableEmailNotification"
+        },
+        "Message":{
+          "shape":"String",
+          "documentation":"<p>The invitation message that you want to send to the accounts that you’re inviting to GuardDuty as members.</p>",
+          "locationName":"message"
+        }
+      }
+    },
+    "InviteMembersResponse":{
+      "type":"structure",
+      "required":["UnprocessedAccounts"],
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>A list of objects containing the unprocessed account and a result string explaining why it was unprocessed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "IpSetFormat":{
+      "type":"string",
+      "enum":[
+        "TXT",
+        "STIX",
+        "OTX_CSV",
+        "ALIEN_VAULT",
+        "PROOF_POINT",
+        "FIRE_EYE"
+      ],
+      "max":300,
+      "min":1
+    },
+    "IpSetIds":{
+      "type":"list",
+      "member":{"shape":"String"},
+      "max":50,
+      "min":0
+    },
+    "IpSetStatus":{
+      "type":"string",
+      "enum":[
+        "INACTIVE",
+        "ACTIVATING",
+        "ACTIVE",
+        "DEACTIVATING",
+        "ERROR",
+        "DELETE_PENDING",
+        "DELETED"
+      ],
+      "max":300,
+      "min":1
+    },
+    "Ipv6Addresses":{
+      "type":"list",
+      "member":{"shape":"String"}
+    },
+    "ListDetectorsRequest":{
+      "type":"structure",
+      "members":{
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+          "location":"querystring",
+          "locationName":"maxResults"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+          "location":"querystring",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListDetectorsResponse":{
+      "type":"structure",
+      "required":["DetectorIds"],
+      "members":{
+        "DetectorIds":{
+          "shape":"DetectorIds",
+          "documentation":"<p>A list of detector Ids.</p>",
+          "locationName":"detectorIds"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Pagination parameter to be used on the next list operation to retrieve more items.</p>",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListFiltersRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the filter is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+          "location":"querystring",
+          "locationName":"maxResults"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+          "location":"querystring",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListFiltersResponse":{
+      "type":"structure",
+      "required":["FilterNames"],
+      "members":{
+        "FilterNames":{
+          "shape":"FilterNames",
+          "documentation":"<p>A list of filter names</p>",
+          "locationName":"filterNames"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Pagination parameter to be used on the next list operation to retrieve more items.</p>",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListFindingsRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The ID of the detector that specifies the GuardDuty service whose findings you want to list.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FindingCriteria":{
+          "shape":"FindingCriteria",
+          "documentation":"<p>Represents the criteria used for querying findings.</p>",
+          "locationName":"findingCriteria"
+        },
+        "SortCriteria":{
+          "shape":"SortCriteria",
+          "documentation":"<p>Represents the criteria used for sorting findings.</p>",
+          "locationName":"sortCriteria"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+          "locationName":"maxResults"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListFindingsResponse":{
+      "type":"structure",
+      "required":["FindingIds"],
+      "members":{
+        "FindingIds":{
+          "shape":"FindingIds",
+          "documentation":"<p>The IDs of the findings you are listing.</p>",
+          "locationName":"findingIds"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Pagination parameter to be used on the next list operation to retrieve more items.</p>",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListIPSetsRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the ipSet is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+          "location":"querystring",
+          "locationName":"maxResults"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+          "location":"querystring",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListIPSetsResponse":{
+      "type":"structure",
+      "required":["IpSetIds"],
+      "members":{
+        "IpSetIds":{
+          "shape":"IpSetIds",
+          "documentation":"<p>The IDs of the IPSet resources.</p>",
+          "locationName":"ipSetIds"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Pagination parameter to be used on the next list operation to retrieve more items.</p>",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListInvitationsRequest":{
+      "type":"structure",
+      "members":{
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+          "location":"querystring",
+          "locationName":"maxResults"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+          "location":"querystring",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListInvitationsResponse":{
+      "type":"structure",
+      "members":{
+        "Invitations":{
+          "shape":"Invitations",
+          "documentation":"<p>A list of invitation descriptions.</p>",
+          "locationName":"invitations"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Pagination parameter to be used on the next list operation to retrieve more items.</p>",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListMembersRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the member is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+          "location":"querystring",
+          "locationName":"maxResults"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+          "location":"querystring",
+          "locationName":"nextToken"
+        },
+        "OnlyAssociated":{
+          "shape":"String",
+          "documentation":"<p>Specifies whether to only return associated members or to return all members (including members which haven't been invited yet or have been disassociated).</p>",
+          "location":"querystring",
+          "locationName":"onlyAssociated"
+        }
+      }
+    },
+    "ListMembersResponse":{
+      "type":"structure",
+      "members":{
+        "Members":{
+          "shape":"Members",
+          "documentation":"<p>A list of members.</p>",
+          "locationName":"members"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Pagination parameter to be used on the next list operation to retrieve more items.</p>",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListTagsForResourceRequest":{
+      "type":"structure",
+      "required":["ResourceArn"],
+      "members":{
+        "ResourceArn":{
+          "shape":"GuardDutyArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) for the given GuardDuty resource </p>",
+          "location":"uri",
+          "locationName":"resourceArn"
+        }
+      }
+    },
+    "ListTagsForResourceResponse":{
+      "type":"structure",
+      "members":{
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags associated with the resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "ListThreatIntelSetsRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector the threatIntelSet is associated with.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "MaxResults":{
+          "shape":"MaxResults",
+          "documentation":"<p>You can use this parameter to indicate the maximum number of items you want in the response. The default value is 50. The maximum value is 50.</p>",
+          "location":"querystring",
+          "locationName":"maxResults"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>You can use this parameter when paginating results. Set the value of this parameter to null on your first call to the list action. For subsequent calls to the action fill nextToken in the request with the value of NextToken from the previous response to continue listing data.</p>",
+          "location":"querystring",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "ListThreatIntelSetsResponse":{
+      "type":"structure",
+      "required":["ThreatIntelSetIds"],
+      "members":{
+        "ThreatIntelSetIds":{
+          "shape":"ThreatIntelSetIds",
+          "documentation":"<p>The IDs of the ThreatIntelSet resources.</p>",
+          "locationName":"threatIntelSetIds"
+        },
+        "NextToken":{
+          "shape":"String",
+          "documentation":"<p>Pagination parameter to be used on the next list operation to retrieve more items.</p>",
+          "locationName":"nextToken"
+        }
+      }
+    },
+    "LocalPortDetails":{
+      "type":"structure",
+      "members":{
+        "Port":{
+          "shape":"Integer",
+          "documentation":"<p>Port number of the local connection.</p>",
+          "locationName":"port"
+        },
+        "PortName":{
+          "shape":"String",
+          "documentation":"<p>Port name of the local connection.</p>",
+          "locationName":"portName"
+        }
+      },
+      "documentation":"<p>Contains information about the port for the local connection.</p>"
+    },
+    "Location":{
+      "type":"string",
+      "max":300,
+      "min":1
+    },
+    "Long":{"type":"long"},
+    "Master":{
+      "type":"structure",
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>The ID of the account used as the Master account.</p>",
+          "locationName":"accountId"
+        },
+        "InvitationId":{
+          "shape":"String",
+          "documentation":"<p>This value is used to validate the master account to the member account.</p>",
+          "locationName":"invitationId"
+        },
+        "RelationshipStatus":{
+          "shape":"String",
+          "documentation":"<p>The status of the relationship between the master and member accounts.</p>",
+          "locationName":"relationshipStatus"
+        },
+        "InvitedAt":{
+          "shape":"String",
+          "documentation":"<p>Timestamp at which the invitation was sent.</p>",
+          "locationName":"invitedAt"
+        }
+      },
+      "documentation":"<p>Contains information about the Master account and invitation.</p>"
+    },
+    "MaxResults":{
+      "type":"integer",
+      "max":50,
+      "min":1
+    },
+    "Member":{
+      "type":"structure",
+      "required":[
+        "AccountId",
+        "MasterId",
+        "Email",
+        "RelationshipStatus",
+        "UpdatedAt"
+      ],
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>Member account ID.</p>",
+          "locationName":"accountId"
+        },
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>Member account's detector ID.</p>",
+          "locationName":"detectorId"
+        },
+        "MasterId":{
+          "shape":"String",
+          "documentation":"<p>Master account ID.</p>",
+          "locationName":"masterId"
+        },
+        "Email":{
+          "shape":"Email",
+          "documentation":"<p>Member account's email address.</p>",
+          "locationName":"email"
+        },
+        "RelationshipStatus":{
+          "shape":"String",
+          "documentation":"<p>The status of the relationship between the member and the master.</p>",
+          "locationName":"relationshipStatus"
+        },
+        "InvitedAt":{
+          "shape":"String",
+          "documentation":"<p>Timestamp at which the invitation was sent</p>",
+          "locationName":"invitedAt"
+        },
+        "UpdatedAt":{
+          "shape":"String",
+          "documentation":"<p>Member last updated timestamp.</p>",
+          "locationName":"updatedAt"
+        }
+      },
+      "documentation":"<p>Continas information about the member account </p>"
+    },
+    "Members":{
+      "type":"list",
+      "member":{"shape":"Member"},
+      "max":50,
+      "min":0
+    },
+    "Name":{
+      "type":"string",
+      "max":300,
+      "min":1
+    },
+    "Neq":{
+      "type":"list",
+      "member":{"shape":"String"}
+    },
+    "NetworkConnectionAction":{
+      "type":"structure",
+      "members":{
+        "Blocked":{
+          "shape":"Boolean",
+          "documentation":"<p>Network connection blocked information.</p>",
+          "locationName":"blocked"
+        },
+        "ConnectionDirection":{
+          "shape":"String",
+          "documentation":"<p>Network connection direction.</p>",
+          "locationName":"connectionDirection"
+        },
+        "LocalPortDetails":{
+          "shape":"LocalPortDetails",
+          "documentation":"<p>Local port information of the connection.</p>",
+          "locationName":"localPortDetails"
+        },
+        "Protocol":{
+          "shape":"String",
+          "documentation":"<p>Network connection protocol.</p>",
+          "locationName":"protocol"
+        },
+        "RemoteIpDetails":{
+          "shape":"RemoteIpDetails",
+          "documentation":"<p>Remote IP information of the connection.</p>",
+          "locationName":"remoteIpDetails"
+        },
+        "RemotePortDetails":{
+          "shape":"RemotePortDetails",
+          "documentation":"<p>Remote port information of the connection.</p>",
+          "locationName":"remotePortDetails"
+        }
+      },
+      "documentation":"<p>Contains information about the network connection.</p>"
+    },
+    "NetworkInterface":{
+      "type":"structure",
+      "members":{
+        "Ipv6Addresses":{
+          "shape":"Ipv6Addresses",
+          "documentation":"<p>A list of EC2 instance IPv6 address information.</p>",
+          "locationName":"ipv6Addresses"
+        },
+        "NetworkInterfaceId":{
+          "shape":"String",
+          "documentation":"<p>The ID of the network interface</p>",
+          "locationName":"networkInterfaceId"
+        },
+        "PrivateDnsName":{
+          "shape":"String",
+          "documentation":"<p>Private DNS name of the EC2 instance.</p>",
+          "locationName":"privateDnsName"
+        },
+        "PrivateIpAddress":{
+          "shape":"String",
+          "documentation":"<p>Private IP address of the EC2 instance.</p>",
+          "locationName":"privateIpAddress"
+        },
+        "PrivateIpAddresses":{
+          "shape":"PrivateIpAddresses",
+          "documentation":"<p>Other private IP address information of the EC2 instance.</p>",
+          "locationName":"privateIpAddresses"
+        },
+        "PublicDnsName":{
+          "shape":"String",
+          "documentation":"<p>Public DNS name of the EC2 instance.</p>",
+          "locationName":"publicDnsName"
+        },
+        "PublicIp":{
+          "shape":"String",
+          "documentation":"<p>Public IP address of the EC2 instance.</p>",
+          "locationName":"publicIp"
+        },
+        "SecurityGroups":{
+          "shape":"SecurityGroups",
+          "documentation":"<p>Security groups associated with the EC2 instance.</p>",
+          "locationName":"securityGroups"
+        },
+        "SubnetId":{
+          "shape":"String",
+          "documentation":"<p>The subnet ID of the EC2 instance.</p>",
+          "locationName":"subnetId"
+        },
+        "VpcId":{
+          "shape":"String",
+          "documentation":"<p>The VPC ID of the EC2 instance.</p>",
+          "locationName":"vpcId"
+        }
+      },
+      "documentation":"<p>Contains information about the network interface.</p>"
+    },
+    "NetworkInterfaces":{
+      "type":"list",
+      "member":{"shape":"NetworkInterface"}
+    },
+    "NotEquals":{
+      "type":"list",
+      "member":{"shape":"String"}
+    },
+    "OrderBy":{
+      "type":"string",
+      "enum":[
+        "ASC",
+        "DESC"
+      ]
+    },
+    "Organization":{
+      "type":"structure",
+      "members":{
+        "Asn":{
+          "shape":"String",
+          "documentation":"<p>Autonomous system number of the internet provider of the remote IP address.</p>",
+          "locationName":"asn"
+        },
+        "AsnOrg":{
+          "shape":"String",
+          "documentation":"<p>Organization that registered this ASN.</p>",
+          "locationName":"asnOrg"
+        },
+        "Isp":{
+          "shape":"String",
+          "documentation":"<p>ISP information for the internet provider.</p>",
+          "locationName":"isp"
+        },
+        "Org":{
+          "shape":"String",
+          "documentation":"<p>Name of the internet provider.</p>",
+          "locationName":"org"
+        }
+      },
+      "documentation":"<p>Continas information about the organization.</p>"
+    },
+    "PortProbeAction":{
+      "type":"structure",
+      "members":{
+        "Blocked":{
+          "shape":"Boolean",
+          "documentation":"<p>Port probe blocked information.</p>",
+          "locationName":"blocked"
+        },
+        "PortProbeDetails":{
+          "shape":"PortProbeDetails",
+          "documentation":"<p>A list of port probe details objects.</p>",
+          "locationName":"portProbeDetails"
+        }
+      },
+      "documentation":"<p>Contains information about the port probe.</p>"
+    },
+    "PortProbeDetail":{
+      "type":"structure",
+      "members":{
+        "LocalPortDetails":{
+          "shape":"LocalPortDetails",
+          "documentation":"<p>Local port information of the connection.</p>",
+          "locationName":"localPortDetails"
+        },
+        "RemoteIpDetails":{
+          "shape":"RemoteIpDetails",
+          "documentation":"<p>Remote IP information of the connection.</p>",
+          "locationName":"remoteIpDetails"
+        }
+      },
+      "documentation":"<p>Contains information about the port probe details.</p>"
+    },
+    "PortProbeDetails":{
+      "type":"list",
+      "member":{"shape":"PortProbeDetail"}
+    },
+    "PrivateIpAddressDetails":{
+      "type":"structure",
+      "members":{
+        "PrivateDnsName":{
+          "shape":"String",
+          "documentation":"<p>Private DNS name of the EC2 instance.</p>",
+          "locationName":"privateDnsName"
+        },
+        "PrivateIpAddress":{
+          "shape":"String",
+          "documentation":"<p>Private IP address of the EC2 instance.</p>",
+          "locationName":"privateIpAddress"
+        }
+      },
+      "documentation":"<p>Contains information about the private IP address.</p>"
+    },
+    "PrivateIpAddresses":{
+      "type":"list",
+      "member":{"shape":"PrivateIpAddressDetails"}
+    },
+    "ProductCode":{
+      "type":"structure",
+      "members":{
+        "Code":{
+          "shape":"String",
+          "documentation":"<p>Product code information.</p>",
+          "locationName":"code"
+        },
+        "ProductType":{
+          "shape":"String",
+          "documentation":"<p>Product code type.</p>",
+          "locationName":"productType"
+        }
+      },
+      "documentation":"<p>Contains information about the product code.</p>"
+    },
+    "ProductCodes":{
+      "type":"list",
+      "member":{"shape":"ProductCode"}
+    },
+    "RemoteIpDetails":{
+      "type":"structure",
+      "members":{
+        "City":{
+          "shape":"City",
+          "documentation":"<p>City information of the remote IP address.</p>",
+          "locationName":"city"
+        },
+        "Country":{
+          "shape":"Country",
+          "documentation":"<p>Country code of the remote IP address.</p>",
+          "locationName":"country"
+        },
+        "GeoLocation":{
+          "shape":"GeoLocation",
+          "documentation":"<p>Location information of the remote IP address.</p>",
+          "locationName":"geoLocation"
+        },
+        "IpAddressV4":{
+          "shape":"String",
+          "documentation":"<p>IPV4 remote address of the connection.</p>",
+          "locationName":"ipAddressV4"
+        },
+        "Organization":{
+          "shape":"Organization",
+          "documentation":"<p>ISP Organization information of the remote IP address.</p>",
+          "locationName":"organization"
+        }
+      },
+      "documentation":"<p>Continas information about the remote IP address.</p>"
+    },
+    "RemotePortDetails":{
+      "type":"structure",
+      "members":{
+        "Port":{
+          "shape":"Integer",
+          "documentation":"<p>Port number of the remote connection.</p>",
+          "locationName":"port"
+        },
+        "PortName":{
+          "shape":"String",
+          "documentation":"<p>Port name of the remote connection.</p>",
+          "locationName":"portName"
+        }
+      },
+      "documentation":"<p>Contains information about the remote port.</p>"
+    },
+    "Resource":{
+      "type":"structure",
+      "members":{
+        "AccessKeyDetails":{
+          "shape":"AccessKeyDetails",
+          "documentation":"<p>The IAM access key details (IAM user information) of a user that engaged in the activity that prompted GuardDuty to generate a finding.</p>",
+          "locationName":"accessKeyDetails"
+        },
+        "InstanceDetails":{
+          "shape":"InstanceDetails",
+          "documentation":"<p>The information about the EC2 instance associated with the activity that prompted GuardDuty to generate a finding.</p>",
+          "locationName":"instanceDetails"
+        },
+        "ResourceType":{
+          "shape":"String",
+          "documentation":"<p>The type of the AWS resource.</p>",
+          "locationName":"resourceType"
+        }
+      },
+      "documentation":"<p>Contains information about the resource.</p>"
+    },
+    "SecurityGroup":{
+      "type":"structure",
+      "members":{
+        "GroupId":{
+          "shape":"String",
+          "documentation":"<p>EC2 instance's security group ID.</p>",
+          "locationName":"groupId"
+        },
+        "GroupName":{
+          "shape":"String",
+          "documentation":"<p>EC2 instance's security group name.</p>",
+          "locationName":"groupName"
+        }
+      },
+      "documentation":"<p>Contains information about the security group.</p>"
+    },
+    "SecurityGroups":{
+      "type":"list",
+      "member":{"shape":"SecurityGroup"}
+    },
+    "Service":{
+      "type":"structure",
+      "members":{
+        "Action":{
+          "shape":"Action",
+          "documentation":"<p>Information about the activity described in a finding.</p>",
+          "locationName":"action"
+        },
+        "Evidence":{
+          "shape":"Evidence",
+          "documentation":"<p>An evidence object associated with the service.</p>",
+          "locationName":"evidence"
+        },
+        "Archived":{
+          "shape":"Boolean",
+          "documentation":"<p>Indicates whether this finding is archived.</p>",
+          "locationName":"archived"
+        },
+        "Count":{
+          "shape":"Integer",
+          "documentation":"<p>Total count of the occurrences of this finding type.</p>",
+          "locationName":"count"
+        },
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>Detector ID for the GuardDuty service.</p>",
+          "locationName":"detectorId"
+        },
+        "EventFirstSeen":{
+          "shape":"String",
+          "documentation":"<p>First seen timestamp of the activity that prompted GuardDuty to generate this finding.</p>",
+          "locationName":"eventFirstSeen"
+        },
+        "EventLastSeen":{
+          "shape":"String",
+          "documentation":"<p>Last seen timestamp of the activity that prompted GuardDuty to generate this finding.</p>",
+          "locationName":"eventLastSeen"
+        },
+        "ResourceRole":{
+          "shape":"String",
+          "documentation":"<p>Resource role information for this finding.</p>",
+          "locationName":"resourceRole"
+        },
+        "ServiceName":{
+          "shape":"String",
+          "documentation":"<p>The name of the AWS service (GuardDuty) that generated a finding.</p>",
+          "locationName":"serviceName"
+        },
+        "UserFeedback":{
+          "shape":"String",
+          "documentation":"<p>Feedback left about the finding.</p>",
+          "locationName":"userFeedback"
+        }
+      },
+      "documentation":"<p>Contains information about the service.</p>"
+    },
+    "SortCriteria":{
+      "type":"structure",
+      "members":{
+        "AttributeName":{
+          "shape":"String",
+          "documentation":"<p>Represents the finding attribute (for example, accountId) by which to sort findings.</p>",
+          "locationName":"attributeName"
+        },
+        "OrderBy":{
+          "shape":"OrderBy",
+          "documentation":"<p>Order by which the sorted findings are to be displayed.</p>",
+          "locationName":"orderBy"
+        }
+      },
+      "documentation":"<p>Contains information about the criteria for sorting.</p>"
+    },
+    "StartMonitoringMembersRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "AccountIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account whom you want to re-enable to monitor members' findings.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "AccountIds":{
+          "shape":"AccountIds",
+          "documentation":"<p>A list of account IDs of the GuardDuty member accounts whose findings you want the master account to monitor.</p>",
+          "locationName":"accountIds"
+        }
+      }
+    },
+    "StartMonitoringMembersResponse":{
+      "type":"structure",
+      "required":["UnprocessedAccounts"],
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>A list of objects containing the unprocessed account and a result string explaining why it was unprocessed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "StopMonitoringMembersRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "AccountIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector of the GuardDuty account that you want to stop from monitor members' findings.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "AccountIds":{
+          "shape":"AccountIds",
+          "documentation":"<p>A list of account IDs of the GuardDuty member accounts whose findings you want the master account to stop monitoring.</p>",
+          "locationName":"accountIds"
+        }
+      }
+    },
+    "StopMonitoringMembersResponse":{
+      "type":"structure",
+      "required":["UnprocessedAccounts"],
+      "members":{
+        "UnprocessedAccounts":{
+          "shape":"UnprocessedAccounts",
+          "documentation":"<p>A list of objects containing the unprocessed account and a result string explaining why it was unprocessed.</p>",
+          "locationName":"unprocessedAccounts"
+        }
+      }
+    },
+    "String":{"type":"string"},
+    "Tag":{
+      "type":"structure",
+      "members":{
+        "Key":{
+          "shape":"String",
+          "documentation":"<p>EC2 instance tag key.</p>",
+          "locationName":"key"
+        },
+        "Value":{
+          "shape":"String",
+          "documentation":"<p>EC2 instance tag value.</p>",
+          "locationName":"value"
+        }
+      },
+      "documentation":"<p>Contains information about the tag associated with the resource.</p>"
+    },
+    "TagKey":{
+      "type":"string",
+      "max":128,
+      "min":1,
+      "pattern":"^(?!aws:)[a-zA-Z+-=._:/]+$"
+    },
+    "TagKeyList":{
+      "type":"list",
+      "member":{"shape":"TagKey"},
+      "max":200,
+      "min":1
+    },
+    "TagMap":{
+      "type":"map",
+      "key":{"shape":"TagKey"},
+      "value":{"shape":"TagValue"},
+      "max":200,
+      "min":1
+    },
+    "TagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceArn",
+        "Tags"
+      ],
+      "members":{
+        "ResourceArn":{
+          "shape":"GuardDutyArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) for the given GuardDuty resource </p>",
+          "location":"uri",
+          "locationName":"resourceArn"
+        },
+        "Tags":{
+          "shape":"TagMap",
+          "documentation":"<p>The tags to be added to a resource.</p>",
+          "locationName":"tags"
+        }
+      }
+    },
+    "TagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "TagValue":{
+      "type":"string",
+      "max":256
+    },
+    "Tags":{
+      "type":"list",
+      "member":{"shape":"Tag"}
+    },
+    "ThreatIntelSetFormat":{
+      "type":"string",
+      "enum":[
+        "TXT",
+        "STIX",
+        "OTX_CSV",
+        "ALIEN_VAULT",
+        "PROOF_POINT",
+        "FIRE_EYE"
+      ],
+      "max":300,
+      "min":1
+    },
+    "ThreatIntelSetIds":{
+      "type":"list",
+      "member":{"shape":"String"},
+      "max":50,
+      "min":0
+    },
+    "ThreatIntelSetStatus":{
+      "type":"string",
+      "enum":[
+        "INACTIVE",
+        "ACTIVATING",
+        "ACTIVE",
+        "DEACTIVATING",
+        "ERROR",
+        "DELETE_PENDING",
+        "DELETED"
+      ],
+      "max":300,
+      "min":1
+    },
+    "ThreatIntelligenceDetail":{
+      "type":"structure",
+      "members":{
+        "ThreatListName":{
+          "shape":"String",
+          "documentation":"<p>The name of the threat intelligence list that triggered the finding.</p>",
+          "locationName":"threatListName"
+        },
+        "ThreatNames":{
+          "shape":"ThreatNames",
+          "documentation":"<p>A list of names of the threats in the threat intelligence list that triggered the finding.</p>",
+          "locationName":"threatNames"
+        }
+      },
+      "documentation":"<p>An instance of a threat intelligence detail that constitutes evidence for the finding.</p>"
+    },
+    "ThreatIntelligenceDetails":{
+      "type":"list",
+      "member":{"shape":"ThreatIntelligenceDetail"}
+    },
+    "ThreatNames":{
+      "type":"list",
+      "member":{"shape":"String"}
+    },
+    "UnarchiveFindingsRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "FindingIds"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The ID of the detector that specifies the GuardDuty service whose findings you want to unarchive.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FindingIds":{
+          "shape":"FindingIds",
+          "documentation":"<p>IDs of the findings that you want to unarchive.</p>",
+          "locationName":"findingIds"
+        }
+      }
+    },
+    "UnarchiveFindingsResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UnprocessedAccount":{
+      "type":"structure",
+      "required":[
+        "AccountId",
+        "Result"
+      ],
+      "members":{
+        "AccountId":{
+          "shape":"AccountId",
+          "documentation":"<p>AWS Account ID.</p>",
+          "locationName":"accountId"
+        },
+        "Result":{
+          "shape":"String",
+          "documentation":"<p>A reason why the account hasn't been processed.</p>",
+          "locationName":"result"
+        }
+      },
+      "documentation":"<p>Contains information about the accounts that were not processed.</p>"
+    },
+    "UnprocessedAccounts":{
+      "type":"list",
+      "member":{"shape":"UnprocessedAccount"},
+      "max":50,
+      "min":0
+    },
+    "UntagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceArn",
+        "TagKeys"
+      ],
+      "members":{
+        "ResourceArn":{
+          "shape":"GuardDutyArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) for the given GuardDuty resource </p>",
+          "location":"uri",
+          "locationName":"resourceArn"
+        },
+        "TagKeys":{
+          "shape":"TagKeyList",
+          "documentation":"<p>The tag keys to remove from a resource.</p>",
+          "location":"querystring",
+          "locationName":"tagKeys"
+        }
+      }
+    },
+    "UntagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateDetectorRequest":{
+      "type":"structure",
+      "required":["DetectorId"],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector that you want to update.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "Enable":{
+          "shape":"Boolean",
+          "documentation":"<p>Updated boolean value for the detector that specifies whether the detector is enabled.</p>",
+          "locationName":"enable"
+        },
+        "FindingPublishingFrequency":{
+          "shape":"FindingPublishingFrequency",
+          "documentation":"<p>A enum value that specifies how frequently customer got Finding updates published.</p>",
+          "locationName":"findingPublishingFrequency"
+        }
+      }
+    },
+    "UpdateDetectorResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateFilterRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "FilterName"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The unique ID of the detector that specifies the GuardDuty service where you want to update a filter.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FilterName":{
+          "shape":"String",
+          "documentation":"<p>The name of the filter.</p>",
+          "location":"uri",
+          "locationName":"filterName"
+        },
+        "Description":{
+          "shape":"FilterDescription",
+          "documentation":"<p>The description of the filter.</p>",
+          "locationName":"description"
+        },
+        "Action":{
+          "shape":"FilterAction",
+          "documentation":"<p>Specifies the action that is to be applied to the findings that match the filter.</p>",
+          "locationName":"action"
+        },
+        "Rank":{
+          "shape":"FilterRank",
+          "documentation":"<p>Specifies the position of the filter in the list of current filters. Also specifies the order in which this filter is applied to the findings.</p>",
+          "locationName":"rank"
+        },
+        "FindingCriteria":{
+          "shape":"FindingCriteria",
+          "documentation":"<p>Represents the criteria to be used in the filter for querying findings.</p>",
+          "locationName":"findingCriteria"
+        }
+      }
+    },
+    "UpdateFilterResponse":{
+      "type":"structure",
+      "required":["Name"],
+      "members":{
+        "Name":{
+          "shape":"FilterName",
+          "documentation":"<p>The name of the filter.</p>",
+          "locationName":"name"
+        }
+      }
+    },
+    "UpdateFindingsFeedbackRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "FindingIds",
+        "Feedback"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The ID of the detector that specifies the GuardDuty service whose findings you want to mark as useful or not useful.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "FindingIds":{
+          "shape":"FindingIds",
+          "documentation":"<p>IDs of the findings that you want to mark as useful or not useful.</p>",
+          "locationName":"findingIds"
+        },
+        "Feedback":{
+          "shape":"Feedback",
+          "documentation":"<p>Valid values: USEFUL | NOT_USEFUL</p>",
+          "locationName":"feedback"
+        },
+        "Comments":{
+          "shape":"String",
+          "documentation":"<p>Additional feedback about the GuardDuty findings.</p>",
+          "locationName":"comments"
+        }
+      }
+    },
+    "UpdateFindingsFeedbackResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateIPSetRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "IpSetId"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The detectorID that specifies the GuardDuty service whose IPSet you want to update.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "IpSetId":{
+          "shape":"String",
+          "documentation":"<p>The unique ID that specifies the IPSet that you want to update.</p>",
+          "location":"uri",
+          "locationName":"ipSetId"
+        },
+        "Name":{
+          "shape":"Name",
+          "documentation":"<p>The unique ID that specifies the IPSet that you want to update.</p>",
+          "locationName":"name"
+        },
+        "Location":{
+          "shape":"Location",
+          "documentation":"<p>The updated URI of the file that contains the IPSet. For example (https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key).</p>",
+          "locationName":"location"
+        },
+        "Activate":{
+          "shape":"Boolean",
+          "documentation":"<p>The updated boolean value that specifies whether the IPSet is active or not.</p>",
+          "locationName":"activate"
+        }
+      }
+    },
+    "UpdateIPSetResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateThreatIntelSetRequest":{
+      "type":"structure",
+      "required":[
+        "DetectorId",
+        "ThreatIntelSetId"
+      ],
+      "members":{
+        "DetectorId":{
+          "shape":"DetectorId",
+          "documentation":"<p>The detectorID that specifies the GuardDuty service whose ThreatIntelSet you want to update.</p>",
+          "location":"uri",
+          "locationName":"detectorId"
+        },
+        "ThreatIntelSetId":{
+          "shape":"String",
+          "documentation":"<p>The unique ID that specifies the ThreatIntelSet that you want to update.</p>",
+          "location":"uri",
+          "locationName":"threatIntelSetId"
+        },
+        "Name":{
+          "shape":"Name",
+          "documentation":"<p>The unique ID that specifies the ThreatIntelSet that you want to update.</p>",
+          "locationName":"name"
+        },
+        "Location":{
+          "shape":"Location",
+          "documentation":"<p>The updated URI of the file that contains the ThreateIntelSet. For example (https://s3.us-west-2.amazonaws.com/my-bucket/my-object-key)</p>",
+          "locationName":"location"
+        },
+        "Activate":{
+          "shape":"Boolean",
+          "documentation":"<p>The updated boolean value that specifies whether the ThreateIntelSet is active or not.</p>",
+          "locationName":"activate"
+        }
+      }
+    },
+    "UpdateThreatIntelSetResponse":{
+      "type":"structure",
+      "members":{
+      }
+    }
+  },
+  "documentation":"<p>Amazon GuardDuty is a continuous security monitoring service that analyzes and processes the following data sources: VPC Flow Logs, AWS CloudTrail event logs, and DNS logs. It uses threat intelligence feeds, such as lists of malicious IPs and domains, and machine learning to identify unexpected and potentially unauthorized and malicious activity within your AWS environment. This can include issues like escalations of privileges, uses of exposed credentials, or communication with malicious IPs, URLs, or domains. For example, GuardDuty can detect compromised EC2 instances serving malware or mining bitcoin. It also monitors AWS account access behavior for signs of compromise, such as unauthorized infrastructure deployments, like instances deployed in a region that has never been used, or unusual API calls, like a password policy change to reduce password strength. GuardDuty informs you of the status of your AWS environment by producing security findings that you can view in the GuardDuty console or through Amazon CloudWatch events. For more information, see <a href=\"https://docs.aws.amazon.com/guardduty/latest/ug/what-is-guardduty.html\"> Amazon GuardDuty User Guide</a>. </p>"
+}

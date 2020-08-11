@@ -1,0 +1,3 @@
+[pytest11]
+html = pytest_html.plugin
+

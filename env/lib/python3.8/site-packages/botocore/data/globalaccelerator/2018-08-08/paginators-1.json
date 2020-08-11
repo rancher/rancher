@@ -1,0 +1,22 @@
+{
+  "pagination": {
+    "ListAccelerators": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Accelerators"
+    },
+    "ListEndpointGroups": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "EndpointGroups"
+    },
+    "ListListeners": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Listeners"
+    }
+  }
+}

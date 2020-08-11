@@ -1,0 +1,453 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="ipv6-unicast-address-assignments.xsl"?>
+<?oxygen RNGSchema="ipv6-unicast-address-assignments.rng" type="xml"?>
+<registry xmlns="http://www.iana.org/assignments" id="ipv6-unicast-address-assignments">
+  <title>IPv6 Global Unicast Address Assignments</title>
+  <category>Internet Protocol version 6 (IPv6) Global Unicast Allocations</category>
+  <updated>2017-01-04</updated>
+  <xref type="rfc" data="rfc7249"/>
+  <registration_rule>Allocations to RIRs are made in line with the Global Policy published at 
+<xref type="uri" data="http://www.icann.org/en/resources/policy/global-addressing"/>. 
+All other assignments require IETF Review.</registration_rule>
+  <description>The allocation of Internet Protocol version 6 (IPv6) unicast address space is listed
+here. References to the various other registries detailing the use of the IPv6 address
+space can be found in the <xref type="registry" data="ipv6-address-space">IPv6 Address Space registry</xref>.</description>
+  <note>The assignable Global Unicast Address space is defined in <xref type="rfc" data="rfc4291"/> as being the address 
+block defined by the prefix 2000::/3. All address space in this block not listed in the 
+table below is reserved by IANA for future allocation.</note>
+  <record date="1999-07-01">
+    <prefix>2001:0000::/23</prefix>
+    <description>IANA</description>
+    <whois>whois.iana.org</whois>
+    <status>ALLOCATED</status>
+    <notes>2001:0000::/23 is reserved for IETF Protocol Assignments <xref type="rfc" data="rfc2928"/>.
+2001:0000::/32 is reserved for TEREDO <xref type="rfc" data="rfc4380"/>.
+      2001:1::1/128 is reserved for Port Control Protocol Anycast <xref type="rfc" data="rfc7723"/>.
+2001:2::/48 is reserved for Benchmarking <xref type="rfc" data="rfc5180"/>.
+2001:3::/32 is reserved for AMT <xref type="rfc" data="rfc7450"/>.
+2001:4:112::/48 is reserved for AS112-v6 <xref type="rfc" data="rfc7535"/>.
+2001:5::/32 is reserved for EID Space for LISP <xref type="rfc" data="rfc7954"/>.
+2001:10::/28 is deprecated (previously ORCHID) <xref type="rfc" data="rfc4843"/>. 
+2001:20::/28 is reserved for ORCHIDv2 <xref type="rfc" data="rfc7343"/>.
+2001:db8::/32 is reserved for Documentation <xref type="rfc" data="rfc3849"/>.
+For complete registration details, see <xref type="registry" data="iana-ipv6-special-registry"/>.</notes>
+  </record>
+  <record date="1999-07-01">
+    <prefix>2001:0200::/23</prefix>
+    <description>APNIC</description>
+    <whois>whois.apnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.apnic.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="1999-07-01">
+    <prefix>2001:0400::/23</prefix>
+    <description>ARIN</description>
+    <whois>whois.arin.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.arin.net/registry</server>
+      <server>http://rdap.arin.net/registry</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="1999-07-01">
+    <prefix>2001:0600::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2002-05-02">
+    <prefix>2001:0800::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2002-11-02">
+    <prefix>2001:0a00::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2002-05-02">
+    <prefix>2001:0c00::/23</prefix>
+    <description>APNIC</description>
+    <whois>whois.apnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.apnic.net/</server>
+    </rdap>
+    <notes>2001:db8::/32 reserved for Documentation <xref type="rfc" data="rfc3849"/>. 
+For complete registration details, see <xref type="registry" data="iana-ipv6-special-registry"/>.</notes>
+  </record>
+  <record date="2003-01-01">
+    <prefix>2001:0e00::/23</prefix>
+    <description>APNIC</description>
+    <whois>whois.apnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.apnic.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2002-11-01">
+    <prefix>2001:1200::/23</prefix>
+    <description>LACNIC</description>
+    <whois>whois.lacnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.lacnic.net/rdap/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2003-02-01">
+    <prefix>2001:1400::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2003-07-01">
+    <prefix>2001:1600::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2003-04-01">
+    <prefix>2001:1800::/23</prefix>
+    <description>ARIN</description>
+    <whois>whois.arin.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.arin.net/registry</server>
+      <server>http://rdap.arin.net/registry</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-01-01">
+    <prefix>2001:1a00::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-05-04">
+    <prefix>2001:1c00::/22</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-05-04">
+    <prefix>2001:2000::/20</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-05-04">
+    <prefix>2001:3000::/21</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-05-04">
+    <prefix>2001:3800::/22</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record>
+    <prefix>2001:3c00::/22</prefix>
+    <description>IANA</description>
+    <whois/>
+    <status>RESERVED</status>
+    <notes>2001:3c00::/22 is reserved for possible future allocation to the RIPE NCC.</notes>
+  </record>
+  <record date="2004-06-11">
+    <prefix>2001:4000::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-06-01">
+    <prefix>2001:4200::/23</prefix>
+    <description>AFRINIC</description>
+    <whois>whois.afrinic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.afrinic.net/rdap/</server>
+      <server>http://rdap.afrinic.net/rdap/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-06-11">
+    <prefix>2001:4400::/23</prefix>
+    <description>APNIC</description>
+    <whois>whois.apnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.apnic.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-08-17">
+    <prefix>2001:4600::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-08-24">
+    <prefix>2001:4800::/23</prefix>
+    <description>ARIN</description>
+    <whois>whois.arin.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.arin.net/registry</server>
+      <server>http://rdap.arin.net/registry</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-10-15">
+    <prefix>2001:4a00::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-12-17">
+    <prefix>2001:4c00::/23</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-09-10">
+    <prefix>2001:5000::/20</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-11-30">
+    <prefix>2001:8000::/19</prefix>
+    <description>APNIC</description>
+    <whois>whois.apnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.apnic.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2004-11-30">
+    <prefix>2001:a000::/20</prefix>
+    <description>APNIC</description>
+    <whois>whois.apnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.apnic.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2006-03-08">
+    <prefix>2001:b000::/20</prefix>
+    <description>APNIC</description>
+    <whois>whois.apnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.apnic.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2001-02-01">
+    <prefix>2002:0000::/16</prefix>
+    <description>6to4</description>
+    <whois/>
+    <status>ALLOCATED</status>
+    <notes>2002::/16 is reserved for 6to4 <xref type="rfc" data="rfc3056"/>. 
+For complete registration details, see <xref type="registry" data="iana-ipv6-special-registry"/>.</notes>
+  </record>
+  <record date="2005-01-12">
+    <prefix>2003:0000::/18</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2006-10-03">
+    <prefix>2400:0000::/12</prefix>
+    <description>APNIC</description>
+    <whois>whois.apnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.apnic.net/</server>
+    </rdap>
+    <notes>2400:0000::/19 was allocated on 2005-05-20. 2400:2000::/19 was allocated on 2005-07-08. 2400:4000::/21 was 
+allocated on 2005-08-08.  2404:0000::/23 was allocated on 2006-01-19. The more recent allocation (2006-10-03) 
+incorporates all these previous allocations.</notes>
+  </record>
+  <record date="2006-10-03">
+    <prefix>2600:0000::/12</prefix>
+    <description>ARIN</description>
+    <whois>whois.arin.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.arin.net/registry</server>
+      <server>http://rdap.arin.net/registry</server>
+    </rdap>
+    <notes>2600:0000::/22, 2604:0000::/22, 2608:0000::/22 and 260c:0000::/22 were allocated on 2005-04-19. The more 
+recent allocation (2006-10-03) incorporates all these previous allocations.</notes>
+  </record>
+  <record date="2005-11-17">
+    <prefix>2610:0000::/23</prefix>
+    <description>ARIN</description>
+    <whois>whois.arin.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.arin.net/registry</server>
+      <server>http://rdap.arin.net/registry</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2006-09-12">
+    <prefix>2620:0000::/23</prefix>
+    <description>ARIN</description>
+    <whois>whois.arin.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.arin.net/registry</server>
+      <server>http://rdap.arin.net/registry</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="2006-10-03">
+    <prefix>2800:0000::/12</prefix>
+    <description>LACNIC</description>
+    <whois>whois.lacnic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.lacnic.net/rdap/</server>
+    </rdap>
+    <notes>2800:0000::/23 was allocated on 2005-11-17. The more recent allocation (2006-10-03) incorporates the 
+previous allocation.</notes>
+  </record>
+  <record date="2006-10-03">
+    <prefix>2a00:0000::/12</prefix>
+    <description>RIPE NCC</description>
+    <whois>whois.ripe.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.db.ripe.net/</server>
+    </rdap>
+    <notes>2a00:0000::/21 was originally allocated on 2005-04-19. 2a01:0000::/23 was allocated on 2005-07-14. 
+2a01:0000::/16 (incorporating the 2a01:0000::/23) was allocated on 2005-12-15. The more recent allocation 
+(2006-10-03) incorporates these previous allocations.</notes>
+  </record>
+  <record date="2006-10-03">
+    <prefix>2c00:0000::/12</prefix>
+    <description>AFRINIC</description>
+    <whois>whois.afrinic.net</whois>
+    <status>ALLOCATED</status>
+    <rdap>
+      <server>https://rdap.afrinic.net/rdap/</server>
+      <server>http://rdap.afrinic.net/rdap/</server>
+    </rdap>
+    <notes/>
+  </record>
+  <record date="1999-07-01">
+    <prefix>2d00:0000::/8</prefix>
+    <description>IANA</description>
+    <whois/>
+    <status>RESERVED</status>
+    <notes/>
+  </record>
+  <record date="1999-07-01">
+    <prefix>2e00:0000::/7</prefix>
+    <description>IANA</description>
+    <whois/>
+    <status>RESERVED</status>
+    <notes/>
+  </record>
+  <record date="1999-07-01">
+    <prefix>3000:0000::/4</prefix>
+    <description>IANA</description>
+    <whois/>
+    <status>RESERVED</status>
+    <notes/>
+  </record>
+  <record date="2008-04">
+    <prefix>3ffe::/16</prefix>
+    <description>IANA</description>
+    <whois/>
+    <status>RESERVED</status>
+    <notes>3ffe:831f::/32 was used for Teredo in some old but widely distributed networking stacks. This usage is 
+deprecated in favor of 2001::/32, which was allocated for the purpose in <xref type="rfc" data="rfc4380"/>.
+3ffe::/16 and 5f00::/8 were used for the 6bone but were returned. <xref type="rfc" data="rfc5156"/></notes>
+  </record>
+  <record date="2008-04">
+    <prefix>5f00::/8</prefix>
+    <description>IANA</description>
+    <whois/>
+    <status>RESERVED</status>
+    <notes>3ffe::/16 and 5f00::/8 were used for the 6bone but were returned. <xref type="rfc" data="rfc5156"/></notes>
+  </record>
+  <people/>
+</registry>

@@ -1,0 +1,1028 @@
+{
+  "version":"2.0",
+  "metadata":{
+    "apiVersion":"2018-11-25",
+    "endpointPrefix":"applicationinsights",
+    "jsonVersion":"1.1",
+    "protocol":"json",
+    "serviceAbbreviation":"Application Insights",
+    "serviceFullName":"Amazon CloudWatch Application Insights",
+    "serviceId":"Application Insights",
+    "signatureVersion":"v4",
+    "signingName":"applicationinsights",
+    "targetPrefix":"EC2WindowsBarleyService",
+    "uid":"application-insights-2018-11-25"
+  },
+  "operations":{
+    "CreateApplication":{
+      "name":"CreateApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"CreateApplicationRequest"},
+      "output":{"shape":"CreateApplicationResponse"},
+      "errors":[
+        {"shape":"ResourceInUseException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Adds an application that is created from a resource group.</p>"
+    },
+    "CreateComponent":{
+      "name":"CreateComponent",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"CreateComponentRequest"},
+      "output":{"shape":"CreateComponentResponse"},
+      "errors":[
+        {"shape":"ResourceInUseException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Creates a custom component by grouping similar standalone instances to monitor.</p>"
+    },
+    "DeleteApplication":{
+      "name":"DeleteApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DeleteApplicationRequest"},
+      "output":{"shape":"DeleteApplicationResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"BadRequestException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Removes the specified application from monitoring. Does not delete the application.</p>"
+    },
+    "DeleteComponent":{
+      "name":"DeleteComponent",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DeleteComponentRequest"},
+      "output":{"shape":"DeleteComponentResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Ungroups a custom component. When you ungroup custom components, all applicable monitors that are set up for the component are removed and the instances revert to their standalone status.</p>"
+    },
+    "DescribeApplication":{
+      "name":"DescribeApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeApplicationRequest"},
+      "output":{"shape":"DescribeApplicationResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Describes the application.</p>"
+    },
+    "DescribeComponent":{
+      "name":"DescribeComponent",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeComponentRequest"},
+      "output":{"shape":"DescribeComponentResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Describes a component and lists the resources that are grouped together in a component.</p>"
+    },
+    "DescribeComponentConfiguration":{
+      "name":"DescribeComponentConfiguration",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeComponentConfigurationRequest"},
+      "output":{"shape":"DescribeComponentConfigurationResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Describes the monitoring configuration of the component.</p>"
+    },
+    "DescribeComponentConfigurationRecommendation":{
+      "name":"DescribeComponentConfigurationRecommendation",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeComponentConfigurationRecommendationRequest"},
+      "output":{"shape":"DescribeComponentConfigurationRecommendationResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Describes the recommended monitoring configuration of the component.</p>"
+    },
+    "DescribeObservation":{
+      "name":"DescribeObservation",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeObservationRequest"},
+      "output":{"shape":"DescribeObservationResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ValidationException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Describes an anomaly or error with the application.</p>"
+    },
+    "DescribeProblem":{
+      "name":"DescribeProblem",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeProblemRequest"},
+      "output":{"shape":"DescribeProblemResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ValidationException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Describes an application problem.</p>"
+    },
+    "DescribeProblemObservations":{
+      "name":"DescribeProblemObservations",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeProblemObservationsRequest"},
+      "output":{"shape":"DescribeProblemObservationsResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ValidationException"},
+        {"shape":"ResourceNotFoundException"}
+      ],
+      "documentation":"<p>Describes the anomalies or errors associated with the problem.</p>"
+    },
+    "ListApplications":{
+      "name":"ListApplications",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListApplicationsRequest"},
+      "output":{"shape":"ListApplicationsResponse"},
+      "errors":[
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Lists the IDs of the applications that you are monitoring. </p>"
+    },
+    "ListComponents":{
+      "name":"ListComponents",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListComponentsRequest"},
+      "output":{"shape":"ListComponentsResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Lists the auto-grouped, standalone, and custom components of the application.</p>"
+    },
+    "ListProblems":{
+      "name":"ListProblems",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListProblemsRequest"},
+      "output":{"shape":"ListProblemsResponse"},
+      "errors":[
+        {"shape":"ValidationException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Lists the problems with your application.</p>"
+    },
+    "UpdateApplication":{
+      "name":"UpdateApplication",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UpdateApplicationRequest"},
+      "output":{"shape":"UpdateApplicationResponse"},
+      "errors":[
+        {"shape":"InternalServerException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"}
+      ],
+      "documentation":"<p>Updates the application.</p>"
+    },
+    "UpdateComponent":{
+      "name":"UpdateComponent",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UpdateComponentRequest"},
+      "output":{"shape":"UpdateComponentResponse"},
+      "errors":[
+        {"shape":"ResourceInUseException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Updates the custom component name and/or the list of resources that make up the component.</p>"
+    },
+    "UpdateComponentConfiguration":{
+      "name":"UpdateComponentConfiguration",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UpdateComponentConfigurationRequest"},
+      "output":{"shape":"UpdateComponentConfigurationResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Updates the monitoring configurations for the component. The configuration input parameter is an escaped JSON of the configuration and should match the schema of what is returned by <code>DescribeComponentConfigurationRecommendation</code>.</p>"
+    }
+  },
+  "shapes":{
+    "AffectedResource":{"type":"string"},
+    "ApplicationComponent":{
+      "type":"structure",
+      "members":{
+        "ComponentName":{
+          "shape":"ComponentName",
+          "documentation":"<p>The name of the component.</p>"
+        },
+        "ResourceType":{
+          "shape":"ResourceType",
+          "documentation":"<p>The resource type. Supported resource types include EC2 instances, Auto Scaling group, Classic ELB, Application ELB, and SQS Queue.</p>"
+        },
+        "Tier":{
+          "shape":"Tier",
+          "documentation":"<p>The stack tier of the application component.</p>"
+        },
+        "Monitor":{
+          "shape":"Monitor",
+          "documentation":"<p>Indicates whether the application component is monitored. </p>"
+        }
+      },
+      "documentation":"<p>Describes a standalone resource or similarly grouped resources that the application is made up of.</p>"
+    },
+    "ApplicationComponentList":{
+      "type":"list",
+      "member":{"shape":"ApplicationComponent"}
+    },
+    "ApplicationInfo":{
+      "type":"structure",
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group used for the application.</p>"
+        },
+        "LifeCycle":{
+          "shape":"LifeCycle",
+          "documentation":"<p>The lifecycle of the application. </p>"
+        },
+        "OpsItemSNSTopicArn":{
+          "shape":"OpsItemSNSTopicArn",
+          "documentation":"<p> The SNS topic provided to Application Insights that is associated to the created opsItems to receive SNS notifications for opsItem updates. </p>"
+        },
+        "OpsCenterEnabled":{
+          "shape":"OpsCenterEnabled",
+          "documentation":"<p> Indicates whether Application Insights will create opsItems for any problem detected by Application Insights for an application. </p>"
+        },
+        "Remarks":{
+          "shape":"Remarks",
+          "documentation":"<p>The issues on the user side that block Application Insights from successfully monitoring an application.</p>"
+        }
+      },
+      "documentation":"<p>Describes the status of the application.</p>"
+    },
+    "ApplicationInfoList":{
+      "type":"list",
+      "member":{"shape":"ApplicationInfo"}
+    },
+    "BadRequestException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"ErrorMsg"}
+      },
+      "documentation":"<p>The request is not understood by the server.</p>",
+      "exception":true
+    },
+    "ComponentConfiguration":{"type":"string"},
+    "ComponentName":{"type":"string"},
+    "CreateApplicationRequest":{
+      "type":"structure",
+      "required":["ResourceGroupName"],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "OpsCenterEnabled":{
+          "shape":"OpsCenterEnabled",
+          "documentation":"<p> When set to <code>true</code>, creates opsItems for any problems detected on an application. </p>"
+        },
+        "OpsItemSNSTopicArn":{
+          "shape":"OpsItemSNSTopicArn",
+          "documentation":"<p> The SNS topic provided to Application Insights that is associated to the created opsItem. Allows you to receive notifications for updates to the opsItem. </p>"
+        }
+      }
+    },
+    "CreateApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "ApplicationInfo":{
+          "shape":"ApplicationInfo",
+          "documentation":"<p>Information about the application.</p>"
+        }
+      }
+    },
+    "CreateComponentRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceGroupName",
+        "ComponentName",
+        "ResourceList"
+      ],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "ComponentName":{
+          "shape":"ComponentName",
+          "documentation":"<p>The name of the component.</p>"
+        },
+        "ResourceList":{
+          "shape":"ResourceList",
+          "documentation":"<p>The list of resource ARNs that belong to the component.</p>"
+        }
+      }
+    },
+    "CreateComponentResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeleteApplicationRequest":{
+      "type":"structure",
+      "required":["ResourceGroupName"],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        }
+      }
+    },
+    "DeleteApplicationResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DeleteComponentRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceGroupName",
+        "ComponentName"
+      ],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "ComponentName":{
+          "shape":"ComponentName",
+          "documentation":"<p>The name of the component.</p>"
+        }
+      }
+    },
+    "DeleteComponentResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "DescribeApplicationRequest":{
+      "type":"structure",
+      "required":["ResourceGroupName"],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        }
+      }
+    },
+    "DescribeApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "ApplicationInfo":{
+          "shape":"ApplicationInfo",
+          "documentation":"<p>Information about the application.</p>"
+        }
+      }
+    },
+    "DescribeComponentConfigurationRecommendationRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceGroupName",
+        "ComponentName",
+        "Tier"
+      ],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "ComponentName":{
+          "shape":"ComponentName",
+          "documentation":"<p>The name of the component.</p>"
+        },
+        "Tier":{
+          "shape":"Tier",
+          "documentation":"<p>The tier of the application component. Supported tiers include <code>DOT_NET_WORKER</code>, <code>DOT_NET_WEB</code>, <code>SQL_SERVER</code>, and <code>DEFAULT</code>.</p>"
+        }
+      }
+    },
+    "DescribeComponentConfigurationRecommendationResponse":{
+      "type":"structure",
+      "members":{
+        "ComponentConfiguration":{
+          "shape":"ComponentConfiguration",
+          "documentation":"<p>The recommended configuration settings of the component. The value is the escaped JSON of the configuration.</p>"
+        }
+      }
+    },
+    "DescribeComponentConfigurationRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceGroupName",
+        "ComponentName"
+      ],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "ComponentName":{
+          "shape":"ComponentName",
+          "documentation":"<p>The name of the component.</p>"
+        }
+      }
+    },
+    "DescribeComponentConfigurationResponse":{
+      "type":"structure",
+      "members":{
+        "Monitor":{
+          "shape":"Monitor",
+          "documentation":"<p>Indicates whether the application component is monitored.</p>"
+        },
+        "Tier":{
+          "shape":"Tier",
+          "documentation":"<p>The tier of the application component. Supported tiers include <code>DOT_NET_WORKER</code>, <code>DOT_NET_WEB</code>, <code>SQL_SERVER</code>, and <code>DEFAULT</code> </p>"
+        },
+        "ComponentConfiguration":{
+          "shape":"ComponentConfiguration",
+          "documentation":"<p>The configuration settings of the component. The value is the escaped JSON of the configuration.</p>"
+        }
+      }
+    },
+    "DescribeComponentRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceGroupName",
+        "ComponentName"
+      ],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "ComponentName":{
+          "shape":"ComponentName",
+          "documentation":"<p>The name of the component.</p>"
+        }
+      }
+    },
+    "DescribeComponentResponse":{
+      "type":"structure",
+      "members":{
+        "ApplicationComponent":{"shape":"ApplicationComponent"},
+        "ResourceList":{
+          "shape":"ResourceList",
+          "documentation":"<p>The list of resource ARNs that belong to the component.</p>"
+        }
+      }
+    },
+    "DescribeObservationRequest":{
+      "type":"structure",
+      "required":["ObservationId"],
+      "members":{
+        "ObservationId":{
+          "shape":"ObservationId",
+          "documentation":"<p>The ID of the observation.</p>"
+        }
+      }
+    },
+    "DescribeObservationResponse":{
+      "type":"structure",
+      "members":{
+        "Observation":{
+          "shape":"Observation",
+          "documentation":"<p>Information about the observation.</p>"
+        }
+      }
+    },
+    "DescribeProblemObservationsRequest":{
+      "type":"structure",
+      "required":["ProblemId"],
+      "members":{
+        "ProblemId":{
+          "shape":"ProblemId",
+          "documentation":"<p>The ID of the problem.</p>"
+        }
+      }
+    },
+    "DescribeProblemObservationsResponse":{
+      "type":"structure",
+      "members":{
+        "RelatedObservations":{
+          "shape":"RelatedObservations",
+          "documentation":"<p>Observations related to the problem.</p>"
+        }
+      }
+    },
+    "DescribeProblemRequest":{
+      "type":"structure",
+      "required":["ProblemId"],
+      "members":{
+        "ProblemId":{
+          "shape":"ProblemId",
+          "documentation":"<p>The ID of the problem.</p>"
+        }
+      }
+    },
+    "DescribeProblemResponse":{
+      "type":"structure",
+      "members":{
+        "Problem":{
+          "shape":"Problem",
+          "documentation":"<p>Information about the problem. </p>"
+        }
+      }
+    },
+    "EndTime":{"type":"timestamp"},
+    "ErrorMsg":{"type":"string"},
+    "Feedback":{
+      "type":"map",
+      "key":{"shape":"FeedbackKey"},
+      "value":{"shape":"FeedbackValue"},
+      "max":10
+    },
+    "FeedbackKey":{
+      "type":"string",
+      "enum":["INSIGHTS_FEEDBACK"]
+    },
+    "FeedbackValue":{
+      "type":"string",
+      "enum":[
+        "NOT_SPECIFIED",
+        "USEFUL",
+        "NOT_USEFUL"
+      ]
+    },
+    "Insights":{"type":"string"},
+    "InternalServerException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"ErrorMsg"}
+      },
+      "documentation":"<p>The server encountered an internal error and is unable to complete the request.</p>",
+      "exception":true
+    },
+    "LifeCycle":{"type":"string"},
+    "LineTime":{"type":"timestamp"},
+    "ListApplicationsRequest":{
+      "type":"structure",
+      "members":{
+        "MaxResults":{
+          "shape":"MaxEntities",
+          "documentation":"<p>The maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+        },
+        "NextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The token to request the next page of results.</p>"
+        }
+      }
+    },
+    "ListApplicationsResponse":{
+      "type":"structure",
+      "members":{
+        "ApplicationInfoList":{
+          "shape":"ApplicationInfoList",
+          "documentation":"<p>The list of applications.</p>"
+        },
+        "NextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The token used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+        }
+      }
+    },
+    "ListComponentsRequest":{
+      "type":"structure",
+      "required":["ResourceGroupName"],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxEntities",
+          "documentation":"<p>The maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+        },
+        "NextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The token to request the next page of results.</p>"
+        }
+      }
+    },
+    "ListComponentsResponse":{
+      "type":"structure",
+      "members":{
+        "ApplicationComponentList":{
+          "shape":"ApplicationComponentList",
+          "documentation":"<p>The list of application components.</p>"
+        },
+        "NextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The token to request the next page of results.</p>"
+        }
+      }
+    },
+    "ListProblemsRequest":{
+      "type":"structure",
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "StartTime":{
+          "shape":"StartTime",
+          "documentation":"<p>The time when the problem was detected, in epoch seconds. If you don't specify a time frame for the request, problems within the past seven days are returned.</p>"
+        },
+        "EndTime":{
+          "shape":"EndTime",
+          "documentation":"<p>The time when the problem ended, in epoch seconds. If not specified, problems within the past seven days are returned.</p>"
+        },
+        "MaxResults":{
+          "shape":"MaxEntities",
+          "documentation":"<p>The maximum number of results to return in a single call. To retrieve the remaining results, make another call with the returned <code>NextToken</code> value.</p>"
+        },
+        "NextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The token to request the next page of results.</p>"
+        }
+      }
+    },
+    "ListProblemsResponse":{
+      "type":"structure",
+      "members":{
+        "ProblemList":{
+          "shape":"ProblemList",
+          "documentation":"<p>The list of problems. </p>"
+        },
+        "NextToken":{
+          "shape":"PaginationToken",
+          "documentation":"<p>The token used to retrieve the next page of results. This value is <code>null</code> when there are no more results to return. </p>"
+        }
+      }
+    },
+    "LogFilter":{
+      "type":"string",
+      "enum":[
+        "ERROR",
+        "WARN",
+        "INFO"
+      ]
+    },
+    "LogGroup":{"type":"string"},
+    "LogText":{"type":"string"},
+    "MaxEntities":{
+      "type":"integer",
+      "max":40,
+      "min":1
+    },
+    "MetricName":{"type":"string"},
+    "MetricNamespace":{"type":"string"},
+    "Monitor":{"type":"boolean"},
+    "NewComponentName":{"type":"string"},
+    "Observation":{
+      "type":"structure",
+      "members":{
+        "Id":{
+          "shape":"ObservationId",
+          "documentation":"<p>The ID of the observation type.</p>"
+        },
+        "StartTime":{
+          "shape":"StartTime",
+          "documentation":"<p>The time when the observation was first detected, in epoch seconds.</p>"
+        },
+        "EndTime":{
+          "shape":"EndTime",
+          "documentation":"<p>The time when the observation ended, in epoch seconds.</p>"
+        },
+        "SourceType":{
+          "shape":"SourceType",
+          "documentation":"<p>The source type of the observation.</p>"
+        },
+        "SourceARN":{
+          "shape":"SourceARN",
+          "documentation":"<p>The source resource ARN of the observation.</p>"
+        },
+        "LogGroup":{
+          "shape":"LogGroup",
+          "documentation":"<p>The log group name.</p>"
+        },
+        "LineTime":{
+          "shape":"LineTime",
+          "documentation":"<p>The timestamp in the CloudWatch Logs that specifies when the matched line occurred.</p>"
+        },
+        "LogText":{
+          "shape":"LogText",
+          "documentation":"<p>The log text of the observation.</p>"
+        },
+        "LogFilter":{
+          "shape":"LogFilter",
+          "documentation":"<p>The log filter of the observation.</p>"
+        },
+        "MetricNamespace":{
+          "shape":"MetricNamespace",
+          "documentation":"<p>The namespace of the observation metric.</p>"
+        },
+        "MetricName":{
+          "shape":"MetricName",
+          "documentation":"<p>The name of the observation metric.</p>"
+        },
+        "Unit":{
+          "shape":"Unit",
+          "documentation":"<p>The unit of the source observation metric.</p>"
+        },
+        "Value":{
+          "shape":"Value",
+          "documentation":"<p>The value of the source observation metric.</p>"
+        }
+      },
+      "documentation":"<p>Describes an anomaly or error with the application.</p>"
+    },
+    "ObservationId":{"type":"string"},
+    "ObservationList":{
+      "type":"list",
+      "member":{"shape":"Observation"}
+    },
+    "OpsCenterEnabled":{"type":"boolean"},
+    "OpsItemSNSTopicArn":{"type":"string"},
+    "PaginationToken":{"type":"string"},
+    "Problem":{
+      "type":"structure",
+      "members":{
+        "Id":{
+          "shape":"ProblemId",
+          "documentation":"<p>The ID of the problem.</p>"
+        },
+        "Title":{
+          "shape":"Title",
+          "documentation":"<p>The name of the problem.</p>"
+        },
+        "Insights":{
+          "shape":"Insights",
+          "documentation":"<p>A detailed analysis of the problem using machine learning.</p>"
+        },
+        "Status":{
+          "shape":"Status",
+          "documentation":"<p>The status of the problem.</p>"
+        },
+        "AffectedResource":{
+          "shape":"AffectedResource",
+          "documentation":"<p>The resource affected by the problem.</p>"
+        },
+        "StartTime":{
+          "shape":"StartTime",
+          "documentation":"<p>The time when the problem started, in epoch seconds.</p>"
+        },
+        "EndTime":{
+          "shape":"EndTime",
+          "documentation":"<p>The time when the problem ended, in epoch seconds.</p>"
+        },
+        "SeverityLevel":{
+          "shape":"SeverityLevel",
+          "documentation":"<p>A measure of the level of impact of the problem.</p>"
+        },
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group affected by the problem.</p>"
+        },
+        "Feedback":{
+          "shape":"Feedback",
+          "documentation":"<p>Feedback provided by the user about the problem.</p>"
+        }
+      },
+      "documentation":"<p>Describes a problem that is detected by correlating observations.</p>"
+    },
+    "ProblemId":{"type":"string"},
+    "ProblemList":{
+      "type":"list",
+      "member":{"shape":"Problem"}
+    },
+    "RelatedObservations":{
+      "type":"structure",
+      "members":{
+        "ObservationList":{
+          "shape":"ObservationList",
+          "documentation":"<p>The list of observations related to the problem.</p>"
+        }
+      },
+      "documentation":"<p>Describes observations related to the problem.</p>"
+    },
+    "Remarks":{"type":"string"},
+    "RemoveSNSTopic":{"type":"boolean"},
+    "ResourceARN":{"type":"string"},
+    "ResourceGroupName":{"type":"string"},
+    "ResourceInUseException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"ErrorMsg"}
+      },
+      "documentation":"<p>The resource is already created or in use.</p>",
+      "exception":true
+    },
+    "ResourceList":{
+      "type":"list",
+      "member":{"shape":"ResourceARN"}
+    },
+    "ResourceNotFoundException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"ErrorMsg"}
+      },
+      "documentation":"<p>The resource does not exist in the customer account.</p>",
+      "exception":true
+    },
+    "ResourceType":{"type":"string"},
+    "SeverityLevel":{
+      "type":"string",
+      "enum":[
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ]
+    },
+    "SourceARN":{"type":"string"},
+    "SourceType":{"type":"string"},
+    "StartTime":{"type":"timestamp"},
+    "Status":{
+      "type":"string",
+      "enum":[
+        "IGNORE",
+        "RESOLVED",
+        "PENDING"
+      ]
+    },
+    "Tier":{"type":"string"},
+    "Title":{"type":"string"},
+    "Unit":{"type":"string"},
+    "UpdateApplicationRequest":{
+      "type":"structure",
+      "required":["ResourceGroupName"],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "OpsCenterEnabled":{
+          "shape":"OpsCenterEnabled",
+          "documentation":"<p> When set to <code>true</code>, creates opsItems for any problems detected on an application. </p>"
+        },
+        "OpsItemSNSTopicArn":{
+          "shape":"OpsItemSNSTopicArn",
+          "documentation":"<p> The SNS topic provided to Application Insights that is associated to the created opsItem. Allows you to receive notifications for updates to the opsItem.</p>"
+        },
+        "RemoveSNSTopic":{
+          "shape":"RemoveSNSTopic",
+          "documentation":"<p> Disassociates the SNS topic from the opsItem created for detected problems.</p>"
+        }
+      }
+    },
+    "UpdateApplicationResponse":{
+      "type":"structure",
+      "members":{
+        "ApplicationInfo":{
+          "shape":"ApplicationInfo",
+          "documentation":"<p>Information about the application. </p>"
+        }
+      }
+    },
+    "UpdateComponentConfigurationRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceGroupName",
+        "ComponentName"
+      ],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "ComponentName":{
+          "shape":"ComponentName",
+          "documentation":"<p>The name of the component.</p>"
+        },
+        "Monitor":{
+          "shape":"Monitor",
+          "documentation":"<p>Indicates whether the application component is monitored.</p>"
+        },
+        "Tier":{
+          "shape":"Tier",
+          "documentation":"<p>The tier of the application component. Supported tiers include <code>DOT_NET_WORKER</code>, <code>DOT_NET_WEB</code>, <code>SQL_SERVER</code>, and <code>DEFAULT</code>.</p>"
+        },
+        "ComponentConfiguration":{
+          "shape":"ComponentConfiguration",
+          "documentation":"<p>The configuration settings of the component. The value is the escaped JSON of the configuration. For more information about the JSON format, see <a href=\"https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/working-with-json.html\">Working with JSON</a>. You can send a request to <code>DescribeComponentConfigurationRecommendation</code> to see the recommended configuration for a component.</p>"
+        }
+      }
+    },
+    "UpdateComponentConfigurationResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "UpdateComponentRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceGroupName",
+        "ComponentName"
+      ],
+      "members":{
+        "ResourceGroupName":{
+          "shape":"ResourceGroupName",
+          "documentation":"<p>The name of the resource group.</p>"
+        },
+        "ComponentName":{
+          "shape":"ComponentName",
+          "documentation":"<p>The name of the component.</p>"
+        },
+        "NewComponentName":{
+          "shape":"NewComponentName",
+          "documentation":"<p>The new name of the component.</p>"
+        },
+        "ResourceList":{
+          "shape":"ResourceList",
+          "documentation":"<p>The list of resource ARNs that belong to the component.</p>"
+        }
+      }
+    },
+    "UpdateComponentResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "ValidationException":{
+      "type":"structure",
+      "members":{
+        "Message":{"shape":"ErrorMsg"}
+      },
+      "documentation":"<p>The parameter is not valid.</p>",
+      "exception":true
+    },
+    "Value":{"type":"double"}
+  },
+  "documentation":"<fullname>Amazon CloudWatch Application Insights for .NET and SQL Server</fullname> <p> Amazon CloudWatch Application Insights for .NET and SQL Server is a service that helps you detect common problems with your .NET and SQL Server-based applications. It enables you to pinpoint the source of issues in your applications (built with technologies such as Microsoft IIS, .NET, and Microsoft SQL Server), by providing key insights into detected problems.</p> <p>After you onboard your application, CloudWatch Application Insights for .NET and SQL Server identifies, recommends, and sets up metrics and logs. It continuously analyzes and correlates your metrics and logs for unusual behavior to surface actionable problems with your application. For example, if your application is slow and unresponsive and leading to HTTP 500 errors in your Application Load Balancer (ALB), Application Insights informs you that a memory pressure problem with your SQL Server database is occurring. It bases this analysis on impactful metrics and log errors. </p>"
+}
