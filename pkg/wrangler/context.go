@@ -30,6 +30,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	apiregistrationv12 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -75,6 +76,7 @@ type MultiClusterManager interface {
 	ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error)
 	Start(ctx context.Context) error
 	Middleware(next http.Handler) http.Handler
+	K8sClient(clusterName string) (kubernetes.Interface, error)
 }
 
 func (w *Context) OnLeader(f func(ctx context.Context) error) {
@@ -176,4 +178,8 @@ func (n noopMCM) Start(ctx context.Context) error {
 
 func (n noopMCM) Middleware(next http.Handler) http.Handler {
 	return next
+}
+
+func (n noopMCM) K8sClient(clusterName string) (kubernetes.Interface, error) {
+	return nil, nil
 }

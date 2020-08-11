@@ -12,7 +12,6 @@ const (
 	System                      = "cattle-system"
 	GlobalNamespace             = "cattle-global-data"
 	NodeTemplateGlobalNamespace = "cattle-global-nt"
-	CatalogSystemNamespace      = "catalog-system"
 )
 
 func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionType string, conditionStatus bool, message string) error {

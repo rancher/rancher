@@ -35,6 +35,7 @@ type Options struct {
 
 type mcm struct {
 	ScaledContext       *config.ScaledContext
+	clusterManager      *clustermanager.Manager
 	router              func(http.Handler) http.Handler
 	wranglerContext     *wrangler.Context
 	localClusterEnabled bool
@@ -99,6 +100,7 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 	mcm := &mcm{
 		router:              router,
 		ScaledContext:       scaledContext,
+		clusterManager:      clusterManager,
 		wranglerContext:     wranglerContext,
 		localClusterEnabled: cfg.LocalClusterEnabled,
 		removeLocalCluster:  cfg.RemoveLocalCluster,

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/rancher/rancher/pkg/wrangler"
+	"k8s.io/client-go/kubernetes"
 )
 
 type DeferredServer struct {
@@ -60,30 +61,45 @@ func (s *DeferredServer) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *DeferredServer) Middleware(next http.Handler) http.Handler {
+func (s *DeferredServer) getMCM() *mcm {
 	s.RLock()
 	defer s.RUnlock()
+	return s.mcm
+}
+
+func (s *DeferredServer) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if s.mcm == nil {
+		mcm := s.getMCM()
+		if mcm == nil {
 			next.ServeHTTP(rw, req)
 			return
 		}
-		s.mcm.Middleware(next).ServeHTTP(rw, req)
+		mcm.Middleware(next).ServeHTTP(rw, req)
 	})
 }
 
 func (s *DeferredServer) ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		s.RLock()
-		if s.mcm == nil {
-			s.RUnlock()
+		mcm := s.getMCM()
+		if mcm == nil {
 			return nil, fmt.Errorf("failed to find cluster %s", clusterID)
 		}
-		dialer, err := s.mcm.ScaledContext.Dialer.ClusterDialer(clusterID)
-		s.RUnlock()
+		dialer, err := mcm.ScaledContext.Dialer.ClusterDialer(clusterID)
 		if err != nil {
 			return nil, err
 		}
 		return dialer(ctx, network, address)
 	}
+}
+
+func (s *DeferredServer) K8sClient(clusterName string) (kubernetes.Interface, error) {
+	mcm := s.getMCM()
+	if mcm == nil {
+		return nil, nil
+	}
+	clusterContext, err := mcm.clusterManager.UserContext(clusterName)
+	if err != nil {
+		return nil, err
+	}
+	return clusterContext.K8sClient, nil
 }

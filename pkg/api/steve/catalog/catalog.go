@@ -21,11 +21,10 @@ func Register(ctx context.Context, server *steve.Server,
 	secrets corecontrollers.SecretController,
 	pods corecontrollers.PodClient,
 	configMaps corecontrollers.ConfigMapCache,
-	repos catalogcontrollers.RepoCache,
 	clusterRepos catalogcontrollers.ClusterRepoCache,
 	catalog catalogcontrollers.Interface) error {
 
-	contentManager := content.NewManager(configMaps, repos, secrets.Cache(), clusterRepos)
+	contentManager := content.NewManager(configMaps, secrets.Cache(), clusterRepos)
 
 	ops := newOperation(server.ClientFactory, catalog, contentManager, pods)
 	server.ClusterCache.OnAdd(ctx, ops.OnAdd)

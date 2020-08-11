@@ -2,7 +2,6 @@ package content
 
 import (
 	"net/url"
-	"path"
 
 	"helm.sh/helm/v3/pkg/repo"
 )
@@ -14,14 +13,15 @@ func TranslateURLs(baseURL *url.URL, index *repo.IndexFile) error {
 			v := url.Values{}
 			v.Set("chartName", chartName)
 			v.Set("version", version.Version)
+			v.Set("link", "chart")
 			u.RawQuery = v.Encode()
-			u.Path = path.Join(baseURL.Path, "chart")
 			version.URLs = []string{
 				u.String(),
 			}
+
+			v.Set("link", "icon")
 			if version.Metadata != nil && version.Icon != "" {
 				u.RawQuery = v.Encode()
-				u.Path = path.Join(baseURL.Path, "icon")
 				version.Icon = u.String()
 			}
 		}

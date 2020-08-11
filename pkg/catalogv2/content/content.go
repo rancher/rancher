@@ -23,19 +23,16 @@ import (
 
 type Manager struct {
 	configMaps   corecontrollers.ConfigMapCache
-	repos        catalogcontrollers.RepoCache
 	secrets      corecontrollers.SecretCache
 	clusterRepos catalogcontrollers.ClusterRepoCache
 }
 
 func NewManager(
 	configMaps corecontrollers.ConfigMapCache,
-	repos catalogcontrollers.RepoCache,
 	secrets corecontrollers.SecretCache,
 	clusterRepos catalogcontrollers.ClusterRepoCache) *Manager {
 	return &Manager{
 		configMaps:   configMaps,
-		repos:        repos,
 		secrets:      secrets,
 		clusterRepos: clusterRepos,
 	}
@@ -62,16 +59,7 @@ func (c *Manager) getRepo(namespace, name string) (repoDef, error) {
 		}, nil
 	}
 
-	cr, err := c.repos.Get(namespace, name)
-	if err != nil {
-		return repoDef{}, err
-	}
-	return repoDef{
-		typedata: &cr.TypeMeta,
-		metadata: &cr.ObjectMeta,
-		spec:     &cr.Spec,
-		status:   &cr.Status,
-	}, nil
+	panic("namespace should never be empty")
 }
 
 func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {

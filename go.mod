@@ -78,6 +78,7 @@ require (
 	github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48
 	github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9
 	github.com/rancher/eks-operator v0.1.0-rc22
+	github.com/rancher/kubernetes-provider-detector v0.0.0-20200807181951-690274ab1fb3
 	github.com/rancher/lasso v0.0.0-20200807231317-fff0364fb3f6
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20200808070119-a173b50371f8
@@ -85,9 +86,9 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20200809004951-760d0515479e
 	github.com/rancher/rke v1.2.0-rc6
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20200807222103-f3edb7357f75
+	github.com/rancher/steve v0.0.0-20200810194305-6ebfa39af82c
 	github.com/rancher/system-upgrade-controller v0.6.2
-	github.com/rancher/wrangler v0.6.2-0.20200809004846-a1e5f1c8fc30
+	github.com/rancher/wrangler v0.6.2-0.20200811174245-58da209ac37b
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0

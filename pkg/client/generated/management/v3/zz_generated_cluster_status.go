@@ -25,6 +25,7 @@ const (
 	ClusterStatusFieldMonitoringStatus                     = "monitoringStatus"
 	ClusterStatusFieldNodeCount                            = "nodeCount"
 	ClusterStatusFieldNodeVersion                          = "nodeVersion"
+	ClusterStatusFieldProvider                             = "provider"
 	ClusterStatusFieldRequested                            = "requested"
 	ClusterStatusFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
 	ClusterStatusFieldVersion                              = "version"
@@ -54,6 +55,7 @@ type ClusterStatus struct {
 	MonitoringStatus                     *MonitoringStatus           `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	NodeCount                            int64                       `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                          int64                       `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
+	Provider                             string                      `json:"provider,omitempty" yaml:"provider,omitempty"`
 	Requested                            map[string]string           `json:"requested,omitempty" yaml:"requested,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
 	Version                              *Info                       `json:"version,omitempty" yaml:"version,omitempty"`

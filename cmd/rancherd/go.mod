@@ -7,9 +7,9 @@ replace (
 	github.com/containerd/btrfs => github.com/containerd/btrfs v0.0.0-20181101203652-af5082808c83
 	github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20190717030353-c4b9ac5c7601
 	github.com/containerd/console => github.com/containerd/console v0.0.0-20181022165439-0650fd9eeb50
-	github.com/containerd/containerd => github.com/rancher/containerd v1.3.3-k3s2
+	github.com/containerd/containerd => github.com/rancher/containerd v1.3.6-k3s2
 	github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190815185530-f2a389ac0a02
-	github.com/containerd/cri => github.com/rancher/cri v1.3.0-k3s.6
+	github.com/containerd/cri => github.com/rancher/cri v1.3.0-k3s.7
 	github.com/containerd/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 	github.com/containerd/go-runc => github.com/containerd/go-runc v0.0.0-20190911050354-e029b79d8cda
 	github.com/containerd/typeurl => github.com/containerd/typeurl v0.0.0-20180627222232-a93fcdb778cd
@@ -61,17 +61,7 @@ replace (
 )
 
 require (
-	github.com/google/go-containerregistry v0.0.0-20200424115305-087a4bdef7c4
-	github.com/pkg/errors v0.9.1
-	github.com/rancher/k3s v1.18.3-0.20200720235607-04f57e5e1da4
-	github.com/rancher/rke2 v1.18.4-beta1.0.20200731190732-5f7ce2415d72
+	github.com/rancher/rke2 v1.18.4-beta2.0.20200810232625-bd90c4742874
 	github.com/rancher/spur v0.0.0-20200617165101-8702c8e4ce7a
-	github.com/rancher/wrangler v0.6.1
-	github.com/sirupsen/logrus v1.4.2
-	google.golang.org/grpc v1.26.0
-	k8s.io/api v0.18.5
-	k8s.io/apimachinery v0.18.5
-	k8s.io/apiserver v0.0.0
-	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
-	sigs.k8s.io/yaml v1.2.0
+	github.com/sirupsen/logrus v1.6.0
 )

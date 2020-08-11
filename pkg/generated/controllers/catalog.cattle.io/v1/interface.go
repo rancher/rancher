@@ -33,7 +33,6 @@ type Interface interface {
 	ClusterRepo() ClusterRepoController
 	Operation() OperationController
 	Release() ReleaseController
-	Repo() RepoController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -54,7 +53,4 @@ func (c *version) Operation() OperationController {
 }
 func (c *version) Release() ReleaseController {
 	return NewReleaseController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Release"}, "releases", true, c.controllerFactory)
-}
-func (c *version) Repo() RepoController {
-	return NewRepoController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Repo"}, "repos", true, c.controllerFactory)
 }
