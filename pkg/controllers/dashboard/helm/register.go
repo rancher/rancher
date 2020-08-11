@@ -9,7 +9,6 @@ import (
 func Register(ctx context.Context, wrangler *wrangler.Context) {
 	RegisterRepos(ctx,
 		wrangler.Core.Secret().Cache(),
-		wrangler.Catalog.Repo(),
 		wrangler.Catalog.ClusterRepo(),
 		wrangler.Core.ConfigMap())
 	RegisterReleases(ctx,

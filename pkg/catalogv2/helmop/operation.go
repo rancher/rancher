@@ -43,7 +43,6 @@ type Operations struct {
 	namespace      string
 	contentManager *content.Manager
 	Impersonator   *podimpersonation.PodImpersonation
-	repos          catalogcontrollers.RepoClient
 	clusterRepos   catalogcontrollers.ClusterRepoClient
 	ops            catalogcontrollers.OperationClient
 	pods           corev1controllers.PodClient
@@ -61,7 +60,6 @@ func NewOperations(
 		contentManager: contentManager,
 		namespace:      "dashboard-catalog",
 		Impersonator:   podimpersonation.New("helm-op", cg, time.Hour),
-		repos:          catalog.Repo(),
 		pods:           pods,
 		clusterRepos:   catalog.ClusterRepo(),
 		ops:            catalog.Operation(),
@@ -186,12 +184,7 @@ func (s *Operations) getSpec(namespace, name string) (*catalog.RepoSpec, error) 
 		return &clusterRepo.Spec, nil
 	}
 
-	repo, err := s.repos.Get(namespace, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return &repo.Spec, nil
+	panic("namespace should not be empty")
 }
 
 func (s *Operations) getUser(userInfo user.Info, namespace, name string) (user.Info, error) {

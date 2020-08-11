@@ -16,16 +16,6 @@ type ClusterRepo struct {
 	Status            RepoStatus `json:"status"`
 }
 
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type Repo struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RepoSpec   `json:"spec"`
-	Status            RepoStatus `json:"status"`
-}
-
 // SecretReference a reference to a secret object
 type SecretReference struct {
 	Name      string `json:"name,omitempty"`

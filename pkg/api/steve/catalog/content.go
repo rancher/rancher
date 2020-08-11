@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
@@ -50,7 +49,6 @@ func (i *contentDownload) serveIndex(apiContext *types.APIRequest, rw http.Respo
 	if err != nil {
 		return err
 	}
-	u.Path = path.Dir(u.Path)
 
 	if err := content.TranslateURLs(u, index); err != nil {
 		return err

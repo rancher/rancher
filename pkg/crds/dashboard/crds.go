@@ -33,12 +33,6 @@ func List() []crd.CRD {
 				WithColumn("Default", ".status.default").
 				WithColumn("Description", ".status.description")
 		}),
-		newCRD(&catalogv1.Repo{}, func(c crd.CRD) crd.CRD {
-			return c.
-				WithStatus().
-				WithCategories("catalog").
-				WithColumn("URL", ".spec.url")
-		}),
 		newCRD(&catalogv1.ClusterRepo{}, func(c crd.CRD) crd.CRD {
 			c.NonNamespace = true
 			return c.

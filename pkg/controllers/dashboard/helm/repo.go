@@ -27,25 +27,20 @@ var (
 
 type repoHandler struct {
 	secrets      corev1controllers.SecretCache
-	repos        catalogcontrollers.RepoController
 	clusterRepos catalogcontrollers.ClusterRepoController
 	configMaps   corev1controllers.ConfigMapClient
 }
 
 func RegisterRepos(ctx context.Context,
 	secrets corev1controllers.SecretCache,
-	repos catalogcontrollers.RepoController,
 	clusterRepos catalogcontrollers.ClusterRepoController,
 	configMap corev1controllers.ConfigMapClient) {
 	h := &repoHandler{
 		secrets:      secrets,
-		repos:        repos,
 		clusterRepos: clusterRepos,
 		configMaps:   configMap,
 	}
 
-	catalogcontrollers.RegisterRepoStatusHandler(ctx, repos,
-		condition.Cond(catalog.RepoDownloaded), "helm-repo-download", h.RepoDownloadStatusHandler)
 	catalogcontrollers.RegisterClusterRepoStatusHandler(ctx, clusterRepos,
 		condition.Cond(catalog.RepoDownloaded), "helm-clusterrepo-download", h.ClusterRepoDownloadStatusHandler)
 
@@ -65,20 +60,6 @@ func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo
 	})
 }
 
-func (r *repoHandler) RepoDownloadStatusHandler(repo *catalog.Repo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
-	if !shouldRefresh(&repo.Spec, &status) {
-		r.repos.EnqueueAfter(repo.Namespace, repo.Name, interval)
-		return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
-	}
-
-	return r.download(&repo.Spec, status, &repo.ObjectMeta, metav1.OwnerReference{
-		APIVersion: catalog.SchemeGroupVersion.Group + "/" + catalog.SchemeGroupVersion.Version,
-		Kind:       "Repo",
-		Name:       repo.Name,
-		UID:        repo.UID,
-	})
-}
-
 func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.IndexFile, owner metav1.OwnerReference) (*corev1.ConfigMap, error) {
 	buf := &bytes.Buffer{}
 	gz := gzip.NewWriter(buf)
@@ -90,7 +71,7 @@ func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.Inde
 	}
 
 	if namespace == "" {
-		namespace = namespaces.CatalogSystemNamespace
+		namespace = namespaces.System
 	}
 
 	cm, err := r.configMaps.Get(namespace, name, metav1.GetOptions{})
