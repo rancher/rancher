@@ -74,20 +74,3 @@ func NewRelease(namespace, name string, obj Release) *Release {
 	obj.Namespace = namespace
 	return &obj
 }
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// RepoList is a list of Repo resources
-type RepoList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []Repo `json:"items"`
-}
-
-func NewRepo(namespace, name string, obj Repo) *Repo {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Repo").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}

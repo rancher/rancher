@@ -31,7 +31,6 @@ var (
 	ClusterRepoResourceName = "clusterrepos"
 	OperationResourceName   = "operations"
 	ReleaseResourceName     = "releases"
-	RepoResourceName        = "repos"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -61,8 +60,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&OperationList{},
 		&Release{},
 		&ReleaseList{},
-		&Repo{},
-		&RepoList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
