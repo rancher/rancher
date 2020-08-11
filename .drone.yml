@@ -35,7 +35,7 @@ steps:
   settings:
     build_args:
     - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
@@ -58,7 +58,7 @@ steps:
   settings:
     build_args:
     - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
@@ -81,7 +81,7 @@ steps:
   settings:
     build_args:
     - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.runtime
@@ -276,7 +276,7 @@ steps:
   settings:
     build_args:
     - ARCH=arm64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
@@ -299,7 +299,7 @@ steps:
   settings:
     build_args:
     - ARCH=arm64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
@@ -419,7 +419,7 @@ steps:
       build_args:
         - SERVERCORE_VERSION=1809
         - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
@@ -527,7 +527,7 @@ steps:
       build_args:
         - SERVERCORE_VERSION=1903
         - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
@@ -636,7 +636,7 @@ steps:
       build_args:
         - SERVERCORE_VERSION=1909
         - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
