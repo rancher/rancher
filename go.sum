@@ -949,8 +949,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200807222103-f3edb7357f75 h1:yDe+jYwabbVjkinG7SSVPIog5ziJz7hsiwVOkI3QQRg=
-github.com/rancher/steve v0.0.0-20200807222103-f3edb7357f75/go.mod h1:OzaEqY4YLLtoxJ9Qozo6+PcmDnzzJ/VN8l3o48d8mR0=
+github.com/rancher/steve v0.0.0-20200810194305-6ebfa39af82c h1:GyN1uaOC5XU0m3Yn40gb6CLl8r094cG10GMBsfs0YQE=
+github.com/rancher/steve v0.0.0-20200810194305-6ebfa39af82c/go.mod h1:OzaEqY4YLLtoxJ9Qozo6+PcmDnzzJ/VN8l3o48d8mR0=
 github.com/rancher/system-upgrade-controller v0.6.2 h1:Q+YcllWjW7A/VdUgnxNIYPnVGTV0hruc1nZNX7iYd5k=
 github.com/rancher/system-upgrade-controller v0.6.2/go.mod h1:TvgsR2KC6Y1vtzbPv2szaxNKEijBslsAzazyDjDm5GI=
 github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
@@ -958,8 +958,8 @@ github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSe
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
 github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f/go.mod h1:NmtmlLkchboIksYJuBemwcP4RBfv8FpeyhVoWXB9Wdc=
 github.com/rancher/wrangler v0.6.2-0.20200714200521-c61fae623942/go.mod h1:8LdIqAQPHysxNlHqmKbUiDIx9ULt9IHUauh9aOnr67k=
-github.com/rancher/wrangler v0.6.2-0.20200809004846-a1e5f1c8fc30 h1:r5WzTb9PNgRQxwSaKTJe4aT4sypsljL9raBKyqCnisk=
-github.com/rancher/wrangler v0.6.2-0.20200809004846-a1e5f1c8fc30/go.mod h1:+Bspc5vuCGYWRAj+sf8xgTSOqRpUnTd4LErtd6be2p0=
+github.com/rancher/wrangler v0.6.2-0.20200811174245-58da209ac37b h1:8AM4gpCDEKrf9GqIqxB0N9ajf/E3+rESJsdY6Fdjylc=
+github.com/rancher/wrangler v0.6.2-0.20200811174245-58da209ac37b/go.mod h1:+Bspc5vuCGYWRAj+sf8xgTSOqRpUnTd4LErtd6be2p0=
 github.com/rancher/wrangler-api v0.5.1-0.20200326194427-c13310506d04/go.mod h1:R3nemXoECcrDqXDSHdY7yJay4j42TeEkU79Hep0rdJ8=
 github.com/rancher/wrangler-api v0.6.1-0.20200427172631-a7c2f09b783e/go.mod h1:2lcWR98q8HU3U4mVETnXc8quNG0uXxrt8vKd6cAa/30=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
