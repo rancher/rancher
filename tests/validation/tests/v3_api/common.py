@@ -959,7 +959,7 @@ def check_cluster_version(cluster, version):
     assert cluster_k8s_version == version, \
         "cluster_k8s_version: " + cluster_k8s_version + \
         " Expected: " + version
-    expected_k8s_version = version[:version.find("-")]
+    expected_k8s_version = version[:version.find("-rancher")]
     k8s_version = execute_kubectl_cmd("version")
     kubectl_k8s_version = k8s_version["serverVersion"]["gitVersion"]
     assert kubectl_k8s_version == expected_k8s_version, \
