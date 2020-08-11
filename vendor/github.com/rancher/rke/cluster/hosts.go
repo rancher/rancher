@@ -219,8 +219,20 @@ func (c *Cluster) SetUpHosts(ctx context.Context, flags ExternalFlags) error {
 			errgrp.Go(func() error {
 				var errList []error
 				for host := range hostsQueue {
-					err := pki.DeployCertificatesOnPlaneHost(ctx, host.(*hosts.Host), c.RancherKubernetesEngineConfig, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap, c.ForceDeployCerts)
-					if err != nil {
+					h := host.(*hosts.Host)
+					var env []string
+					if h.IsWindows() {
+						env = c.getWindowsEnv(h)
+					}
+					if err := pki.DeployCertificatesOnPlaneHost(
+						ctx,
+						h,
+						c.RancherKubernetesEngineConfig,
+						c.Certificates,
+						c.SystemImages.CertDownloader,
+						c.PrivateRegistriesMap,
+						c.ForceDeployCerts,
+						env); err != nil {
 						errList = append(errList, err)
 					}
 				}

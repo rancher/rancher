@@ -32,6 +32,7 @@ const (
 	NodeAddressEnv         = "RKE_NODE_ADDRESS"
 	NodeInternalAddressEnv = "RKE_NODE_INTERNAL_ADDRESS"
 	NodeNameOverrideEnv    = "RKE_NODE_NAME_OVERRIDE"
+	NodePrefixPath         = "RKE_NODE_PREFIX_PATH"
 
 	NetworkConfigurationEnv = "RKE_NETWORK_CONFIGURATION"
 
@@ -652,6 +653,9 @@ func (c *Cluster) BuildProxyProcess(host *hosts.Host) v3.Process {
 		}
 	}
 	Env := []string{fmt.Sprintf("%s=%s", services.NginxProxyEnvName, nginxProxyEnv)}
+	if host.IsWindows() {
+		Env = append(Env, c.getWindowsEnv(host)...) // mostly need prefix path
+	}
 
 	VolumesFrom := []string{}
 	if host.IsWindows() { // compatible withe Windows
@@ -772,6 +776,8 @@ func (c *Cluster) BuildSidecarProcess(host *hosts.Host) v3.Process {
 		Binds = []string{
 			// put the execution binaries and the cni binaries to the host
 			fmt.Sprintf("%s:c:/host/opt", path.Join(host.PrefixPath, "/opt")),
+			// access to the etc dir for k8s certs to make a copy for flannel
+			fmt.Sprintf("%s:c:/host/etc", path.Join(host.PrefixPath, "/etc")),
 			// put the cni configuration to the host
 			fmt.Sprintf("%s:c:/host/etc/cni/net.d", path.Join(host.PrefixPath, "/etc/cni/net.d")),
 			// put the cni network component configuration to the host

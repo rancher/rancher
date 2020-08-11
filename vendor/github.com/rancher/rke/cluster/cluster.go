@@ -1186,5 +1186,6 @@ func (c *Cluster) getWindowsEnv(host *hosts.Host) []string {
 		fmt.Sprintf("%s=%s", NodeAddressEnv, host.Address),
 		fmt.Sprintf("%s=%s", NodeInternalAddressEnv, host.InternalAddress),
 		fmt.Sprintf("%s=%s", CloudProviderNameEnv, c.CloudProvider.Name),
+		fmt.Sprintf("%s=%s", NodePrefixPath, host.PrefixPath),
 	}
 }

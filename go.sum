@@ -838,10 +838,9 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAX
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
 github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83 h1:0+HVgp5uVy7BvBn1Ee3PrXG4GktYlD/mwCBBKH77RCw=
 github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
-github.com/rancher/rke v1.1.5-rc3 h1:biKgA3Gsojm5dtYgcsDxY2j4odJxakHR/STAH9F/U3o=
 github.com/rancher/rke v1.1.5-rc3/go.mod h1:Vs49ny2u80SAQwbsCf0RUjixT2aTOj6rZWwQKcpE37c=
-github.com/rancher/rke v1.1.5-rc4 h1:N5KmnCT60f0yrqWxqKCW6mPRF61XF+cds9MvpN7Ab+I=
-github.com/rancher/rke v1.1.5-rc4/go.mod h1:Vs49ny2u80SAQwbsCf0RUjixT2aTOj6rZWwQKcpE37c=
+github.com/rancher/rke v1.1.5-rc5 h1:26JceLb76oLpZbdP2yZeN/NE39mZKdnjZ+MeZeo42YI=
+github.com/rancher/rke v1.1.5-rc5/go.mod h1:Vs49ny2u80SAQwbsCf0RUjixT2aTOj6rZWwQKcpE37c=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
@@ -854,7 +853,6 @@ github.com/rancher/types v0.0.0-20200723224053-ae84b42a4797 h1:luVtAWdaFjTc80CC1
 github.com/rancher/types v0.0.0-20200723224053-ae84b42a4797/go.mod h1:HX+ryuo/4a4OtbjPzaCvXWL7nAk5sQN5dP9XQl6iH78=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
-github.com/rancher/wrangler v0.5.4-0.20200520040055-b8d49179cfc8 h1:gyboq5L4bx+iWyz4xHHFRqt7wyoou8+akRczPgVlFaQ=
 github.com/rancher/wrangler v0.5.4-0.20200520040055-b8d49179cfc8/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
 github.com/rancher/wrangler v0.5.4-0.20200604212251-fc9dde4243fc h1:1Xmqilomczb53CyPvXxuVj1Yu1oIfNPzb5MEp3EsudE=
 github.com/rancher/wrangler v0.5.4-0.20200604212251-fc9dde4243fc/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
@@ -1131,7 +1129,6 @@ golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297/go.mod h1:z5CRVTTTmAJ677TzLL
 golang.org/x/net v0.0.0-20190923162816-aa69164e4478/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20191002035440-2ec189313ef0/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20191004110552-13f9640d40b9/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
-golang.org/x/net v0.0.0-20191112182307-2180aed22343 h1:00ohfJ4K98s3m6BGUoBd8nyfp4Yl0GoIKvw5abItTjI=
 golang.org/x/net v0.0.0-20191112182307-2180aed22343/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20200226121028-0de0cce0169b h1:0mm1VjtFUOIlE1SbDlwjYaDxZVDP2S5ou6y0gSgXHu8=
 golang.org/x/net v0.0.0-20200226121028-0de0cce0169b/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
@@ -1247,7 +1244,6 @@ golang.org/x/tools v0.0.0-20191017205301-920acffc3e65/go.mod h1:b+2E5dAYhXwXZwtn
 golang.org/x/tools v0.0.0-20191029041327-9cc4af7d6b2c/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
 golang.org/x/tools v0.0.0-20191111182352-50fa39b762bc/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
 golang.org/x/tools v0.0.0-20191113191852-77e3bb0ad9e7/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
-golang.org/x/tools v0.0.0-20191115202509-3a792d9c32b2 h1:EtTFh6h4SAKemS+CURDMTDIANuduG5zKEXShyy18bGA=
 golang.org/x/tools v0.0.0-20191115202509-3a792d9c32b2/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
 golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
 golang.org/x/tools v0.0.0-20200624223020-7a9acb0a45bb h1:NyaeMQ3XiyZSnTS7YjPk1ksNbe4EUlrse3jBvmVU2l8=
