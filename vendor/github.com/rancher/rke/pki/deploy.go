@@ -23,9 +23,16 @@ const (
 	StateDeployerContainerName = "cluster-state-deployer"
 )
 
-func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, rkeConfig v3.RancherKubernetesEngineConfig, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry, forceDeploy bool) error {
+func DeployCertificatesOnPlaneHost(
+	ctx context.Context,
+	host *hosts.Host,
+	rkeConfig v3.RancherKubernetesEngineConfig,
+	crtMap map[string]CertificatePKI,
+	certDownloaderImage string,
+	prsMap map[string]v3.PrivateRegistry,
+	forceDeploy bool,
+	env []string) error {
 	crtBundle := GenerateRKENodeCerts(ctx, rkeConfig, host.Address, crtMap)
-	env := []string{}
 
 	// Strip CA key as its sensitive and unneeded on nodes without controlplane role
 	if !host.IsControl {
@@ -101,12 +108,13 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 	if err := docker.UseLocalOrPull(ctx, host.DClient, host.Address, certDownloaderImage, CertificatesServiceName, prsMap); err != nil {
 		return err
 	}
+
 	imageCfg := &container.Config{
 		Image: certDownloaderImage,
 		Cmd:   []string{"cert-deployer"},
 		Env:   containerEnv,
 	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	if host.IsWindows() { // compatible with Windows
 		imageCfg = &container.Config{
 			Image: certDownloaderImage,
 			Cmd: []string{
@@ -121,7 +129,7 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 		},
 		Privileged: true,
 	}
-	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+	if host.IsWindows() { // compatible with Windows
 		hostCfg = &container.HostConfig{
 			Binds: []string{
 				fmt.Sprintf("%s:c:/etc/kubernetes", path.Join(host.PrefixPath, "/etc/kubernetes")),

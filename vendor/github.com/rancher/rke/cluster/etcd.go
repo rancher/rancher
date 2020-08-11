@@ -37,8 +37,20 @@ func (c *Cluster) DeployRestoreCerts(ctx context.Context, clusterCerts map[strin
 		errgrp.Go(func() error {
 			var errList []error
 			for host := range hostsQueue {
-				err := pki.DeployCertificatesOnPlaneHost(ctx, host.(*hosts.Host), c.RancherKubernetesEngineConfig, restoreCerts, c.SystemImages.CertDownloader, c.PrivateRegistriesMap, false)
-				if err != nil {
+				h := host.(*hosts.Host)
+				var env []string
+				if h.IsWindows() {
+					env = c.getWindowsEnv(h)
+				}
+				if err := pki.DeployCertificatesOnPlaneHost(
+					ctx,
+					h,
+					c.RancherKubernetesEngineConfig,
+					restoreCerts,
+					c.SystemImages.CertDownloader,
+					c.PrivateRegistriesMap,
+					false,
+					env); err != nil {
 					errList = append(errList, err)
 				}
 			}
