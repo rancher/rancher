@@ -9,17 +9,6 @@ CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.5"}
 
 cd $(dirname $0)/../package
 
-TAG=${TAG:-${VERSION}${SUFFIX}}
-REPO=${REPO:-rancher}
-
-if echo $TAG | grep -q dirty; then
-    TAG=dev
-fi
-
-if [ -n "$DRONE_TAG" ]; then
-    TAG=$DRONE_TAG
-fi
-
 cp ../bin/rancher.yaml ../bin/rancher ../bin/agent ../bin/data.json .
 
 IMAGE=${REPO}/rancher:${TAG}

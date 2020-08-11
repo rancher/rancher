@@ -48,8 +48,21 @@ fi
 SUFFIX=""
 [ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
 
+TAG=${TAG:-${VERSION}${SUFFIX}}
+REPO=${REPO:-rancher}
+
+if echo $TAG | grep -q dirty; then
+    TAG=dev
+fi
+
+if [ -n "$DRONE_TAG" ]; then
+    TAG=$DRONE_TAG
+fi
+
 echo "ARCH: $ARCH"
 echo "CHART_REPO: $CHART_REPO"
 echo "CHART_VERSION: $CHART_VERSION"
 echo "VERSION: $VERSION"
 echo "SUFFIX: $SUFFIX"
+echo "REPO: $REPO"
+echo "TAG: $TAG"
