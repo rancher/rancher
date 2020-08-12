@@ -33,7 +33,7 @@ for ($i = $args.Length; $i -ge 0; $i--)
 	}
 }
 
-if ($CATTLE_PREFIX_PATH -eq "") {
+if ([string]::IsNullOrEmpty($CATTLE_PREFIX_PATH)) {
 	$CATTLE_PREFIX_PATH = "c:\"
 }
 
