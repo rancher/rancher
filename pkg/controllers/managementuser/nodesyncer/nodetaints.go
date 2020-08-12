@@ -31,6 +31,11 @@ func (n *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, erro
 	if err != nil {
 		return obj, err
 	}
+
+	if node == nil {
+		return nil, nil
+	}
+
 	toAdd, toDel := taints.GetToDiffTaints(node.Spec.Taints, obj.Spec.DesiredNodeTaints)
 	newObj := obj.DeepCopy()
 	if len(toAdd) != 0 || len(toDel) != 0 {
