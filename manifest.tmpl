@@ -1,12 +1,12 @@
 image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}
 manifests:
   -
-    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}-head{{/if}}-linux-amd64
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-amd64
     platform:
       architecture: amd64
       os: linux
   -
-    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}-head{{/if}}-linux-arm64
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-arm64
     platform:
       architecture: arm64
       os: linux
