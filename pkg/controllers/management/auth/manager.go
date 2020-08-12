@@ -333,7 +333,16 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 		return err
 	}
 
-	for _, rb := range roleBindings {
+	for _, elt := range roleBindings {
+		// NOTE: Type assertion is currently providing a workaround for an issue where keys for deleted RoleBinding resources remain in the indexer.
+		// This leads to nil values for rb in this loop. If we don't type assert here, an error will be returned from meta.Accessor
+		// and the desired RoleBinding won't be deleted/updated.
+		// Details: https://github.com/rancher/rancher/issues/28094
+		rb, ok := elt.(*v1.RoleBinding)
+		if !ok {
+			continue
+		}
+
 		objMeta, err := meta.Accessor(rb)
 		if err != nil {
 			return err
@@ -350,7 +359,7 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 			if k == rtbUID && v == membershipBindingOwner {
 				delete(objMeta.GetLabels(), k)
 			} else if v == membershipBindingOwner {
-				// Another crtb is also linked to this roleBinding so don't delete
+				// Another rtb is also linked to this roleBinding so don't delete
 				otherOwners = true
 			}
 		}
@@ -365,8 +374,8 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 			}
 		} else {
 			logrus.Infof("[%v] Updating owner label for roleBinding %v", m.controller, objMeta.GetName())
-			if rb, ok := rb.(runtime.Object); ok {
-				if _, err := client.Update(objMeta.GetName(), rb); err != nil {
+			if obj, ok := elt.(runtime.Object); ok {
+				if _, err := client.Update(objMeta.GetName(), obj); err != nil {
 					return err
 				}
 			}
