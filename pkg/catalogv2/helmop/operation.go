@@ -407,7 +407,7 @@ func (c Command) renderArgs() ([]string, error) {
 		args = append(args, filepath.Join(helmDataPath, c.ChartFile))
 	}
 
-	return append([]string{c.Operation}, args...), nil
+	return append([]string{"--debug", c.Operation}, args...), nil
 }
 
 func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, values map[string]interface{}) (Command, error) {
