@@ -632,6 +632,15 @@ class AmazonWebServices(CloudProviderBase):
         except ClientError:
             return None
 
+    def describe_eks_nodegroup(self, cluster_name, nodegroup_name):
+        try:
+            return self._eks_client.describe_nodegroup(
+                clusterName=cluster_name,
+                nodegroupName=nodegroup_name
+            )
+        except ClientError:
+            return None
+
     def wait_for_eks_cluster_state(self, name, target_state, timeout=1200):
         start = time.time()
         cluster = self.describe_eks_cluster(name)['cluster']
@@ -646,3 +655,13 @@ class AmazonWebServices(CloudProviderBase):
             status = cluster['status']
             print(status)
         return cluster
+
+    def wait_for_delete_eks_cluster(self, cluster_name):
+        ng_names = self._eks_client.list_nodegroups(clusterName=cluster_name)
+        waiter_ng = self._eks_client.get_waiter('nodegroup_deleted')
+        for node_group in ng_names['nodegroups']:
+            print ("Waiting for deletion of nodegroup: {}".format(node_group))
+            waiter_ng.wait(clusterName=cluster_name, nodegroupName=node_group)
+        print ("Waiting for deletion of cluster: {}".format(cluster_name))
+        waiter = self._eks_client.get_waiter('cluster_deleted')
+        waiter.wait(name=cluster_name)
