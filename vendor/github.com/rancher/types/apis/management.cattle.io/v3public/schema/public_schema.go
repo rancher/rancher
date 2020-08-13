@@ -27,6 +27,10 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{}
 		}).
+		MustImportAndCustomize(&PublicVersion, v3public.AuthToken{}, func(schema *types.Schema) {
+			schema.CollectionMethods = []string{http.MethodGet, http.MethodDelete}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
+		}).
 		MustImportAndCustomize(&PublicVersion, v3public.AuthProvider{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
 		}).

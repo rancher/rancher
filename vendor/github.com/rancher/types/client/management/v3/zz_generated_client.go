@@ -29,6 +29,7 @@ type Client struct {
 	TemplateContent                         TemplateContentOperations
 	Group                                   GroupOperations
 	GroupMember                             GroupMemberOperations
+	SamlToken                               SamlTokenOperations
 	Principal                               PrincipalOperations
 	User                                    UserOperations
 	AuthConfig                              AuthConfigOperations
@@ -104,6 +105,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.TemplateContent = newTemplateContentClient(client)
 	client.Group = newGroupClient(client)
 	client.GroupMember = newGroupMemberClient(client)
+	client.SamlToken = newSamlTokenClient(client)
 	client.Principal = newPrincipalClient(client)
 	client.User = newUserClient(client)
 	client.AuthConfig = newAuthConfigClient(client)
