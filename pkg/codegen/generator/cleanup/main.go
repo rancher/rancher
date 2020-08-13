@@ -1,4 +1,4 @@
-package main
+package cleanup
 
 import (
 	"fmt"
@@ -7,13 +7,7 @@ import (
 	"strings"
 )
 
-func main() {
-	if err := run(); err != nil {
-		panic(err)
-	}
-}
-
-func run() error {
+func CleanUp() error {
 	if err := os.RemoveAll("./pkg/client/generated"); err != nil {
 		return err
 	}
