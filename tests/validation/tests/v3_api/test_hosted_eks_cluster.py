@@ -90,8 +90,16 @@ def test_create_hosted_eks_cluster_2():
 
 @ekscredential
 def test_create_hosted_eks_cluster_3():
+    ec2_cloud_credential = get_aws_cloud_credential()
     cluster_name = random_test_name("test-auto-eks")
-    eks_config_temp = get_eks_config_all(cluster_name)
+    global eks_config
+    nodegroup = get_new_node()
+    eks_config_temp = eks_config.copy()
+    eks_config_temp["displayName"] = cluster_name
+    eks_config_temp["amazonCredentialSecret"] = ec2_cloud_credential.id
+    eks_config_temp["nodeGroups"] = []
+    eks_config_temp["nodeGroups"].append(nodegroup)
+    print(eks_config_temp)
     cluster_config = {
         "eksConfig": eks_config_temp,
         "name": cluster_name,
@@ -108,8 +116,16 @@ def test_create_hosted_eks_cluster_3():
 
 @ekscredential
 def test_create_hosted_eks_cluster_4():
+    ec2_cloud_credential = get_aws_cloud_credential()
     cluster_name = random_test_name("test-auto-eks")
-    eks_config_temp = get_eks_config_all(cluster_name)
+    global eks_config
+    nodegroup = get_new_node()
+    eks_config_temp = eks_config.copy()
+    eks_config_temp["displayName"] = cluster_name
+    eks_config_temp["amazonCredentialSecret"] = ec2_cloud_credential.id
+    eks_config_temp["nodeGroups"] = []
+    eks_config_temp["nodeGroups"].append(nodegroup)
+    print(eks_config_temp)
     cluster_config = {
         "eksConfig": eks_config_temp,
         "name": cluster_name,
@@ -304,7 +320,7 @@ def edit_eks_cluster(cluster, eks_config_temp):
     new_nodegroup = get_new_node()
     eks_config_temp["nodeGroups"].append(new_nodegroup)
     # remove all logging
-    eks_config_temp["loggingTypes"] = []
+    eks_config_temp["loggingTypes"] = get_logging_types()
     client = get_user_client()
     client.update(cluster, eksConfig=eks_config_temp)
     cluster = validate_cluster(client, cluster, intermediate_state="updating",
