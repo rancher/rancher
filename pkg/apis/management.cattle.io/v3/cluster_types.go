@@ -141,7 +141,7 @@ type ClusterStatus struct {
 	// Component statuses will represent cluster's components (etcd/controller/scheduler) health
 	// https://kubernetes.io/docs/api-reference/v1.8/#componentstatus-v1-core
 	Driver                               string                      `json:"driver"`
-	Provider                             string                      `json:"provider"`
+	Provider                             string                      `json:"clusterProvider"`
 	AgentImage                           string                      `json:"agentImage"`
 	AgentFeatures                        map[string]bool             `json:"agentFeatures,omitempty"`
 	AuthImage                            string                      `json:"authImage"`
