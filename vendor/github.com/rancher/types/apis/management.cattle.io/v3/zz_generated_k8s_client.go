@@ -42,6 +42,7 @@ type Interface interface {
 	TemplateContentsGetter
 	GroupsGetter
 	GroupMembersGetter
+	SamlTokensGetter
 	PrincipalsGetter
 	UsersGetter
 	AuthConfigsGetter
@@ -112,6 +113,7 @@ type Client struct {
 	templateContentControllers                         map[string]TemplateContentController
 	groupControllers                                   map[string]GroupController
 	groupMemberControllers                             map[string]GroupMemberController
+	samlTokenControllers                               map[string]SamlTokenController
 	principalControllers                               map[string]PrincipalController
 	userControllers                                    map[string]UserController
 	authConfigControllers                              map[string]AuthConfigController
@@ -190,6 +192,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		templateContentControllers:                         map[string]TemplateContentController{},
 		groupControllers:                                   map[string]GroupController{},
 		groupMemberControllers:                             map[string]GroupMemberController{},
+		samlTokenControllers:                               map[string]SamlTokenController{},
 		principalControllers:                               map[string]PrincipalController{},
 		userControllers:                                    map[string]UserController{},
 		authConfigControllers:                              map[string]AuthConfigController{},
@@ -526,6 +529,19 @@ type GroupMembersGetter interface {
 func (c *Client) GroupMembers(namespace string) GroupMemberInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &GroupMemberResource, GroupMemberGroupVersionKind, groupMemberFactory{})
 	return &groupMemberClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type SamlTokensGetter interface {
+	SamlTokens(namespace string) SamlTokenInterface
+}
+
+func (c *Client) SamlTokens(namespace string) SamlTokenInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &SamlTokenResource, SamlTokenGroupVersionKind, samlTokenFactory{})
+	return &samlTokenClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

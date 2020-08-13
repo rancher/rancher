@@ -29,15 +29,16 @@ type node struct {
 }
 
 type data struct {
-	ClusterName string
-	Host        string
-	ClusterID   string
-	Cert        string
-	User        string
-	Username    string
-	Password    string
-	Token       string
-	Nodes       []node
+	ClusterName     string
+	Host            string
+	ClusterID       string
+	Cert            string
+	User            string
+	Username        string
+	Password        string
+	Token           string
+	EndpointEnabled bool
+	Nodes           []node
 }
 
 func ForBasic(host, username, password string) (string, error) {
@@ -96,13 +97,14 @@ func getDefaultNode(clusterName, clusterID, host string) node {
 
 func ForTokenBased(clusterName, clusterID, host, token string) (string, error) {
 	data := &data{
-		ClusterName: clusterName,
-		ClusterID:   clusterID,
-		Host:        host,
-		Cert:        caCertString(),
-		User:        clusterName,
-		Token:       token,
-		Nodes:       []node{getDefaultNode(clusterName, clusterID, host)},
+		ClusterName:     clusterName,
+		ClusterID:       clusterID,
+		Host:            host,
+		Cert:            caCertString(),
+		User:            clusterName,
+		Token:           token,
+		Nodes:           []node{getDefaultNode(clusterName, clusterID, host)},
+		EndpointEnabled: false,
 	}
 
 	if data.ClusterName == "" {
@@ -151,13 +153,14 @@ func ForClusterTokenBased(cluster *managementv3.Cluster, clusterID, host, token 
 	}
 
 	data := &data{
-		ClusterName: clusterName,
-		ClusterID:   clusterID,
-		Host:        host,
-		Cert:        caCertString(),
-		User:        clusterName,
-		Token:       token,
-		Nodes:       nodes,
+		ClusterName:     clusterName,
+		ClusterID:       clusterID,
+		Host:            host,
+		Cert:            caCertString(),
+		User:            clusterName,
+		Token:           token,
+		Nodes:           nodes,
+		EndpointEnabled: true,
 	}
 
 	buf := &bytes.Buffer{}
