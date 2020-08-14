@@ -37,6 +37,11 @@ if ([string]::IsNullOrEmpty($CATTLE_PREFIX_PATH)) {
 	$CATTLE_PREFIX_PATH = "c:\"
 }
 
+if ($CATTLE_PREFIX_PATH.Chars($CATTLE_PREFIX_PATH.Length - 1) -ne '\') {
+    # confirm trailing slash for path building below
+    $CATTLE_PREFIX_PATH = ($CATTLE_PREFIX_PATH + '\')
+}
+
 $hostPrefixPath = $CATTLE_PREFIX_PATH -Replace "c:\\", "c:\host\"
 
 
@@ -45,33 +50,33 @@ $hostPrefixPath = $CATTLE_PREFIX_PATH -Replace "c:\\", "c:\host\"
 try
 {
     New-Item -Force -ItemType Directory -Path @(
-        "$hostPrefixPath\opt"
-        "$hostPrefixPath\opt\bin"
-        "$hostPrefixPath\opt\cni"
-        "$hostPrefixPath\opt\cni\bin"
-        "$hostPrefixPath\etc"
-        "$hostPrefixPath\etc\rancher"
-        "$hostPrefixPath\etc\rancher\wins"
-        "$hostPrefixPath\etc\kubernetes"
-        "$hostPrefixPath\etc\kubernetes\bin"
-        "$hostPrefixPath\etc\cni"
-        "$hostPrefixPath\etc\cni\net.d"
-        "$hostPrefixPath\etc\nginx"
-        "$hostPrefixPath\etc\nginx\logs"
-        "$hostPrefixPath\etc\nginx\temp"
-        "$hostPrefixPath\etc\nginx\conf"
-        "$hostPrefixPath\etc\kube-flannel"
-        "$hostPrefixPath\var"
-        "$hostPrefixPath\var\run"
-        "$hostPrefixPath\var\log"
-        "$hostPrefixPath\var\log\pods"
-        "$hostPrefixPath\var\log\containers"
-        "$hostPrefixPath\var\lib"
-        "$hostPrefixPath\var\lib\cni"
-        "$hostPrefixPath\var\lib\rancher"
-        "$hostPrefixPath\var\lib\kubelet"
-        "$hostPrefixPath\var\lib\kubelet\volumeplugins"
-        "$hostPrefixPath\run"
+        "$($hostPrefixPath)opt"
+        "$($hostPrefixPath)opt\bin"
+        "$($hostPrefixPath)opt\cni"
+        "$($hostPrefixPath)opt\cni\bin"
+        "$($hostPrefixPath)etc"
+        "$($hostPrefixPath)etc\rancher"
+        "$($hostPrefixPath)etc\rancher\wins"
+        "$($hostPrefixPath)etc\kubernetes"
+        "$($hostPrefixPath)etc\kubernetes\bin"
+        "$($hostPrefixPath)etc\cni"
+        "$($hostPrefixPath)etc\cni\net.d"
+        "$($hostPrefixPath)etc\nginx"
+        "$($hostPrefixPath)etc\nginx\logs"
+        "$($hostPrefixPath)etc\nginx\temp"
+        "$($hostPrefixPath)etc\nginx\conf"
+        "$($hostPrefixPath)etc\kube-flannel"
+        "$($hostPrefixPath)var"
+        "$($hostPrefixPath)var\run"
+        "$($hostPrefixPath)var\log"
+        "$($hostPrefixPath)var\log\pods"
+        "$($hostPrefixPath)var\log\containers"
+        "$($hostPrefixPath)var\lib"
+        "$($hostPrefixPath)var\lib\cni"
+        "$($hostPrefixPath)var\lib\rancher"
+        "$($hostPrefixPath)var\lib\kubelet"
+        "$($hostPrefixPath)var\lib\kubelet\volumeplugins"
+        "$($hostPrefixPath)run"
         "c:\host\ProgramData\docker\certs.d"
     ) | Out-Null
 } catch { }
@@ -80,7 +85,7 @@ try
 # wins needs to run as a server on the host to accept the request from container
 try
 {
-    Copy-Item -Force -Destination "$hostPrefixPath\etc\rancher" -Path @(
+    Copy-Item -Force -Destination "$($hostPrefixPath)etc\rancher" -Path @(
         "c:\etc\rancher\utils.psm1"
         "c:\etc\rancher\cleanup.ps1"
         "c:\Windows\wins.exe"
@@ -214,7 +219,7 @@ if ($env:WITHOUT_VERIFICATION -eq "true") {
     $verification = ""
 }
 
-Out-File -Encoding ascii -FilePath "$hostPrefixPath\etc\rancher\bootstrap.ps1" -InputObject @"
+Out-File -Encoding ascii -FilePath "$($hostPrefixPath)etc\rancher\bootstrap.ps1" -InputObject @"
 `$ErrorActionPreference = 'Stop'
 `$WarningPreference = 'SilentlyContinue'
 `$VerbosePreference = 'SilentlyContinue'
@@ -243,7 +248,7 @@ if (-not `$getGcePodNameCommand)
 Unblock-File -Path DLLPATH -ErrorAction Ignore
 Import-Module -Name DLLPATH -ErrorAction Ignore
 '@
-    Add-Content -Path `$profilePath -Value `$appendProfile.replace('DLLPATH', "$CATTLE_PREFIX_PATH\run\GetGcePdName.dll") -ErrorAction Ignore
+    Add-Content -Path `$profilePath -Value `$appendProfile.replace('DLLPATH', "$($CATTLE_PREFIX_PATH)run\GetGcePdName.dll") -ErrorAction Ignore
 }
 
 # clean up the stale HNS network if required
@@ -273,18 +278,18 @@ catch
 @{
     whiteList = @{
         processPaths = @(
-            "$CATTLE_PREFIX_PATH\etc\wmi-exporter\wmi-exporter.exe"
-            "$CATTLE_PREFIX_PATH\etc\kubernetes\bin\kube-proxy.exe"
-            "$CATTLE_PREFIX_PATH\etc\kubernetes\bin\kubelet.exe"
-            "$CATTLE_PREFIX_PATH\etc\nginx\nginx.exe"
-            "$CATTLE_PREFIX_PATH\opt\bin\flanneld.exe"
+            "$($CATTLE_PREFIX_PATH)etc\wmi-exporter\wmi-exporter.exe"
+            "$($CATTLE_PREFIX_PATH)etc\kubernetes\bin\kube-proxy.exe"
+            "$($CATTLE_PREFIX_PATH)etc\kubernetes\bin\kubelet.exe"
+            "$($CATTLE_PREFIX_PATH)etc\nginx\nginx.exe"
+            "$($CATTLE_PREFIX_PATH)opt\bin\flanneld.exe"
         )
     }
-} | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "$CATTLE_PREFIX_PATH\etc\rancher\wins\config"
+} | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "$($CATTLE_PREFIX_PATH)etc\rancher\wins\config"
 
 # register wins
 Start-Process -NoNewWindow -Wait ``
-    -FilePath "$CATTLE_PREFIX_PATH\etc\rancher\wins.exe" ``
+    -FilePath "$($CATTLE_PREFIX_PATH)etc\rancher\wins.exe" ``
     -ArgumentList "srv app run --register"
 
 # start wins
@@ -293,9 +298,9 @@ Start-Service -Name "rancher-wins" -ErrorAction Ignore
 # run agent
 Start-Process -NoNewWindow -Wait ``
     -FilePath "docker.exe" ``
-    -ArgumentList "run -d --restart=unless-stopped -e CATTLE_PREFIX_PATH=$CATTLE_PREFIX_PATH -v \\.\pipe\docker_engine:\\.\pipe\docker_engine -v c:\ProgramData\docker\certs.d:c:\etc\docker\certs.d -v $CATTLE_PREFIX_PATH\etc\kubernetes:c:\etc\kubernetes -v \\.\pipe\rancher_wins:\\.\pipe\rancher_wins -v $CATTLE_PREFIX_PATH\etc\rancher\wins:c:\etc\rancher\wins $($env:AGENT_IMAGE) execute $($args -join " ")"
+    -ArgumentList "run -d --restart=unless-stopped -e CATTLE_PREFIX_PATH=$CATTLE_PREFIX_PATH -v \\.\pipe\docker_engine:\\.\pipe\docker_engine -v c:\ProgramData\docker\certs.d:c:\etc\docker\certs.d -v $($CATTLE_PREFIX_PATH)etc\kubernetes:c:\etc\kubernetes -v \\.\pipe\rancher_wins:\\.\pipe\rancher_wins -v $($CATTLE_PREFIX_PATH)etc\rancher\wins:c:\etc\rancher\wins $($env:AGENT_IMAGE) execute $($args -join " ")"
 "@
 
 
-Write-Output -InputObject "$CATTLE_PREFIX_PATH\etc\rancher\bootstrap.ps1"
+Write-Output -InputObject "$($CATTLE_PREFIX_PATH)etc\rancher\bootstrap.ps1"
 
