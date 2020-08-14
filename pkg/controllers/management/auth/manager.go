@@ -333,24 +333,31 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 		return err
 	}
 
-	for _, rb := range roleBindings {
-		objMeta, err := meta.Accessor(rb)
+	for _, elt := range roleBindings {
+		obj, ok := elt.(runtime.Object)
+		if !ok {
+			continue
+		}
+
+		// copy so we don't modify object in cache
+		objCopy := obj.DeepCopyObject()
+
+		objMeta, err := meta.Accessor(objCopy)
 		if err != nil {
 			return err
 		}
 
-		roleName := convert(rb)
+		roleName := convert(objCopy)
 		if roleName == roleToKeep {
 			continue
 		}
 
 		var otherOwners bool
-
 		for k, v := range objMeta.GetLabels() {
 			if k == rtbUID && v == membershipBindingOwner {
 				delete(objMeta.GetLabels(), k)
 			} else if v == membershipBindingOwner {
-				// Another crtb is also linked to this roleBinding so don't delete
+				// Another rtb is also linked to this roleBinding so don't delete
 				otherOwners = true
 			}
 		}
@@ -365,10 +372,8 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 			}
 		} else {
 			logrus.Infof("[%v] Updating owner label for roleBinding %v", m.controller, objMeta.GetName())
-			if rb, ok := rb.(runtime.Object); ok {
-				if _, err := client.Update(objMeta.GetName(), rb); err != nil {
-					return err
-				}
+			if _, err := client.Update(objMeta.GetName(), objCopy); err != nil {
+				return err
 			}
 		}
 	}
