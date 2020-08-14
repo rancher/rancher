@@ -22,9 +22,11 @@ import (
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/robfig/cron"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Validator struct {
+	ClusterClient                 v3.ClusterInterface
 	ClusterLister                 v3.ClusterLister
 	ClusterTemplateLister         v3.ClusterTemplateLister
 	ClusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
@@ -335,6 +337,7 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		return nil
 	}
 
+	// check user's access to cloud credential
 	amazonCredential, _ := eksConfig["amazonCredentialSecret"].(string)
 
 	var accessCred mgmtclient.CloudCredential
@@ -347,14 +350,14 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("error accessing cloud credential"))
 	}
 
-	if request.Method == http.MethodPost && eksConfig["imported"] == true {
-		// cluster is imported and has not copied spec from upstream yet, validation below does not apply
-		return nil
-	}
+	createFromImport := request.Method == http.MethodPost && eksConfig["imported"] == true
 
+	// validate nodegroups
 	nodegroups, _ := eksConfig["nodeGroups"].([]interface{})
 	if len(nodegroups) == 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node group"))
+		if !createFromImport {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node group"))
+		}
 	}
 
 	for _, ng := range nodegroups {
@@ -374,6 +377,7 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		}
 	}
 
+	// validate cluster has public access, private access, or both enabled
 	publicAccess, ok := eksConfig["publicAccess"].(bool)
 	if !ok {
 		publicAccess = prevCluster != nil && prevCluster.Spec.EKSConfig.PublicAccess
@@ -384,8 +388,10 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	}
 
 	if !publicAccess && !privateAccess {
-		return httperror.NewAPIError(httperror.InvalidBodyContent,
-			"public access, private access, or both must be enabled")
+		if !createFromImport {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				"public access, private access, or both must be enabled")
+		}
 	}
 
 	if request.Method != http.MethodPost {
@@ -394,6 +400,30 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 
 	// validation for creates only
 
+	// validate cluster does not reference an EKS cluster that is already backed by a Rancher cluster
+	name, _ := eksConfig["displayName"]
+	region, _ := eksConfig["region"]
+
+	// cluster client is being used instead of lister to avoid the use of an outdated cache
+	clusters, err := v.ClusterClient.List(metav1.ListOptions{})
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm displayName is unique among Rancher EKS clusters for region %s", region))
+	}
+
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.EKSConfig == nil {
+			continue
+		}
+		if name != cluster.Spec.EKSConfig.DisplayName {
+			continue
+		}
+		if region != cluster.Spec.EKSConfig.Region {
+			continue
+		}
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
+	}
+
+	// validate either all networking fields are provided or no networking fields are provided
 	securityGroups, _ := eksConfig["securityGroups"].([]interface{})
 	subnets, _ := eksConfig["subnets"].([]interface{})
 
@@ -401,8 +431,10 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	noNetworkingFieldsProvided := len(subnets) == 0 && len(securityGroups) == 0
 
 	if !(allNetworkingFieldsProvided || noNetworkingFieldsProvided) {
-		return httperror.NewAPIError(httperror.InvalidBodyContent,
-			"must provide both networking fields (subnets, securityGroups) or neither")
+		if !createFromImport {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				"must provide both networking fields (subnets, securityGroups) or neither")
+		}
 	}
 
 	return nil
