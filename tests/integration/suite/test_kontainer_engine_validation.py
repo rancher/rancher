@@ -44,7 +44,7 @@ def test_min_nodes_cannot_be_greater_than_max(admin_mc, remove_resource):
         "accessKey": "not a real access key",
         "secretKey": "not a real secret key",
         "region": "us-west-2",
-        "kubernetesVersion": "1.13",
+        "kubernetesVersion": "1.17",
         "minimumNodes": 3,
         "maximumNodes": 2
     }
@@ -59,7 +59,7 @@ def test_min_nodes_cannot_be_zero(admin_mc, remove_resource):
         "accessKey": "not a real access key",
         "secretKey": "not a real secret key",
         "region": "us-west-2",
-        "kubernetesVersion": "1.13",
+        "kubernetesVersion": "1.17",
         "minimumNodes": 0,
         "maximumNodes": 0
     }
@@ -73,7 +73,7 @@ def test_node_volume_size_cannot_be_zero(admin_mc, remove_resource):
         "accessKey": "not a real access key",
         "secretKey": "not a real secret key",
         "region": "us-west-2",
-        "kubernetesVersion": "1.13",
+        "kubernetesVersion": "1.17",
         "minimumNodes": 1,
         "maximumNodes": 3,
         "nodeVolumeSize": 0
@@ -88,7 +88,7 @@ def test_private_cluster_requires_vpc_subnets(admin_mc, remove_resource):
         "accessKey": "not a real access key",
         "secretKey": "not a real secret key",
         "region": "us-west-2",
-        "kubernetesVersion": "1.13",
+        "kubernetesVersion": "1.17",
         "minimumNodes": 1,
         "maximumNodes": 3,
         "associateWorkerNodePublicIp": False

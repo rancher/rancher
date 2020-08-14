@@ -5,7 +5,12 @@ EKS_ACCESS_KEY = os.environ.get('RANCHER_EKS_ACCESS_KEY', "")
 EKS_SECRET_KEY = os.environ.get('RANCHER_EKS_SECRET_KEY', "")
 EKS_AMI = os.environ.get('RANCHER_EKS_AMI', "")
 EKS_REGION = os.environ.get('RANCHER_EKS_REGION', "us-west-2")
-EKS_K8S_VERSION = os.environ.get('RANCHER_EKS_K8S_VERSION', "1.12")
+EKS_K8S_VERSION = os.environ.get('RANCHER_EKS_K8S_VERSION', "1.17")
+
+# Hardcoded to follow UI-style:
+# https://github.com/rancher/ui/blob/master/lib/shared/addon/components/cluster-driver/driver-amazoneks/component.js
+EKS_K8S_VERSIONS = os.environ.get('RANCHER_EKS_K8S_VERSIONS',
+                                  "1.17,1.16,1.15").split(",")
 
 ekscredential = pytest.mark.skipif(not (EKS_ACCESS_KEY and EKS_SECRET_KEY),
                                    reason='EKS Credentials not provided, '
