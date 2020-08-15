@@ -1128,7 +1128,8 @@ def create_custom_host_from_nodes(nodes, node_roles,
         i += 1
 
     cluster = validate_cluster_state(client, cluster,
-                                     check_intermediate_state=False)
+                                     check_intermediate_state=False,
+                                     expected_node_count=len(node_roles))
 
     return cluster, nodes
 
