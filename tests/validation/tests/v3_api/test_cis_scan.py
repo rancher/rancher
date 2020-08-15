@@ -32,7 +32,7 @@ scan_results = {
         "not_applicable": 19, "total": 97, "fail": 0
     },
     "rke-cis-1.5": {
-        "permissive": {"pass": 60, "fail": 0, "skip": 12},
+        "permissive": {"pass": 58, "fail": 0, "skip": 14},
         "hardened": {"pass": 72, "fail": 0, "skip": 0},
         "not_applicable": 20, "total": 92, "fail": 0
     }
