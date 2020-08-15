@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 	"sync"
@@ -14,6 +15,8 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/httpstream"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/client-go/rest"
 )
@@ -228,12 +231,44 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		er.Error(rw, req, err)
 		return
 	}
+
+	if httpstream.IsUpgradeRequest(req) {
+		upgradeProxy := NewUpgradeProxy(&u, transport)
+		upgradeProxy.ServeHTTP(rw, req)
+		return
+	}
+
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, transport, true, false, er)
 	httpProxy.ServeHTTP(rw, req)
 }
 
 func (r *RemoteService) Cluster() *v3.Cluster {
 	return r.cluster
+}
+
+type UpgradeProxy struct {
+	Location  *url.URL
+	Transport http.RoundTripper
+}
+
+func NewUpgradeProxy(location *url.URL, transport http.RoundTripper) *UpgradeProxy {
+	return &UpgradeProxy{
+		Location:  location,
+		Transport: transport,
+	}
+}
+
+func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	loc := *p.Location
+	loc.RawQuery = req.URL.RawQuery
+
+	newReq := req.WithContext(req.Context())
+	newReq.Header = utilnet.CloneHeader(req.Header)
+	newReq.URL = &loc
+
+	httpProxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: p.Location.Scheme, Host: p.Location.Host})
+	httpProxy.Transport = p.Transport
+	httpProxy.ServeHTTP(rw, newReq)
 }
 
 type SimpleProxy struct {
