@@ -167,6 +167,7 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 			return nil, err
 		}
 		transport.Dial = d
+		transport.Proxy = http.ProxyFromEnvironment
 	}
 
 	r.caCert = newCluster.Status.CACert
