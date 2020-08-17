@@ -250,9 +250,12 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
     api_instance = kubernetes.client.RbacAuthorizationV1Api(
         admin_mc.k8s_client)
 
+    split = str.split(prtb.id, ":")
+    prtb_key = split[0]+"_"+split[1]
+
     # Find the expected k8s clusterRoleBinding
     crbs = api_instance.list_cluster_role_binding(
-        label_selector=prtb.uuid + "=" + mbo)
+        label_selector=prtb_key + "=" + mbo)
 
     assert len(crbs.items) == 1
 
@@ -262,7 +265,7 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
 
     def crb_callback():
         crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb.uuid + "=" + mbo)
+            label_selector=prtb_key + "=" + mbo)
         return len(crbs.items) == 0
 
     def fail_handler():
