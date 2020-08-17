@@ -1,0 +1,10 @@
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterOutput
+metadata:
+  name: es-output-sample
+  namespace: cattle-logging-system
+spec:
+  elasticsearch:
+    host: myhostname
+    port: 9200
+    scheme: http
