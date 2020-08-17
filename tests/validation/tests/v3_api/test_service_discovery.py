@@ -66,7 +66,8 @@ SKIP_PING_CHECK_TEST = \
     ast.literal_eval(os.environ.get('RANCHER_SKIP_PING_CHECK_TEST', "False"))
 if_skip_ping_check_test = pytest.mark.skipif(
     SKIP_PING_CHECK_TEST,
-    reason='This test is only for testing upgrading Rancher')
+    reason='For skipping tests in clusters that ' \
+           'are deployed with security groups that will not allow ping')
 
 
 def create_and_validate_wl(name, con, scale, type, p_client=None, ns=None):
