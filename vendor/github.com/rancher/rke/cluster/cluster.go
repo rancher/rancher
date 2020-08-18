@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -1118,9 +1119,9 @@ func (c *Cluster) GetHostInfoMap() map[string]types.Info {
 func (c *Cluster) getPrefixPath(os string) string {
 	switch {
 	case os == "windows" && c.WindowsPrefixPath != "":
-		return c.WindowsPrefixPath
+		return filepath.Clean(c.WindowsPrefixPath)
 	default:
-		return c.PrefixPath
+		return filepath.Clean(c.PrefixPath)
 	}
 }
 

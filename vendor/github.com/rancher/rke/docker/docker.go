@@ -135,6 +135,23 @@ func DoRunOnetimeContainer(ctx context.Context, dClient *client.Client, imageCfg
 	return err
 }
 
+func DoCopyToContainer(ctx context.Context, dClient *client.Client, plane, containerName, hostname, destinationDir string, tarFile io.Reader) error {
+	if dClient == nil {
+		return fmt.Errorf("[%s] Failed to run container: docker client is nil for container [%s] on host [%s]", plane, containerName, hostname)
+	}
+	// Need container.ID for CopyToContainer function
+	container, err := InspectContainer(ctx, dClient, hostname, containerName)
+	if err != nil {
+		return fmt.Errorf("Could not inspect container [%s] on host [%s]: %s", containerName, hostname, err)
+	}
+
+	err = dClient.CopyToContainer(ctx, container.ID, destinationDir, tarFile, types.CopyToContainerOptions{})
+	if err != nil {
+		return fmt.Errorf("Error while copying file to container [%s] on host [%s]: %v", containerName, hostname, err)
+	}
+	return nil
+}
+
 func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName, hostname, plane string, prsMap map[string]v3.PrivateRegistry) error {
 	if dClient == nil {
 		return fmt.Errorf("[%s] Failed rolling update of container: docker client is nil for container [%s] on host [%s]", plane, containerName, hostname)

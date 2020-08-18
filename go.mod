@@ -9,6 +9,7 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190830141801-acfa387b8d69
 
 	k8s.io/api => k8s.io/api v0.18.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.0
@@ -43,7 +44,6 @@ require (
 	github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1 // indirect
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/containerd/containerd v1.3.0 // indirect
 	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/coreos/go-semver v0.3.0
 	github.com/coreos/prometheus-operator v0.36.0
@@ -83,7 +83,7 @@ require (
 	github.com/rancher/norman v0.0.0-20200806175025-f974dbfb2734
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83
-	github.com/rancher/rke v1.1.5-rc5
+	github.com/rancher/rke v1.1.5-rc5.0.20200818182503-20424dd0fcd1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200522224200-dc9f969673f8
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd

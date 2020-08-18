@@ -112,7 +112,6 @@ func SnapshotSaveEtcdHosts(
 	log.Infof(ctx, "Starting saving snapshot on etcd hosts")
 
 	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
-	rkeFullState, _ := cluster.ReadStateFile(ctx, stateFilePath)
 
 	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, "")
 	if err != nil {
@@ -126,7 +125,7 @@ func SnapshotSaveEtcdHosts(
 		return err
 	}
 
-	if err := kubeCluster.DeployStateFile(ctx, rkeFullState, snapshotName); err != nil {
+	if err := kubeCluster.DeployStateFile(ctx, stateFilePath, snapshotName); err != nil {
 		return err
 	}
 
