@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -63,18 +62,14 @@ func (c *Cluster) DeployRestoreCerts(ctx context.Context, clusterCerts map[strin
 	return nil
 }
 
-func (c *Cluster) DeployStateFile(ctx context.Context, fullState *FullState, snapshotName string) error {
+func (c *Cluster) DeployStateFile(ctx context.Context, stateFilePath, snapshotName string) error {
 	var errgrp errgroup.Group
 	hostsQueue := util.GetObjectQueue(c.EtcdHosts)
-	stateFile, err := json.MarshalIndent(fullState, "", "  ")
-	if err != nil {
-		return err
-	}
 	for w := 0; w < WorkerThreads; w++ {
 		errgrp.Go(func() error {
 			var errList []error
 			for host := range hostsQueue {
-				err := pki.DeployStateOnPlaneHost(ctx, host.(*hosts.Host), c.SystemImages.CertDownloader, c.PrivateRegistriesMap, string(stateFile), snapshotName)
+				err := pki.DeployStateOnPlaneHost(ctx, host.(*hosts.Host), c.SystemImages.CertDownloader, c.PrivateRegistriesMap, stateFilePath, snapshotName)
 				if err != nil {
 					errList = append(errList, err)
 				}
