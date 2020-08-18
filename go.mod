@@ -9,6 +9,7 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190830141801-acfa387b8d69
 
 	k8s.io/api => k8s.io/api v0.18.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.0
