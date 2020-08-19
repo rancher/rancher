@@ -161,3 +161,22 @@ func PrintProxyEnvVars() {
 		}
 	}
 }
+
+func CleanWindowsPath(s string) string {
+	// clean backslashes added from encoding
+	var new []string
+
+	// squash multi backslashes
+	sp := strings.Split(s, "\\")
+	for _, v := range sp {
+		if v != "" {
+			new = append(new, v)
+		}
+	}
+
+	// drive letter only, add a trailing slash
+	if len(new) == 1 {
+		new = append(new, "")
+	}
+	return strings.Join(new, "\\")
+}
