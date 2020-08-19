@@ -40,6 +40,13 @@ const (
 	roleTemplatesRequired        = "authz.management.cattle.io/creator-role-bindings"
 )
 
+var backoff = wait.Backoff{
+	Duration: 100 * time.Millisecond,
+	Factor:   1,
+	Jitter:   0,
+	Steps:    7,
+}
+
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	userInformer := scaledContext.Management.Users("").Controller().Informer()
 	userIndexers := map[string]cache.IndexFunc{
@@ -281,21 +288,29 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 
 	logrus.Infof("Creating token for user %v", userName)
 	createdToken, err := m.tokens.Create(token)
-	if err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return nil, err
-		}
-		if !useExisting {
-			return nil, err
-		}
-		token, err = m.tokens.Get(tokenName, v1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		token = createdToken
+	if err == nil {
+		return createdToken, nil
 	}
-
+	if !apierrors.IsAlreadyExists(err) {
+		return nil, err
+	}
+	if useExisting {
+		return m.tokens.Get(tokenName, v1.GetOptions{})
+	}
+	// retry if can't use existing token
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		token, err = m.tokens.Create(token)
+		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
 	return token, nil
 }
 
@@ -343,13 +358,6 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 	if err != nil {
 		if !apierrors.IsConflict(err) {
 			return nil, fmt.Errorf("getToken: updating token [%s] failed [%v]", tokenName, err)
-		}
-
-		backoff := wait.Backoff{
-			Duration: 100 * time.Millisecond,
-			Factor:   1,
-			Jitter:   0,
-			Steps:    7,
 		}
 
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
