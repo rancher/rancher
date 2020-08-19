@@ -10,6 +10,8 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
 
+	github.com/rancher/eks-operator => github.com/rmweir/eks-operator v0.0.0-20200819225814-d4f52dd5c540
+
 	k8s.io/api => k8s.io/api v0.18.8
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.8
 	k8s.io/apimachinery => k8s.io/apimachinery v0.18.8
@@ -77,7 +79,7 @@ require (
 	github.com/prometheus/common v0.9.1
 	github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48
 	github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9
-	github.com/rancher/eks-operator v0.1.0-rc22
+	github.com/rancher/eks-operator v0.1.0-rc9
 	github.com/rancher/kubernetes-provider-detector v0.0.0-20200807181951-690274ab1fb3
 	github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0
 	github.com/rancher/machine v0.15.0-rancher25
