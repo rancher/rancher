@@ -187,6 +187,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	r.Wrangler.OnLeader(r.authServer.OnLeader)
 	r.auditLog.Start(ctx)
+
 	return r.Wrangler.Start(ctx)
 }
 

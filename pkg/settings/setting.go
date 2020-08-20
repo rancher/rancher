@@ -91,6 +91,7 @@ var (
 	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.2")
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
+	EKSUpstreamRefreshCron            = NewSetting("eks-refresh-cron", "*/5 * * * *")
 )
 
 func FullShellImage() string {
