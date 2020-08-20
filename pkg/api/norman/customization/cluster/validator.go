@@ -68,7 +68,7 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
-	if err := v.validateEKSConfig(request, &clusterSpec); err != nil {
+	if err := v.validateEKSConfig(request, data); err != nil {
 		return err
 	}
 
@@ -329,13 +329,16 @@ func (v *Validator) validateGenericEngineConfig(request *types.APIContext, spec 
 
 }
 
-func (v *Validator) validateEKSConfig(request *types.APIContext, spec *v32.ClusterSpec) error {
-	if spec.EKSConfig == nil {
+func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[string]interface{}) error {
+	eksConfig, ok := cluster["eksConfig"].(map[string]interface{})
+	if !ok {
 		return nil
 	}
 
+	amazonCredential, _ := eksConfig["amazonCredentialSecret"].(string)
+
 	var accessCred mgmtclient.CloudCredential
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, spec.EKSConfig.AmazonCredentialSecret, &accessCred); err != nil {
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, amazonCredential, &accessCred); err != nil {
 		if apiError, ok := err.(*httperror.APIError); ok {
 			if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
 				return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("cloud credential not found"))
@@ -344,25 +347,60 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, spec *v32.Clust
 		return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("error accessing cloud credential"))
 	}
 
-	isNewImported := request.Method == http.MethodPost && spec.EKSConfig.Imported
-	if !isNewImported && len(spec.EKSConfig.NodeGroups) == 0 {
+	if request.Method == http.MethodPost && eksConfig["imported"] == true {
+		// cluster is imported and has not copied spec from upstream yet, validation below does not apply
+		return nil
+	}
+
+	nodegroups, _ := eksConfig["nodeGroups"].([]interface{})
+	if len(nodegroups) == 0 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node group"))
 	}
 
-	for _, ng := range spec.EKSConfig.NodeGroups {
-		if ng.NodegroupName == "" {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("nodegroupName cannot be an empty string"))
+	for _, ng := range nodegroups {
+		ngMap, _ := ng.(map[string]interface{})
+		if name, _ := ngMap["nodegroupName"].(string); name == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("nodegroupName cannot be an empty"))
 		}
+	}
+
+	var prevCluster *v3.Cluster
+	var err error
+
+	if request.Method == http.MethodPut {
+		prevCluster, err = v.ClusterLister.Get("", request.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	publicAccess, ok := eksConfig["publicAccess"].(bool)
+	if !ok {
+		publicAccess = prevCluster != nil && prevCluster.Spec.EKSConfig.PublicAccess
+	}
+	privateAccess, ok := eksConfig["privateAccess"].(bool)
+	if !ok {
+		privateAccess = prevCluster != nil && prevCluster.Spec.EKSConfig.PrivateAccess
+	}
+
+	if !publicAccess && !privateAccess {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			"public access, private access, or both must be enabled")
 	}
 
 	if request.Method != http.MethodPost {
 		return nil
 	}
 
-	allNetworkingFields := len(spec.EKSConfig.Subnets) == 0 && len(spec.EKSConfig.SecurityGroups) == 0
-	noNetworkingFields := len(spec.EKSConfig.Subnets) != 0 && len(spec.EKSConfig.SecurityGroups) != 0
+	// validation for creates only
 
-	if !(allNetworkingFields || noNetworkingFields) {
+	securityGroups, _ := eksConfig["securityGroups"].([]interface{})
+	subnets, _ := eksConfig["subnets"].([]interface{})
+
+	allNetworkingFieldsProvided := len(subnets) != 0 && len(securityGroups) != 0
+	noNetworkingFieldsProvided := len(subnets) == 0 && len(securityGroups) == 0
+
+	if !(allNetworkingFieldsProvided || noNetworkingFieldsProvided) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			"must provide both networking fields (subnets, securityGroups) or neither")
 	}
