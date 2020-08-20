@@ -55,6 +55,12 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 	return result
 }
 
+// IsTimeout returns true if the given error is a network timeout error
+func IsTimeout(err error) bool {
+	neterr, ok := err.(net.Error)
+	return ok && neterr != nil && neterr.Timeout()
+}
+
 // IsProbableEOF returns true if the given error resembles a connection termination
 // scenario that would justify assuming that the watch is empty.
 // These errors are what the Go http stack returns back to us which are general
@@ -440,7 +446,7 @@ redirectLoop:
 
 		// Only follow redirects to the same host. Otherwise, propagate the redirect response back.
 		if requireSameHostRedirects && location.Hostname() != originalLocation.Hostname() {
-			break redirectLoop
+			return nil, nil, fmt.Errorf("hostname mismatch: expected %s, found %s", originalLocation.Hostname(), location.Hostname())
 		}
 
 		// Reset the connection.
