@@ -167,14 +167,10 @@ type AuthConfig struct {
 	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type LocalConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline" mapstructure:",squash"`
+	AuthConfig `json:",inline" mapstructure:",squash"`
 }
 
 // +genclient
@@ -182,9 +178,7 @@ type LocalConfig struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type GithubConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline" mapstructure:",squash"`
+	AuthConfig `json:",inline" mapstructure:",squash"`
 
 	Hostname     string `json:"hostname,omitempty" norman:"default=github.com" norman:"required"`
 	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true" norman:"required"`
@@ -206,14 +200,10 @@ type GithubConfigApplyInput struct {
 	Enabled      bool         `json:"enabled,omitempty"`
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type GoogleOauthConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline" mapstructure:",squash"`
+	AuthConfig `json:",inline" mapstructure:",squash"`
 
 	OauthCredential              string `json:"oauthCredential,omitempty" norman:"required,type=password,notnullable"`
 	ServiceAccountCredential     string `json:"serviceAccountCredential,omitempty" norman:"required,type=password,notnullable"`
@@ -233,14 +223,10 @@ type GoogleOauthConfigApplyInput struct {
 	Enabled           bool              `json:"enabled,omitempty"`
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type AzureADConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline" mapstructure:",squash"`
+	AuthConfig `json:",inline" mapstructure:",squash"`
 
 	Endpoint          string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
 	GraphEndpoint     string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
@@ -261,14 +247,10 @@ type AzureADConfigApplyInput struct {
 	Code   string        `json:"code,omitempty"`
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ActiveDirectoryConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline" mapstructure:",squash"`
+	AuthConfig `json:",inline" mapstructure:",squash"`
 
 	Servers                      []string `json:"servers,omitempty"                     norman:"type=array[string],required"`
 	Port                         int64    `json:"port,omitempty"                        norman:"default=389"`
@@ -332,15 +314,11 @@ type LdapFields struct {
 	NestedGroupMembershipEnabled    bool     `json:"nestedGroupMembershipEnabled"              norman:"default=false"`
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type LdapConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline" mapstructure:",squash"`
-	LdapFields        `json:",inline" mapstructure:",squash"`
+	AuthConfig `json:",inline" mapstructure:",squash"`
+	LdapFields `json:",inline" mapstructure:",squash"`
 }
 
 type LdapTestAndApplyInput struct {
@@ -365,14 +343,10 @@ type FreeIpaTestAndApplyInput struct {
 	LdapTestAndApplyInput `json:",inline" mapstructure:",squash"`
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type SamlConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	AuthConfig        `json:",inline" mapstructure:",squash"`
+	AuthConfig `json:",inline" mapstructure:",squash"`
 
 	IDPMetadataContent string `json:"idpMetadataContent" norman:"required"`
 	SpCert             string `json:"spCert"             norman:"required"`
