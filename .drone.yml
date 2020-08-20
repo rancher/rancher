@@ -59,6 +59,7 @@ steps:
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
@@ -143,6 +144,7 @@ steps:
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
+    - "RANCHER_TAG=${DRONE_TAG}-linux-amd64"
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
@@ -300,6 +302,7 @@ steps:
     build_args:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
@@ -342,6 +345,7 @@ steps:
     build_args:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"
+    - "RANCHER_TAG=${DRONE_TAG}-linux-arm64"
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent

@@ -1,3 +1,7 @@
+ARG RANCHER_TAG=dev
+ARG RANCHER_REPO=rancher
+FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} as rancher
+
 FROM ubuntu:18.04
 ARG ARCH=amd64
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
@@ -7,7 +11,7 @@ ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
 RUN rm -f /bin/sh && ln -s /bin/bash /bin/sh
 ENV KUBECTL_VERSION v1.17.6
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates jq iproute2 vim-tiny less bash-completion unzip sysstat acl && \
+    apt-get install -y --no-install-recommends git curl ca-certificates jq iproute2 vim-tiny less bash-completion unzip sysstat acl && \
     curl -sLf ${!DOCKER_URL} > /usr/bin/docker && \
     chmod +x /usr/bin/docker && \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
@@ -26,5 +30,7 @@ LABEL io.cattle.agent true
 ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
+COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY agent run.sh kubectl-shell.sh shell-setup.sh share-root.sh /usr/bin/
+WORKDIR /var/lib/rancher
 ENTRYPOINT ["run.sh"]
