@@ -28,11 +28,9 @@ import (
 )
 
 var (
-	ActiveDirectoryConfigResourceName                   = "activedirectoryconfigs"
 	ActiveDirectoryProviderResourceName                 = "activedirectoryproviders"
 	AuthConfigResourceName                              = "authconfigs"
 	AuthProviderResourceName                            = "authproviders"
-	AzureADConfigResourceName                           = "azureadconfigs"
 	AzureADProviderResourceName                         = "azureadproviders"
 	CatalogResourceName                                 = "catalogs"
 	CatalogTemplateResourceName                         = "catalogtemplates"
@@ -57,19 +55,15 @@ var (
 	EtcdBackupResourceName                              = "etcdbackups"
 	FeatureResourceName                                 = "features"
 	FreeIpaProviderResourceName                         = "freeipaproviders"
-	GithubConfigResourceName                            = "githubconfigs"
 	GithubProviderResourceName                          = "githubproviders"
 	GlobalDNSProviderResourceName                       = "globaldnsproviders"
 	GlobalDnsResourceName                               = "globaldnses"
 	GlobalRoleResourceName                              = "globalroles"
 	GlobalRoleBindingResourceName                       = "globalrolebindings"
 	GoogleOAuthProviderResourceName                     = "googleoauthproviders"
-	GoogleOauthConfigResourceName                       = "googleoauthconfigs"
 	GroupResourceName                                   = "groups"
 	GroupMemberResourceName                             = "groupmembers"
 	KontainerDriverResourceName                         = "kontainerdrivers"
-	LdapConfigResourceName                              = "ldapconfigs"
-	LocalConfigResourceName                             = "localconfigs"
 	LocalProviderResourceName                           = "localproviders"
 	MonitorMetricResourceName                           = "monitormetrics"
 	MultiClusterAppResourceName                         = "multiclusterapps"
@@ -97,7 +91,6 @@ var (
 	RkeK8sServiceOptionResourceName                     = "rkek8sserviceoptions"
 	RkeK8sSystemImageResourceName                       = "rkek8ssystemimages"
 	RoleTemplateResourceName                            = "roletemplates"
-	SamlConfigResourceName                              = "samlconfigs"
 	SamlProviderResourceName                            = "samlproviders"
 	SettingResourceName                                 = "settings"
 	TemplateResourceName                                = "templates"
@@ -129,16 +122,12 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&ActiveDirectoryConfig{},
-		&ActiveDirectoryConfigList{},
 		&ActiveDirectoryProvider{},
 		&ActiveDirectoryProviderList{},
 		&AuthConfig{},
 		&AuthConfigList{},
 		&AuthProvider{},
 		&AuthProviderList{},
-		&AzureADConfig{},
-		&AzureADConfigList{},
 		&AzureADProvider{},
 		&AzureADProviderList{},
 		&Catalog{},
@@ -187,8 +176,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&FeatureList{},
 		&FreeIpaProvider{},
 		&FreeIpaProviderList{},
-		&GithubConfig{},
-		&GithubConfigList{},
 		&GithubProvider{},
 		&GithubProviderList{},
 		&GlobalDNSProvider{},
@@ -201,18 +188,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&GlobalRoleBindingList{},
 		&GoogleOAuthProvider{},
 		&GoogleOAuthProviderList{},
-		&GoogleOauthConfig{},
-		&GoogleOauthConfigList{},
 		&Group{},
 		&GroupList{},
 		&GroupMember{},
 		&GroupMemberList{},
 		&KontainerDriver{},
 		&KontainerDriverList{},
-		&LdapConfig{},
-		&LdapConfigList{},
-		&LocalConfig{},
-		&LocalConfigList{},
 		&LocalProvider{},
 		&LocalProviderList{},
 		&MonitorMetric{},
@@ -267,8 +248,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RkeK8sSystemImageList{},
 		&RoleTemplate{},
 		&RoleTemplateList{},
-		&SamlConfig{},
-		&SamlConfigList{},
 		&SamlProvider{},
 		&SamlProviderList{},
 		&Setting{},
