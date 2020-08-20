@@ -98,7 +98,7 @@ func (g *Git) clone(branch string) error {
 	}
 
 	if err := os.RemoveAll(g.directory); err != nil {
-		return err
+		return fmt.Errorf("failed to remove directory %s: %v", g.directory, err)
 	}
 
 	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.url, g.directory)
@@ -120,7 +120,7 @@ func (g *Git) needsUpdate(branch string) (string, bool, error) {
 
 func (g *Git) Head(branch string) (string, error) {
 	if err := g.clone(branch); err != nil {
-		return "", nil
+		return "", err
 	}
 
 	if err := g.reset("HEAD"); err != nil {
