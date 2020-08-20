@@ -35,7 +35,7 @@ const (
 	rancherCACertsFile = "/etc/rancher/ssl/cacerts.pem"
 )
 
-func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
+func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, bindHost string, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 10 * time.Minute
 
@@ -48,6 +48,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	if err != nil {
 		return errors.Wrap(err, "failed to setup TLS listener")
 	}
+	opts.BindHost = bindHost
 
 	migrateConfig(ctx, restConfig, opts)
 

@@ -2,6 +2,8 @@ package steve
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"sync"
 	"time"
 
@@ -39,7 +41,9 @@ func Run(ctx context.Context) error {
 		for {
 			ctx, cancel := context.WithCancel(ctx)
 			r, err := rancher.New(ctx, c, &rancher.Options{
-				HTTPSListenPort: 6080,
+				BindHost:        "127.0.0.1",
+				HTTPListenPort:  6080,
+				HTTPSListenPort: 6443,
 				AddLocal:        "true",
 				Agent:           true,
 			})
@@ -49,6 +53,20 @@ func Run(ctx context.Context) error {
 				time.Sleep(10 * time.Second)
 				continue
 			}
+
+			go func() {
+				err = http.ListenAndServe(":8080", http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+					resp, err := http.Get("http://localhost:6080/healthz")
+					if err != nil {
+						http.Error(rw, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					defer resp.Body.Close()
+					rw.WriteHeader(resp.StatusCode)
+					_, _ = io.Copy(rw, resp.Body)
+				}))
+				panic("health check server failed: " + err.Error())
+			}()
 
 			if err := r.ListenAndServe(ctx); err != nil {
 				cancel()

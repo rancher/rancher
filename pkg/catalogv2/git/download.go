@@ -3,6 +3,8 @@ package git
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -61,6 +63,14 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string) error
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string) (*Git, error) {
+	u, err := url.Parse(gitURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) supported", u.Scheme)
+
+	}
 	dir := gitDir(namespace, name, gitURL)
 	return NewGit(dir, gitURL, &Options{
 		Credential: secret,

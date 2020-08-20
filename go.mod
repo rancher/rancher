@@ -10,28 +10,28 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
 
-	k8s.io/api => k8s.io/api v0.18.0
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.0
-	k8s.io/apimachinery => k8s.io/apimachinery v0.18.0
-	k8s.io/apiserver => k8s.io/apiserver v0.18.0
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.18.0
-	k8s.io/client-go => github.com/rancher/client-go v1.18.0-rancher.1
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.18.0
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.18.0
-	k8s.io/code-generator => k8s.io/code-generator v0.18.0
-	k8s.io/component-base => k8s.io/component-base v0.18.0
-	k8s.io/cri-api => k8s.io/cri-api v0.18.0
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.18.0
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.18.0
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.18.0
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.18.0
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.18.0
-	k8s.io/kubectl => k8s.io/kubectl v0.18.0
-	k8s.io/kubelet => k8s.io/kubelet v0.18.0
-	k8s.io/kubernetes => k8s.io/kubernetes v1.18.0
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.18.0
-	k8s.io/metrics => k8s.io/metrics v0.18.0
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.18.0
+	k8s.io/api => k8s.io/api v0.18.8
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.8
+	k8s.io/apimachinery => k8s.io/apimachinery v0.18.8
+	k8s.io/apiserver => k8s.io/apiserver v0.18.8
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.18.8
+	k8s.io/client-go => github.com/rancher/client-go v1.18.8-rancher.1
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.18.8
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.18.8
+	k8s.io/code-generator => k8s.io/code-generator v0.18.8
+	k8s.io/component-base => k8s.io/component-base v0.18.8
+	k8s.io/cri-api => k8s.io/cri-api v0.18.8
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.18.8
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.18.8
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.18.8
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.18.8
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.18.8
+	k8s.io/kubectl => k8s.io/kubectl v0.18.8
+	k8s.io/kubelet => k8s.io/kubelet v0.18.8
+	k8s.io/kubernetes => k8s.io/kubernetes v1.18.8
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.18.8
+	k8s.io/metrics => k8s.io/metrics v0.18.8
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.18.8
 )
 
 require (
@@ -79,16 +79,16 @@ require (
 	github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9
 	github.com/rancher/eks-operator v0.1.0-rc22
 	github.com/rancher/kubernetes-provider-detector v0.0.0-20200807181951-690274ab1fb3
-	github.com/rancher/lasso v0.0.0-20200807231317-fff0364fb3f6
+	github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200808070119-a173b50371f8
+	github.com/rancher/norman v0.0.0-20200820172041-261460ee9088
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/remotedialer v0.2.6-0.20200809004951-760d0515479e
+	github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee
 	github.com/rancher/rke v1.2.0-rc6
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200810194305-6ebfa39af82c
 	github.com/rancher/system-upgrade-controller v0.6.2
-	github.com/rancher/wrangler v0.6.2-0.20200811174245-58da209ac37b
+	github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0
@@ -115,11 +115,11 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.3.0
 	helm.sh/helm/v3 v3.2.0
-	k8s.io/api v0.18.0
+	k8s.io/api v0.18.8
 	k8s.io/apiextensions-apiserver v0.18.0
-	k8s.io/apimachinery v0.18.5
-	k8s.io/apiserver v0.18.0
-	k8s.io/cli-runtime v0.18.0
+	k8s.io/apimachinery v0.18.8
+	k8s.io/apiserver v0.18.8
+	k8s.io/cli-runtime v0.18.8
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20200710205751-c0d492a0f3ca
 	k8s.io/helm v2.16.7+incompatible

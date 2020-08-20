@@ -45,14 +45,20 @@ func InfoFromTarball(input io.Reader) (*types.ChartInfo, error) {
 		}
 
 		switch strings.ToLower(parts[1]) {
+		case "values.yml":
+			fallthrough
 		case "values.yaml":
 			if err := decodeYAML(tarball, &result.Values); err != nil {
 				return nil, err
 			}
+		case "questions.yml":
+			fallthrough
 		case "questions.yaml":
-			if err := decodeYAML(tarball, &result.Values); err != nil {
+			if err := decodeYAML(tarball, &result.Questions); err != nil {
 				return nil, err
 			}
+		case "chart.yml":
+			fallthrough
 		case "chart.yaml":
 			if err := decodeYAML(tarball, &result.Chart); err != nil {
 				return nil, err

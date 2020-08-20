@@ -228,7 +228,8 @@ func (s *Operations) getUninstallArgs(releaseNamespace, releaseName string, body
 		ArgObjects: []interface{}{
 			uninstallArgs,
 		},
-		ReleaseName: rel.Spec.Name,
+		ReleaseName:      rel.Spec.Name,
+		ReleaseNamespace: rel.Namespace,
 	}
 
 	status := catalog.OperationStatus{
@@ -256,7 +257,8 @@ func (s *Operations) getRollbackArgs(releaseNamespace, releaseName string, body 
 		ArgObjects: []interface{}{
 			rollbackArgs,
 		},
-		ReleaseName: rel.Spec.Name,
+		ReleaseName:      rel.Spec.Name,
+		ReleaseNamespace: rel.Namespace,
 	}
 	status := catalog.OperationStatus{
 		Action:    "rollback",
@@ -294,13 +296,14 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 }
 
 type Command struct {
-	Operation   string
-	ArgObjects  []interface{}
-	ValuesFile  string
-	Values      []byte
-	ChartFile   string
-	Chart       []byte
-	ReleaseName string
+	Operation        string
+	ArgObjects       []interface{}
+	ValuesFile       string
+	Values           []byte
+	ChartFile        string
+	Chart            []byte
+	ReleaseName      string
+	ReleaseNamespace string
 }
 
 type Commands []Command
@@ -399,6 +402,10 @@ func (c Command) renderArgs() ([]string, error) {
 		args = append(args, "--values="+filepath.Join(helmDataPath, c.ValuesFile))
 	}
 
+	if c.ReleaseNamespace != "" {
+		args = append(args, "--namespace", c.ReleaseNamespace)
+	}
+
 	sort.Strings(args)
 	if c.ReleaseName != "" {
 		args = append(args, c.ReleaseName)
@@ -407,7 +414,7 @@ func (c Command) renderArgs() ([]string, error) {
 		args = append(args, filepath.Join(helmDataPath, c.ChartFile))
 	}
 
-	return append([]string{c.Operation}, args...), nil
+	return append([]string{"--debug", c.Operation}, args...), nil
 }
 
 func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, values map[string]interface{}) (Command, error) {
@@ -487,9 +494,11 @@ func namespace(ns string) string {
 }
 
 func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands) (*catalog.Operation, error) {
-	_, err := s.createNamespace(ctx, status.Namespace)
-	if err != nil {
-		return nil, err
+	if status.Action != "uninstall" {
+		_, err := s.createNamespace(ctx, status.Namespace)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	secretData, err := cmds.Render()

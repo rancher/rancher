@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/wrangler/pkg/ratelimit"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/rancher/lasso/pkg/controller"
@@ -295,7 +297,9 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: append(caBytes, suffix...),
 		},
-		Timeout: 30 * time.Second,
+		Timeout:     45 * time.Second,
+		RateLimiter: ratelimit.None,
+		UserAgent:   rest.DefaultKubernetesUserAgent() + " cluster " + cluster.Name,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
 				if tlsDialer == nil {
