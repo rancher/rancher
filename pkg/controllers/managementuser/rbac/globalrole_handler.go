@@ -1,10 +1,12 @@
 package rbac
 
 import (
+	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +29,9 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 		grbIndexer:          informer.GetIndexer(),
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		grLister:            workload.Management.Management.GlobalRoles("").Controller().Lister(),
 	}
+
 	return h.sync
 }
 
@@ -37,12 +41,22 @@ type grbHandler struct {
 	clusterRoleBindings rbacv1.ClusterRoleBindingInterface
 	crbLister           rbacv1.ClusterRoleBindingLister
 	grbIndexer          cache.Indexer
+	grLister            v3.GlobalRoleLister
 }
 
 func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	if obj == nil || obj.DeletionTimestamp != nil || obj.GlobalRoleName != "admin" {
+	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
+
+	isAdmin, err := c.isAdminRole(obj.GlobalRoleName)
+	if err != nil {
+		return nil, err
+	} else if !isAdmin {
+		return obj, nil
+	}
+
+	logrus.Debugf("%v is an admin role", obj.GlobalRoleName)
 
 	bindingName := rbac.GrbCRBName(obj)
 	b, err := c.crbLister.Get("", bindingName)
@@ -70,7 +84,40 @@ func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 			return obj, err
 		}
 	}
+
 	return obj, nil
+}
+
+// isAdminRole detects whether a GlobalRole has admin permissions or not.
+func (c *grbHandler) isAdminRole(rtName string) (bool, error) {
+	gr, err := c.grLister.Get("", rtName)
+	if err != nil {
+		return false, err
+	}
+
+	// global role is builtin admin role
+	if gr.Builtin && gr.Name == "admin" {
+		return true, nil
+	}
+
+	var hasResourceRule, hasNonResourceRule bool
+	for _, rule := range gr.Rules {
+		if slice.ContainsString(rule.Resources, "*") && slice.ContainsString(rule.APIGroups, "*") && slice.ContainsString(rule.Verbs, "*") {
+			hasResourceRule = true
+			continue
+		}
+		if slice.ContainsString(rule.NonResourceURLs, "*") && slice.ContainsString(rule.Verbs, "*") {
+			hasNonResourceRule = true
+			continue
+		}
+	}
+
+	// global role has an admin resource rule, and admin nonResourceURLs rule
+	if hasResourceRule && hasNonResourceRule {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func grbByUserAndRole(obj interface{}) ([]string, error) {
