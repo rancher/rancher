@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -352,12 +355,32 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 
 	createFromImport := request.Method == http.MethodPost && eksConfig["imported"] == true
 
-	// validate nodegroups
-	nodegroups, _ := eksConfig["nodeGroups"].([]interface{})
-	if len(nodegroups) == 0 {
-		if !createFromImport {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node group"))
+	var prevCluster *v3.Cluster
+	var err error
+	var upstreamSpec *eksv1.EKSClusterConfigSpec
+
+	if request.Method == http.MethodPut {
+		prevCluster, err = v.ClusterLister.Get("", request.ID)
+		if err != nil {
+			return err
 		}
+		upstreamSpec = prevCluster.Status.EKSStatus.UpstreamSpec
+		if upstreamSpec == nil {
+			return httperror.NewAPIError(httperror.ServerError, "upstream state unavailable,cannot validate")
+		}
+	}
+
+	// validate nodegroups
+	noNodegroupsError := httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one nodegroup"))
+	nodegroups, ok := eksConfig["nodeGroups"].([]interface{})
+	if !ok || nodegroups == nil {
+		spec := prevCluster.Spec.EKSConfig
+		upstreamSpec := prevCluster.Status.EKSStatus.UpstreamSpec
+		if len(spec.NodeGroups) == 0 && spec.NodeGroups != nil || (spec.NodeGroups == nil && len(upstreamSpec.NodeGroups) > 0) {
+			return noNodegroupsError
+		}
+	} else if len(nodegroups) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node group"))
 	}
 
 	for _, ng := range nodegroups {
@@ -367,30 +390,9 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		}
 	}
 
-	var prevCluster *v3.Cluster
-	var err error
-
-	if request.Method == http.MethodPut {
-		prevCluster, err = v.ClusterLister.Get("", request.ID)
-		if err != nil {
+	if !createFromImport {
+		if err := validateEKSAccess(request, eksConfig, prevCluster); err != nil {
 			return err
-		}
-	}
-
-	// validate cluster has public access, private access, or both enabled
-	publicAccess, ok := eksConfig["publicAccess"].(bool)
-	if !ok {
-		publicAccess = prevCluster != nil && prevCluster.Spec.EKSConfig.PublicAccess
-	}
-	privateAccess, ok := eksConfig["privateAccess"].(bool)
-	if !ok {
-		privateAccess = prevCluster != nil && prevCluster.Spec.EKSConfig.PrivateAccess
-	}
-
-	if !publicAccess && !privateAccess {
-		if !createFromImport {
-			return httperror.NewAPIError(httperror.InvalidBodyContent,
-				"public access, private access, or both must be enabled")
 		}
 	}
 
@@ -423,20 +425,45 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
 	}
 
-	// validate either all networking fields are provided or no networking fields are provided
-	securityGroups, _ := eksConfig["securityGroups"].([]interface{})
-	subnets, _ := eksConfig["subnets"].([]interface{})
+	if !createFromImport {
+		// validate either all networking fields are provided or no networking fields are provided
+		securityGroups, _ := eksConfig["securityGroups"].([]interface{})
+		subnets, _ := eksConfig["subnets"].([]interface{})
 
-	allNetworkingFieldsProvided := len(subnets) != 0 && len(securityGroups) != 0
-	noNetworkingFieldsProvided := len(subnets) == 0 && len(securityGroups) == 0
+		allNetworkingFieldsProvided := len(subnets) != 0 && len(securityGroups) != 0
+		noNetworkingFieldsProvided := len(subnets) == 0 && len(securityGroups) == 0
 
-	if !(allNetworkingFieldsProvided || noNetworkingFieldsProvided) {
-		if !createFromImport {
-			return httperror.NewAPIError(httperror.InvalidBodyContent,
-				"must provide both networking fields (subnets, securityGroups) or neither")
+		if !(allNetworkingFieldsProvided || noNetworkingFieldsProvided) {
+			if !createFromImport {
+				return httperror.NewAPIError(httperror.InvalidBodyContent,
+					"must provide both networking fields (subnets, securityGroups) or neither")
+			}
 		}
 	}
 
+	return nil
+}
+
+func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
+	publicAccess, _ := eksConfig["publicAccess"].(*bool)
+	privateAccess, _ := eksConfig["privateAccess"].(*bool)
+	if request.Method != http.MethodPost {
+		if publicAccess == nil {
+			publicAccess = prevCluster.Spec.EKSConfig.PublicAccess
+		}
+		if privateAccess == nil {
+			privateAccess = prevCluster.Spec.EKSConfig.PrivateAccess
+		}
+	}
+
+	if publicAccess == nil || privateAccess == nil {
+		return nil
+	}
+
+	if !aws.BoolValue(publicAccess) && !aws.BoolValue(privateAccess) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			"public access, private access, or both must be enabled")
+	}
 	return nil
 }
 

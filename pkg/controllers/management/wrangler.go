@@ -15,5 +15,6 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 
 	k3sbasedupgrade.Register(ctx, wranglerContext, management, manager)
 	eks.Register(ctx, wranglerContext, management)
+	eks.RegisterRefresh(ctx, wranglerContext, management)
 	return nil
 }

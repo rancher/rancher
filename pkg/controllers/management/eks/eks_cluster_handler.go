@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/rancher/eks-operator/controller"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	"github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -139,10 +138,6 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, err
 		}
 
-		cluster, err = e.recordAppliedSpec(cluster)
-		if err != nil {
-			return cluster, err
-		}
 	}
 
 	eksClusterConfigMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cluster.Spec.EKSConfig)
@@ -230,6 +225,11 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			}
 		}
 
+		cluster, err = e.recordAppliedSpec(cluster)
+		if err != nil {
+			return cluster, err
+		}
+
 		return e.setTrue(cluster, apimgmtv3.ClusterConditionUpdated, "")
 	case "updating":
 		cluster, err = e.setTrue(cluster, apimgmtv3.ClusterConditionProvisioned, "")
@@ -278,12 +278,6 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 		return cluster, err
 	}
 
-	// update applied spec
-	cluster, err = e.recordAppliedSpec(cluster)
-	if err != nil {
-		return cluster, err
-	}
-
 	// EKS cluster and node group statuses are not always immediately updated. This cause the EKSConfig to
 	// stay in "active" for a few seconds, causing the cluster to go back to "active".
 	timeout := time.NewTimer(10 * time.Second)
@@ -304,6 +298,7 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 		}
 	}
 }
+
 func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	// service account token and API endpoint are need to deploy cluster agent, should be able to retrieve
 	// from secret
@@ -320,7 +315,7 @@ func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 
 		// sa token generation can be its own function
 		logrus.Infof("generating service account token for cluster [%s]", cluster.Name)
-		sess, err := e.startAWSSession(cluster.Spec.EKSConfig.AmazonCredentialSecret)
+		sess, _, err := controller.StartAWSSessions(e.secretsCache, *cluster.Spec.EKSConfig)
 		if err != nil {
 			return cluster, nil
 		}
@@ -393,6 +388,10 @@ func buildEKSCCObject(cluster *mgmtv3.Cluster) (*unstructured.Unstructured, erro
 }
 
 func (e *eksOperatorController) recordAppliedSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+	if reflect.DeepEqual(cluster.Status.AppliedSpec.EKSConfig, cluster.Spec.EKSConfig) {
+		return cluster, nil
+	}
+
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.EKSConfig = cluster.Spec.EKSConfig
 	return e.clusterClient.Update(cluster)
@@ -509,33 +508,6 @@ func generateSAToken(sess *session.Session, clusterID, endpoint, ca string) (str
 	}
 
 	return util.GenerateServiceAccountToken(clientset)
-}
-
-func (e *eksOperatorController) startAWSSession(cloudCredential string) (*session.Session, error) {
-	awsConfig := &aws.Config{}
-
-	ns, id := ref.Parse(cloudCredential)
-	secret, err := e.secretsCache.Get(ns, id)
-	if err != nil {
-		return nil, err
-	}
-
-	accessKeyBytes, _ := secret.Data[awsAccessKey]
-	secretKeyBytes, _ := secret.Data[awsSecretKey]
-	if accessKeyBytes == nil || secretKeyBytes == nil {
-		return nil, fmt.Errorf("Invalid aws cloud credential")
-	}
-
-	accessKey := string(accessKeyBytes)
-	secretKey := string(secretKeyBytes)
-
-	awsConfig.Credentials = credentials.NewStaticCredentials(accessKey, secretKey, "")
-
-	sess, err := session.NewSession(awsConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error getting new aws session: %v", err)
-	}
-	return sess, nil
 }
 
 func (e *eksOperatorController) setUnknown(cluster *mgmtv3.Cluster, condition condition.Cond, message string) (*mgmtv3.Cluster, error) {
