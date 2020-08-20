@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -94,8 +93,7 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		}
 		if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
-				callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
-				if canCreateTemplates, _ := CanCreateRKETemplate(callerID, f.SubjectAccessReviewClient); canCreateTemplates {
+				if err := request.AccessControl.CanDo(v3.ClusterTemplateGroupVersionKind.Group, v3.ClusterTemplateResource.Name, "create", request, resource.Values, request.Schema); err == nil {
 					resource.AddAction(request, v32.ClusterActionSaveAsTemplate)
 				}
 			}
