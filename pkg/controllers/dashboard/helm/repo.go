@@ -46,10 +46,28 @@ func RegisterRepos(ctx context.Context,
 
 }
 
+func RegisterReposForFollowers(ctx context.Context,
+	secrets corev1controllers.SecretCache,
+	clusterRepos catalogcontrollers.ClusterRepoController) {
+	h := &repoHandler{
+		secrets:      secrets,
+		clusterRepos: clusterRepos,
+	}
+
+	catalogcontrollers.RegisterClusterRepoStatusHandler(ctx, clusterRepos,
+		condition.Cond(catalog.RepoDownloaded), "helm-clusterrepo-ensure", h.ClusterRepoDownloadEnsureStatusHandler)
+
+}
+
+func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
+	r.clusterRepos.EnqueueAfter(repo.Name, interval)
+	return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
+}
+
 func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
 	if !shouldRefresh(&repo.Spec, &status) {
 		r.clusterRepos.EnqueueAfter(repo.Name, interval)
-		return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
+		return status, nil
 	}
 
 	return r.download(&repo.Spec, status, &repo.ObjectMeta, metav1.OwnerReference{
