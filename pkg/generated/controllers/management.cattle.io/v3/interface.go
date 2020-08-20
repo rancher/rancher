@@ -30,11 +30,9 @@ func init() {
 }
 
 type Interface interface {
-	ActiveDirectoryConfig() ActiveDirectoryConfigController
 	ActiveDirectoryProvider() ActiveDirectoryProviderController
 	AuthConfig() AuthConfigController
 	AuthProvider() AuthProviderController
-	AzureADConfig() AzureADConfigController
 	AzureADProvider() AzureADProviderController
 	Catalog() CatalogController
 	CatalogTemplate() CatalogTemplateController
@@ -59,19 +57,15 @@ type Interface interface {
 	EtcdBackup() EtcdBackupController
 	Feature() FeatureController
 	FreeIpaProvider() FreeIpaProviderController
-	GithubConfig() GithubConfigController
 	GithubProvider() GithubProviderController
 	GlobalDNSProvider() GlobalDNSProviderController
 	GlobalDns() GlobalDnsController
 	GlobalRole() GlobalRoleController
 	GlobalRoleBinding() GlobalRoleBindingController
 	GoogleOAuthProvider() GoogleOAuthProviderController
-	GoogleOauthConfig() GoogleOauthConfigController
 	Group() GroupController
 	GroupMember() GroupMemberController
 	KontainerDriver() KontainerDriverController
-	LdapConfig() LdapConfigController
-	LocalConfig() LocalConfigController
 	LocalProvider() LocalProviderController
 	MonitorMetric() MonitorMetricController
 	MultiClusterApp() MultiClusterAppController
@@ -99,7 +93,6 @@ type Interface interface {
 	RkeK8sServiceOption() RkeK8sServiceOptionController
 	RkeK8sSystemImage() RkeK8sSystemImageController
 	RoleTemplate() RoleTemplateController
-	SamlConfig() SamlConfigController
 	SamlProvider() SamlProviderController
 	Setting() SettingController
 	Template() TemplateController
@@ -120,9 +113,6 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) ActiveDirectoryConfig() ActiveDirectoryConfigController {
-	return NewActiveDirectoryConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ActiveDirectoryConfig"}, "activedirectoryconfigs", false, c.controllerFactory)
-}
 func (c *version) ActiveDirectoryProvider() ActiveDirectoryProviderController {
 	return NewActiveDirectoryProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ActiveDirectoryProvider"}, "activedirectoryproviders", false, c.controllerFactory)
 }
@@ -131,9 +121,6 @@ func (c *version) AuthConfig() AuthConfigController {
 }
 func (c *version) AuthProvider() AuthProviderController {
 	return NewAuthProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthProvider"}, "authproviders", false, c.controllerFactory)
-}
-func (c *version) AzureADConfig() AzureADConfigController {
-	return NewAzureADConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AzureADConfig"}, "azureadconfigs", false, c.controllerFactory)
 }
 func (c *version) AzureADProvider() AzureADProviderController {
 	return NewAzureADProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AzureADProvider"}, "azureadproviders", false, c.controllerFactory)
@@ -207,9 +194,6 @@ func (c *version) Feature() FeatureController {
 func (c *version) FreeIpaProvider() FreeIpaProviderController {
 	return NewFreeIpaProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "FreeIpaProvider"}, "freeipaproviders", false, c.controllerFactory)
 }
-func (c *version) GithubConfig() GithubConfigController {
-	return NewGithubConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GithubConfig"}, "githubconfigs", false, c.controllerFactory)
-}
 func (c *version) GithubProvider() GithubProviderController {
 	return NewGithubProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GithubProvider"}, "githubproviders", false, c.controllerFactory)
 }
@@ -228,9 +212,6 @@ func (c *version) GlobalRoleBinding() GlobalRoleBindingController {
 func (c *version) GoogleOAuthProvider() GoogleOAuthProviderController {
 	return NewGoogleOAuthProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GoogleOAuthProvider"}, "googleoauthproviders", false, c.controllerFactory)
 }
-func (c *version) GoogleOauthConfig() GoogleOauthConfigController {
-	return NewGoogleOauthConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GoogleOauthConfig"}, "googleoauthconfigs", false, c.controllerFactory)
-}
 func (c *version) Group() GroupController {
 	return NewGroupController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Group"}, "groups", false, c.controllerFactory)
 }
@@ -239,12 +220,6 @@ func (c *version) GroupMember() GroupMemberController {
 }
 func (c *version) KontainerDriver() KontainerDriverController {
 	return NewKontainerDriverController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "KontainerDriver"}, "kontainerdrivers", false, c.controllerFactory)
-}
-func (c *version) LdapConfig() LdapConfigController {
-	return NewLdapConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "LdapConfig"}, "ldapconfigs", false, c.controllerFactory)
-}
-func (c *version) LocalConfig() LocalConfigController {
-	return NewLocalConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "LocalConfig"}, "localconfigs", false, c.controllerFactory)
 }
 func (c *version) LocalProvider() LocalProviderController {
 	return NewLocalProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "LocalProvider"}, "localproviders", false, c.controllerFactory)
@@ -326,9 +301,6 @@ func (c *version) RkeK8sSystemImage() RkeK8sSystemImageController {
 }
 func (c *version) RoleTemplate() RoleTemplateController {
 	return NewRoleTemplateController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RoleTemplate"}, "roletemplates", false, c.controllerFactory)
-}
-func (c *version) SamlConfig() SamlConfigController {
-	return NewSamlConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlConfig"}, "samlconfigs", false, c.controllerFactory)
 }
 func (c *version) SamlProvider() SamlProviderController {
 	return NewSamlProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlProvider"}, "samlproviders", false, c.controllerFactory)

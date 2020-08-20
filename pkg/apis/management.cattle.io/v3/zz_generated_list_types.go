@@ -26,23 +26,6 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ActiveDirectoryConfigList is a list of ActiveDirectoryConfig resources
-type ActiveDirectoryConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ActiveDirectoryConfig `json:"items"`
-}
-
-func NewActiveDirectoryConfig(namespace, name string, obj ActiveDirectoryConfig) *ActiveDirectoryConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ActiveDirectoryConfig").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // ActiveDirectoryProviderList is a list of ActiveDirectoryProvider resources
 type ActiveDirectoryProviderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -87,23 +70,6 @@ type AuthProviderList struct {
 
 func NewAuthProvider(namespace, name string, obj AuthProvider) *AuthProvider {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("AuthProvider").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// AzureADConfigList is a list of AzureADConfig resources
-type AzureADConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []AzureADConfig `json:"items"`
-}
-
-func NewAzureADConfig(namespace, name string, obj AzureADConfig) *AzureADConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("AzureADConfig").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -502,23 +468,6 @@ func NewFreeIpaProvider(namespace, name string, obj FreeIpaProvider) *FreeIpaPro
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GithubConfigList is a list of GithubConfig resources
-type GithubConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []GithubConfig `json:"items"`
-}
-
-func NewGithubConfig(namespace, name string, obj GithubConfig) *GithubConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("GithubConfig").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // GithubProviderList is a list of GithubProvider resources
 type GithubProviderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -621,23 +570,6 @@ func NewGoogleOAuthProvider(namespace, name string, obj GoogleOAuthProvider) *Go
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GoogleOauthConfigList is a list of GoogleOauthConfig resources
-type GoogleOauthConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []GoogleOauthConfig `json:"items"`
-}
-
-func NewGoogleOauthConfig(namespace, name string, obj GoogleOauthConfig) *GoogleOauthConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("GoogleOauthConfig").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // GroupList is a list of Group resources
 type GroupList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -682,40 +614,6 @@ type KontainerDriverList struct {
 
 func NewKontainerDriver(namespace, name string, obj KontainerDriver) *KontainerDriver {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("KontainerDriver").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// LdapConfigList is a list of LdapConfig resources
-type LdapConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []LdapConfig `json:"items"`
-}
-
-func NewLdapConfig(namespace, name string, obj LdapConfig) *LdapConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("LdapConfig").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// LocalConfigList is a list of LocalConfig resources
-type LocalConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []LocalConfig `json:"items"`
-}
-
-func NewLocalConfig(namespace, name string, obj LocalConfig) *LocalConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("LocalConfig").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -1158,23 +1056,6 @@ type RoleTemplateList struct {
 
 func NewRoleTemplate(namespace, name string, obj RoleTemplate) *RoleTemplate {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RoleTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// SamlConfigList is a list of SamlConfig resources
-type SamlConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []SamlConfig `json:"items"`
-}
-
-func NewSamlConfig(namespace, name string, obj SamlConfig) *SamlConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SamlConfig").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
