@@ -234,8 +234,10 @@ spec:
           mountPath: /etc/kubernetes
         - name: var-run
           mountPath: /var/run
+          mountPropagation: HostToContainer
         - name: run
           mountPath: /run
+          mountPropagation: HostToContainer
         - name: docker-certs
           mountPath: /etc/docker/certs.d
         securityContext:
