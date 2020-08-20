@@ -322,13 +322,14 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 	}
 	// retry if can't use existing token
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		token, err = m.tokens.Create(token)
+		createdToken, err = m.tokens.Create(token)
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {
 				return false, nil
 			}
 			return false, err
 		}
+		token = createdToken
 		return true, nil
 	})
 	if err != nil {
