@@ -170,6 +170,12 @@ spec:
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
+          readinessProbe:
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            httpGet:
+              path: /health
+              port: 8080
       {{- if .PrivateRegistryConfig}}
       imagePullSecrets:
       - name: cattle-private-registry
