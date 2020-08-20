@@ -31,6 +31,7 @@ type Options struct {
 	ACMEDomains       cli.StringSlice
 	AddLocal          string
 	Embedded          bool
+	BindHost          string
 	HTTPListenPort    int
 	HTTPSListenPort   int
 	K8sMode           string
@@ -189,6 +190,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
+		r.opts.BindHost,
 		r.opts.HTTPSListenPort,
 		r.opts.HTTPListenPort,
 		r.opts.ACMEDomains,

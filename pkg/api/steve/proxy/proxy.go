@@ -183,13 +183,10 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {
 	cfg := &rest.Config{
-		// this is bogus, the dialer will change it to 127.0.0.1:6443, but the clusterID is used to lookup the tunnel
+		// this is bogus, the dialer will change it to 127.0.0.1:6080, but the clusterID is used to lookup the tunnel
 		// connect
-		Host:      "https://" + clusterID,
+		Host:      "http://" + clusterID,
 		UserAgent: rest.DefaultKubernetesUserAgent() + " cluster " + clusterID,
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-		},
 		// Ensure this function pointer does not change per invocation so that we don't
 		// blow out the cache.
 		Dial: h.dialer,
