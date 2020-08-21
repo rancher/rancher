@@ -71,7 +71,9 @@ func DeployStateOnPlaneHost(ctx context.Context, host *hosts.Host, stateDownload
 	DestinationClusterStateFilePath := path.Join(K8sBaseDir, "/", fmt.Sprintf("%s%s", snapshotName, ClusterStateExt))
 	// This is the location where the 1-on-1 copy from local will be placed in the container, this is later moved to DestinationClusterStateFilePath
 	// Example: /etc/kubernetes/cluster.rkestate
-	SourceClusterStateFilePath := path.Join(K8sBaseDir, stateFilePath)
+	// Example: /etc/kubernetes/rancher-cluster.rkestate
+	baseStateFile := path.Base(stateFilePath)
+	SourceClusterStateFilePath := path.Join(K8sBaseDir, baseStateFile)
 	logrus.Infof("[state] Deploying state file to [%v] on host [%s]", DestinationClusterStateFilePath, host.Address)
 
 	imageCfg := &container.Config{
