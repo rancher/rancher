@@ -157,7 +157,7 @@ def test_import_initial_conditions(admin_mc, remove_resource):
     cluster = admin_mc.client.create_cluster(name=random_str())
     remove_resource(cluster)
 
-    assert cluster.conditions is None
+    assert not cluster.conditions
 
 
 def test_rke_k8s_deprecated_versions(admin_mc, remove_resource):
