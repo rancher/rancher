@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -372,7 +373,7 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 				// symbolic link source: docker container logs location
 				"c:/ProgramData:c:/ProgramData",
 				// symbolic link target
-				"c:/var/lib:c:/var/lib",
+				fmt.Sprintf("%s/var/lib:c:/var/lib", getWindowsPrefixPath()),
 			},
 			NetworkMode: "none",
 		}
@@ -441,4 +442,13 @@ func (s containerWaitingStatus) error() error {
 	}
 
 	return nil
+}
+
+func getWindowsPrefixPath() string {
+	prefixPath := os.Getenv("CATTLE_PREFIX_PATH")
+	if prefixPath == "" {
+		prefixPath = "c:\\"
+	}
+
+	return prefixPath
 }

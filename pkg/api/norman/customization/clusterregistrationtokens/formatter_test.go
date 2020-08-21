@@ -54,7 +54,8 @@ func TestFormatter(t *testing.T) {
 					"rancher/rancher-agent:test",
 					"https://fake-server.rancher.io",
 					"fake-token",
-					" --ca-checksum c1dedde8bea64bee49f62c595e6bf7a96eae0888cf73bb6c90b6be5031052600"),
+					" --ca-checksum c1dedde8bea64bee49f62c595e6bf7a96eae0888cf73bb6c90b6be5031052600",
+					""),
 			},
 		},
 		{
@@ -80,7 +81,8 @@ func TestFormatter(t *testing.T) {
 					"fake-registry.rancher.io:443/rancher/rancher-agent:test",
 					"https://fake-server.rancher.io",
 					"fake-token",
-					" --ca-checksum c1dedde8bea64bee49f62c595e6bf7a96eae0888cf73bb6c90b6be5031052600"),
+					" --ca-checksum c1dedde8bea64bee49f62c595e6bf7a96eae0888cf73bb6c90b6be5031052600",
+					""),
 			},
 		},
 		{
@@ -105,7 +107,8 @@ func TestFormatter(t *testing.T) {
 					"rancher/rancher-agent:test",
 					"https://fake-test.rancher.io",
 					"fake-token",
-					" --ca-checksum c1dedde8bea64bee49f62c595e6bf7a96eae0888cf73bb6c90b6be5031052600"),
+					" --ca-checksum c1dedde8bea64bee49f62c595e6bf7a96eae0888cf73bb6c90b6be5031052600",
+					""),
 			},
 		},
 	}

@@ -26,6 +26,7 @@ const (
 	RancherKubernetesEngineConfigFieldServices            = "services"
 	RancherKubernetesEngineConfigFieldUpgradeStrategy     = "upgradeStrategy"
 	RancherKubernetesEngineConfigFieldVersion             = "kubernetesVersion"
+	RancherKubernetesEngineConfigFieldWindowsPrefixPath   = "winPrefixPath"
 )
 
 type RancherKubernetesEngineConfig struct {
@@ -53,4 +54,5 @@ type RancherKubernetesEngineConfig struct {
 	Services            *RKEConfigServices   `json:"services,omitempty" yaml:"services,omitempty"`
 	UpgradeStrategy     *NodeUpgradeStrategy `json:"upgradeStrategy,omitempty" yaml:"upgradeStrategy,omitempty"`
 	Version             string               `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
+	WindowsPrefixPath   string               `json:"winPrefixPath,omitempty" yaml:"winPrefixPath,omitempty"`
 }

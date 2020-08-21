@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -15,11 +17,10 @@ import (
 )
 
 const (
-	commandFormat         = "kubectl apply -f %s"
-	insecureCommandFormat = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat     = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
-
-	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:/:c:/host %s%s bootstrap --server %s --token %s%s | iex}"`
+	commandFormat            = "kubectl apply -f %s"
+	insecureCommandFormat    = "curl --insecure -sfL %s | kubectl apply -f -"
+	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
+	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
 
 type Formatter struct {
@@ -68,8 +69,28 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			agentImage,
 			rootURL,
 			token,
-			ca)
+			ca,
+			getWindowsPrefixPathArg(cluster.Spec.RancherKubernetesEngineConfig))
 	}
+}
+
+func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) string {
+	if rkeConfig == nil {
+		return ""
+	}
+	// default to prefix path
+	prefixPath := rkeConfig.PrefixPath
+
+	// if windows prefix path set, override
+	if rkeConfig.WindowsPrefixPath != "" {
+		prefixPath = rkeConfig.WindowsPrefixPath
+	}
+
+	if prefixPath != "" {
+		return fmt.Sprintf(" --prefix-path %s", prefixPath)
+	}
+
+	return ""
 }
 
 func NodeCommand(token string, cluster *v3.Cluster) string {
