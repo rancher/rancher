@@ -1,8 +1,10 @@
 package dialer
 
 import (
+	"bufio"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -17,6 +19,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/proxy"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -24,6 +27,8 @@ import (
 func NewFactory(apiContext *config.ScaledContext) (*Factory, error) {
 	authorizer := tunnelserver.NewAuthorizer(apiContext)
 	tunneler := tunnelserver.NewTunnelServer(authorizer)
+
+	proxy.RegisterDialerType("http", newHTTPProxy)
 
 	return &Factory{
 		clusterLister:    apiContext.Management.Clusters("").Controller().Lister(),
@@ -136,10 +141,20 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 	}
 
 	hostPort := hostPort(cluster)
-	logrus.Debugf("dialerFactory: apiEndpoint hostPort for cluster [%s] is [%s]", clusterName, hostPort)
+	logrus.Debugf("dialerFactory: apiEndpoint hostPort for cluster [%s] is [%s] address [%s]", clusterName, hostPort, address)
 	if (address == hostPort || isProxyAddress(address)) && isCloudDriver(cluster) {
 		// For cloud drivers we just connect directly to the k8s API, not through the tunnel.  All other go through tunnel
-		return native()
+		if isProxyAddress(address) {
+			return native()
+		}
+		return func(network, address string) (net.Conn, error) {
+			d, err := proxyDialer()
+			if err != nil {
+				d, _ = native()
+				return d(network, address)
+			}
+			return d(network, address)
+		}, nil
 	}
 
 	if f.TunnelServer.HasSession(cluster.Name) {
@@ -305,4 +320,97 @@ func parseProxy(proxy string) (*url.URL, error) {
 		return nil, fmt.Errorf("invalid proxy address %q: %v", proxy, err)
 	}
 	return proxyURL, nil
+}
+
+// https://gist.github.com/jim3ma/3750675f141669ac4702bc9deaf31c6b
+// httpProxy is a HTTP/HTTPS connect proxy.
+type httpProxy struct {
+	host     string
+	haveAuth bool
+	username string
+	password string
+	forward  proxy.Dialer
+}
+
+func newHTTPProxy(uri *url.URL, forward proxy.Dialer) (proxy.Dialer, error) {
+	s := new(httpProxy)
+	s.host = uri.Host
+	s.forward = forward
+	if uri.User != nil {
+		s.haveAuth = true
+		s.username = uri.User.Username()
+		s.password, _ = uri.User.Password()
+	}
+
+	return s, nil
+}
+
+func (s *httpProxy) Dial(network, addr string) (net.Conn, error) {
+	// Dial and create the https client connection.
+	c, err := s.forward.Dial("tcp", s.host)
+	if err != nil {
+		return nil, err
+	}
+
+	reqURL, err := url.Parse("http://" + addr)
+	if err != nil {
+		c.Close()
+		return nil, err
+	}
+	reqURL.Scheme = ""
+
+	req, err := http.NewRequest("CONNECT", reqURL.String(), nil)
+	if err != nil {
+		c.Close()
+		return nil, err
+	}
+	req.Close = false
+	if s.haveAuth {
+		req.SetBasicAuth(s.username, s.password)
+	}
+	req.Header.Set("User-Agent", "")
+
+	err = req.Write(c)
+	if err != nil {
+		c.Close()
+		return nil, err
+	}
+
+	resp, err := http.ReadResponse(bufio.NewReader(c), req)
+	if err != nil {
+		resp.Body.Close()
+		c.Close()
+		return nil, err
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		c.Close()
+		err = fmt.Errorf("connect server using proxy error, StatusCode [%d]", resp.StatusCode)
+		return nil, err
+	}
+
+	return c, nil
+}
+
+func proxyDialer() (dialer.Dialer, error) {
+	pp := getEnvAny("HTTP_PROXY", "http_proxy")
+	if pp == "" {
+		pp = getEnvAny("HTTPS_PROXY", "https_proxy")
+	}
+
+	if pp == "" {
+		return native()
+	}
+
+	parsed, err := url.Parse(pp)
+	if err != nil {
+		return native()
+	}
+
+	p, err := proxy.FromURL(parsed, proxy.Direct)
+	if err != nil {
+		return native()
+	}
+
+	return p.Dial, nil
 }
