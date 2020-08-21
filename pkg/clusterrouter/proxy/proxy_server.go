@@ -14,6 +14,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/rancher/norman/httperror"
+	factory "github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -172,7 +173,9 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 			return nil, err
 		}
 		transport.DialContext = d
-		transport.Proxy = http.ProxyFromEnvironment
+		if factory.IsCloudDriver(newCluster) {
+			transport.Proxy = http.ProxyFromEnvironment
+		}
 	}
 
 	r.caCert = newCluster.Status.CACert
