@@ -32,6 +32,7 @@ type Config struct {
 	TemplateContents                         map[string]managementClient.TemplateContent                         `json:"templateContents,omitempty" yaml:"templateContents,omitempty"`
 	Groups                                   map[string]managementClient.Group                                   `json:"groups,omitempty" yaml:"groups,omitempty"`
 	GroupMembers                             map[string]managementClient.GroupMember                             `json:"groupMembers,omitempty" yaml:"groupMembers,omitempty"`
+	SamlTokens                               map[string]managementClient.SamlToken                               `json:"samlTokens,omitempty" yaml:"samlTokens,omitempty"`
 	Users                                    map[string]managementClient.User                                    `json:"users,omitempty" yaml:"users,omitempty"`
 	LdapConfigs                              map[string]managementClient.LdapConfig                              `json:"ldapConfigs,omitempty" yaml:"ldapConfigs,omitempty"`
 	Tokens                                   map[string]managementClient.Token                                   `json:"tokens,omitempty" yaml:"tokens,omitempty"`

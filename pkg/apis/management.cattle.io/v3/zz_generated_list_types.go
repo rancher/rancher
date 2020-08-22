@@ -77,6 +77,23 @@ func NewAuthProvider(namespace, name string, obj AuthProvider) *AuthProvider {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// AuthTokenList is a list of AuthToken resources
+type AuthTokenList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []AuthToken `json:"items"`
+}
+
+func NewAuthToken(namespace, name string, obj AuthToken) *AuthToken {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("AuthToken").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // AzureADProviderList is a list of AzureADProvider resources
 type AzureADProviderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1073,6 +1090,23 @@ type SamlProviderList struct {
 
 func NewSamlProvider(namespace, name string, obj SamlProvider) *SamlProvider {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SamlProvider").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SamlTokenList is a list of SamlToken resources
+type SamlTokenList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []SamlToken `json:"items"`
+}
+
+func NewSamlToken(namespace, name string, obj SamlToken) *SamlToken {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SamlToken").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

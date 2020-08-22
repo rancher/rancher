@@ -31,6 +31,7 @@ var (
 	ActiveDirectoryProviderResourceName                 = "activedirectoryproviders"
 	AuthConfigResourceName                              = "authconfigs"
 	AuthProviderResourceName                            = "authproviders"
+	AuthTokenResourceName                               = "authtokens"
 	AzureADProviderResourceName                         = "azureadproviders"
 	CatalogResourceName                                 = "catalogs"
 	CatalogTemplateResourceName                         = "catalogtemplates"
@@ -92,6 +93,7 @@ var (
 	RkeK8sSystemImageResourceName                       = "rkek8ssystemimages"
 	RoleTemplateResourceName                            = "roletemplates"
 	SamlProviderResourceName                            = "samlproviders"
+	SamlTokenResourceName                               = "samltokens"
 	SettingResourceName                                 = "settings"
 	TemplateResourceName                                = "templates"
 	TemplateContentResourceName                         = "templatecontents"
@@ -128,6 +130,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AuthConfigList{},
 		&AuthProvider{},
 		&AuthProviderList{},
+		&AuthToken{},
+		&AuthTokenList{},
 		&AzureADProvider{},
 		&AzureADProviderList{},
 		&Catalog{},
@@ -250,6 +254,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RoleTemplateList{},
 		&SamlProvider{},
 		&SamlProviderList{},
+		&SamlToken{},
+		&SamlTokenList{},
 		&Setting{},
 		&SettingList{},
 		&Template{},

@@ -32,6 +32,7 @@ type Interface interface {
 	TemplateContentsGetter
 	GroupsGetter
 	GroupMembersGetter
+	SamlTokensGetter
 	PrincipalsGetter
 	UsersGetter
 	AuthConfigsGetter
@@ -401,6 +402,20 @@ func (c *Client) GroupMembers(namespace string) GroupMemberInterface {
 	sharedClient := c.clientFactory.ForResourceKind(GroupMemberGroupVersionResource, GroupMemberGroupVersionKind.Kind, false)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GroupMemberResource, GroupMemberGroupVersionKind, groupMemberFactory{})
 	return &groupMemberClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type SamlTokensGetter interface {
+	SamlTokens(namespace string) SamlTokenInterface
+}
+
+func (c *Client) SamlTokens(namespace string) SamlTokenInterface {
+	sharedClient := c.clientFactory.ForResourceKind(SamlTokenGroupVersionResource, SamlTokenGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SamlTokenResource, SamlTokenGroupVersionKind, samlTokenFactory{})
+	return &samlTokenClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
