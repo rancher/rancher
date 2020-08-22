@@ -1,6 +1,8 @@
+import kubernetes
 from .common import random_str
-from .conftest import wait_for
+from .conftest import wait_for, kubernetes_api_client
 from kubernetes.client import CustomObjectsApi
+from kubernetes.client.rest import ApiException
 
 
 def test_cluster_node_count(admin_mc, remove_resource,
@@ -27,6 +29,27 @@ def test_cluster_node_count(admin_mc, remove_resource,
     node_count = 0
     wait_for(lambda: _check_node_count(cluster, node_count),
              fail_handler=lambda: _node_count_fail(cluster, node_count))
+
+    # Wait for cluster ns to be created
+    k8s_client = kubernetes_api_client(admin_mc.client, 'local')
+    ns_api = kubernetes.client.CoreV1Api(k8s_client)
+
+    def _check_cluster_ns(cluster):
+        try:
+            ns = ns_api.read_namespace(cluster.id)
+        except ApiException as e:
+            if e.status != 404:
+                raise(e)
+            return False
+        else:
+            return ns is not None
+
+    def _check_cluster_ns_fail(cluster):
+        s = "cluster {} namespace isn't created"
+        return s.format(cluster.id)
+
+    wait_for(lambda: _check_cluster_ns(cluster),
+             fail_handler=lambda: _check_cluster_ns_fail(cluster))
 
     # Nodes have to be created manually through k8s client to attach to a
     # pending cluster

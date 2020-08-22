@@ -132,6 +132,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.RoleTemplateType,
 		client.CisConfigType,
 		client.CisBenchmarkVersionType,
+		client.SamlTokenType,
 		client.SettingType,
 		client.TemplateType,
 		client.TemplateVersionType,

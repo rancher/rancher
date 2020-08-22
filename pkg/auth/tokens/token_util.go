@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 )
 
@@ -98,4 +100,26 @@ func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]inte
 	mapper.FromInternal(tokenData)
 
 	return tokenData, nil
+}
+
+func GetKubeConfigToken(userName, responseType string, userMGR user.Manager) (*v3.Token, error) {
+	// create kubeconfig expiring tokens if responseType=kubeconfig in login action vs login tokens for responseType=json
+	clusterID := ""
+	responseSplit := strings.SplitN(responseType, "_", 2)
+	if len(responseSplit) == 2 {
+		clusterID = responseSplit[1]
+	}
+
+	logrus.Debugf("getKubeConfigToken: responseType %s", responseType)
+	name := "kubeconfig-" + userName
+	if clusterID != "" {
+		name = fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID)
+	}
+
+	token, err := userMGR.GetKubeconfigToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName)
+	if err != nil {
+		return nil, err
+	}
+
+	return token, err
 }

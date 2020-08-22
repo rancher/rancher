@@ -10,7 +10,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/util"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
+	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -76,4 +79,57 @@ func (s *authProvidersStore) Update(apiContext *types.APIContext, schema *types.
 		}
 	}
 	return result, nil
+}
+
+func setAuthTokensStore(schema *types.Schema, apiContext *config.ScaledContext) {
+	schema.Store = &authTokensStore{
+		tokens: apiContext.Management.SamlTokens(""),
+	}
+}
+
+type authTokensStore struct {
+	empty.Store
+	tokens v3.SamlTokenInterface
+}
+
+func (t *authTokensStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	token, err := t.tokens.GetNamespaced(namespace.GlobalNamespace, id, v1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	generated := transformToAuthToken(token)
+	return generated, err
+}
+
+func (t *authTokensStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
+	tokens, err := t.tokens.ListNamespaced(namespace.GlobalNamespace, v1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var result []map[string]interface{}
+	for _, token := range tokens.Items {
+		generated := transformToAuthToken(&token)
+		result = append(result, generated)
+	}
+	return result, nil
+}
+
+func (t *authTokensStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	if err := t.tokens.DeleteNamespaced(namespace.GlobalNamespace, id, &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func transformToAuthToken(token *v3.SamlToken) map[string]interface{} {
+	generated := map[string]interface{}{}
+	if token == nil {
+		return generated
+	}
+	generated["id"] = token.Name
+	generated["type"] = "authToken"
+	generated["name"] = token.Name
+	generated["token"] = token.Token
+	generated["expiresAt"] = token.ExpiresAt
+	return generated
 }
