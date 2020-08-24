@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
 	rbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/ratelimit"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -290,7 +291,9 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: append(caBytes, suffix...),
 		},
-		Timeout: 30 * time.Second,
+		Timeout:     45 * time.Second,
+		RateLimiter: ratelimit.None,
+		UserAgent:   rest.DefaultKubernetesUserAgent() + " cluster " + cluster.Name,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
 				ht.DialContext = nil
