@@ -208,11 +208,9 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 }
 
 func (m *manager) ensureNamespacedRoles(rt *v3.RoleTemplate) error {
-	isClusterOwner, err := m.isClusterOwner(rt.Name)
-	if err != nil {
+	// if the RoleTemplate has cluster owner rules, don't update Roles
+	if isClusterOwner, err := m.isClusterOwner(rt.Name); isClusterOwner || err != nil {
 		return err
-	} else if isClusterOwner {
-		return nil
 	}
 
 	// role template is not a cluster owner
@@ -248,20 +246,21 @@ func (m *manager) isClusterOwner(rtName string) (bool, error) {
 		return true, nil
 	}
 
-	// role template has rules for cluster ownership
 	for _, rule := range rt.Rules {
-		if slice.ContainsString(rule.Resources, "clusters") {
-			if slice.ContainsString(rule.Verbs, "own") {
-				return true, nil
-			}
+		// cluster + own rule that indicates cluster owner permissions
+		if slice.ContainsString(rule.Resources, "clusters") && slice.ContainsString(rule.Verbs, "own") {
+			return true, nil
+		}
+		// rules with nonResourceURLs can only be applied to ClusterRoles and indicate a RoleTemplate with cluster owner permissions
+		if rule.NonResourceURLs != nil {
+			return true, nil
 		}
 	}
 
-	isOwner := false
 	if len(rt.RoleTemplateNames) > 0 {
 		for _, inherited := range rt.RoleTemplateNames {
 			// recurse on inherited role template to check for cluster ownership
-			isOwner, err = m.isClusterOwner(inherited)
+			isOwner, err := m.isClusterOwner(inherited)
 			if err != nil {
 				return false, err
 			}
@@ -272,7 +271,7 @@ func (m *manager) isClusterOwner(rtName string) (bool, error) {
 		}
 	}
 
-	return isOwner, nil
+	return false, nil
 }
 
 func (m *manager) updateRole(rt *v3.RoleTemplate, namespace string) error {
