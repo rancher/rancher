@@ -33,6 +33,7 @@ type Interface interface {
 	ActiveDirectoryProvider() ActiveDirectoryProviderController
 	AuthConfig() AuthConfigController
 	AuthProvider() AuthProviderController
+	AuthToken() AuthTokenController
 	AzureADProvider() AzureADProviderController
 	Catalog() CatalogController
 	CatalogTemplate() CatalogTemplateController
@@ -94,6 +95,7 @@ type Interface interface {
 	RkeK8sSystemImage() RkeK8sSystemImageController
 	RoleTemplate() RoleTemplateController
 	SamlProvider() SamlProviderController
+	SamlToken() SamlTokenController
 	Setting() SettingController
 	Template() TemplateController
 	TemplateContent() TemplateContentController
@@ -121,6 +123,9 @@ func (c *version) AuthConfig() AuthConfigController {
 }
 func (c *version) AuthProvider() AuthProviderController {
 	return NewAuthProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthProvider"}, "authproviders", false, c.controllerFactory)
+}
+func (c *version) AuthToken() AuthTokenController {
+	return NewAuthTokenController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthToken"}, "authtokens", false, c.controllerFactory)
 }
 func (c *version) AzureADProvider() AzureADProviderController {
 	return NewAzureADProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AzureADProvider"}, "azureadproviders", false, c.controllerFactory)
@@ -304,6 +309,9 @@ func (c *version) RoleTemplate() RoleTemplateController {
 }
 func (c *version) SamlProvider() SamlProviderController {
 	return NewSamlProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlProvider"}, "samlproviders", false, c.controllerFactory)
+}
+func (c *version) SamlToken() SamlTokenController {
+	return NewSamlTokenController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlToken"}, "samltokens", false, c.controllerFactory)
 }
 func (c *version) Setting() SettingController {
 	return NewSettingController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Setting"}, "settings", false, c.controllerFactory)

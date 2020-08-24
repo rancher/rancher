@@ -15,6 +15,18 @@ type AuthProvider struct {
 	Type string `json:"type"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type AuthToken struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Token     string `json:"token"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
 type GenericLogin struct {
 	TTLMillis    int64  `json:"ttl,omitempty"`
 	Description  string `json:"description,omitempty" norman:"type=string,required"`
@@ -154,6 +166,9 @@ type OKTAProvider struct {
 
 type SamlLoginInput struct {
 	FinalRedirectURL string `json:"finalRedirectUrl"`
+	RequestID        string `json:"requestId"`
+	PublicKey        string `json:"publicKey"`
+	ResponseType     string `json:"responseType"`
 }
 
 type SamlLoginOutput struct {

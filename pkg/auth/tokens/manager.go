@@ -17,6 +17,7 @@ import (
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
@@ -31,12 +32,13 @@ import (
 // TODO Cleanup error logging. If error is being returned, use errors.wrap to return and dont log here
 
 const (
-	userPrincipalIndex = "authn.management.cattle.io/user-principal-index"
-	UserIDLabel        = "authn.management.cattle.io/token-userId"
-	TokenKindLabel     = "authn.management.cattle.io/kind"
-	tokenKeyIndex      = "authn.management.cattle.io/token-key-index"
-	secretNameEnding   = "-secret"
-	secretNamespace    = "cattle-system"
+	userPrincipalIndex     = "authn.management.cattle.io/user-principal-index"
+	UserIDLabel            = "authn.management.cattle.io/token-userId"
+	TokenKindLabel         = "authn.management.cattle.io/kind"
+	tokenKeyIndex          = "authn.management.cattle.io/token-key-index"
+	secretNameEnding       = "-secret"
+	secretNamespace        = "cattle-system"
+	KubeconfigResponseType = "kubeconfig"
 )
 
 var (
@@ -102,10 +104,15 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return v3.Token{}, 401, err
 	}
 
+	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Minute)
+	if err != nil {
+		return v3.Token{}, 500, fmt.Errorf("error validating max-ttl %v", err)
+	}
+
 	derivedToken := v3.Token{
 		UserPrincipal: token.UserPrincipal,
 		IsDerived:     true,
-		TTLMillis:     jsonInput.TTLMillis,
+		TTLMillis:     tokenTTL.Milliseconds(),
 		UserID:        token.UserID,
 		AuthProvider:  token.AuthProvider,
 		ProviderInfo:  token.ProviderInfo,
@@ -780,4 +787,31 @@ func (m *Manager) TokenStreamTransformer(
 		}
 		return data
 	}), nil
+}
+
+func ParseTokenTTL(ttl string) (time.Duration, error) {
+	durString := fmt.Sprintf("%vm", ttl)
+	dur, err := time.ParseDuration(durString)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing token ttl: %v", err)
+	}
+	return dur, nil
+}
+
+func ValidateMaxTTL(ttl time.Duration) (time.Duration, error) {
+	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
+	if err != nil {
+		return 0, fmt.Errorf("error getting auth-token-max-ttl %v", err)
+	}
+	if maxTTL == 0 {
+		return ttl, nil
+	}
+	if ttl == 0 {
+		return maxTTL, nil
+	}
+	// return min(ttl, maxTTL)
+	if ttl <= maxTTL {
+		return ttl, nil
+	}
+	return maxTTL, nil
 }

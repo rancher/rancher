@@ -1,8 +1,12 @@
 package saml
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
@@ -12,16 +16,17 @@ import (
 	"sync"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/gorilla/mux"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type IDPMetadata struct {
@@ -370,12 +375,71 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 	}
 	redirectURL = s.clientState.GetState(r, "Rancher_FinalRedirectURL")
+
 	if redirectURL != "" {
 		// delete the cookie
 		s.clientState.DeleteState(w, r, "Rancher_FinalRedirectURL")
+
+		requestID := s.clientState.GetState(r, "Rancher_RequestID")
+		log.Debugf("SAML: requestID: %s", requestID)
+		if requestID != "" {
+			// generate kubeconfig saml token
+			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
+			publicKey := s.clientState.GetState(r, "Rancher_PublicKey")
+
+			token, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR)
+			if err != nil {
+				log.Errorf("SAML: getToken error %v", err)
+				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				return
+			}
+
+			keyBytes, err := base64.StdEncoding.DecodeString(publicKey)
+			pubKey := &rsa.PublicKey{}
+			err = json.Unmarshal(keyBytes, pubKey)
+			if err != nil {
+				log.Errorf("SAML: getPublicKey error %v", err)
+				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				return
+			}
+			encryptedToken, err := rsa.EncryptOAEP(
+				sha256.New(),
+				rand.Reader,
+				pubKey,
+				[]byte(fmt.Sprintf("%s:%s", token.ObjectMeta.Name, token.Token)),
+				nil)
+			if err != nil {
+				log.Errorf("SAML: getEncryptedToken error %v", err)
+				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				return
+			}
+			encoded := base64.StdEncoding.EncodeToString(encryptedToken)
+
+			samlToken := &v3.SamlToken{
+				Token:     encoded,
+				ExpiresAt: token.ExpiresAt,
+				ObjectMeta: v1.ObjectMeta{
+					Name:      requestID,
+					Namespace: namespace.GlobalNamespace,
+				},
+			}
+
+			_, err = s.samlTokens.Create(samlToken)
+			if err != nil {
+				log.Errorf("SAML: createToken err %v", err)
+				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+			}
+
+			s.clientState.DeleteState(w, r, "Rancher_ConnToken")
+			s.clientState.DeleteState(w, r, "Rancher_RequestUUID")
+			s.clientState.DeleteState(w, r, "Rancher_ResponseType")
+			s.clientState.DeleteState(w, r, "Rancher_PublicKey")
+
+		}
+
 		http.Redirect(w, r, redirectURL, http.StatusFound)
+		return
 	}
-	return
 }
 
 func setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,

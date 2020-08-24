@@ -2,6 +2,8 @@ package setting
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -9,8 +11,10 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 )
 
 var ReadOnlySettings = []string{
@@ -77,6 +81,28 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 		_, err = providerrefresh.ParseMaxAge(newValueString)
 	case "auth-user-info-resync-cron":
 		_, err = providerrefresh.ParseCron(newValueString)
+	case "kubeconfig-token-ttl-minutes":
+		generateToken := strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
+		if generateToken {
+			return httperror.NewAPIError(httperror.ActionNotAvailable, fmt.Sprintf("kubeconfig-token-ttl-minutes can be set only if rancher doesn't generate token, "+
+				"disable kubeconfig-generate-token"))
+		}
+
+		var tokenTTL time.Duration
+		tokenTTL, err = tokens.ParseTokenTTL(newValueString)
+		if err == nil {
+			maxTTL, err := tokens.ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
+			if err != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent,
+					fmt.Sprintf("error parsing auth-token-max-ttl-minutes %v", err))
+			}
+			if maxTTL != 0 {
+				if tokenTTL == 0 || tokenTTL.Minutes() > maxTTL.Minutes() {
+					return httperror.NewAPIError(httperror.MaxLimitExceeded,
+						fmt.Sprintf("max ttl for tokens is [%s]", settings.AuthTokenMaxTTLMinutes.Get()))
+				}
+			}
+		}
 	}
 
 	if err != nil {

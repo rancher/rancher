@@ -15,17 +15,21 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -54,6 +58,13 @@ func NewUserManagerNoBindings(scaledContext *config.ScaledContext) (user.Manager
 		tokenLister: scaledContext.Management.Tokens("").Controller().Lister(),
 		rbacClient:  scaledContext.RBAC,
 	}, nil
+}
+
+var backoff = wait.Backoff{
+	Duration: 100 * time.Millisecond,
+	Factor:   1,
+	Jitter:   0,
+	Steps:    7,
 }
 
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
@@ -211,6 +222,7 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 	return false, errors.Errorf("Unsupported accessMode: %v", accessMode)
 }
 
+// creates tokens with 0 ttl and returns token in 'token.Name:token.Token' format
 func (m *userManager) EnsureToken(tokenName, description, kind, userName string) (string, error) {
 	return m.EnsureClusterToken("", tokenName, description, kind, userName)
 }
@@ -264,6 +276,143 @@ func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, ki
 	}
 
 	return token.Name + ":" + token.Token, nil
+}
+
+func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, ttl time.Duration, useExisting bool) (*v3.Token, error) {
+	key, err := randomtoken.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token key %v", err)
+	}
+
+	tokenTTL, err := tokens.ValidateMaxTTL(ttl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate token ttl %v", err)
+	}
+
+	token := &v3.Token{
+		ObjectMeta: v1.ObjectMeta{
+			Name: tokenName,
+			Labels: map[string]string{
+				tokens.UserIDLabel:    userName,
+				tokens.TokenKindLabel: kind,
+			},
+		},
+		Description:  description,
+		UserID:       userName,
+		AuthProvider: "local",
+		IsDerived:    true,
+		Token:        key,
+		ClusterName:  clusterName,
+	}
+
+	if tokenTTL.Minutes() > 0 {
+		token.TTLMillis = tokenTTL.Milliseconds()
+	}
+
+	logrus.Infof("Creating token for user %v", userName)
+	createdToken, err := m.tokens.Create(token)
+	if err == nil {
+		return createdToken, nil
+	}
+	if !apierrors.IsAlreadyExists(err) {
+		return nil, err
+	}
+	if useExisting {
+		return m.tokens.Get(tokenName, v1.GetOptions{})
+	}
+	// retry if can't use existing token
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		createdToken, err = m.tokens.Create(token)
+		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		token = createdToken
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+// creates kubeconfig tokens with KubeconfigTokenTTL and regenerates if existing token expired
+func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string) (*v3.Token, error) {
+	token, err := m.tokenLister.Get("", tokenName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	tokenTTL, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse setting [%s]: %v", settings.KubeconfigTokenTTLMinutes.Name, err)
+	}
+
+	if token == nil {
+		createdToken, err := m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, tokenTTL, true)
+		if err != nil {
+			return nil, err
+		}
+		token = createdToken
+	}
+
+	if token != nil && tokenUtil.IsExpired(*token) {
+		logrus.Debugf("getToken: deleting expired token %s", tokenName)
+		err := m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		token, err = m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, tokenTTL, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if token.ExpiresAt != "" {
+		return token, nil
+	}
+
+	// SetTokenExpiresAt requires creationTS, so can only be set post create
+	tokenCopy := token.DeepCopy()
+	tokenUtil.SetTokenExpiresAt(tokenCopy)
+
+	token, err = m.tokens.Update(tokenCopy)
+	if err != nil {
+		if !apierrors.IsConflict(err) {
+			return nil, fmt.Errorf("getToken: updating token [%s] failed [%v]", tokenName, err)
+		}
+
+		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+			token, err = m.tokens.Get(tokenName, v1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			if token.ExpiresAt == "" {
+				tokenCopy := token.DeepCopy()
+				tokenUtil.SetTokenExpiresAt(tokenCopy)
+
+				token, err = m.tokens.Update(tokenCopy)
+				if err != nil {
+					logrus.Debugf("getToken: updating token [%s] failed [%v]", tokenName, err)
+					if apierrors.IsConflict(err) {
+						return false, nil
+					}
+					return false, err
+				}
+			}
+			return true, nil
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("getToken: retry updating token [%s] failed [%v]", tokenName, err)
+		}
+	}
+
+	logrus.Debugf("getToken: token %s expiresAt %s", token.Name, token.ExpiresAt)
+	return token, nil
 }
 
 func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, error) {
