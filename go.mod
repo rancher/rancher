@@ -10,6 +10,9 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
 
+	github.com/rancher/rancher/pkg/apis => ./pkg/apis
+	github.com/rancher/rancher/pkg/client => ./pkg/client
+
 	k8s.io/api => k8s.io/api v0.18.8
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.8
 	k8s.io/apimachinery => k8s.io/apimachinery v0.18.8
@@ -82,12 +85,14 @@ require (
 	github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20200820225344-b715968cde24
+	github.com/rancher/rancher/pkg/apis v0.0.0
+	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee
 	github.com/rancher/rke v1.2.0-rc8
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200810194305-6ebfa39af82c
-	github.com/rancher/system-upgrade-controller v0.6.2
+	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
 	github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
