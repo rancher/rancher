@@ -3,19 +3,17 @@ package main
 import (
 	"os"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	controllergen "github.com/rancher/wrangler/pkg/controller-gen"
-
 	"github.com/coreos/prometheus-operator/pkg/apis/monitoring"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/codegen/generator"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	publicSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
-
+	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
+	controllergen "github.com/rancher/wrangler/pkg/controller-gen"
 	"github.com/rancher/wrangler/pkg/controller-gen/args"
 	appsv1 "k8s.io/api/apps/v1"
 	scalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -71,6 +69,13 @@ func main() {
 					"./pkg/apis/catalog.cattle.io/v1",
 				},
 				GenerateTypes: true,
+			},
+			"upgrade.cattle.io": {
+				PackageName: "upgrade.cattle.io",
+				Types: []interface{}{
+					planv1.Plan{},
+				},
+				GenerateClients: true,
 			},
 		},
 	})
