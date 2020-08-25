@@ -38,4 +38,10 @@ if [ ! -d build/system-charts ]; then
     mkdir -p build
     git clone --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts build/system-charts
 fi
-TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts $IMAGE $AGENT_IMAGE
+
+if [ ! -d build/charts ]; then
+    mkdir -p build
+    git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts build/charts
+fi
+
+TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts build/charts $IMAGE $AGENT_IMAGE

@@ -18,55 +18,81 @@ import (
 )
 
 const (
+	testChartBranch       = "dev-v2.5"
+	testChartCommit       = "3887f667bf6d8663032b7bd298d74d46018183ca"
 	testSystemChartBranch = "dev"
 	testSystemChartCommit = "7c183b98ceb8a7a50892cdb9a991fe627a782fe6"
 )
 
 func TestFetchImagesFromCharts(t *testing.T) {
 	systemChartPath := cloneTestSystemChart(t)
+	chartPath := cloneTestChart(t)
 
-	bothImages := []string{
+	systemChartBothImages := []string{
 		"rancher/fluentd:v0.1.16",
 	}
-	linuxImagesOnly := []string{
+	systemChartLinuxImagesOnly := []string{
 		"rancher/prom-alertmanager:v0.17.0",
 	}
-	windowsImagesOnly := []string{
+	systemChartWindowsImagesOnly := []string{
 		"rancher/wmi_exporter-package:v0.0.2",
 	}
+	chartLinuxImagesOnly := []string{
+		"rancher/istio-kubectl:1.5.8",
+	}
+	chartWindowsImagesOnly := []string{}
 
 	testCases := []struct {
 		caseName               string
 		inputPath              string
+		isLocalHelmRepo        bool
 		inputOsType            OSType
 		outputShouldContain    []string
 		outputShouldNotContain []string
 	}{
 		{
-			caseName:    "fetch linux images from charts",
-			inputPath:   systemChartPath,
-			inputOsType: Linux,
+			caseName:        "fetch linux images from system charts",
+			inputPath:       systemChartPath,
+			isLocalHelmRepo: false,
+			inputOsType:     Linux,
 			outputShouldContain: flatStringSlice(
-				bothImages,
-				linuxImagesOnly,
+				systemChartBothImages,
+				systemChartLinuxImagesOnly,
 			),
-			outputShouldNotContain: windowsImagesOnly,
+			outputShouldNotContain: systemChartWindowsImagesOnly,
 		},
 		{
-			caseName:    "fetch windows images from charts",
-			inputPath:   systemChartPath,
-			inputOsType: Windows,
+			caseName:        "fetch windows images from system charts",
+			inputPath:       systemChartPath,
+			isLocalHelmRepo: false,
+			inputOsType:     Windows,
 			outputShouldContain: flatStringSlice(
-				bothImages,
-				windowsImagesOnly,
+				systemChartBothImages,
+				systemChartWindowsImagesOnly,
 			),
-			outputShouldNotContain: linuxImagesOnly,
+			outputShouldNotContain: systemChartLinuxImagesOnly,
+		},
+		{
+			caseName:               "fetch linux images from charts",
+			inputPath:              chartPath,
+			isLocalHelmRepo:        true,
+			inputOsType:            Linux,
+			outputShouldContain:    chartLinuxImagesOnly,
+			outputShouldNotContain: chartWindowsImagesOnly,
+		},
+		{
+			caseName:               "fetch windows images from charts",
+			inputPath:              chartPath,
+			isLocalHelmRepo:        true,
+			inputOsType:            Windows,
+			outputShouldContain:    chartWindowsImagesOnly,
+			outputShouldNotContain: chartLinuxImagesOnly,
 		},
 	}
 
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
-		images, err := fetchImagesFromCharts(cs.inputPath, cs.inputOsType)
+		images, err := fetchImagesFromCharts(cs.inputPath, cs.isLocalHelmRepo, cs.inputOsType)
 		assert.Nilf(err, "%s, failed to fetch images from charts", cs.caseName)
 		if len(cs.outputShouldContain) > 0 {
 			assert.Subset(images, cs.outputShouldContain, cs.caseName)
@@ -184,6 +210,7 @@ func TestNormalizeImages(t *testing.T) {
 
 func TestGetImages(t *testing.T) {
 	systemChartPath := cloneTestSystemChart(t)
+	chartPath := cloneTestChart(t)
 	linuxInfo, windowsInfo, err := getTestK8sVersionInfo()
 	if err != nil {
 		t.Error(err)
@@ -209,6 +236,7 @@ func TestGetImages(t *testing.T) {
 	testCases := []struct {
 		caseName               string
 		inputSystemChartPath   string
+		inputChartPath         string
 		inputImagesFromArgs    []string
 		inputRkeSystemImages   map[string]rketypes.RKESystemImages
 		inputOsType            OSType
@@ -218,6 +246,7 @@ func TestGetImages(t *testing.T) {
 		{
 			caseName:             "get linux images",
 			inputSystemChartPath: systemChartPath,
+			inputChartPath:       chartPath,
 			inputImagesFromArgs: []string{
 				"rancher/rancher:master-head",
 				"rancher/rancher-agent:master-head",
@@ -233,6 +262,7 @@ func TestGetImages(t *testing.T) {
 		{
 			caseName:             "get windows images",
 			inputSystemChartPath: systemChartPath,
+			inputChartPath:       chartPath,
 			inputImagesFromArgs: []string{
 				"rancher/rancher-agent:master-head",
 			},
@@ -248,7 +278,7 @@ func TestGetImages(t *testing.T) {
 
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
-		images, err := GetImages(cs.inputSystemChartPath, []string{}, cs.inputImagesFromArgs, cs.inputRkeSystemImages, cs.inputOsType)
+		images, err := GetImages(cs.inputSystemChartPath, cs.inputChartPath, []string{}, cs.inputImagesFromArgs, cs.inputRkeSystemImages, cs.inputOsType)
 		assert.Nilf(err, "%s, failed to get images", cs.caseName)
 		if len(cs.outputShouldContain) > 0 {
 			assert.Subset(images, cs.outputShouldContain, cs.caseName)
@@ -313,6 +343,43 @@ func cloneTestSystemChart(t *testing.T) string {
 		t.Fatalf("failed to checkout system chart: %s, %v", string(gitCheckoutOutput), err)
 	}
 	fmt.Printf("Checked out system charts to %s\n", testSystemChartCommit)
+
+	return tempDir
+}
+
+func cloneTestChart(t *testing.T) string {
+	tempDir, err := ioutil.TempDir("", "chart")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Minute)
+	defer cancel()
+
+	gitCloneCmd := exec.CommandContext(ctx, "git", "clone",
+		"--branch", testChartBranch,
+		"--single-branch",
+		"https://github.com/rancher/charts.git",
+		tempDir,
+	)
+	fmt.Printf("Cloning charts (branch: %s) into %s\n", testChartBranch, tempDir)
+	gitCloneCmdOutput, err := gitCloneCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to clone  chart: %s, %v", string(gitCloneCmdOutput), err)
+	}
+	fmt.Printf("Cloned  charts (branch: %s) into %s\n", testChartBranch, tempDir)
+
+	gitCheckoutCmd := exec.CommandContext(ctx, "git",
+		"-C", tempDir,
+		"checkout",
+		testChartCommit,
+	)
+	fmt.Printf("Checking out charts to %s\n", testChartCommit)
+	gitCheckoutOutput, err := gitCheckoutCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to checkout chart: %s, %v", string(gitCheckoutOutput), err)
+	}
+	fmt.Printf("Checked out charts to %s\n", testChartCommit)
 
 	return tempDir
 }

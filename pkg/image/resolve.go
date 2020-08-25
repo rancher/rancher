@@ -46,12 +46,13 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	return image
 }
 
-func getChartAndVersion(path string) (map[string]string, error) {
+func getChartAndVersion(path string, isLocalHelmRepo bool) (map[string]string, error) {
 	rtn := map[string]string{}
 	helm := libhelm.Helm{
-		LocalPath: path,
-		IconPath:  path,
-		Hash:      "",
+		IsLocalHelmRepo: isLocalHelmRepo,
+		LocalPath:       path,
+		IconPath:        path,
+		Hash:            "",
 	}
 	index, err := helm.LoadIndex()
 	if err != nil {
@@ -60,6 +61,12 @@ func getChartAndVersion(path string) (map[string]string, error) {
 	for k, versions := range index.IndexFile.Entries {
 		// because versions is sorted in reverse order, the first one will be the latest version
 		if len(versions) > 0 {
+			// extract version's tgz of a local helm repo for access of chart's files later
+			if isLocalHelmRepo {
+				if err := helm.ExtractTgz(versions[0]); err != nil {
+					return nil, err
+				}
+			}
 			rtn[k] = versions[0].Dir
 		}
 	}
@@ -133,12 +140,23 @@ func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[inte
 	}
 }
 
-func GetImages(systemChartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, error) {
+func GetImages(systemChartPath, chartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, error) {
 	var images []string
 
-	// fetch images from charts
+	// fetch images from system charts
 	if systemChartPath != "" {
-		imagesInCharts, err := fetchImagesFromCharts(systemChartPath, osType)
+		isLocalHelmRepo := false
+		imagesInSystemCharts, err := fetchImagesFromCharts(systemChartPath, isLocalHelmRepo, osType)
+		if err != nil {
+			return []string{}, errors.Wrap(err, "failed to fetch images from system charts")
+		}
+		images = append(images, imagesInSystemCharts...)
+	}
+
+	// fetch images from charts
+	if chartPath != "" {
+		isLocalHelmRepo := true
+		imagesInCharts, err := fetchImagesFromCharts(chartPath, isLocalHelmRepo, osType)
 		if err != nil {
 			return []string{}, errors.Wrap(err, "failed to fetch images from charts")
 		}
@@ -172,8 +190,8 @@ func GetImages(systemChartPath string, k3sUpgradeImages, imagesFromArgs []string
 	return normalizeImages(images), nil
 }
 
-func fetchImagesFromCharts(path string, osType OSType) ([]string, error) {
-	chartVersion, err := getChartAndVersion(path)
+func fetchImagesFromCharts(path string, isLocalHelmRepo bool, osType OSType) ([]string, error) {
+	chartVersion, err := getChartAndVersion(path, isLocalHelmRepo)
 	if err != nil {
 		return []string{}, errors.Wrapf(err, "failed to get chart and version from %q", path)
 	}

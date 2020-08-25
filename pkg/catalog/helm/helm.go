@@ -47,16 +47,17 @@ var (
 )
 
 type Helm struct {
-	LocalPath   string
-	IconPath    string
-	catalogName string
-	Hash        string
-	Kind        string
-	url         string
-	branch      string
-	username    string
-	password    string
-	lastCommit  string
+	IsLocalHelmRepo bool
+	LocalPath       string
+	IconPath        string
+	catalogName     string
+	Hash            string
+	Kind            string
+	url             string
+	branch          string
+	username        string
+	password        string
+	lastCommit      string
 }
 
 func (h *Helm) lock() {
@@ -185,23 +186,23 @@ func (h *Helm) LoadIndex() (*RepoIndex, error) {
 	return helmRepoIndex, yaml.Unmarshal(body, helmRepoIndex.IndexFile)
 }
 
-func (h *Helm) fetchTgz(helmURL string) ([]v32.File, error) {
-	var files []v32.File
-	logrus.Debugf("Helm fetching file %s", helmURL)
-
-	resp, err := h.request(helmURL)
-	if err != nil || resp.StatusCode > 400 {
-		if e, ok := err.(net.Error); ok && e.Timeout() {
-			return nil, errors.Errorf("Timeout in HTTP GET to [%s], did not respond in %s", helmURL, httpTimeout)
-		}
-		if err == nil {
-			return nil, errors.Errorf("Error in HTTP GET of [%s], received: %s", helmURL, resp.Status)
-		}
-		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", helmURL, err)
+func (h *Helm) ExtractTgz(version *ChartVersion) error {
+	logrus.Debugf("Helm extracting file %s", version.URLs[0])
+	tgzDir := filepath.Dir(version.URLs[0])
+	versionPath := filepath.Join(h.LocalPath, tgzDir, version.Name)
+	_, err := h.fetchAndCacheURLs(versionPath, version.Name, version.URLs, []string{})
+	if err != nil {
+		return err
 	}
-	defer resp.Body.Close()
+	version.Dir = filepath.Join(tgzDir, version.Name)
 
-	gzf, err := gzip.NewReader(resp.Body)
+	return nil
+}
+
+func readTgz(reader io.Reader) ([]v32.File, error) {
+	var files []v32.File
+
+	gzf, err := gzip.NewReader(reader)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +214,6 @@ func (h *Helm) fetchTgz(helmURL string) ([]v32.File, error) {
 		if err == io.EOF {
 			break
 		}
-
 		if err != nil {
 			return nil, err
 		}
@@ -233,6 +233,42 @@ func (h *Helm) fetchTgz(helmURL string) ([]v32.File, error) {
 				Name:     name,
 				Contents: string(contents),
 			})
+		}
+	}
+
+	return files, nil
+}
+
+func (h *Helm) fetchTgz(helmURL string) ([]v32.File, error) {
+	var files []v32.File
+	logrus.Debugf("Helm fetching file %s", helmURL)
+
+	if h.IsLocalHelmRepo {
+		tgzPath := filepath.Join(h.LocalPath, helmURL)
+		r, err := os.Open(tgzPath)
+		if err != nil {
+			return nil, err
+		}
+		defer r.Close()
+		files, err = readTgz(r)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		resp, err := h.request(helmURL)
+		if err != nil || resp.StatusCode > 400 {
+			if e, ok := err.(net.Error); ok && e.Timeout() {
+				return nil, errors.Errorf("Timeout in HTTP GET to [%s], did not respond in %s", helmURL, httpTimeout)
+			}
+			if err == nil {
+				return nil, errors.Errorf("Error in HTTP GET of [%s], received: %s", helmURL, resp.Status)
+			}
+			return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", helmURL, err)
+		}
+		defer resp.Body.Close()
+		files, err = readTgz(resp.Body)
+		if err != nil {
+			return nil, err
 		}
 	}
 
