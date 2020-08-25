@@ -60,6 +60,7 @@ var (
 	TLSMinVersion                     = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                        = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
 	UIBanners                         = NewSetting("ui-banners", "{}")
+	UIDefaultLanding                  = NewSetting("ui-default-landing", "")
 	UIFeedBackForm                    = NewSetting("ui-feedback-form", "")
 	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
 	UIPath                            = NewSetting("ui-path", "/usr/share/rancher/ui")
