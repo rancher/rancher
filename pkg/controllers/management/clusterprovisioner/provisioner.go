@@ -792,6 +792,9 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 func (p *Provisioner) getSystemImages(spec apimgmtv3.ClusterSpec) (*rketypes.RKESystemImages, error) {
 	// fetch system images from settings
 	version := spec.RancherKubernetesEngineConfig.Version
+	if version == "" {
+		return nil, fmt.Errorf("kubernete version (spec.rancherKubernetesEngineConfig.kubernetesVersion) is unset")
+	}
 	systemImages, err := kd.GetRKESystemImages(version, p.RKESystemImagesLister, p.RKESystemImages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find system images for version %s: %v", version, err)
