@@ -329,7 +329,7 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 	}
 	if !labelsEqual {
 		logrus.Debugf("serviceOptions labels changed %s old: %v new: %v", name, svcOptionCopy.Labels, exists)
-		updateLabel(svcOptionCopy.Labels, exists)
+		svcOptionCopy.Labels = updateLabel(svcOptionCopy.Labels, exists)
 	}
 	if svcOptionCopy != nil {
 		if _, err := md.ServiceOptions.Update(svcOptionCopy); err != nil {
@@ -378,7 +378,7 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 	}
 	if !labelsEqual {
 		logrus.Debugf("addonTemplate labels changed %s old: %v new: %v", addonName, addonCopy.Labels, exists)
-		updateLabel(addonCopy.Labels, exists)
+		addonCopy.Labels = updateLabel(addonCopy.Labels, exists)
 	}
 	if addonCopy != nil {
 		if _, err := md.Addons.Update(addonCopy); err != nil {
@@ -800,11 +800,16 @@ func labelEqual(labels map[string]string, exists bool) bool {
 	return toSendValue == labels[sendRKELabel]
 }
 
-func updateLabel(labels map[string]string, exists bool) {
+func updateLabel(labels map[string]string, exists bool) map[string]string {
 	if exists {
+		if labels == nil {
+			return map[string]string{
+				sendRKELabel: "false",
+			}
+		}
 		labels[sendRKELabel] = "false"
-	} else {
-		delete(labels, sendRKELabel)
+		return labels
 	}
-
+	delete(labels, sendRKELabel)
+	return labels
 }
