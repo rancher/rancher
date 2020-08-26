@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -65,6 +65,7 @@ func EtcdCommand() cli.Command {
 			Usage: "Specify s3 folder name",
 		},
 	}
+
 	snapshotSaveFlags := append(snapshotFlags, commonFlags...)
 
 	snapshotRestoreFlags := []cli.Flag{
@@ -345,6 +346,9 @@ func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 	useLocalState := ctx.Bool("use-local-state")
 
 	flags := cluster.GetExternalFlags(false, false, false, useLocalState, "", filePath)
+	// Custom certificates and certificate dir flags
+	flags.CertificateDir = ctx.String("cert-dir")
+	flags.CustomCerts = ctx.Bool("custom-certs")
 
 	_, _, _, _, _, err = RestoreEtcdSnapshot(context.Background(), rkeConfig, hosts.DialersOptions{}, flags, map[string]interface{}{}, etcdSnapshotName)
 	return err

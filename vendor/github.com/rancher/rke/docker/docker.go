@@ -21,7 +21,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/metadata"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 )

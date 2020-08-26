@@ -1,4 +1,4 @@
-package generic
+package controller
 
 import (
 	"context"
@@ -11,6 +11,18 @@ type HandlerTransaction struct {
 	parent context.Context
 	done   chan struct{}
 	result bool
+}
+
+func (h *HandlerTransaction) do(f func()) {
+	if h == nil {
+		f()
+	} else {
+		go func() {
+			if h.shouldContinue() {
+				f()
+			}
+		}()
+	}
 }
 
 func (h *HandlerTransaction) shouldContinue() bool {

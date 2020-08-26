@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -23,8 +22,8 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/rke/services"
+	v3 "github.com/rancher/rke/types"
 	"github.com/rancher/rke/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
@@ -1121,7 +1120,7 @@ func (c *Cluster) getPrefixPath(os string) string {
 	case os == "windows" && c.WindowsPrefixPath != "":
 		return util.CleanWindowsPath(c.WindowsPrefixPath)
 	default:
-		return filepath.Clean(c.PrefixPath)
+		return c.PrefixPath
 	}
 }
 
