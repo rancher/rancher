@@ -57,8 +57,8 @@ var (
 	FeatureResourceName                                 = "features"
 	FreeIpaProviderResourceName                         = "freeipaproviders"
 	GithubProviderResourceName                          = "githubproviders"
-	GlobalDNSProviderResourceName                       = "globaldnsproviders"
 	GlobalDnsResourceName                               = "globaldnses"
+	GlobalDnsProviderResourceName                       = "globaldnsproviders"
 	GlobalRoleResourceName                              = "globalroles"
 	GlobalRoleBindingResourceName                       = "globalrolebindings"
 	GoogleOAuthProviderResourceName                     = "googleoauthproviders"
@@ -182,10 +182,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&FreeIpaProviderList{},
 		&GithubProvider{},
 		&GithubProviderList{},
-		&GlobalDNSProvider{},
-		&GlobalDNSProviderList{},
 		&GlobalDns{},
 		&GlobalDnsList{},
+		&GlobalDnsProvider{},
+		&GlobalDnsProviderList{},
 		&GlobalRole{},
 		&GlobalRoleList{},
 		&GlobalRoleBinding{},

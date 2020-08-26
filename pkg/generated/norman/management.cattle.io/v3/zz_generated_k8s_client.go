@@ -59,7 +59,7 @@ type Interface interface {
 	MultiClusterAppsGetter
 	MultiClusterAppRevisionsGetter
 	GlobalDnsesGetter
-	GlobalDNSProvidersGetter
+	GlobalDnsProvidersGetter
 	KontainerDriversGetter
 	EtcdBackupsGetter
 	ClusterScansGetter
@@ -786,13 +786,13 @@ func (c *Client) GlobalDnses(namespace string) GlobalDnsInterface {
 	}
 }
 
-type GlobalDNSProvidersGetter interface {
-	GlobalDNSProviders(namespace string) GlobalDNSProviderInterface
+type GlobalDnsProvidersGetter interface {
+	GlobalDnsProviders(namespace string) GlobalDnsProviderInterface
 }
 
-func (c *Client) GlobalDNSProviders(namespace string) GlobalDNSProviderInterface {
-	sharedClient := c.clientFactory.ForResourceKind(GlobalDNSProviderGroupVersionResource, GlobalDNSProviderGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GlobalDNSProviderResource, GlobalDNSProviderGroupVersionKind, globalDnsProviderFactory{})
+func (c *Client) GlobalDnsProviders(namespace string) GlobalDnsProviderInterface {
+	sharedClient := c.clientFactory.ForResourceKind(GlobalDnsProviderGroupVersionResource, GlobalDnsProviderGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GlobalDnsProviderResource, GlobalDnsProviderGroupVersionKind, globalDnsProviderFactory{})
 	return &globalDnsProviderClient{
 		ns:           namespace,
 		client:       c,

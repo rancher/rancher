@@ -59,8 +59,8 @@ type Interface interface {
 	Feature() FeatureController
 	FreeIpaProvider() FreeIpaProviderController
 	GithubProvider() GithubProviderController
-	GlobalDNSProvider() GlobalDNSProviderController
 	GlobalDns() GlobalDnsController
+	GlobalDnsProvider() GlobalDnsProviderController
 	GlobalRole() GlobalRoleController
 	GlobalRoleBinding() GlobalRoleBindingController
 	GoogleOAuthProvider() GoogleOAuthProviderController
@@ -202,11 +202,11 @@ func (c *version) FreeIpaProvider() FreeIpaProviderController {
 func (c *version) GithubProvider() GithubProviderController {
 	return NewGithubProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GithubProvider"}, "githubproviders", false, c.controllerFactory)
 }
-func (c *version) GlobalDNSProvider() GlobalDNSProviderController {
-	return NewGlobalDNSProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalDNSProvider"}, "globaldnsproviders", true, c.controllerFactory)
-}
 func (c *version) GlobalDns() GlobalDnsController {
 	return NewGlobalDnsController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalDns"}, "globaldnses", true, c.controllerFactory)
+}
+func (c *version) GlobalDnsProvider() GlobalDnsProviderController {
+	return NewGlobalDnsProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalDnsProvider"}, "globaldnsproviders", true, c.controllerFactory)
 }
 func (c *version) GlobalRole() GlobalRoleController {
 	return NewGlobalRoleController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalRole"}, "globalroles", false, c.controllerFactory)

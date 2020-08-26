@@ -502,23 +502,6 @@ func NewGithubProvider(namespace, name string, obj GithubProvider) *GithubProvid
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GlobalDNSProviderList is a list of GlobalDNSProvider resources
-type GlobalDNSProviderList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []GlobalDNSProvider `json:"items"`
-}
-
-func NewGlobalDNSProvider(namespace, name string, obj GlobalDNSProvider) *GlobalDNSProvider {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("GlobalDNSProvider").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // GlobalDnsList is a list of GlobalDns resources
 type GlobalDnsList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -529,6 +512,23 @@ type GlobalDnsList struct {
 
 func NewGlobalDns(namespace, name string, obj GlobalDns) *GlobalDns {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("GlobalDns").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// GlobalDnsProviderList is a list of GlobalDnsProvider resources
+type GlobalDnsProviderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GlobalDnsProvider `json:"items"`
+}
+
+func NewGlobalDnsProvider(namespace, name string, obj GlobalDnsProvider) *GlobalDnsProvider {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("GlobalDnsProvider").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

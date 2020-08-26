@@ -141,7 +141,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.UserAttributeType,
 		client.UserType,
 		client.GlobalDnsType,
-		client.GlobalDNSProviderType,
+		client.GlobalDnsProviderType,
 		client.ClusterTemplateType,
 		client.ClusterTemplateRevisionType,
 	)
@@ -810,7 +810,7 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localC
 }
 
 func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
-	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSProviderType)
+	schema := schemas.Schema(&managementschema.Version, client.GlobalDnsProviderType)
 	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
 	schema.Store = globaldnsAPIStore.ProviderWrap(schema.Store)
 	if !localClusterEnabled {
@@ -820,7 +820,7 @@ func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext
 }
 
 func GlobalDNSProvidersPwdWrap(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
-	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSProviderType)
+	schema := schemas.Schema(&managementschema.Version, client.GlobalDnsProviderType)
 	schema.Store = globaldnsAPIStore.ProviderPwdWrap(schema.Store)
 }
 

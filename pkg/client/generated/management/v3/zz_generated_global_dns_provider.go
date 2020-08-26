@@ -5,23 +5,23 @@ import (
 )
 
 const (
-	GlobalDNSProviderType                          = "globalDnsProvider"
-	GlobalDNSProviderFieldAlidnsProviderConfig     = "alidnsProviderConfig"
-	GlobalDNSProviderFieldAnnotations              = "annotations"
-	GlobalDNSProviderFieldCloudflareProviderConfig = "cloudflareProviderConfig"
-	GlobalDNSProviderFieldCreated                  = "created"
-	GlobalDNSProviderFieldCreatorID                = "creatorId"
-	GlobalDNSProviderFieldLabels                   = "labels"
-	GlobalDNSProviderFieldMembers                  = "members"
-	GlobalDNSProviderFieldName                     = "name"
-	GlobalDNSProviderFieldOwnerReferences          = "ownerReferences"
-	GlobalDNSProviderFieldRemoved                  = "removed"
-	GlobalDNSProviderFieldRootDomain               = "rootDomain"
-	GlobalDNSProviderFieldRoute53ProviderConfig    = "route53ProviderConfig"
-	GlobalDNSProviderFieldUUID                     = "uuid"
+	GlobalDnsProviderType                          = "globalDnsProvider"
+	GlobalDnsProviderFieldAlidnsProviderConfig     = "alidnsProviderConfig"
+	GlobalDnsProviderFieldAnnotations              = "annotations"
+	GlobalDnsProviderFieldCloudflareProviderConfig = "cloudflareProviderConfig"
+	GlobalDnsProviderFieldCreated                  = "created"
+	GlobalDnsProviderFieldCreatorID                = "creatorId"
+	GlobalDnsProviderFieldLabels                   = "labels"
+	GlobalDnsProviderFieldMembers                  = "members"
+	GlobalDnsProviderFieldName                     = "name"
+	GlobalDnsProviderFieldOwnerReferences          = "ownerReferences"
+	GlobalDnsProviderFieldRemoved                  = "removed"
+	GlobalDnsProviderFieldRootDomain               = "rootDomain"
+	GlobalDnsProviderFieldRoute53ProviderConfig    = "route53ProviderConfig"
+	GlobalDnsProviderFieldUUID                     = "uuid"
 )
 
-type GlobalDNSProvider struct {
+type GlobalDnsProvider struct {
 	types.Resource
 	AlidnsProviderConfig     *AlidnsProviderConfig     `json:"alidnsProviderConfig,omitempty" yaml:"alidnsProviderConfig,omitempty"`
 	Annotations              map[string]string         `json:"annotations,omitempty" yaml:"annotations,omitempty"`
@@ -38,59 +38,59 @@ type GlobalDNSProvider struct {
 	UUID                     string                    `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
-type GlobalDNSProviderCollection struct {
+type GlobalDnsProviderCollection struct {
 	types.Collection
-	Data   []GlobalDNSProvider `json:"data,omitempty"`
-	client *GlobalDNSProviderClient
+	Data   []GlobalDnsProvider `json:"data,omitempty"`
+	client *GlobalDnsProviderClient
 }
 
-type GlobalDNSProviderClient struct {
+type GlobalDnsProviderClient struct {
 	apiClient *Client
 }
 
-type GlobalDNSProviderOperations interface {
-	List(opts *types.ListOpts) (*GlobalDNSProviderCollection, error)
-	ListAll(opts *types.ListOpts) (*GlobalDNSProviderCollection, error)
-	Create(opts *GlobalDNSProvider) (*GlobalDNSProvider, error)
-	Update(existing *GlobalDNSProvider, updates interface{}) (*GlobalDNSProvider, error)
-	Replace(existing *GlobalDNSProvider) (*GlobalDNSProvider, error)
-	ByID(id string) (*GlobalDNSProvider, error)
-	Delete(container *GlobalDNSProvider) error
+type GlobalDnsProviderOperations interface {
+	List(opts *types.ListOpts) (*GlobalDnsProviderCollection, error)
+	ListAll(opts *types.ListOpts) (*GlobalDnsProviderCollection, error)
+	Create(opts *GlobalDnsProvider) (*GlobalDnsProvider, error)
+	Update(existing *GlobalDnsProvider, updates interface{}) (*GlobalDnsProvider, error)
+	Replace(existing *GlobalDnsProvider) (*GlobalDnsProvider, error)
+	ByID(id string) (*GlobalDnsProvider, error)
+	Delete(container *GlobalDnsProvider) error
 }
 
-func newGlobalDNSProviderClient(apiClient *Client) *GlobalDNSProviderClient {
-	return &GlobalDNSProviderClient{
+func newGlobalDnsProviderClient(apiClient *Client) *GlobalDnsProviderClient {
+	return &GlobalDnsProviderClient{
 		apiClient: apiClient,
 	}
 }
 
-func (c *GlobalDNSProviderClient) Create(container *GlobalDNSProvider) (*GlobalDNSProvider, error) {
-	resp := &GlobalDNSProvider{}
-	err := c.apiClient.Ops.DoCreate(GlobalDNSProviderType, container, resp)
+func (c *GlobalDnsProviderClient) Create(container *GlobalDnsProvider) (*GlobalDnsProvider, error) {
+	resp := &GlobalDnsProvider{}
+	err := c.apiClient.Ops.DoCreate(GlobalDnsProviderType, container, resp)
 	return resp, err
 }
 
-func (c *GlobalDNSProviderClient) Update(existing *GlobalDNSProvider, updates interface{}) (*GlobalDNSProvider, error) {
-	resp := &GlobalDNSProvider{}
-	err := c.apiClient.Ops.DoUpdate(GlobalDNSProviderType, &existing.Resource, updates, resp)
+func (c *GlobalDnsProviderClient) Update(existing *GlobalDnsProvider, updates interface{}) (*GlobalDnsProvider, error) {
+	resp := &GlobalDnsProvider{}
+	err := c.apiClient.Ops.DoUpdate(GlobalDnsProviderType, &existing.Resource, updates, resp)
 	return resp, err
 }
 
-func (c *GlobalDNSProviderClient) Replace(obj *GlobalDNSProvider) (*GlobalDNSProvider, error) {
-	resp := &GlobalDNSProvider{}
-	err := c.apiClient.Ops.DoReplace(GlobalDNSProviderType, &obj.Resource, obj, resp)
+func (c *GlobalDnsProviderClient) Replace(obj *GlobalDnsProvider) (*GlobalDnsProvider, error) {
+	resp := &GlobalDnsProvider{}
+	err := c.apiClient.Ops.DoReplace(GlobalDnsProviderType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
-func (c *GlobalDNSProviderClient) List(opts *types.ListOpts) (*GlobalDNSProviderCollection, error) {
-	resp := &GlobalDNSProviderCollection{}
-	err := c.apiClient.Ops.DoList(GlobalDNSProviderType, opts, resp)
+func (c *GlobalDnsProviderClient) List(opts *types.ListOpts) (*GlobalDnsProviderCollection, error) {
+	resp := &GlobalDnsProviderCollection{}
+	err := c.apiClient.Ops.DoList(GlobalDnsProviderType, opts, resp)
 	resp.client = c
 	return resp, err
 }
 
-func (c *GlobalDNSProviderClient) ListAll(opts *types.ListOpts) (*GlobalDNSProviderCollection, error) {
-	resp := &GlobalDNSProviderCollection{}
+func (c *GlobalDnsProviderClient) ListAll(opts *types.ListOpts) (*GlobalDnsProviderCollection, error) {
+	resp := &GlobalDnsProviderCollection{}
 	resp, err := c.List(opts)
 	if err != nil {
 		return resp, err
@@ -107,9 +107,9 @@ func (c *GlobalDNSProviderClient) ListAll(opts *types.ListOpts) (*GlobalDNSProvi
 	return resp, err
 }
 
-func (cc *GlobalDNSProviderCollection) Next() (*GlobalDNSProviderCollection, error) {
+func (cc *GlobalDnsProviderCollection) Next() (*GlobalDnsProviderCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
-		resp := &GlobalDNSProviderCollection{}
+		resp := &GlobalDnsProviderCollection{}
 		err := cc.client.apiClient.Ops.DoNext(cc.Pagination.Next, resp)
 		resp.client = cc.client
 		return resp, err
@@ -117,12 +117,12 @@ func (cc *GlobalDNSProviderCollection) Next() (*GlobalDNSProviderCollection, err
 	return nil, nil
 }
 
-func (c *GlobalDNSProviderClient) ByID(id string) (*GlobalDNSProvider, error) {
-	resp := &GlobalDNSProvider{}
-	err := c.apiClient.Ops.DoByID(GlobalDNSProviderType, id, resp)
+func (c *GlobalDnsProviderClient) ByID(id string) (*GlobalDnsProvider, error) {
+	resp := &GlobalDnsProvider{}
+	err := c.apiClient.Ops.DoByID(GlobalDnsProviderType, id, resp)
 	return resp, err
 }
 
-func (c *GlobalDNSProviderClient) Delete(container *GlobalDNSProvider) error {
-	return c.apiClient.Ops.DoResourceDelete(GlobalDNSProviderType, &container.Resource)
+func (c *GlobalDnsProviderClient) Delete(container *GlobalDnsProvider) error {
+	return c.apiClient.Ops.DoResourceDelete(GlobalDnsProviderType, &container.Resource)
 }
