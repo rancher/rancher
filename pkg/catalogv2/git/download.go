@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/pkg/git"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -62,7 +64,7 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string) error
 	return git.Ensure(commit)
 }
 
-func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string) (*Git, error) {
+func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string) (*git.Git, error) {
 	u, err := url.Parse(gitURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
@@ -72,8 +74,13 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string) (*Git, er
 
 	}
 	dir := gitDir(namespace, name, gitURL)
-	return NewGit(dir, gitURL, &Options{
+	headers := map[string]string{}
+	if settings.InstallUUID.Get() != "" {
+		headers["X-Install-Uuid"] = settings.InstallUUID.Get()
+	}
+	return git.NewGit(dir, gitURL, &git.Options{
 		Credential: secret,
+		Headers:    headers,
 	})
 }
 
