@@ -31,12 +31,10 @@ github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX
 github.com/Azure/go-autorest v12.2.0+incompatible h1:2Fxszbg492oAJrcvJlgyVaTqnQYRkxmEK6VPCLLVpBI=
 github.com/Azure/go-autorest v12.2.0+incompatible/go.mod h1:r+4oMnoxhatjLLJ6zxSWATqVooLgysK6ZNox3g/xq24=
 github.com/Azure/go-autorest/autorest v0.9.0/go.mod h1:xyHB1BMZT0cuDHU7I0+g046+BFDTQ8rEZB0s4Yfa6bI=
-github.com/Azure/go-autorest/autorest v0.9.3-0.20191028180845-3492b2aff503 h1:uUhdsDMg2GbFLF5GfQPtLMWd5vdDZSfqvqQp3waafxQ=
 github.com/Azure/go-autorest/autorest v0.9.3-0.20191028180845-3492b2aff503/go.mod h1:xyHB1BMZT0cuDHU7I0+g046+BFDTQ8rEZB0s4Yfa6bI=
 github.com/Azure/go-autorest/autorest v0.9.6 h1:5YWtOnckcudzIw8lPPBcWOnmIFWMtHci1ZWAZulMSx0=
 github.com/Azure/go-autorest/autorest v0.9.6/go.mod h1:/FALq9T/kS7b5J5qsQ+RSTUdAmGFqi0vUdVNNx8q630=
 github.com/Azure/go-autorest/autorest/adal v0.5.0/go.mod h1:8Z9fGy2MpX0PvDjB1pEgQTmVqjGhiHBW7RJJEciWzS0=
-github.com/Azure/go-autorest/autorest/adal v0.8.1-0.20191028180845-3492b2aff503 h1:Hxqlh1uAA8aGpa1dFhDNhll7U/rkWtG8ZItFvRMr7l0=
 github.com/Azure/go-autorest/autorest/adal v0.8.1-0.20191028180845-3492b2aff503/go.mod h1:Z6vX6WXXuyieHAXwMj0S6HY6e6wcHn37qQMBQlvY3lc=
 github.com/Azure/go-autorest/autorest/adal v0.8.2 h1:O1X4oexUxnZCaEUGsvMnr8ZGj8HI37tNezwY4npRqA0=
 github.com/Azure/go-autorest/autorest/adal v0.8.2/go.mod h1:ZjhuQClTqx435SRJ2iMlOxPYt3d2C/T/7TiQCVZSn3Q=
@@ -74,7 +72,6 @@ github.com/Masterminds/semver/v3 v3.0.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0
 github.com/Masterminds/sprig/v3 v3.0.0 h1:KSQz7Nb08/3VU9E4ns29dDxcczhOD1q7O1UfM4G3t3g=
 github.com/Masterminds/sprig/v3 v3.0.0/go.mod h1:NEUY/Qq8Gdm2xgYA+NwJM6wmfdRV9xkh8h/Rld20R0U=
 github.com/Microsoft/go-winio v0.4.12/go.mod h1:VhR8bwka0BXejwEJY73c50VrPtXAaKcyvVC4A4RozmA=
-github.com/Microsoft/go-winio v0.4.14 h1:+hMXMk01us9KgxGb7ftKQt2Xpf5hH/yky+TDA+qxleU=
 github.com/Microsoft/go-winio v0.4.14/go.mod h1:qXqCSQ3Xa7+6tgxaGTIe4Kpcdsi+P8jBhyzoq1bpyYA=
 github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5 h1:ygIc8M6trr62pF5DucadTWGdEB4mEyvzi0e2nbcmcyA=
 github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5/go.mod h1:tTuCMEN+UleMWgg9dVx4Hu52b1bJo+59jBh3ajtinzw=
@@ -306,7 +303,6 @@ github.com/globalsign/mgo v0.0.0-20180905125535-1ca0a4f7cbcb/go.mod h1:xkRDCp4j0
 github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8/go.mod h1:xkRDCp4j0OGD1HRkm4kmhM+pmpv3AKq5SU7GMg4oO/Q=
 github.com/go-acme/lego v2.5.0+incompatible/go.mod h1:yzMNe9CasVUhkquNvti5nAtPmG94USbYxYrZfTkIn0M=
 github.com/go-bindata/go-bindata v3.1.1+incompatible/go.mod h1:xK8Dsgwmeed+BBsSy2XTopBn/8uK2HWuGSnA11C3Joo=
-github.com/go-bindata/go-bindata v3.1.2+incompatible h1:5vjJMVhowQdPzjE1LdxyFF7YFTXg5IgGVW4gBr5IbvE=
 github.com/go-bindata/go-bindata v3.1.2+incompatible/go.mod h1:xK8Dsgwmeed+BBsSy2XTopBn/8uK2HWuGSnA11C3Joo=
 github.com/go-critic/go-critic v0.3.5-0.20190526074819-1df300866540/go.mod h1:+sE8vrLDS2M0pZkBk0wy6+nLdKexVDrl/jBqQOTDThA=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
@@ -847,11 +843,8 @@ github.com/rancher/kontainer-engine v0.0.4-dev.0.20200805195909-3e842ecc0384 h1:
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200805195909-3e842ecc0384/go.mod h1:CofnuNGQefXjvq95fwXNVFJzOdrVW3ZUtQZC9ezQzHQ=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
-github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
-github.com/rancher/norman v0.0.0-20200520181341-ab75acb55410 h1:iPheUCT5yzEWhMsILMUeFfbcwkhKur5BsuMTL/pGC5s=
 github.com/rancher/norman v0.0.0-20200520181341-ab75acb55410/go.mod h1:j0ffXOmInpTVfy/4M8zLrpgkUOwEe6YFBJ/tzkBss78=
-github.com/rancher/norman v0.0.0-20200609224801-7afd2e9bf37f h1:A88Zbs3ztrHMe3ZrFklkJ6Kp3oCkXVSpnTXrgLzgLvw=
 github.com/rancher/norman v0.0.0-20200609224801-7afd2e9bf37f/go.mod h1:j0ffXOmInpTVfy/4M8zLrpgkUOwEe6YFBJ/tzkBss78=
 github.com/rancher/norman v0.0.0-20200806175025-f974dbfb2734 h1:nQg+3b0fPKUBaYP1yYPEvW6fg27qtwPRIwZe4lHXkgk=
 github.com/rancher/norman v0.0.0-20200806175025-f974dbfb2734/go.mod h1:7SIoXCD1NVlmN2tO65sqbue1dAcgYMKEUwedRfXi45U=
@@ -862,8 +855,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8w
 github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83 h1:0+HVgp5uVy7BvBn1Ee3PrXG4GktYlD/mwCBBKH77RCw=
 github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
 github.com/rancher/rke v1.1.5-rc3/go.mod h1:Vs49ny2u80SAQwbsCf0RUjixT2aTOj6rZWwQKcpE37c=
-github.com/rancher/rke v1.1.5-rc9 h1:xoxtJlUiOxkJH/2fDW/LNdz28yqCZB3aQI3paEun1o4=
-github.com/rancher/rke v1.1.5-rc9/go.mod h1:ixdG4yOKf6yJxmj/wqHJniMHOgParBzS1cQ9u3Mq4no=
+github.com/rancher/rke v1.1.5 h1:2kwT7Zluf4d+I4Pbzjgiz4fYine51HZ+JdFysoVEekg=
+github.com/rancher/rke v1.1.5/go.mod h1:ixdG4yOKf6yJxmj/wqHJniMHOgParBzS1cQ9u3Mq4no=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
@@ -872,7 +865,6 @@ github.com/rancher/steve v0.0.0-20200522224200-dc9f969673f8 h1:RYlF+dgeBYbcwkiqK
 github.com/rancher/steve v0.0.0-20200522224200-dc9f969673f8/go.mod h1:sBa/mMNDBPpcko9xFZ9ZoDJ9IeOoU0v/b6VJjH1Uem0=
 github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd h1:h4VDCviV2Iixfk9SjUcfzq0l+pRsvadt2QSNuoQKfxE=
 github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd/go.mod h1:8x2eK9Q5/1c2AC9xJtNFyAyjP9ytP4uPHhGA6wajIS0=
-github.com/rancher/types v0.0.0-20200723224053-ae84b42a4797 h1:luVtAWdaFjTc80CC117r2bwLj3xAwW9UgHXjoOpKKqU=
 github.com/rancher/types v0.0.0-20200723224053-ae84b42a4797/go.mod h1:HX+ryuo/4a4OtbjPzaCvXWL7nAk5sQN5dP9XQl6iH78=
 github.com/rancher/types v0.0.0-20200812201428-42b3abe8e39e h1:nW5niNDJD9wSHUMtzAor7DMqF1OFr/l7NZ6DINkcRTs=
 github.com/rancher/types v0.0.0-20200812201428-42b3abe8e39e/go.mod h1:HX+ryuo/4a4OtbjPzaCvXWL7nAk5sQN5dP9XQl6iH78=
@@ -1380,7 +1372,6 @@ k8s.io/kube-aggregator v0.18.8/go.mod h1:CyLoGZB+io8eEwnn+6RbV7QWJQhj8a3TBH8ZM8s
 k8s.io/kube-controller-manager v0.18.8/go.mod h1:IYZteddXJFD1TVgAw8eRP3c9OOA2WtHdXdE8aH6gXnc=
 k8s.io/kube-openapi v0.0.0-20190502190224-411b2483e503/go.mod h1:iU+ZGYsNlvU9XKUSso6SQfKTCCw7lFduMZy26Mgr2Fw=
 k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a/go.mod h1:1TqjTSzOxsLGIKfj0lK8EeCP7K1iUG65v09OM0/WG5E=
-k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c h1:/KUFqjjqAcY4Us6luF5RDNZ16KJtb49HfR3ZHB9qYXM=
 k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c/go.mod h1:GRQhZsXIAJ1xR0C9bd8UpWHZ5plfAS9fzPjJuQ6JL3E=
 k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6 h1:Oh3Mzx5pJ+yIumsAD0MOECPVeXsVot0UkiaCGVyfGQY=
 k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6/go.mod h1:GRQhZsXIAJ1xR0C9bd8UpWHZ5plfAS9fzPjJuQ6JL3E=
