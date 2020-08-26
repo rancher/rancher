@@ -37,11 +37,17 @@ func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error)
 		return cluster, nil
 	}
 
+	if !v3.ClusterConditionReady.IsTrue(cluster) {
+		return cluster, nil
+	}
+
 	var client kubernetes.Interface
 	if cluster.Spec.Internal {
 		client = h.localClusterClient
 	} else if k8s, err := h.mcm.K8sClient(cluster.Name); err != nil {
-		return nil, err
+		// ignore error. If we can't get a client just ignore it. The cluster probably isn't happy
+		// yet and we will get an update later when it is.
+		return nil, nil
 	} else if k8s != nil {
 		client = k8s
 	}
