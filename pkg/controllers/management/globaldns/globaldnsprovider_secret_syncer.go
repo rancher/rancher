@@ -19,14 +19,14 @@ const (
 )
 
 type ProviderSecretSyncer struct {
-	globalDNSProviders      v3.GlobalDNSProviderInterface
-	globalDNSProviderLister v3.GlobalDNSProviderLister
+	globalDNSProviders      v3.GlobalDnsProviderInterface
+	globalDNSProviderLister v3.GlobalDnsProviderLister
 }
 
 func newProviderSecretSyncer(ctx context.Context, mgmt *config.ManagementContext) *ProviderSecretSyncer {
 	n := &ProviderSecretSyncer{
-		globalDNSProviders:      mgmt.Management.GlobalDNSProviders(""),
-		globalDNSProviderLister: mgmt.Management.GlobalDNSProviders("").Controller().Lister(),
+		globalDNSProviders:      mgmt.Management.GlobalDnsProviders(""),
+		globalDNSProviderLister: mgmt.Management.GlobalDnsProviders("").Controller().Lister(),
 	}
 	return n
 }
@@ -61,7 +61,7 @@ func (n *ProviderSecretSyncer) reconcileAllGlobalDNSProviders(key string) (runti
 	return nil, nil
 }
 
-func (n *ProviderSecretSyncer) doesGlobalDNSProviderUseSecret(key string, globalDNSProviderObj *v3.GlobalDNSProvider) bool {
+func (n *ProviderSecretSyncer) doesGlobalDNSProviderUseSecret(key string, globalDNSProviderObj *v3.GlobalDnsProvider) bool {
 	var secretRef string
 	if globalDNSProviderObj.Spec.Route53ProviderConfig != nil {
 		secretRef = globalDNSProviderObj.Spec.Route53ProviderConfig.SecretKey

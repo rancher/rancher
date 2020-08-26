@@ -59,7 +59,7 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 }
 
 //sync is called periodically and on real updates
-func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDnsProvider) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -72,7 +72,7 @@ func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (r
 		return nil, fmt.Errorf("GlobalDNS %v has no creatorId annotation", metaAccessor.GetName())
 	}
 
-	if err := rbac.CreateRoleAndRoleBinding(rbac.GlobalDNSProviderResource, v3.GlobalDNSProviderGroupVersionKind.Kind, obj.Name, namespace.GlobalNamespace,
+	if err := rbac.CreateRoleAndRoleBinding(rbac.GlobalDNSProviderResource, v3.GlobalDnsProviderGroupVersionKind.Kind, obj.Name, namespace.GlobalNamespace,
 		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIGroup},
 		obj.UID, obj.Spec.Members, n.managementContext); err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (r
 	return nil, nil
 }
 
-func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDnsProvider) (runtime.Object, error) {
 	rancherInstallUUID := settings.InstallUUID.Get()
 	//create external-dns route53 provider
 
@@ -127,7 +127,7 @@ func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvide
 	return n.createUpdateExternalDNSApp(obj, answers)
 }
 
-func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDnsProvider) (runtime.Object, error) {
 	rancherInstallUUID := settings.InstallUUID.Get()
 
 	isProxy := "true"
@@ -163,7 +163,7 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 	return n.createUpdateExternalDNSApp(obj, answers)
 }
 
-func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDnsProvider) (runtime.Object, error) {
 	rancherInstallUUID := settings.InstallUUID.Get()
 
 	secretKey := obj.Spec.AlidnsProviderConfig.SecretKey
@@ -194,7 +194,7 @@ func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider
 	return n.createUpdateExternalDNSApp(obj, answers)
 }
 
-func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSProvider, answers map[string]string) (runtime.Object, error) {
+func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDnsProvider, answers map[string]string) (runtime.Object, error) {
 	//check if provider already running for this GlobalDNSProvider.
 	existingApp, err := n.getProviderIfAlreadyRunning(obj)
 	if err != nil {
@@ -259,7 +259,7 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 	return nil, nil
 }
 
-func (n *ProviderCatalogLauncher) getProviderIfAlreadyRunning(obj *v3.GlobalDNSProvider) (*pv3.App, error) {
+func (n *ProviderCatalogLauncher) getProviderIfAlreadyRunning(obj *v3.GlobalDnsProvider) (*pv3.App, error) {
 	sysProject, err := n.getSystemProjectID()
 	if err != nil {
 		return nil, err

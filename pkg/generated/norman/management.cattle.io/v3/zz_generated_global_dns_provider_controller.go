@@ -19,20 +19,20 @@ import (
 )
 
 var (
-	GlobalDNSProviderGroupVersionKind = schema.GroupVersionKind{
+	GlobalDnsProviderGroupVersionKind = schema.GroupVersionKind{
 		Version: Version,
 		Group:   GroupName,
-		Kind:    "GlobalDNSProvider",
+		Kind:    "GlobalDnsProvider",
 	}
-	GlobalDNSProviderResource = metav1.APIResource{
+	GlobalDnsProviderResource = metav1.APIResource{
 		Name:         "globaldnsproviders",
 		SingularName: "globaldnsprovider",
 		Namespaced:   true,
 
-		Kind: GlobalDNSProviderGroupVersionKind.Kind,
+		Kind: GlobalDnsProviderGroupVersionKind.Kind,
 	}
 
-	GlobalDNSProviderGroupVersionResource = schema.GroupVersionResource{
+	GlobalDnsProviderGroupVersionResource = schema.GroupVersionResource{
 		Group:    GroupName,
 		Version:  Version,
 		Resource: "globaldnsproviders",
@@ -40,75 +40,75 @@ var (
 )
 
 func init() {
-	resource.Put(GlobalDNSProviderGroupVersionResource)
+	resource.Put(GlobalDnsProviderGroupVersionResource)
 }
 
-// Deprecated use v3.GlobalDNSProvider instead
-type GlobalDNSProvider = v3.GlobalDNSProvider
+// Deprecated use v3.GlobalDnsProvider instead
+type GlobalDnsProvider = v3.GlobalDnsProvider
 
-func NewGlobalDNSProvider(namespace, name string, obj v3.GlobalDNSProvider) *v3.GlobalDNSProvider {
-	obj.APIVersion, obj.Kind = GlobalDNSProviderGroupVersionKind.ToAPIVersionAndKind()
+func NewGlobalDnsProvider(namespace, name string, obj v3.GlobalDnsProvider) *v3.GlobalDnsProvider {
+	obj.APIVersion, obj.Kind = GlobalDnsProviderGroupVersionKind.ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
 }
 
-type GlobalDNSProviderHandlerFunc func(key string, obj *v3.GlobalDNSProvider) (runtime.Object, error)
+type GlobalDnsProviderHandlerFunc func(key string, obj *v3.GlobalDnsProvider) (runtime.Object, error)
 
-type GlobalDNSProviderChangeHandlerFunc func(obj *v3.GlobalDNSProvider) (runtime.Object, error)
+type GlobalDnsProviderChangeHandlerFunc func(obj *v3.GlobalDnsProvider) (runtime.Object, error)
 
-type GlobalDNSProviderLister interface {
-	List(namespace string, selector labels.Selector) (ret []*v3.GlobalDNSProvider, err error)
-	Get(namespace, name string) (*v3.GlobalDNSProvider, error)
+type GlobalDnsProviderLister interface {
+	List(namespace string, selector labels.Selector) (ret []*v3.GlobalDnsProvider, err error)
+	Get(namespace, name string) (*v3.GlobalDnsProvider, error)
 }
 
-type GlobalDNSProviderController interface {
+type GlobalDnsProviderController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
-	Lister() GlobalDNSProviderLister
-	AddHandler(ctx context.Context, name string, handler GlobalDNSProviderHandlerFunc)
-	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDNSProviderHandlerFunc)
-	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GlobalDNSProviderHandlerFunc)
-	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GlobalDNSProviderHandlerFunc)
+	Lister() GlobalDnsProviderLister
+	AddHandler(ctx context.Context, name string, handler GlobalDnsProviderHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDnsProviderHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GlobalDnsProviderHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GlobalDnsProviderHandlerFunc)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, after time.Duration)
 }
 
-type GlobalDNSProviderInterface interface {
+type GlobalDnsProviderInterface interface {
 	ObjectClient() *objectclient.ObjectClient
-	Create(*v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error)
-	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.GlobalDNSProvider, error)
-	Get(name string, opts metav1.GetOptions) (*v3.GlobalDNSProvider, error)
-	Update(*v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error)
+	Create(*v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.GlobalDnsProvider, error)
+	Get(name string, opts metav1.GetOptions) (*v3.GlobalDnsProvider, error)
+	Update(*v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*v3.GlobalDNSProviderList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*v3.GlobalDNSProviderList, error)
+	List(opts metav1.ListOptions) (*v3.GlobalDnsProviderList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v3.GlobalDnsProviderList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Controller() GlobalDNSProviderController
-	AddHandler(ctx context.Context, name string, sync GlobalDNSProviderHandlerFunc)
-	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDNSProviderHandlerFunc)
-	AddLifecycle(ctx context.Context, name string, lifecycle GlobalDNSProviderLifecycle)
-	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle GlobalDNSProviderLifecycle)
-	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalDNSProviderHandlerFunc)
-	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync GlobalDNSProviderHandlerFunc)
-	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDNSProviderLifecycle)
-	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle GlobalDNSProviderLifecycle)
+	Controller() GlobalDnsProviderController
+	AddHandler(ctx context.Context, name string, sync GlobalDnsProviderHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDnsProviderHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle GlobalDnsProviderLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle GlobalDnsProviderLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalDnsProviderHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync GlobalDnsProviderHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDnsProviderLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle GlobalDnsProviderLifecycle)
 }
 
 type globalDnsProviderLister struct {
 	controller *globalDnsProviderController
 }
 
-func (l *globalDnsProviderLister) List(namespace string, selector labels.Selector) (ret []*v3.GlobalDNSProvider, err error) {
+func (l *globalDnsProviderLister) List(namespace string, selector labels.Selector) (ret []*v3.GlobalDnsProvider, err error) {
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
-		ret = append(ret, obj.(*v3.GlobalDNSProvider))
+		ret = append(ret, obj.(*v3.GlobalDnsProvider))
 	})
 	return
 }
 
-func (l *globalDnsProviderLister) Get(namespace, name string) (*v3.GlobalDNSProvider, error) {
+func (l *globalDnsProviderLister) Get(namespace, name string) (*v3.GlobalDnsProvider, error) {
 	var key string
 	if namespace != "" {
 		key = namespace + "/" + name
@@ -121,11 +121,11 @@ func (l *globalDnsProviderLister) Get(namespace, name string) (*v3.GlobalDNSProv
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    GlobalDNSProviderGroupVersionKind.Group,
-			Resource: GlobalDNSProviderGroupVersionResource.Resource,
+			Group:    GlobalDnsProviderGroupVersionKind.Group,
+			Resource: GlobalDnsProviderGroupVersionResource.Resource,
 		}, key)
 	}
-	return obj.(*v3.GlobalDNSProvider), nil
+	return obj.(*v3.GlobalDnsProvider), nil
 }
 
 type globalDnsProviderController struct {
@@ -136,17 +136,17 @@ func (c *globalDnsProviderController) Generic() controller.GenericController {
 	return c.GenericController
 }
 
-func (c *globalDnsProviderController) Lister() GlobalDNSProviderLister {
+func (c *globalDnsProviderController) Lister() GlobalDnsProviderLister {
 	return &globalDnsProviderLister{
 		controller: c,
 	}
 }
 
-func (c *globalDnsProviderController) AddHandler(ctx context.Context, name string, handler GlobalDNSProviderHandlerFunc) {
+func (c *globalDnsProviderController) AddHandler(ctx context.Context, name string, handler GlobalDnsProviderHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v3.GlobalDNSProvider); ok {
+		} else if v, ok := obj.(*v3.GlobalDnsProvider); ok {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -154,13 +154,13 @@ func (c *globalDnsProviderController) AddHandler(ctx context.Context, name strin
 	})
 }
 
-func (c *globalDnsProviderController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler GlobalDNSProviderHandlerFunc) {
+func (c *globalDnsProviderController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler GlobalDnsProviderHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil
 		} else if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v3.GlobalDNSProvider); ok {
+		} else if v, ok := obj.(*v3.GlobalDnsProvider); ok {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -168,11 +168,11 @@ func (c *globalDnsProviderController) AddFeatureHandler(ctx context.Context, ena
 	})
 }
 
-func (c *globalDnsProviderController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler GlobalDNSProviderHandlerFunc) {
+func (c *globalDnsProviderController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler GlobalDnsProviderHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v3.GlobalDNSProvider); ok && controller.ObjectInCluster(cluster, obj) {
+		} else if v, ok := obj.(*v3.GlobalDnsProvider); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -180,13 +180,13 @@ func (c *globalDnsProviderController) AddClusterScopedHandler(ctx context.Contex
 	})
 }
 
-func (c *globalDnsProviderController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler GlobalDNSProviderHandlerFunc) {
+func (c *globalDnsProviderController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler GlobalDnsProviderHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil
 		} else if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v3.GlobalDNSProvider); ok && controller.ObjectInCluster(cluster, obj) {
+		} else if v, ok := obj.(*v3.GlobalDnsProvider); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -198,16 +198,16 @@ type globalDnsProviderFactory struct {
 }
 
 func (c globalDnsProviderFactory) Object() runtime.Object {
-	return &v3.GlobalDNSProvider{}
+	return &v3.GlobalDnsProvider{}
 }
 
 func (c globalDnsProviderFactory) List() runtime.Object {
-	return &v3.GlobalDNSProviderList{}
+	return &v3.GlobalDnsProviderList{}
 }
 
-func (s *globalDnsProviderClient) Controller() GlobalDNSProviderController {
-	genericController := controller.NewGenericController(GlobalDNSProviderGroupVersionKind.Kind+"Controller",
-		s.client.controllerFactory.ForResourceKind(GlobalDNSProviderGroupVersionResource, GlobalDNSProviderGroupVersionKind.Kind, true))
+func (s *globalDnsProviderClient) Controller() GlobalDnsProviderController {
+	genericController := controller.NewGenericController(GlobalDnsProviderGroupVersionKind.Kind+"Controller",
+		s.client.controllerFactory.ForResourceKind(GlobalDnsProviderGroupVersionResource, GlobalDnsProviderGroupVersionKind.Kind, true))
 
 	return &globalDnsProviderController{
 		GenericController: genericController,
@@ -218,36 +218,36 @@ type globalDnsProviderClient struct {
 	client       *Client
 	ns           string
 	objectClient *objectclient.ObjectClient
-	controller   GlobalDNSProviderController
+	controller   GlobalDnsProviderController
 }
 
 func (s *globalDnsProviderClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 
-func (s *globalDnsProviderClient) Create(o *v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error) {
+func (s *globalDnsProviderClient) Create(o *v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error) {
 	obj, err := s.objectClient.Create(o)
-	return obj.(*v3.GlobalDNSProvider), err
+	return obj.(*v3.GlobalDnsProvider), err
 }
 
-func (s *globalDnsProviderClient) Get(name string, opts metav1.GetOptions) (*v3.GlobalDNSProvider, error) {
+func (s *globalDnsProviderClient) Get(name string, opts metav1.GetOptions) (*v3.GlobalDnsProvider, error) {
 	obj, err := s.objectClient.Get(name, opts)
-	return obj.(*v3.GlobalDNSProvider), err
+	return obj.(*v3.GlobalDnsProvider), err
 }
 
-func (s *globalDnsProviderClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.GlobalDNSProvider, error) {
+func (s *globalDnsProviderClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.GlobalDnsProvider, error) {
 	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
-	return obj.(*v3.GlobalDNSProvider), err
+	return obj.(*v3.GlobalDnsProvider), err
 }
 
-func (s *globalDnsProviderClient) Update(o *v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error) {
+func (s *globalDnsProviderClient) Update(o *v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
-	return obj.(*v3.GlobalDNSProvider), err
+	return obj.(*v3.GlobalDnsProvider), err
 }
 
-func (s *globalDnsProviderClient) UpdateStatus(o *v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error) {
+func (s *globalDnsProviderClient) UpdateStatus(o *v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error) {
 	obj, err := s.objectClient.UpdateStatus(o.Name, o)
-	return obj.(*v3.GlobalDNSProvider), err
+	return obj.(*v3.GlobalDnsProvider), err
 }
 
 func (s *globalDnsProviderClient) Delete(name string, options *metav1.DeleteOptions) error {
@@ -258,14 +258,14 @@ func (s *globalDnsProviderClient) DeleteNamespaced(namespace, name string, optio
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *globalDnsProviderClient) List(opts metav1.ListOptions) (*v3.GlobalDNSProviderList, error) {
+func (s *globalDnsProviderClient) List(opts metav1.ListOptions) (*v3.GlobalDnsProviderList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*v3.GlobalDNSProviderList), err
+	return obj.(*v3.GlobalDnsProviderList), err
 }
 
-func (s *globalDnsProviderClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v3.GlobalDNSProviderList, error) {
+func (s *globalDnsProviderClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v3.GlobalDnsProviderList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*v3.GlobalDNSProviderList), err
+	return obj.(*v3.GlobalDnsProviderList), err
 }
 
 func (s *globalDnsProviderClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
@@ -273,47 +273,47 @@ func (s *globalDnsProviderClient) Watch(opts metav1.ListOptions) (watch.Interfac
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *globalDnsProviderClient) Patch(o *v3.GlobalDNSProvider, patchType types.PatchType, data []byte, subresources ...string) (*v3.GlobalDNSProvider, error) {
+func (s *globalDnsProviderClient) Patch(o *v3.GlobalDnsProvider, patchType types.PatchType, data []byte, subresources ...string) (*v3.GlobalDnsProvider, error) {
 	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
-	return obj.(*v3.GlobalDNSProvider), err
+	return obj.(*v3.GlobalDnsProvider), err
 }
 
 func (s *globalDnsProviderClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *globalDnsProviderClient) AddHandler(ctx context.Context, name string, sync GlobalDNSProviderHandlerFunc) {
+func (s *globalDnsProviderClient) AddHandler(ctx context.Context, name string, sync GlobalDnsProviderHandlerFunc) {
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *globalDnsProviderClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDNSProviderHandlerFunc) {
+func (s *globalDnsProviderClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDnsProviderHandlerFunc) {
 	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
-func (s *globalDnsProviderClient) AddLifecycle(ctx context.Context, name string, lifecycle GlobalDNSProviderLifecycle) {
-	sync := NewGlobalDNSProviderLifecycleAdapter(name, false, s, lifecycle)
+func (s *globalDnsProviderClient) AddLifecycle(ctx context.Context, name string, lifecycle GlobalDnsProviderLifecycle) {
+	sync := NewGlobalDnsProviderLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *globalDnsProviderClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle GlobalDNSProviderLifecycle) {
-	sync := NewGlobalDNSProviderLifecycleAdapter(name, false, s, lifecycle)
+func (s *globalDnsProviderClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle GlobalDnsProviderLifecycle) {
+	sync := NewGlobalDnsProviderLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
-func (s *globalDnsProviderClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalDNSProviderHandlerFunc) {
+func (s *globalDnsProviderClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalDnsProviderHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *globalDnsProviderClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync GlobalDNSProviderHandlerFunc) {
+func (s *globalDnsProviderClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync GlobalDnsProviderHandlerFunc) {
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
-func (s *globalDnsProviderClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDNSProviderLifecycle) {
-	sync := NewGlobalDNSProviderLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+func (s *globalDnsProviderClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDnsProviderLifecycle) {
+	sync := NewGlobalDnsProviderLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *globalDnsProviderClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle GlobalDNSProviderLifecycle) {
-	sync := NewGlobalDNSProviderLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+func (s *globalDnsProviderClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle GlobalDnsProviderLifecycle) {
+	sync := NewGlobalDnsProviderLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }

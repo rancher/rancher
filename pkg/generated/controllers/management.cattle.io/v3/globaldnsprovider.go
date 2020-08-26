@@ -38,51 +38,51 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-type GlobalDNSProviderHandler func(string, *v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error)
+type GlobalDnsProviderHandler func(string, *v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error)
 
-type GlobalDNSProviderController interface {
+type GlobalDnsProviderController interface {
 	generic.ControllerMeta
-	GlobalDNSProviderClient
+	GlobalDnsProviderClient
 
-	OnChange(ctx context.Context, name string, sync GlobalDNSProviderHandler)
-	OnRemove(ctx context.Context, name string, sync GlobalDNSProviderHandler)
+	OnChange(ctx context.Context, name string, sync GlobalDnsProviderHandler)
+	OnRemove(ctx context.Context, name string, sync GlobalDnsProviderHandler)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
-	Cache() GlobalDNSProviderCache
+	Cache() GlobalDnsProviderCache
 }
 
-type GlobalDNSProviderClient interface {
-	Create(*v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error)
-	Update(*v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error)
+type GlobalDnsProviderClient interface {
+	Create(*v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error)
+	Update(*v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error)
 
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	Get(namespace, name string, options metav1.GetOptions) (*v3.GlobalDNSProvider, error)
-	List(namespace string, opts metav1.ListOptions) (*v3.GlobalDNSProviderList, error)
+	Get(namespace, name string, options metav1.GetOptions) (*v3.GlobalDnsProvider, error)
+	List(namespace string, opts metav1.ListOptions) (*v3.GlobalDnsProviderList, error)
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.GlobalDNSProvider, err error)
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.GlobalDnsProvider, err error)
 }
 
-type GlobalDNSProviderCache interface {
-	Get(namespace, name string) (*v3.GlobalDNSProvider, error)
-	List(namespace string, selector labels.Selector) ([]*v3.GlobalDNSProvider, error)
+type GlobalDnsProviderCache interface {
+	Get(namespace, name string) (*v3.GlobalDnsProvider, error)
+	List(namespace string, selector labels.Selector) ([]*v3.GlobalDnsProvider, error)
 
-	AddIndexer(indexName string, indexer GlobalDNSProviderIndexer)
-	GetByIndex(indexName, key string) ([]*v3.GlobalDNSProvider, error)
+	AddIndexer(indexName string, indexer GlobalDnsProviderIndexer)
+	GetByIndex(indexName, key string) ([]*v3.GlobalDnsProvider, error)
 }
 
-type GlobalDNSProviderIndexer func(obj *v3.GlobalDNSProvider) ([]string, error)
+type GlobalDnsProviderIndexer func(obj *v3.GlobalDnsProvider) ([]string, error)
 
-type globalDNSProviderController struct {
+type globalDnsProviderController struct {
 	controller    controller.SharedController
 	client        *client.Client
 	gvk           schema.GroupVersionKind
 	groupResource schema.GroupResource
 }
 
-func NewGlobalDNSProviderController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) GlobalDNSProviderController {
+func NewGlobalDnsProviderController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) GlobalDnsProviderController {
 	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &globalDNSProviderController{
+	return &globalDnsProviderController{
 		controller: c,
 		client:     c.Client(),
 		gvk:        gvk,
@@ -93,13 +93,13 @@ func NewGlobalDNSProviderController(gvk schema.GroupVersionKind, resource string
 	}
 }
 
-func FromGlobalDNSProviderHandlerToHandler(sync GlobalDNSProviderHandler) generic.Handler {
+func FromGlobalDnsProviderHandlerToHandler(sync GlobalDnsProviderHandler) generic.Handler {
 	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.GlobalDNSProvider
+		var v *v3.GlobalDnsProvider
 		if obj == nil {
 			v, err = sync(key, nil)
 		} else {
-			v, err = sync(key, obj.(*v3.GlobalDNSProvider))
+			v, err = sync(key, obj.(*v3.GlobalDnsProvider))
 		}
 		if v == nil {
 			return nil, err
@@ -108,9 +108,9 @@ func FromGlobalDNSProviderHandlerToHandler(sync GlobalDNSProviderHandler) generi
 	}
 }
 
-func (c *globalDNSProviderController) Updater() generic.Updater {
+func (c *globalDnsProviderController) Updater() generic.Updater {
 	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.GlobalDNSProvider))
+		newObj, err := c.Update(obj.(*v3.GlobalDnsProvider))
 		if newObj == nil {
 			return nil, err
 		}
@@ -118,7 +118,7 @@ func (c *globalDNSProviderController) Updater() generic.Updater {
 	}
 }
 
-func UpdateGlobalDNSProviderDeepCopyOnChange(client GlobalDNSProviderClient, obj *v3.GlobalDNSProvider, handler func(obj *v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error)) (*v3.GlobalDNSProvider, error) {
+func UpdateGlobalDnsProviderDeepCopyOnChange(client GlobalDnsProviderClient, obj *v3.GlobalDnsProvider, handler func(obj *v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error)) (*v3.GlobalDnsProvider, error) {
 	if obj == nil {
 		return obj, nil
 	}
@@ -135,87 +135,87 @@ func UpdateGlobalDNSProviderDeepCopyOnChange(client GlobalDNSProviderClient, obj
 	return copyObj, err
 }
 
-func (c *globalDNSProviderController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
+func (c *globalDnsProviderController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
 	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
-func (c *globalDNSProviderController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
+func (c *globalDnsProviderController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
 	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
 }
 
-func (c *globalDNSProviderController) OnChange(ctx context.Context, name string, sync GlobalDNSProviderHandler) {
-	c.AddGenericHandler(ctx, name, FromGlobalDNSProviderHandlerToHandler(sync))
+func (c *globalDnsProviderController) OnChange(ctx context.Context, name string, sync GlobalDnsProviderHandler) {
+	c.AddGenericHandler(ctx, name, FromGlobalDnsProviderHandlerToHandler(sync))
 }
 
-func (c *globalDNSProviderController) OnRemove(ctx context.Context, name string, sync GlobalDNSProviderHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromGlobalDNSProviderHandlerToHandler(sync)))
+func (c *globalDnsProviderController) OnRemove(ctx context.Context, name string, sync GlobalDnsProviderHandler) {
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromGlobalDnsProviderHandlerToHandler(sync)))
 }
 
-func (c *globalDNSProviderController) Enqueue(namespace, name string) {
+func (c *globalDnsProviderController) Enqueue(namespace, name string) {
 	c.controller.Enqueue(namespace, name)
 }
 
-func (c *globalDNSProviderController) EnqueueAfter(namespace, name string, duration time.Duration) {
+func (c *globalDnsProviderController) EnqueueAfter(namespace, name string, duration time.Duration) {
 	c.controller.EnqueueAfter(namespace, name, duration)
 }
 
-func (c *globalDNSProviderController) Informer() cache.SharedIndexInformer {
+func (c *globalDnsProviderController) Informer() cache.SharedIndexInformer {
 	return c.controller.Informer()
 }
 
-func (c *globalDNSProviderController) GroupVersionKind() schema.GroupVersionKind {
+func (c *globalDnsProviderController) GroupVersionKind() schema.GroupVersionKind {
 	return c.gvk
 }
 
-func (c *globalDNSProviderController) Cache() GlobalDNSProviderCache {
-	return &globalDNSProviderCache{
+func (c *globalDnsProviderController) Cache() GlobalDnsProviderCache {
+	return &globalDnsProviderCache{
 		indexer:  c.Informer().GetIndexer(),
 		resource: c.groupResource,
 	}
 }
 
-func (c *globalDNSProviderController) Create(obj *v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error) {
-	result := &v3.GlobalDNSProvider{}
+func (c *globalDnsProviderController) Create(obj *v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error) {
+	result := &v3.GlobalDnsProvider{}
 	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
 }
 
-func (c *globalDNSProviderController) Update(obj *v3.GlobalDNSProvider) (*v3.GlobalDNSProvider, error) {
-	result := &v3.GlobalDNSProvider{}
+func (c *globalDnsProviderController) Update(obj *v3.GlobalDnsProvider) (*v3.GlobalDnsProvider, error) {
+	result := &v3.GlobalDnsProvider{}
 	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
-func (c *globalDNSProviderController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+func (c *globalDnsProviderController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
 	return c.client.Delete(context.TODO(), namespace, name, *options)
 }
 
-func (c *globalDNSProviderController) Get(namespace, name string, options metav1.GetOptions) (*v3.GlobalDNSProvider, error) {
-	result := &v3.GlobalDNSProvider{}
+func (c *globalDnsProviderController) Get(namespace, name string, options metav1.GetOptions) (*v3.GlobalDnsProvider, error) {
+	result := &v3.GlobalDnsProvider{}
 	return result, c.client.Get(context.TODO(), namespace, name, result, options)
 }
 
-func (c *globalDNSProviderController) List(namespace string, opts metav1.ListOptions) (*v3.GlobalDNSProviderList, error) {
-	result := &v3.GlobalDNSProviderList{}
+func (c *globalDnsProviderController) List(namespace string, opts metav1.ListOptions) (*v3.GlobalDnsProviderList, error) {
+	result := &v3.GlobalDnsProviderList{}
 	return result, c.client.List(context.TODO(), namespace, result, opts)
 }
 
-func (c *globalDNSProviderController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+func (c *globalDnsProviderController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.client.Watch(context.TODO(), namespace, opts)
 }
 
-func (c *globalDNSProviderController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.GlobalDNSProvider, error) {
-	result := &v3.GlobalDNSProvider{}
+func (c *globalDnsProviderController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.GlobalDnsProvider, error) {
+	result := &v3.GlobalDnsProvider{}
 	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
-type globalDNSProviderCache struct {
+type globalDnsProviderCache struct {
 	indexer  cache.Indexer
 	resource schema.GroupResource
 }
 
-func (c *globalDNSProviderCache) Get(namespace, name string) (*v3.GlobalDNSProvider, error) {
+func (c *globalDnsProviderCache) Get(namespace, name string) (*v3.GlobalDnsProvider, error) {
 	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -223,34 +223,34 @@ func (c *globalDNSProviderCache) Get(namespace, name string) (*v3.GlobalDNSProvi
 	if !exists {
 		return nil, errors.NewNotFound(c.resource, name)
 	}
-	return obj.(*v3.GlobalDNSProvider), nil
+	return obj.(*v3.GlobalDnsProvider), nil
 }
 
-func (c *globalDNSProviderCache) List(namespace string, selector labels.Selector) (ret []*v3.GlobalDNSProvider, err error) {
+func (c *globalDnsProviderCache) List(namespace string, selector labels.Selector) (ret []*v3.GlobalDnsProvider, err error) {
 
 	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.GlobalDNSProvider))
+		ret = append(ret, m.(*v3.GlobalDnsProvider))
 	})
 
 	return ret, err
 }
 
-func (c *globalDNSProviderCache) AddIndexer(indexName string, indexer GlobalDNSProviderIndexer) {
+func (c *globalDnsProviderCache) AddIndexer(indexName string, indexer GlobalDnsProviderIndexer) {
 	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
 		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.GlobalDNSProvider))
+			return indexer(obj.(*v3.GlobalDnsProvider))
 		},
 	}))
 }
 
-func (c *globalDNSProviderCache) GetByIndex(indexName, key string) (result []*v3.GlobalDNSProvider, err error) {
+func (c *globalDnsProviderCache) GetByIndex(indexName, key string) (result []*v3.GlobalDnsProvider, err error) {
 	objs, err := c.indexer.ByIndex(indexName, key)
 	if err != nil {
 		return nil, err
 	}
-	result = make([]*v3.GlobalDNSProvider, 0, len(objs))
+	result = make([]*v3.GlobalDnsProvider, 0, len(objs))
 	for _, obj := range objs {
-		result = append(result, obj.(*v3.GlobalDNSProvider))
+		result = append(result, obj.(*v3.GlobalDnsProvider))
 	}
 	return result, nil
 }

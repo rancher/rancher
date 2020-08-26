@@ -37,7 +37,7 @@ type GlobalDNSStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type GlobalDNSProvider struct {
+type GlobalDnsProvider struct {
 	types.Namespaced
 
 	metav1.TypeMeta `json:",inline"`
