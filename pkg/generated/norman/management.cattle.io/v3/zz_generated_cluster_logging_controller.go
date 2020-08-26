@@ -206,7 +206,7 @@ func (c clusterLoggingFactory) List() runtime.Object {
 }
 
 func (s *clusterLoggingClient) Controller() ClusterLoggingController {
-	genericController := controller.NewGenericController(ClusterLoggingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterLoggingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterLoggingGroupVersionResource, ClusterLoggingGroupVersionKind.Kind, true))
 
 	return &clusterLoggingController{

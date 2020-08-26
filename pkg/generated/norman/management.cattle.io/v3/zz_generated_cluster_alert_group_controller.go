@@ -206,7 +206,7 @@ func (c clusterAlertGroupFactory) List() runtime.Object {
 }
 
 func (s *clusterAlertGroupClient) Controller() ClusterAlertGroupController {
-	genericController := controller.NewGenericController(ClusterAlertGroupGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterAlertGroupGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterAlertGroupGroupVersionResource, ClusterAlertGroupGroupVersionKind.Kind, true))
 
 	return &clusterAlertGroupController{

@@ -206,7 +206,7 @@ func (c pipelineExecutionFactory) List() runtime.Object {
 }
 
 func (s *pipelineExecutionClient) Controller() PipelineExecutionController {
-	genericController := controller.NewGenericController(PipelineExecutionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PipelineExecutionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PipelineExecutionGroupVersionResource, PipelineExecutionGroupVersionKind.Kind, true))
 
 	return &pipelineExecutionController{

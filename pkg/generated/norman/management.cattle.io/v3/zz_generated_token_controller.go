@@ -205,7 +205,7 @@ func (c tokenFactory) List() runtime.Object {
 }
 
 func (s *tokenClient) Controller() TokenController {
-	genericController := controller.NewGenericController(TokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, TokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(TokenGroupVersionResource, TokenGroupVersionKind.Kind, false))
 
 	return &tokenController{

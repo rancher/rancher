@@ -205,7 +205,7 @@ func (c nodeDriverFactory) List() runtime.Object {
 }
 
 func (s *nodeDriverClient) Controller() NodeDriverController {
-	genericController := controller.NewGenericController(NodeDriverGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NodeDriverGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NodeDriverGroupVersionResource, NodeDriverGroupVersionKind.Kind, false))
 
 	return &nodeDriverController{

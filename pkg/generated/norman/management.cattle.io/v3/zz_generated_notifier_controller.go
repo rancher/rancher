@@ -206,7 +206,7 @@ func (c notifierFactory) List() runtime.Object {
 }
 
 func (s *notifierClient) Controller() NotifierController {
-	genericController := controller.NewGenericController(NotifierGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NotifierGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NotifierGroupVersionResource, NotifierGroupVersionKind.Kind, true))
 
 	return &notifierController{

@@ -206,7 +206,7 @@ func (c replicaSetFactory) List() runtime.Object {
 }
 
 func (s *replicaSetClient) Controller() ReplicaSetController {
-	genericController := controller.NewGenericController(ReplicaSetGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ReplicaSetGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ReplicaSetGroupVersionResource, ReplicaSetGroupVersionKind.Kind, true))
 
 	return &replicaSetController{

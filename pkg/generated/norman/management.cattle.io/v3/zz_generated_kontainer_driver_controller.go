@@ -205,7 +205,7 @@ func (c kontainerDriverFactory) List() runtime.Object {
 }
 
 func (s *kontainerDriverClient) Controller() KontainerDriverController {
-	genericController := controller.NewGenericController(KontainerDriverGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, KontainerDriverGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(KontainerDriverGroupVersionResource, KontainerDriverGroupVersionKind.Kind, false))
 
 	return &kontainerDriverController{

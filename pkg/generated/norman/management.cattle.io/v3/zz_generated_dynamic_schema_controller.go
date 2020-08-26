@@ -205,7 +205,7 @@ func (c dynamicSchemaFactory) List() runtime.Object {
 }
 
 func (s *dynamicSchemaClient) Controller() DynamicSchemaController {
-	genericController := controller.NewGenericController(DynamicSchemaGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DynamicSchemaGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DynamicSchemaGroupVersionResource, DynamicSchemaGroupVersionKind.Kind, false))
 
 	return &dynamicSchemaController{

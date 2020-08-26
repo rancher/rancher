@@ -206,7 +206,7 @@ func (c sourceCodeCredentialFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeCredentialClient) Controller() SourceCodeCredentialController {
-	genericController := controller.NewGenericController(SourceCodeCredentialGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SourceCodeCredentialGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SourceCodeCredentialGroupVersionResource, SourceCodeCredentialGroupVersionKind.Kind, true))
 
 	return &sourceCodeCredentialController{

@@ -206,7 +206,7 @@ func (c virtualServiceFactory) List() runtime.Object {
 }
 
 func (s *virtualServiceClient) Controller() VirtualServiceController {
-	genericController := controller.NewGenericController(VirtualServiceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, VirtualServiceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(VirtualServiceGroupVersionResource, VirtualServiceGroupVersionKind.Kind, true))
 
 	return &virtualServiceController{

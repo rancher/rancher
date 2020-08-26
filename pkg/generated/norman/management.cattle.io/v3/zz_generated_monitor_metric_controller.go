@@ -206,7 +206,7 @@ func (c monitorMetricFactory) List() runtime.Object {
 }
 
 func (s *monitorMetricClient) Controller() MonitorMetricController {
-	genericController := controller.NewGenericController(MonitorMetricGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, MonitorMetricGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(MonitorMetricGroupVersionResource, MonitorMetricGroupVersionKind.Kind, true))
 
 	return &monitorMetricController{

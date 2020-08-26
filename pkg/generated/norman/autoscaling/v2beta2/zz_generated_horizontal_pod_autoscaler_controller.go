@@ -206,7 +206,7 @@ func (c horizontalPodAutoscalerFactory) List() runtime.Object {
 }
 
 func (s *horizontalPodAutoscalerClient) Controller() HorizontalPodAutoscalerController {
-	genericController := controller.NewGenericController(HorizontalPodAutoscalerGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, HorizontalPodAutoscalerGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(HorizontalPodAutoscalerGroupVersionResource, HorizontalPodAutoscalerGroupVersionKind.Kind, true))
 
 	return &horizontalPodAutoscalerController{

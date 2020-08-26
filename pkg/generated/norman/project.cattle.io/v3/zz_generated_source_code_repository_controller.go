@@ -206,7 +206,7 @@ func (c sourceCodeRepositoryFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeRepositoryClient) Controller() SourceCodeRepositoryController {
-	genericController := controller.NewGenericController(SourceCodeRepositoryGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SourceCodeRepositoryGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SourceCodeRepositoryGroupVersionResource, SourceCodeRepositoryGroupVersionKind.Kind, true))
 
 	return &sourceCodeRepositoryController{

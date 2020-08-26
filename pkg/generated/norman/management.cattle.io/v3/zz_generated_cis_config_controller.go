@@ -206,7 +206,7 @@ func (c cisConfigFactory) List() runtime.Object {
 }
 
 func (s *cisConfigClient) Controller() CisConfigController {
-	genericController := controller.NewGenericController(CisConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CisConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CisConfigGroupVersionResource, CisConfigGroupVersionKind.Kind, true))
 
 	return &cisConfigController{

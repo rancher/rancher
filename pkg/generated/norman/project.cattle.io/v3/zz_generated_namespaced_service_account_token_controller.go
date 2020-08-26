@@ -206,7 +206,7 @@ func (c namespacedServiceAccountTokenFactory) List() runtime.Object {
 }
 
 func (s *namespacedServiceAccountTokenClient) Controller() NamespacedServiceAccountTokenController {
-	genericController := controller.NewGenericController(NamespacedServiceAccountTokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NamespacedServiceAccountTokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NamespacedServiceAccountTokenGroupVersionResource, NamespacedServiceAccountTokenGroupVersionKind.Kind, true))
 
 	return &namespacedServiceAccountTokenController{

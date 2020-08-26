@@ -205,7 +205,7 @@ func (c apiServiceFactory) List() runtime.Object {
 }
 
 func (s *apiServiceClient) Controller() APIServiceController {
-	genericController := controller.NewGenericController(APIServiceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, APIServiceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(APIServiceGroupVersionResource, APIServiceGroupVersionKind.Kind, false))
 
 	return &apiServiceController{

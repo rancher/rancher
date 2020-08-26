@@ -206,7 +206,7 @@ func (c clusterCatalogFactory) List() runtime.Object {
 }
 
 func (s *clusterCatalogClient) Controller() ClusterCatalogController {
-	genericController := controller.NewGenericController(ClusterCatalogGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterCatalogGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterCatalogGroupVersionResource, ClusterCatalogGroupVersionKind.Kind, true))
 
 	return &clusterCatalogController{

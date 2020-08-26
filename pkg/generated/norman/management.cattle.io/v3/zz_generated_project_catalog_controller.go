@@ -206,7 +206,7 @@ func (c projectCatalogFactory) List() runtime.Object {
 }
 
 func (s *projectCatalogClient) Controller() ProjectCatalogController {
-	genericController := controller.NewGenericController(ProjectCatalogGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectCatalogGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectCatalogGroupVersionResource, ProjectCatalogGroupVersionKind.Kind, true))
 
 	return &projectCatalogController{

@@ -206,7 +206,7 @@ func (c projectNetworkPolicyFactory) List() runtime.Object {
 }
 
 func (s *projectNetworkPolicyClient) Controller() ProjectNetworkPolicyController {
-	genericController := controller.NewGenericController(ProjectNetworkPolicyGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectNetworkPolicyGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectNetworkPolicyGroupVersionResource, ProjectNetworkPolicyGroupVersionKind.Kind, true))
 
 	return &projectNetworkPolicyController{

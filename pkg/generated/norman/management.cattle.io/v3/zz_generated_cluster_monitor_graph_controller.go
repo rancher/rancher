@@ -206,7 +206,7 @@ func (c clusterMonitorGraphFactory) List() runtime.Object {
 }
 
 func (s *clusterMonitorGraphClient) Controller() ClusterMonitorGraphController {
-	genericController := controller.NewGenericController(ClusterMonitorGraphGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterMonitorGraphGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterMonitorGraphGroupVersionResource, ClusterMonitorGraphGroupVersionKind.Kind, true))
 
 	return &clusterMonitorGraphController{

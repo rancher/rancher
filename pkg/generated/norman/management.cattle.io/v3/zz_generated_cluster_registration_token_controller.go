@@ -206,7 +206,7 @@ func (c clusterRegistrationTokenFactory) List() runtime.Object {
 }
 
 func (s *clusterRegistrationTokenClient) Controller() ClusterRegistrationTokenController {
-	genericController := controller.NewGenericController(ClusterRegistrationTokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterRegistrationTokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterRegistrationTokenGroupVersionResource, ClusterRegistrationTokenGroupVersionKind.Kind, true))
 
 	return &clusterRegistrationTokenController{

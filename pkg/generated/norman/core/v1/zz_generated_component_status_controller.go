@@ -205,7 +205,7 @@ func (c componentStatusFactory) List() runtime.Object {
 }
 
 func (s *componentStatusClient) Controller() ComponentStatusController {
-	genericController := controller.NewGenericController(ComponentStatusGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ComponentStatusGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ComponentStatusGroupVersionResource, ComponentStatusGroupVersionKind.Kind, false))
 
 	return &componentStatusController{

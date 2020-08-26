@@ -205,7 +205,7 @@ func (c clusterRoleBindingFactory) List() runtime.Object {
 }
 
 func (s *clusterRoleBindingClient) Controller() ClusterRoleBindingController {
-	genericController := controller.NewGenericController(ClusterRoleBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterRoleBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterRoleBindingGroupVersionResource, ClusterRoleBindingGroupVersionKind.Kind, false))
 
 	return &clusterRoleBindingController{

@@ -206,7 +206,7 @@ func (c statefulSetFactory) List() runtime.Object {
 }
 
 func (s *statefulSetClient) Controller() StatefulSetController {
-	genericController := controller.NewGenericController(StatefulSetGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, StatefulSetGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(StatefulSetGroupVersionResource, StatefulSetGroupVersionKind.Kind, true))
 
 	return &statefulSetController{

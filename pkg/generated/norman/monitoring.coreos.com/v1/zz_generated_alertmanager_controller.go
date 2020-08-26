@@ -206,7 +206,7 @@ func (c alertmanagerFactory) List() runtime.Object {
 }
 
 func (s *alertmanagerClient) Controller() AlertmanagerController {
-	genericController := controller.NewGenericController(AlertmanagerGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, AlertmanagerGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(AlertmanagerGroupVersionResource, AlertmanagerGroupVersionKind.Kind, true))
 
 	return &alertmanagerController{

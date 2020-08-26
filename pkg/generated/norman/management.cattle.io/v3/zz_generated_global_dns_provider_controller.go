@@ -206,7 +206,7 @@ func (c globalDnsProviderFactory) List() runtime.Object {
 }
 
 func (s *globalDnsProviderClient) Controller() GlobalDnsProviderController {
-	genericController := controller.NewGenericController(GlobalDnsProviderGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, GlobalDnsProviderGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(GlobalDnsProviderGroupVersionResource, GlobalDnsProviderGroupVersionKind.Kind, true))
 
 	return &globalDnsProviderController{

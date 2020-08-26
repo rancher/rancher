@@ -206,7 +206,7 @@ func (c samlTokenFactory) List() runtime.Object {
 }
 
 func (s *samlTokenClient) Controller() SamlTokenController {
-	genericController := controller.NewGenericController(SamlTokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SamlTokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SamlTokenGroupVersionResource, SamlTokenGroupVersionKind.Kind, true))
 
 	return &samlTokenController{

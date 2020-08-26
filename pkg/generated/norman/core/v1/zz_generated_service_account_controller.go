@@ -206,7 +206,7 @@ func (c serviceAccountFactory) List() runtime.Object {
 }
 
 func (s *serviceAccountClient) Controller() ServiceAccountController {
-	genericController := controller.NewGenericController(ServiceAccountGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ServiceAccountGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ServiceAccountGroupVersionResource, ServiceAccountGroupVersionKind.Kind, true))
 
 	return &serviceAccountController{

@@ -206,7 +206,7 @@ func (c rkeK8sSystemImageFactory) List() runtime.Object {
 }
 
 func (s *rkeK8sSystemImageClient) Controller() RkeK8sSystemImageController {
-	genericController := controller.NewGenericController(RkeK8sSystemImageGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RkeK8sSystemImageGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RkeK8sSystemImageGroupVersionResource, RkeK8sSystemImageGroupVersionKind.Kind, true))
 
 	return &rkeK8sSystemImageController{

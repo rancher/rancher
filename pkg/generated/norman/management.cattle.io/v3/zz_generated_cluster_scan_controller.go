@@ -206,7 +206,7 @@ func (c clusterScanFactory) List() runtime.Object {
 }
 
 func (s *clusterScanClient) Controller() ClusterScanController {
-	genericController := controller.NewGenericController(ClusterScanGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterScanGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterScanGroupVersionResource, ClusterScanGroupVersionKind.Kind, true))
 
 	return &clusterScanController{

@@ -206,7 +206,7 @@ func (c cronJobFactory) List() runtime.Object {
 }
 
 func (s *cronJobClient) Controller() CronJobController {
-	genericController := controller.NewGenericController(CronJobGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CronJobGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CronJobGroupVersionResource, CronJobGroupVersionKind.Kind, true))
 
 	return &cronJobController{

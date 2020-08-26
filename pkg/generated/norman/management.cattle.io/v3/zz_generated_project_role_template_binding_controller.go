@@ -206,7 +206,7 @@ func (c projectRoleTemplateBindingFactory) List() runtime.Object {
 }
 
 func (s *projectRoleTemplateBindingClient) Controller() ProjectRoleTemplateBindingController {
-	genericController := controller.NewGenericController(ProjectRoleTemplateBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectRoleTemplateBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectRoleTemplateBindingGroupVersionResource, ProjectRoleTemplateBindingGroupVersionKind.Kind, true))
 
 	return &projectRoleTemplateBindingController{

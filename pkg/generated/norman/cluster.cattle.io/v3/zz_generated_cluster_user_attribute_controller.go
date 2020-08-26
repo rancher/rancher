@@ -206,7 +206,7 @@ func (c clusterUserAttributeFactory) List() runtime.Object {
 }
 
 func (s *clusterUserAttributeClient) Controller() ClusterUserAttributeController {
-	genericController := controller.NewGenericController(ClusterUserAttributeGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterUserAttributeGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterUserAttributeGroupVersionResource, ClusterUserAttributeGroupVersionKind.Kind, true))
 
 	return &clusterUserAttributeController{

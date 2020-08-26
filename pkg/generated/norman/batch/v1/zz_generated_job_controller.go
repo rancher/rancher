@@ -206,7 +206,7 @@ func (c jobFactory) List() runtime.Object {
 }
 
 func (s *jobClient) Controller() JobController {
-	genericController := controller.NewGenericController(JobGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, JobGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(JobGroupVersionResource, JobGroupVersionKind.Kind, true))
 
 	return &jobController{

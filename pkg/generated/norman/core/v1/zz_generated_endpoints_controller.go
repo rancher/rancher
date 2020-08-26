@@ -206,7 +206,7 @@ func (c endpointsFactory) List() runtime.Object {
 }
 
 func (s *endpointsClient) Controller() EndpointsController {
-	genericController := controller.NewGenericController(EndpointsGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, EndpointsGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(EndpointsGroupVersionResource, EndpointsGroupVersionKind.Kind, true))
 
 	return &endpointsController{

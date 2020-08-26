@@ -206,7 +206,7 @@ func (c replicationControllerFactory) List() runtime.Object {
 }
 
 func (s *replicationControllerClient) Controller() ReplicationControllerController {
-	genericController := controller.NewGenericController(ReplicationControllerGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ReplicationControllerGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ReplicationControllerGroupVersionResource, ReplicationControllerGroupVersionKind.Kind, true))
 
 	return &replicationControllerController{

@@ -206,7 +206,7 @@ func (c catalogTemplateVersionFactory) List() runtime.Object {
 }
 
 func (s *catalogTemplateVersionClient) Controller() CatalogTemplateVersionController {
-	genericController := controller.NewGenericController(CatalogTemplateVersionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CatalogTemplateVersionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CatalogTemplateVersionGroupVersionResource, CatalogTemplateVersionGroupVersionKind.Kind, true))
 
 	return &catalogTemplateVersionController{

@@ -206,7 +206,7 @@ func (c appRevisionFactory) List() runtime.Object {
 }
 
 func (s *appRevisionClient) Controller() AppRevisionController {
-	genericController := controller.NewGenericController(AppRevisionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, AppRevisionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(AppRevisionGroupVersionResource, AppRevisionGroupVersionKind.Kind, true))
 
 	return &appRevisionController{

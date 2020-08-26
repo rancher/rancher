@@ -206,7 +206,7 @@ func (c resourceQuotaFactory) List() runtime.Object {
 }
 
 func (s *resourceQuotaClient) Controller() ResourceQuotaController {
-	genericController := controller.NewGenericController(ResourceQuotaGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ResourceQuotaGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ResourceQuotaGroupVersionResource, ResourceQuotaGroupVersionKind.Kind, true))
 
 	return &resourceQuotaController{

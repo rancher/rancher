@@ -206,7 +206,7 @@ func (c workloadFactory) List() runtime.Object {
 }
 
 func (s *workloadClient) Controller() WorkloadController {
-	genericController := controller.NewGenericController(WorkloadGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, WorkloadGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(WorkloadGroupVersionResource, WorkloadGroupVersionKind.Kind, true))
 
 	return &workloadController{

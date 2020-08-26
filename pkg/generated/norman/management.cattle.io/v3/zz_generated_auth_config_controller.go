@@ -205,7 +205,7 @@ func (c authConfigFactory) List() runtime.Object {
 }
 
 func (s *authConfigClient) Controller() AuthConfigController {
-	genericController := controller.NewGenericController(AuthConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, AuthConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(AuthConfigGroupVersionResource, AuthConfigGroupVersionKind.Kind, false))
 
 	return &authConfigController{

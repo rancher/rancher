@@ -206,7 +206,7 @@ func (c dockerCredentialFactory) List() runtime.Object {
 }
 
 func (s *dockerCredentialClient) Controller() DockerCredentialController {
-	genericController := controller.NewGenericController(DockerCredentialGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DockerCredentialGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DockerCredentialGroupVersionResource, DockerCredentialGroupVersionKind.Kind, true))
 
 	return &dockerCredentialController{

@@ -206,7 +206,7 @@ func (c projectMonitorGraphFactory) List() runtime.Object {
 }
 
 func (s *projectMonitorGraphClient) Controller() ProjectMonitorGraphController {
-	genericController := controller.NewGenericController(ProjectMonitorGraphGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectMonitorGraphGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectMonitorGraphGroupVersionResource, ProjectMonitorGraphGroupVersionKind.Kind, true))
 
 	return &projectMonitorGraphController{

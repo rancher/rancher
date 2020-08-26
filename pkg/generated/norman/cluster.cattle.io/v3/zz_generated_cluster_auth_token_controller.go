@@ -206,7 +206,7 @@ func (c clusterAuthTokenFactory) List() runtime.Object {
 }
 
 func (s *clusterAuthTokenClient) Controller() ClusterAuthTokenController {
-	genericController := controller.NewGenericController(ClusterAuthTokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterAuthTokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterAuthTokenGroupVersionResource, ClusterAuthTokenGroupVersionKind.Kind, true))
 
 	return &clusterAuthTokenController{

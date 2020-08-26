@@ -206,7 +206,7 @@ func (c podFactory) List() runtime.Object {
 }
 
 func (s *podClient) Controller() PodController {
-	genericController := controller.NewGenericController(PodGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PodGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PodGroupVersionResource, PodGroupVersionKind.Kind, true))
 
 	return &podController{

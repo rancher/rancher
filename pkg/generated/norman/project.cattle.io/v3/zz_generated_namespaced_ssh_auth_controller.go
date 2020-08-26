@@ -206,7 +206,7 @@ func (c namespacedSshAuthFactory) List() runtime.Object {
 }
 
 func (s *namespacedSshAuthClient) Controller() NamespacedSSHAuthController {
-	genericController := controller.NewGenericController(NamespacedSSHAuthGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NamespacedSSHAuthGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NamespacedSSHAuthGroupVersionResource, NamespacedSSHAuthGroupVersionKind.Kind, true))
 
 	return &namespacedSshAuthController{

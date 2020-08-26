@@ -205,7 +205,7 @@ func (c composeConfigFactory) List() runtime.Object {
 }
 
 func (s *composeConfigClient) Controller() ComposeConfigController {
-	genericController := controller.NewGenericController(ComposeConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ComposeConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ComposeConfigGroupVersionResource, ComposeConfigGroupVersionKind.Kind, false))
 
 	return &composeConfigController{

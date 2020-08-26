@@ -206,7 +206,7 @@ func (c nodeTemplateFactory) List() runtime.Object {
 }
 
 func (s *nodeTemplateClient) Controller() NodeTemplateController {
-	genericController := controller.NewGenericController(NodeTemplateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NodeTemplateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NodeTemplateGroupVersionResource, NodeTemplateGroupVersionKind.Kind, true))
 
 	return &nodeTemplateController{

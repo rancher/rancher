@@ -206,7 +206,7 @@ func (c sshAuthFactory) List() runtime.Object {
 }
 
 func (s *sshAuthClient) Controller() SSHAuthController {
-	genericController := controller.NewGenericController(SSHAuthGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SSHAuthGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SSHAuthGroupVersionResource, SSHAuthGroupVersionKind.Kind, true))
 
 	return &sshAuthController{

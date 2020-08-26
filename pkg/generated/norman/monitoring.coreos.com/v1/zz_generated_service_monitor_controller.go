@@ -206,7 +206,7 @@ func (c serviceMonitorFactory) List() runtime.Object {
 }
 
 func (s *serviceMonitorClient) Controller() ServiceMonitorController {
-	genericController := controller.NewGenericController(ServiceMonitorGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ServiceMonitorGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ServiceMonitorGroupVersionResource, ServiceMonitorGroupVersionKind.Kind, true))
 
 	return &serviceMonitorController{

@@ -206,7 +206,7 @@ func (c roleFactory) List() runtime.Object {
 }
 
 func (s *roleClient) Controller() RoleController {
-	genericController := controller.NewGenericController(RoleGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RoleGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RoleGroupVersionResource, RoleGroupVersionKind.Kind, true))
 
 	return &roleController{

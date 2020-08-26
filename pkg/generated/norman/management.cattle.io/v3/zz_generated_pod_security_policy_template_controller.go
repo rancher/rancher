@@ -205,7 +205,7 @@ func (c podSecurityPolicyTemplateFactory) List() runtime.Object {
 }
 
 func (s *podSecurityPolicyTemplateClient) Controller() PodSecurityPolicyTemplateController {
-	genericController := controller.NewGenericController(PodSecurityPolicyTemplateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PodSecurityPolicyTemplateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PodSecurityPolicyTemplateGroupVersionResource, PodSecurityPolicyTemplateGroupVersionKind.Kind, false))
 
 	return &podSecurityPolicyTemplateController{

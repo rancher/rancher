@@ -206,7 +206,7 @@ func (c rkeAddonFactory) List() runtime.Object {
 }
 
 func (s *rkeAddonClient) Controller() RkeAddonController {
-	genericController := controller.NewGenericController(RkeAddonGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RkeAddonGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RkeAddonGroupVersionResource, RkeAddonGroupVersionKind.Kind, true))
 
 	return &rkeAddonController{

@@ -205,7 +205,7 @@ func (c nodeFactory) List() runtime.Object {
 }
 
 func (s *nodeClient) Controller() NodeController {
-	genericController := controller.NewGenericController(NodeGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NodeGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NodeGroupVersionResource, NodeGroupVersionKind.Kind, false))
 
 	return &nodeController{

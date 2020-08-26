@@ -206,7 +206,7 @@ func (c secretFactory) List() runtime.Object {
 }
 
 func (s *secretClient) Controller() SecretController {
-	genericController := controller.NewGenericController(SecretGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SecretGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SecretGroupVersionResource, SecretGroupVersionKind.Kind, true))
 
 	return &secretController{

@@ -205,7 +205,7 @@ func (c principalFactory) List() runtime.Object {
 }
 
 func (s *principalClient) Controller() PrincipalController {
-	genericController := controller.NewGenericController(PrincipalGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PrincipalGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PrincipalGroupVersionResource, PrincipalGroupVersionKind.Kind, false))
 
 	return &principalController{

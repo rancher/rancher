@@ -206,7 +206,7 @@ func (c namespacedCertificateFactory) List() runtime.Object {
 }
 
 func (s *namespacedCertificateClient) Controller() NamespacedCertificateController {
-	genericController := controller.NewGenericController(NamespacedCertificateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NamespacedCertificateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NamespacedCertificateGroupVersionResource, NamespacedCertificateGroupVersionKind.Kind, true))
 
 	return &namespacedCertificateController{

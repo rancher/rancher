@@ -206,7 +206,7 @@ func (c clusterTemplateFactory) List() runtime.Object {
 }
 
 func (s *clusterTemplateClient) Controller() ClusterTemplateController {
-	genericController := controller.NewGenericController(ClusterTemplateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterTemplateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterTemplateGroupVersionResource, ClusterTemplateGroupVersionKind.Kind, true))
 
 	return &clusterTemplateController{

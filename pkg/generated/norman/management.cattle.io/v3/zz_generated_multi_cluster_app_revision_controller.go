@@ -206,7 +206,7 @@ func (c multiClusterAppRevisionFactory) List() runtime.Object {
 }
 
 func (s *multiClusterAppRevisionClient) Controller() MultiClusterAppRevisionController {
-	genericController := controller.NewGenericController(MultiClusterAppRevisionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, MultiClusterAppRevisionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(MultiClusterAppRevisionGroupVersionResource, MultiClusterAppRevisionGroupVersionKind.Kind, true))
 
 	return &multiClusterAppRevisionController{

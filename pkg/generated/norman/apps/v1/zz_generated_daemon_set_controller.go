@@ -206,7 +206,7 @@ func (c daemonSetFactory) List() runtime.Object {
 }
 
 func (s *daemonSetClient) Controller() DaemonSetController {
-	genericController := controller.NewGenericController(DaemonSetGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DaemonSetGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DaemonSetGroupVersionResource, DaemonSetGroupVersionKind.Kind, true))
 
 	return &daemonSetController{

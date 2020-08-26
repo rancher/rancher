@@ -205,7 +205,7 @@ func (c userAttributeFactory) List() runtime.Object {
 }
 
 func (s *userAttributeClient) Controller() UserAttributeController {
-	genericController := controller.NewGenericController(UserAttributeGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, UserAttributeGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(UserAttributeGroupVersionResource, UserAttributeGroupVersionKind.Kind, false))
 
 	return &userAttributeController{

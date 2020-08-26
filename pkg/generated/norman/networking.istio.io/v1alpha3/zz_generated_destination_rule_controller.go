@@ -206,7 +206,7 @@ func (c destinationRuleFactory) List() runtime.Object {
 }
 
 func (s *destinationRuleClient) Controller() DestinationRuleController {
-	genericController := controller.NewGenericController(DestinationRuleGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DestinationRuleGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DestinationRuleGroupVersionResource, DestinationRuleGroupVersionKind.Kind, true))
 
 	return &destinationRuleController{

@@ -206,7 +206,7 @@ func (c basicAuthFactory) List() runtime.Object {
 }
 
 func (s *basicAuthClient) Controller() BasicAuthController {
-	genericController := controller.NewGenericController(BasicAuthGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, BasicAuthGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(BasicAuthGroupVersionResource, BasicAuthGroupVersionKind.Kind, true))
 
 	return &basicAuthController{

@@ -205,7 +205,7 @@ func (c namespaceFactory) List() runtime.Object {
 }
 
 func (s *namespaceClient) Controller() NamespaceController {
-	genericController := controller.NewGenericController(NamespaceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NamespaceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NamespaceGroupVersionResource, NamespaceGroupVersionKind.Kind, false))
 
 	return &namespaceController{

@@ -206,7 +206,7 @@ func (c limitRangeFactory) List() runtime.Object {
 }
 
 func (s *limitRangeClient) Controller() LimitRangeController {
-	genericController := controller.NewGenericController(LimitRangeGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, LimitRangeGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(LimitRangeGroupVersionResource, LimitRangeGroupVersionKind.Kind, true))
 
 	return &limitRangeController{

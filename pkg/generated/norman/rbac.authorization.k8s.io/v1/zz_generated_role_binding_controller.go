@@ -206,7 +206,7 @@ func (c roleBindingFactory) List() runtime.Object {
 }
 
 func (s *roleBindingClient) Controller() RoleBindingController {
-	genericController := controller.NewGenericController(RoleBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RoleBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RoleBindingGroupVersionResource, RoleBindingGroupVersionKind.Kind, true))
 
 	return &roleBindingController{

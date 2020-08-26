@@ -206,7 +206,7 @@ func (c rkeK8sServiceOptionFactory) List() runtime.Object {
 }
 
 func (s *rkeK8sServiceOptionClient) Controller() RkeK8sServiceOptionController {
-	genericController := controller.NewGenericController(RkeK8sServiceOptionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RkeK8sServiceOptionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RkeK8sServiceOptionGroupVersionResource, RkeK8sServiceOptionGroupVersionKind.Kind, true))
 
 	return &rkeK8sServiceOptionController{

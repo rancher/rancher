@@ -206,7 +206,7 @@ func (c projectLoggingFactory) List() runtime.Object {
 }
 
 func (s *projectLoggingClient) Controller() ProjectLoggingController {
-	genericController := controller.NewGenericController(ProjectLoggingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectLoggingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectLoggingGroupVersionResource, ProjectLoggingGroupVersionKind.Kind, true))
 
 	return &projectLoggingController{

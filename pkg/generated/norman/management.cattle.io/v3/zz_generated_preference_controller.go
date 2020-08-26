@@ -206,7 +206,7 @@ func (c preferenceFactory) List() runtime.Object {
 }
 
 func (s *preferenceClient) Controller() PreferenceController {
-	genericController := controller.NewGenericController(PreferenceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PreferenceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PreferenceGroupVersionResource, PreferenceGroupVersionKind.Kind, true))
 
 	return &preferenceController{

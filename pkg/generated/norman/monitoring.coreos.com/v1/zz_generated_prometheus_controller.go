@@ -206,7 +206,7 @@ func (c prometheusFactory) List() runtime.Object {
 }
 
 func (s *prometheusClient) Controller() PrometheusController {
-	genericController := controller.NewGenericController(PrometheusGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PrometheusGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PrometheusGroupVersionResource, PrometheusGroupVersionKind.Kind, true))
 
 	return &prometheusController{

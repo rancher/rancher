@@ -206,7 +206,7 @@ func (c prometheusRuleFactory) List() runtime.Object {
 }
 
 func (s *prometheusRuleClient) Controller() PrometheusRuleController {
-	genericController := controller.NewGenericController(PrometheusRuleGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PrometheusRuleGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PrometheusRuleGroupVersionResource, PrometheusRuleGroupVersionKind.Kind, true))
 
 	return &prometheusRuleController{

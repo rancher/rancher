@@ -206,7 +206,7 @@ func (c certificateFactory) List() runtime.Object {
 }
 
 func (s *certificateClient) Controller() CertificateController {
-	genericController := controller.NewGenericController(CertificateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CertificateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CertificateGroupVersionResource, CertificateGroupVersionKind.Kind, true))
 
 	return &certificateController{

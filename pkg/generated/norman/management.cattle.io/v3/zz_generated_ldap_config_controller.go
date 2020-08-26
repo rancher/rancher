@@ -205,7 +205,7 @@ func (c ldapConfigFactory) List() runtime.Object {
 }
 
 func (s *ldapConfigClient) Controller() LdapConfigController {
-	genericController := controller.NewGenericController(LdapConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, LdapConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(LdapConfigGroupVersionResource, LdapConfigGroupVersionKind.Kind, false))
 
 	return &ldapConfigController{

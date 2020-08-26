@@ -205,7 +205,7 @@ func (c eventFactory) List() runtime.Object {
 }
 
 func (s *eventClient) Controller() EventController {
-	genericController := controller.NewGenericController(EventGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, EventGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(EventGroupVersionResource, EventGroupVersionKind.Kind, false))
 
 	return &eventController{

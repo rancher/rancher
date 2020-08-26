@@ -206,7 +206,7 @@ func (c etcdBackupFactory) List() runtime.Object {
 }
 
 func (s *etcdBackupClient) Controller() EtcdBackupController {
-	genericController := controller.NewGenericController(EtcdBackupGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, EtcdBackupGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(EtcdBackupGroupVersionResource, EtcdBackupGroupVersionKind.Kind, true))
 
 	return &etcdBackupController{

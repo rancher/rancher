@@ -206,7 +206,7 @@ func (c cisBenchmarkVersionFactory) List() runtime.Object {
 }
 
 func (s *cisBenchmarkVersionClient) Controller() CisBenchmarkVersionController {
-	genericController := controller.NewGenericController(CisBenchmarkVersionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CisBenchmarkVersionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CisBenchmarkVersionGroupVersionResource, CisBenchmarkVersionGroupVersionKind.Kind, true))
 
 	return &cisBenchmarkVersionController{

@@ -206,7 +206,7 @@ func (c configMapFactory) List() runtime.Object {
 }
 
 func (s *configMapClient) Controller() ConfigMapController {
-	genericController := controller.NewGenericController(ConfigMapGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ConfigMapGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ConfigMapGroupVersionResource, ConfigMapGroupVersionKind.Kind, true))
 
 	return &configMapController{

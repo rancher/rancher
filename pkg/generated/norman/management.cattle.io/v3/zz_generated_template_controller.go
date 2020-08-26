@@ -205,7 +205,7 @@ func (c templateFactory) List() runtime.Object {
 }
 
 func (s *templateClient) Controller() TemplateController {
-	genericController := controller.NewGenericController(TemplateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, TemplateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(TemplateGroupVersionResource, TemplateGroupVersionKind.Kind, false))
 
 	return &templateController{

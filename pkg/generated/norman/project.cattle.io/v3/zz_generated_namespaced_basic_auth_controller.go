@@ -206,7 +206,7 @@ func (c namespacedBasicAuthFactory) List() runtime.Object {
 }
 
 func (s *namespacedBasicAuthClient) Controller() NamespacedBasicAuthController {
-	genericController := controller.NewGenericController(NamespacedBasicAuthGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NamespacedBasicAuthGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NamespacedBasicAuthGroupVersionResource, NamespacedBasicAuthGroupVersionKind.Kind, true))
 
 	return &namespacedBasicAuthController{

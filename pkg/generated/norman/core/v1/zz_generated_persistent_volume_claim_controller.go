@@ -206,7 +206,7 @@ func (c persistentVolumeClaimFactory) List() runtime.Object {
 }
 
 func (s *persistentVolumeClaimClient) Controller() PersistentVolumeClaimController {
-	genericController := controller.NewGenericController(PersistentVolumeClaimGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PersistentVolumeClaimGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PersistentVolumeClaimGroupVersionResource, PersistentVolumeClaimGroupVersionKind.Kind, true))
 
 	return &persistentVolumeClaimController{

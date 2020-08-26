@@ -206,7 +206,7 @@ func (c ingressFactory) List() runtime.Object {
 }
 
 func (s *ingressClient) Controller() IngressController {
-	genericController := controller.NewGenericController(IngressGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, IngressGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(IngressGroupVersionResource, IngressGroupVersionKind.Kind, true))
 
 	return &ingressController{

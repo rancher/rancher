@@ -206,7 +206,7 @@ func (c deploymentFactory) List() runtime.Object {
 }
 
 func (s *deploymentClient) Controller() DeploymentController {
-	genericController := controller.NewGenericController(DeploymentGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DeploymentGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DeploymentGroupVersionResource, DeploymentGroupVersionKind.Kind, true))
 
 	return &deploymentController{

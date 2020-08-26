@@ -205,7 +205,7 @@ func (c storageClassFactory) List() runtime.Object {
 }
 
 func (s *storageClassClient) Controller() StorageClassController {
-	genericController := controller.NewGenericController(StorageClassGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, StorageClassGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(StorageClassGroupVersionResource, StorageClassGroupVersionKind.Kind, false))
 
 	return &storageClassController{

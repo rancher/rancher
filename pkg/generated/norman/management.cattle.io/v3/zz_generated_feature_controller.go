@@ -205,7 +205,7 @@ func (c featureFactory) List() runtime.Object {
 }
 
 func (s *featureClient) Controller() FeatureController {
-	genericController := controller.NewGenericController(FeatureGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, FeatureGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(FeatureGroupVersionResource, FeatureGroupVersionKind.Kind, false))
 
 	return &featureController{

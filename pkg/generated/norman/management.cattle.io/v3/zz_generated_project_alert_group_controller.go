@@ -206,7 +206,7 @@ func (c projectAlertGroupFactory) List() runtime.Object {
 }
 
 func (s *projectAlertGroupClient) Controller() ProjectAlertGroupController {
-	genericController := controller.NewGenericController(ProjectAlertGroupGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectAlertGroupGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectAlertGroupGroupVersionResource, ProjectAlertGroupGroupVersionKind.Kind, true))
 
 	return &projectAlertGroupController{

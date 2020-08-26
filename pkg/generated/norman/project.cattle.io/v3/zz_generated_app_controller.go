@@ -206,7 +206,7 @@ func (c appFactory) List() runtime.Object {
 }
 
 func (s *appClient) Controller() AppController {
-	genericController := controller.NewGenericController(AppGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, AppGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(AppGroupVersionResource, AppGroupVersionKind.Kind, true))
 
 	return &appController{
