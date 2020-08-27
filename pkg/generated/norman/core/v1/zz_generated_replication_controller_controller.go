@@ -98,10 +98,14 @@ type ReplicationControllerInterface interface {
 }
 
 type replicationControllerLister struct {
+	ns         string
 	controller *replicationControllerController
 }
 
 func (l *replicationControllerLister) List(namespace string, selector labels.Selector) (ret []*v1.ReplicationController, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ReplicationController))
 	})
@@ -129,6 +133,7 @@ func (l *replicationControllerLister) Get(namespace, name string) (*v1.Replicati
 }
 
 type replicationControllerController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *replicationControllerController) Generic() controller.GenericController
 
 func (c *replicationControllerController) Lister() ReplicationControllerLister {
 	return &replicationControllerLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c replicationControllerFactory) List() runtime.Object {
 }
 
 func (s *replicationControllerClient) Controller() ReplicationControllerController {
-	genericController := controller.NewGenericController(ReplicationControllerGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ReplicationControllerGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ReplicationControllerGroupVersionResource, ReplicationControllerGroupVersionKind.Kind, true))
 
 	return &replicationControllerController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

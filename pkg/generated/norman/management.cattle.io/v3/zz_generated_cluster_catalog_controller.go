@@ -98,10 +98,14 @@ type ClusterCatalogInterface interface {
 }
 
 type clusterCatalogLister struct {
+	ns         string
 	controller *clusterCatalogController
 }
 
 func (l *clusterCatalogLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterCatalog, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterCatalog))
 	})
@@ -129,6 +133,7 @@ func (l *clusterCatalogLister) Get(namespace, name string) (*v3.ClusterCatalog, 
 }
 
 type clusterCatalogController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterCatalogController) Generic() controller.GenericController {
 
 func (c *clusterCatalogController) Lister() ClusterCatalogLister {
 	return &clusterCatalogLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterCatalogFactory) List() runtime.Object {
 }
 
 func (s *clusterCatalogClient) Controller() ClusterCatalogController {
-	genericController := controller.NewGenericController(ClusterCatalogGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterCatalogGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterCatalogGroupVersionResource, ClusterCatalogGroupVersionKind.Kind, true))
 
 	return &clusterCatalogController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

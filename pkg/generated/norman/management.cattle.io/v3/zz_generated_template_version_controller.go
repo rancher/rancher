@@ -97,10 +97,14 @@ type TemplateVersionInterface interface {
 }
 
 type templateVersionLister struct {
+	ns         string
 	controller *templateVersionController
 }
 
 func (l *templateVersionLister) List(namespace string, selector labels.Selector) (ret []*v3.TemplateVersion, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.TemplateVersion))
 	})
@@ -128,6 +132,7 @@ func (l *templateVersionLister) Get(namespace, name string) (*v3.TemplateVersion
 }
 
 type templateVersionController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *templateVersionController) Generic() controller.GenericController {
 
 func (c *templateVersionController) Lister() TemplateVersionLister {
 	return &templateVersionLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c templateVersionFactory) List() runtime.Object {
 }
 
 func (s *templateVersionClient) Controller() TemplateVersionController {
-	genericController := controller.NewGenericController(TemplateVersionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, TemplateVersionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(TemplateVersionGroupVersionResource, TemplateVersionGroupVersionKind.Kind, false))
 
 	return &templateVersionController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

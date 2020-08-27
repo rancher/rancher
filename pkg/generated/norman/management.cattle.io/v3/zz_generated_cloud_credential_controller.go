@@ -98,10 +98,14 @@ type CloudCredentialInterface interface {
 }
 
 type cloudCredentialLister struct {
+	ns         string
 	controller *cloudCredentialController
 }
 
 func (l *cloudCredentialLister) List(namespace string, selector labels.Selector) (ret []*v3.CloudCredential, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.CloudCredential))
 	})
@@ -129,6 +133,7 @@ func (l *cloudCredentialLister) Get(namespace, name string) (*v3.CloudCredential
 }
 
 type cloudCredentialController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *cloudCredentialController) Generic() controller.GenericController {
 
 func (c *cloudCredentialController) Lister() CloudCredentialLister {
 	return &cloudCredentialLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c cloudCredentialFactory) List() runtime.Object {
 }
 
 func (s *cloudCredentialClient) Controller() CloudCredentialController {
-	genericController := controller.NewGenericController(CloudCredentialGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CloudCredentialGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CloudCredentialGroupVersionResource, CloudCredentialGroupVersionKind.Kind, true))
 
 	return &cloudCredentialController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -97,10 +97,14 @@ type ClusterRoleInterface interface {
 }
 
 type clusterRoleLister struct {
+	ns         string
 	controller *clusterRoleController
 }
 
 func (l *clusterRoleLister) List(namespace string, selector labels.Selector) (ret []*v1.ClusterRole, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ClusterRole))
 	})
@@ -128,6 +132,7 @@ func (l *clusterRoleLister) Get(namespace, name string) (*v1.ClusterRole, error)
 }
 
 type clusterRoleController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *clusterRoleController) Generic() controller.GenericController {
 
 func (c *clusterRoleController) Lister() ClusterRoleLister {
 	return &clusterRoleLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c clusterRoleFactory) List() runtime.Object {
 }
 
 func (s *clusterRoleClient) Controller() ClusterRoleController {
-	genericController := controller.NewGenericController(ClusterRoleGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterRoleGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterRoleGroupVersionResource, ClusterRoleGroupVersionKind.Kind, false))
 
 	return &clusterRoleController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

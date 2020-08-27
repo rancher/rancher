@@ -97,10 +97,14 @@ type TemplateInterface interface {
 }
 
 type templateLister struct {
+	ns         string
 	controller *templateController
 }
 
 func (l *templateLister) List(namespace string, selector labels.Selector) (ret []*v3.Template, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Template))
 	})
@@ -128,6 +132,7 @@ func (l *templateLister) Get(namespace, name string) (*v3.Template, error) {
 }
 
 type templateController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *templateController) Generic() controller.GenericController {
 
 func (c *templateController) Lister() TemplateLister {
 	return &templateLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c templateFactory) List() runtime.Object {
 }
 
 func (s *templateClient) Controller() TemplateController {
-	genericController := controller.NewGenericController(TemplateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, TemplateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(TemplateGroupVersionResource, TemplateGroupVersionKind.Kind, false))
 
 	return &templateController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

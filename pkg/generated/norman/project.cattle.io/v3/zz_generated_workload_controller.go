@@ -98,10 +98,14 @@ type WorkloadInterface interface {
 }
 
 type workloadLister struct {
+	ns         string
 	controller *workloadController
 }
 
 func (l *workloadLister) List(namespace string, selector labels.Selector) (ret []*v3.Workload, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Workload))
 	})
@@ -129,6 +133,7 @@ func (l *workloadLister) Get(namespace, name string) (*v3.Workload, error) {
 }
 
 type workloadController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *workloadController) Generic() controller.GenericController {
 
 func (c *workloadController) Lister() WorkloadLister {
 	return &workloadLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c workloadFactory) List() runtime.Object {
 }
 
 func (s *workloadClient) Controller() WorkloadController {
-	genericController := controller.NewGenericController(WorkloadGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, WorkloadGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(WorkloadGroupVersionResource, WorkloadGroupVersionKind.Kind, true))
 
 	return &workloadController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

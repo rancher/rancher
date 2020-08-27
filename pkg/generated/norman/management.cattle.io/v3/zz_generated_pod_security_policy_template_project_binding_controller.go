@@ -98,10 +98,14 @@ type PodSecurityPolicyTemplateProjectBindingInterface interface {
 }
 
 type podSecurityPolicyTemplateProjectBindingLister struct {
+	ns         string
 	controller *podSecurityPolicyTemplateProjectBindingController
 }
 
 func (l *podSecurityPolicyTemplateProjectBindingLister) List(namespace string, selector labels.Selector) (ret []*v3.PodSecurityPolicyTemplateProjectBinding, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.PodSecurityPolicyTemplateProjectBinding))
 	})
@@ -129,6 +133,7 @@ func (l *podSecurityPolicyTemplateProjectBindingLister) Get(namespace, name stri
 }
 
 type podSecurityPolicyTemplateProjectBindingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *podSecurityPolicyTemplateProjectBindingController) Generic() controller
 
 func (c *podSecurityPolicyTemplateProjectBindingController) Lister() PodSecurityPolicyTemplateProjectBindingLister {
 	return &podSecurityPolicyTemplateProjectBindingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c podSecurityPolicyTemplateProjectBindingFactory) List() runtime.Object {
 }
 
 func (s *podSecurityPolicyTemplateProjectBindingClient) Controller() PodSecurityPolicyTemplateProjectBindingController {
-	genericController := controller.NewGenericController(PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PodSecurityPolicyTemplateProjectBindingGroupVersionResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind, true))
 
 	return &podSecurityPolicyTemplateProjectBindingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type PreferenceInterface interface {
 }
 
 type preferenceLister struct {
+	ns         string
 	controller *preferenceController
 }
 
 func (l *preferenceLister) List(namespace string, selector labels.Selector) (ret []*v3.Preference, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Preference))
 	})
@@ -129,6 +133,7 @@ func (l *preferenceLister) Get(namespace, name string) (*v3.Preference, error) {
 }
 
 type preferenceController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *preferenceController) Generic() controller.GenericController {
 
 func (c *preferenceController) Lister() PreferenceLister {
 	return &preferenceLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c preferenceFactory) List() runtime.Object {
 }
 
 func (s *preferenceClient) Controller() PreferenceController {
-	genericController := controller.NewGenericController(PreferenceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PreferenceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PreferenceGroupVersionResource, PreferenceGroupVersionKind.Kind, true))
 
 	return &preferenceController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

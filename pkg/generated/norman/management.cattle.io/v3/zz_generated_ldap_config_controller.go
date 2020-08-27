@@ -97,10 +97,14 @@ type LdapConfigInterface interface {
 }
 
 type ldapConfigLister struct {
+	ns         string
 	controller *ldapConfigController
 }
 
 func (l *ldapConfigLister) List(namespace string, selector labels.Selector) (ret []*v3.LdapConfig, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.LdapConfig))
 	})
@@ -128,6 +132,7 @@ func (l *ldapConfigLister) Get(namespace, name string) (*v3.LdapConfig, error) {
 }
 
 type ldapConfigController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *ldapConfigController) Generic() controller.GenericController {
 
 func (c *ldapConfigController) Lister() LdapConfigLister {
 	return &ldapConfigLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c ldapConfigFactory) List() runtime.Object {
 }
 
 func (s *ldapConfigClient) Controller() LdapConfigController {
-	genericController := controller.NewGenericController(LdapConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, LdapConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(LdapConfigGroupVersionResource, LdapConfigGroupVersionKind.Kind, false))
 
 	return &ldapConfigController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

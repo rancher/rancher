@@ -97,10 +97,14 @@ type APIServiceInterface interface {
 }
 
 type apiServiceLister struct {
+	ns         string
 	controller *apiServiceController
 }
 
 func (l *apiServiceLister) List(namespace string, selector labels.Selector) (ret []*v1.APIService, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.APIService))
 	})
@@ -128,6 +132,7 @@ func (l *apiServiceLister) Get(namespace, name string) (*v1.APIService, error) {
 }
 
 type apiServiceController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *apiServiceController) Generic() controller.GenericController {
 
 func (c *apiServiceController) Lister() APIServiceLister {
 	return &apiServiceLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c apiServiceFactory) List() runtime.Object {
 }
 
 func (s *apiServiceClient) Controller() APIServiceController {
-	genericController := controller.NewGenericController(APIServiceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, APIServiceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(APIServiceGroupVersionResource, APIServiceGroupVersionKind.Kind, false))
 
 	return &apiServiceController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

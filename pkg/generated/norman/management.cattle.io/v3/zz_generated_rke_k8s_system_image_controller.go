@@ -98,10 +98,14 @@ type RkeK8sSystemImageInterface interface {
 }
 
 type rkeK8sSystemImageLister struct {
+	ns         string
 	controller *rkeK8sSystemImageController
 }
 
 func (l *rkeK8sSystemImageLister) List(namespace string, selector labels.Selector) (ret []*v3.RkeK8sSystemImage, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.RkeK8sSystemImage))
 	})
@@ -129,6 +133,7 @@ func (l *rkeK8sSystemImageLister) Get(namespace, name string) (*v3.RkeK8sSystemI
 }
 
 type rkeK8sSystemImageController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *rkeK8sSystemImageController) Generic() controller.GenericController {
 
 func (c *rkeK8sSystemImageController) Lister() RkeK8sSystemImageLister {
 	return &rkeK8sSystemImageLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c rkeK8sSystemImageFactory) List() runtime.Object {
 }
 
 func (s *rkeK8sSystemImageClient) Controller() RkeK8sSystemImageController {
-	genericController := controller.NewGenericController(RkeK8sSystemImageGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RkeK8sSystemImageGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RkeK8sSystemImageGroupVersionResource, RkeK8sSystemImageGroupVersionKind.Kind, true))
 
 	return &rkeK8sSystemImageController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

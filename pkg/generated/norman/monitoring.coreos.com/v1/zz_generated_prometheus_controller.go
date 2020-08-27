@@ -98,10 +98,14 @@ type PrometheusInterface interface {
 }
 
 type prometheusLister struct {
+	ns         string
 	controller *prometheusController
 }
 
 func (l *prometheusLister) List(namespace string, selector labels.Selector) (ret []*v1.Prometheus, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Prometheus))
 	})
@@ -129,6 +133,7 @@ func (l *prometheusLister) Get(namespace, name string) (*v1.Prometheus, error) {
 }
 
 type prometheusController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *prometheusController) Generic() controller.GenericController {
 
 func (c *prometheusController) Lister() PrometheusLister {
 	return &prometheusLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c prometheusFactory) List() runtime.Object {
 }
 
 func (s *prometheusClient) Controller() PrometheusController {
-	genericController := controller.NewGenericController(PrometheusGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PrometheusGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PrometheusGroupVersionResource, PrometheusGroupVersionKind.Kind, true))
 
 	return &prometheusController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

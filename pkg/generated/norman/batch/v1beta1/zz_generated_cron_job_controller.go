@@ -98,10 +98,14 @@ type CronJobInterface interface {
 }
 
 type cronJobLister struct {
+	ns         string
 	controller *cronJobController
 }
 
 func (l *cronJobLister) List(namespace string, selector labels.Selector) (ret []*v1beta1.CronJob, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1beta1.CronJob))
 	})
@@ -129,6 +133,7 @@ func (l *cronJobLister) Get(namespace, name string) (*v1beta1.CronJob, error) {
 }
 
 type cronJobController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *cronJobController) Generic() controller.GenericController {
 
 func (c *cronJobController) Lister() CronJobLister {
 	return &cronJobLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c cronJobFactory) List() runtime.Object {
 }
 
 func (s *cronJobClient) Controller() CronJobController {
-	genericController := controller.NewGenericController(CronJobGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CronJobGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CronJobGroupVersionResource, CronJobGroupVersionKind.Kind, true))
 
 	return &cronJobController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

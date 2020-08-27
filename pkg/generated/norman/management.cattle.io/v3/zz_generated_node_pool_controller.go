@@ -98,10 +98,14 @@ type NodePoolInterface interface {
 }
 
 type nodePoolLister struct {
+	ns         string
 	controller *nodePoolController
 }
 
 func (l *nodePoolLister) List(namespace string, selector labels.Selector) (ret []*v3.NodePool, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.NodePool))
 	})
@@ -129,6 +133,7 @@ func (l *nodePoolLister) Get(namespace, name string) (*v3.NodePool, error) {
 }
 
 type nodePoolController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *nodePoolController) Generic() controller.GenericController {
 
 func (c *nodePoolController) Lister() NodePoolLister {
 	return &nodePoolLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c nodePoolFactory) List() runtime.Object {
 }
 
 func (s *nodePoolClient) Controller() NodePoolController {
-	genericController := controller.NewGenericController(NodePoolGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NodePoolGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NodePoolGroupVersionResource, NodePoolGroupVersionKind.Kind, true))
 
 	return &nodePoolController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

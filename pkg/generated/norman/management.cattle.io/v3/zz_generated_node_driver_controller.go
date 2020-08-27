@@ -97,10 +97,14 @@ type NodeDriverInterface interface {
 }
 
 type nodeDriverLister struct {
+	ns         string
 	controller *nodeDriverController
 }
 
 func (l *nodeDriverLister) List(namespace string, selector labels.Selector) (ret []*v3.NodeDriver, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.NodeDriver))
 	})
@@ -128,6 +132,7 @@ func (l *nodeDriverLister) Get(namespace, name string) (*v3.NodeDriver, error) {
 }
 
 type nodeDriverController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *nodeDriverController) Generic() controller.GenericController {
 
 func (c *nodeDriverController) Lister() NodeDriverLister {
 	return &nodeDriverLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c nodeDriverFactory) List() runtime.Object {
 }
 
 func (s *nodeDriverClient) Controller() NodeDriverController {
-	genericController := controller.NewGenericController(NodeDriverGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NodeDriverGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NodeDriverGroupVersionResource, NodeDriverGroupVersionKind.Kind, false))
 
 	return &nodeDriverController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

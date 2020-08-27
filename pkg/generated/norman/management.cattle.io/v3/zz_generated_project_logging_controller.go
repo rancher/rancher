@@ -98,10 +98,14 @@ type ProjectLoggingInterface interface {
 }
 
 type projectLoggingLister struct {
+	ns         string
 	controller *projectLoggingController
 }
 
 func (l *projectLoggingLister) List(namespace string, selector labels.Selector) (ret []*v3.ProjectLogging, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ProjectLogging))
 	})
@@ -129,6 +133,7 @@ func (l *projectLoggingLister) Get(namespace, name string) (*v3.ProjectLogging, 
 }
 
 type projectLoggingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *projectLoggingController) Generic() controller.GenericController {
 
 func (c *projectLoggingController) Lister() ProjectLoggingLister {
 	return &projectLoggingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c projectLoggingFactory) List() runtime.Object {
 }
 
 func (s *projectLoggingClient) Controller() ProjectLoggingController {
-	genericController := controller.NewGenericController(ProjectLoggingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectLoggingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectLoggingGroupVersionResource, ProjectLoggingGroupVersionKind.Kind, true))
 
 	return &projectLoggingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

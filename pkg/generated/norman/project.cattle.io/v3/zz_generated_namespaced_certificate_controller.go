@@ -98,10 +98,14 @@ type NamespacedCertificateInterface interface {
 }
 
 type namespacedCertificateLister struct {
+	ns         string
 	controller *namespacedCertificateController
 }
 
 func (l *namespacedCertificateLister) List(namespace string, selector labels.Selector) (ret []*v3.NamespacedCertificate, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.NamespacedCertificate))
 	})
@@ -129,6 +133,7 @@ func (l *namespacedCertificateLister) Get(namespace, name string) (*v3.Namespace
 }
 
 type namespacedCertificateController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *namespacedCertificateController) Generic() controller.GenericController
 
 func (c *namespacedCertificateController) Lister() NamespacedCertificateLister {
 	return &namespacedCertificateLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c namespacedCertificateFactory) List() runtime.Object {
 }
 
 func (s *namespacedCertificateClient) Controller() NamespacedCertificateController {
-	genericController := controller.NewGenericController(NamespacedCertificateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NamespacedCertificateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NamespacedCertificateGroupVersionResource, NamespacedCertificateGroupVersionKind.Kind, true))
 
 	return &namespacedCertificateController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

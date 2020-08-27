@@ -97,10 +97,14 @@ type RoleTemplateInterface interface {
 }
 
 type roleTemplateLister struct {
+	ns         string
 	controller *roleTemplateController
 }
 
 func (l *roleTemplateLister) List(namespace string, selector labels.Selector) (ret []*v3.RoleTemplate, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.RoleTemplate))
 	})
@@ -128,6 +132,7 @@ func (l *roleTemplateLister) Get(namespace, name string) (*v3.RoleTemplate, erro
 }
 
 type roleTemplateController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *roleTemplateController) Generic() controller.GenericController {
 
 func (c *roleTemplateController) Lister() RoleTemplateLister {
 	return &roleTemplateLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c roleTemplateFactory) List() runtime.Object {
 }
 
 func (s *roleTemplateClient) Controller() RoleTemplateController {
-	genericController := controller.NewGenericController(RoleTemplateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RoleTemplateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RoleTemplateGroupVersionResource, RoleTemplateGroupVersionKind.Kind, false))
 
 	return &roleTemplateController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

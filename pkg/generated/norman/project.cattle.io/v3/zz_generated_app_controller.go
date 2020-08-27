@@ -98,10 +98,14 @@ type AppInterface interface {
 }
 
 type appLister struct {
+	ns         string
 	controller *appController
 }
 
 func (l *appLister) List(namespace string, selector labels.Selector) (ret []*v3.App, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.App))
 	})
@@ -129,6 +133,7 @@ func (l *appLister) Get(namespace, name string) (*v3.App, error) {
 }
 
 type appController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *appController) Generic() controller.GenericController {
 
 func (c *appController) Lister() AppLister {
 	return &appLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c appFactory) List() runtime.Object {
 }
 
 func (s *appClient) Controller() AppController {
-	genericController := controller.NewGenericController(AppGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, AppGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(AppGroupVersionResource, AppGroupVersionKind.Kind, true))
 
 	return &appController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type PipelineSettingInterface interface {
 }
 
 type pipelineSettingLister struct {
+	ns         string
 	controller *pipelineSettingController
 }
 
 func (l *pipelineSettingLister) List(namespace string, selector labels.Selector) (ret []*v3.PipelineSetting, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.PipelineSetting))
 	})
@@ -129,6 +133,7 @@ func (l *pipelineSettingLister) Get(namespace, name string) (*v3.PipelineSetting
 }
 
 type pipelineSettingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *pipelineSettingController) Generic() controller.GenericController {
 
 func (c *pipelineSettingController) Lister() PipelineSettingLister {
 	return &pipelineSettingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c pipelineSettingFactory) List() runtime.Object {
 }
 
 func (s *pipelineSettingClient) Controller() PipelineSettingController {
-	genericController := controller.NewGenericController(PipelineSettingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PipelineSettingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PipelineSettingGroupVersionResource, PipelineSettingGroupVersionKind.Kind, true))
 
 	return &pipelineSettingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

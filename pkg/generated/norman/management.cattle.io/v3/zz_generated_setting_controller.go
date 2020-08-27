@@ -97,10 +97,14 @@ type SettingInterface interface {
 }
 
 type settingLister struct {
+	ns         string
 	controller *settingController
 }
 
 func (l *settingLister) List(namespace string, selector labels.Selector) (ret []*v3.Setting, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Setting))
 	})
@@ -128,6 +132,7 @@ func (l *settingLister) Get(namespace, name string) (*v3.Setting, error) {
 }
 
 type settingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *settingController) Generic() controller.GenericController {
 
 func (c *settingController) Lister() SettingLister {
 	return &settingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c settingFactory) List() runtime.Object {
 }
 
 func (s *settingClient) Controller() SettingController {
-	genericController := controller.NewGenericController(SettingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SettingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SettingGroupVersionResource, SettingGroupVersionKind.Kind, false))
 
 	return &settingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

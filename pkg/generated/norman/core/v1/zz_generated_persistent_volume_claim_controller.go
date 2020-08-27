@@ -98,10 +98,14 @@ type PersistentVolumeClaimInterface interface {
 }
 
 type persistentVolumeClaimLister struct {
+	ns         string
 	controller *persistentVolumeClaimController
 }
 
 func (l *persistentVolumeClaimLister) List(namespace string, selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.PersistentVolumeClaim))
 	})
@@ -129,6 +133,7 @@ func (l *persistentVolumeClaimLister) Get(namespace, name string) (*v1.Persisten
 }
 
 type persistentVolumeClaimController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *persistentVolumeClaimController) Generic() controller.GenericController
 
 func (c *persistentVolumeClaimController) Lister() PersistentVolumeClaimLister {
 	return &persistentVolumeClaimLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c persistentVolumeClaimFactory) List() runtime.Object {
 }
 
 func (s *persistentVolumeClaimClient) Controller() PersistentVolumeClaimController {
-	genericController := controller.NewGenericController(PersistentVolumeClaimGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PersistentVolumeClaimGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PersistentVolumeClaimGroupVersionResource, PersistentVolumeClaimGroupVersionKind.Kind, true))
 
 	return &persistentVolumeClaimController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type CisConfigInterface interface {
 }
 
 type cisConfigLister struct {
+	ns         string
 	controller *cisConfigController
 }
 
 func (l *cisConfigLister) List(namespace string, selector labels.Selector) (ret []*v3.CisConfig, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.CisConfig))
 	})
@@ -129,6 +133,7 @@ func (l *cisConfigLister) Get(namespace, name string) (*v3.CisConfig, error) {
 }
 
 type cisConfigController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *cisConfigController) Generic() controller.GenericController {
 
 func (c *cisConfigController) Lister() CisConfigLister {
 	return &cisConfigLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c cisConfigFactory) List() runtime.Object {
 }
 
 func (s *cisConfigClient) Controller() CisConfigController {
-	genericController := controller.NewGenericController(CisConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CisConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CisConfigGroupVersionResource, CisConfigGroupVersionKind.Kind, true))
 
 	return &cisConfigController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

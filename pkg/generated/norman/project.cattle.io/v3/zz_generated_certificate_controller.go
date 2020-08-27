@@ -98,10 +98,14 @@ type CertificateInterface interface {
 }
 
 type certificateLister struct {
+	ns         string
 	controller *certificateController
 }
 
 func (l *certificateLister) List(namespace string, selector labels.Selector) (ret []*v3.Certificate, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Certificate))
 	})
@@ -129,6 +133,7 @@ func (l *certificateLister) Get(namespace, name string) (*v3.Certificate, error)
 }
 
 type certificateController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *certificateController) Generic() controller.GenericController {
 
 func (c *certificateController) Lister() CertificateLister {
 	return &certificateLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c certificateFactory) List() runtime.Object {
 }
 
 func (s *certificateClient) Controller() CertificateController {
-	genericController := controller.NewGenericController(CertificateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CertificateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CertificateGroupVersionResource, CertificateGroupVersionKind.Kind, true))
 
 	return &certificateController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

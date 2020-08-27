@@ -98,10 +98,14 @@ type DestinationRuleInterface interface {
 }
 
 type destinationRuleLister struct {
+	ns         string
 	controller *destinationRuleController
 }
 
 func (l *destinationRuleLister) List(namespace string, selector labels.Selector) (ret []*v1alpha3.DestinationRule, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1alpha3.DestinationRule))
 	})
@@ -129,6 +133,7 @@ func (l *destinationRuleLister) Get(namespace, name string) (*v1alpha3.Destinati
 }
 
 type destinationRuleController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *destinationRuleController) Generic() controller.GenericController {
 
 func (c *destinationRuleController) Lister() DestinationRuleLister {
 	return &destinationRuleLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c destinationRuleFactory) List() runtime.Object {
 }
 
 func (s *destinationRuleClient) Controller() DestinationRuleController {
-	genericController := controller.NewGenericController(DestinationRuleGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DestinationRuleGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DestinationRuleGroupVersionResource, DestinationRuleGroupVersionKind.Kind, true))
 
 	return &destinationRuleController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

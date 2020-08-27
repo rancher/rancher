@@ -98,10 +98,14 @@ type StatefulSetInterface interface {
 }
 
 type statefulSetLister struct {
+	ns         string
 	controller *statefulSetController
 }
 
 func (l *statefulSetLister) List(namespace string, selector labels.Selector) (ret []*v1.StatefulSet, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.StatefulSet))
 	})
@@ -129,6 +133,7 @@ func (l *statefulSetLister) Get(namespace, name string) (*v1.StatefulSet, error)
 }
 
 type statefulSetController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *statefulSetController) Generic() controller.GenericController {
 
 func (c *statefulSetController) Lister() StatefulSetLister {
 	return &statefulSetLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c statefulSetFactory) List() runtime.Object {
 }
 
 func (s *statefulSetClient) Controller() StatefulSetController {
-	genericController := controller.NewGenericController(StatefulSetGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, StatefulSetGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(StatefulSetGroupVersionResource, StatefulSetGroupVersionKind.Kind, true))
 
 	return &statefulSetController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

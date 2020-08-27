@@ -98,10 +98,14 @@ type HorizontalPodAutoscalerInterface interface {
 }
 
 type horizontalPodAutoscalerLister struct {
+	ns         string
 	controller *horizontalPodAutoscalerController
 }
 
 func (l *horizontalPodAutoscalerLister) List(namespace string, selector labels.Selector) (ret []*v2beta2.HorizontalPodAutoscaler, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v2beta2.HorizontalPodAutoscaler))
 	})
@@ -129,6 +133,7 @@ func (l *horizontalPodAutoscalerLister) Get(namespace, name string) (*v2beta2.Ho
 }
 
 type horizontalPodAutoscalerController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *horizontalPodAutoscalerController) Generic() controller.GenericControll
 
 func (c *horizontalPodAutoscalerController) Lister() HorizontalPodAutoscalerLister {
 	return &horizontalPodAutoscalerLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c horizontalPodAutoscalerFactory) List() runtime.Object {
 }
 
 func (s *horizontalPodAutoscalerClient) Controller() HorizontalPodAutoscalerController {
-	genericController := controller.NewGenericController(HorizontalPodAutoscalerGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, HorizontalPodAutoscalerGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(HorizontalPodAutoscalerGroupVersionResource, HorizontalPodAutoscalerGroupVersionKind.Kind, true))
 
 	return &horizontalPodAutoscalerController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type NotifierInterface interface {
 }
 
 type notifierLister struct {
+	ns         string
 	controller *notifierController
 }
 
 func (l *notifierLister) List(namespace string, selector labels.Selector) (ret []*v3.Notifier, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Notifier))
 	})
@@ -129,6 +133,7 @@ func (l *notifierLister) Get(namespace, name string) (*v3.Notifier, error) {
 }
 
 type notifierController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *notifierController) Generic() controller.GenericController {
 
 func (c *notifierController) Lister() NotifierLister {
 	return &notifierLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c notifierFactory) List() runtime.Object {
 }
 
 func (s *notifierClient) Controller() NotifierController {
-	genericController := controller.NewGenericController(NotifierGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NotifierGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NotifierGroupVersionResource, NotifierGroupVersionKind.Kind, true))
 
 	return &notifierController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

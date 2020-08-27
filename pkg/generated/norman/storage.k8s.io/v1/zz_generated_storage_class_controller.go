@@ -97,10 +97,14 @@ type StorageClassInterface interface {
 }
 
 type storageClassLister struct {
+	ns         string
 	controller *storageClassController
 }
 
 func (l *storageClassLister) List(namespace string, selector labels.Selector) (ret []*v1.StorageClass, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.StorageClass))
 	})
@@ -128,6 +132,7 @@ func (l *storageClassLister) Get(namespace, name string) (*v1.StorageClass, erro
 }
 
 type storageClassController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *storageClassController) Generic() controller.GenericController {
 
 func (c *storageClassController) Lister() StorageClassLister {
 	return &storageClassLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c storageClassFactory) List() runtime.Object {
 }
 
 func (s *storageClassClient) Controller() StorageClassController {
-	genericController := controller.NewGenericController(StorageClassGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, StorageClassGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(StorageClassGroupVersionResource, StorageClassGroupVersionKind.Kind, false))
 
 	return &storageClassController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

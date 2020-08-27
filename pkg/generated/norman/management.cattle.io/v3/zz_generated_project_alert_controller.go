@@ -98,10 +98,14 @@ type ProjectAlertInterface interface {
 }
 
 type projectAlertLister struct {
+	ns         string
 	controller *projectAlertController
 }
 
 func (l *projectAlertLister) List(namespace string, selector labels.Selector) (ret []*v3.ProjectAlert, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ProjectAlert))
 	})
@@ -129,6 +133,7 @@ func (l *projectAlertLister) Get(namespace, name string) (*v3.ProjectAlert, erro
 }
 
 type projectAlertController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *projectAlertController) Generic() controller.GenericController {
 
 func (c *projectAlertController) Lister() ProjectAlertLister {
 	return &projectAlertLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c projectAlertFactory) List() runtime.Object {
 }
 
 func (s *projectAlertClient) Controller() ProjectAlertController {
-	genericController := controller.NewGenericController(ProjectAlertGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectAlertGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectAlertGroupVersionResource, ProjectAlertGroupVersionKind.Kind, true))
 
 	return &projectAlertController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

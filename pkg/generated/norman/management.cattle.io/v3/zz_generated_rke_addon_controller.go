@@ -98,10 +98,14 @@ type RkeAddonInterface interface {
 }
 
 type rkeAddonLister struct {
+	ns         string
 	controller *rkeAddonController
 }
 
 func (l *rkeAddonLister) List(namespace string, selector labels.Selector) (ret []*v3.RkeAddon, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.RkeAddon))
 	})
@@ -129,6 +133,7 @@ func (l *rkeAddonLister) Get(namespace, name string) (*v3.RkeAddon, error) {
 }
 
 type rkeAddonController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *rkeAddonController) Generic() controller.GenericController {
 
 func (c *rkeAddonController) Lister() RkeAddonLister {
 	return &rkeAddonLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c rkeAddonFactory) List() runtime.Object {
 }
 
 func (s *rkeAddonClient) Controller() RkeAddonController {
-	genericController := controller.NewGenericController(RkeAddonGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RkeAddonGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RkeAddonGroupVersionResource, RkeAddonGroupVersionKind.Kind, true))
 
 	return &rkeAddonController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

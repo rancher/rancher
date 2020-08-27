@@ -98,10 +98,14 @@ type RkeK8sServiceOptionInterface interface {
 }
 
 type rkeK8sServiceOptionLister struct {
+	ns         string
 	controller *rkeK8sServiceOptionController
 }
 
 func (l *rkeK8sServiceOptionLister) List(namespace string, selector labels.Selector) (ret []*v3.RkeK8sServiceOption, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.RkeK8sServiceOption))
 	})
@@ -129,6 +133,7 @@ func (l *rkeK8sServiceOptionLister) Get(namespace, name string) (*v3.RkeK8sServi
 }
 
 type rkeK8sServiceOptionController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *rkeK8sServiceOptionController) Generic() controller.GenericController {
 
 func (c *rkeK8sServiceOptionController) Lister() RkeK8sServiceOptionLister {
 	return &rkeK8sServiceOptionLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c rkeK8sServiceOptionFactory) List() runtime.Object {
 }
 
 func (s *rkeK8sServiceOptionClient) Controller() RkeK8sServiceOptionController {
-	genericController := controller.NewGenericController(RkeK8sServiceOptionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RkeK8sServiceOptionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RkeK8sServiceOptionGroupVersionResource, RkeK8sServiceOptionGroupVersionKind.Kind, true))
 
 	return &rkeK8sServiceOptionController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type PipelineExecutionInterface interface {
 }
 
 type pipelineExecutionLister struct {
+	ns         string
 	controller *pipelineExecutionController
 }
 
 func (l *pipelineExecutionLister) List(namespace string, selector labels.Selector) (ret []*v3.PipelineExecution, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.PipelineExecution))
 	})
@@ -129,6 +133,7 @@ func (l *pipelineExecutionLister) Get(namespace, name string) (*v3.PipelineExecu
 }
 
 type pipelineExecutionController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *pipelineExecutionController) Generic() controller.GenericController {
 
 func (c *pipelineExecutionController) Lister() PipelineExecutionLister {
 	return &pipelineExecutionLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c pipelineExecutionFactory) List() runtime.Object {
 }
 
 func (s *pipelineExecutionClient) Controller() PipelineExecutionController {
-	genericController := controller.NewGenericController(PipelineExecutionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PipelineExecutionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PipelineExecutionGroupVersionResource, PipelineExecutionGroupVersionKind.Kind, true))
 
 	return &pipelineExecutionController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

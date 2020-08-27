@@ -98,10 +98,14 @@ type ConfigMapInterface interface {
 }
 
 type configMapLister struct {
+	ns         string
 	controller *configMapController
 }
 
 func (l *configMapLister) List(namespace string, selector labels.Selector) (ret []*v1.ConfigMap, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ConfigMap))
 	})
@@ -129,6 +133,7 @@ func (l *configMapLister) Get(namespace, name string) (*v1.ConfigMap, error) {
 }
 
 type configMapController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *configMapController) Generic() controller.GenericController {
 
 func (c *configMapController) Lister() ConfigMapLister {
 	return &configMapLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c configMapFactory) List() runtime.Object {
 }
 
 func (s *configMapClient) Controller() ConfigMapController {
-	genericController := controller.NewGenericController(ConfigMapGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ConfigMapGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ConfigMapGroupVersionResource, ConfigMapGroupVersionKind.Kind, true))
 
 	return &configMapController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type ServiceInterface interface {
 }
 
 type serviceLister struct {
+	ns         string
 	controller *serviceController
 }
 
 func (l *serviceLister) List(namespace string, selector labels.Selector) (ret []*v1.Service, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Service))
 	})
@@ -129,6 +133,7 @@ func (l *serviceLister) Get(namespace, name string) (*v1.Service, error) {
 }
 
 type serviceController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *serviceController) Generic() controller.GenericController {
 
 func (c *serviceController) Lister() ServiceLister {
 	return &serviceLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c serviceFactory) List() runtime.Object {
 }
 
 func (s *serviceClient) Controller() ServiceController {
-	genericController := controller.NewGenericController(ServiceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ServiceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ServiceGroupVersionResource, ServiceGroupVersionKind.Kind, true))
 
 	return &serviceController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type ClusterRoleTemplateBindingInterface interface {
 }
 
 type clusterRoleTemplateBindingLister struct {
+	ns         string
 	controller *clusterRoleTemplateBindingController
 }
 
 func (l *clusterRoleTemplateBindingLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterRoleTemplateBinding, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterRoleTemplateBinding))
 	})
@@ -129,6 +133,7 @@ func (l *clusterRoleTemplateBindingLister) Get(namespace, name string) (*v3.Clus
 }
 
 type clusterRoleTemplateBindingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterRoleTemplateBindingController) Generic() controller.GenericContr
 
 func (c *clusterRoleTemplateBindingController) Lister() ClusterRoleTemplateBindingLister {
 	return &clusterRoleTemplateBindingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterRoleTemplateBindingFactory) List() runtime.Object {
 }
 
 func (s *clusterRoleTemplateBindingClient) Controller() ClusterRoleTemplateBindingController {
-	genericController := controller.NewGenericController(ClusterRoleTemplateBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterRoleTemplateBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterRoleTemplateBindingGroupVersionResource, ClusterRoleTemplateBindingGroupVersionKind.Kind, true))
 
 	return &clusterRoleTemplateBindingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

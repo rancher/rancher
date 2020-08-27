@@ -98,10 +98,14 @@ type DeploymentInterface interface {
 }
 
 type deploymentLister struct {
+	ns         string
 	controller *deploymentController
 }
 
 func (l *deploymentLister) List(namespace string, selector labels.Selector) (ret []*v1.Deployment, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Deployment))
 	})
@@ -129,6 +133,7 @@ func (l *deploymentLister) Get(namespace, name string) (*v1.Deployment, error) {
 }
 
 type deploymentController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *deploymentController) Generic() controller.GenericController {
 
 func (c *deploymentController) Lister() DeploymentLister {
 	return &deploymentLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c deploymentFactory) List() runtime.Object {
 }
 
 func (s *deploymentClient) Controller() DeploymentController {
-	genericController := controller.NewGenericController(DeploymentGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DeploymentGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DeploymentGroupVersionResource, DeploymentGroupVersionKind.Kind, true))
 
 	return &deploymentController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type EtcdBackupInterface interface {
 }
 
 type etcdBackupLister struct {
+	ns         string
 	controller *etcdBackupController
 }
 
 func (l *etcdBackupLister) List(namespace string, selector labels.Selector) (ret []*v3.EtcdBackup, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.EtcdBackup))
 	})
@@ -129,6 +133,7 @@ func (l *etcdBackupLister) Get(namespace, name string) (*v3.EtcdBackup, error) {
 }
 
 type etcdBackupController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *etcdBackupController) Generic() controller.GenericController {
 
 func (c *etcdBackupController) Lister() EtcdBackupLister {
 	return &etcdBackupLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c etcdBackupFactory) List() runtime.Object {
 }
 
 func (s *etcdBackupClient) Controller() EtcdBackupController {
-	genericController := controller.NewGenericController(EtcdBackupGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, EtcdBackupGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(EtcdBackupGroupVersionResource, EtcdBackupGroupVersionKind.Kind, true))
 
 	return &etcdBackupController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

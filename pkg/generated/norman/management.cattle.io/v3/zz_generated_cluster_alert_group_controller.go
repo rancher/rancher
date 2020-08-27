@@ -98,10 +98,14 @@ type ClusterAlertGroupInterface interface {
 }
 
 type clusterAlertGroupLister struct {
+	ns         string
 	controller *clusterAlertGroupController
 }
 
 func (l *clusterAlertGroupLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterAlertGroup, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterAlertGroup))
 	})
@@ -129,6 +133,7 @@ func (l *clusterAlertGroupLister) Get(namespace, name string) (*v3.ClusterAlertG
 }
 
 type clusterAlertGroupController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterAlertGroupController) Generic() controller.GenericController {
 
 func (c *clusterAlertGroupController) Lister() ClusterAlertGroupLister {
 	return &clusterAlertGroupLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterAlertGroupFactory) List() runtime.Object {
 }
 
 func (s *clusterAlertGroupClient) Controller() ClusterAlertGroupController {
-	genericController := controller.NewGenericController(ClusterAlertGroupGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterAlertGroupGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterAlertGroupGroupVersionResource, ClusterAlertGroupGroupVersionKind.Kind, true))
 
 	return &clusterAlertGroupController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

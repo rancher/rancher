@@ -98,10 +98,14 @@ type ProjectAlertRuleInterface interface {
 }
 
 type projectAlertRuleLister struct {
+	ns         string
 	controller *projectAlertRuleController
 }
 
 func (l *projectAlertRuleLister) List(namespace string, selector labels.Selector) (ret []*v3.ProjectAlertRule, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ProjectAlertRule))
 	})
@@ -129,6 +133,7 @@ func (l *projectAlertRuleLister) Get(namespace, name string) (*v3.ProjectAlertRu
 }
 
 type projectAlertRuleController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *projectAlertRuleController) Generic() controller.GenericController {
 
 func (c *projectAlertRuleController) Lister() ProjectAlertRuleLister {
 	return &projectAlertRuleLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c projectAlertRuleFactory) List() runtime.Object {
 }
 
 func (s *projectAlertRuleClient) Controller() ProjectAlertRuleController {
-	genericController := controller.NewGenericController(ProjectAlertRuleGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectAlertRuleGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectAlertRuleGroupVersionResource, ProjectAlertRuleGroupVersionKind.Kind, true))
 
 	return &projectAlertRuleController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

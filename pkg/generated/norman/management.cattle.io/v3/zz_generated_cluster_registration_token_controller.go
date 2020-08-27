@@ -98,10 +98,14 @@ type ClusterRegistrationTokenInterface interface {
 }
 
 type clusterRegistrationTokenLister struct {
+	ns         string
 	controller *clusterRegistrationTokenController
 }
 
 func (l *clusterRegistrationTokenLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterRegistrationToken, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterRegistrationToken))
 	})
@@ -129,6 +133,7 @@ func (l *clusterRegistrationTokenLister) Get(namespace, name string) (*v3.Cluste
 }
 
 type clusterRegistrationTokenController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterRegistrationTokenController) Generic() controller.GenericControl
 
 func (c *clusterRegistrationTokenController) Lister() ClusterRegistrationTokenLister {
 	return &clusterRegistrationTokenLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterRegistrationTokenFactory) List() runtime.Object {
 }
 
 func (s *clusterRegistrationTokenClient) Controller() ClusterRegistrationTokenController {
-	genericController := controller.NewGenericController(ClusterRegistrationTokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterRegistrationTokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterRegistrationTokenGroupVersionResource, ClusterRegistrationTokenGroupVersionKind.Kind, true))
 
 	return &clusterRegistrationTokenController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

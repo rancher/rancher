@@ -98,10 +98,14 @@ type ClusterAuthTokenInterface interface {
 }
 
 type clusterAuthTokenLister struct {
+	ns         string
 	controller *clusterAuthTokenController
 }
 
 func (l *clusterAuthTokenLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterAuthToken, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterAuthToken))
 	})
@@ -129,6 +133,7 @@ func (l *clusterAuthTokenLister) Get(namespace, name string) (*v3.ClusterAuthTok
 }
 
 type clusterAuthTokenController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterAuthTokenController) Generic() controller.GenericController {
 
 func (c *clusterAuthTokenController) Lister() ClusterAuthTokenLister {
 	return &clusterAuthTokenLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterAuthTokenFactory) List() runtime.Object {
 }
 
 func (s *clusterAuthTokenClient) Controller() ClusterAuthTokenController {
-	genericController := controller.NewGenericController(ClusterAuthTokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterAuthTokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterAuthTokenGroupVersionResource, ClusterAuthTokenGroupVersionKind.Kind, true))
 
 	return &clusterAuthTokenController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

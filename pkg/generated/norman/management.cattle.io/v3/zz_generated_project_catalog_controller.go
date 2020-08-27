@@ -98,10 +98,14 @@ type ProjectCatalogInterface interface {
 }
 
 type projectCatalogLister struct {
+	ns         string
 	controller *projectCatalogController
 }
 
 func (l *projectCatalogLister) List(namespace string, selector labels.Selector) (ret []*v3.ProjectCatalog, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ProjectCatalog))
 	})
@@ -129,6 +133,7 @@ func (l *projectCatalogLister) Get(namespace, name string) (*v3.ProjectCatalog, 
 }
 
 type projectCatalogController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *projectCatalogController) Generic() controller.GenericController {
 
 func (c *projectCatalogController) Lister() ProjectCatalogLister {
 	return &projectCatalogLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c projectCatalogFactory) List() runtime.Object {
 }
 
 func (s *projectCatalogClient) Controller() ProjectCatalogController {
-	genericController := controller.NewGenericController(ProjectCatalogGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectCatalogGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectCatalogGroupVersionResource, ProjectCatalogGroupVersionKind.Kind, true))
 
 	return &projectCatalogController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

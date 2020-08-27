@@ -97,10 +97,14 @@ type GlobalRoleBindingInterface interface {
 }
 
 type globalRoleBindingLister struct {
+	ns         string
 	controller *globalRoleBindingController
 }
 
 func (l *globalRoleBindingLister) List(namespace string, selector labels.Selector) (ret []*v3.GlobalRoleBinding, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.GlobalRoleBinding))
 	})
@@ -128,6 +132,7 @@ func (l *globalRoleBindingLister) Get(namespace, name string) (*v3.GlobalRoleBin
 }
 
 type globalRoleBindingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *globalRoleBindingController) Generic() controller.GenericController {
 
 func (c *globalRoleBindingController) Lister() GlobalRoleBindingLister {
 	return &globalRoleBindingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c globalRoleBindingFactory) List() runtime.Object {
 }
 
 func (s *globalRoleBindingClient) Controller() GlobalRoleBindingController {
-	genericController := controller.NewGenericController(GlobalRoleBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, GlobalRoleBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(GlobalRoleBindingGroupVersionResource, GlobalRoleBindingGroupVersionKind.Kind, false))
 
 	return &globalRoleBindingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

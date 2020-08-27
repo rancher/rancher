@@ -98,10 +98,14 @@ type ClusterTemplateInterface interface {
 }
 
 type clusterTemplateLister struct {
+	ns         string
 	controller *clusterTemplateController
 }
 
 func (l *clusterTemplateLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterTemplate, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterTemplate))
 	})
@@ -129,6 +133,7 @@ func (l *clusterTemplateLister) Get(namespace, name string) (*v3.ClusterTemplate
 }
 
 type clusterTemplateController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterTemplateController) Generic() controller.GenericController {
 
 func (c *clusterTemplateController) Lister() ClusterTemplateLister {
 	return &clusterTemplateLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterTemplateFactory) List() runtime.Object {
 }
 
 func (s *clusterTemplateClient) Controller() ClusterTemplateController {
-	genericController := controller.NewGenericController(ClusterTemplateGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterTemplateGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterTemplateGroupVersionResource, ClusterTemplateGroupVersionKind.Kind, true))
 
 	return &clusterTemplateController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

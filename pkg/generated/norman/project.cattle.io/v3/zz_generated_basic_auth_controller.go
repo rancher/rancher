@@ -98,10 +98,14 @@ type BasicAuthInterface interface {
 }
 
 type basicAuthLister struct {
+	ns         string
 	controller *basicAuthController
 }
 
 func (l *basicAuthLister) List(namespace string, selector labels.Selector) (ret []*v3.BasicAuth, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.BasicAuth))
 	})
@@ -129,6 +133,7 @@ func (l *basicAuthLister) Get(namespace, name string) (*v3.BasicAuth, error) {
 }
 
 type basicAuthController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *basicAuthController) Generic() controller.GenericController {
 
 func (c *basicAuthController) Lister() BasicAuthLister {
 	return &basicAuthLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c basicAuthFactory) List() runtime.Object {
 }
 
 func (s *basicAuthClient) Controller() BasicAuthController {
-	genericController := controller.NewGenericController(BasicAuthGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, BasicAuthGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(BasicAuthGroupVersionResource, BasicAuthGroupVersionKind.Kind, true))
 
 	return &basicAuthController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

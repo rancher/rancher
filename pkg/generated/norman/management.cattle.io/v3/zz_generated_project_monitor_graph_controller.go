@@ -98,10 +98,14 @@ type ProjectMonitorGraphInterface interface {
 }
 
 type projectMonitorGraphLister struct {
+	ns         string
 	controller *projectMonitorGraphController
 }
 
 func (l *projectMonitorGraphLister) List(namespace string, selector labels.Selector) (ret []*v3.ProjectMonitorGraph, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ProjectMonitorGraph))
 	})
@@ -129,6 +133,7 @@ func (l *projectMonitorGraphLister) Get(namespace, name string) (*v3.ProjectMoni
 }
 
 type projectMonitorGraphController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *projectMonitorGraphController) Generic() controller.GenericController {
 
 func (c *projectMonitorGraphController) Lister() ProjectMonitorGraphLister {
 	return &projectMonitorGraphLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c projectMonitorGraphFactory) List() runtime.Object {
 }
 
 func (s *projectMonitorGraphClient) Controller() ProjectMonitorGraphController {
-	genericController := controller.NewGenericController(ProjectMonitorGraphGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectMonitorGraphGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectMonitorGraphGroupVersionResource, ProjectMonitorGraphGroupVersionKind.Kind, true))
 
 	return &projectMonitorGraphController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

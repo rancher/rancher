@@ -97,10 +97,14 @@ type GlobalRoleInterface interface {
 }
 
 type globalRoleLister struct {
+	ns         string
 	controller *globalRoleController
 }
 
 func (l *globalRoleLister) List(namespace string, selector labels.Selector) (ret []*v3.GlobalRole, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.GlobalRole))
 	})
@@ -128,6 +132,7 @@ func (l *globalRoleLister) Get(namespace, name string) (*v3.GlobalRole, error) {
 }
 
 type globalRoleController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *globalRoleController) Generic() controller.GenericController {
 
 func (c *globalRoleController) Lister() GlobalRoleLister {
 	return &globalRoleLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c globalRoleFactory) List() runtime.Object {
 }
 
 func (s *globalRoleClient) Controller() GlobalRoleController {
-	genericController := controller.NewGenericController(GlobalRoleGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, GlobalRoleGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(GlobalRoleGroupVersionResource, GlobalRoleGroupVersionKind.Kind, false))
 
 	return &globalRoleController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

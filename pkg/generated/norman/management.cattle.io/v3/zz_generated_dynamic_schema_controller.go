@@ -97,10 +97,14 @@ type DynamicSchemaInterface interface {
 }
 
 type dynamicSchemaLister struct {
+	ns         string
 	controller *dynamicSchemaController
 }
 
 func (l *dynamicSchemaLister) List(namespace string, selector labels.Selector) (ret []*v3.DynamicSchema, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.DynamicSchema))
 	})
@@ -128,6 +132,7 @@ func (l *dynamicSchemaLister) Get(namespace, name string) (*v3.DynamicSchema, er
 }
 
 type dynamicSchemaController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *dynamicSchemaController) Generic() controller.GenericController {
 
 func (c *dynamicSchemaController) Lister() DynamicSchemaLister {
 	return &dynamicSchemaLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c dynamicSchemaFactory) List() runtime.Object {
 }
 
 func (s *dynamicSchemaClient) Controller() DynamicSchemaController {
-	genericController := controller.NewGenericController(DynamicSchemaGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DynamicSchemaGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DynamicSchemaGroupVersionResource, DynamicSchemaGroupVersionKind.Kind, false))
 
 	return &dynamicSchemaController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

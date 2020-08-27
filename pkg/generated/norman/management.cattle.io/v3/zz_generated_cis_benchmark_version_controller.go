@@ -98,10 +98,14 @@ type CisBenchmarkVersionInterface interface {
 }
 
 type cisBenchmarkVersionLister struct {
+	ns         string
 	controller *cisBenchmarkVersionController
 }
 
 func (l *cisBenchmarkVersionLister) List(namespace string, selector labels.Selector) (ret []*v3.CisBenchmarkVersion, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.CisBenchmarkVersion))
 	})
@@ -129,6 +133,7 @@ func (l *cisBenchmarkVersionLister) Get(namespace, name string) (*v3.CisBenchmar
 }
 
 type cisBenchmarkVersionController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *cisBenchmarkVersionController) Generic() controller.GenericController {
 
 func (c *cisBenchmarkVersionController) Lister() CisBenchmarkVersionLister {
 	return &cisBenchmarkVersionLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c cisBenchmarkVersionFactory) List() runtime.Object {
 }
 
 func (s *cisBenchmarkVersionClient) Controller() CisBenchmarkVersionController {
-	genericController := controller.NewGenericController(CisBenchmarkVersionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CisBenchmarkVersionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CisBenchmarkVersionGroupVersionResource, CisBenchmarkVersionGroupVersionKind.Kind, true))
 
 	return &cisBenchmarkVersionController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

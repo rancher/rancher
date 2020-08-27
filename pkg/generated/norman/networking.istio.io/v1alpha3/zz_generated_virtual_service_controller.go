@@ -98,10 +98,14 @@ type VirtualServiceInterface interface {
 }
 
 type virtualServiceLister struct {
+	ns         string
 	controller *virtualServiceController
 }
 
 func (l *virtualServiceLister) List(namespace string, selector labels.Selector) (ret []*v1alpha3.VirtualService, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1alpha3.VirtualService))
 	})
@@ -129,6 +133,7 @@ func (l *virtualServiceLister) Get(namespace, name string) (*v1alpha3.VirtualSer
 }
 
 type virtualServiceController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *virtualServiceController) Generic() controller.GenericController {
 
 func (c *virtualServiceController) Lister() VirtualServiceLister {
 	return &virtualServiceLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c virtualServiceFactory) List() runtime.Object {
 }
 
 func (s *virtualServiceClient) Controller() VirtualServiceController {
-	genericController := controller.NewGenericController(VirtualServiceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, VirtualServiceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(VirtualServiceGroupVersionResource, VirtualServiceGroupVersionKind.Kind, true))
 
 	return &virtualServiceController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }
