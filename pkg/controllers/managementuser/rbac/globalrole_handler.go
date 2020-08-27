@@ -1,6 +1,8 @@
 package rbac
 
 import (
+	"context"
+
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -18,12 +20,41 @@ const (
 	grbByUserAndRoleIndex = "authz.cluster.cattle.io/grb-by-user-and-role"
 )
 
-func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBindingHandlerFunc {
-	informer := workload.Management.Management.GlobalRoleBindings("").Controller().Informer()
+func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+	informer := scaledContext.Management.GlobalRoleBindings("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{
 		grbByUserAndRoleIndex: grbByUserAndRole,
+		grbByRoleIndex:        grbByRole,
 	}
-	informer.AddIndexers(indexers)
+	if err := informer.AddIndexers(indexers); err != nil {
+		return err
+	}
+
+	// Add cache informer to project role template bindings
+	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	prtbIndexers := map[string]cache.IndexFunc{
+		prtbByProjectIndex:               prtbByProjectName,
+		prtbByProjecSubjectIndex:         prtbByProjectAndSubject,
+		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
+		prtbByUIDIndex:                   prtbByUID,
+	}
+	if err := prtbInformer.AddIndexers(prtbIndexers); err != nil {
+		return err
+	}
+
+	crtbInformer := scaledContext.Management.ClusterRoleTemplateBindings("").Controller().Informer()
+	crtbIndexers := map[string]cache.IndexFunc{
+		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
+	}
+	if err := crtbInformer.AddIndexers(crtbIndexers); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBindingHandlerFunc {
+	informer := workload.Management.Management.GlobalRoleBindings("").Controller().Informer()
 
 	h := &grbHandler{
 		grbIndexer:          informer.GetIndexer(),

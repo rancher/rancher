@@ -19,10 +19,6 @@ const (
 
 func newClusterHandler(workload *config.UserContext) v3.ClusterHandlerFunc { //*clusterHandler {
 	informer := workload.Management.Management.GlobalRoleBindings("").Controller().Informer()
-	indexers := map[string]cache.IndexFunc{
-		grbByRoleIndex: grbByRole,
-	}
-	informer.AddIndexers(indexers)
 
 	ch := &clusterHandler{
 		grbIndexer: informer.GetIndexer(),

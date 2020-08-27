@@ -29,16 +29,7 @@ type roleTemplateLifecycle struct {
 
 func newRoleTemplateLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) v3.RoleTemplateLifecycle {
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
-	prtbIndexers := map[string]cache.IndexFunc{
-		prtbByRoleTemplateIndex: prtbByRoleTemplate,
-	}
-	prtbInformer.AddIndexers(prtbIndexers)
-
 	crtbInformer := management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
-	crtbIndexers := map[string]cache.IndexFunc{
-		crtbByRoleTemplateIndex: crtbByRoleTemplate,
-	}
-	crtbInformer.AddIndexers(crtbIndexers)
 
 	rtl := &roleTemplateLifecycle{
 		prtbIndexer:    prtbInformer.GetIndexer(),

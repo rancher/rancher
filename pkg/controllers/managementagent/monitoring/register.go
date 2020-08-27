@@ -11,6 +11,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	return prtbInformer.AddIndexers(map[string]cache.IndexFunc{
+		prtbBySA: prtbBySAFunc,
+	})
+}
+
 // Register initializes the controllers and registers
 func Register(ctx context.Context, agentContext *config.UserContext) {
 	clusterName := agentContext.ClusterName
@@ -77,9 +84,6 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 	agentNodeClient.AddHandler(ctx, "cluster-monitoring-sync-windows-node-handler", cmeh.syncWindowsNode)
 
 	prtbInformer := mgmtContext.ProjectRoleTemplateBindings("").Controller().Informer()
-	prtbInformer.AddIndexers(map[string]cache.IndexFunc{
-		prtbBySA: prtbBySAFunc,
-	})
 
 	// project handler
 	ph := &projectHandler{

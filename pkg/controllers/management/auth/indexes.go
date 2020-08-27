@@ -8,12 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func rbByOwner(obj interface{}) ([]string, error) {
-	rb, ok := obj.(*v1.RoleBinding)
-	if !ok {
-		return []string{}, nil
-	}
-
+func rbByOwner(rb *v1.RoleBinding) ([]string, error) {
 	return getRBOwnerKey(rb), nil
 }
 
@@ -60,19 +55,21 @@ func indexByMembershipBindingOwner(obj interface{}) ([]string, error) {
 	return keys, nil
 }
 
-func rbByRoleAndSubject(obj interface{}) ([]string, error) {
+func rbByClusterRoleAndSubject(rb *v1.ClusterRoleBinding) ([]string, error) {
 	var subjects []v1.Subject
 	var roleName string
 
-	if rb, ok := obj.(*v1.ClusterRoleBinding); ok {
-		roleName = rb.RoleRef.Name
-		subjects = rb.Subjects
-	} else if rb, ok := obj.(*v1.RoleBinding); ok {
-		roleName = rb.RoleRef.Name
-		subjects = rb.Subjects
-	} else {
-		return []string{}, nil
-	}
+	roleName = rb.RoleRef.Name
+	subjects = rb.Subjects
+	return rbRoleSubjectKeys(roleName, subjects), nil
+}
+
+func rbByRoleAndSubject(rb *v1.RoleBinding) ([]string, error) {
+	var subjects []v1.Subject
+	var roleName string
+
+	roleName = rb.RoleRef.Name
+	subjects = rb.Subjects
 
 	return rbRoleSubjectKeys(roleName, subjects), nil
 }

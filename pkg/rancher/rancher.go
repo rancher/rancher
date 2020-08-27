@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
+	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
+	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/clusterapi"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
@@ -12,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
+	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
 	crds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
@@ -77,6 +80,10 @@ func New(ctx context.Context, restConfig *rest.Config, opts *Options) (*Rancher,
 		return nil, err
 	}
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
+
+	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
+	kontainerdriver.RegisterIndexers(wranglerContext)
+	managementauth.RegisterWranglerIndexers(wranglerContext)
 
 	if err := crds.Create(ctx, restConfig); err != nil {
 		return nil, err
