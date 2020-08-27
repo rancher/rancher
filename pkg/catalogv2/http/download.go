@@ -89,7 +89,7 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
-	return ioutil.NopCloser(bytes.NewBuffer(data)), nil
+	return ioutil.NopCloser(bytes.NewBuffer(data)), err
 }
 
 func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool) (*repo.IndexFile, error) {
