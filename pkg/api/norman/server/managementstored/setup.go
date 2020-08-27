@@ -273,6 +273,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	schema.ActionHandler = handler.ClusterActionHandler
 
 	clusterValidator := ccluster.Validator{
+		ClusterClient:                 managementContext.Management.Clusters(""),
 		ClusterLister:                 managementContext.Management.Clusters("").Controller().Lister(),
 		ClusterTemplateLister:         managementContext.Management.ClusterTemplates("").Controller().Lister(),
 		ClusterTemplateRevisionLister: managementContext.Management.ClusterTemplateRevisions("").Controller().Lister(),
