@@ -98,10 +98,14 @@ type JobInterface interface {
 }
 
 type jobLister struct {
+	ns         string
 	controller *jobController
 }
 
 func (l *jobLister) List(namespace string, selector labels.Selector) (ret []*v1.Job, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Job))
 	})
@@ -129,6 +133,7 @@ func (l *jobLister) Get(namespace, name string) (*v1.Job, error) {
 }
 
 type jobController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *jobController) Generic() controller.GenericController {
 
 func (c *jobController) Lister() JobLister {
 	return &jobLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c jobFactory) List() runtime.Object {
 }
 
 func (s *jobClient) Controller() JobController {
-	genericController := controller.NewGenericController(JobGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, JobGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(JobGroupVersionResource, JobGroupVersionKind.Kind, true))
 
 	return &jobController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

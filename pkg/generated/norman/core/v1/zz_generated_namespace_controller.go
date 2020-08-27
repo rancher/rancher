@@ -97,10 +97,14 @@ type NamespaceInterface interface {
 }
 
 type namespaceLister struct {
+	ns         string
 	controller *namespaceController
 }
 
 func (l *namespaceLister) List(namespace string, selector labels.Selector) (ret []*v1.Namespace, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Namespace))
 	})
@@ -128,6 +132,7 @@ func (l *namespaceLister) Get(namespace, name string) (*v1.Namespace, error) {
 }
 
 type namespaceController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *namespaceController) Generic() controller.GenericController {
 
 func (c *namespaceController) Lister() NamespaceLister {
 	return &namespaceLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c namespaceFactory) List() runtime.Object {
 }
 
 func (s *namespaceClient) Controller() NamespaceController {
-	genericController := controller.NewGenericController(NamespaceGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NamespaceGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NamespaceGroupVersionResource, NamespaceGroupVersionKind.Kind, false))
 
 	return &namespaceController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

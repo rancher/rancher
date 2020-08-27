@@ -98,10 +98,14 @@ type NetworkPolicyInterface interface {
 }
 
 type networkPolicyLister struct {
+	ns         string
 	controller *networkPolicyController
 }
 
 func (l *networkPolicyLister) List(namespace string, selector labels.Selector) (ret []*v1.NetworkPolicy, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.NetworkPolicy))
 	})
@@ -129,6 +133,7 @@ func (l *networkPolicyLister) Get(namespace, name string) (*v1.NetworkPolicy, er
 }
 
 type networkPolicyController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *networkPolicyController) Generic() controller.GenericController {
 
 func (c *networkPolicyController) Lister() NetworkPolicyLister {
 	return &networkPolicyLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c networkPolicyFactory) List() runtime.Object {
 }
 
 func (s *networkPolicyClient) Controller() NetworkPolicyController {
-	genericController := controller.NewGenericController(NetworkPolicyGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NetworkPolicyGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NetworkPolicyGroupVersionResource, NetworkPolicyGroupVersionKind.Kind, true))
 
 	return &networkPolicyController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

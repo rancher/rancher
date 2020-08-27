@@ -98,10 +98,14 @@ type AppRevisionInterface interface {
 }
 
 type appRevisionLister struct {
+	ns         string
 	controller *appRevisionController
 }
 
 func (l *appRevisionLister) List(namespace string, selector labels.Selector) (ret []*v3.AppRevision, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.AppRevision))
 	})
@@ -129,6 +133,7 @@ func (l *appRevisionLister) Get(namespace, name string) (*v3.AppRevision, error)
 }
 
 type appRevisionController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *appRevisionController) Generic() controller.GenericController {
 
 func (c *appRevisionController) Lister() AppRevisionLister {
 	return &appRevisionLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c appRevisionFactory) List() runtime.Object {
 }
 
 func (s *appRevisionClient) Controller() AppRevisionController {
-	genericController := controller.NewGenericController(AppRevisionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, AppRevisionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(AppRevisionGroupVersionResource, AppRevisionGroupVersionKind.Kind, true))
 
 	return &appRevisionController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

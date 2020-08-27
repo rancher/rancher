@@ -66,31 +66,15 @@ func newUserLifecycle(management *config.ManagementContext, clusterManager *clus
 	}
 
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
-	prtbInformer.AddIndexers(map[string]cache.IndexFunc{
-		prtbByUserRefKey: prtbByUserRefFunc,
-	})
-
 	lfc.prtbIndexer = prtbInformer.GetIndexer()
 
 	crtbInformer := management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
-	crtbInformer.AddIndexers(map[string]cache.IndexFunc{
-		crtbByUserRefKey: crtbByUserRefFunc,
-	})
-
 	lfc.crtbIndexer = crtbInformer.GetIndexer()
 
 	grbInformer := management.Management.GlobalRoleBindings("").Controller().Informer()
-	grbInformer.AddIndexers(map[string]cache.IndexFunc{
-		grbByUserRefKey: grbByUserRefFunc,
-	})
-
 	lfc.grbIndexer = grbInformer.GetIndexer()
 
 	tokenInformer := management.Management.Tokens("").Controller().Informer()
-	tokenInformer.AddIndexers(map[string]cache.IndexFunc{
-		tokenByUserRefKey: tokenByUserRefFunc,
-	})
-
 	lfc.tokenIndexer = tokenInformer.GetIndexer()
 
 	return lfc

@@ -98,10 +98,14 @@ type ServiceAccountTokenInterface interface {
 }
 
 type serviceAccountTokenLister struct {
+	ns         string
 	controller *serviceAccountTokenController
 }
 
 func (l *serviceAccountTokenLister) List(namespace string, selector labels.Selector) (ret []*v3.ServiceAccountToken, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ServiceAccountToken))
 	})
@@ -129,6 +133,7 @@ func (l *serviceAccountTokenLister) Get(namespace, name string) (*v3.ServiceAcco
 }
 
 type serviceAccountTokenController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *serviceAccountTokenController) Generic() controller.GenericController {
 
 func (c *serviceAccountTokenController) Lister() ServiceAccountTokenLister {
 	return &serviceAccountTokenLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c serviceAccountTokenFactory) List() runtime.Object {
 }
 
 func (s *serviceAccountTokenClient) Controller() ServiceAccountTokenController {
-	genericController := controller.NewGenericController(ServiceAccountTokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ServiceAccountTokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ServiceAccountTokenGroupVersionResource, ServiceAccountTokenGroupVersionKind.Kind, true))
 
 	return &serviceAccountTokenController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

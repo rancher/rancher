@@ -97,10 +97,14 @@ type UserAttributeInterface interface {
 }
 
 type userAttributeLister struct {
+	ns         string
 	controller *userAttributeController
 }
 
 func (l *userAttributeLister) List(namespace string, selector labels.Selector) (ret []*v3.UserAttribute, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.UserAttribute))
 	})
@@ -128,6 +132,7 @@ func (l *userAttributeLister) Get(namespace, name string) (*v3.UserAttribute, er
 }
 
 type userAttributeController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *userAttributeController) Generic() controller.GenericController {
 
 func (c *userAttributeController) Lister() UserAttributeLister {
 	return &userAttributeLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c userAttributeFactory) List() runtime.Object {
 }
 
 func (s *userAttributeClient) Controller() UserAttributeController {
-	genericController := controller.NewGenericController(UserAttributeGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, UserAttributeGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(UserAttributeGroupVersionResource, UserAttributeGroupVersionKind.Kind, false))
 
 	return &userAttributeController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

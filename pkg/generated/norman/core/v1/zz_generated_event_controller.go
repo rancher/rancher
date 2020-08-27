@@ -97,10 +97,14 @@ type EventInterface interface {
 }
 
 type eventLister struct {
+	ns         string
 	controller *eventController
 }
 
 func (l *eventLister) List(namespace string, selector labels.Selector) (ret []*v1.Event, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Event))
 	})
@@ -128,6 +132,7 @@ func (l *eventLister) Get(namespace, name string) (*v1.Event, error) {
 }
 
 type eventController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *eventController) Generic() controller.GenericController {
 
 func (c *eventController) Lister() EventLister {
 	return &eventLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c eventFactory) List() runtime.Object {
 }
 
 func (s *eventClient) Controller() EventController {
-	genericController := controller.NewGenericController(EventGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, EventGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(EventGroupVersionResource, EventGroupVersionKind.Kind, false))
 
 	return &eventController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type RoleBindingInterface interface {
 }
 
 type roleBindingLister struct {
+	ns         string
 	controller *roleBindingController
 }
 
 func (l *roleBindingLister) List(namespace string, selector labels.Selector) (ret []*v1.RoleBinding, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.RoleBinding))
 	})
@@ -129,6 +133,7 @@ func (l *roleBindingLister) Get(namespace, name string) (*v1.RoleBinding, error)
 }
 
 type roleBindingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *roleBindingController) Generic() controller.GenericController {
 
 func (c *roleBindingController) Lister() RoleBindingLister {
 	return &roleBindingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c roleBindingFactory) List() runtime.Object {
 }
 
 func (s *roleBindingClient) Controller() RoleBindingController {
-	genericController := controller.NewGenericController(RoleBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RoleBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RoleBindingGroupVersionResource, RoleBindingGroupVersionKind.Kind, true))
 
 	return &roleBindingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -97,10 +97,14 @@ type AuthConfigInterface interface {
 }
 
 type authConfigLister struct {
+	ns         string
 	controller *authConfigController
 }
 
 func (l *authConfigLister) List(namespace string, selector labels.Selector) (ret []*v3.AuthConfig, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.AuthConfig))
 	})
@@ -128,6 +132,7 @@ func (l *authConfigLister) Get(namespace, name string) (*v3.AuthConfig, error) {
 }
 
 type authConfigController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *authConfigController) Generic() controller.GenericController {
 
 func (c *authConfigController) Lister() AuthConfigLister {
 	return &authConfigLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c authConfigFactory) List() runtime.Object {
 }
 
 func (s *authConfigClient) Controller() AuthConfigController {
-	genericController := controller.NewGenericController(AuthConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, AuthConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(AuthConfigGroupVersionResource, AuthConfigGroupVersionKind.Kind, false))
 
 	return &authConfigController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

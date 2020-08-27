@@ -98,10 +98,14 @@ type SamlTokenInterface interface {
 }
 
 type samlTokenLister struct {
+	ns         string
 	controller *samlTokenController
 }
 
 func (l *samlTokenLister) List(namespace string, selector labels.Selector) (ret []*v3.SamlToken, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.SamlToken))
 	})
@@ -129,6 +133,7 @@ func (l *samlTokenLister) Get(namespace, name string) (*v3.SamlToken, error) {
 }
 
 type samlTokenController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *samlTokenController) Generic() controller.GenericController {
 
 func (c *samlTokenController) Lister() SamlTokenLister {
 	return &samlTokenLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c samlTokenFactory) List() runtime.Object {
 }
 
 func (s *samlTokenClient) Controller() SamlTokenController {
-	genericController := controller.NewGenericController(SamlTokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SamlTokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SamlTokenGroupVersionResource, SamlTokenGroupVersionKind.Kind, true))
 
 	return &samlTokenController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

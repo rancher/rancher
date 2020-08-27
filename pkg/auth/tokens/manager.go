@@ -45,12 +45,18 @@ var (
 	toDeleteCookies = []string{CookieName, CSRFCookie}
 )
 
+func RegisterIndexer(ctx context.Context, apiContext *config.ScaledContext) error {
+	informer := apiContext.Management.Users("").Controller().Informer()
+	if err := informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager {
 	informer := apiContext.Management.Users("").Controller().Informer()
-	informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
-
 	tokenInformer := apiContext.Management.Tokens("").Controller().Informer()
-	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 
 	return &Manager{
 		ctx:                 ctx,
@@ -84,15 +90,6 @@ func userPrincipalIndexer(obj interface{}) ([]string, error) {
 	}
 
 	return user.PrincipalIDs, nil
-}
-
-func tokenKeyIndexer(obj interface{}) ([]string, error) {
-	token, ok := obj.(*v3.Token)
-	if !ok {
-		return []string{}, nil
-	}
-
-	return []string{token.Token}, nil
 }
 
 // createDerivedToken will create a jwt token for the authenticated user

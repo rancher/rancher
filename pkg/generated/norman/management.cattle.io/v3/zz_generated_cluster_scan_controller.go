@@ -98,10 +98,14 @@ type ClusterScanInterface interface {
 }
 
 type clusterScanLister struct {
+	ns         string
 	controller *clusterScanController
 }
 
 func (l *clusterScanLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterScan, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterScan))
 	})
@@ -129,6 +133,7 @@ func (l *clusterScanLister) Get(namespace, name string) (*v3.ClusterScan, error)
 }
 
 type clusterScanController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterScanController) Generic() controller.GenericController {
 
 func (c *clusterScanController) Lister() ClusterScanLister {
 	return &clusterScanLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterScanFactory) List() runtime.Object {
 }
 
 func (s *clusterScanClient) Controller() ClusterScanController {
-	genericController := controller.NewGenericController(ClusterScanGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterScanGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterScanGroupVersionResource, ClusterScanGroupVersionKind.Kind, true))
 
 	return &clusterScanController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

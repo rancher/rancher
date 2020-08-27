@@ -20,10 +20,6 @@ type store struct {
 
 func NewStore(management *config.ScaledContext, s types.Store) types.Store {
 	clusterInformer := management.Management.Clusters("").Controller().Informer()
-	// use an indexer instead of expensive k8s api calls
-	clusterInformer.AddIndexers(map[string]cache.IndexFunc{
-		clusterByGenericEngineConfigKey: clusterByKontainerDriver,
-	})
 	kd := management.Management.KontainerDrivers("").Controller().Lister()
 	storeObj := store{
 		Store:                 s,

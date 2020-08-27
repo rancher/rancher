@@ -98,10 +98,14 @@ type ProjectRoleTemplateBindingInterface interface {
 }
 
 type projectRoleTemplateBindingLister struct {
+	ns         string
 	controller *projectRoleTemplateBindingController
 }
 
 func (l *projectRoleTemplateBindingLister) List(namespace string, selector labels.Selector) (ret []*v3.ProjectRoleTemplateBinding, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ProjectRoleTemplateBinding))
 	})
@@ -129,6 +133,7 @@ func (l *projectRoleTemplateBindingLister) Get(namespace, name string) (*v3.Proj
 }
 
 type projectRoleTemplateBindingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *projectRoleTemplateBindingController) Generic() controller.GenericContr
 
 func (c *projectRoleTemplateBindingController) Lister() ProjectRoleTemplateBindingLister {
 	return &projectRoleTemplateBindingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c projectRoleTemplateBindingFactory) List() runtime.Object {
 }
 
 func (s *projectRoleTemplateBindingClient) Controller() ProjectRoleTemplateBindingController {
-	genericController := controller.NewGenericController(ProjectRoleTemplateBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectRoleTemplateBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectRoleTemplateBindingGroupVersionResource, ProjectRoleTemplateBindingGroupVersionKind.Kind, true))
 
 	return &projectRoleTemplateBindingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

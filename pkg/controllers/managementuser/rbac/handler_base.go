@@ -43,19 +43,7 @@ const (
 func Register(ctx context.Context, workload *config.UserContext) {
 	// Add cache informer to project role template bindings
 	prtbInformer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
-	prtbIndexers := map[string]cache.IndexFunc{
-		prtbByProjectIndex:               prtbByProjectName,
-		prtbByProjecSubjectIndex:         prtbByProjectAndSubject,
-		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
-		prtbByUIDIndex:                   prtbByUID,
-	}
-	prtbInformer.AddIndexers(prtbIndexers)
-
 	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
-	crtbIndexers := map[string]cache.IndexFunc{
-		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
-	}
-	crtbInformer.AddIndexers(crtbIndexers)
 
 	// Index for looking up namespaces by projectID annotation
 	nsInformer := workload.Core.Namespaces("").Controller().Informer()

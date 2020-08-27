@@ -97,10 +97,14 @@ type TokenInterface interface {
 }
 
 type tokenLister struct {
+	ns         string
 	controller *tokenController
 }
 
 func (l *tokenLister) List(namespace string, selector labels.Selector) (ret []*v3.Token, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Token))
 	})
@@ -128,6 +132,7 @@ func (l *tokenLister) Get(namespace, name string) (*v3.Token, error) {
 }
 
 type tokenController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *tokenController) Generic() controller.GenericController {
 
 func (c *tokenController) Lister() TokenLister {
 	return &tokenLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c tokenFactory) List() runtime.Object {
 }
 
 func (s *tokenClient) Controller() TokenController {
-	genericController := controller.NewGenericController(TokenGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, TokenGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(TokenGroupVersionResource, TokenGroupVersionKind.Kind, false))
 
 	return &tokenController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

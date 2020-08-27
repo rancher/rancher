@@ -98,10 +98,14 @@ type LimitRangeInterface interface {
 }
 
 type limitRangeLister struct {
+	ns         string
 	controller *limitRangeController
 }
 
 func (l *limitRangeLister) List(namespace string, selector labels.Selector) (ret []*v1.LimitRange, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.LimitRange))
 	})
@@ -129,6 +133,7 @@ func (l *limitRangeLister) Get(namespace, name string) (*v1.LimitRange, error) {
 }
 
 type limitRangeController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *limitRangeController) Generic() controller.GenericController {
 
 func (c *limitRangeController) Lister() LimitRangeLister {
 	return &limitRangeLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c limitRangeFactory) List() runtime.Object {
 }
 
 func (s *limitRangeClient) Controller() LimitRangeController {
-	genericController := controller.NewGenericController(LimitRangeGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, LimitRangeGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(LimitRangeGroupVersionResource, LimitRangeGroupVersionKind.Kind, true))
 
 	return &limitRangeController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

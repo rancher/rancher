@@ -98,10 +98,14 @@ type GlobalDnsProviderInterface interface {
 }
 
 type globalDnsProviderLister struct {
+	ns         string
 	controller *globalDnsProviderController
 }
 
 func (l *globalDnsProviderLister) List(namespace string, selector labels.Selector) (ret []*v3.GlobalDnsProvider, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.GlobalDnsProvider))
 	})
@@ -129,6 +133,7 @@ func (l *globalDnsProviderLister) Get(namespace, name string) (*v3.GlobalDnsProv
 }
 
 type globalDnsProviderController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *globalDnsProviderController) Generic() controller.GenericController {
 
 func (c *globalDnsProviderController) Lister() GlobalDnsProviderLister {
 	return &globalDnsProviderLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c globalDnsProviderFactory) List() runtime.Object {
 }
 
 func (s *globalDnsProviderClient) Controller() GlobalDnsProviderController {
-	genericController := controller.NewGenericController(GlobalDnsProviderGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, GlobalDnsProviderGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(GlobalDnsProviderGroupVersionResource, GlobalDnsProviderGroupVersionKind.Kind, true))
 
 	return &globalDnsProviderController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

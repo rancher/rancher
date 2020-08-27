@@ -98,10 +98,14 @@ type PodInterface interface {
 }
 
 type podLister struct {
+	ns         string
 	controller *podController
 }
 
 func (l *podLister) List(namespace string, selector labels.Selector) (ret []*v1.Pod, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Pod))
 	})
@@ -129,6 +133,7 @@ func (l *podLister) Get(namespace, name string) (*v1.Pod, error) {
 }
 
 type podController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *podController) Generic() controller.GenericController {
 
 func (c *podController) Lister() PodLister {
 	return &podLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c podFactory) List() runtime.Object {
 }
 
 func (s *podClient) Controller() PodController {
-	genericController := controller.NewGenericController(PodGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PodGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PodGroupVersionResource, PodGroupVersionKind.Kind, true))
 
 	return &podController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

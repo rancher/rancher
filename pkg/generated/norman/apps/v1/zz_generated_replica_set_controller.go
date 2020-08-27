@@ -98,10 +98,14 @@ type ReplicaSetInterface interface {
 }
 
 type replicaSetLister struct {
+	ns         string
 	controller *replicaSetController
 }
 
 func (l *replicaSetLister) List(namespace string, selector labels.Selector) (ret []*v1.ReplicaSet, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ReplicaSet))
 	})
@@ -129,6 +133,7 @@ func (l *replicaSetLister) Get(namespace, name string) (*v1.ReplicaSet, error) {
 }
 
 type replicaSetController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *replicaSetController) Generic() controller.GenericController {
 
 func (c *replicaSetController) Lister() ReplicaSetLister {
 	return &replicaSetLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c replicaSetFactory) List() runtime.Object {
 }
 
 func (s *replicaSetClient) Controller() ReplicaSetController {
-	genericController := controller.NewGenericController(ReplicaSetGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ReplicaSetGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ReplicaSetGroupVersionResource, ReplicaSetGroupVersionKind.Kind, true))
 
 	return &replicaSetController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type ResourceQuotaInterface interface {
 }
 
 type resourceQuotaLister struct {
+	ns         string
 	controller *resourceQuotaController
 }
 
 func (l *resourceQuotaLister) List(namespace string, selector labels.Selector) (ret []*v1.ResourceQuota, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ResourceQuota))
 	})
@@ -129,6 +133,7 @@ func (l *resourceQuotaLister) Get(namespace, name string) (*v1.ResourceQuota, er
 }
 
 type resourceQuotaController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *resourceQuotaController) Generic() controller.GenericController {
 
 func (c *resourceQuotaController) Lister() ResourceQuotaLister {
 	return &resourceQuotaLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c resourceQuotaFactory) List() runtime.Object {
 }
 
 func (s *resourceQuotaClient) Controller() ResourceQuotaController {
-	genericController := controller.NewGenericController(ResourceQuotaGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ResourceQuotaGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ResourceQuotaGroupVersionResource, ResourceQuotaGroupVersionKind.Kind, true))
 
 	return &resourceQuotaController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

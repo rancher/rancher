@@ -98,10 +98,14 @@ type ServiceMonitorInterface interface {
 }
 
 type serviceMonitorLister struct {
+	ns         string
 	controller *serviceMonitorController
 }
 
 func (l *serviceMonitorLister) List(namespace string, selector labels.Selector) (ret []*v1.ServiceMonitor, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ServiceMonitor))
 	})
@@ -129,6 +133,7 @@ func (l *serviceMonitorLister) Get(namespace, name string) (*v1.ServiceMonitor, 
 }
 
 type serviceMonitorController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *serviceMonitorController) Generic() controller.GenericController {
 
 func (c *serviceMonitorController) Lister() ServiceMonitorLister {
 	return &serviceMonitorLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c serviceMonitorFactory) List() runtime.Object {
 }
 
 func (s *serviceMonitorClient) Controller() ServiceMonitorController {
-	genericController := controller.NewGenericController(ServiceMonitorGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ServiceMonitorGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ServiceMonitorGroupVersionResource, ServiceMonitorGroupVersionKind.Kind, true))
 
 	return &serviceMonitorController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

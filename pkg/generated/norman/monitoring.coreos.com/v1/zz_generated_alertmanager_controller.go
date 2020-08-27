@@ -98,10 +98,14 @@ type AlertmanagerInterface interface {
 }
 
 type alertmanagerLister struct {
+	ns         string
 	controller *alertmanagerController
 }
 
 func (l *alertmanagerLister) List(namespace string, selector labels.Selector) (ret []*v1.Alertmanager, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Alertmanager))
 	})
@@ -129,6 +133,7 @@ func (l *alertmanagerLister) Get(namespace, name string) (*v1.Alertmanager, erro
 }
 
 type alertmanagerController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *alertmanagerController) Generic() controller.GenericController {
 
 func (c *alertmanagerController) Lister() AlertmanagerLister {
 	return &alertmanagerLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c alertmanagerFactory) List() runtime.Object {
 }
 
 func (s *alertmanagerClient) Controller() AlertmanagerController {
-	genericController := controller.NewGenericController(AlertmanagerGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, AlertmanagerGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(AlertmanagerGroupVersionResource, AlertmanagerGroupVersionKind.Kind, true))
 
 	return &alertmanagerController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

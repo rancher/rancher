@@ -97,10 +97,14 @@ type FeatureInterface interface {
 }
 
 type featureLister struct {
+	ns         string
 	controller *featureController
 }
 
 func (l *featureLister) List(namespace string, selector labels.Selector) (ret []*v3.Feature, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Feature))
 	})
@@ -128,6 +132,7 @@ func (l *featureLister) Get(namespace, name string) (*v3.Feature, error) {
 }
 
 type featureController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *featureController) Generic() controller.GenericController {
 
 func (c *featureController) Lister() FeatureLister {
 	return &featureLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c featureFactory) List() runtime.Object {
 }
 
 func (s *featureClient) Controller() FeatureController {
-	genericController := controller.NewGenericController(FeatureGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, FeatureGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(FeatureGroupVersionResource, FeatureGroupVersionKind.Kind, false))
 
 	return &featureController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

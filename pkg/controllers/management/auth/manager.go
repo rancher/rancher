@@ -29,19 +29,7 @@ var commonClusterAndProjectMgmtPlaneResources = map[string]bool{
 
 func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *crtbLifecycle) {
 	crbInformer := management.RBAC.ClusterRoleBindings("").Controller().Informer()
-	crbIndexers := map[string]cache.IndexFunc{
-		rbByRoleAndSubjectIndex:     rbByRoleAndSubject,
-		membershipBindingOwnerIndex: indexByMembershipBindingOwner,
-	}
-	crbInformer.AddIndexers(crbIndexers)
-
 	rbInformer := management.RBAC.RoleBindings("").Controller().Informer()
-	rbIndexers := map[string]cache.IndexFunc{
-		rbByOwnerIndex:              rbByOwner,
-		rbByRoleAndSubjectIndex:     rbByRoleAndSubject,
-		membershipBindingOwnerIndex: indexByMembershipBindingOwner,
-	}
-	rbInformer.AddIndexers(rbIndexers)
 
 	prtb := &prtbLifecycle{
 		mgr: &manager{

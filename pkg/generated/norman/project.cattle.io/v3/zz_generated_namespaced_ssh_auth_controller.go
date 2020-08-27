@@ -98,10 +98,14 @@ type NamespacedSSHAuthInterface interface {
 }
 
 type namespacedSshAuthLister struct {
+	ns         string
 	controller *namespacedSshAuthController
 }
 
 func (l *namespacedSshAuthLister) List(namespace string, selector labels.Selector) (ret []*v3.NamespacedSSHAuth, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.NamespacedSSHAuth))
 	})
@@ -129,6 +133,7 @@ func (l *namespacedSshAuthLister) Get(namespace, name string) (*v3.NamespacedSSH
 }
 
 type namespacedSshAuthController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *namespacedSshAuthController) Generic() controller.GenericController {
 
 func (c *namespacedSshAuthController) Lister() NamespacedSSHAuthLister {
 	return &namespacedSshAuthLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c namespacedSshAuthFactory) List() runtime.Object {
 }
 
 func (s *namespacedSshAuthClient) Controller() NamespacedSSHAuthController {
-	genericController := controller.NewGenericController(NamespacedSSHAuthGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, NamespacedSSHAuthGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(NamespacedSSHAuthGroupVersionResource, NamespacedSSHAuthGroupVersionKind.Kind, true))
 
 	return &namespacedSshAuthController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

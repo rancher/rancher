@@ -97,10 +97,14 @@ type PrincipalInterface interface {
 }
 
 type principalLister struct {
+	ns         string
 	controller *principalController
 }
 
 func (l *principalLister) List(namespace string, selector labels.Selector) (ret []*v3.Principal, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Principal))
 	})
@@ -128,6 +132,7 @@ func (l *principalLister) Get(namespace, name string) (*v3.Principal, error) {
 }
 
 type principalController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *principalController) Generic() controller.GenericController {
 
 func (c *principalController) Lister() PrincipalLister {
 	return &principalLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c principalFactory) List() runtime.Object {
 }
 
 func (s *principalClient) Controller() PrincipalController {
-	genericController := controller.NewGenericController(PrincipalGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, PrincipalGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(PrincipalGroupVersionResource, PrincipalGroupVersionKind.Kind, false))
 
 	return &principalController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type ClusterTemplateRevisionInterface interface {
 }
 
 type clusterTemplateRevisionLister struct {
+	ns         string
 	controller *clusterTemplateRevisionController
 }
 
 func (l *clusterTemplateRevisionLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterTemplateRevision, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterTemplateRevision))
 	})
@@ -129,6 +133,7 @@ func (l *clusterTemplateRevisionLister) Get(namespace, name string) (*v3.Cluster
 }
 
 type clusterTemplateRevisionController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterTemplateRevisionController) Generic() controller.GenericControll
 
 func (c *clusterTemplateRevisionController) Lister() ClusterTemplateRevisionLister {
 	return &clusterTemplateRevisionLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterTemplateRevisionFactory) List() runtime.Object {
 }
 
 func (s *clusterTemplateRevisionClient) Controller() ClusterTemplateRevisionController {
-	genericController := controller.NewGenericController(ClusterTemplateRevisionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterTemplateRevisionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterTemplateRevisionGroupVersionResource, ClusterTemplateRevisionGroupVersionKind.Kind, true))
 
 	return &clusterTemplateRevisionController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

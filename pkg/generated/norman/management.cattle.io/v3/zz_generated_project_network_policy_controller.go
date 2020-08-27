@@ -98,10 +98,14 @@ type ProjectNetworkPolicyInterface interface {
 }
 
 type projectNetworkPolicyLister struct {
+	ns         string
 	controller *projectNetworkPolicyController
 }
 
 func (l *projectNetworkPolicyLister) List(namespace string, selector labels.Selector) (ret []*v3.ProjectNetworkPolicy, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ProjectNetworkPolicy))
 	})
@@ -129,6 +133,7 @@ func (l *projectNetworkPolicyLister) Get(namespace, name string) (*v3.ProjectNet
 }
 
 type projectNetworkPolicyController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *projectNetworkPolicyController) Generic() controller.GenericController 
 
 func (c *projectNetworkPolicyController) Lister() ProjectNetworkPolicyLister {
 	return &projectNetworkPolicyLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c projectNetworkPolicyFactory) List() runtime.Object {
 }
 
 func (s *projectNetworkPolicyClient) Controller() ProjectNetworkPolicyController {
-	genericController := controller.NewGenericController(ProjectNetworkPolicyGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ProjectNetworkPolicyGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ProjectNetworkPolicyGroupVersionResource, ProjectNetworkPolicyGroupVersionKind.Kind, true))
 
 	return &projectNetworkPolicyController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

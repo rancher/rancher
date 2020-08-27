@@ -98,10 +98,14 @@ type MonitorMetricInterface interface {
 }
 
 type monitorMetricLister struct {
+	ns         string
 	controller *monitorMetricController
 }
 
 func (l *monitorMetricLister) List(namespace string, selector labels.Selector) (ret []*v3.MonitorMetric, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.MonitorMetric))
 	})
@@ -129,6 +133,7 @@ func (l *monitorMetricLister) Get(namespace, name string) (*v3.MonitorMetric, er
 }
 
 type monitorMetricController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *monitorMetricController) Generic() controller.GenericController {
 
 func (c *monitorMetricController) Lister() MonitorMetricLister {
 	return &monitorMetricLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c monitorMetricFactory) List() runtime.Object {
 }
 
 func (s *monitorMetricClient) Controller() MonitorMetricController {
-	genericController := controller.NewGenericController(MonitorMetricGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, MonitorMetricGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(MonitorMetricGroupVersionResource, MonitorMetricGroupVersionKind.Kind, true))
 
 	return &monitorMetricController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

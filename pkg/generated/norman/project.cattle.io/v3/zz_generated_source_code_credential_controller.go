@@ -98,10 +98,14 @@ type SourceCodeCredentialInterface interface {
 }
 
 type sourceCodeCredentialLister struct {
+	ns         string
 	controller *sourceCodeCredentialController
 }
 
 func (l *sourceCodeCredentialLister) List(namespace string, selector labels.Selector) (ret []*v3.SourceCodeCredential, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.SourceCodeCredential))
 	})
@@ -129,6 +133,7 @@ func (l *sourceCodeCredentialLister) Get(namespace, name string) (*v3.SourceCode
 }
 
 type sourceCodeCredentialController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *sourceCodeCredentialController) Generic() controller.GenericController 
 
 func (c *sourceCodeCredentialController) Lister() SourceCodeCredentialLister {
 	return &sourceCodeCredentialLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c sourceCodeCredentialFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeCredentialClient) Controller() SourceCodeCredentialController {
-	genericController := controller.NewGenericController(SourceCodeCredentialGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SourceCodeCredentialGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SourceCodeCredentialGroupVersionResource, SourceCodeCredentialGroupVersionKind.Kind, true))
 
 	return &sourceCodeCredentialController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

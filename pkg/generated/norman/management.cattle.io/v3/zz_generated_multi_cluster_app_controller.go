@@ -98,10 +98,14 @@ type MultiClusterAppInterface interface {
 }
 
 type multiClusterAppLister struct {
+	ns         string
 	controller *multiClusterAppController
 }
 
 func (l *multiClusterAppLister) List(namespace string, selector labels.Selector) (ret []*v3.MultiClusterApp, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.MultiClusterApp))
 	})
@@ -129,6 +133,7 @@ func (l *multiClusterAppLister) Get(namespace, name string) (*v3.MultiClusterApp
 }
 
 type multiClusterAppController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *multiClusterAppController) Generic() controller.GenericController {
 
 func (c *multiClusterAppController) Lister() MultiClusterAppLister {
 	return &multiClusterAppLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c multiClusterAppFactory) List() runtime.Object {
 }
 
 func (s *multiClusterAppClient) Controller() MultiClusterAppController {
-	genericController := controller.NewGenericController(MultiClusterAppGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, MultiClusterAppGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(MultiClusterAppGroupVersionResource, MultiClusterAppGroupVersionKind.Kind, true))
 
 	return &multiClusterAppController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

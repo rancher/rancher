@@ -12,13 +12,17 @@ import (
 
 const tokenByUserAndClusterIndex = "auth.management.cattle.io/token-by-user-and-cluster"
 
-func Register(ctx context.Context, cluster *config.UserContext) {
-	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
+func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+	tokenInformer := scaledContext.Management.Tokens("").Controller().Informer()
 	tokenIndexers := map[string]cache.IndexFunc{
 		tokenByUserAndClusterIndex: tokenByUserAndCluster,
 	}
 
-	tokenInformer.AddIndexers(tokenIndexers)
+	return tokenInformer.AddIndexers(tokenIndexers)
+}
+
+func Register(ctx context.Context, cluster *config.UserContext) {
+	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
 
 	namespace := common.DefaultNamespace
 	clusterName := cluster.ClusterName

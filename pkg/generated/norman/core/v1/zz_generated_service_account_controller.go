@@ -98,10 +98,14 @@ type ServiceAccountInterface interface {
 }
 
 type serviceAccountLister struct {
+	ns         string
 	controller *serviceAccountController
 }
 
 func (l *serviceAccountLister) List(namespace string, selector labels.Selector) (ret []*v1.ServiceAccount, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ServiceAccount))
 	})
@@ -129,6 +133,7 @@ func (l *serviceAccountLister) Get(namespace, name string) (*v1.ServiceAccount, 
 }
 
 type serviceAccountController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *serviceAccountController) Generic() controller.GenericController {
 
 func (c *serviceAccountController) Lister() ServiceAccountLister {
 	return &serviceAccountLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c serviceAccountFactory) List() runtime.Object {
 }
 
 func (s *serviceAccountClient) Controller() ServiceAccountController {
-	genericController := controller.NewGenericController(ServiceAccountGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ServiceAccountGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ServiceAccountGroupVersionResource, ServiceAccountGroupVersionKind.Kind, true))
 
 	return &serviceAccountController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

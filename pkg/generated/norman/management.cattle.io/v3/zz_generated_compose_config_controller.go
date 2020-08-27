@@ -97,10 +97,14 @@ type ComposeConfigInterface interface {
 }
 
 type composeConfigLister struct {
+	ns         string
 	controller *composeConfigController
 }
 
 func (l *composeConfigLister) List(namespace string, selector labels.Selector) (ret []*v3.ComposeConfig, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ComposeConfig))
 	})
@@ -128,6 +132,7 @@ func (l *composeConfigLister) Get(namespace, name string) (*v3.ComposeConfig, er
 }
 
 type composeConfigController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *composeConfigController) Generic() controller.GenericController {
 
 func (c *composeConfigController) Lister() ComposeConfigLister {
 	return &composeConfigLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c composeConfigFactory) List() runtime.Object {
 }
 
 func (s *composeConfigClient) Controller() ComposeConfigController {
-	genericController := controller.NewGenericController(ComposeConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ComposeConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ComposeConfigGroupVersionResource, ComposeConfigGroupVersionKind.Kind, false))
 
 	return &composeConfigController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

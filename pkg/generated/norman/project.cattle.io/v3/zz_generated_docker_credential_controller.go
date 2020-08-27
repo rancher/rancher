@@ -98,10 +98,14 @@ type DockerCredentialInterface interface {
 }
 
 type dockerCredentialLister struct {
+	ns         string
 	controller *dockerCredentialController
 }
 
 func (l *dockerCredentialLister) List(namespace string, selector labels.Selector) (ret []*v3.DockerCredential, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.DockerCredential))
 	})
@@ -129,6 +133,7 @@ func (l *dockerCredentialLister) Get(namespace, name string) (*v3.DockerCredenti
 }
 
 type dockerCredentialController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *dockerCredentialController) Generic() controller.GenericController {
 
 func (c *dockerCredentialController) Lister() DockerCredentialLister {
 	return &dockerCredentialLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c dockerCredentialFactory) List() runtime.Object {
 }
 
 func (s *dockerCredentialClient) Controller() DockerCredentialController {
-	genericController := controller.NewGenericController(DockerCredentialGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DockerCredentialGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DockerCredentialGroupVersionResource, DockerCredentialGroupVersionKind.Kind, true))
 
 	return &dockerCredentialController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

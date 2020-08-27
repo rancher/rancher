@@ -98,10 +98,14 @@ type EndpointsInterface interface {
 }
 
 type endpointsLister struct {
+	ns         string
 	controller *endpointsController
 }
 
 func (l *endpointsLister) List(namespace string, selector labels.Selector) (ret []*v1.Endpoints, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Endpoints))
 	})
@@ -129,6 +133,7 @@ func (l *endpointsLister) Get(namespace, name string) (*v1.Endpoints, error) {
 }
 
 type endpointsController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *endpointsController) Generic() controller.GenericController {
 
 func (c *endpointsController) Lister() EndpointsLister {
 	return &endpointsLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c endpointsFactory) List() runtime.Object {
 }
 
 func (s *endpointsClient) Controller() EndpointsController {
-	genericController := controller.NewGenericController(EndpointsGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, EndpointsGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(EndpointsGroupVersionResource, EndpointsGroupVersionKind.Kind, true))
 
 	return &endpointsController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

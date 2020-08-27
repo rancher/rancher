@@ -97,10 +97,14 @@ type KontainerDriverInterface interface {
 }
 
 type kontainerDriverLister struct {
+	ns         string
 	controller *kontainerDriverController
 }
 
 func (l *kontainerDriverLister) List(namespace string, selector labels.Selector) (ret []*v3.KontainerDriver, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.KontainerDriver))
 	})
@@ -128,6 +132,7 @@ func (l *kontainerDriverLister) Get(namespace, name string) (*v3.KontainerDriver
 }
 
 type kontainerDriverController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *kontainerDriverController) Generic() controller.GenericController {
 
 func (c *kontainerDriverController) Lister() KontainerDriverLister {
 	return &kontainerDriverLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c kontainerDriverFactory) List() runtime.Object {
 }
 
 func (s *kontainerDriverClient) Controller() KontainerDriverController {
-	genericController := controller.NewGenericController(KontainerDriverGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, KontainerDriverGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(KontainerDriverGroupVersionResource, KontainerDriverGroupVersionKind.Kind, false))
 
 	return &kontainerDriverController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

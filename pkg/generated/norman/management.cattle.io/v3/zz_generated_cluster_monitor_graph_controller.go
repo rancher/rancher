@@ -98,10 +98,14 @@ type ClusterMonitorGraphInterface interface {
 }
 
 type clusterMonitorGraphLister struct {
+	ns         string
 	controller *clusterMonitorGraphController
 }
 
 func (l *clusterMonitorGraphLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterMonitorGraph, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterMonitorGraph))
 	})
@@ -129,6 +133,7 @@ func (l *clusterMonitorGraphLister) Get(namespace, name string) (*v3.ClusterMoni
 }
 
 type clusterMonitorGraphController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterMonitorGraphController) Generic() controller.GenericController {
 
 func (c *clusterMonitorGraphController) Lister() ClusterMonitorGraphLister {
 	return &clusterMonitorGraphLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterMonitorGraphFactory) List() runtime.Object {
 }
 
 func (s *clusterMonitorGraphClient) Controller() ClusterMonitorGraphController {
-	genericController := controller.NewGenericController(ClusterMonitorGraphGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterMonitorGraphGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterMonitorGraphGroupVersionResource, ClusterMonitorGraphGroupVersionKind.Kind, true))
 
 	return &clusterMonitorGraphController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

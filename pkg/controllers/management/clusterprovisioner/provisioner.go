@@ -65,7 +65,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		ClusterController:     management.Management.Clusters("").Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
 		Nodes:                 management.Management.Nodes(""),
-		backoff:               flowcontrol.NewBackOff(5*time.Second, 10*time.Minute),
+		backoff:               flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		DynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
 		Backups:               management.Management.EtcdBackups("").Controller().Lister(),
@@ -472,7 +472,6 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	}
 
 	if ok, delay := p.backoffFailure(cluster, spec); ok {
-		logrus.Infof("backing off provisioning cluster %s for %v", cluster.Name, delay)
 		return cluster, &controller.ForgetError{Err: fmt.Errorf("backing off failure, delay: %v", delay)}
 	}
 

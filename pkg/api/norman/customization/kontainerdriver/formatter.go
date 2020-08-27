@@ -8,6 +8,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/cache"
 )
@@ -16,13 +17,12 @@ type Format struct {
 	ClusterIndexer cache.Indexer
 }
 
+func RegisterIndexers(config *wrangler.Context) {
+	config.Mgmt.Cluster().Cache().AddIndexer(clusterByGenericEngineConfigKey, clusterByKontainerDriver)
+}
+
 func NewFormatter(manangement *config.ScaledContext) types.Formatter {
 	clusterInformer := manangement.Management.Clusters("").Controller().Informer()
-	// use an indexer instead of expensive k8s api calls
-	clusterInformer.AddIndexers(map[string]cache.IndexFunc{
-		clusterByGenericEngineConfigKey: clusterByKontainerDriver,
-	})
-
 	format := Format{
 		ClusterIndexer: clusterInformer.GetIndexer(),
 	}
@@ -43,11 +43,7 @@ const clusterByGenericEngineConfigKey = "genericEngineConfig"
 
 // clusterByKontainerDriver is an indexer function that uses the cluster genericEngineConfig
 // driverName field
-func clusterByKontainerDriver(obj interface{}) ([]string, error) {
-	cluster, ok := obj.(*v3.Cluster)
-	if !ok {
-		return []string{}, nil
-	}
+func clusterByKontainerDriver(cluster *v3.Cluster) ([]string, error) {
 	engineConfig := cluster.Spec.GenericEngineConfig
 	if engineConfig == nil {
 		return []string{}, nil

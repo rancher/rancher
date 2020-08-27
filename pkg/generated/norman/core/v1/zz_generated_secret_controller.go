@@ -98,10 +98,14 @@ type SecretInterface interface {
 }
 
 type secretLister struct {
+	ns         string
 	controller *secretController
 }
 
 func (l *secretLister) List(namespace string, selector labels.Selector) (ret []*v1.Secret, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Secret))
 	})
@@ -129,6 +133,7 @@ func (l *secretLister) Get(namespace, name string) (*v1.Secret, error) {
 }
 
 type secretController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *secretController) Generic() controller.GenericController {
 
 func (c *secretController) Lister() SecretLister {
 	return &secretLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c secretFactory) List() runtime.Object {
 }
 
 func (s *secretClient) Controller() SecretController {
-	genericController := controller.NewGenericController(SecretGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SecretGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SecretGroupVersionResource, SecretGroupVersionKind.Kind, true))
 
 	return &secretController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

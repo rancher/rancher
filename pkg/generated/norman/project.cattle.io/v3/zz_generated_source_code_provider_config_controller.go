@@ -98,10 +98,14 @@ type SourceCodeProviderConfigInterface interface {
 }
 
 type sourceCodeProviderConfigLister struct {
+	ns         string
 	controller *sourceCodeProviderConfigController
 }
 
 func (l *sourceCodeProviderConfigLister) List(namespace string, selector labels.Selector) (ret []*v3.SourceCodeProviderConfig, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.SourceCodeProviderConfig))
 	})
@@ -129,6 +133,7 @@ func (l *sourceCodeProviderConfigLister) Get(namespace, name string) (*v3.Source
 }
 
 type sourceCodeProviderConfigController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *sourceCodeProviderConfigController) Generic() controller.GenericControl
 
 func (c *sourceCodeProviderConfigController) Lister() SourceCodeProviderConfigLister {
 	return &sourceCodeProviderConfigLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c sourceCodeProviderConfigFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeProviderConfigClient) Controller() SourceCodeProviderConfigController {
-	genericController := controller.NewGenericController(SourceCodeProviderConfigGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SourceCodeProviderConfigGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SourceCodeProviderConfigGroupVersionResource, SourceCodeProviderConfigGroupVersionKind.Kind, true))
 
 	return &sourceCodeProviderConfigController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

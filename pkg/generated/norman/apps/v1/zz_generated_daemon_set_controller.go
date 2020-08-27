@@ -98,10 +98,14 @@ type DaemonSetInterface interface {
 }
 
 type daemonSetLister struct {
+	ns         string
 	controller *daemonSetController
 }
 
 func (l *daemonSetLister) List(namespace string, selector labels.Selector) (ret []*v1.DaemonSet, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.DaemonSet))
 	})
@@ -129,6 +133,7 @@ func (l *daemonSetLister) Get(namespace, name string) (*v1.DaemonSet, error) {
 }
 
 type daemonSetController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *daemonSetController) Generic() controller.GenericController {
 
 func (c *daemonSetController) Lister() DaemonSetLister {
 	return &daemonSetLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c daemonSetFactory) List() runtime.Object {
 }
 
 func (s *daemonSetClient) Controller() DaemonSetController {
-	genericController := controller.NewGenericController(DaemonSetGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, DaemonSetGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(DaemonSetGroupVersionResource, DaemonSetGroupVersionKind.Kind, true))
 
 	return &daemonSetController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

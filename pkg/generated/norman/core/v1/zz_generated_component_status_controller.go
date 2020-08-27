@@ -97,10 +97,14 @@ type ComponentStatusInterface interface {
 }
 
 type componentStatusLister struct {
+	ns         string
 	controller *componentStatusController
 }
 
 func (l *componentStatusLister) List(namespace string, selector labels.Selector) (ret []*v1.ComponentStatus, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ComponentStatus))
 	})
@@ -128,6 +132,7 @@ func (l *componentStatusLister) Get(namespace, name string) (*v1.ComponentStatus
 }
 
 type componentStatusController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *componentStatusController) Generic() controller.GenericController {
 
 func (c *componentStatusController) Lister() ComponentStatusLister {
 	return &componentStatusLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c componentStatusFactory) List() runtime.Object {
 }
 
 func (s *componentStatusClient) Controller() ComponentStatusController {
-	genericController := controller.NewGenericController(ComponentStatusGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ComponentStatusGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ComponentStatusGroupVersionResource, ComponentStatusGroupVersionKind.Kind, false))
 
 	return &componentStatusController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

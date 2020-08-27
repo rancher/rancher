@@ -97,10 +97,14 @@ type GroupInterface interface {
 }
 
 type groupLister struct {
+	ns         string
 	controller *groupController
 }
 
 func (l *groupLister) List(namespace string, selector labels.Selector) (ret []*v3.Group, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Group))
 	})
@@ -128,6 +132,7 @@ func (l *groupLister) Get(namespace, name string) (*v3.Group, error) {
 }
 
 type groupController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *groupController) Generic() controller.GenericController {
 
 func (c *groupController) Lister() GroupLister {
 	return &groupLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c groupFactory) List() runtime.Object {
 }
 
 func (s *groupClient) Controller() GroupController {
-	genericController := controller.NewGenericController(GroupGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, GroupGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(GroupGroupVersionResource, GroupGroupVersionKind.Kind, false))
 
 	return &groupController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

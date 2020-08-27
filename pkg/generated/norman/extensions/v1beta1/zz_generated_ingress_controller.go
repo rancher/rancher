@@ -98,10 +98,14 @@ type IngressInterface interface {
 }
 
 type ingressLister struct {
+	ns         string
 	controller *ingressController
 }
 
 func (l *ingressLister) List(namespace string, selector labels.Selector) (ret []*v1beta1.Ingress, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1beta1.Ingress))
 	})
@@ -129,6 +133,7 @@ func (l *ingressLister) Get(namespace, name string) (*v1beta1.Ingress, error) {
 }
 
 type ingressController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *ingressController) Generic() controller.GenericController {
 
 func (c *ingressController) Lister() IngressLister {
 	return &ingressLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c ingressFactory) List() runtime.Object {
 }
 
 func (s *ingressClient) Controller() IngressController {
-	genericController := controller.NewGenericController(IngressGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, IngressGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(IngressGroupVersionResource, IngressGroupVersionKind.Kind, true))
 
 	return &ingressController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

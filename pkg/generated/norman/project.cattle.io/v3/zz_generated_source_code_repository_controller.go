@@ -98,10 +98,14 @@ type SourceCodeRepositoryInterface interface {
 }
 
 type sourceCodeRepositoryLister struct {
+	ns         string
 	controller *sourceCodeRepositoryController
 }
 
 func (l *sourceCodeRepositoryLister) List(namespace string, selector labels.Selector) (ret []*v3.SourceCodeRepository, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.SourceCodeRepository))
 	})
@@ -129,6 +133,7 @@ func (l *sourceCodeRepositoryLister) Get(namespace, name string) (*v3.SourceCode
 }
 
 type sourceCodeRepositoryController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *sourceCodeRepositoryController) Generic() controller.GenericController 
 
 func (c *sourceCodeRepositoryController) Lister() SourceCodeRepositoryLister {
 	return &sourceCodeRepositoryLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c sourceCodeRepositoryFactory) List() runtime.Object {
 }
 
 func (s *sourceCodeRepositoryClient) Controller() SourceCodeRepositoryController {
-	genericController := controller.NewGenericController(SourceCodeRepositoryGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, SourceCodeRepositoryGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(SourceCodeRepositoryGroupVersionResource, SourceCodeRepositoryGroupVersionKind.Kind, true))
 
 	return &sourceCodeRepositoryController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

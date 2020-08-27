@@ -97,10 +97,14 @@ type CatalogInterface interface {
 }
 
 type catalogLister struct {
+	ns         string
 	controller *catalogController
 }
 
 func (l *catalogLister) List(namespace string, selector labels.Selector) (ret []*v3.Catalog, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.Catalog))
 	})
@@ -128,6 +132,7 @@ func (l *catalogLister) Get(namespace, name string) (*v3.Catalog, error) {
 }
 
 type catalogController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *catalogController) Generic() controller.GenericController {
 
 func (c *catalogController) Lister() CatalogLister {
 	return &catalogLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c catalogFactory) List() runtime.Object {
 }
 
 func (s *catalogClient) Controller() CatalogController {
-	genericController := controller.NewGenericController(CatalogGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, CatalogGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(CatalogGroupVersionResource, CatalogGroupVersionKind.Kind, false))
 
 	return &catalogController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

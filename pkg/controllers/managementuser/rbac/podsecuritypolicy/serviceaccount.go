@@ -23,6 +23,14 @@ const psptpbByTargetProjectNameAnnotationIndex = "podsecuritypolicy.rbac.user.ca
 const roleBindingByServiceAccountIndex = "podsecuritypolicy.rbac.user.cattle.io/role-binding-by-service-account"
 const psptpbRoleBindingAnnotation = "podsecuritypolicy.rbac.user.cattle.io/psptpb-role-binding"
 
+func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+	psptpbInformer := scaledContext.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
+	psptpbIndexers := map[string]cache.IndexFunc{
+		psptpbByTargetProjectNameAnnotationIndex: psptpbByTargetProjectName,
+	}
+	return psptpbInformer.AddIndexers(psptpbIndexers)
+}
+
 // RegisterServiceAccount ensures that:
 // 	1. Each namespace has a pod security policy assigned to a role if:
 //		a. its project has a PSPT assigned to it
@@ -33,10 +41,6 @@ func RegisterServiceAccount(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy serviceaccount handler for cluster %v", context.ClusterName)
 
 	psptpbInformer := context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
-	psptpbIndexers := map[string]cache.IndexFunc{
-		psptpbByTargetProjectNameAnnotationIndex: psptpbByTargetProjectName,
-	}
-	psptpbInformer.AddIndexers(psptpbIndexers)
 
 	roleBindingInformer := context.RBAC.RoleBindings("").Controller().Informer()
 	roleBindingIndexers := map[string]cache.IndexFunc{

@@ -97,10 +97,14 @@ type ClusterRoleBindingInterface interface {
 }
 
 type clusterRoleBindingLister struct {
+	ns         string
 	controller *clusterRoleBindingController
 }
 
 func (l *clusterRoleBindingLister) List(namespace string, selector labels.Selector) (ret []*v1.ClusterRoleBinding, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.ClusterRoleBinding))
 	})
@@ -128,6 +132,7 @@ func (l *clusterRoleBindingLister) Get(namespace, name string) (*v1.ClusterRoleB
 }
 
 type clusterRoleBindingController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -137,6 +142,7 @@ func (c *clusterRoleBindingController) Generic() controller.GenericController {
 
 func (c *clusterRoleBindingController) Lister() ClusterRoleBindingLister {
 	return &clusterRoleBindingLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -205,10 +211,11 @@ func (c clusterRoleBindingFactory) List() runtime.Object {
 }
 
 func (s *clusterRoleBindingClient) Controller() ClusterRoleBindingController {
-	genericController := controller.NewGenericController(ClusterRoleBindingGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterRoleBindingGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterRoleBindingGroupVersionResource, ClusterRoleBindingGroupVersionKind.Kind, false))
 
 	return &clusterRoleBindingController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

@@ -98,10 +98,14 @@ type RoleInterface interface {
 }
 
 type roleLister struct {
+	ns         string
 	controller *roleController
 }
 
 func (l *roleLister) List(namespace string, selector labels.Selector) (ret []*v1.Role, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v1.Role))
 	})
@@ -129,6 +133,7 @@ func (l *roleLister) Get(namespace, name string) (*v1.Role, error) {
 }
 
 type roleController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *roleController) Generic() controller.GenericController {
 
 func (c *roleController) Lister() RoleLister {
 	return &roleLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c roleFactory) List() runtime.Object {
 }
 
 func (s *roleClient) Controller() RoleController {
-	genericController := controller.NewGenericController(RoleGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, RoleGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(RoleGroupVersionResource, RoleGroupVersionKind.Kind, true))
 
 	return &roleController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

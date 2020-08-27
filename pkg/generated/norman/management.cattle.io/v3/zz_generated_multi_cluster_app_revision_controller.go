@@ -98,10 +98,14 @@ type MultiClusterAppRevisionInterface interface {
 }
 
 type multiClusterAppRevisionLister struct {
+	ns         string
 	controller *multiClusterAppRevisionController
 }
 
 func (l *multiClusterAppRevisionLister) List(namespace string, selector labels.Selector) (ret []*v3.MultiClusterAppRevision, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.MultiClusterAppRevision))
 	})
@@ -129,6 +133,7 @@ func (l *multiClusterAppRevisionLister) Get(namespace, name string) (*v3.MultiCl
 }
 
 type multiClusterAppRevisionController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *multiClusterAppRevisionController) Generic() controller.GenericControll
 
 func (c *multiClusterAppRevisionController) Lister() MultiClusterAppRevisionLister {
 	return &multiClusterAppRevisionLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c multiClusterAppRevisionFactory) List() runtime.Object {
 }
 
 func (s *multiClusterAppRevisionClient) Controller() MultiClusterAppRevisionController {
-	genericController := controller.NewGenericController(MultiClusterAppRevisionGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, MultiClusterAppRevisionGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(MultiClusterAppRevisionGroupVersionResource, MultiClusterAppRevisionGroupVersionKind.Kind, true))
 
 	return &multiClusterAppRevisionController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }

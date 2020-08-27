@@ -98,10 +98,14 @@ type ClusterUserAttributeInterface interface {
 }
 
 type clusterUserAttributeLister struct {
+	ns         string
 	controller *clusterUserAttributeController
 }
 
 func (l *clusterUserAttributeLister) List(namespace string, selector labels.Selector) (ret []*v3.ClusterUserAttribute, err error) {
+	if namespace == "" {
+		namespace = l.ns
+	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
 		ret = append(ret, obj.(*v3.ClusterUserAttribute))
 	})
@@ -129,6 +133,7 @@ func (l *clusterUserAttributeLister) Get(namespace, name string) (*v3.ClusterUse
 }
 
 type clusterUserAttributeController struct {
+	ns string
 	controller.GenericController
 }
 
@@ -138,6 +143,7 @@ func (c *clusterUserAttributeController) Generic() controller.GenericController 
 
 func (c *clusterUserAttributeController) Lister() ClusterUserAttributeLister {
 	return &clusterUserAttributeLister{
+		ns:         c.ns,
 		controller: c,
 	}
 }
@@ -206,10 +212,11 @@ func (c clusterUserAttributeFactory) List() runtime.Object {
 }
 
 func (s *clusterUserAttributeClient) Controller() ClusterUserAttributeController {
-	genericController := controller.NewGenericController(ClusterUserAttributeGroupVersionKind.Kind+"Controller",
+	genericController := controller.NewGenericController(s.ns, ClusterUserAttributeGroupVersionKind.Kind+"Controller",
 		s.client.controllerFactory.ForResourceKind(ClusterUserAttributeGroupVersionResource, ClusterUserAttributeGroupVersionKind.Kind, true))
 
 	return &clusterUserAttributeController{
+		ns:                s.ns,
 		GenericController: genericController,
 	}
 }
