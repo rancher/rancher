@@ -18,7 +18,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.18.8
 	k8s.io/apiserver => k8s.io/apiserver v0.18.8
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.18.8
-	k8s.io/client-go => github.com/rancher/client-go v1.18.8-rancher.1
+	k8s.io/client-go => github.com/rancher/client-go v1.18.8-rancher.2
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.18.8
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.18.8
 	k8s.io/code-generator => k8s.io/code-generator v0.18.8
@@ -84,7 +84,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.0.0-20200807181951-690274ab1fb3
 	github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200826210253-c5b2039c29f9
+	github.com/rancher/norman v0.0.0-20200827042722-ea785e633e08
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
@@ -93,7 +93,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200810194305-6ebfa39af82c
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
-	github.com/rancher/wrangler v0.6.2-0.20200826173859-caae3107f64a
+	github.com/rancher/wrangler v0.6.2-0.20200827052259-fe65feea1795
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0
