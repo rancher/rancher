@@ -11,5 +11,8 @@ fi
 echo Running: golangci-lint
 golangci-lint run
 
+echo Tidying up modules
+go mod tidy
+
 echo Verifying modules
 go mod verify
