@@ -8,11 +8,10 @@ import (
 	"io/ioutil"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-
+	"github.com/rancher/rancher/pkg/settings"
 	"helm.sh/helm/v3/pkg/release"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func isHelm3(labels map[string]string) bool {
@@ -106,6 +105,11 @@ func fromHelm3ReleaseToRelease(release *release.Release, isNamespaced IsNamespac
 		Version:          release.Version,
 		Namespace:        release.Namespace,
 		HelmMajorVersion: 3,
+	}
+
+	reg := settings.SystemDefaultRegistry.Get()
+	if reg != "" {
+		hr.Values["systemDefaultRegistry"] = reg
 	}
 
 	hr.Resources, err = resourcesFromManifest(release.Namespace, release.Manifest, isNamespaced)

@@ -11,6 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	rspb "k8s.io/helm/pkg/proto/hapi/release"
@@ -74,7 +75,7 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 			Notes:         release.GetInfo().GetStatus().GetNotes(),
 		},
 		Chart: &v1.Chart{
-			Values: toMap(release.Namespace, release.Name, release.GetChart().GetValues().GetRaw()),
+			Values: toMap(release.Namespace, release.Name, release.GetChart().GetValues().GetRaw(), false),
 			Metadata: &v1.Metadata{
 				Name:        release.GetChart().GetMetadata().GetName(),
 				Home:        release.GetChart().GetMetadata().GetHome(),
@@ -91,7 +92,7 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 				KubeVersion: release.GetChart().GetMetadata().GetKubeVersion(),
 			},
 		},
-		Values:           toMap(release.Namespace, release.Name, release.GetConfig().GetRaw()),
+		Values:           toMap(release.Namespace, release.Name, release.GetConfig().GetRaw(), true),
 		Version:          int(release.Version),
 		Namespace:        release.Namespace,
 		HelmMajorVersion: 3,
@@ -121,7 +122,7 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 	return hr, err
 }
 
-func toMap(namespace, name string, manifest string) map[string]interface{} {
+func toMap(namespace, name string, manifest string, addRegistry bool) map[string]interface{} {
 	values := map[string]interface{}{}
 
 	if manifest == "" {
@@ -130,6 +131,11 @@ func toMap(namespace, name string, manifest string) map[string]interface{} {
 
 	if err := yaml.Unmarshal([]byte(manifest), &values); err != nil {
 		logrus.Errorf("failed to unmarshal yaml for %s/%s", namespace, name)
+	}
+
+	reg := settings.SystemDefaultRegistry.Get()
+	if reg != "" && addRegistry {
+		values["systemDefaultRegistry"] = reg
 	}
 
 	return values
