@@ -133,12 +133,21 @@ func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[inte
 	}
 }
 
-func GetImages(systemChartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, error) {
+func GetImages(systemChartPath, chartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, error) {
 	var images []string
 
-	// fetch images from charts
+	// fetch images from system charts
 	if systemChartPath != "" {
-		imagesInCharts, err := fetchImagesFromCharts(systemChartPath, osType)
+		imagesInSystemCharts, err := fetchImagesFromCharts(systemChartPath, osType)
+		if err != nil {
+			return []string{}, errors.Wrap(err, "failed to fetch images from system charts")
+		}
+		images = append(images, imagesInSystemCharts...)
+	}
+
+	// fetch images from charts
+	if chartPath != "" {
+		imagesInCharts, err := fetchImagesFromCharts(chartPath, osType)
 		if err != nil {
 			return []string{}, errors.Wrap(err, "failed to fetch images from charts")
 		}

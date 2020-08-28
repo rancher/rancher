@@ -42,16 +42,16 @@ var (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("system charts path is required, please set it as the first parameter")
+	if len(os.Args) < 3 {
+		log.Fatal("\"main.go\" requires 2 arguments. Usage: go run main.go [SYSTEM_CHART_PATH] [CHART_PATH] [OPTIONAL]...")
 	}
 
-	if err := run(os.Args[1], os.Args[2:]); err != nil {
+	if err := run(os.Args[1], os.Args[2], os.Args[3:]); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(systemChartPath string, imagesFromArgs []string) error {
+func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 	tag, ok := os.LookupEnv("TAG")
 	if !ok {
 		return fmt.Errorf("no tag %s", tag)
@@ -87,12 +87,12 @@ func run(systemChartPath string, imagesFromArgs []string) error {
 
 	k3sUpgradeImages := getK3sUpgradeImages(rancherVersion, data.K3S)
 
-	targetImages, err := img.GetImages(systemChartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
+	targetImages, err := img.GetImages(systemChartPath, chartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
 	if err != nil {
 		return err
 	}
 
-	targetWindowsImages, err := img.GetImages(systemChartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
+	targetWindowsImages, err := img.GetImages(systemChartPath, chartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
 	if err != nil {
 		return err
 	}
