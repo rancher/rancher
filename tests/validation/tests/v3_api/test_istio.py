@@ -189,6 +189,7 @@ def test_istio_custom_answers(skipif_unsupported_istio_version,
 
 # This is split out separately from test_istio_custom_answers because
 # certmanager creates its own crds outside of istio
+@pytest.mark.skip(reason="To be removed, no support from 1.7.000")
 def test_istio_certmanager_enables(skipif_unsupported_istio_version,
                                    enable_certmanager):
     expected_deployments = [
