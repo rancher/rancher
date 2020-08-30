@@ -100,7 +100,7 @@ ENV DAPPER_ENV REPO TAG DRONE_TAG SYSTEM_CHART_DEFAULT_BRANCH
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
 ENV DAPPER_OUTPUT ./bin ./dist
 ENV DAPPER_DOCKER_SOCKET true
-ENV DAPPER_RUN_ARGS "-v rancher2-pkg:/go/pkg -v rancher2-cache:/root/.cache/go-build"
+ENV DAPPER_RUN_ARGS "-v rancher2-pkg:/go/pkg -v rancher2-cache:/root/.cache/go-build --privileged"
 ENV TRASH_CACHE ${DAPPER_SOURCE}/.trash-cache
 ENV GOCACHE /root/.cache/go-build
 ENV HOME ${DAPPER_SOURCE}
