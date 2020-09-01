@@ -19,7 +19,7 @@ var (
 
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
-	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "1440") // 24 hours
+	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds  = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	CACerts                           = NewSetting("cacerts", "")
