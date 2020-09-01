@@ -101,7 +101,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return v3.Token{}, 401, err
 	}
 
-	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Minute)
+	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
 	if err != nil {
 		return v3.Token{}, 500, fmt.Errorf("error validating max-ttl %v", err)
 	}
