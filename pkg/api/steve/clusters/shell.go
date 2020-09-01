@@ -102,6 +102,17 @@ func (s *shell) createPod() *v1.Pod {
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,
+			NodeSelector: map[string]string{
+				"kubernetes.io/os": "linux",
+			},
+			Tolerations: []v1.Toleration{
+				{
+					Key:      "cattle.io/os",
+					Operator: "Equals",
+					Value:    "linux",
+					Effect:   "NoSchedule",
+				},
+			},
 			Containers: []v1.Container{
 				{
 					Name:      "shell",

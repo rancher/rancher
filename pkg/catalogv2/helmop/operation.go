@@ -581,6 +581,17 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 			},
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,
+			NodeSelector: map[string]string{
+				"kubernetes.io/os": "linux",
+			},
+			Tolerations: []v1.Toleration{
+				{
+					Key:      "cattle.io/os",
+					Operator: "Equals",
+					Value:    "linux",
+					Effect:   "NoSchedule",
+				},
+			},
 			Containers: []v1.Container{
 				{
 					Name: "helm",
