@@ -915,8 +915,8 @@ github.com/quobyte/api v0.1.2/go.mod h1:jL7lIHrmqQ7yh05OJ+eEEdHr0u/kmT1Ff9iHd+4H
 github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4bJ1FwuaBZ6dt1VcDX5/O662mwR8GWqS4l68H6hkoYQ=
 github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48 h1:XmhN3O0azgyrMRTX3v/MEHfb5BSjdbRUYJijiJ7Gs5s=
 github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
-github.com/rancher/client-go v1.18.8-rancher.2 h1:L+3yVWYaVIf1oL9fKrMR8nAhrzRTYyXDRrL1SDQCjp0=
-github.com/rancher/client-go v1.18.8-rancher.2/go.mod h1:HqFqMllQ5NnQJNwjro9k5zMyfhZlOwpuTLVrxjkYSxU=
+github.com/rancher/client-go v1.18.8-rancher.3 h1:pFE68oEM0eJzz4STYFmSMkF+/o6O8ydyT6efDF7aF/4=
+github.com/rancher/client-go v1.18.8-rancher.3/go.mod h1:HqFqMllQ5NnQJNwjro9k5zMyfhZlOwpuTLVrxjkYSxU=
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
 github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9 h1:Vg2dLoL5n4RTnp5pLVtgkqQu7k5O5lsXCNhIlUQmb+g=
 github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
