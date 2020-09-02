@@ -5,7 +5,6 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -96,6 +95,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		dsClient:                     dsClient,
 		dsLister:                     dsLister,
 		templateLister:               templateLister,
+		apiExtensionsClient:          userContext.APIExtClient,
 	}
 	clusterScanClient.AddClusterScopedLifecycle(ctx, "cisScanHandler", clusterName, clusterScanHandler)
 

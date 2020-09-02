@@ -1,6 +1,7 @@
 package cis
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -69,6 +71,7 @@ type cisScanHandler struct {
 	dsClient                     appsv1.DaemonSetInterface
 	dsLister                     appsv1.DaemonSetLister
 	templateLister               v3.CatalogTemplateLister
+	apiExtensionsClient          clientset.Interface
 }
 
 type appInfo struct {
@@ -108,6 +111,16 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	if cluster.Spec.WindowsPreferedCluster {
 		v32.ClusterScanConditionFailed.True(cs)
 		v32.ClusterScanConditionFailed.Message(cs, "cannot run scan on a windows cluster")
+		return cs, nil
+	}
+
+	cisv2, err := csh.isCISv2Enabled(cluster)
+	if err != nil {
+		return cs, fmt.Errorf("cisScanHandler: Create: Error while checking CIS v2 CRD presence %v, will retry", err)
+	}
+	if cisv2 {
+		v32.ClusterScanConditionFailed.True(cs)
+		v32.ClusterScanConditionFailed.Message(cs, "cannot run scan on cluster, CIS v2 feature is enabled")
 		return cs, nil
 	}
 
@@ -304,6 +317,16 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 		v32.ClusterScanConditionCompleted.True(cs)
 		v32.ClusterScanConditionAlerted.Unknown(cs)
+	} else if v32.ClusterScanConditionFailed.IsTrue(cs) {
+		cluster, err := csh.clusterLister.Get("", csh.clusterNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("cisScanHandler: Updated: error getting cluster %v", err)
+		}
+		updatedCluster := cluster.DeepCopy()
+		updatedCluster.Status.CurrentCisRunName = ""
+		if _, err := csh.clusterClient.Update(updatedCluster); err != nil {
+			return nil, fmt.Errorf("cisScanHandler: Updated: failed to update cluster about CIS scan completion with error %v", err)
+		}
 	}
 	return cs, nil
 }
@@ -460,4 +483,16 @@ func (csh *cisScanHandler) getCISBenchmarkCatalogID() (string, error) {
 
 func (csh *cisScanHandler) getRancherCISBenchmarkTemplateID() string {
 	return fmt.Sprintf("%s-%s", cutils.SystemLibraryName, templateName)
+}
+
+func (csh *cisScanHandler) isCISv2Enabled(cluster *v3.Cluster) (bool, error) {
+	cisv2CRD := "clusterscanprofiles.cis.cattle.io"
+	_, err := csh.apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), cisv2CRD, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
