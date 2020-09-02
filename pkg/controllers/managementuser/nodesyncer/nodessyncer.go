@@ -7,12 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
@@ -20,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,13 +42,17 @@ type nodeSyncer struct {
 }
 
 type nodesSyncer struct {
-	machines         v3.NodeInterface
-	machineLister    v3.NodeLister
-	nodeLister       v1.NodeLister
-	nodeClient       v1.NodeInterface
-	podLister        v1.PodLister
-	clusterNamespace string
-	clusterLister    v3.ClusterLister
+	machines             v3.NodeInterface
+	machineLister        v3.NodeLister
+	nodeLister           v1.NodeLister
+	nodeClient           v1.NodeInterface
+	podLister            v1.PodLister
+	clusterNamespace     string
+	clusterLister        v3.ClusterLister
+	serviceOptionsLister v3.RkeK8sServiceOptionLister
+	serviceOptions       v3.RkeK8sServiceOptionInterface
+	sysImagesLister      v3.RkeK8sSystemImageLister
+	sysImages            v3.RkeK8sSystemImageInterface
 }
 
 type nodeDrain struct {
@@ -70,13 +73,17 @@ type canChangeValuePolicy func(key string) bool
 
 func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	m := &nodesSyncer{
-		clusterNamespace: cluster.ClusterName,
-		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
-		machineLister:    cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
-		nodeLister:       cluster.Core.Nodes("").Controller().Lister(),
-		nodeClient:       cluster.Core.Nodes(""),
-		podLister:        cluster.Core.Pods("").Controller().Lister(),
-		clusterLister:    cluster.Management.Management.Clusters("").Controller().Lister(),
+		clusterNamespace:     cluster.ClusterName,
+		machines:             cluster.Management.Management.Nodes(cluster.ClusterName),
+		machineLister:        cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
+		nodeLister:           cluster.Core.Nodes("").Controller().Lister(),
+		nodeClient:           cluster.Core.Nodes(""),
+		podLister:            cluster.Core.Pods("").Controller().Lister(),
+		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
+		serviceOptionsLister: cluster.Management.Management.RkeK8sServiceOptions("").Controller().Lister(),
+		serviceOptions:       cluster.Management.Management.RkeK8sServiceOptions(""),
+		sysImagesLister:      cluster.Management.Management.RkeK8sSystemImages("").Controller().Lister(),
+		sysImages:            cluster.Management.Management.RkeK8sSystemImages(""),
 	}
 
 	n := &nodeSyncer{
@@ -323,7 +330,15 @@ func (m *nodesSyncer) getNodePlan(node *v3.Node) (rketypes.RKEConfigNodePlan, er
 		return rketypes.RKEConfigNodePlan{}, err
 	}
 
-	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo, map[string]interface{}{})
+	hostAddress := node.Status.NodeConfig.Address
+	hostDockerInfo := dockerInfo[hostAddress]
+
+	svcOptions, err := m.getServiceOptions(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version, hostDockerInfo.OSType)
+	if err != nil {
+		return rketypes.RKEConfigNodePlan{}, err
+	}
+
+	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo, svcOptions)
 	if err != nil {
 		return rketypes.RKEConfigNodePlan{}, err
 	}
@@ -335,6 +350,29 @@ func (m *nodesSyncer) getNodePlan(node *v3.Node) (rketypes.RKEConfigNodePlan, er
 	}
 
 	return rketypes.RKEConfigNodePlan{}, nil
+}
+
+func (m *nodesSyncer) getServiceOptions(k8sVersion string, osType string) (map[string]interface{}, error) {
+	data := map[string]interface{}{}
+	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, m.serviceOptionsLister, m.serviceOptions, m.sysImagesLister, m.sysImages, kd.Linux)
+	if err != nil {
+		logrus.Errorf("getK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
+		return data, err
+	}
+	if svcOptions != nil {
+		data["k8s-service-options"] = svcOptions
+	}
+	if osType == "windows" {
+		svcOptionsWindows, err := kd.GetRKEK8sServiceOptions(k8sVersion, m.serviceOptionsLister, m.serviceOptions, m.sysImagesLister, m.sysImages, kd.Windows)
+		if err != nil {
+			logrus.Errorf("getK8sServiceOptionsWindows: k8sVersion %s [%v]", k8sVersion, err)
+			return data, err
+		}
+		if svcOptionsWindows != nil {
+			data["k8s-windows-service-options"] = svcOptionsWindows
+		}
+	}
+	return data, nil
 }
 
 func (m *nodesSyncer) reconcileAll() error {
