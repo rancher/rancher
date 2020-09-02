@@ -108,7 +108,7 @@ func (s *shell) createPod() *v1.Pod {
 			Tolerations: []v1.Toleration{
 				{
 					Key:      "cattle.io/os",
-					Operator: "Equals",
+					Operator: "Equal",
 					Value:    "linux",
 					Effect:   "NoSchedule",
 				},
