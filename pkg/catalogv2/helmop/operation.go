@@ -587,7 +587,7 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 			Tolerations: []v1.Toleration{
 				{
 					Key:      "cattle.io/os",
-					Operator: "Equals",
+					Operator: "Equal",
 					Value:    "linux",
 					Effect:   "NoSchedule",
 				},
