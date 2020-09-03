@@ -61,7 +61,7 @@ replace (
 )
 
 require (
-	github.com/rancher/rke2 v1.18.4-beta2.0.20200810232625-bd90c4742874
+	github.com/rancher/rke2 v1.18.4-beta16.0.20200901184550-9c11691024ae
 	github.com/rancher/spur v0.0.0-20200617165101-8702c8e4ce7a
 	github.com/sirupsen/logrus v1.6.0
 )

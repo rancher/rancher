@@ -216,6 +216,7 @@ github.com/fatih/color v1.6.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5Kwzbycv
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568/go.mod h1:xEzjJPgXI435gkrCt3MPfRiAkVrwSbHsst4LCFVfpJc=
 github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzPa1k=
+github.com/frankban/quicktest v1.10.2/go.mod h1:K+q6oSqb0W0Ininfk863uOk1lMy69l/P6txr3mVT54s=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
@@ -362,6 +363,8 @@ github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5a
 github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
 github.com/google/go-cmp v0.3.1 h1:Xye71clBPdm5HgqGwUkwhbynsUJZhDbS20FvLhQ2izg=
 github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
+github.com/google/go-cmp v0.5.2 h1:X2ev0eStA3AbceY54o37/0PQ/UWqKEiiO2dKL5OPaFM=
+github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-containerregistry v0.0.0-20190617215043-876b8855d23c/go.mod h1:yZAFP63pRshzrEYLXLGPmUt0Ay+2zdjmMN1loCnRLUk=
 github.com/google/go-containerregistry v0.0.0-20200424115305-087a4bdef7c4 h1:ZMeWxtuudhKYLuQL95+c4ZQHWA4TmSlcl29BDeuQShY=
 github.com/google/go-containerregistry v0.0.0-20200424115305-087a4bdef7c4/go.mod h1:pD1UFYs7MCAx+ZLShBdttcaOSbyc8F9Na/9IZLNwJeA=
@@ -417,6 +420,8 @@ github.com/hashicorp/golang-lru v0.5.0/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ
 github.com/hashicorp/golang-lru v0.5.1/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
 github.com/hashicorp/golang-lru v0.5.3 h1:YPkqC67at8FYaadspW/6uE0COsBxS2656RLEr8Bppgk=
 github.com/hashicorp/golang-lru v0.5.3/go.mod h1:iADmTwqILo4mZ8BN3D2Q6+9jd8WM5uGBxy+E8yxSoD4=
+github.com/hashicorp/golang-lru v0.5.4 h1:YDjusn29QI/Das2iO9M0BHnIbxPeyuCHsjMW+lJfyTc=
+github.com/hashicorp/golang-lru v0.5.4/go.mod h1:iADmTwqILo4mZ8BN3D2Q6+9jd8WM5uGBxy+E8yxSoD4=
 github.com/hashicorp/hcl v0.0.0-20180404174102-ef8a98b0bbce/go.mod h1:oZtUIOe8dh44I2q6ScRibXws4Ajl+d+nod3AaR9vL5w=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
 github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible/go.mod h1:bB9ly3RchcQqsQ9CpyaQwvva7RS5ytVoSoholZQON6o=
@@ -471,6 +476,7 @@ github.com/konsorten/go-windows-terminal-sequences v1.0.2/go.mod h1:T0+1ngSBFLxv
 github.com/konsorten/go-windows-terminal-sequences v1.0.3 h1:CE8S1cTafDpPvMhIxNJKvHsGVBgn1xWYf1NbHQhywc8=
 github.com/konsorten/go-windows-terminal-sequences v1.0.3/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
+github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/pty v1.1.3/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/pty v1.1.5/go.mod h1:9r2w37qlBe7rQ6e1fg1S/9xpWHSnaqNdHD3WcMdbPDA=
@@ -597,6 +603,8 @@ github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtP
 github.com/pelletier/go-toml v1.1.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
+github.com/pierrec/lz4 v2.5.2+incompatible h1:WCjObylUIOlKy/+7Abdn34TLIkXiA4UWUMhxq9m9ZXI=
+github.com/pierrec/lz4 v2.5.2+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
@@ -626,12 +634,18 @@ github.com/rancher/cri v1.3.0-k3s.7/go.mod h1:Ht5T1dIKzm+4NExmb7wDVG6qR+j0xeXIjj
 github.com/rancher/cri-tools v1.18.0-k3s1/go.mod h1:Ij/GWNRcEDP6zVN6eQpvN/s0nhuJVtPQFy7RAdl+Wu8=
 github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234 h1:wZ1Zh7fI7B9hfZw9Ouhz7171CZKu6XffM3ysUhhO6i0=
 github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
+github.com/rancher/dynamiclistener v0.2.1 h1:QiY1jxs2TOLrKB04G36vE2ehEvPMPGiWp8zEHLKB1nE=
+github.com/rancher/dynamiclistener v0.2.1/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/flannel v0.11.0-k3s.2 h1:0GVr5ORAIvcri1LYTE8eMQ+NrRbuPeIniPaW51IzLco=
 github.com/rancher/flannel v0.11.0-k3s.2/go.mod h1:Hn4ZV+eq0LhLZP63xZnxdGwXEoRSxs5sxELxu27M3UA=
 github.com/rancher/helm-controller v0.6.3 h1:tsqSXndQ7Ms8S0mBd2zWOcTV1tiZ4BUYkemYnijNXio=
 github.com/rancher/helm-controller v0.6.3/go.mod h1:ZylsxIMGNADRPRNW+NiBWhrwwks9vnKLQiCHYWb6Bi0=
+github.com/rancher/helm-controller v0.7.2 h1:noDPX08rnEoYhTGfgyLdEqG7DvihYbWJagbdS9OiA7s=
+github.com/rancher/helm-controller v0.7.2/go.mod h1:ZylsxIMGNADRPRNW+NiBWhrwwks9vnKLQiCHYWb6Bi0=
 github.com/rancher/k3s v1.18.3-0.20200807184958-026584e1f72b h1:yZII7+CujAlMvNjQkfH9cWA+m20oxtpcrBV7+rCXm3s=
 github.com/rancher/k3s v1.18.3-0.20200807184958-026584e1f72b/go.mod h1:7hMbRoSumpe4oNnvdhdUeOHwVPCDLFa4JZvMfiSBrXE=
+github.com/rancher/k3s v1.18.3-0.20200828235740-866dc94ceaac h1:4lQNQUb04pd7QqMIq3VDOeaHDhrd+LaDLVnFTHC2tH0=
+github.com/rancher/k3s v1.18.3-0.20200828235740-866dc94ceaac/go.mod h1:ZQKXfuwk6yqNABREesVtLjfSFXH1/iAmSQF0Him6TtU=
 github.com/rancher/kine v0.4.0 h1:1IhWy3TzjExG8xnj46eyUEWdzqNAD1WrgL4eEBKm6Uc=
 github.com/rancher/kine v0.4.0/go.mod h1:IImtCJ68AIkE+VY/kUI0NkyJL5q5WzO8QvMsSXqbrpA=
 github.com/rancher/kubernetes v1.18.4-k3s1 h1:eTwiRm2Gu8AUDgrda5FK8atZvkh6/3ZDoRFsxmnLvLc=
@@ -678,6 +692,12 @@ github.com/rancher/kubernetes/staging/src/k8s.io/sample-apiserver v1.18.4-k3s1/g
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/remotedialer v0.2.0 h1:xD7t3K6JYwTdAsxmGtTHQMkEkFgKouQ1foLxVW424Dc=
 github.com/rancher/remotedialer v0.2.0/go.mod h1:tkU8ZvrR5lRgaKWaX71nAy6daeqvPFx/lJEnbW7tXSI=
+github.com/rancher/rke2 v1.18.4-beta13.0.20200829224410-ca5f9bacfac5 h1:mewUvPpeZ1CGFOMxBEwyA9zd3ltG2MB5YDp8hxTsyxU=
+github.com/rancher/rke2 v1.18.4-beta13.0.20200829224410-ca5f9bacfac5/go.mod h1:2xK1WYc1SW2duN3rx/9WZqgioOEY/5MditdQ9e5qgZs=
+github.com/rancher/rke2 v1.18.4-beta14.0.20200831235141-a04621dcf45b h1:bFFcLmCXypeNLPbcXzndy9sY5Sh0Q0ve3N2XeySp1hQ=
+github.com/rancher/rke2 v1.18.4-beta14.0.20200831235141-a04621dcf45b/go.mod h1:2xK1WYc1SW2duN3rx/9WZqgioOEY/5MditdQ9e5qgZs=
+github.com/rancher/rke2 v1.18.4-beta16.0.20200901184550-9c11691024ae h1:3bAbBFtju5JrTgy/ieM8g27qG2vdDpEwzdNacC9Up7Y=
+github.com/rancher/rke2 v1.18.4-beta16.0.20200901184550-9c11691024ae/go.mod h1:2xK1WYc1SW2duN3rx/9WZqgioOEY/5MditdQ9e5qgZs=
 github.com/rancher/rke2 v1.18.4-beta2.0.20200810232625-bd90c4742874 h1:f5bAJniNwaHggoFjQFBfkVVExB68WvtTMq/llZdatAk=
 github.com/rancher/rke2 v1.18.4-beta2.0.20200810232625-bd90c4742874/go.mod h1:L2Zwi01UWXNVA4tb9epPdA8M+fxwKmXKLqMxCt18tuA=
 github.com/rancher/spur v0.0.0-20200617165101-8702c8e4ce7a h1:MIWeFYPZ/XXnskvcUqV8W89PFs+n/mr4YWMHeZuMpYs=
@@ -693,6 +713,8 @@ github.com/rancher/wrangler-api v0.6.0/go.mod h1:RbuDkPNHhxcXuwAbLVvEAhH+UPAh+MI
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=
 github.com/robfig/cron v1.1.0 h1:jk4/Hud3TTdcrJgUOBgsqrZBarcxl6ADIjSC2iniwLY=
 github.com/robfig/cron v1.1.0/go.mod h1:JGuDeoQd7Z6yL4zQhZ3OPEVHB7fL6Ka6skscFHfmt2k=
+github.com/robfig/cron/v3 v3.0.1 h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=
+github.com/robfig/cron/v3 v3.0.1/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
 github.com/rogpeppe/go-internal v1.1.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
@@ -985,6 +1007,7 @@ golang.org/x/tools v0.0.0-20200210192313-1ace956b0e17 h1:a/Fd23DJvg1CaeDH0dYHahE
 golang.org/x/tools v0.0.0-20200210192313-1ace956b0e17/go.mod h1:TB2adYChydJhpapKDTa4BR/hXlZSLoq2Wpct/0txZ28=
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 gonum.org/v1/gonum v0.0.0-20180816165407-929014505bf4/go.mod h1:Y+Yx5eoAFn32cQvJDxZx5Dpnq+c3wtXuadVZAcxbbBo=
 gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485/go.mod h1:2ltnJ7xHfj0zHS40VVPYEAAMTa3ZGguvHGBSJeRWqE0=
 gonum.org/v1/gonum v0.6.2 h1:4r+yNT0+8SWcOkXP+63H2zQbN+USnC73cjGUxnDF94Q=

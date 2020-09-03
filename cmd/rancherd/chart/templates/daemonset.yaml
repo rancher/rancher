@@ -1,0 +1,136 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: rancher
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: rancher
+  template:
+    metadata:
+      labels:
+        app: rancher
+        release: rancher
+    spec:
+      serviceAccountName: rancher
+{{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.imagePullSecrets | indent 6 }}
+{{- end }}
+      nodeSelector:
+        node-role.kubernetes.io/master: "true"
+      containers:
+      - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
+        name: rancher
+        ports:
+        - containerPort: 80
+{{- if not .Values.disableHostport }}
+          hostPort: {{ .Values.httpPort }}
+{{- end }}
+          protocol: TCP
+        - containerPort: 443
+{{- if not .Values.disableHostport }}
+          hostPort: {{ .Values.httpsPort }}
+{{- end }}
+          protocol: TCP
+        args:
+{{- if .Values.debug }}
+        - "--debug"
+{{- end }}
+{{- if .Values.publicCA }}
+        - "--no-cacerts"
+{{- end }}
+        - "--http-listen-port=80"
+        - "--https-listen-port=443"
+        - "--add-local={{ .Values.addLocal }}"
+        env:
+        - name: CATTLE_NAMESPACE
+          value: {{ .Release.Namespace }}
+        - name: CATTLE_PEER_SERVICE
+          value: rancher
+{{- if gt (int .Values.auditLog.level) 0 }}
+        - name: AUDIT_LEVEL
+          value: {{ .Values.auditLog.level | quote }}
+        - name: AUDIT_LOG_MAXAGE
+          value: {{ .Values.auditLog.maxAge | quote }}
+        - name: AUDIT_LOG_MAXBACKUP
+          value: {{ .Values.auditLog.maxBackup | quote }}
+        - name: AUDIT_LOG_MAXSIZE
+          value: {{ .Values.auditLog.maxSize | quote }}
+{{- end }}
+{{- if .Values.proxy }}
+        - name: HTTP_PROXY
+          value: {{ .Values.proxy }}
+        - name: HTTPS_PROXY
+          value: {{ .Values.proxy }}
+        - name: NO_PROXY
+          value: {{ .Values.noProxy }}
+{{- end }}
+{{- if .Values.systemDefaultRegistry }}
+        - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
+          value: {{ .Values.systemDefaultRegistry }}
+{{- end }}
+{{- if .Values.useBundledSystemChart }}
+        - name: CATTLE_SYSTEM_CATALOG
+          value: bundled
+{{- end }}
+{{- if .Values.extraEnv }}
+{{ toYaml .Values.extraEnv | indent 8}}
+{{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 30
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+        volumeMounts:
+        - mountPath: /etc/ssl/certs/ca-additional.pem
+          name: etc-ssl-additonal-ca
+          readOnly: true
+        - mountPath: /etc/rancher/ssl
+          name: etc-rancher
+          readOnly: true
+{{- if gt (int .Values.auditLog.level) 0 }}
+        - mountPath: /var/log/auditlog
+          name: audit-log
+{{- end }}
+{{- if gt (int .Values.auditLog.level) 0 }}
+      # Make audit logs available for Rancher log collector tools.
+      - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
+        name: rancher-audit-log
+        command: ["tail"]
+        args: ["-F", "/var/log/auditlog/rancher-api-audit.log"]
+        volumeMounts:
+        - mountPath: /var/log/auditlog
+          name: audit-log
+{{- end }}
+      volumes:
+      - name: etc-ssl-additonal-ca
+        hostPath:
+          type: FileOrCreate
+          path: /etc/ssl/certs/ca-additional.pem
+      - name: etc-rancher
+        hostPath:
+          type: DirectoryOrCreate
+          path: /etc/rancher/ssl
+{{- if gt (int .Values.auditLog.level) 0 }}
+  {{- if eq .Values.auditLog.destination "hostPath" }}
+      - name: audit-log
+        hostPath:
+          path: {{ .Values.auditLog.hostPath }}
+          type: DirectoryOrCreate
+  {{- else }}
+      - name: audit-log
+        emptyDir: {}
+  {{- end }}
+{{- end }}

@@ -10,7 +10,7 @@ cd $(dirname $0)/..
 cd ..
 mkdir -p build/chart
 rm -rf build/chart/rancher
-cp -rf chart build/chart/rancher
+cp -rf ${1} build/chart/rancher
 
 sed -i -e "s/%VERSION%/${CHART_VERSION}/g" build/chart/rancher/Chart.yaml
 sed -i -e "s/%APP_VERSION%/${VERSION}/g" build/chart/rancher/Chart.yaml
