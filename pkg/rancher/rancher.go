@@ -226,7 +226,7 @@ func setupAndValidationRESTConfig(ctx context.Context, restConfig *rest.Config) 
 }
 
 func localClusterEnabled(opts *Options) bool {
-	if opts.AddLocal == "true" || (opts.AddLocal == "auto" && !opts.Embedded) {
+	if opts.AddLocal == "true" || opts.AddLocal == "auto" {
 		return true
 	}
 	return false

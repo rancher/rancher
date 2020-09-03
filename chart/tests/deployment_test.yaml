@@ -9,11 +9,11 @@ tests:
   - contains:
       path: spec.template.spec.containers[0].args
       content: "--add-local=false"
-- it: should default to --add-local=auto
+- it: should default to --add-local=true
   asserts:
   - contains:
       path: spec.template.spec.containers[0].args
-      content: "--add-local=auto"
+      content: "--add-local=true"
 - it: should add CATTLE_SYSTEM_DEFAULT_REGISTRY to env and maintain default vars
   set:
     systemDefaultRegistry: "registry.example.com"

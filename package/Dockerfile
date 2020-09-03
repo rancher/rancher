@@ -117,7 +117,6 @@ ENV AUDIT_LOG_MAXAGE 10
 ENV AUDIT_LOG_MAXBACKUP 10
 ENV AUDIT_LOG_MAXSIZE 100
 ENV AUDIT_LEVEL 0
-VOLUME /var/log/auditlog
 
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
@@ -156,5 +155,8 @@ ENV ETCDCTL_API=3
 
 ENV SSL_CERT_DIR /etc/rancher/ssl
 VOLUME /var/lib/rancher
+VOLUME /var/lib/kubelet
+VOLUME /var/lib/cni
+VOLUME /var/log
 
 ENTRYPOINT ["entrypoint.sh"]

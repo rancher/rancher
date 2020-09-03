@@ -18,7 +18,7 @@ To get automated notifications of our latest release, you can watch the announce
 
 ## Quick Start
 
-    sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher
+    sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --privileged rancher/rancher
 
 Open your browser to https://localhost
 
