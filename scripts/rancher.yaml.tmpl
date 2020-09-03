@@ -1,3 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cattle-system
+---
 apiVersion: helm.cattle.io/v1
 kind: HelmChart
 metadata:
@@ -6,3 +11,4 @@ metadata:
 spec:
   targetNamespace: cattle-system
   chartContent: %{CHART_CONTENT}%
+---

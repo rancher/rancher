@@ -1,0 +1,15 @@
+apiVersion: v1
+name: rancher
+description: Internal rancher chart used by rancherd
+version: %VERSION%
+appVersion: %APP_VERSION%
+home: https://rancher.com
+icon: https://github.com/rancher/ui/blob/master/public/assets/images/logos/welcome-cow.svg
+keywords:
+  - rancher
+sources:
+  - https://github.com/rancher/rancher
+  - https://github.com/rancher/server-chart
+maintainers:
+  - name: Rancher Labs
+    email: charts@rancher.com

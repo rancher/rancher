@@ -1,0 +1,80 @@
+suite: Test Daemonset
+templates:
+- daemonset.yaml
+tests:
+- it: should set --add-local=false
+  set:
+    addLocal: "false"
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: "--add-local=false"
+- it: should default to --add-local=true
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: "--add-local=true"
+- it: should add CATTLE_SYSTEM_DEFAULT_REGISTRY to env and maintain default vars
+  set:
+    systemDefaultRegistry: "registry.example.com"
+    extraEnv:
+    - name: CATTLE_TLS_MIN_VERSION
+      value: "1.0"
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_SYSTEM_DEFAULT_REGISTRY
+        value: "registry.example.com"
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_TLS_MIN_VERSION
+        value: "1.0"
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_PEER_SERVICE
+        value: RELEASE-NAME-rancher
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_NAMESPACE
+        value: NAMESPACE
+- it: should Just have default env vars
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].env
+      value:
+      - name: CATTLE_NAMESPACE
+        value: NAMESPACE
+      - name: CATTLE_PEER_SERVICE
+        value: RELEASE-NAME-rancher
+- it: should default imagePullPolicy to IfNotPresent
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].imagePullPolicy
+      value: IfNotPresent
+- it: should override imagePullPolicy to Always
+  set:
+    rancherImagePullPolicy: Always
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].imagePullPolicy
+      value: Always
+- it: should not have command arg "--no-cacerts" when using private CA
+  set:
+    publicCA: "true"
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: "--no-cacerts"
+- it: should add CATTLE_SYSTEM_CATALOG to env
+  set:
+    useBundledSystemChart: true
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_SYSTEM_CATALOG
+        value: "bundled"

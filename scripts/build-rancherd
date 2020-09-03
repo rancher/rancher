@@ -21,7 +21,7 @@ if [ "$ARCH" = "amd64" ]; then
 fi
 
 cd ../..
-./scripts/chart/build
+./scripts/chart/build cmd/rancherd/chart
 ./scripts/chart/package
 
 sed -e "s|%{CHART_CONTENT}%|$(base64 -w0 ./bin/chart/*/rancher-${CHART_VERSION}.tgz)|g" ./scripts/rancher.yaml.tmpl > ./bin/rancher.yaml
