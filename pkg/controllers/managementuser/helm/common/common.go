@@ -61,7 +61,7 @@ type Label struct {
 //Marshal kustomization settings into YAML
 type Kustomization struct {
 	CommonLabel Label    `json:"commonLabels"`
-	Resrouces   []string `json:"resources"`
+	Resources   []string `json:"resources"`
 }
 
 func ParseExternalID(externalID string) (string, string, error) {
