@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (n *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
@@ -27,7 +27,7 @@ func (n *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, erro
 	if obj.Spec.UpdateTaintsFromAPI == nil {
 		return obj, nil
 	}
-	node, err := nodehelper.GetNodeForMachine(obj, n.nodeLister)
+	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
 	if err != nil {
 		return obj, err
 	}
@@ -45,7 +45,7 @@ func (n *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, erro
 			taintList = append(taintList, taintStr)
 		}
 		newNode.Spec.Taints = taintList
-		if _, err := n.nodeClient.Update(newNode); err != nil && !isDuplicate(err) {
+		if _, err := m.nodeClient.Update(newNode); err != nil && !isDuplicate(err) {
 			return obj, errors.Wrapf(err, "failed to update corev1.Node %s from v3.Node %s in node taint controller", node.Name, obj.Name)
 		} else if isDuplicate(err) {
 			// If the node has duplicated taints, we should skip the error and set desired taints to nil and stop trying again.
@@ -57,7 +57,7 @@ func (n *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, erro
 	}
 	newObj.Spec.DesiredNodeTaints = nil
 	newObj.Spec.UpdateTaintsFromAPI = nil
-	return n.machines.Update(newObj)
+	return m.machines.Update(newObj)
 }
 
 func isDuplicate(err error) bool {
