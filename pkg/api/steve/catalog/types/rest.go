@@ -44,22 +44,24 @@ type ChartUninstallAction struct {
 }
 
 type ChartUpgradeAction struct {
-	Atomic        bool                  `json:"atomic,omitempty"`
-	ChartName     string                `json:"chartName,omitempty"`
-	Version       string                `json:"version,omitempty"`
-	Namespace     string                `json:"namespace,omitempty"`
-	ReleaseName   string                `json:"releaseName,omitempty"`
-	Timeout       time.Duration         `json:"timeout,omitempty"`
-	Wait          bool                  `json:"wait,omitempty"`
-	DisableHooks  bool                  `json:"noHooks,omitempty"`
-	DryRun        bool                  `json:"dryRun,omitempty"`
-	Force         bool                  `json:"force,omitempty"`
-	ResetValues   bool                  `json:"resetValues,omitempty"`
-	ReuseValues   bool                  `json:"reuseValues,omitempty"`
-	MaxHistory    int                   `json:"historyMax,omitempty"`
-	CleanupOnFail bool                  `json:"cleanupOnFail,omitempty"`
-	Description   string                `json:"description,omitempty"`
-	Values        v3.MapStringInterface `json:"values,omitempty"`
+	Timeout       time.Duration  `json:"timeout,omitempty"`
+	Wait          bool           `json:"wait,omitempty"`
+	DisableHooks  bool           `json:"noHooks,omitempty"`
+	Force         bool           `json:"force,omitempty"`
+	MaxHistory    int            `json:"historyMax,omitempty"`
+	CleanupOnFail bool           `json:"cleanupOnFail,omitempty"`
+	Charts        []ChartUpgrade `json:"charts,omitempty"`
+}
+
+type ChartUpgrade struct {
+	ChartName   string                `json:"chartName,omitempty"`
+	Version     string                `json:"version,omitempty"`
+	Namespace   string                `json:"namespace,omitempty"`
+	ReleaseName string                `json:"releaseName,omitempty"`
+	Force       bool                  `json:"force,omitempty"`
+	ResetValues bool                  `json:"resetValues,omitempty"`
+	Description string                `json:"description,omitempty"`
+	Values      v3.MapStringInterface `json:"values,omitempty"`
 }
 
 type ChartRollbackAction struct {

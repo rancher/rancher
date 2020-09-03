@@ -41,6 +41,7 @@ func Register(ctx context.Context, server *steve.Server,
 func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUninstallAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgradeAction{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgrade{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartRollbackAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartInstallAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartInstall{}, nil)
