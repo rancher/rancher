@@ -21,6 +21,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,7 +32,6 @@ const (
 	HelmV2          = "rancher-helm"
 	HelmV3          = "helm_v3"
 	forceUpgradeStr = "--force"
-	maxHistory      = "10"
 )
 
 type HelmPath struct {
@@ -100,7 +100,7 @@ func SplitExternalID(externalID string) (string, string, string, string, string,
 func StartTiller(context context.Context, tempDirs *HelmPath, port, namespace string) error {
 	probePort := GenerateRandomPort()
 	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe-listen", ":"+probePort)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", tempDirs.KubeConfigInJail), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace), fmt.Sprintf("%s=%s", "TILLER_HISTORY_MAX", maxHistory)}
+	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", tempDirs.KubeConfigInJail), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace), fmt.Sprintf("%s=%s", "TILLER_HISTORY_MAX", settings.HelmMaxHistory.Get())}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -149,7 +149,7 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 			return err
 		}
 		logrus.Infof("Installing chart using helm version: %s", HelmV3)
-		commands = append([]string{"upgrade", "--install", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--kubeconfig", tempDirs.KubeConfigInJail, "--post-renderer", tempDirs.KustomizeInJail, "--history-max", maxHistory}, timeoutArgs...)
+		commands = append([]string{"upgrade", "--install", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--kubeconfig", tempDirs.KubeConfigInJail, "--post-renderer", tempDirs.KustomizeInJail, "--history-max", settings.HelmMaxHistory.Get()}, timeoutArgs...)
 	} else {
 		logrus.Infof("Installing chart using helm version: %s", HelmV2)
 		commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, timeoutArgs...)
