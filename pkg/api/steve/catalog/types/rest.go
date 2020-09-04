@@ -1,9 +1,8 @@
 package types
 
 import (
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ChartInstall struct {
@@ -18,11 +17,11 @@ type ChartInstall struct {
 }
 
 type ChartInstallAction struct {
-	DisableHooks             bool          `json:"noHooks,omitempty"`
-	Wait                     bool          `json:"wait,omitempty"`
-	Timeout                  time.Duration `json:"timeout,omitempty"`
-	SkipCRDs                 bool          `json:"skipCRDs,omitempty"`
-	DisableOpenAPIValidation bool          `json:"disableOpenAPIValidation,omitempty"`
+	DisableHooks             bool             `json:"noHooks,omitempty"`
+	Wait                     bool             `json:"wait,omitempty"`
+	Timeout                  *metav1.Duration `json:"timeout,omitempty"`
+	SkipCRDs                 bool             `json:"skipCRDs,omitempty"`
+	DisableOpenAPIValidation bool             `json:"disableOpenAPIValidation,omitempty"`
 
 	Charts []ChartInstall `json:"charts,omitempty"`
 }
@@ -36,21 +35,21 @@ type ChartInfo struct {
 }
 
 type ChartUninstallAction struct {
-	DisableHooks bool          `json:"noHooks,omitempty"`
-	DryRun       bool          `json:"dryRun,omitempty"`
-	KeepHistory  bool          `json:"keepHistory,omitempty"`
-	Timeout      time.Duration `json:"timeout,omitempty"`
-	Description  string        `json:"description,omitempty"`
+	DisableHooks bool             `json:"noHooks,omitempty"`
+	DryRun       bool             `json:"dryRun,omitempty"`
+	KeepHistory  bool             `json:"keepHistory,omitempty"`
+	Timeout      *metav1.Duration `json:"timeout,omitempty"`
+	Description  string           `json:"description,omitempty"`
 }
 
 type ChartUpgradeAction struct {
-	Timeout       time.Duration  `json:"timeout,omitempty"`
-	Wait          bool           `json:"wait,omitempty"`
-	DisableHooks  bool           `json:"noHooks,omitempty"`
-	Force         bool           `json:"force,omitempty"`
-	MaxHistory    int            `json:"historyMax,omitempty"`
-	CleanupOnFail bool           `json:"cleanupOnFail,omitempty"`
-	Charts        []ChartUpgrade `json:"charts,omitempty"`
+	Timeout       *metav1.Duration `json:"timeout,omitempty"`
+	Wait          bool             `json:"wait,omitempty"`
+	DisableHooks  bool             `json:"noHooks,omitempty"`
+	Force         bool             `json:"force,omitempty"`
+	MaxHistory    int              `json:"historyMax,omitempty"`
+	CleanupOnFail bool             `json:"cleanupOnFail,omitempty"`
+	Charts        []ChartUpgrade   `json:"charts,omitempty"`
 }
 
 type ChartUpgrade struct {
@@ -65,13 +64,13 @@ type ChartUpgrade struct {
 }
 
 type ChartRollbackAction struct {
-	Timeout       time.Duration `json:"timeout,omitempty"`
-	Wait          bool          `json:"wait,omitempty"`
-	DisableHooks  bool          `json:"noHooks,omitempty"`
-	DryRun        bool          `json:"dryRun,omitempty"`
-	Recreate      bool          `json:"recreatePods,omitempty"`
-	Force         bool          `json:"force,omitempty"`
-	CleanupOnFail bool          `json:"cleanupOnFail,omitempty"`
+	Timeout       *metav1.Duration `json:"timeout,omitempty"`
+	Wait          bool             `json:"wait,omitempty"`
+	DisableHooks  bool             `json:"noHooks,omitempty"`
+	DryRun        bool             `json:"dryRun,omitempty"`
+	Recreate      bool             `json:"recreatePods,omitempty"`
+	Force         bool             `json:"force,omitempty"`
+	CleanupOnFail bool             `json:"cleanupOnFail,omitempty"`
 }
 
 type ChartActionOutput struct {
