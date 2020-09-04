@@ -168,7 +168,7 @@ func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.N
 		logrus.Tracef("getMachine: looking up [%s] as node name in cluster [%s]", inNode.RequestedHostname, cluster.Name)
 		machine, err := t.machineLister.Get(cluster.Name, inNode.RequestedHostname)
 		if err == nil {
-			logrus.Debugf("Error looking up [%s] as node name in cluster [%s], error: %v", inNode.RequestedHostname, cluster.Name, err)
+			logrus.Debugf("Found [%s] as node name in cluster [%s], error: %v", inNode.RequestedHostname, cluster.Name, err)
 			return machine, nil
 		}
 
