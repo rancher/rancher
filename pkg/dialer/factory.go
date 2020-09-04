@@ -178,7 +178,8 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 	}
 
 	for _, node := range nodes {
-		if node.DeletionTimestamp == nil && v32.NodeConditionProvisioned.IsTrue(node) {
+		if node.DeletionTimestamp == nil && v32.NodeConditionProvisioned.IsTrue(node) &&
+			(node.Spec.ControlPlane || v32.NodeConditionReady.IsTrue(node)) {
 			logrus.Tracef("dialerFactory: using node [%s]/[%s] for nodeDialer",
 				node.Labels["management.cattle.io/nodename"], node.Name)
 			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
