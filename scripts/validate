@@ -16,3 +16,8 @@ go mod tidy
 
 echo Verifying modules
 go mod verify
+
+if [[ $(git diff --stat) != '' ]]; then
+  echo "Encountered dirty repo!"
+  exit 1
+fi
