@@ -270,29 +270,36 @@ func (s *Operations) getRollbackArgs(releaseNamespace, releaseName string, body 
 }
 
 func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
-	upgradeArgs := &types2.ChartUpgradeAction{}
+	var (
+		upgradeArgs = &types2.ChartUpgradeAction{}
+		commands    Commands
+	)
 	err := json.NewDecoder(body).Decode(upgradeArgs)
 	if err != nil {
 		return catalog.OperationStatus{}, nil, err
 	}
 
 	status := catalog.OperationStatus{
-		Action:    "upgrade",
-		Release:   upgradeArgs.ReleaseName,
-		Namespace: namespace(upgradeArgs.Namespace),
+		Action: "upgrade",
 	}
 
-	cmd, err := s.getChartCommand(repoNamespace, repoName, upgradeArgs.ChartName, upgradeArgs.Version, upgradeArgs.Values)
-	if err != nil {
-		return status, nil, err
-	}
-	cmd.ReleaseName = upgradeArgs.ReleaseName
-	cmd.Operation = "upgrade"
-	cmd.ArgObjects = []interface{}{
-		upgradeArgs,
+	for _, chartUpgrade := range upgradeArgs.Charts {
+		cmd, err := s.getChartCommand(repoNamespace, repoName, chartUpgrade.ChartName, chartUpgrade.Version, chartUpgrade.Values)
+		if err != nil {
+			return status, nil, err
+		}
+		cmd.ReleaseName = chartUpgrade.ReleaseName
+		cmd.Operation = "upgrade"
+		cmd.ArgObjects = []interface{}{
+			chartUpgrade,
+			upgradeArgs,
+		}
+
+		status.Release = chartUpgrade.ReleaseName
+		status.Namespace = namespace(chartUpgrade.Namespace)
 	}
 
-	return status, Commands{cmd}, nil
+	return status, commands, nil
 }
 
 type Command struct {
