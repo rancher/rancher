@@ -43,7 +43,7 @@ func Run(ctx context.Context) error {
 			r, err := rancher.New(ctx, c, &rancher.Options{
 				BindHost:        "127.0.0.1",
 				HTTPListenPort:  6080,
-				HTTPSListenPort: 6443,
+				HTTPSListenPort: 0,
 				AddLocal:        "true",
 				Agent:           true,
 			})
