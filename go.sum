@@ -929,6 +929,8 @@ github.com/rancher/lasso v0.0.0-20200513231433-d0ce66327a25/go.mod h1:6Dw19z1lDI
 github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB2YjTVagmu4NkhBvbE8nBcGykHRENH6arI=
 github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0 h1:ng7i8n0kzTGnXyvVK+nkb+sLm06BBNdsbd2aqJAP3lM=
 github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
+github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b h1:DQLpu44dsR+2qYvg1wyYadk108MWMHUOqvb2z4274Vs=
+github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
