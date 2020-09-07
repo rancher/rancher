@@ -349,6 +349,10 @@ func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, s
 		newRoles = append(newRoles, "worker")
 	}
 
+	if len(newRoles) == 0 {
+		newRoles = []string{"worker"}
+	}
+
 	toUpdate.Status.NodeConfig.Role = newRoles
 	if simulate {
 		return toUpdate, nil
