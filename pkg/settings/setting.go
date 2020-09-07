@@ -84,7 +84,8 @@ var (
 	InitialDockerRootDir              = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.5")
-	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
+	IgnoreNodeName                    = NewSetting("ignore-node-name", "")             // nodes to ignore when syncing v1.node to v3.node
+	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "") // fleetWorkspaceName to assign to clusters with none
 )
 
 func init() {
