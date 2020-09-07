@@ -57,6 +57,7 @@ type Interface interface {
 	DynamicSchema() DynamicSchemaController
 	EtcdBackup() EtcdBackupController
 	Feature() FeatureController
+	FleetWorkspace() FleetWorkspaceController
 	FreeIpaProvider() FreeIpaProviderController
 	GithubProvider() GithubProviderController
 	GlobalDns() GlobalDnsController
@@ -195,6 +196,9 @@ func (c *version) EtcdBackup() EtcdBackupController {
 }
 func (c *version) Feature() FeatureController {
 	return NewFeatureController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Feature"}, "features", false, c.controllerFactory)
+}
+func (c *version) FleetWorkspace() FleetWorkspaceController {
+	return NewFleetWorkspaceController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "FleetWorkspace"}, "fleetworkspaces", false, c.controllerFactory)
 }
 func (c *version) FreeIpaProvider() FreeIpaProviderController {
 	return NewFreeIpaProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "FreeIpaProvider"}, "freeipaproviders", false, c.controllerFactory)
