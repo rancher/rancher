@@ -15,9 +15,6 @@ func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) 
 	}
 	return catalog.Register(ctx,
 		server,
-		config.Core.Secret(),
-		config.Core.Pod(),
-		config.Core.ConfigMap().Cache(),
-		config.Catalog.ClusterRepo().Cache(),
-		config.Catalog)
+		config.HelmOperations,
+		config.CatalogContentManager)
 }

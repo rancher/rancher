@@ -209,8 +209,8 @@ func migrateETCDlocal() {
 	}
 
 	// Purposely ignoring errors
-	os.Mkdir("management-state", 0700)
-	os.Symlink("../etcd", "management-state/etcd")
+	_ = os.Mkdir("management-state", 0700)
+	_ = os.Symlink("../etcd", "management-state/etcd")
 }
 
 func run(cli *cli.Context, cfg rancher.Options) error {
@@ -228,12 +228,7 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 
 	os.Unsetenv("KUBECONFIG")
 
-	restConfig, err := clientConfig.ClientConfig()
-	if err != nil {
-		return nil
-	}
-
-	server, err := rancher.New(ctx, restConfig, &cfg)
+	server, err := rancher.New(ctx, clientConfig, &cfg)
 	if err != nil {
 		return err
 	}

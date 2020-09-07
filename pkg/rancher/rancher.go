@@ -28,6 +28,7 @@ import (
 	"github.com/rancher/wrangler/pkg/k8scheck"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type Options struct {
@@ -61,7 +62,7 @@ type Rancher struct {
 	opts       *Options
 }
 
-func New(ctx context.Context, restConfig *rest.Config, opts *Options) (*Rancher, error) {
+func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options) (*Rancher, error) {
 	var (
 		authServer *auth.Server
 	)
@@ -70,12 +71,17 @@ func New(ctx context.Context, restConfig *rest.Config, opts *Options) (*Rancher,
 		opts = &Options{}
 	}
 
-	restConfig, err := setupAndValidationRESTConfig(ctx, restConfig)
+	restConfig, err := clientConfg.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	wranglerContext, err := wrangler.NewContext(ctx, restConfig)
+	restConfig, err = setupAndValidationRESTConfig(ctx, restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
 	}
