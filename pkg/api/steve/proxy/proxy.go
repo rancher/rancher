@@ -99,6 +99,10 @@ func routeToShellProxy(localSupport bool, localCluster http.Handler, mux *gmux.R
 		cluster := vars["clusterID"]
 		if cluster == "local" {
 			if localSupport {
+				q := r.URL.Query()
+				q.Set("link", "shell")
+				r.URL.RawQuery = q.Encode()
+				r.URL.Path = "/v1/management.cattle.io.clusters/local"
 				localCluster.ServeHTTP(rw, r)
 			} else {
 				mux.NotFoundHandler.ServeHTTP(rw, r)
