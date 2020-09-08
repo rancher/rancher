@@ -39,3 +39,20 @@ if [ ! -d build/system-charts ]; then
     git clone --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts build/system-charts
 fi
 TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts $IMAGE $AGENT_IMAGE
+
+if type makeself.sh rsync && [ -e ./rancherd ]; then
+    mkdir -p ./build/installer/bin
+    rsync -a ./rancherd ./build/installer/bin/
+    rsync -a ../cmd/rancherd/installer/ ./build/installer/
+    makeself.sh \
+        --needroot \
+        --nox11 \
+        --sha256 \
+        --target /usr/local \
+        "./build/installer" \
+        "./rancherd-installer.linux-${ARCH}.run" \
+        "rancherd ${VERSION}" \
+        "env" \
+        INSTALL_RANCHERD_ROOT="." \
+        sh ./share/rancherd/scripts/rke2-install.sh
+fi

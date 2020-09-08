@@ -4,13 +4,13 @@ import (
 	"os"
 
 	"github.com/rancher/rke2/pkg/cli/cmds"
-	"github.com/rancher/spur/cli"
 	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 func main() {
 	app := cmds.NewApp()
-	app.Commands = []*cli.Command{
+	app.Commands = []cli.Command{
 		cmds.NewServerCommand(),
 		cmds.NewAgentCommand(),
 	}

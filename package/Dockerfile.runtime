@@ -1,3 +1,3 @@
-ARG RKE2_VERSION=v1.18.4-beta16-rke2
+ARG RKE2_VERSION=v1.18.4-beta17-rke2
 FROM rancher/rke2-runtime:${RKE2_VERSION}
 COPY rancher.yaml /charts/
