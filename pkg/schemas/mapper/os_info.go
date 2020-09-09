@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type OSInfo struct {
@@ -15,16 +16,16 @@ func (o OSInfo) FromInternal(data map[string]interface{}) {
 	if data == nil {
 		return
 	}
-	cpuInfo := map[string]interface{}{
-		"count": values.GetValueN(data, "capacity", "cpu"),
+	cpuInfo := map[string]interface{}{}
+	cpuNum, err := resource.ParseQuantity(convert.ToString(values.GetValueN(data, "capacity", "cpu")))
+	if err == nil {
+		cpuInfo["count"] = cpuNum.Value()
 	}
 
-	kib := strings.TrimSuffix(convert.ToString(values.GetValueN(data, "capacity", "memory")), "Ki")
 	memoryInfo := map[string]interface{}{}
-
-	kibNum, err := convert.ToNumber(kib)
+	kibNum, err := resource.ParseQuantity(convert.ToString(values.GetValueN(data, "capacity", "memory")))
 	if err == nil {
-		memoryInfo["memTotalKiB"] = kibNum
+		memoryInfo["memTotalKiB"] = kibNum.Value() / 1024
 	}
 
 	osInfo := map[string]interface{}{
