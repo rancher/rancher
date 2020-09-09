@@ -26,6 +26,7 @@ const (
 	ContainerFieldRestartCount             = "restartCount"
 	ContainerFieldRunAsGroup               = "runAsGroup"
 	ContainerFieldRunAsNonRoot             = "runAsNonRoot"
+	ContainerFieldSeccompProfile           = "seccompProfile"
 	ContainerFieldStartupProbe             = "startupProbe"
 	ContainerFieldState                    = "state"
 	ContainerFieldStdin                    = "stdin"
@@ -67,6 +68,7 @@ type Container struct {
 	RestartCount             int64                          `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
 	RunAsGroup               *int64                         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot             *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	SeccompProfile           *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	StartupProbe             *Probe                         `json:"startupProbe,omitempty" yaml:"startupProbe,omitempty"`
 	State                    string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Stdin                    bool                           `json:"stdin,omitempty" yaml:"stdin,omitempty"`

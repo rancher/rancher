@@ -43,8 +43,10 @@ const (
 	CronJobFieldRunAsNonRoot                  = "runAsNonRoot"
 	CronJobFieldRuntimeClassName              = "runtimeClassName"
 	CronJobFieldScheduling                    = "scheduling"
+	CronJobFieldSeccompProfile                = "seccompProfile"
 	CronJobFieldSelector                      = "selector"
 	CronJobFieldServiceAccountName            = "serviceAccountName"
+	CronJobFieldSetHostnameAsFQDN             = "setHostnameAsFQDN"
 	CronJobFieldShareProcessNamespace         = "shareProcessNamespace"
 	CronJobFieldState                         = "state"
 	CronJobFieldSubdomain                     = "subdomain"
@@ -102,8 +104,10 @@ type CronJob struct {
 	RunAsNonRoot                  *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                         `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
+	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      *LabelSelector                 `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	SetHostnameAsFQDN             *bool                          `json:"setHostnameAsFQDN,omitempty" yaml:"setHostnameAsFQDN,omitempty"`
 	ShareProcessNamespace         *bool                          `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`

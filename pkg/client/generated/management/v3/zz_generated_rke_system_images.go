@@ -9,6 +9,7 @@ const (
 	RKESystemImagesFieldCalicoFlexVol             = "calicoFlexVol"
 	RKESystemImagesFieldCalicoNode                = "calicoNode"
 	RKESystemImagesFieldCanalCNI                  = "canalCni"
+	RKESystemImagesFieldCanalControllers          = "canalControllers"
 	RKESystemImagesFieldCanalFlannel              = "canalFlannel"
 	RKESystemImagesFieldCanalFlexVol              = "canalFlexVol"
 	RKESystemImagesFieldCanalNode                 = "canalNode"
@@ -43,6 +44,7 @@ type RKESystemImages struct {
 	CalicoFlexVol             string `json:"calicoFlexVol,omitempty" yaml:"calicoFlexVol,omitempty"`
 	CalicoNode                string `json:"calicoNode,omitempty" yaml:"calicoNode,omitempty"`
 	CanalCNI                  string `json:"canalCni,omitempty" yaml:"canalCni,omitempty"`
+	CanalControllers          string `json:"canalControllers,omitempty" yaml:"canalControllers,omitempty"`
 	CanalFlannel              string `json:"canalFlannel,omitempty" yaml:"canalFlannel,omitempty"`
 	CanalFlexVol              string `json:"canalFlexVol,omitempty" yaml:"canalFlexVol,omitempty"`
 	CanalNode                 string `json:"canalNode,omitempty" yaml:"canalNode,omitempty"`

@@ -11,6 +11,7 @@ const (
 	VolumeFieldConfigMap             = "configMap"
 	VolumeFieldDownwardAPI           = "downwardAPI"
 	VolumeFieldEmptyDir              = "emptyDir"
+	VolumeFieldEphemeral             = "ephemeral"
 	VolumeFieldFC                    = "fc"
 	VolumeFieldFlexVolume            = "flexVolume"
 	VolumeFieldFlocker               = "flocker"
@@ -43,6 +44,7 @@ type Volume struct {
 	ConfigMap             *ConfigMapVolumeSource             `json:"configMap,omitempty" yaml:"configMap,omitempty"`
 	DownwardAPI           *DownwardAPIVolumeSource           `json:"downwardAPI,omitempty" yaml:"downwardAPI,omitempty"`
 	EmptyDir              *EmptyDirVolumeSource              `json:"emptyDir,omitempty" yaml:"emptyDir,omitempty"`
+	Ephemeral             *EphemeralVolumeSource             `json:"ephemeral,omitempty" yaml:"ephemeral,omitempty"`
 	FC                    *FCVolumeSource                    `json:"fc,omitempty" yaml:"fc,omitempty"`
 	FlexVolume            *FlexVolumeSource                  `json:"flexVolume,omitempty" yaml:"flexVolume,omitempty"`
 	Flocker               *FlockerVolumeSource               `json:"flocker,omitempty" yaml:"flocker,omitempty"`
