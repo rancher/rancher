@@ -44,10 +44,17 @@ def test_delete_keypair():
 
 
 def test_deploy_rancher_server():
-    RANCHER_SERVER_CMD = \
-        'sudo docker run -d --name="rancher-server" ' \
-        '--restart=unless-stopped -p 80:80 -p 443:443  ' \
-        'rancher/rancher'
+    if "v2.5" in  RANCHER_SERVER_VERSION or "master" in RANCHER_SERVER_VERSION:
+        RANCHER_SERVER_CMD = \
+            'sudo docker run -d --privileged --name="rancher-server" ' \
+            '--restart=unless-stopped -p 80:80 -p 443:443  ' \
+            'rancher/rancher'
+    else:
+        RANCHER_SERVER_CMD = \
+            'sudo docker run -d --name="rancher-server" ' \
+            '--restart=unless-stopped -p 80:80 -p 443:443  ' \
+            'rancher/rancher'
+    print(RANCHER_SERVER_CMD)
     RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION
     aws_nodes = AmazonWebServices().create_multiple_nodes(
         1, random_test_name("testsa" + HOST_NAME))
