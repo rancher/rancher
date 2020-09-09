@@ -19,6 +19,7 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
+	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/pkg/data/convert"
@@ -58,7 +59,7 @@ func NewOperations(
 	return &Operations{
 		cg:             cg,
 		contentManager: contentManager,
-		namespace:      "dashboard-catalog",
+		namespace:      namespaces.System,
 		Impersonator:   podimpersonation.New("helm-op", cg, time.Hour),
 		pods:           pods,
 		clusterRepos:   catalog.ClusterRepo(),
