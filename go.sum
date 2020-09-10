@@ -976,8 +976,8 @@ github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9 h1:Vg2dL
 github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
 github.com/rancher/eks-operator v0.1.0-rc22 h1:wPX+aP/kJ3q9wA7qiZ8jEDbRZ6PV6cWnodemKbWXmcw=
 github.com/rancher/eks-operator v0.1.0-rc22/go.mod h1:TrTF54+K2X6QLhVFspIfawYcPnVNLSIBrgCvpE1BiqM=
-github.com/rancher/kubernetes-provider-detector v0.0.0-20200807181951-690274ab1fb3 h1:A6ZJlwasEPwXhw1zI+68QVEPM9LzkXwCVlT1n1oyXe4=
-github.com/rancher/kubernetes-provider-detector v0.0.0-20200807181951-690274ab1fb3/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
+github.com/rancher/kubernetes-provider-detector v0.1.0 h1:lQl16AX7UkHPKMaam+Aubu90nvovyzSbbE3SOBBXdbQ=
+github.com/rancher/kubernetes-provider-detector v0.1.0/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
 github.com/rancher/lasso v0.0.0-20200427171700-e0509f89f319/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
 github.com/rancher/lasso v0.0.0-20200513231433-d0ce66327a25/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
 github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB2YjTVagmu4NkhBvbE8nBcGykHRENH6arI=
