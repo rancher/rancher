@@ -16,7 +16,7 @@ replace (
 
 	k8s.io/api => k8s.io/api v0.19.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
-	k8s.io/apimachinery => k8s.io/apimachinery v0.19.0
+	k8s.io/apimachinery => github.com/rancher/apimachinery v0.19.0-rancher1
 	k8s.io/apiserver => k8s.io/apiserver v0.19.0
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.19.0
 	k8s.io/client-go => github.com/rancher/client-go v1.19.0-rancher.1
