@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -38,6 +39,10 @@ import (
 
 const (
 	helmDataPath = "/home/shell/helm"
+)
+
+var (
+	badChars = regexp.MustCompile("[^-.0-9a-zA-Z]")
 )
 
 type Operations struct {
@@ -298,6 +303,8 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 
 		status.Release = chartUpgrade.ReleaseName
 		status.Namespace = namespace(chartUpgrade.Namespace)
+
+		commands = append(commands, cmd)
 	}
 
 	return status, commands, nil
@@ -425,6 +432,10 @@ func (c Command) renderArgs() ([]string, error) {
 	return append([]string{"--debug", c.Operation}, args...), nil
 }
 
+func sanitizeVersion(chartVersion string) string {
+	return badChars.ReplaceAllString(chartVersion, "-")
+}
+
 func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, values map[string]interface{}) (Command, error) {
 	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion)
 	if err != nil {
@@ -437,8 +448,8 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	}
 
 	c := Command{
-		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, chartVersion),
-		ChartFile:  fmt.Sprintf("%s-%s.tgz", chartName, chartVersion),
+		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, sanitizeVersion(chartVersion)),
+		ChartFile:  fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)),
 		Chart:      chartData,
 	}
 

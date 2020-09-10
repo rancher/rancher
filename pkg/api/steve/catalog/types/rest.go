@@ -48,6 +48,7 @@ type ChartUpgradeAction struct {
 	DisableHooks  bool             `json:"noHooks,omitempty"`
 	Force         bool             `json:"force,omitempty"`
 	MaxHistory    int              `json:"historyMax,omitempty"`
+	Install       bool             `json:"install,omitempty"`
 	CleanupOnFail bool             `json:"cleanupOnFail,omitempty"`
 	Charts        []ChartUpgrade   `json:"charts,omitempty"`
 }
