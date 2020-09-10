@@ -2,10 +2,8 @@ package proxy
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -77,20 +75,6 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 			mux.ServeHTTP(rw, req)
 		})
 	}, nil
-}
-
-func routeToShellLink(rw http.ResponseWriter, req *http.Request, next http.Handler) {
-	clusterID := gmux.Vars(req)["id"]
-	if clusterID == "local" {
-		req.URL.RawPath = "/v1/management.cattle.io.clusters/local"
-	} else {
-		req.URL.RawPath = fmt.Sprintf("/k8s/clusters/%s/v1/management.cattle.io.clusters/local", clusterID)
-	}
-	req.URL.Path = req.URL.RawPath
-	req.URL.RawQuery = url.Values{
-		"link": []string{"shell"},
-	}.Encode()
-	next.ServeHTTP(rw, req)
 }
 
 func routeToShellProxy(localSupport bool, localCluster http.Handler, mux *gmux.Router, proxyHandler *Handler) func(rw http.ResponseWriter, r *http.Request) {
@@ -193,9 +177,9 @@ func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {
 		// connect
 		Host:      "http://" + clusterID,
 		UserAgent: rest.DefaultKubernetesUserAgent() + " cluster " + clusterID,
-		// Ensure this function pointer does not change per invocation so that we don't
-		// blow out the cache.
-		Dial: h.dialer,
+		Transport: &http.Transport{
+			DialContext: h.dialer,
+		},
 	}
 
 	next := proxy.ImpersonatingHandler(prefix, cfg)
