@@ -20,6 +20,7 @@ const (
 	ClusterSpecFieldEnableClusterAlerting               = "enableClusterAlerting"
 	ClusterSpecFieldEnableClusterMonitoring             = "enableClusterMonitoring"
 	ClusterSpecFieldEnableNetworkPolicy                 = "enableNetworkPolicy"
+	ClusterSpecFieldFleetWorkspaceName                  = "fleetWorkspaceName"
 	ClusterSpecFieldGenericEngineConfig                 = "genericEngineConfig"
 	ClusterSpecFieldGoogleKubernetesEngineConfig        = "googleKubernetesEngineConfig"
 	ClusterSpecFieldImportedConfig                      = "importedConfig"
@@ -51,6 +52,7 @@ type ClusterSpec struct {
 	EnableClusterAlerting               bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
 	EnableClusterMonitoring             bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                 *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
+	FleetWorkspaceName                  string                         `json:"fleetWorkspaceName,omitempty" yaml:"fleetWorkspaceName,omitempty"`
 	GenericEngineConfig                 map[string]interface{}         `json:"genericEngineConfig,omitempty" yaml:"genericEngineConfig,omitempty"`
 	GoogleKubernetesEngineConfig        map[string]interface{}         `json:"googleKubernetesEngineConfig,omitempty" yaml:"googleKubernetesEngineConfig,omitempty"`
 	ImportedConfig                      *ImportedConfig                `json:"importedConfig,omitempty" yaml:"importedConfig,omitempty"`

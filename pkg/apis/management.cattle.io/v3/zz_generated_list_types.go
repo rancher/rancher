@@ -468,6 +468,23 @@ func NewFeature(namespace, name string, obj Feature) *Feature {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// FleetWorkspaceList is a list of FleetWorkspace resources
+type FleetWorkspaceList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []FleetWorkspace `json:"items"`
+}
+
+func NewFleetWorkspace(namespace, name string, obj FleetWorkspace) *FleetWorkspace {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("FleetWorkspace").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // FreeIpaProviderList is a list of FreeIpaProvider resources
 type FreeIpaProviderList struct {
 	metav1.TypeMeta `json:",inline"`

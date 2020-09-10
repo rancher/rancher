@@ -55,6 +55,7 @@ var (
 	DynamicSchemaResourceName                           = "dynamicschemas"
 	EtcdBackupResourceName                              = "etcdbackups"
 	FeatureResourceName                                 = "features"
+	FleetWorkspaceResourceName                          = "fleetworkspaces"
 	FreeIpaProviderResourceName                         = "freeipaproviders"
 	GithubProviderResourceName                          = "githubproviders"
 	GlobalDnsResourceName                               = "globaldnses"
@@ -178,6 +179,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&EtcdBackupList{},
 		&Feature{},
 		&FeatureList{},
+		&FleetWorkspace{},
+		&FleetWorkspaceList{},
 		&FreeIpaProvider{},
 		&FreeIpaProviderList{},
 		&GithubProvider{},
