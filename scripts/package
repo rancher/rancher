@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+extract_latest_version_tgz() {
+    # Takes in a path to a chart's directory, finds the latest version's tgz and extracts it
+    # All crd tgz are ignored
+    # Max depth is set to prevent extracting a tgz contained within another tgz, which is the case for charts containing a helm repo
+    LATEST_VERSION_TGZ_PATH=$(find $1 -maxdepth 1 -name "*.tgz" ! -name "*crd*.tgz" -print | sort -Vr | head -1)
+    if [[ $LATEST_VERSION_TGZ_PATH ]]; then
+        tar -xvf $LATEST_VERSION_TGZ_PATH -C $(dirname $LATEST_VERSION_TGZ_PATH)
+    fi
+}
+export -f extract_latest_version_tgz
+
 source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
@@ -38,4 +49,15 @@ if [ ! -d build/system-charts ]; then
     mkdir -p build
     git clone --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts build/system-charts
 fi
-TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts $IMAGE $AGENT_IMAGE
+
+if [ ! -d build/charts ]; then
+    git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts build/charts
+
+    # Iterate through chart directories and execute callback to extract latest version tgz
+    find build/charts/assets -type d -maxdepth 1 -exec bash -c 'extract_latest_version_tgz {}' \;
+
+    # Remove index to force building a virtual index like system charts
+    rm -f build/charts/index.yaml build/charts/assets/index.yaml
+fi
+
+TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts build/charts $IMAGE $AGENT_IMAGE
