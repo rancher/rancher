@@ -39,15 +39,6 @@ const (
 	helmDataPath = "/home/shell/helm"
 )
 
-var (
-	paramScheme = runtime.NewScheme()
-	paramCodec  = runtime.NewParameterCodec(paramScheme)
-)
-
-func init() {
-	metav1.AddToGroupVersion(paramScheme, metav1.SchemeGroupVersion)
-}
-
 type Operations struct {
 	namespace      string
 	contentManager *content.Manager
@@ -123,7 +114,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 }
 
 func decodeParams(req *http.Request, target runtime.Object) error {
-	return paramCodec.DecodeParameters(req.URL.Query(), corev1.SchemeGroupVersion, target)
+	return scheme.ParameterCodec.DecodeParameters(req.URL.Query(), corev1.SchemeGroupVersion, target)
 }
 
 func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, pod *v1.Pod, client kubernetes.Interface) error {

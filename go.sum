@@ -967,6 +967,8 @@ github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40T
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
 github.com/quobyte/api v0.1.2/go.mod h1:jL7lIHrmqQ7yh05OJ+eEEdHr0u/kmT1Ff9iHd+4H6VI=
 github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4bJ1FwuaBZ6dt1VcDX5/O662mwR8GWqS4l68H6hkoYQ=
+github.com/rancher/apimachinery v0.19.0-rancher1 h1:8eD7WxSeGk6UmvQptygPJ59jhRXomxua9OwiSCOghNM=
+github.com/rancher/apimachinery v0.19.0-rancher1/go.mod h1:DnPGDnARWFvYa3pMHgSxtbZb7gpzzAZ1pTfaUNDVlmA=
 github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48 h1:XmhN3O0azgyrMRTX3v/MEHfb5BSjdbRUYJijiJ7Gs5s=
 github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/client-go v1.19.0-rancher.1 h1:O6NXYfWsavvTgSQP5/xchVjxG+34hWWMVp31fF+91C8=
@@ -1558,8 +1560,6 @@ k8s.io/api v0.19.0 h1:XyrFIJqTYZJ2DU7FBE/bSPz7b1HvbVBuBf07oeo6eTc=
 k8s.io/api v0.19.0/go.mod h1:I1K45XlvTrDjmj5LoM5LuP/KYrhWbjUKT/SoPG0qTjw=
 k8s.io/apiextensions-apiserver v0.19.0 h1:jlY13lvZp+0p9fRX2khHFdiT9PYzT7zUrANz6R1NKtY=
 k8s.io/apiextensions-apiserver v0.19.0/go.mod h1:znfQxNpjqz/ZehvbfMg5N6fvBJW5Lqu5HVLTJQdP4Fs=
-k8s.io/apimachinery v0.19.0 h1:gjKnAda/HZp5k4xQYjL0K/Yb66IvNqjthCb03QlKpaQ=
-k8s.io/apimachinery v0.19.0/go.mod h1:DnPGDnARWFvYa3pMHgSxtbZb7gpzzAZ1pTfaUNDVlmA=
 k8s.io/apiserver v0.19.0 h1:jLhrL06wGAADbLUUQm8glSLnAGP6c7y5R3p19grkBoY=
 k8s.io/apiserver v0.19.0/go.mod h1:XvzqavYj73931x7FLtyagh8WibHpePJ1QwWrSJs2CLk=
 k8s.io/cli-runtime v0.19.0 h1:wLe+osHSqcItyS3MYQXVyGFa54fppORVA8Jn7DBGSWw=
