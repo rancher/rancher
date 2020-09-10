@@ -92,7 +92,7 @@ func getAugmentedKubeletProcesses() map[string]rketypes.Process {
 		},
 	}
 
-	return AugmentProcesses("token", processes, true, false, "dummynode", &cluster)
+	return AugmentProcesses("token", processes, true, "dummynode", &cluster)
 }
 
 func getCommandFromProcesses(processes map[string]rketypes.Process) map[string]struct{} {
