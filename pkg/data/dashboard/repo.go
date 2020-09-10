@@ -14,14 +14,14 @@ import (
 )
 
 var (
-	packagedRepos = []string{
-		"rancher-charts",
-		"rancher-partner-charts",
+	packagedRepos = map[string]string{
+		"rancher-charts":         settings.ChartDefaultBranch.Get(),
+		"rancher-partner-charts": settings.PartnerChartDefaultBranch.Get(),
 	}
 	prefix = "rancher-"
 )
 
-func addRepo(wrangler *wrangler.Context, repoName string) error {
+func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 	repo, err := wrangler.Catalog.ClusterRepo().Get(repoName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = wrangler.Catalog.ClusterRepo().Create(&v1.ClusterRepo{
@@ -30,11 +30,11 @@ func addRepo(wrangler *wrangler.Context, repoName string) error {
 			},
 			Spec: v1.RepoSpec{
 				GitRepo:   "https://git.rancher.io/" + strings.TrimPrefix(repoName, prefix),
-				GitBranch: settings.ChartDefaultBranch.Get(),
+				GitBranch: branchName,
 			},
 		})
-	} else if err == nil && repo.Spec.GitBranch != settings.ChartDefaultBranch.Get() {
-		repo.Spec.GitBranch = settings.ChartDefaultBranch.Get()
+	} else if err == nil && repo.Spec.GitBranch != packagedRepos[repoName] {
+		repo.Spec.GitBranch = packagedRepos[repoName]
 		_, err = wrangler.Catalog.ClusterRepo().Update(repo)
 	}
 
@@ -42,8 +42,8 @@ func addRepo(wrangler *wrangler.Context, repoName string) error {
 }
 
 func addRepos(ctx context.Context, wrangler *wrangler.Context) error {
-	for _, repoName := range packagedRepos {
-		if err := addRepo(wrangler, repoName); err != nil {
+	for repoName, branchName := range packagedRepos {
+		if err := addRepo(wrangler, repoName, branchName); err != nil {
 			return err
 		}
 	}
