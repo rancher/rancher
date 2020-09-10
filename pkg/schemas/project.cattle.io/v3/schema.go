@@ -772,8 +772,6 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1.VolumeMount{}, struct {
 			MountPath string `json:"mountPath" norman:"required"`
 		}{}).
-		MustImport(&Version, v1.Volume{}, struct {
-		}{}).
 		MustImport(&Version, v1.PersistentVolumeSpec{}, struct {
 			StorageClassName *string `json:"storageClassName,omitempty" norman:"type=reference[/v3/cluster/storageClass]"`
 		}{}).
@@ -781,6 +779,8 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 			AccessModes      []string `json:"accessModes,omitempty" norman:"type=array[enum],options=ReadWriteOnce|ReadOnlyMany|ReadWriteMany"`
 			VolumeName       string   `json:"volumeName,omitempty" norman:"type=reference[/v3/cluster/persistentVolume]"`
 			StorageClassName *string  `json:"storageClassName,omitempty" norman:"type=reference[/v3/cluster/storageClass]"`
+		}{}).
+		MustImport(&Version, v1.Volume{}, struct {
 		}{}).
 		MustImportAndCustomize(&Version, v1.PersistentVolumeClaim{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("name", func(field types.Field) types.Field {

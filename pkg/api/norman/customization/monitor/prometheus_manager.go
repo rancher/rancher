@@ -55,7 +55,7 @@ func NewPrometheusQuery(ctx context.Context, clusterName, authToken, svcNamespac
 }
 
 func (q *Queries) QueryRange(query *PrometheusQuery) ([]*TimeSeries, error) {
-	value, err := q.api.QueryRange(q.ctx, query.Expr, query.getRange())
+	value, _, err := q.api.QueryRange(q.ctx, query.Expr, query.getRange())
 	if err != nil {
 		return nil, fmt.Errorf("query range failed, %v, expression: %s", err, query.Expr)
 	}
@@ -68,7 +68,7 @@ func (q *Queries) QueryRange(query *PrometheusQuery) ([]*TimeSeries, error) {
 
 func (q *Queries) Query(query *PrometheusQuery) ([]*TimeSeries, error) {
 
-	value, err := q.api.Query(q.ctx, query.Expr, time.Now())
+	value, _, err := q.api.Query(q.ctx, query.Expr, time.Now())
 	if err != nil {
 		return nil, fmt.Errorf("query range failed, %v, expression: %s", err, query.Expr)
 	}
@@ -126,7 +126,7 @@ func (q *Queries) Do(querys []*PrometheusQuery) (map[string][]*TimeSeries, error
 }
 
 func (q *Queries) GetLabelValues(labelName string) ([]string, error) {
-	value, err := q.api.LabelValues(q.ctx, labelName)
+	value, _, err := q.api.LabelValues(q.ctx, labelName, time.Now().Add(-time.Hour), time.Now())
 	if err != nil {
 		return nil, fmt.Errorf("get prometheus metric list failed, %v", err)
 	}

@@ -2,7 +2,6 @@ package kubernetesprovider
 
 import (
 	"context"
-	"errors"
 
 	detector "github.com/rancher/kubernetes-provider-detector"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -57,8 +56,7 @@ func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error)
 	}
 
 	provider, err := detector.DetectProvider(h.ctx, client)
-	var u detector.ErrUnknownProvider
-	if errors.Is(err, &u) {
+	if err == detector.ErrUnknownProvider {
 		return cluster, nil
 	} else if err != nil {
 		return cluster, err

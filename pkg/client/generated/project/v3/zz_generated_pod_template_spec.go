@@ -28,7 +28,9 @@ const (
 	PodTemplateSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	PodTemplateSpecFieldRuntimeClassName              = "runtimeClassName"
 	PodTemplateSpecFieldScheduling                    = "scheduling"
+	PodTemplateSpecFieldSeccompProfile                = "seccompProfile"
 	PodTemplateSpecFieldServiceAccountName            = "serviceAccountName"
+	PodTemplateSpecFieldSetHostnameAsFQDN             = "setHostnameAsFQDN"
 	PodTemplateSpecFieldShareProcessNamespace         = "shareProcessNamespace"
 	PodTemplateSpecFieldSubdomain                     = "subdomain"
 	PodTemplateSpecFieldSysctls                       = "sysctls"
@@ -66,7 +68,9 @@ type PodTemplateSpec struct {
 	RunAsNonRoot                  *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                         `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
+	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	SetHostnameAsFQDN             *bool                          `json:"setHostnameAsFQDN,omitempty" yaml:"setHostnameAsFQDN,omitempty"`
 	ShareProcessNamespace         *bool                          `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`

@@ -326,7 +326,7 @@ func (l *Lifecycle) reconcileRegistryCrtSecret(clusterID, projectID string) erro
 
 func getRegistryCredential(projectID string, token string, hostname string) (*corev1.Secret, error) {
 	_, ns := ref.Parse(projectID)
-	config := credentialprovider.DockerConfigJson{
+	config := credentialprovider.DockerConfigJSON{
 		Auths: credentialprovider.DockerConfig{
 			hostname: credentialprovider.DockerConfigEntry{
 				Username: utils.PipelineSecretDefaultUser,

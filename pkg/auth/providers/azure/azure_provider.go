@@ -308,7 +308,7 @@ func (ap *azureProvider) getGroup(client *azureClient, principalID string, token
 
 func (ap *azureProvider) searchUsers(client *azureClient, name string, token v3.Token) ([]v3.Principal, error) {
 	filter := fmt.Sprintf("startswith(userPrincipalName,'%[1]s') or startswith(displayName,'%[1]s') or startswith(givenName,'%[1]s') or startswith(surname,'%[1]s')", name)
-	users, err := client.userClient.List(context.Background(), filter)
+	users, err := client.userClient.List(context.Background(), filter, "")
 	if err != nil {
 		return nil, err
 	}

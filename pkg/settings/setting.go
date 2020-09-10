@@ -19,7 +19,7 @@ var (
 
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
-	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "1440") // 24 hours
+	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds  = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	CACerts                           = NewSetting("cacerts", "")
@@ -85,7 +85,8 @@ var (
 	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.5")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
-	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
+	IgnoreNodeName                    = NewSetting("ignore-node-name", "")             // nodes to ignore when syncing v1.node to v3.node
+	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "") // fleetWorkspaceName to assign to clusters with none
 )
 
 func init() {

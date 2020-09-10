@@ -109,6 +109,7 @@ type ClusterSpecBase struct {
 	WindowsPreferedCluster               bool                                    `json:"windowsPreferedCluster" norman:"noupdate"`
 	LocalClusterAuthEndpoint             LocalClusterAuthEndpoint                `json:"localClusterAuthEndpoint,omitempty"`
 	ScheduledClusterScan                 *ScheduledClusterScan                   `json:"scheduledClusterScan,omitempty"`
+	FleetWorkspaceName                   string                                  `json:"fleetWorkspaceName,omitempty"`
 }
 
 type ClusterSpec struct {

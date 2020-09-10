@@ -54,7 +54,7 @@ func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	}, nil
 }
 
-func isCloudDriver(cluster *v3.Cluster) bool {
+func IsCloudDriver(cluster *v3.Cluster) bool {
 	return !cluster.Spec.Internal &&
 		cluster.Status.Driver != "" &&
 		cluster.Status.Driver != v32.ClusterDriverImported &&
@@ -148,7 +148,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 
 	hostPort := hostPort(cluster)
 	logrus.Tracef("dialerFactory: apiEndpoint hostPort for cluster [%s] is [%s]", clusterName, hostPort)
-	if (address == hostPort || isProxyAddress(address)) && isCloudDriver(cluster) {
+	if (address == hostPort || isProxyAddress(address)) && IsCloudDriver(cluster) {
 		// For cloud drivers we just connect directly to the k8s API, not through the tunnel.  All other go through tunnel
 		return native()
 	}
