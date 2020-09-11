@@ -87,7 +87,7 @@ var (
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "")             // nodes to ignore when syncing v1.node to v3.node
 	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "") // fleetWorkspaceName to assign to clusters with none
-	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.0")
+	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.1")
 )
 
 func FullShellImage() string {
