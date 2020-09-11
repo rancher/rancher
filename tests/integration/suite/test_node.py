@@ -282,6 +282,7 @@ def test_user_access_to_other_template(user_factory, remove_resource):
         "unable to find node template [%s]" % user2_node_template.id
 
 
+@pytest.mark.skip(reason="flaky, todo in 27885")
 def test_user_cluster_owner_access_to_pool(admin_mc,
                                            user_factory,
                                            remove_resource,
