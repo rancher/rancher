@@ -32,6 +32,7 @@ replace (
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
 	github.com/prometheus/common => github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a
+
 	k8s.io/api => github.com/rancher/kubernetes/staging/src/k8s.io/api v1.18.4-k3s1
 	k8s.io/apiextensions-apiserver => github.com/rancher/kubernetes/staging/src/k8s.io/apiextensions-apiserver v1.18.4-k3s1
 	k8s.io/apimachinery => github.com/rancher/kubernetes/staging/src/k8s.io/apimachinery v1.18.4-k3s1
@@ -61,7 +62,17 @@ replace (
 )
 
 require (
+	github.com/onsi/gomega v1.8.1 // indirect
+	github.com/pkg/errors v0.9.1
+	github.com/rancher/k3s v1.18.3-0.20200828235740-866dc94ceaac
+	github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0 // indirect
 	github.com/rancher/rke2 v1.18.4-beta16.0.20200901184550-9c11691024ae
 	github.com/rancher/spur v0.0.0-20200617165101-8702c8e4ce7a
+	github.com/rancher/wrangler v0.6.1
 	github.com/sirupsen/logrus v1.6.0
+	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
+	k8s.io/api v0.18.8
+	k8s.io/apimachinery v0.18.8
+	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
+	sigs.k8s.io/cli-utils v0.16.0 // indirect
 )

@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
@@ -383,6 +384,9 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 // bootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
 // already created the admin user and should not attempt it again. Otherwise attempt to create the admin.
 func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool) (string, error) {
+	if settings.NoDefaultAdmin.Get() == "true" {
+		return "", nil
+	}
 	var adminName string
 
 	set := labels.Set(defaultAdminLabel)
