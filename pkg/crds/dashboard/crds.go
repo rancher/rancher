@@ -26,6 +26,10 @@ func List() []crd.CRD {
 			return c.
 				WithColumn("Value", ".value")
 		}),
+		newCRD(&v3.Preference{}, func(c crd.CRD) crd.CRD {
+			return c.
+				WithColumn("Value", ".value")
+		}),
 		newCRD(&v3.Feature{}, func(c crd.CRD) crd.CRD {
 			c.NonNamespace = true
 			return c.

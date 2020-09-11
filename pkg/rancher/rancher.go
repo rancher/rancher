@@ -115,7 +115,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Controllers:     wranglerContext.Controllers,
 		AccessSetLookup: wranglerContext.ASL,
 		AuthMiddleware:  steveauth.ExistingContext,
-		Next:            ui.New(),
+		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache()),
 	})
 	if err != nil {
 		return nil, err
