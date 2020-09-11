@@ -419,7 +419,7 @@ func (c Command) renderArgs() ([]string, error) {
 	}
 
 	if c.ReleaseNamespace != "" {
-		args = append(args, "--namespace", c.ReleaseNamespace)
+		args = append(args, "--namespace="+c.ReleaseNamespace)
 	}
 
 	sort.Strings(args)
