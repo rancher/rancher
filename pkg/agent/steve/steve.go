@@ -93,7 +93,7 @@ func (r reverseClientConfig) RawConfig() (clientcmdapi.Config, error) {
 }
 
 func (r reverseClientConfig) ClientConfig() (*rest.Config, error) {
-	panic("not implemented ")
+	return r.cfg, nil
 }
 
 func (r reverseClientConfig) Namespace() (string, bool, error) {
