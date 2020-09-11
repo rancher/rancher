@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/apiserver/pkg/server"
 	"github.com/rancher/apiserver/pkg/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/auth"
@@ -66,20 +65,6 @@ func (s *clusterAPIServer) newSchemas() *types.APISchemas {
 		s.clusterLinks = append(s.clusterLinks, "projects")
 	})
 
-	schemas.MustImportAndCustomize(projectv3.App{}, func(schema *types.APISchema) {
-		schema.Store = &projectStore{
-			Store:   store,
-			clients: s.cf,
-		}
-		attributes.SetNamespaced(schema, true)
-		attributes.SetGroup(schema, projectv3.GroupName)
-		attributes.SetVersion(schema, "v3")
-		attributes.SetKind(schema, "App")
-		attributes.SetResource(schema, "apps")
-		attributes.SetVerbs(schema, []string{"create", "list", "get", "delete", "update", "watch", "patch"})
-		s.clusterLinks = append(s.clusterLinks, "apps")
-	})
-
 	return schemas
 }
 
@@ -107,7 +92,6 @@ func (s *clusterAPIServer) Wrap(next http.Handler) http.Handler {
 	router := mux.NewRouter()
 	router.UseEncodedPath()
 	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type:apps?}/{namespace}").Handler(server)
 	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}").Handler(server)
 	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
 	router.NotFoundHandler = next
