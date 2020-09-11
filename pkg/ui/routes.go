@@ -2,19 +2,21 @@ package ui
 
 import (
 	"net/http"
-
-	"github.com/rancher/apiserver/pkg/parse"
+	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/apiserver/pkg/parse"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/pkg/slice"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-func New() http.Handler {
+func New(prefs v3.PreferenceCache) http.Handler {
 	router := mux.NewRouter()
 	router.UseEncodedPath()
 
-	router.Handle("/", PreferredIndex())
+	router.Handle("/", PreferredIndex(prefs))
 	router.Handle("/asset-manifest.json", ember.ServeAsset())
 	router.Handle("/crossdomain.xml", ember.ServeAsset())
 	router.Handle("/dashboard", http.RedirectHandler("/dashboard/", http.StatusFound))
@@ -46,12 +48,28 @@ func emberIndexUnlessAPI() http.Handler {
 	})
 }
 
-func PreferredIndex() http.Handler {
+func PreferredIndex(prefs v3.PreferenceCache) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if settings.UIPreferred.Get() == "ember" && features.MCM.Enabled() {
-			emberIndex.ServeHTTP(rw, req)
-		} else {
-			vueIndex.ServeHTTP(rw, req)
+		user, ok := request.UserFrom(req.Context())
+		if !ok || !slice.ContainsString(user.GetGroups(), "system:authenticated") {
+			serveIndexFromSetting(rw, req, settings.UIPreferred.Get())
+			return
 		}
+
+		pref, err := prefs.Get(user.GetName(), "landing")
+		if err == nil && pref.Value != "" {
+			serveIndexFromSetting(rw, req, pref.Value)
+			return
+		}
+
+		serveIndexFromSetting(rw, req, settings.UIDefaultLanding.Get())
 	})
+}
+
+func serveIndexFromSetting(rw http.ResponseWriter, req *http.Request, setting string) {
+	if strings.Contains(setting, "ember") {
+		emberIndex.ServeHTTP(rw, req)
+	} else {
+		http.Redirect(rw, req, "/dashboard/", http.StatusFound)
+	}
 }

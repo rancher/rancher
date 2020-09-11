@@ -47,6 +47,12 @@ var (
 		true,
 		true,
 		false)
+	Fleet = newFeature(
+		"fleet",
+		"Install fleet by default on start",
+		true,
+		false,
+		false)
 )
 
 type Feature struct {

@@ -1,4 +1,4 @@
-package clusterapi
+package projects
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/apiserver/pkg/server"
 	"github.com/rancher/apiserver/pkg/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/auth"
@@ -18,7 +17,7 @@ import (
 	"github.com/rancher/steve/pkg/stores/proxy"
 )
 
-type clusterAPIServer struct {
+type projectServer struct {
 	ctx          context.Context
 	asl          accesscontrol.AccessSetLookup
 	auth         auth.Middleware
@@ -26,15 +25,15 @@ type clusterAPIServer struct {
 	clusterLinks []string
 }
 
-func ClusterAPI(ctx context.Context, server *steveserver.Server) (func(http.Handler) http.Handler, error) {
-	s := clusterAPIServer{}
+func Projects(ctx context.Context, server *steveserver.Server) (func(http.Handler) http.Handler, error) {
+	s := projectServer{}
 	if err := s.Setup(ctx, server); err != nil {
 		return nil, err
 	}
-	return s.Wrap, nil
+	return s.middleware(), nil
 }
 
-func (s *clusterAPIServer) Setup(ctx context.Context, server *steveserver.Server) error {
+func (s *projectServer) Setup(ctx context.Context, server *steveserver.Server) error {
 	s.ctx = ctx
 	s.asl = server.AccessSetLookup
 	s.cf = server.ClientFactory
@@ -51,7 +50,7 @@ func (s *clusterAPIServer) Setup(ctx context.Context, server *steveserver.Server
 	return nil
 }
 
-func (s *clusterAPIServer) newSchemas() *types.APISchemas {
+func (s *projectServer) newSchemas() *types.APISchemas {
 	store := proxy.NewProxyStore(s.cf, nil, s.asl)
 	schemas := types.EmptyAPISchemas()
 
@@ -66,24 +65,10 @@ func (s *clusterAPIServer) newSchemas() *types.APISchemas {
 		s.clusterLinks = append(s.clusterLinks, "projects")
 	})
 
-	schemas.MustImportAndCustomize(projectv3.App{}, func(schema *types.APISchema) {
-		schema.Store = &projectStore{
-			Store:   store,
-			clients: s.cf,
-		}
-		attributes.SetNamespaced(schema, true)
-		attributes.SetGroup(schema, projectv3.GroupName)
-		attributes.SetVersion(schema, "v3")
-		attributes.SetKind(schema, "App")
-		attributes.SetResource(schema, "apps")
-		attributes.SetVerbs(schema, []string{"create", "list", "get", "delete", "update", "watch", "patch"})
-		s.clusterLinks = append(s.clusterLinks, "apps")
-	})
-
 	return schemas
 }
 
-func (s *clusterAPIServer) newAPIHandler() http.Handler {
+func (s *projectServer) newAPIHandler() http.Handler {
 	server := server.DefaultAPIServer()
 	for k, v := range server.ResponseWriters {
 		server.ResponseWriters[k] = stripNS{writer: v}
@@ -100,19 +85,21 @@ func (s *clusterAPIServer) newAPIHandler() http.Handler {
 	return schema.WrapServer(sf, server)
 }
 
-func (s *clusterAPIServer) Wrap(next http.Handler) http.Handler {
+func (s *projectServer) middleware() func(http.Handler) http.Handler {
 	server := s.newAPIHandler()
 	server = prefix(server)
 
 	router := mux.NewRouter()
 	router.UseEncodedPath()
+	router.Path("/v1/management.cattle.io.clusters/{namespace}").Queries("link", "{type:projects?}").Handler(server)
 	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type:apps?}/{namespace}").Handler(server)
 	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}").Handler(server)
 	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
-	router.NotFoundHandler = next
 
-	return router
+	return func(next http.Handler) http.Handler {
+		router.NotFoundHandler = next
+		return router
+	}
 }
 
 func prefix(next http.Handler) http.Handler {
