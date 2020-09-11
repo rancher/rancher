@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/pkg/data/convert"
@@ -65,7 +66,7 @@ func NewOperations(
 		cg:             cg,
 		contentManager: contentManager,
 		namespace:      namespaces.System,
-		Impersonator:   podimpersonation.New("helm-op", cg, time.Hour),
+		Impersonator:   podimpersonation.New("helm-op", cg, time.Hour, settings.FullShellImage),
 		pods:           pods,
 		clusterRepos:   catalog.ClusterRepo(),
 		ops:            catalog.Operation(),
@@ -623,7 +624,7 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 					Stdin:           true,
 					TTY:             true,
 					StdinOnce:       true,
-					Image:           "ibuildthecloud/shell:v0.0.10",
+					Image:           settings.FullShellImage(),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Command:         []string{"helm-cmd"},
 					WorkingDir:      helmDataPath,
