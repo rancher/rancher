@@ -1,4 +1,4 @@
-package clusterapi
+package projects
 
 import (
 	"strings"

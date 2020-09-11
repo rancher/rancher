@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
-	"github.com/rancher/rancher/pkg/api/steve/clusterapi"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
@@ -132,12 +131,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	additionalAPI, err := steveapi.AdditionalAPIs(wranglerContext)
-	if err != nil {
-		return nil, err
-	}
-
-	clusterAPI, err := clusterapi.ClusterAPI(ctx, steve)
+	additionalAPI, err := steveapi.AdditionalAPIs(ctx, wranglerContext, steve)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +150,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			wranglerContext.MultiClusterManager.Middleware,
 			authServer.Management,
 			additionalAPI,
-			clusterAPI,
 		}.Handler(steve),
 		Wrangler:   wranglerContext,
 		Steve:      steve,
