@@ -15,11 +15,6 @@ cleanup()
         rke remove --dind --force --config $dindYML
         rm -f $dindYML
     done
-    if [ $EXIT -ne 0 ]; then
-        echo '***RANCHER LOGS***'
-        cat $CWD/rancherlogs.txt
-        echo '***END RANCHER LOGS***'
-    fi
     return $EXIT
 }
 
@@ -31,7 +26,7 @@ if [ ${ARCH} == arm64 ]; then
 fi
 
 echo Starting rancher server
-$(dirname $0)/run &> $CWD/rancherlogs.txt &
+$(dirname $0)/run &> /dev/null &
 PID=$!
 trap cleanup exit
 
