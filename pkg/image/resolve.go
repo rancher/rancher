@@ -9,15 +9,14 @@ import (
 	"sort"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
+	rketypes "github.com/rancher/rke/types"
 	img "github.com/rancher/rke/types/image"
 	"gopkg.in/yaml.v2"
 )
@@ -246,6 +245,7 @@ func getRequirementImages(osType OSType) []string {
 	case Linux:
 		return []string{
 			"busybox",
+			settings.ShellImage.Get(),
 		}
 	}
 	return []string{}
