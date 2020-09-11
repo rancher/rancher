@@ -162,6 +162,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	// get EKS Cluster Config's phase
 	status, _ := eksClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase, _ := status["phase"]
+	failureMessage, _ := status["failureMessage"].(string)
 
 	switch phase {
 	case "creating":
@@ -171,9 +172,13 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, err
 		}
 
-		logrus.Infof("waiting for EKS cluster [%s] to finish creating", cluster.Name)
 		e.clusterEnqueueAfter(cluster.Name, 20*time.Second)
-		return cluster, nil
+		if failureMessage == "" {
+			logrus.Infof("waiting for cluster EKS [%s] to finish creating", cluster.Name)
+			return e.setUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+		}
+		logrus.Infof("waiting for cluster EKS [%s] create failure to be resolved", cluster.Name)
+		return e.setFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
 	case "active":
 		if cluster.Spec.EKSConfig.Imported {
 			// copy upstream spec if newly imported
@@ -230,7 +235,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		}
 
 		// check for unauthorized error
-		if failureMessage, _ := status["failureMessage"].(string); failureMessage != "" {
+		if failureMessage != "" {
 			if strings.Contains(failureMessage, "403") {
 				return e.setFalse(cluster, apimgmtv3.ClusterConditionUpdated, "cannot access EKS, check cloud credential")
 			}
@@ -243,7 +248,6 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, err
 		}
 
-		failureMessage, _ := status["failureMessage"].(string)
 		e.clusterEnqueueAfter(cluster.Name, 20*time.Second)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster EKS [%s] to update", cluster.Name)
@@ -262,7 +266,20 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
 		}
 		e.clusterEnqueueAfter(cluster.Name, 20*time.Second)
-		return cluster, nil
+		if failureMessage == "" {
+			if cluster.Spec.EKSConfig.Imported {
+				cluster, err = e.setUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
+				if err != nil {
+					return cluster, err
+				}
+				logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
+			} else {
+				logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
+			}
+			return e.setUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+		}
+		logrus.Infof("waiting for cluster EKS [%s] pre-create failure to be resolved", cluster.Name)
+		return e.setFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
 	}
 }
 
