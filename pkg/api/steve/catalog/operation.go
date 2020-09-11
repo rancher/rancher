@@ -6,11 +6,7 @@ import (
 	"github.com/rancher/apiserver/pkg/types"
 	catalogtypes "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
-	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
-	"github.com/rancher/steve/pkg/stores/proxy"
-	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
@@ -22,12 +18,9 @@ type operation struct {
 }
 
 func newOperation(
-	cg proxy.ClientGetter,
-	catalog catalogcontrollers.Interface,
-	contentManager *content.Manager,
-	pods corev1controllers.PodClient) *operation {
+	helmop *helmop.Operations) *operation {
 	return &operation{
-		ops: helmop.NewOperations(cg, catalog, contentManager, pods),
+		ops: helmop,
 	}
 }
 

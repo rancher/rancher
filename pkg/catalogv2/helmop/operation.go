@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
+	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/pkg/data/convert"
@@ -37,6 +39,10 @@ import (
 
 const (
 	helmDataPath = "/home/shell/helm"
+)
+
+var (
+	badChars = regexp.MustCompile("[^-.0-9a-zA-Z]")
 )
 
 type Operations struct {
@@ -58,7 +64,7 @@ func NewOperations(
 	return &Operations{
 		cg:             cg,
 		contentManager: contentManager,
-		namespace:      "dashboard-catalog",
+		namespace:      namespaces.System,
 		Impersonator:   podimpersonation.New("helm-op", cg, time.Hour),
 		pods:           pods,
 		clusterRepos:   catalog.ClusterRepo(),
@@ -297,6 +303,8 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 
 		status.Release = chartUpgrade.ReleaseName
 		status.Namespace = namespace(chartUpgrade.Namespace)
+
+		commands = append(commands, cmd)
 	}
 
 	return status, commands, nil
@@ -424,6 +432,10 @@ func (c Command) renderArgs() ([]string, error) {
 	return append([]string{"--debug", c.Operation}, args...), nil
 }
 
+func sanitizeVersion(chartVersion string) string {
+	return badChars.ReplaceAllString(chartVersion, "-")
+}
+
 func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, values map[string]interface{}) (Command, error) {
 	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion)
 	if err != nil {
@@ -436,8 +448,8 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	}
 
 	c := Command{
-		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, chartVersion),
-		ChartFile:  fmt.Sprintf("%s-%s.tgz", chartName, chartVersion),
+		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, sanitizeVersion(chartVersion)),
+		ChartFile:  fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)),
 		Chart:      chartData,
 	}
 

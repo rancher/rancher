@@ -8,11 +8,11 @@ replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
-
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	// This is because docker/docker/pkg/archive has a dependency on an old x/sys
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190921190940-14da1ac737cc
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190921190940-14da1ac737cc // This is because docker/docker/pkg/archive has a dependency on an old x/sys
+	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.3.0-rancher1
 
 	k8s.io/api => k8s.io/api v0.19.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
@@ -44,6 +44,7 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.8.2
 	github.com/Azure/go-autorest/autorest/to v0.3.1-0.20191028180845-3492b2aff503
 	github.com/DataDog/zstd v1.4.5 // indirect
+	github.com/Masterminds/semver/v3 v3.1.0
 	github.com/aws/aws-sdk-go v1.33.5
 	github.com/beevik/etree v1.1.0 // indirect
 	github.com/bep/debounce v1.2.0
@@ -80,7 +81,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.10.0
 	github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48
-	github.com/rancher/dynamiclistener v0.2.1-0.20200802063751-ebebb82b9bd9
+	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
 	github.com/rancher/eks-operator v0.1.0-rc22
 	github.com/rancher/kubernetes-provider-detector v0.1.0
 	github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b
@@ -94,7 +95,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200909221921-9b7fcc9a0158
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
-	github.com/rancher/wrangler v0.6.2-0.20200829053106-7e1dd4260224
+	github.com/rancher/wrangler v0.6.2-0.20200909050541-7465f10bdac7
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0
@@ -134,6 +135,7 @@ require (
 	k8s.io/kubectl v0.19.0
 	k8s.io/kubernetes v1.19.0
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+	rsc.io/letsencrypt v0.0.3 // indirect
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
 	sigs.k8s.io/yaml v1.2.0
 )

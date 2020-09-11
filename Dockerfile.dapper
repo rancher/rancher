@@ -104,6 +104,8 @@ ENV DAPPER_RUN_ARGS "-v rancher2-pkg:/go/pkg -v rancher2-cache:/root/.cache/go-b
 ENV TRASH_CACHE ${DAPPER_SOURCE}/.trash-cache
 ENV GOCACHE /root/.cache/go-build
 ENV HOME ${DAPPER_SOURCE}
+VOLUME /var/lib/rancher
+VOLUME /var/lib/kubelet
 WORKDIR ${DAPPER_SOURCE}
 
 ENTRYPOINT ["./scripts/entry"]

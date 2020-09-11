@@ -5,28 +5,20 @@ import (
 	"net/http"
 
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
-
 	"github.com/rancher/apiserver/pkg/types"
 	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	"github.com/rancher/rancher/pkg/apis/catalog.cattle.io"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
-	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	schemas3 "github.com/rancher/wrangler/pkg/schemas"
 )
 
 func Register(ctx context.Context, server *steve.Server,
-	secrets corecontrollers.SecretController,
-	pods corecontrollers.PodClient,
-	configMaps corecontrollers.ConfigMapCache,
-	clusterRepos catalogcontrollers.ClusterRepoCache,
-	catalog catalogcontrollers.Interface) error {
-
-	contentManager := content.NewManager(configMaps, secrets.Cache(), clusterRepos)
-
-	ops := newOperation(server.ClientFactory, catalog, contentManager, pods)
+	helmop *helmop.Operations,
+	contentManager *content.Manager) error {
+	ops := newOperation(helmop)
 	server.ClusterCache.OnAdd(ctx, ops.OnAdd)
 	server.ClusterCache.OnChange(ctx, ops.OnChange)
 
