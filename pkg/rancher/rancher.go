@@ -104,6 +104,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			return nil, err
 		}
 		features.MCM.Disable()
+		features.Fleet.Disable()
 	} else {
 		authServer, err = auth.NewServer(ctx, restConfig)
 		if err != nil {
