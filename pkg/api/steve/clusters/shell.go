@@ -6,6 +6,7 @@ import (
 	"net/http/httputil"
 	"time"
 
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
@@ -125,7 +126,7 @@ func (s *shell) createPod() *v1.Pod {
 							Value: "/home/shell/.kube/config",
 						},
 					},
-					Image:           "ibuildthecloud/shell:v0.0.10",
+					Image:           settings.FullShellImage(),
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},

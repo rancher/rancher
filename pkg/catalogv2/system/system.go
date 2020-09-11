@@ -16,7 +16,9 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/release"
 	release2 "helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/storage"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,6 +66,26 @@ func (m *Manager) Ensure(namespace, name, version string, values map[string]inte
 		return nil
 	}
 
+	if ok, relName, err := m.isPendingUninstall(namespace, name); err != nil {
+		return err
+	} else if ok {
+		uninstall, err := json.Marshal(types.ChartUninstallAction{
+			Timeout: &metav1.Duration{Duration: 5 * time.Minute},
+		})
+		if err != nil {
+			return err
+		}
+
+		op, err := m.operation.Uninstall(m.ctx, installUser, namespace, relName, bytes.NewBuffer(uninstall))
+		if err != nil {
+			return err
+		}
+
+		if err := m.waitPodDone(op); err != nil {
+			return err
+		}
+	}
+
 	upgrade, err := json.Marshal(types.ChartUpgradeAction{
 		Timeout:    &metav1.Duration{Duration: 5 * time.Minute},
 		Wait:       true,
@@ -76,6 +98,7 @@ func (m *Manager) Ensure(namespace, name, version string, values map[string]inte
 				Namespace:   namespace,
 				ReleaseName: name,
 				Values:      values,
+				ResetValues: true,
 			},
 		},
 	})
@@ -158,7 +181,7 @@ func (m *Manager) isInstalled(namespace, name, version string, values map[string
 	}
 
 	l := action.NewList(helmcfg)
-	l.Filter = name
+	l.Filter = "^" + name + "$"
 
 	releases, err := l.Run()
 	if err != nil {
@@ -171,7 +194,7 @@ func (m *Manager) isInstalled(namespace, name, version string, values map[string
 	}
 
 	for _, release := range releases {
-		if release.Name != name || release.Info.Status != release2.StatusDeployed {
+		if release.Info.Status != release2.StatusDeployed {
 			continue
 		}
 
@@ -186,4 +209,35 @@ func (m *Manager) isInstalled(namespace, name, version string, values map[string
 	}
 
 	return false, nil
+}
+
+func (m *Manager) isPendingUninstall(namespace, name string) (bool, string, error) {
+	helmcfg := &action.Configuration{}
+	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
+		return false, "", err
+	}
+
+	l := action.NewList(helmcfg)
+	l.Filter = "^" + name + "$"
+	l.Pending = true
+	l.SetStateMask()
+
+	releases, err := l.Run()
+	if err != nil {
+		return false, "", err
+	}
+
+	for _, release := range releases {
+		if release.Info.Status == release2.StatusPendingInstall {
+			return true, releaseName(release), nil
+		}
+	}
+
+	return false, "", nil
+}
+
+// releaseName will create the internal name of the release stored in secrets.  This is a bit hacky
+// but we only use one storage backend so, oh well.
+func releaseName(release *release.Release) string {
+	return fmt.Sprintf("%s.%s.v%d", storage.HelmStorageType, release.Name, release.Version)
 }

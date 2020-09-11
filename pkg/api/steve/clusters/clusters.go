@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
@@ -17,7 +18,7 @@ func Register(ctx context.Context, server *steve.Server) error {
 	shell := &shell{
 		cg:           server.ClientFactory,
 		namespace:    "dashboard-shells",
-		impersonator: podimpersonation.New("shell", server.ClientFactory, time.Hour),
+		impersonator: podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
 	}
 
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
