@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 )
 
 var (
+	releasePattern = regexp.MustCompile("^v[0-9]")
 	settings       = map[string]Setting{}
 	provider       Provider
 	InjectDefaults string
@@ -101,6 +103,10 @@ func PrefixPrivateRegistry(image string) string {
 		return image
 	}
 	return private + "/" + image
+}
+
+func IsRelease() bool {
+	return releasePattern.MatchString(ServerVersion.Get())
 }
 
 func init() {

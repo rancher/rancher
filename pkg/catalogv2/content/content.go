@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2"
@@ -15,8 +16,10 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/helm"
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
+	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -89,7 +92,47 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	}
 
 	index := &repo.IndexFile{}
-	return index, json.Unmarshal(data, index)
+	if err := json.Unmarshal(data, index); err != nil {
+		return nil, err
+	}
+	return c.filterReleases(index), nil
+}
+
+func (c *Manager) filterReleases(index *repo.IndexFile) *repo.IndexFile {
+	index.SortEntries()
+	if !settings.IsRelease() {
+		return index
+	}
+
+	rancherVersion, err := semver.NewVersion(settings.ServerVersion.Get())
+	if err != nil {
+		logrus.Errorf("failed to parse server version %s: %v", settings.ServerVersion.Get(), err)
+		return index
+	}
+
+	for rel, versions := range index.Entries {
+		newVersions := make([]*repo.ChartVersion, 0, len(versions))
+		for _, version := range versions {
+			if constraintStr, ok := version.Annotations["catalog.cattle.io/rancher-version"]; ok {
+				if constraint, err := semver.NewConstraint(constraintStr); err == nil {
+					if !constraint.Check(rancherVersion) {
+						continue
+					}
+				} else {
+					logrus.Errorf("failed to parse constraint version %s: %v", settings.ServerVersion.Get(), err)
+				}
+			}
+			newVersions = append(newVersions, version)
+		}
+
+		if len(newVersions) == 0 {
+			delete(index.Entries, rel)
+		} else {
+			index.Entries[rel] = newVersions
+		}
+	}
+
+	return index
 }
 
 func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadCloser, string, error) {

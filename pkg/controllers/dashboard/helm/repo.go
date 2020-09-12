@@ -55,7 +55,7 @@ func RegisterReposForFollowers(ctx context.Context,
 	}
 
 	catalogcontrollers.RegisterClusterRepoStatusHandler(ctx, clusterRepos,
-		condition.Cond(catalog.RepoDownloaded), "helm-clusterrepo-ensure", h.ClusterRepoDownloadEnsureStatusHandler)
+		condition.Cond(catalog.FollowerRepoDownloaded), "helm-clusterrepo-ensure", h.ClusterRepoDownloadEnsureStatusHandler)
 
 }
 

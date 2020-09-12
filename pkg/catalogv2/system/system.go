@@ -59,8 +59,19 @@ func NewManager(ctx context.Context,
 	}, nil
 }
 
-func (m *Manager) Ensure(namespace, name, version string, values map[string]interface{}) error {
-	if ok, err := m.isInstalled(namespace, name, version, values); err != nil {
+func (m *Manager) Ensure(namespace, name string, values map[string]interface{}) error {
+	index, err := m.content.Index("", "rancher-charts")
+	if err != nil {
+		return err
+	}
+
+	// get latest, the ~0-a is a weird syntax to match everything including prereleases build
+	chart, err := index.Get(name, "~0-a")
+	if err != nil {
+		return err
+	}
+
+	if ok, err := m.isInstalled(namespace, name, chart.Version, values); err != nil {
 		return err
 	} else if ok {
 		return nil
@@ -94,7 +105,7 @@ func (m *Manager) Ensure(namespace, name, version string, values map[string]inte
 		Charts: []types.ChartUpgrade{
 			{
 				ChartName:   name,
-				Version:     version,
+				Version:     chart.Version,
 				Namespace:   namespace,
 				ReleaseName: name,
 				Values:      values,
@@ -188,7 +199,7 @@ func (m *Manager) isInstalled(namespace, name, version string, values map[string
 		return false, err
 	}
 
-	con, err := semver.NewConstraint(version)
+	desired, err := semver.NewVersion(version)
 	if err != nil {
 		return false, err
 	}
@@ -203,7 +214,7 @@ func (m *Manager) isInstalled(namespace, name, version string, values map[string
 			return false, err
 		}
 
-		if con.Check(ver) && equality.Semantic.DeepEqual(values, release.Config) {
+		if (desired.LessThan(ver) || desired.Equal(ver)) && equality.Semantic.DeepEqual(values, release.Config) {
 			return true, nil
 		}
 	}

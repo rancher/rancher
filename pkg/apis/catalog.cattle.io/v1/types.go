@@ -66,7 +66,8 @@ type RepoSpec struct {
 type RepoCondition string
 
 const (
-	RepoDownloaded RepoCondition = "Downloaded"
+	RepoDownloaded         RepoCondition = "Downloaded"
+	FollowerRepoDownloaded RepoCondition = "FollowerDownloaded"
 )
 
 type RepoStatus struct {

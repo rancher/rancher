@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sync"
 
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -34,9 +33,8 @@ var (
 	vue = newHandler(settings.UIDashboardIndex.Get,
 		settings.UIDashboardPath.Get,
 		settings.UIOfflinePreferred.Get)
-	emberIndex     = ember.IndexFile()
-	vueIndex       = vue.IndexFile()
-	releasePattern = regexp.MustCompile("^v[0-9]")
+	emberIndex = ember.IndexFile()
+	vueIndex   = vue.IndexFile()
 )
 
 func newHandler(
@@ -86,7 +84,7 @@ func (u *handler) canDownload(url string) bool {
 func (u *handler) path() (path string, isURL bool) {
 	switch u.offlineSetting() {
 	case "dynamic":
-		if releasePattern.MatchString(settings.ServerVersion.Get()) {
+		if settings.IsRelease() {
 			return u.pathSetting(), false
 		}
 		if u.canDownload(u.indexSetting()) {
