@@ -22,18 +22,18 @@ func buildOrGetIndex(dir string) (*repo.IndexFile, error) {
 
 	var (
 		existingIndex *repo.IndexFile
+		indexPath     = ""
 		builtIndex    = repo.NewIndexFile()
 	)
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if existingIndex != nil {
-			return filepath.SkipDir
-		}
-
 		if info.Name() == "index.yaml" {
-			if index, err := repo.LoadIndexFile(path); err == nil {
-				existingIndex = index
-				return filepath.SkipDir
+			if indexPath == "" || len(path) < len(indexPath) {
+				if index, err := repo.LoadIndexFile(path); err == nil {
+					existingIndex = index
+					indexPath = path
+					return filepath.SkipDir
+				}
 			}
 		}
 
