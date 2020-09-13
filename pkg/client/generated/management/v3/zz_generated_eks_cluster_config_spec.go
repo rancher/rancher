@@ -28,11 +28,11 @@ type EKSClusterConfigSpec struct {
 	KubernetesVersion      string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	LoggingTypes           []string          `json:"loggingTypes,omitempty" yaml:"loggingTypes,omitempty"`
 	NodeGroups             []NodeGroup       `json:"nodeGroups,omitempty" yaml:"nodeGroups,omitempty"`
-	PrivateAccess          bool              `json:"privateAccess,omitempty" yaml:"privateAccess,omitempty"`
-	PublicAccess           bool              `json:"publicAccess,omitempty" yaml:"publicAccess,omitempty"`
+	PrivateAccess          *bool             `json:"privateAccess,omitempty" yaml:"privateAccess,omitempty"`
+	PublicAccess           *bool             `json:"publicAccess,omitempty" yaml:"publicAccess,omitempty"`
 	PublicAccessSources    []string          `json:"publicAccessSources,omitempty" yaml:"publicAccessSources,omitempty"`
 	Region                 string            `json:"region,omitempty" yaml:"region,omitempty"`
-	SecretsEncryption      bool              `json:"secretsEncryption,omitempty" yaml:"secretsEncryption,omitempty"`
+	SecretsEncryption      *bool             `json:"secretsEncryption,omitempty" yaml:"secretsEncryption,omitempty"`
 	SecurityGroups         []string          `json:"securityGroups,omitempty" yaml:"securityGroups,omitempty"`
 	ServiceRole            string            `json:"serviceRole,omitempty" yaml:"serviceRole,omitempty"`
 	Subnets                []string          `json:"subnets,omitempty" yaml:"subnets,omitempty"`

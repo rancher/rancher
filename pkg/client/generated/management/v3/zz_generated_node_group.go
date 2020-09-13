@@ -20,7 +20,7 @@ type NodeGroup struct {
 	DesiredSize   *int64            `json:"desiredSize,omitempty" yaml:"desiredSize,omitempty"`
 	DiskSize      *int64            `json:"diskSize,omitempty" yaml:"diskSize,omitempty"`
 	Ec2SshKey     string            `json:"ec2SshKey,omitempty" yaml:"ec2SshKey,omitempty"`
-	Gpu           bool              `json:"gpu,omitempty" yaml:"gpu,omitempty"`
+	Gpu           *bool             `json:"gpu,omitempty" yaml:"gpu,omitempty"`
 	InstanceType  string            `json:"instanceType,omitempty" yaml:"instanceType,omitempty"`
 	Labels        map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	MaxSize       *int64            `json:"maxSize,omitempty" yaml:"maxSize,omitempty"`
