@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -338,59 +340,41 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	}
 
 	// check user's access to cloud credential
-	amazonCredential, _ := eksConfig["amazonCredentialSecret"].(string)
-
-	var accessCred mgmtclient.CloudCredential
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, amazonCredential, &accessCred); err != nil {
-		if apiError, ok := err.(*httperror.APIError); ok {
-			if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
-				return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("cloud credential not found"))
+	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok {
+		var accessCred mgmtclient.CloudCredential
+		if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, amazonCredential, &accessCred); err != nil {
+			if apiError, ok := err.(*httperror.APIError); ok {
+				if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
+					return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("cloud credential not found"))
+				}
 			}
+			return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("error accessing cloud credential"))
 		}
-		return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("error accessing cloud credential"))
 	}
 
 	createFromImport := request.Method == http.MethodPost && eksConfig["imported"] == true
 
-	// validate nodegroups
-	nodegroups, _ := eksConfig["nodeGroups"].([]interface{})
-	if len(nodegroups) == 0 {
-		if !createFromImport {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node group"))
-		}
-	}
-
-	for _, ng := range nodegroups {
-		ngMap, _ := ng.(map[string]interface{})
-		if name, _ := ngMap["nodegroupName"].(string); name == "" {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("nodegroupName cannot be an empty"))
-		}
-	}
-
 	var prevCluster *v3.Cluster
 	var err error
+	var upstreamSpec *eksv1.EKSClusterConfigSpec
 
 	if request.Method == http.MethodPut {
 		prevCluster, err = v.ClusterLister.Get("", request.ID)
 		if err != nil {
 			return err
 		}
+		upstreamSpec = prevCluster.Status.EKSStatus.UpstreamSpec
+		if upstreamSpec == nil {
+			return httperror.NewAPIError(httperror.ServerError, "upstream state unavailable,cannot validate")
+		}
 	}
 
-	// validate cluster has public access, private access, or both enabled
-	publicAccess, ok := eksConfig["publicAccess"].(bool)
-	if !ok {
-		publicAccess = prevCluster != nil && prevCluster.Spec.EKSConfig.PublicAccess
-	}
-	privateAccess, ok := eksConfig["privateAccess"].(bool)
-	if !ok {
-		privateAccess = prevCluster != nil && prevCluster.Spec.EKSConfig.PrivateAccess
-	}
-
-	if !publicAccess && !privateAccess {
-		if !createFromImport {
-			return httperror.NewAPIError(httperror.InvalidBodyContent,
-				"public access, private access, or both must be enabled")
+	if !createFromImport {
+		if err := validateEKSNodegroups(request, eksConfig, prevCluster); err != nil {
+			return err
+		}
+		if err := validateEKSAccess(request, eksConfig, prevCluster); err != nil {
+			return err
 		}
 	}
 
@@ -423,20 +407,70 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
 	}
 
-	// validate either all networking fields are provided or no networking fields are provided
-	securityGroups, _ := eksConfig["securityGroups"].([]interface{})
-	subnets, _ := eksConfig["subnets"].([]interface{})
+	if !createFromImport {
+		// validate either all networking fields are provided or no networking fields are provided
+		securityGroups, _ := eksConfig["securityGroups"].([]interface{})
+		subnets, _ := eksConfig["subnets"].([]interface{})
 
-	allNetworkingFieldsProvided := len(subnets) != 0 && len(securityGroups) != 0
-	noNetworkingFieldsProvided := len(subnets) == 0 && len(securityGroups) == 0
+		allNetworkingFieldsProvided := len(subnets) != 0 && len(securityGroups) != 0
+		noNetworkingFieldsProvided := len(subnets) == 0 && len(securityGroups) == 0
 
-	if !(allNetworkingFieldsProvided || noNetworkingFieldsProvided) {
-		if !createFromImport {
-			return httperror.NewAPIError(httperror.InvalidBodyContent,
-				"must provide both networking fields (subnets, securityGroups) or neither")
+		if !(allNetworkingFieldsProvided || noNetworkingFieldsProvided) {
+			if !createFromImport {
+				return httperror.NewAPIError(httperror.InvalidBodyContent,
+					"must provide both networking fields (subnets, securityGroups) or neither")
+			}
 		}
 	}
 
+	return nil
+}
+
+func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
+	publicAccess, _ := eksConfig["publicAccess"].(*bool)
+	privateAccess, _ := eksConfig["privateAccess"].(*bool)
+	if request.Method != http.MethodPost {
+		if publicAccess == nil {
+			publicAccess = prevCluster.Spec.EKSConfig.PublicAccess
+		}
+		if privateAccess == nil {
+			privateAccess = prevCluster.Spec.EKSConfig.PrivateAccess
+		}
+	}
+
+	if publicAccess == nil || privateAccess == nil {
+		return nil
+	}
+
+	if !aws.BoolValue(publicAccess) && !aws.BoolValue(privateAccess) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			"public access, private access, or both must be enabled")
+	}
+	return nil
+}
+
+func validateEKSNodegroups(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
+	noNodegroupsError := httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one nodegroup"))
+	nodegroups, ok := eksConfig["nodeGroups"].([]interface{})
+	if !ok || nodegroups == nil {
+		if request.Method == http.MethodPost {
+			return noNodegroupsError
+		}
+		spec := prevCluster.Spec.EKSConfig
+		upstreamSpec := prevCluster.Status.EKSStatus.UpstreamSpec
+		if len(spec.NodeGroups) == 0 && spec.NodeGroups != nil || (spec.NodeGroups == nil && len(upstreamSpec.NodeGroups) == 0) {
+			return noNodegroupsError
+		}
+	} else if len(nodegroups) == 0 {
+		return noNodegroupsError
+	}
+
+	for _, ng := range nodegroups {
+		ngMap, _ := ng.(map[string]interface{})
+		if name, ok := ngMap["nodegroupName"].(string); ok && name == "" {
+			return noNodegroupsError
+		}
+	}
 	return nil
 }
 

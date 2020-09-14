@@ -8,15 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/eks"
+	"github.com/rancher/eks-operator/controller"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	"github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apiprojv3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	utils2 "github.com/rancher/rancher/pkg/app"
 	"github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/controllers/management/eksupstreamrefresh"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -51,8 +53,6 @@ const (
 	eksOperator         = "rancher-eks-operator"
 	localCluster        = "local"
 	importedAnno        = "eks.cattle.io/imported"
-	awsAccessKey        = "amazonec2credentialConfig-accessKey"
-	awsSecretKey        = "amazonec2credentialConfig-secretKey"
 )
 
 // TODO: switch to wrangler caches and clients for all types
@@ -139,10 +139,6 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, err
 		}
 
-		cluster, err = e.recordAppliedSpec(cluster)
-		if err != nil {
-			return cluster, err
-		}
 	}
 
 	eksClusterConfigMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cluster.Spec.EKSConfig)
@@ -152,11 +148,8 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 	// check for changes between EKS spec on cluster and the EKS spec on the EKSClusterConfig object
 	if !reflect.DeepEqual(eksClusterConfigMap, eksClusterConfigDynamic.Object["spec"]) {
-		// if cluster is imported make sure it's original spec has been copied copied before mutating
-		if !cluster.Spec.EKSConfig.Imported || cluster.GetAnnotations()[importedAnno] == "true" {
-			logrus.Infof("change detected for cluster [%s], updating EKSClusterConfig", cluster.Name)
-			return e.updateEKSClusterConfig(cluster, eksClusterConfigDynamic, eksClusterConfigMap)
-		}
+		logrus.Infof("change detected for cluster [%s], updating EKSClusterConfig", cluster.Name)
+		return e.updateEKSClusterConfig(cluster, eksClusterConfigDynamic, eksClusterConfigMap)
 	}
 
 	// get EKS Cluster Config's phase
@@ -172,6 +165,18 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, err
 		}
 
+		if cluster.Status.EKSStatus.UpstreamSpec == nil {
+			if cluster.Status.EKSStatus.UpstreamSpec == nil {
+				cluster, err = e.setInitialUpstreamSpec(cluster)
+				if err != nil {
+					if !notFound(err) {
+						return cluster, err
+					}
+				}
+				return cluster, nil
+			}
+		}
+
 		e.clusterEnqueueAfter(cluster.Name, 20*time.Second)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster EKS [%s] to finish creating", cluster.Name)
@@ -180,13 +185,18 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		logrus.Infof("waiting for cluster EKS [%s] create failure to be resolved", cluster.Name)
 		return e.setFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
 	case "active":
+		if apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
+			cluster = cluster.DeepCopy()
+			apimgmtv3.ClusterConditionPending.True(cluster)
+			cluster, err = e.clusterClient.Update(cluster)
+			if err != nil {
+				return cluster, err
+			}
+		}
+
 		if cluster.Spec.EKSConfig.Imported {
-			// copy upstream spec if newly imported
-			if cluster.Annotations == nil || cluster.Annotations[importedAnno] != "true" {
-				cluster, err = e.copyImportedClusterSpec(cluster, eksClusterConfigDynamic.Object)
-				if err != nil {
-					return cluster, err
-				}
+			if cluster.Status.EKSStatus.UpstreamSpec == nil {
+				return e.setInitialUpstreamSpec(cluster)
 			}
 		}
 
@@ -241,6 +251,11 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			}
 		}
 
+		cluster, err = e.recordAppliedSpec(cluster)
+		if err != nil {
+			return cluster, err
+		}
+
 		return e.setTrue(cluster, apimgmtv3.ClusterConditionUpdated, "")
 	case "updating":
 		cluster, err = e.setTrue(cluster, apimgmtv3.ClusterConditionProvisioned, "")
@@ -283,6 +298,17 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	}
 }
 
+func (e *eksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
+	cluster = cluster.DeepCopy()
+	upstreamSpec, err := eksupstreamrefresh.GetComparableUpstreamSpec(e.secretsCache, cluster)
+	if err != nil {
+		return cluster, err
+	}
+	cluster.Status.EKSStatus.UpstreamSpec = upstreamSpec
+	return e.clusterClient.Update(cluster)
+}
+
 func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, eksClusterConfigDynamic *unstructured.Unstructured, spec map[string]interface{}) (*mgmtv3.Cluster, error) {
 	// configs are not equal, need to update EKS cluster config
 	// getting resource version for watch
@@ -297,12 +323,6 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 	}
 	eksClusterConfigDynamic.Object["spec"] = spec
 	eksClusterConfigDynamic, err = e.dynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), eksClusterConfigDynamic, v1.UpdateOptions{})
-	if err != nil {
-		return cluster, err
-	}
-
-	// update applied spec
-	cluster, err = e.recordAppliedSpec(cluster)
 	if err != nil {
 		return cluster, err
 	}
@@ -323,10 +343,15 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 			e.clusterEnqueueAfter(cluster.Name, 10*time.Second)
 			return e.setUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
 		case <-timeout.C:
+			cluster, err = e.recordAppliedSpec(cluster)
+			if err != nil {
+				return cluster, err
+			}
 			return cluster, nil
 		}
 	}
 }
+
 func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	// service account token and API endpoint are need to deploy cluster agent, should be able to retrieve
 	// from secret
@@ -343,7 +368,7 @@ func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 
 		// sa token generation can be its own function
 		logrus.Infof("generating service account token for cluster [%s]", cluster.Name)
-		sess, err := e.startAWSSession(cluster.Spec.EKSConfig.AmazonCredentialSecret)
+		sess, _, err := controller.StartAWSSessions(e.secretsCache, *cluster.Spec.EKSConfig)
 		if err != nil {
 			return cluster, err
 		}
@@ -362,27 +387,6 @@ func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 		return e.clusterClient.Update(cluster)
 	}
 	return cluster, fmt.Errorf("failed waiting for cluster [%s] secret", cluster.Name)
-}
-
-func (e *eksOperatorController) copyImportedClusterSpec(cluster *mgmtv3.Cluster, eksClusterConfigMap map[string]interface{}) (*mgmtv3.Cluster, error) {
-	// imported annotation is not set- need to get spec from upstream cluster
-	var eksClusterConfigStructured eksv1.EKSClusterConfig
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(eksClusterConfigMap, &eksClusterConfigStructured); err != nil {
-		return cluster, fmt.Errorf("failed to import cluster [%s]", cluster.Name)
-	}
-
-	// copy EKS cluster config spec to cluster and set imported annotation
-	cluster = cluster.DeepCopy()
-	cluster.Spec.EKSConfig = &eksClusterConfigStructured.Spec
-	cluster.Status.AppliedSpec = cluster.Spec
-	if cluster.Annotations == nil {
-		cluster.Annotations = make(map[string]string)
-	}
-	cluster.Annotations[importedAnno] = "true"
-	if !apimgmtv3.ClusterConditionPending.IsTrue(cluster) {
-		apimgmtv3.ClusterConditionPending.True(cluster)
-	}
-	return e.clusterClient.Update(cluster)
 }
 
 func buildEKSCCObject(cluster *mgmtv3.Cluster) (*unstructured.Unstructured, error) {
@@ -417,6 +421,10 @@ func buildEKSCCObject(cluster *mgmtv3.Cluster) (*unstructured.Unstructured, erro
 }
 
 func (e *eksOperatorController) recordAppliedSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+	if reflect.DeepEqual(cluster.Status.AppliedSpec.EKSConfig, cluster.Spec.EKSConfig) {
+		return cluster, nil
+	}
+
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.EKSConfig = cluster.Spec.EKSConfig
 	return e.clusterClient.Update(cluster)
@@ -530,33 +538,6 @@ func generateSAToken(sess *session.Session, clusterID, endpoint, ca string) (str
 	return util.GenerateServiceAccountToken(clientset)
 }
 
-func (e *eksOperatorController) startAWSSession(cloudCredential string) (*session.Session, error) {
-	awsConfig := &aws.Config{}
-
-	ns, id := ref.Parse(cloudCredential)
-	secret, err := e.secretsCache.Get(ns, id)
-	if err != nil {
-		return nil, err
-	}
-
-	accessKeyBytes, _ := secret.Data[awsAccessKey]
-	secretKeyBytes, _ := secret.Data[awsSecretKey]
-	if accessKeyBytes == nil || secretKeyBytes == nil {
-		return nil, fmt.Errorf("Invalid aws cloud credential")
-	}
-
-	accessKey := string(accessKeyBytes)
-	secretKey := string(secretKeyBytes)
-
-	awsConfig.Credentials = credentials.NewStaticCredentials(accessKey, secretKey, "")
-
-	sess, err := session.NewSession(awsConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error getting new aws session: %v", err)
-	}
-	return sess, nil
-}
-
 func (e *eksOperatorController) setUnknown(cluster *mgmtv3.Cluster, condition condition.Cond, message string) (*mgmtv3.Cluster, error) {
 	if condition.IsUnknown(cluster) && condition.GetMessage(cluster) == message {
 		return cluster, nil
@@ -600,4 +581,11 @@ func (e *eksOperatorController) setFalse(cluster *mgmtv3.Cluster, condition cond
 		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s false with message: %s", cluster.Name, condition, message)
 	}
 	return cluster, nil
+}
+
+func notFound(err error) bool {
+	if awsErr, ok := err.(awserr.Error); ok {
+		return awsErr.Code() == eks.ErrCodeResourceNotFoundException
+	}
+	return false
 }
