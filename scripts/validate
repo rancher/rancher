@@ -17,7 +17,7 @@ go mod tidy
 echo Verifying modules
 go mod verify
 
-if [[ $(git diff --stat) != '' ]]; then
+if [[ $(git status --porcelain --untracked-files=no) != '' ]]; then
   echo "Encountered dirty repo!"
   exit 1
 fi
