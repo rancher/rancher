@@ -151,6 +151,8 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 		if err != nil {
 			return status, err
 		}
+		status.URL = repoSpec.GitRepo
+		status.Branch = repoSpec.GitBranch
 		index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
 	} else if repoSpec.GitRepo != "" {
 		commit, err = git.Update(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch)
