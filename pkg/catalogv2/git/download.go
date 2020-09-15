@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/git"
@@ -49,7 +50,15 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string) (stri
 		return "", err
 	}
 
-	return git.Update(branch)
+	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
+		return Head(secret, namespace, name, gitURL, branch)
+	}
+
+	commit, err := git.Update(branch)
+	if err != nil && isBundled(git) {
+		return Head(secret, namespace, name, gitURL, branch)
+	}
+	return commit, err
 }
 
 func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string) error {
