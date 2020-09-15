@@ -185,33 +185,37 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		logrus.Infof("waiting for cluster EKS [%s] create failure to be resolved", cluster.Name)
 		return e.setFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
 	case "active":
-		if apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
-			cluster = cluster.DeepCopy()
-			apimgmtv3.ClusterConditionPending.True(cluster)
-			cluster, err = e.clusterClient.Update(cluster)
-			if err != nil {
-				return cluster, err
-			}
-		}
-
 		if cluster.Spec.EKSConfig.Imported {
 			if cluster.Status.EKSStatus.UpstreamSpec == nil {
+				// non imported clusters will have already had upstream spec set
 				return e.setInitialUpstreamSpec(cluster)
 			}
-			addNgMessage := "Cannot deploy agent without nodegroups. Add a nodegroup."
-			if len(cluster.Spec.EKSConfig.NodeGroups) == 0 {
-				cluster, err = e.setFalse(cluster, apimgmtv3.ClusterConditionWaiting, addNgMessage)
+
+			if apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
+				cluster = cluster.DeepCopy()
+				apimgmtv3.ClusterConditionPending.True(cluster)
+				cluster, err = e.clusterClient.Update(cluster)
 				if err != nil {
 					return cluster, err
 				}
-			} else {
-				if apimgmtv3.ClusterConditionWaiting.GetMessage(cluster) == addNgMessage {
-					cluster = cluster.DeepCopy()
-					apimgmtv3.ClusterConditionWaiting.Message(cluster, "Waiting for API to be available")
-					cluster, err = e.clusterClient.Update(cluster)
-					if err != nil {
-						return cluster, err
-					}
+			}
+		}
+
+		addNgMessage := "Cannot deploy agent without nodegroups. Add a nodegroup."
+		noNodeGroupsOnSpec := len(cluster.Spec.EKSConfig.NodeGroups) == 0
+		noNodeGroupsOnUpstreamSpec := len(cluster.Status.EKSStatus.UpstreamSpec.NodeGroups) == 0
+		if (cluster.Spec.EKSConfig.NodeGroups != nil && noNodeGroupsOnSpec) || noNodeGroupsOnUpstreamSpec {
+			cluster, err = e.setFalse(cluster, apimgmtv3.ClusterConditionWaiting, addNgMessage)
+			if err != nil {
+				return cluster, err
+			}
+		} else {
+			if apimgmtv3.ClusterConditionWaiting.GetMessage(cluster) == addNgMessage {
+				cluster = cluster.DeepCopy()
+				apimgmtv3.ClusterConditionWaiting.Message(cluster, "Waiting for API to be available")
+				cluster, err = e.clusterClient.Update(cluster)
+				if err != nil {
+					return cluster, err
 				}
 			}
 		}
