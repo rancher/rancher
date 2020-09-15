@@ -64,14 +64,19 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string) error
 	return git.Ensure(commit)
 }
 
-func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string) (*git.Git, error) {
-	u, err := url.Parse(gitURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) supported", u.Scheme)
+func isBundled(git *git.Git) bool {
+	return strings.HasPrefix(git.Directory, staticDir)
+}
 
+func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string) (*git.Git, error) {
+	if !strings.HasPrefix(gitURL, "git@") {
+		u, err := url.Parse(gitURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) and git supported", u.Scheme)
+		}
 	}
 	dir := gitDir(namespace, name, gitURL)
 	headers := map[string]string{}
