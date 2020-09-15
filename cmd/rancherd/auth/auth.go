@@ -1,12 +1,13 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/spur/cli"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -29,7 +30,8 @@ var (
 	defaultAdminLabel      = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 )
 
-func ResetAdmin(c *cli.Context) error {
+func ResetAdmin(_ *cli.Context) error {
+	ctx := context.Background()
 	token, err := randomtoken.Generate()
 	if err != nil {
 		return err
@@ -67,7 +69,7 @@ func ResetAdmin(c *cli.Context) error {
 	var adminName string
 
 	set := labels.Set(defaultAdminLabel)
-	admins, err := userClient.List(c.Context, v1.ListOptions{LabelSelector: set.String()})
+	admins, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
 		return err
 	}
@@ -76,14 +78,14 @@ func ResetAdmin(c *cli.Context) error {
 		adminName = admins.Items[0].GetName()
 	}
 
-	if _, err := configmapClient.Get(c.Context, bootstrapAdminConfig, v1.GetOptions{}); err != nil {
+	if _, err := configmapClient.Get(ctx, bootstrapAdminConfig, v1.GetOptions{}); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
 	} else {
 		// if it is already bootstrapped, reset admin password
 		set := labels.Set(map[string]string{defaultAdminLabelKey: defaultAdminLabelValue})
-		admins, err := userClient.List(c.Context, v1.ListOptions{LabelSelector: set.String()})
+		admins, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			return err
 		}
@@ -105,7 +107,7 @@ func ResetAdmin(c *cli.Context) error {
 		}
 		admin.Object["password"] = string(hash)
 		admin.Object["mustChangePassword"] = false
-		_, err = userClient.Update(c.Context, &admin, v1.UpdateOptions{})
+		_, err = userClient.Update(ctx, &admin, v1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -113,7 +115,7 @@ func ResetAdmin(c *cli.Context) error {
 		return nil
 	}
 
-	users, err := userClient.List(c.Context, v1.ListOptions{LabelSelector: set.String()})
+	users, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
 		panic(err)
 	}
@@ -121,7 +123,7 @@ func ResetAdmin(c *cli.Context) error {
 	if len(users.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
 		hash, _ := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
-		admin, err := userClient.Create(c.Context,
+		admin, err := userClient.Create(ctx,
 			&unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "management.cattle.io/v3",
@@ -141,12 +143,12 @@ func ResetAdmin(c *cli.Context) error {
 		}
 		adminName = admin.GetName()
 
-		bindings, err := grbClient.List(c.Context, v1.ListOptions{LabelSelector: set.String()})
+		bindings, err := grbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			return err
 		}
 		if len(bindings.Items) == 0 {
-			_, err = grbClient.Create(c.Context,
+			_, err = grbClient.Create(ctx,
 				&unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"metadata": v1.ObjectMeta{
@@ -164,16 +166,16 @@ func ResetAdmin(c *cli.Context) error {
 			}
 		}
 
-		users, err := userClient.List(c.Context, v1.ListOptions{
+		users, err := userClient.List(ctx, v1.ListOptions{
 			LabelSelector: set.String(),
 		})
 
-		crbBindings, err := crbClient.List(c.Context, v1.ListOptions{LabelSelector: set.String()})
+		crbBindings, err := crbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			return err
 		}
 		if len(crbBindings.Items) == 0 && len(users.Items) > 0 {
-			_, err = crbClient.Create(c.Context,
+			_, err = crbClient.Create(ctx,
 				&unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"metadata": v1.ObjectMeta{
@@ -210,7 +212,7 @@ func ResetAdmin(c *cli.Context) error {
 		}
 	}
 
-	_, err = configmapClient.Create(c.Context,
+	_, err = configmapClient.Create(ctx,
 		&corev1.ConfigMap{
 			ObjectMeta: v1.ObjectMeta{
 				Namespace: cattleNamespace,
@@ -224,7 +226,7 @@ func ResetAdmin(c *cli.Context) error {
 	}
 
 	serverURL := "https://%v:8443"
-	nodes, err := nodeClient.List(c.Context, v1.ListOptions{})
+	nodes, err := nodeClient.List(ctx, v1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -242,7 +244,7 @@ func ResetAdmin(c *cli.Context) error {
 		}
 	}
 
-	serverURLSettings, err := settingClient.Get(c.Context, "server-url", v1.GetOptions{})
+	serverURLSettings, err := settingClient.Get(ctx, "server-url", v1.GetOptions{})
 	if err != nil {
 		return err
 	}
