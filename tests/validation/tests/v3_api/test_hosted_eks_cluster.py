@@ -148,10 +148,7 @@ def test_eks_v2_create_import_cluster():
         "amazonCredentialSecret": ec2_cloud_credential.id,
         "displayName": display_name,
         "imported": True,
-        "privateAccess": False,
-        "publicAccess": False,
         "region": EKS_REGION,
-        "secretsEncryption": False,
         "type": "eksclusterconfigspec"
     }
 
