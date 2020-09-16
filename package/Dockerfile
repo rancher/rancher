@@ -23,7 +23,7 @@ ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
-ENV CATTLE_K3S_VERSION v1.17.2+k3s1
+ENV CATTLE_K3S_VERSION v1.18.8+k3s1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher45
 ENV CATTLE_ETCD_VERSION v3.4.3
 ENV CATTLE_CHANNELSERVER_VERSION v0.5.0
@@ -100,6 +100,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf ${!CHANNELSERVER_URL} > /usr/bin/channelserver && \
     curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
+    mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${!ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
@@ -145,6 +146,7 @@ ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY entrypoint.sh rancher /usr/bin/
 COPY kustomize.sh /usr/bin/
 COPY jailer.sh /usr/bin/
+COPY k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
 

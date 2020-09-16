@@ -12,6 +12,8 @@ extract_latest_version_tgz() {
 }
 export -f extract_latest_version_tgz
 
+./k3s-images.sh
+
 source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
