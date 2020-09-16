@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -354,26 +353,21 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 
 	createFromImport := request.Method == http.MethodPost && eksConfig["imported"] == true
 
-	var prevCluster *v3.Cluster
-	var err error
-	var upstreamSpec *eksv1.EKSClusterConfigSpec
+	var prevSpec *eksv1.EKSClusterConfigSpec
 
 	if request.Method == http.MethodPut {
-		prevCluster, err = v.ClusterLister.Get("", request.ID)
+		prevCluster, err := v.ClusterLister.Get("", request.ID)
 		if err != nil {
 			return err
 		}
-		upstreamSpec = prevCluster.Status.EKSStatus.UpstreamSpec
-		if upstreamSpec == nil {
-			return httperror.NewAPIError(httperror.ServerError, "upstream state unavailable,cannot validate")
-		}
+		prevSpec = prevCluster.Spec.EKSConfig
 	}
 
 	if !createFromImport {
-		if err := validateEKSNodegroups(request, eksConfig, prevCluster); err != nil {
+		if err := validateEKSNodegroups(request, eksConfig, prevSpec); err != nil {
 			return err
 		}
-		if err := validateEKSAccess(request, eksConfig, prevCluster); err != nil {
+		if err := validateEKSAccess(request, eksConfig, prevSpec); err != nil {
 			return err
 		}
 	}
@@ -426,39 +420,34 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	return nil
 }
 
-func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
-	publicAccess, _ := eksConfig["publicAccess"].(*bool)
-	privateAccess, _ := eksConfig["privateAccess"].(*bool)
+func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevSpec *eksv1.EKSClusterConfigSpec) error {
+	publicAccess, _ := eksConfig["publicAccess"]
+	privateAccess, _ := eksConfig["privateAccess"]
 	if request.Method != http.MethodPost {
 		if publicAccess == nil {
-			publicAccess = prevCluster.Spec.EKSConfig.PublicAccess
+			publicAccess = prevSpec.PublicAccess
 		}
 		if privateAccess == nil {
-			privateAccess = prevCluster.Spec.EKSConfig.PrivateAccess
+			privateAccess = prevSpec.PrivateAccess
 		}
 	}
 
-	if publicAccess == nil || privateAccess == nil {
-		return nil
-	}
-
-	if !aws.BoolValue(publicAccess) && !aws.BoolValue(privateAccess) {
+	// can only perform comparisons on interfaces, cannot use as bool
+	if publicAccess == false && privateAccess == false {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			"public access, private access, or both must be enabled")
 	}
 	return nil
 }
 
-func validateEKSNodegroups(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
+func validateEKSNodegroups(request *types.APIContext, eksConfig map[string]interface{}, prevSpec *eksv1.EKSClusterConfigSpec) error {
 	noNodegroupsError := httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one nodegroup"))
 	nodegroups, ok := eksConfig["nodeGroups"].([]interface{})
 	if !ok || nodegroups == nil {
 		if request.Method == http.MethodPost {
 			return noNodegroupsError
 		}
-		spec := prevCluster.Spec.EKSConfig
-		upstreamSpec := prevCluster.Status.EKSStatus.UpstreamSpec
-		if len(spec.NodeGroups) == 0 && spec.NodeGroups != nil || (spec.NodeGroups == nil && len(upstreamSpec.NodeGroups) == 0) {
+		if prevSpec.NodeGroups != nil && len(prevSpec.NodeGroups) == 0 {
 			return noNodegroupsError
 		}
 	} else if len(nodegroups) == 0 {
