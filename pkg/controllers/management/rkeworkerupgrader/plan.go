@@ -10,7 +10,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
-	rkehosts "github.com/rancher/rke/hosts"
 	rkeservices "github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
@@ -53,8 +52,7 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rk
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == hostAddress {
 
-			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-			np.Processes = nodeserver.AugmentProcesses(token, tempNode.Processes, false, b2d,
+			np.Processes = nodeserver.AugmentProcesses(token, tempNode.Processes, false,
 				node.Status.NodeConfig.HostnameOverride, cluster)
 
 			np.Processes = nodeserver.AppendTaintsToKubeletArgs(np.Processes, node.Status.NodeConfig.Taints)
@@ -102,8 +100,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 			if hostDockerInfo.OSType == "windows" { // compatible with Windows
 				np.Processes = nodeserver.EnhanceWindowsProcesses(tempNode.Processes)
 			} else {
-				b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-				np.Processes = nodeserver.AugmentProcesses(token, tempNode.Processes, true, b2d,
+				np.Processes = nodeserver.AugmentProcesses(token, tempNode.Processes, true,
 					node.Status.NodeConfig.HostnameOverride, cluster)
 			}
 			np.Processes = nodeserver.AppendTaintsToKubeletArgs(np.Processes, node.Status.NodeConfig.Taints)

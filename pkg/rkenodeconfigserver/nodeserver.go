@@ -36,10 +36,6 @@ const (
 	AgentCheckIntervalDuringCreate  = 15
 )
 
-var (
-	b2Mount = "/mnt/sda1"
-)
-
 type RKENodeConfigServer struct {
 	auth                 *tunnelserver.Authorizer
 	lookup               *BundleLookup
@@ -255,28 +251,25 @@ func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node)
 	spec.Nodes = nodeList
 }
 
-func AugmentProcesses(token string, processes map[string]rketypes.Process, worker, b2d bool, nodeName string,
+func AugmentProcesses(token string, processes map[string]rketypes.Process, worker bool, nodeName string,
 	cluster *v3.Cluster) map[string]rketypes.Process {
-	var shared []string
+	var shared bool
 
-	if b2d {
-		shared = append(shared, b2Mount)
-	}
-
+OuterLoop:
 	for _, process := range processes {
 		for _, bind := range process.Binds {
 			parts := strings.Split(bind, ":")
 			if len(parts) > 2 && strings.Contains(parts[2], "shared") {
-				shared = append(shared, parts[0])
+				shared = true
+				break OuterLoop
 			}
 		}
 	}
 
-	if len(shared) > 0 {
+	if shared {
 		agentImage := settings.AgentImage.Get()
 		nodeCommand := clusterregistrationtokens.NodeCommand(token, cluster) + " --no-register --only-write-certs --node-name " + nodeName
 		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
-		args = append(args, shared...)
 		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
 		processes["share-mnt"] = rketypes.Process{
 			Name:                    "share-mnt",

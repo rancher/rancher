@@ -66,9 +66,9 @@ func TestAppendKubeletArgs(t *testing.T) {
 func TestShareMntArgs(t *testing.T) {
 	augmentedProcesses := getAugmentedKubeletProcesses()
 	args := augmentedProcesses["share-mnt"].Args
-	// args should be "--", "share-root.sh", "node command in one string", "one argument per shared bind in kubelet process"
-	// By default, arg count is 3, plus 2 shared binds we use in the test
-	assert.Equal(t, 5, len(args), "args count for share-mnt should be the same")
+	// args should be "--", "share-root.sh", "node command in one string"
+	// By default, arg count is 3
+	assert.Equal(t, 3, len(args), "args count for share-mnt should be the same")
 }
 
 func getKubeletProcess(commands []string) map[string]rketypes.Process {
@@ -92,7 +92,7 @@ func getAugmentedKubeletProcesses() map[string]rketypes.Process {
 		},
 	}
 
-	return AugmentProcesses("token", processes, true, false, "dummynode", &cluster)
+	return AugmentProcesses("token", processes, true, "dummynode", &cluster)
 }
 
 func getCommandFromProcesses(processes map[string]rketypes.Process) map[string]struct{} {
