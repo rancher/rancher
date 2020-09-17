@@ -9,8 +9,12 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/kstatus"
 	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -18,15 +22,20 @@ const (
 )
 
 type operationHandler struct {
+	ctx             context.Context
 	pods            corecontrollers.PodCache
+	k8s             kubernetes.Interface
 	operationsCache catalogcontrollers.OperationCache
 }
 
 func RegisterOperations(ctx context.Context,
+	k8s kubernetes.Interface,
 	pods corecontrollers.PodController,
 	operations catalogcontrollers.OperationController) {
 
 	o := operationHandler{
+		ctx:             ctx,
+		k8s:             k8s,
 		pods:            pods.Cache(),
 		operationsCache: operations.Cache(),
 	}
@@ -83,6 +92,7 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 						container.State.Terminated.Message,
 						container.State.Terminated.ExitCode))
 			}
+			o.cleanup(pod)
 		} else if container.State.Waiting != nil {
 			kstatus.SetTransitioning(&status, "waiting to run operation")
 		} else {
@@ -91,4 +101,39 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 	}
 
 	return status, nil
+}
+
+func (o *operationHandler) cleanup(pod *corev1.Pod) error {
+	running := false
+	success := false
+	for _, container := range pod.Status.ContainerStatuses {
+		if container.Name == "proxy" && container.State.Terminated == nil {
+			running = true
+		} else if container.Name == "helm" && container.State.Terminated != nil && container.State.Terminated.ExitCode == 0 {
+			success = true
+		}
+	}
+	if running && success {
+		result := o.k8s.CoreV1().RESTClient().
+			Get().
+			Namespace(pod.Namespace).
+			Resource("pods").
+			Name(pod.Name).
+			SubResource("exec").
+			SetHeader("Upgrade", "websocket").
+			SetHeader("Sec-Websocket-Key", "websocket").
+			SetHeader("Sec-Websocket-Version", "13").
+			SetHeader("Connection", "Upgrade").
+			VersionedParams(&corev1.PodExecOptions{
+				Stdout:    true,
+				Stderr:    true,
+				Container: "proxy",
+				Command:   []string{"killall", "kubectl"},
+			}, scheme.ParameterCodec).Do(o.ctx)
+		if result.Error() != nil {
+			logrus.Errorf("failed to shutdown helm operation: %s/%s: %v", pod.Namespace, pod.Name, result.Error())
+		}
+	}
+
+	return nil
 }
