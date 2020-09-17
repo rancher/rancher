@@ -5,7 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
+	"helm.sh/helm/v3/pkg/repo"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
@@ -36,12 +41,25 @@ var (
 	}
 )
 
+type desiredKey struct {
+	namespace string
+	name      string
+}
+
+type desired struct {
+	key    desiredKey
+	values map[string]interface{}
+}
+
 type Manager struct {
 	ctx              context.Context
 	operation        *helmop.Operations
 	content          *content.Manager
 	restClientGetter genericclioptions.RESTClientGetter
 	pods             corecontrollers.PodClient
+	desiredCharts    map[desiredKey]map[string]interface{}
+	sync             chan desired
+	syncLock         sync.Mutex
 }
 
 func NewManager(ctx context.Context,
@@ -50,16 +68,91 @@ func NewManager(ctx context.Context,
 	ops *helmop.Operations,
 	pods corecontrollers.PodClient) (*Manager, error) {
 
-	return &Manager{
+	m := &Manager{
 		ctx:              ctx,
 		operation:        ops,
 		content:          contentManager,
 		restClientGetter: restClientGetter,
 		pods:             pods,
-	}, nil
+		sync:             make(chan desired, 5),
+		desiredCharts:    map[desiredKey]map[string]interface{}{},
+	}
+
+	go m.runSync()
+	return m, nil
+}
+
+func (m *Manager) cleanup() {
+	// This shouldn't be this hard, I'm clearly doing something wrong
+	toDrain := m.sync
+	go func() {
+		for range toDrain {
+		}
+	}()
+
+	m.syncLock.Lock()
+	close(m.sync)
+	m.sync = nil
+	m.syncLock.Unlock()
+}
+
+func (m *Manager) runSync() {
+	t := time.NewTicker(15 * time.Minute)
+	defer t.Stop()
+	defer m.cleanup()
+
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-t.C:
+			m.installCharts(m.desiredCharts)
+		case desired := <-m.sync:
+			v, exists := m.desiredCharts[desired.key]
+			m.desiredCharts[desired.key] = desired.values
+			// newly requested or changed
+			if !exists || !equality.Semantic.DeepEqual(v, desired.values) {
+				m.installCharts(map[desiredKey]map[string]interface{}{
+					desired.key: desired.values,
+				})
+			}
+		}
+	}
+}
+
+func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}) {
+	for key, values := range charts {
+		for {
+			if err := m.install(key.namespace, key.name, values); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds", key.name)
+				time.Sleep(5 * time.Second)
+				continue
+			} else if err != nil {
+				logrus.Errorf("Failed to install system chart %s: %v", key.name, err)
+			}
+			break
+		}
+	}
 }
 
 func (m *Manager) Ensure(namespace, name string, values map[string]interface{}) error {
+	m.syncLock.Lock()
+	defer m.syncLock.Unlock()
+	if m.sync == nil {
+		return nil
+	}
+
+	m.sync <- desired{
+		key: desiredKey{
+			namespace: namespace,
+			name:      name,
+		},
+		values: values,
+	}
+	return nil
+}
+
+func (m *Manager) install(namespace, name string, values map[string]interface{}) error {
 	index, err := m.content.Index("", "rancher-charts")
 	if err != nil {
 		return err
