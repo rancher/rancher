@@ -277,13 +277,6 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			}
 		}
 
-		// check for unauthorized error
-		if failureMessage != "" {
-			if strings.Contains(failureMessage, "403") {
-				return e.setFalse(cluster, apimgmtv3.ClusterConditionUpdated, "cannot access EKS, check cloud credential")
-			}
-		}
-
 		cluster, err = e.recordAppliedSpec(cluster)
 		if err != nil {
 			return cluster, err
@@ -302,6 +295,9 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return e.setUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
 		}
 		logrus.Infof("waiting for cluster EKS [%s] update failure to be resolved", cluster.Name)
+		if strings.Contains(failureMessage, "403") {
+			failureMessage = "cannot access EKS, check cloud credential"
+		}
 		return e.setFalse(cluster, apimgmtv3.ClusterConditionUpdated, failureMessage)
 	default:
 		if cluster.Spec.EKSConfig.Imported {
