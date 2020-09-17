@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 )
 
 func NewAccessControl(ctx context.Context, clusterName string, rbacClient v1.Interface) types.AccessControl {
-	asl := accesscontrol.NewAccessStore(ctx, features.Steve.Enabled(), rbacClient)
+	asl := accesscontrol.NewAccessStore(ctx, true, rbacClient)
 	return NewAccessControlWithASL(clusterName, rbacClient, asl)
 }
 

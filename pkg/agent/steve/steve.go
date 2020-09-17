@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rancher"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
@@ -21,10 +20,6 @@ var (
 )
 
 func Run(ctx context.Context) error {
-	if !features.Steve.Enabled() {
-		return nil
-	}
-
 	runLock.Lock()
 	defer runLock.Unlock()
 

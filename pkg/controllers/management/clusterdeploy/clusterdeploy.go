@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
@@ -240,9 +239,8 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
 
-	desiredFeatures := map[string]bool{
-		features.Steve.Name(): features.Steve.Enabled(),
-	}
+	desiredFeatures := map[string]bool{}
+
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 
 	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures) {

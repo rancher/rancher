@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -177,7 +176,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	asl := accesscontrol.NewAccessStore(ctx, features.Steve.Enabled(), steveControllers.RBAC)
+	asl := accesscontrol.NewAccessStore(ctx, true, steveControllers.RBAC)
 
 	cg, err := client.NewFactory(restConfig, false)
 	if err != nil {

@@ -127,13 +127,7 @@ func (h *Handler) MatchNonLegacy(prefix string, force bool) gmux.MatcherFunc {
 		}
 		match.Vars["clusterID"] = clusterID
 
-		cluster, err := h.clusters.Get(clusterID)
-		if err != nil {
-			return true
-		}
-
-		// No steve means we are upgrading a node that doesn't have the right proxy
-		return cluster.Status.AgentFeatures[features.Steve.Name()]
+		return true
 	}
 }
 
