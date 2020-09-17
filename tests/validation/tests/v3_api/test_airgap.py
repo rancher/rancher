@@ -5,7 +5,7 @@ import re
 import time
 from lib.aws import AWS_USER
 from .common import (
-    AmazonWebServices, run_command, wait_for_status_code,
+    ADMIN_PASSWORD, AmazonWebServices, run_command, wait_for_status_code,
     TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE, readDataFile,
     DEFAULT_CLUSTER_STATE_TIMEOUT
 )
@@ -19,7 +19,8 @@ from .test_create_ha import (
 from .test_import_k3s_cluster import (RANCHER_K3S_VERSION)
 
 PRIVATE_REGISTRY_USERNAME = os.environ.get("RANCHER_BASTION_USERNAME")
-PRIVATE_REGISTRY_PASSWORD = os.environ.get("RANCHER_BASTION_PASSWORD")
+PRIVATE_REGISTRY_PASSWORD = \
+    os.environ.get("RANCHER_BASTION_PASSWORD", ADMIN_PASSWORD)
 BASTION_ID = os.environ.get("RANCHER_BASTION_ID", "")
 NUMBER_OF_INSTANCES = int(os.environ.get("RANCHER_AIRGAP_INSTANCE_COUNT", "1"))
 IMAGE_LIST = os.environ.get("RANCHER_IMAGE_LIST", ",".join(
