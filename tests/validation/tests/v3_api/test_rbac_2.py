@@ -39,3 +39,12 @@ def test_istio_rbac_v2(cluster_role, command, authorization, name):
                              'rbac/logging/logging_rbac.json')))
 def test_logging_rbac_v2(cluster_role, command, authorization, name):
     validate_cluster_role_rbac(cluster_role, command, authorization, name)
+
+
+@if_test_rbac_v2
+@pytest.mark.parametrize("cluster_role, command, authorization, name",
+                         rbac_test_file_reader(os.path.join(
+                             DATA_SUBDIR,
+                             'rbac/cis/cis_rbac.json')))
+def test_cis_rbac_v2(cluster_role, command, authorization, name):
+    validate_cluster_role_rbac(cluster_role, command, authorization, name)
