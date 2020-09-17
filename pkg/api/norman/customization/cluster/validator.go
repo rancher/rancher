@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -71,7 +71,7 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
-	if err := v.validateEKSConfig(request, data); err != nil {
+	if err := v.validateEKSConfig(request, data, &clusterSpec); err != nil {
 		return err
 	}
 
@@ -332,7 +332,7 @@ func (v *Validator) validateGenericEngineConfig(request *types.APIContext, spec 
 
 }
 
-func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[string]interface{}) error {
+func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {
 	eksConfig, ok := cluster["eksConfig"].(map[string]interface{})
 	if !ok {
 		return nil
@@ -353,21 +353,24 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 
 	createFromImport := request.Method == http.MethodPost && eksConfig["imported"] == true
 
-	var prevSpec *eksv1.EKSClusterConfigSpec
+	var prevCluster *v3.Cluster
 
 	if request.Method == http.MethodPut {
-		prevCluster, err := v.ClusterLister.Get("", request.ID)
+		var err error
+		prevCluster, err = v.ClusterLister.Get("", request.ID)
 		if err != nil {
 			return err
 		}
-		prevSpec = prevCluster.Spec.EKSConfig
 	}
 
 	if !createFromImport {
-		if err := validateEKSNodegroups(request, eksConfig, prevSpec); err != nil {
+		if err := validateEKSKubernetesVersion(clusterSpec, prevCluster); err != nil {
 			return err
 		}
-		if err := validateEKSAccess(request, eksConfig, prevSpec); err != nil {
+		if err := validateEKSNodegroups(clusterSpec); err != nil {
+			return err
+		}
+		if err := validateEKSAccess(request, eksConfig, prevCluster); err != nil {
 			return err
 		}
 	}
@@ -420,15 +423,15 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	return nil
 }
 
-func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevSpec *eksv1.EKSClusterConfigSpec) error {
+func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
 	publicAccess, _ := eksConfig["publicAccess"]
 	privateAccess, _ := eksConfig["privateAccess"]
 	if request.Method != http.MethodPost {
 		if publicAccess == nil {
-			publicAccess = prevSpec.PublicAccess
+			publicAccess = prevCluster.Spec.EKSConfig.PublicAccess
 		}
 		if privateAccess == nil {
-			privateAccess = prevSpec.PrivateAccess
+			privateAccess = prevCluster.Spec.EKSConfig.PrivateAccess
 		}
 	}
 
@@ -440,25 +443,51 @@ func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface
 	return nil
 }
 
-func validateEKSNodegroups(request *types.APIContext, eksConfig map[string]interface{}, prevSpec *eksv1.EKSClusterConfigSpec) error {
-	noNodegroupsError := httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one nodegroup"))
-	nodegroups, ok := eksConfig["nodeGroups"].([]interface{})
-	if !ok || nodegroups == nil {
-		if request.Method == http.MethodPost {
-			return noNodegroupsError
-		}
-		if prevSpec.NodeGroups != nil && len(prevSpec.NodeGroups) == 0 {
-			return noNodegroupsError
-		}
-	} else if len(nodegroups) == 0 {
-		return noNodegroupsError
+// validateEKSKubernetesVersion checks whether a kubernetes version is provided and if it is supported
+func validateEKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	clusterVersion := spec.EKSConfig.KubernetesVersion
+	if clusterVersion == nil {
+		return nil
 	}
 
+	if aws.StringValue(clusterVersion) == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
+	}
+
+	return nil
+}
+
+// validateEKSNodegroups checks whether a given nodegroup version is empty or not supported.
+// More involved validation is performed in the EKS-operator.
+func validateEKSNodegroups(spec *v32.ClusterSpec) error {
+	nodegroups := spec.EKSConfig.NodeGroups
+	if nodegroups == nil {
+		return nil
+	}
+	if len(nodegroups) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one nodegroup"))
+	}
+
+	var errors []string
+
 	for _, ng := range nodegroups {
-		ngMap, _ := ng.(map[string]interface{})
-		if name, ok := ngMap["nodegroupName"].(string); ok && name == "" {
-			return noNodegroupsError
+		name := aws.StringValue(ng.NodegroupName)
+		if name == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("nodegroupName cannot be an empty"))
 		}
+
+		version := ng.Version
+		if version == nil {
+			continue
+		}
+		if aws.StringValue(version) == "" {
+			errors = append(errors, fmt.Sprintf("nodegroup [%s] version cannot be empty string", name))
+			continue
+		}
+	}
+
+	if len(errors) != 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf(strings.Join(errors, ";")))
 	}
 	return nil
 }

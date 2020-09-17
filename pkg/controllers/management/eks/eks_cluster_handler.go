@@ -169,7 +169,9 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	status, _ := eksClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase, _ := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
-
+	if strings.Contains(failureMessage, "403") {
+		failureMessage = fmt.Sprintf("cannot access EKS, check cloud credential: %s", failureMessage)
+	}
 	switch phase {
 	case "creating":
 		// set provisioning to unknown
@@ -274,13 +276,6 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 					return cluster, statusErr
 				}
 				return cluster, err
-			}
-		}
-
-		// check for unauthorized error
-		if failureMessage != "" {
-			if strings.Contains(failureMessage, "403") {
-				return e.setFalse(cluster, apimgmtv3.ClusterConditionUpdated, "cannot access EKS, check cloud credential")
 			}
 		}
 
