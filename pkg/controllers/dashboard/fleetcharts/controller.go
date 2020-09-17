@@ -38,7 +38,6 @@ func Register(ctx context.Context, wContext *wrangler.Context) error {
 type handler struct {
 	sync.Mutex
 	manager *system.Manager
-	once    sync.Once
 }
 
 func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error) {
@@ -50,9 +49,6 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		setting.Name != settings.CACerts.Name {
 		return setting, nil
 	}
-
-	h.Lock()
-	defer h.Unlock()
 
 	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, nil)
 	if err != nil {
