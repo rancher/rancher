@@ -1,0 +1,75 @@
+{
+  "cis-admin": {
+    "should_pass": [
+      "create -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+      "get clusterscans",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+      "get clusterscanprofiles",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+      "get clusterscanbenchmarks",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml",
+      "get clusterscanreports",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml"
+    ],
+    "should_fail": []
+  },
+  "cis-edit": {
+    "should_pass": [
+      "create -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+      "get clusterscans",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+      "get clusterscanprofiles",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+      "get clusterscanbenchmarks",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml",
+      "get clusterscanreports",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml"
+    ],
+    "should_fail": []
+  },
+  "cis-view": {
+    "should_pass": [
+      "get clusterscans",
+      "get clusterscanprofiles",
+      "get clusterscanbenchmarks",
+      "get clusterscanreports"
+    ],
+    "should_fail": [
+      "create -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscans.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanprofiles.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanbenchmarks.yaml",
+
+      "create -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml",
+      "apply -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml",
+      "delete -f {resource_root}/rbac/cis/cr_clusterscanreports.yaml"
+    ]
+  }
+}
