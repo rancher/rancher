@@ -29,12 +29,6 @@ var (
 		true,
 		true,
 		true)
-	Steve = newFeature(
-		"dashboard",
-		"Deploy experimental new UI for managing resources inside of clusters.",
-		true,
-		false,
-		true)
 	SteveProxy = newFeature(
 		"proxy",
 		"Use new experimental proxy for Kubernetes API requests.",
@@ -56,11 +50,12 @@ var (
 )
 
 type Feature struct {
-	name string
-	// val is the effective value- it is equal to default until explicitly changed
+	name        string
 	description string
-	val         bool
-	def         bool
+	// val is the effective value- it is equal to default until explicitly changed
+	val bool
+	// default value of feature
+	def bool
 	// if a feature is not dynamic, then rancher must be restarted when the value is changed
 	dynamic bool
 	// Whether we should install this feature or assume something else will install and manage the Feature CR
@@ -233,7 +228,7 @@ func newFeature(name, description string, def, dynamic, install bool) *Feature {
 	}
 
 	// feature will be stored in feature map, features contained in feature
-	// map will be then be initialized
+	// map will then be initialized
 	features[name] = feature
 
 	return feature
