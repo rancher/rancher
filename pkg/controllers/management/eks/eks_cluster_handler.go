@@ -204,7 +204,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		addNgMessage := "Cannot deploy agent without nodegroups. Add a nodegroup."
 		noNodeGroupsOnSpec := len(cluster.Spec.EKSConfig.NodeGroups) == 0
 		noNodeGroupsOnUpstreamSpec := len(cluster.Status.EKSStatus.UpstreamSpec.NodeGroups) == 0
-		if (cluster.Spec.EKSConfig.NodeGroups != nil && noNodeGroupsOnSpec) || noNodeGroupsOnUpstreamSpec {
+		if (cluster.Spec.EKSConfig.NodeGroups != nil && noNodeGroupsOnSpec) || (cluster.Spec.EKSConfig.NodeGroups == nil && noNodeGroupsOnUpstreamSpec) {
 			cluster, err = e.setFalse(cluster, apimgmtv3.ClusterConditionWaiting, addNgMessage)
 			if err != nil {
 				return cluster, err
