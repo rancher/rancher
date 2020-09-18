@@ -21,7 +21,7 @@ go build -o ../../bin/rancherd-${ARCH} \
     -X github.com/rancher/rke2/pkg/images.RuntimeImageName=rancher-runtime
     -X github.com/rancher/k3s/pkg/version.Program=rke2
     -X github.com/rancher/k3s/pkg/version.Version='$RUNTIME_TAG \
-    -tags "netgo osusergo "
+    -tags "netgo osusergo selinux "
 if [ "$ARCH" = "amd64" ]; then
     cp ../../bin/rancherd-${ARCH} ../../bin/rancherd
 fi
