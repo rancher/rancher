@@ -295,7 +295,8 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		Host:        u.String(),
 		BearerToken: cluster.Status.ServiceAccountToken,
 		TLSClientConfig: rest.TLSClientConfig{
-			CAData: append(caBytes, suffix...),
+			CAData:     append(caBytes, suffix...),
+			NextProtos: []string{"http/1.1"},
 		},
 		Timeout:     45 * time.Second,
 		RateLimiter: ratelimit.None,
