@@ -9,7 +9,6 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/kstatus"
 	"github.com/rancher/wrangler/pkg/relatedresource"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,7 +91,9 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 						container.State.Terminated.Message,
 						container.State.Terminated.ExitCode))
 			}
-			o.cleanup(pod)
+			if err := o.cleanup(pod); err != nil {
+				return status, err
+			}
 		} else if container.State.Waiting != nil {
 			kstatus.SetTransitioning(&status, "waiting to run operation")
 		} else {
@@ -103,7 +104,7 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 	return status, nil
 }
 
-func (o *operationHandler) cleanup(pod *corev1.Pod) {
+func (o *operationHandler) cleanup(pod *corev1.Pod) error {
 	running := false
 	success := false
 	for _, container := range pod.Status.ContainerStatuses {
@@ -113,25 +114,26 @@ func (o *operationHandler) cleanup(pod *corev1.Pod) {
 			success = true
 		}
 	}
-	if running && success {
-		result := o.k8s.CoreV1().RESTClient().
-			Get().
-			Namespace(pod.Namespace).
-			Resource("pods").
-			Name(pod.Name).
-			SubResource("exec").
-			SetHeader("Upgrade", "websocket").
-			SetHeader("Sec-Websocket-Key", "websocket").
-			SetHeader("Sec-Websocket-Version", "13").
-			SetHeader("Connection", "Upgrade").
-			VersionedParams(&corev1.PodExecOptions{
-				Stdout:    true,
-				Stderr:    true,
-				Container: "proxy",
-				Command:   []string{"killall", "kubectl"},
-			}, scheme.ParameterCodec).Do(o.ctx)
-		if result.Error() != nil {
-			logrus.Errorf("failed to shutdown helm operation: %s/%s: %v", pod.Namespace, pod.Name, result.Error())
-		}
+
+	if !running || !success {
+		return nil
 	}
+
+	result := o.k8s.CoreV1().RESTClient().
+		Get().
+		Namespace(pod.Namespace).
+		Resource("pods").
+		Name(pod.Name).
+		SubResource("exec").
+		SetHeader("Upgrade", "websocket").
+		SetHeader("Sec-Websocket-Key", "websocket").
+		SetHeader("Sec-Websocket-Version", "13").
+		SetHeader("Connection", "Upgrade").
+		VersionedParams(&corev1.PodExecOptions{
+			Stdout:    true,
+			Stderr:    true,
+			Container: "proxy",
+			Command:   []string{"killall", "kubectl"},
+		}, scheme.ParameterCodec).Do(o.ctx)
+	return result.Error()
 }
