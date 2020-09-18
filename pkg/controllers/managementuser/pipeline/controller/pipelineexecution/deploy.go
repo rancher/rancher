@@ -134,7 +134,7 @@ func (l *Lifecycle) deploy(projectName string) error {
 	if err := l.reconcileRegistryCredential(projectName, token); err != nil {
 		return err
 	}
-	nginxDaemonset := getProxyDaemonset()
+	nginxDaemonset := GetProxyDaemonset()
 	if _, err := l.daemonsets.Create(nginxDaemonset); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error creating the nginx proxy")
 	}
@@ -345,6 +345,9 @@ func getRegistryCredential(projectID string, token string, hostname string) (*co
 			Namespace: ns,
 			Annotations: map[string]string{
 				projectIDFieldLabel: projectID,
+			},
+			Labels: map[string]string{
+				"cattle.io/creator": "norman",
 			},
 		},
 		Data: map[string][]byte{
@@ -758,7 +761,7 @@ func (l *Lifecycle) getAvailablePort() (string, error) {
 
 }
 
-func getProxyDaemonset() *appsv1.DaemonSet {
+func GetProxyDaemonset() *appsv1.DaemonSet {
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: utils.PipelineNamespace,
