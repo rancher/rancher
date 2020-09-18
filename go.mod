@@ -83,7 +83,7 @@ require (
 	github.com/rancher/norman v0.0.0-20200806175025-f974dbfb2734
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83
-	github.com/rancher/rke v1.1.7-0.20200909222504-7a68adea9093
+	github.com/rancher/rke v1.1.9-rc1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200522224200-dc9f969673f8
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd
