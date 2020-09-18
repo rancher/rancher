@@ -28,7 +28,7 @@ func cssURL() string {
 	case "false":
 		return ""
 	}
-	return "/api-ui/ui-min.css"
+	return "/api-ui/ui.min.css"
 }
 
 func jsURL() string {
@@ -40,5 +40,5 @@ func jsURL() string {
 	case "false":
 		return ""
 	}
-	return "/api-ui/ui-min.js"
+	return "/api-ui/ui.min.js"
 }
