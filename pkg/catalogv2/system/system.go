@@ -8,10 +8,6 @@ import (
 	"sync"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"helm.sh/helm/v3/pkg/repo"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -23,9 +19,11 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/release"
 	release2 "helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -74,7 +72,7 @@ func NewManager(ctx context.Context,
 		content:          contentManager,
 		restClientGetter: restClientGetter,
 		pods:             pods,
-		sync:             make(chan desired, 5),
+		sync:             make(chan desired, 10),
 		desiredCharts:    map[desiredKey]map[string]interface{}{},
 	}
 
@@ -82,24 +80,9 @@ func NewManager(ctx context.Context,
 	return m, nil
 }
 
-func (m *Manager) cleanup() {
-	// This shouldn't be this hard, I'm clearly doing something wrong
-	toDrain := m.sync
-	go func() {
-		for range toDrain {
-		}
-	}()
-
-	m.syncLock.Lock()
-	close(m.sync)
-	m.sync = nil
-	m.syncLock.Unlock()
-}
-
 func (m *Manager) runSync() {
 	t := time.NewTicker(15 * time.Minute)
 	defer t.Stop()
-	defer m.cleanup()
 
 	for {
 		select {
@@ -136,19 +119,15 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}) {
 }
 
 func (m *Manager) Ensure(namespace, name string, values map[string]interface{}) error {
-	m.syncLock.Lock()
-	defer m.syncLock.Unlock()
-	if m.sync == nil {
-		return nil
-	}
-
-	m.sync <- desired{
-		key: desiredKey{
-			namespace: namespace,
-			name:      name,
-		},
-		values: values,
-	}
+	go func() {
+		m.sync <- desired{
+			key: desiredKey{
+				namespace: namespace,
+				name:      name,
+			},
+			values: values,
+		}
+	}()
 	return nil
 }
 

@@ -103,7 +103,7 @@ func (o *operationHandler) onOperationChange(operation *catalog.Operation, statu
 	return status, nil
 }
 
-func (o *operationHandler) cleanup(pod *corev1.Pod) error {
+func (o *operationHandler) cleanup(pod *corev1.Pod) {
 	running := false
 	success := false
 	for _, container := range pod.Status.ContainerStatuses {
@@ -134,6 +134,4 @@ func (o *operationHandler) cleanup(pod *corev1.Pod) error {
 			logrus.Errorf("failed to shutdown helm operation: %s/%s: %v", pod.Namespace, pod.Name, result.Error())
 		}
 	}
-
-	return nil
 }
