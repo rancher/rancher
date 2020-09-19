@@ -686,7 +686,8 @@ func skipLocalK3sImported(cluster *apimgmtv3.Cluster) bool {
 		cluster.Status.Driver == apimgmtv3.ClusterDriverImported ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3s ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
-		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD
 }
 
 func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, driverName, clusterName string) (*apimgmtv3.ClusterSpec, interface{}, error) {
@@ -1015,7 +1016,8 @@ func k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 	}
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverK3s ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
-		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 {
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD {
 		return nil //no-op
 	}
 
@@ -1037,6 +1039,10 @@ func k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 			cluster.Spec.K3sConfig.SetStrategy(1, 1)
 		}
 	} else if strings.Contains(cluster.Status.Version.String(), "rke2") {
+		if cluster.Name == "local" {
+			cluster.Status.Driver = apimgmtv3.ClusterDriverRancherD
+			return nil
+		}
 		cluster.Status.Driver = apimgmtv3.ClusterDriverRke2
 		if cluster.Spec.Rke2Config == nil {
 			cluster.Spec.Rke2Config = &apimgmtv3.Rke2Config{

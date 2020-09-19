@@ -61,7 +61,8 @@ func IsCloudDriver(cluster *v3.Cluster) bool {
 		cluster.Status.Driver != v32.ClusterDriverRKE &&
 		cluster.Status.Driver != v32.ClusterDriverK3s &&
 		cluster.Status.Driver != v32.ClusterDriverK3os &&
-		cluster.Status.Driver != v32.ClusterDriverRke2
+		cluster.Status.Driver != v32.ClusterDriverRke2 &&
+		cluster.Status.Driver != v32.ClusterDriverRancherD
 }
 
 func (f *Factory) translateClusterAddress(cluster *v3.Cluster, clusterHostPort, address string) string {
