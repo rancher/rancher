@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/settings"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/systemimage"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -77,6 +78,11 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 
 	if clusterRec.Spec.Internal {
 		err := managementagent.Register(ctx, cluster.UserOnlyContext())
+		if err != nil {
+			return err
+		}
+	} else {
+		err := settings.Register(ctx, cluster)
 		if err != nil {
 			return err
 		}
