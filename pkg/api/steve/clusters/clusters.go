@@ -29,11 +29,34 @@ func Register(ctx context.Context, server *steve.Server) error {
 	server.SchemaFactory.AddTemplate(schema2.Template{
 		Group: "management.cattle.io",
 		Kind:  "Cluster",
-		ID:    "",
 		Customize: func(schema *types.APISchema) {
 			schema.LinkHandlers = map[string]http.Handler{
 				"shell": shell,
 			}
+			// Everybody can list even if they have no list or get privileges. The users
+			// authorization will still be used to determine what can be seen but just
+			// may result in an empty list
+			schema.CollectionMethods = append(schema.CollectionMethods, http.MethodGet)
+		},
+	})
+	server.SchemaFactory.AddTemplate(schema2.Template{
+		Group: "management.cattle.io",
+		Kind:  "Project",
+		Customize: func(schema *types.APISchema) {
+			// Everybody can list even if they have no list or get privileges. The users
+			// authorization will still be used to determine what can be seen but just
+			// may result in an empty list
+			schema.CollectionMethods = append(schema.CollectionMethods, http.MethodGet)
+		},
+	})
+	server.SchemaFactory.AddTemplate(schema2.Template{
+		Group: "",
+		Kind:  "Namespace",
+		Customize: func(schema *types.APISchema) {
+			// Everybody can list even if they have no list or get privileges. The users
+			// authorization will still be used to determine what can be seen but just
+			// may result in an empty list
+			schema.CollectionMethods = append(schema.CollectionMethods, http.MethodGet)
 		},
 	})
 
