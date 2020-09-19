@@ -1002,8 +1002,8 @@ github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09 h1:Rh+7v
 github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
 github.com/rancher/eks-operator v0.1.0-rc22 h1:wPX+aP/kJ3q9wA7qiZ8jEDbRZ6PV6cWnodemKbWXmcw=
 github.com/rancher/eks-operator v0.1.0-rc22/go.mod h1:TrTF54+K2X6QLhVFspIfawYcPnVNLSIBrgCvpE1BiqM=
-github.com/rancher/eks-operator v0.1.0-rc28 h1:+rg04yGpBN38vGBYXM3UVS7H+bJDUk2BDxVteBlbftk=
-github.com/rancher/eks-operator v0.1.0-rc28/go.mod h1:Q9J5NGpq/y1qdog+6YzYmvhPDKgJ7F/8vOgza9+HF6M=
+github.com/rancher/eks-operator v0.1.0-rc30 h1:5Q/TWFRzHX7O4ZsNAdaSMSSHVHoxYxB5GlxwcFh+3WQ=
+github.com/rancher/eks-operator v0.1.0-rc30/go.mod h1:Q9J5NGpq/y1qdog+6YzYmvhPDKgJ7F/8vOgza9+HF6M=
 github.com/rancher/helm/v3 v3.3.0-rancher1 h1:i9uzKgPbt15FTn0rHMt22sA4rdHPq4iJ8gmohSWPR1o=
 github.com/rancher/helm/v3 v3.3.0-rancher1/go.mod h1:qUawjWz9THVCBVsNPJ/Q20VNEyrK7kN6lYf5loyp194=
 github.com/rancher/kubernetes-provider-detector v0.1.0 h1:lQl16AX7UkHPKMaam+Aubu90nvovyzSbbE3SOBBXdbQ=
