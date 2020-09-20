@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/url"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
@@ -28,6 +30,13 @@ type Manager struct {
 	configMaps   corecontrollers.ConfigMapCache
 	secrets      corecontrollers.SecretCache
 	clusterRepos catalogcontrollers.ClusterRepoCache
+	IndexCache   map[string]indexCache
+	lock         sync.RWMutex
+}
+
+type indexCache struct {
+	index    repo.IndexFile
+	revision string
 }
 
 func NewManager(
@@ -38,6 +47,7 @@ func NewManager(
 		configMaps:   configMaps,
 		secrets:      secrets,
 		clusterRepos: clusterRepos,
+		IndexCache:   map[string]indexCache{},
 	}
 }
 
@@ -76,6 +86,15 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 		return nil, err
 	}
 
+	c.lock.RLock()
+	if cache, ok := c.IndexCache[fmt.Sprintf("%s/%s", r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)]; ok {
+		if cm.ResourceVersion == cache.revision {
+			c.lock.RUnlock()
+			return c.filterReleases(&cache.index), nil
+		}
+	}
+	c.lock.RUnlock()
+
 	if len(cm.OwnerReferences) == 0 || cm.OwnerReferences[0].UID != r.metadata.UID {
 		return nil, validation.Unauthorized
 	}
@@ -95,11 +114,18 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	if err := json.Unmarshal(data, index); err != nil {
 		return nil, err
 	}
+
+	c.lock.Lock()
+	c.IndexCache[fmt.Sprintf("%s/%s", r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)] = indexCache{
+		index:    *index,
+		revision: cm.ResourceVersion,
+	}
+	c.lock.Unlock()
+
 	return c.filterReleases(index), nil
 }
 
 func (c *Manager) filterReleases(index *repo.IndexFile) *repo.IndexFile {
-	index.SortEntries()
 	if !settings.IsRelease() {
 		return index
 	}
