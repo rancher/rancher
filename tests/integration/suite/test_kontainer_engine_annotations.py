@@ -1,5 +1,5 @@
 from .common import random_str
-from .conftest import wait_until
+from .conftest import wait_until, wait_for
 
 annotation = "clusterstatus.management.cattle.io/" \
              "temporary-security-credentials"
@@ -102,8 +102,8 @@ def test_editing_eks_cluster_gives_temp_creds_annotation(
         amazonElasticContainerServiceConfig=eks
     )
 
-    wait_until(has_cluster_annotation(admin_mc.client, cluster,
-                                      expected="true"))
+    wait_for(has_cluster_annotation(admin_mc.client, cluster,
+                                    expected="true"), timeout=120)
 
     cluster = admin_mc.client.reload(cluster)
 
