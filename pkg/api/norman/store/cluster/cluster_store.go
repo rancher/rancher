@@ -241,6 +241,21 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	return r.Store.Create(apiContext, schema, data)
 }
 
+func dropEKSv1SubnetUpdate(apiContext *types.APIContext, data map[string]interface{}, existingCluster map[string]interface{}) {
+	if apiContext.Method != http.MethodPut {
+		return
+	}
+	eksConfig, ok := data["amazonElasticContainerServiceConfig"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	existingEKSConfig, ok := existingCluster["amazonElasticContainerServiceConfig"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	eksConfig["subnets"] = existingEKSConfig["subnets"]
+}
+
 func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types.Schema) map[string]interface{} {
 
 	if clusterConfigSchema != nil {
@@ -465,6 +480,8 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, err
 		}
 	}
+
+	dropEKSv1SubnetUpdate(apiContext, data, existingCluster)
 
 	//check if template is passed. if yes, load template data
 	if hasTemplate(data) {
