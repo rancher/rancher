@@ -103,6 +103,19 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	}
 
 	if err := e.deployEKSOperator(); err != nil {
+		failedToDeployEKSOperatorErr := "failed to deploy eks-operator: %v"
+		var conditionErr error
+		if cluster.Spec.EKSConfig.Imported {
+			cluster, conditionErr = e.setFalse(cluster, apimgmtv3.ClusterConditionPending, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
+			if err != nil {
+				return cluster, conditionErr
+			}
+		} else {
+			cluster, conditionErr = e.setFalse(cluster, apimgmtv3.ClusterConditionProvisioned, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
+			if err != nil {
+				return cluster, conditionErr
+			}
+		}
 		return cluster, err
 	}
 
@@ -465,8 +478,9 @@ func (e *eksOperatorController) deployEKSOperator() error {
 
 	systemProject, err := project.GetSystemProject(localCluster, e.projectCache)
 	if err != nil {
-		panic(err)
+		return err
 	}
+
 	systemProjectID := ref.Ref(systemProject)
 	_, systemProjectName := ref.Parse(systemProjectID)
 
