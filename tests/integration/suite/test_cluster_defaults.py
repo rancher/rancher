@@ -56,56 +56,21 @@ def test_generic_initial_conditions(admin_mc, remove_resource):
 
 
 def test_eks_cluster_immutable_subnets(admin_mc, remove_resource):
+    original_subnets = ["subnet-045bfaeca7d3f1cb3", "subnet-02388a166136f98c4"]
     cluster = admin_mc.client.create_cluster(
         name=random_str(), amazonElasticContainerServiceConfig={
             "accessKey": "asdfsd",
             "secretKey": "verySecretKey",
-            "subnets": [
-                "subnet-045bfaeca7d3f1cb3",
-                "subnet-02388a166136f98c4"
-            ]})
+            "subnets": original_subnets})
     remove_resource(cluster)
 
-    def cannot_modify_error():
-        with pytest.raises(ApiError) as e:
-            # try to edit cluster subnets
-            admin_mc.client.update_by_id_cluster(
-                id=cluster.id,
-                amazonElasticContainerServiceConfig={
-                     "accessKey": "asdfsd",
-                     "secretKey": "verySecretKey",
-                     "subnets": [
-                         "subnet-045bfaeca7d3f1cb3"
-                     ]})
-        if e.value.error.status == 404:
-            return False
-        print(e)
-        assert e.value.error.status == 422
-        assert e.value.error.message ==\
-            'cannot modify EKS subnets after creation'
-        return True
+    cluster.amazonElasticContainerServiceConfig.subnets = ["asd"]
+    cluster = admin_mc.client.update_by_id_cluster(cluster.id, cluster)
 
-    # lister used by cluster validator may not be up to date, may need to retry
-    wait_for(cannot_modify_error)
-
-    # tests updates still work
-    new = admin_mc.client.update_by_id_cluster(
-       id=cluster.id,
-       name=cluster.name,
-       description="update",
-       amazonElasticContainerServiceConfig={
-           # required field when updating KE clusters
-           "driverName": "amazonelasticcontainerservice",
-           "accessKey": "asdfsd",
-           "secretKey": "verySecretKey",
-           "subnets": [
-               "subnet-045bfaeca7d3f1cb3",
-               "subnet-02388a166136f98c4"
-           ]})
-
-    assert new.id == cluster.id
-    assert not hasattr(cluster, "description")
-    assert hasattr(new, "description")
+    new_subnets = cluster.amazonElasticContainerServiceConfig.subnets
+    assert len(original_subnets) == len(new_subnets)
+    for key, value in enumerate(new_subnets):
+        assert original_subnets[key] == value
 
 
 def test_rke_initial_conditions(admin_mc, remove_resource):
