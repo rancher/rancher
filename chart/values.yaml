@@ -18,9 +18,7 @@ auditLog:
   maxBackup: 1
   maxSize: 100
 
-# Have Rancher detect and import the "local" Rancher server cluster
-# Adding the "local" cluster available in the GUI can be convenient, but any user with access to this cluster has "root" on any of the clusters that Rancher manages.
-# options; "true", "false"
+# As of Rancher v2.5.0 this flag is deprecated and must be set to 'true' in order for Rancher to start
 addLocal: "true"
 
 # Image for collecting rancher audit logs.
