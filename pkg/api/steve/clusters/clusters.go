@@ -17,7 +17,7 @@ import (
 func Register(ctx context.Context, server *steve.Server) error {
 	shell := &shell{
 		cg:           server.ClientFactory,
-		namespace:    "dashboard-shells",
+		namespace:    "cattle-system",
 		impersonator: podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
 	}
 
