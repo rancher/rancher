@@ -35,7 +35,7 @@ type Manager struct {
 }
 
 type indexCache struct {
-	index    repo.IndexFile
+	index    *repo.IndexFile
 	revision string
 }
 
@@ -90,7 +90,7 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	if cache, ok := c.IndexCache[fmt.Sprintf("%s/%s", r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)]; ok {
 		if cm.ResourceVersion == cache.revision {
 			c.lock.RUnlock()
-			return c.filterReleases(&cache.index), nil
+			return c.filterReleases(deepCopyIndex(cache.index)), nil
 		}
 	}
 	c.lock.RUnlock()
@@ -117,12 +117,38 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 
 	c.lock.Lock()
 	c.IndexCache[fmt.Sprintf("%s/%s", r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)] = indexCache{
-		index:    *index,
+		index:    index,
 		revision: cm.ResourceVersion,
 	}
 	c.lock.Unlock()
 
-	return c.filterReleases(index), nil
+	return c.filterReleases(deepCopyIndex(index)), nil
+}
+
+func deepCopyIndex(src *repo.IndexFile) *repo.IndexFile {
+	deepcopy := repo.IndexFile{
+		APIVersion: src.APIVersion,
+		Generated:  src.Generated,
+		Entries:    map[string]repo.ChartVersions{},
+	}
+	keys := deepcopy.PublicKeys
+	copy(keys, src.PublicKeys)
+	for k, entries := range src.Entries {
+		for _, chart := range entries {
+			cpMeta := *chart.Metadata
+			cpChart := &repo.ChartVersion{
+				Metadata: &cpMeta,
+				Created:  chart.Created,
+				Removed:  chart.Removed,
+				Digest:   chart.Digest,
+				URLs:     make([]string, len(chart.URLs)),
+			}
+
+			copy(cpChart.URLs, chart.URLs)
+			deepcopy.Entries[k] = append(deepcopy.Entries[k], cpChart)
+		}
+	}
+	return &deepcopy
 }
 
 func (c *Manager) filterReleases(index *repo.IndexFile) *repo.IndexFile {
