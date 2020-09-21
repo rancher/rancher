@@ -236,7 +236,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbUID, namespace str
 // (or CRUD the project/cluster if they are an owner)
 func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Cluster, makeOwner bool) error {
 	if cr, _ := m.crLister.Get("", roleName); cr == nil {
-		return m.createMembershipRole(clusterResource, roleName, makeOwner, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient())
+		return m.createMembershipRole(clusterResource, roleName, makeOwner, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
 	}
 	return nil
 }
@@ -245,12 +245,12 @@ func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Clust
 // (or CRUD the project if they are an owner)
 func (m *manager) createProjectMembershipRole(roleName, namespace string, project *v3.Project, makeOwner bool) error {
 	if cr, _ := m.rLister.Get(namespace, roleName); cr == nil {
-		return m.createMembershipRole(projectResource, roleName, makeOwner, project, m.mgmt.RBAC.Roles(namespace).ObjectClient())
+		return m.createMembershipRole(projectResource, roleName, makeOwner, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
 	}
 	return nil
 }
 
-func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient) error {
+func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {
 		return err
@@ -273,21 +273,31 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 	} else {
 		rules[0].Verbs = []string{"get"}
 	}
-	logrus.Infof("[%v] Creating clusterRole %v", m.controller, roleName)
-	_, err = client.Create(&v1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: roleName,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: typeMeta.GetAPIVersion(),
-					Kind:       typeMeta.GetKind(),
-					Name:       metaObj.GetName(),
-					UID:        metaObj.GetUID(),
-				},
+	logrus.Infof("[%v] Creating role/clusterRole %v", m.controller, roleName)
+	var toCreate runtime.Object
+	objectMeta := metav1.ObjectMeta{
+		Name: roleName,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: typeMeta.GetAPIVersion(),
+				Kind:       typeMeta.GetKind(),
+				Name:       metaObj.GetName(),
+				UID:        metaObj.GetUID(),
 			},
 		},
-		Rules: rules,
-	})
+	}
+	if clusterRole {
+		toCreate = &v1.ClusterRole{
+			ObjectMeta: objectMeta,
+			Rules:      rules,
+		}
+	} else {
+		toCreate = &v1.Role{
+			ObjectMeta: objectMeta,
+			Rules:      rules,
+		}
+	}
+	_, err = client.Create(toCreate)
 	return err
 }
 
