@@ -77,7 +77,7 @@ def test_eks_cluster_immutable_subnets(admin_mc, remove_resource):
                      "subnets": [
                          "subnet-045bfaeca7d3f1cb3"
                      ]})
-        if e.value.error.status == 404:
+        if e.value.error.status == 404 or e.value.error.status == 500:
             return False
         print(e)
         assert e.value.error.status == 422
