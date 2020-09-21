@@ -13,9 +13,11 @@ import (
 )
 
 const (
-	NamespaceID = "namespaceId"
-	ProjectID   = "projectId"
-	ClusterID   = "clusterId"
+	NamespaceID           = "namespaceId"
+	ProjectID             = "projectId"
+	ClusterID             = "clusterId"
+	GlobalAdmin           = "admin"
+	GlobalRestrictedAdmin = "restricted-admin"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -79,7 +81,13 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 }
 
 func GrbCRBName(grb *v3.GlobalRoleBinding) string {
-	return "globaladmin-" + GetGRBTargetKey(grb)
+	var prefix string
+	if grb.GlobalRoleName == GlobalAdmin {
+		prefix = "globaladmin-"
+	} else {
+		prefix = "globalrestrictedadmin-"
+	}
+	return prefix + GetGRBTargetKey(grb)
 }
 
 // GetGRBSubject creates and returns a subject that is

@@ -73,7 +73,7 @@ func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runti
 }
 
 func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	if obj.GlobalRoleName == "admin" {
+	if obj.GlobalRoleName == rbac.GlobalAdmin || obj.GlobalRoleName == rbac.GlobalRestrictedAdmin {
 		return obj, grb.deleteAdminBinding(obj)
 	}
 	// Don't need to delete the created ClusterRole because owner reference will take care of that

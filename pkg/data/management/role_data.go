@@ -73,6 +73,15 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
+	// restricted-admin will get cluster admin access to all downstream clusters but limited access to the local cluster
+	// The validating webhook will ensure GRBs PRTBs and CRTBs are not created by a restricted admin in the local cluster
+	rb.addRole("Restricted Admin", "restricted-admin").
+		addRule().apiGroups("management.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("fleet.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("rancher.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("catalog.cattle.io").resources("*").verbs("*")
+
 	rb.addRole("User", "user").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
