@@ -113,7 +113,12 @@ func cordonUncordonNode(actionName string, apiContext *types.APIContext, cordon 
 		return httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Node %s already %sed", apiContext.ID, actionName))
 	}
 	values.PutValue(node, convert.ToString(!unschedulable), "desiredNodeUnschedulable")
-	return updateNode(apiContext, node, schema, actionName)
+	err = updateNode(apiContext, node, schema, actionName)
+	if err != nil {
+		return err
+	}
+	apiContext.WriteResponse(http.StatusOK, map[string]interface{}{})
+	return nil
 }
 
 func drainNode(actionName string, apiContext *types.APIContext, stop bool) error {
@@ -129,7 +134,12 @@ func drainNode(actionName string, apiContext *types.APIContext, stop bool) error
 		values.PutValue(node, drainInput, "nodeDrainInput")
 	}
 	values.PutValue(node, actionName, "desiredNodeUnschedulable")
-	return updateNode(apiContext, node, schema, actionName)
+	err = updateNode(apiContext, node, schema, actionName)
+	if err != nil {
+		return err
+	}
+	apiContext.WriteResponse(http.StatusOK, map[string]interface{}{})
+	return nil
 }
 
 func validate(apiContext *types.APIContext) (*v32.NodeDrainInput, error) {
