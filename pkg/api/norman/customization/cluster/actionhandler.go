@@ -3,16 +3,16 @@ package cluster
 import (
 	"fmt"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -41,7 +41,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		cluster := map[string]interface{}{
 			"id": apiContext.ID,
 		}
-
 		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, cluster, apiContext.Schema) == nil
 	}
 
@@ -55,7 +54,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	}
 
 	canCreateClusterTemplate := func() bool {
-
 		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
 		canCreateTemplates, _ := CanCreateRKETemplate(callerID, a.SubjectAccessReviewClient)
 		return canCreateTemplates
@@ -100,6 +98,18 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate certificates")
 		}
 		return a.RotateCertificates(actionName, action, apiContext)
+	case v32.ClusterActionRotateEncryptionKey:
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate encryption key")
+		}
+		enabled, err := a.secretEncryptionEnabled(apiContext.ID)
+		if err != nil {
+			return httperror.NewAPIError(httperror.ClusterUnavailable, err.Error())
+		}
+		if !enabled {
+			return httperror.NewAPIError(httperror.InvalidAction, "encryption is disabled")
+		}
+		return a.RotateEncryptionKey(actionName, action, apiContext)
 	case v32.ClusterActionRunSecurityScan:
 		return a.runCisScan(actionName, action, apiContext)
 	case v32.ClusterActionSaveAsTemplate:
@@ -129,6 +139,19 @@ func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmt
 	if err != nil {
 		return nil, err
 	}
-
 	return a.ClusterManager.KubeConfig(cluster.ID, token), nil
+}
+
+func (a ActionHandler) secretEncryptionEnabled(clusterID string) (bool, error) {
+	c, err := a.ClusterClient.Get(clusterID, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+
+	if c.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig != nil &&
+		c.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.Enabled {
+		return true, nil
+	}
+
+	return false, nil
 }
