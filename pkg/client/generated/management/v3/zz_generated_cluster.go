@@ -173,6 +173,8 @@ type ClusterOperations interface {
 
 	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
 
+	ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error)
+
 	ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error
 
 	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error)
@@ -295,6 +297,12 @@ func (c *ClusterClient) ActionRestoreFromEtcdBackup(resource *Cluster, input *Re
 func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error) {
 	resp := &RotateCertificateOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "rotateCertificates", &resource.Resource, input, resp)
+	return resp, err
+}
+
+func (c *ClusterClient) ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error) {
+	resp := &RotateEncryptionKeyOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "rotateEncryptionKey", &resource.Resource, nil, resp)
 	return resp, err
 }
 
