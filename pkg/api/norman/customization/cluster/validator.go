@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -351,7 +350,7 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 
 	// check user's access to cloud credential
 	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok {
-		if err := validateEKSCredentialAuth(request, amazonCredential, prevCluster.Spec.EKSConfig); err != nil {
+		if err := validateEKSCredentialAuth(request, amazonCredential, prevCluster); err != nil {
 			return err
 		}
 	}
@@ -455,26 +454,33 @@ func validateEKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster
 // validateEKSCredentialAuth validates that a user has access to the credential they are setting and the credential
 // they are overwriting. If there is no previous credential such as during a create or the old credential cannot
 // be found, the auth check will succeed as long as the user can access the new credential.
-func validateEKSCredentialAuth(request *types.APIContext, credential string, prevSpec *eksv1.EKSClusterConfigSpec) error {
+func validateEKSCredentialAuth(request *types.APIContext, credential string, prevCluster *v3.Cluster) error {
 	var accessCred mgmtclient.CloudCredential
-	credentialErr := "error accessing new cloud credential"
+	credentialErr := "error accessing cloud credential"
 	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
 		return httperror.NewAPIError(httperror.NotFound, credentialErr)
 	}
 
-	if prevSpec != nil {
-		// validate the user has access to the old cloud credential before allowing them to change it
-		credential = prevSpec.AmazonCredentialSecret
-		if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
-			if apiError, ok := err.(*httperror.APIError); ok {
-				if apiError.Code.Status == httperror.NotFound.Status {
-					// old cloud credential doesn't exist anymore, anyone can change it
-					return nil
-				}
-			}
-			return httperror.NewAPIError(httperror.NotFound, credentialErr)
-		}
+	if prevCluster == nil {
+		return nil
 	}
+
+	if prevCluster.Spec.EKSConfig == nil {
+		return nil
+	}
+
+	// validate the user has access to the old cloud credential before allowing them to change it
+	credential = prevCluster.Spec.EKSConfig.AmazonCredentialSecret
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.NotFound.Status {
+				// old cloud credential doesn't exist anymore, anyone can change it
+				return nil
+			}
+		}
+		return httperror.NewAPIError(httperror.NotFound, credentialErr)
+	}
+
 	return nil
 }
 
