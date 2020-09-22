@@ -25,7 +25,7 @@ cd $(dirname $0)/../package
 cp ../bin/rancher.yaml ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 
 IMAGE=${REPO}/rancher:${TAG}
-AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
+AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
 RUNTIME_IMAGE=${REPO}/rancher-runtime:${TAG}
 
 if [ ${ARCH} == arm64 ]; then
