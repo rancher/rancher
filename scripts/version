@@ -59,6 +59,11 @@ if [ -n "$DRONE_TAG" ]; then
     TAG=$DRONE_TAG
 fi
 
+AGENT_TAG="$TAG"
+if [ "$AGENT_TAG" = dev ]; then
+    AGENT_TAG="master-head"
+fi
+
 echo "ARCH: $ARCH"
 echo "CHART_REPO: $CHART_REPO"
 echo "CHART_VERSION: $CHART_VERSION"
@@ -66,3 +71,4 @@ echo "VERSION: $VERSION"
 echo "SUFFIX: $SUFFIX"
 echo "REPO: $REPO"
 echo "TAG: $TAG"
+echo "AGENT_TAG: $AGENT_TAG"
