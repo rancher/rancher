@@ -41,51 +41,51 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-type ReleaseHandler func(string, *v1.Release) (*v1.Release, error)
+type AppHandler func(string, *v1.App) (*v1.App, error)
 
-type ReleaseController interface {
+type AppController interface {
 	generic.ControllerMeta
-	ReleaseClient
+	AppClient
 
-	OnChange(ctx context.Context, name string, sync ReleaseHandler)
-	OnRemove(ctx context.Context, name string, sync ReleaseHandler)
+	OnChange(ctx context.Context, name string, sync AppHandler)
+	OnRemove(ctx context.Context, name string, sync AppHandler)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
-	Cache() ReleaseCache
+	Cache() AppCache
 }
 
-type ReleaseClient interface {
-	Create(*v1.Release) (*v1.Release, error)
-	Update(*v1.Release) (*v1.Release, error)
-	UpdateStatus(*v1.Release) (*v1.Release, error)
+type AppClient interface {
+	Create(*v1.App) (*v1.App, error)
+	Update(*v1.App) (*v1.App, error)
+	UpdateStatus(*v1.App) (*v1.App, error)
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	Get(namespace, name string, options metav1.GetOptions) (*v1.Release, error)
-	List(namespace string, opts metav1.ListOptions) (*v1.ReleaseList, error)
+	Get(namespace, name string, options metav1.GetOptions) (*v1.App, error)
+	List(namespace string, opts metav1.ListOptions) (*v1.AppList, error)
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Release, err error)
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.App, err error)
 }
 
-type ReleaseCache interface {
-	Get(namespace, name string) (*v1.Release, error)
-	List(namespace string, selector labels.Selector) ([]*v1.Release, error)
+type AppCache interface {
+	Get(namespace, name string) (*v1.App, error)
+	List(namespace string, selector labels.Selector) ([]*v1.App, error)
 
-	AddIndexer(indexName string, indexer ReleaseIndexer)
-	GetByIndex(indexName, key string) ([]*v1.Release, error)
+	AddIndexer(indexName string, indexer AppIndexer)
+	GetByIndex(indexName, key string) ([]*v1.App, error)
 }
 
-type ReleaseIndexer func(obj *v1.Release) ([]string, error)
+type AppIndexer func(obj *v1.App) ([]string, error)
 
-type releaseController struct {
+type appController struct {
 	controller    controller.SharedController
 	client        *client.Client
 	gvk           schema.GroupVersionKind
 	groupResource schema.GroupResource
 }
 
-func NewReleaseController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ReleaseController {
+func NewAppController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) AppController {
 	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &releaseController{
+	return &appController{
 		controller: c,
 		client:     c.Client(),
 		gvk:        gvk,
@@ -96,13 +96,13 @@ func NewReleaseController(gvk schema.GroupVersionKind, resource string, namespac
 	}
 }
 
-func FromReleaseHandlerToHandler(sync ReleaseHandler) generic.Handler {
+func FromAppHandlerToHandler(sync AppHandler) generic.Handler {
 	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.Release
+		var v *v1.App
 		if obj == nil {
 			v, err = sync(key, nil)
 		} else {
-			v, err = sync(key, obj.(*v1.Release))
+			v, err = sync(key, obj.(*v1.App))
 		}
 		if v == nil {
 			return nil, err
@@ -111,9 +111,9 @@ func FromReleaseHandlerToHandler(sync ReleaseHandler) generic.Handler {
 	}
 }
 
-func (c *releaseController) Updater() generic.Updater {
+func (c *appController) Updater() generic.Updater {
 	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.Release))
+		newObj, err := c.Update(obj.(*v1.App))
 		if newObj == nil {
 			return nil, err
 		}
@@ -121,7 +121,7 @@ func (c *releaseController) Updater() generic.Updater {
 	}
 }
 
-func UpdateReleaseDeepCopyOnChange(client ReleaseClient, obj *v1.Release, handler func(obj *v1.Release) (*v1.Release, error)) (*v1.Release, error) {
+func UpdateAppDeepCopyOnChange(client AppClient, obj *v1.App, handler func(obj *v1.App) (*v1.App, error)) (*v1.App, error) {
 	if obj == nil {
 		return obj, nil
 	}
@@ -138,92 +138,92 @@ func UpdateReleaseDeepCopyOnChange(client ReleaseClient, obj *v1.Release, handle
 	return copyObj, err
 }
 
-func (c *releaseController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
+func (c *appController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
 	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
-func (c *releaseController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
+func (c *appController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
 	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
 }
 
-func (c *releaseController) OnChange(ctx context.Context, name string, sync ReleaseHandler) {
-	c.AddGenericHandler(ctx, name, FromReleaseHandlerToHandler(sync))
+func (c *appController) OnChange(ctx context.Context, name string, sync AppHandler) {
+	c.AddGenericHandler(ctx, name, FromAppHandlerToHandler(sync))
 }
 
-func (c *releaseController) OnRemove(ctx context.Context, name string, sync ReleaseHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromReleaseHandlerToHandler(sync)))
+func (c *appController) OnRemove(ctx context.Context, name string, sync AppHandler) {
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromAppHandlerToHandler(sync)))
 }
 
-func (c *releaseController) Enqueue(namespace, name string) {
+func (c *appController) Enqueue(namespace, name string) {
 	c.controller.Enqueue(namespace, name)
 }
 
-func (c *releaseController) EnqueueAfter(namespace, name string, duration time.Duration) {
+func (c *appController) EnqueueAfter(namespace, name string, duration time.Duration) {
 	c.controller.EnqueueAfter(namespace, name, duration)
 }
 
-func (c *releaseController) Informer() cache.SharedIndexInformer {
+func (c *appController) Informer() cache.SharedIndexInformer {
 	return c.controller.Informer()
 }
 
-func (c *releaseController) GroupVersionKind() schema.GroupVersionKind {
+func (c *appController) GroupVersionKind() schema.GroupVersionKind {
 	return c.gvk
 }
 
-func (c *releaseController) Cache() ReleaseCache {
-	return &releaseCache{
+func (c *appController) Cache() AppCache {
+	return &appCache{
 		indexer:  c.Informer().GetIndexer(),
 		resource: c.groupResource,
 	}
 }
 
-func (c *releaseController) Create(obj *v1.Release) (*v1.Release, error) {
-	result := &v1.Release{}
+func (c *appController) Create(obj *v1.App) (*v1.App, error) {
+	result := &v1.App{}
 	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
 }
 
-func (c *releaseController) Update(obj *v1.Release) (*v1.Release, error) {
-	result := &v1.Release{}
+func (c *appController) Update(obj *v1.App) (*v1.App, error) {
+	result := &v1.App{}
 	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
-func (c *releaseController) UpdateStatus(obj *v1.Release) (*v1.Release, error) {
-	result := &v1.Release{}
+func (c *appController) UpdateStatus(obj *v1.App) (*v1.App, error) {
+	result := &v1.App{}
 	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
-func (c *releaseController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+func (c *appController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
 	return c.client.Delete(context.TODO(), namespace, name, *options)
 }
 
-func (c *releaseController) Get(namespace, name string, options metav1.GetOptions) (*v1.Release, error) {
-	result := &v1.Release{}
+func (c *appController) Get(namespace, name string, options metav1.GetOptions) (*v1.App, error) {
+	result := &v1.App{}
 	return result, c.client.Get(context.TODO(), namespace, name, result, options)
 }
 
-func (c *releaseController) List(namespace string, opts metav1.ListOptions) (*v1.ReleaseList, error) {
-	result := &v1.ReleaseList{}
+func (c *appController) List(namespace string, opts metav1.ListOptions) (*v1.AppList, error) {
+	result := &v1.AppList{}
 	return result, c.client.List(context.TODO(), namespace, result, opts)
 }
 
-func (c *releaseController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+func (c *appController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.client.Watch(context.TODO(), namespace, opts)
 }
 
-func (c *releaseController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Release, error) {
-	result := &v1.Release{}
+func (c *appController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.App, error) {
+	result := &v1.App{}
 	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
-type releaseCache struct {
+type appCache struct {
 	indexer  cache.Indexer
 	resource schema.GroupResource
 }
 
-func (c *releaseCache) Get(namespace, name string) (*v1.Release, error) {
+func (c *appCache) Get(namespace, name string) (*v1.App, error) {
 	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
 	if err != nil {
 		return nil, err
@@ -231,73 +231,73 @@ func (c *releaseCache) Get(namespace, name string) (*v1.Release, error) {
 	if !exists {
 		return nil, errors.NewNotFound(c.resource, name)
 	}
-	return obj.(*v1.Release), nil
+	return obj.(*v1.App), nil
 }
 
-func (c *releaseCache) List(namespace string, selector labels.Selector) (ret []*v1.Release, err error) {
+func (c *appCache) List(namespace string, selector labels.Selector) (ret []*v1.App, err error) {
 
 	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Release))
+		ret = append(ret, m.(*v1.App))
 	})
 
 	return ret, err
 }
 
-func (c *releaseCache) AddIndexer(indexName string, indexer ReleaseIndexer) {
+func (c *appCache) AddIndexer(indexName string, indexer AppIndexer) {
 	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
 		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.Release))
+			return indexer(obj.(*v1.App))
 		},
 	}))
 }
 
-func (c *releaseCache) GetByIndex(indexName, key string) (result []*v1.Release, err error) {
+func (c *appCache) GetByIndex(indexName, key string) (result []*v1.App, err error) {
 	objs, err := c.indexer.ByIndex(indexName, key)
 	if err != nil {
 		return nil, err
 	}
-	result = make([]*v1.Release, 0, len(objs))
+	result = make([]*v1.App, 0, len(objs))
 	for _, obj := range objs {
-		result = append(result, obj.(*v1.Release))
+		result = append(result, obj.(*v1.App))
 	}
 	return result, nil
 }
 
-type ReleaseStatusHandler func(obj *v1.Release, status v1.ReleaseStatus) (v1.ReleaseStatus, error)
+type AppStatusHandler func(obj *v1.App, status v1.ReleaseStatus) (v1.ReleaseStatus, error)
 
-type ReleaseGeneratingHandler func(obj *v1.Release, status v1.ReleaseStatus) ([]runtime.Object, v1.ReleaseStatus, error)
+type AppGeneratingHandler func(obj *v1.App, status v1.ReleaseStatus) ([]runtime.Object, v1.ReleaseStatus, error)
 
-func RegisterReleaseStatusHandler(ctx context.Context, controller ReleaseController, condition condition.Cond, name string, handler ReleaseStatusHandler) {
-	statusHandler := &releaseStatusHandler{
+func RegisterAppStatusHandler(ctx context.Context, controller AppController, condition condition.Cond, name string, handler AppStatusHandler) {
+	statusHandler := &appStatusHandler{
 		client:    controller,
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromReleaseHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromAppHandlerToHandler(statusHandler.sync))
 }
 
-func RegisterReleaseGeneratingHandler(ctx context.Context, controller ReleaseController, apply apply.Apply,
-	condition condition.Cond, name string, handler ReleaseGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
-	statusHandler := &releaseGeneratingHandler{
-		ReleaseGeneratingHandler: handler,
-		apply:                    apply,
-		name:                     name,
-		gvk:                      controller.GroupVersionKind(),
+func RegisterAppGeneratingHandler(ctx context.Context, controller AppController, apply apply.Apply,
+	condition condition.Cond, name string, handler AppGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
+	statusHandler := &appGeneratingHandler{
+		AppGeneratingHandler: handler,
+		apply:                apply,
+		name:                 name,
+		gvk:                  controller.GroupVersionKind(),
 	}
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
 	controller.OnChange(ctx, name, statusHandler.Remove)
-	RegisterReleaseStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
+	RegisterAppStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
-type releaseStatusHandler struct {
-	client    ReleaseClient
+type appStatusHandler struct {
+	client    AppClient
 	condition condition.Cond
-	handler   ReleaseStatusHandler
+	handler   AppStatusHandler
 }
 
-func (a *releaseStatusHandler) sync(key string, obj *v1.Release) (*v1.Release, error) {
+func (a *appStatusHandler) sync(key string, obj *v1.App) (*v1.App, error) {
 	if obj == nil {
 		return obj, nil
 	}
@@ -333,20 +333,20 @@ func (a *releaseStatusHandler) sync(key string, obj *v1.Release) (*v1.Release, e
 	return obj, err
 }
 
-type releaseGeneratingHandler struct {
-	ReleaseGeneratingHandler
+type appGeneratingHandler struct {
+	AppGeneratingHandler
 	apply apply.Apply
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
 }
 
-func (a *releaseGeneratingHandler) Remove(key string, obj *v1.Release) (*v1.Release, error) {
+func (a *appGeneratingHandler) Remove(key string, obj *v1.App) (*v1.App, error) {
 	if obj != nil {
 		return obj, nil
 	}
 
-	obj = &v1.Release{}
+	obj = &v1.App{}
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
@@ -356,8 +356,8 @@ func (a *releaseGeneratingHandler) Remove(key string, obj *v1.Release) (*v1.Rele
 		ApplyObjects()
 }
 
-func (a *releaseGeneratingHandler) Handle(obj *v1.Release, status v1.ReleaseStatus) (v1.ReleaseStatus, error) {
-	objs, newStatus, err := a.ReleaseGeneratingHandler(obj, status)
+func (a *appGeneratingHandler) Handle(obj *v1.App, status v1.ReleaseStatus) (v1.ReleaseStatus, error) {
+	objs, newStatus, err := a.AppGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
