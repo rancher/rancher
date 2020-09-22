@@ -80,7 +80,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
+	lockID := "cattle-controllers"
+	if opts.Agent {
+		lockID = "cattle-agent-controllers"
+	}
+
+	wranglerContext, err := wrangler.NewContext(ctx, lockID, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
 	}

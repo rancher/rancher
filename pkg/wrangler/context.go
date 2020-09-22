@@ -133,7 +133,7 @@ func (w *Context) Start(ctx context.Context) error {
 	return nil
 }
 
-func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
+func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(restConfig, Scheme)
 	if err != nil {
 		return nil, err
@@ -218,7 +218,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		MultiClusterManager:   noopMCM{},
 		CachedDiscovery:       cache,
 		RESTMapper:            restMapper,
-		leadership:            leader.NewManager("", "cattle-controllers", steveControllers.K8s),
+		leadership:            leader.NewManager("", lockID, steveControllers.K8s),
 		RESTClientGetter:      restClientGetter,
 		CatalogContentManager: content,
 		HelmOperations:        helmop,
