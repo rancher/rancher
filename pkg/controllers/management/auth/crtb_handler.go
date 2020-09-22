@@ -11,6 +11,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -22,6 +23,8 @@ const (
 	rbByOwnerIndex              = "auth.management.cattle.io/rb-by-owner"
 	rbByRoleAndSubjectIndex     = "auth.management.cattle.io/crb-by-role-and-subject"
 	ctrbMGMTController          = "mgmt-auth-crtb-controller"
+	rtbLabelUpdated             = "auth.management.cattle.io/rtb-label-updated"
+	rtbCrbRbLabelsUpdated       = "auth.management.cattle.io/crb-rb-labels-updated"
 )
 
 var clusterManagmentPlaneResources = map[string]string{
@@ -63,12 +66,15 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 	if err != nil {
 		return nil, err
 	}
+	if err := c.reconcileLabels(obj); err != nil {
+		return nil, err
+	}
 	err = c.reconcileBindings(obj)
 	return obj, err
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
-	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", string(obj.UID)); err != nil {
+	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", getRTBLabelKey(obj.ObjectMeta)); err != nil {
 		return nil, err
 	}
 	err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj)
@@ -142,7 +148,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	if err != nil {
 		return err
 	}
-	if err := c.mgr.ensureClusterMembershipBinding(clusterRoleName, string(binding.UID), cluster, isOwnerRole, subject); err != nil {
+	if err := c.mgr.ensureClusterMembershipBinding(clusterRoleName, getRTBLabelKey(binding.ObjectMeta), cluster, isOwnerRole, subject); err != nil {
 		return err
 	}
 
@@ -168,8 +174,9 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	if err != nil {
 		return err
 	}
+	bindingKey := getRTBLabelKey(binding.ObjectMeta)
 	for _, p := range projects {
-		set := labels.Set(map[string]string{string(binding.UID): crtbInProjectBindingOwner})
+		set := labels.Set(map[string]string{bindingKey: crtbInProjectBindingOwner})
 		rbs, err := c.mgr.rbLister.List(p.Name, set.AsSelector())
 		if err != nil {
 			return err
@@ -182,4 +189,79 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 		}
 	}
 	return nil
+}
+
+func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) error {
+	/* Prior to 2.5, for every CRTB, following CRBs and RBs are created in the management clusters
+		1. CRTB.UID is the label key for a CRB, CRTB.UID=memberhsip-binding-owner
+	    2. CRTB.UID is label key for the RB, CRTB.UID=crtb-in-project-binding-owner (in the namespace of each project in the cluster that the user has access to)
+	Using above labels, list the CRB and RB and update them to add a label with ns+name of CRTB
+	*/
+	if binding.Labels[rtbCrbRbLabelsUpdated] == "true" {
+		return nil
+	}
+
+	var returnErr []error
+	requirements, err := getLabelRequirements(binding.Namespace, binding.Name)
+	if err != nil {
+		return err
+	}
+
+	set := labels.Set(map[string]string{string(binding.UID): membershipBindingOwner})
+	crbs, err := c.mgr.crbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
+	if err != nil {
+		return err
+	}
+	bindingKey := getRTBLabelKey(binding.ObjectMeta)
+	for _, crb := range crbs {
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			crbToUpdate, updateErr := c.mgr.crbClient.Get(crb.Name, v1.GetOptions{})
+			if updateErr != nil {
+				return updateErr
+			}
+			crbToUpdate.Labels[bindingKey] = membershipBindingOwner
+			crbToUpdate.Labels[rtbLabelUpdated] = "true"
+			_, err := c.mgr.crbClient.Update(crbToUpdate)
+			return err
+		})
+		if retryErr != nil {
+			returnErr = append(returnErr, retryErr)
+		}
+	}
+
+	set = map[string]string{string(binding.UID): crtbInProjectBindingOwner}
+	rbs, err := c.mgr.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
+	if err != nil {
+		return err
+	}
+
+	for _, rb := range rbs {
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			rbToUpdate, updateErr := c.mgr.rbClient.GetNamespaced(rb.Namespace, rb.Name, v1.GetOptions{})
+			if updateErr != nil {
+				return updateErr
+			}
+			rbToUpdate.Labels[bindingKey] = crtbInProjectBindingOwner
+			rbToUpdate.Labels[rtbLabelUpdated] = "true"
+			_, err := c.mgr.rbClient.Update(rbToUpdate)
+			return err
+		})
+		if retryErr != nil {
+			returnErr = append(returnErr, retryErr)
+		}
+	}
+	if len(returnErr) > 0 {
+		return fmt.Errorf("%v", returnErr)
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		crtbToUpdate, updateErr := c.mgr.crtbs.GetNamespaced(binding.Namespace, binding.Name, v1.GetOptions{})
+		if updateErr != nil {
+			return updateErr
+		}
+		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		_, err := c.mgr.crtbs.Update(crtbToUpdate)
+		return err
+	})
+	return retryErr
 }

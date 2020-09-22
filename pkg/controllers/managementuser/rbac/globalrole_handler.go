@@ -37,6 +37,7 @@ func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 		prtbByProjecSubjectIndex:         prtbByProjectAndSubject,
 		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
 		prtbByUIDIndex:                   prtbByUID,
+		prtbByNsAndNameIndex:             prtbByNsName,
 	}
 	if err := prtbInformer.AddIndexers(prtbIndexers); err != nil {
 		return err

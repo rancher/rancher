@@ -28,16 +28,20 @@ import (
 )
 
 const (
-	rtbOwnerLabel                    = "authz.cluster.cattle.io/rtb-owner"
+	rtbOwnerLabel                    = "authz.cluster.cattle.io/rtb-owner-updated"
+	rtbOwnerLabelLegacy              = "authz.cluster.cattle.io/rtb-owner"
 	clusterRoleOwner                 = "authz.cluster.cattle.io/clusterrole-owner"
 	projectIDAnnotation              = "field.cattle.io/projectId"
 	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
 	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
 	prtbByUIDIndex                   = "authz.cluster.cattle.io/rtb-owner"
+	prtbByNsAndNameIndex             = "authz.cluster.cattle.io/rtb-owner-updated"
 	rtbByClusterAndRoleTemplateIndex = "authz.cluster.cattle.io/rtb-by-cluster-rt"
 	nsByProjectIndex                 = "authz.cluster.cattle.io/ns-by-project"
 	crByNSIndex                      = "authz.cluster.cattle.io/cr-by-ns"
 	crbByRoleAndSubjectIndex         = "authz.cluster.cattle.io/crb-by-role-and-subject"
+	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
+	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
 )
 
 func Register(ctx context.Context, workload *config.UserContext) {
@@ -81,10 +85,13 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		crLister:            workload.RBAC.ClusterRoles("").Controller().Lister(),
 		clusterRoles:        workload.RBAC.ClusterRoles(""),
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
+		roleBindings:        workload.RBAC.RoleBindings(""),
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
 		nsController:        workload.Core.Namespaces("").Controller(),
 		clusterLister:       workload.Management.Management.Clusters("").Controller().Lister(),
 		projectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
+		crtbs:               workload.Management.Management.ClusterRoleTemplateBindings(""),
+		prtbs:               workload.Management.Management.ProjectRoleTemplateBindings(""),
 		clusterName:         workload.ClusterName,
 	}
 	workload.Management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
@@ -122,12 +129,15 @@ type manager struct {
 	crbLister           typesrbacv1.ClusterRoleBindingLister
 	clusterRoleBindings typesrbacv1.ClusterRoleBindingInterface
 	rbLister            typesrbacv1.RoleBindingLister
+	roleBindings        typesrbacv1.RoleBindingInterface
 	rLister             typesrbacv1.RoleLister
 	roles               typesrbacv1.RoleInterface
 	nsLister            typescorev1.NamespaceLister
 	nsController        typescorev1.NamespaceController
 	clusterLister       v3.ClusterLister
 	projectLister       v3.ProjectLister
+	crtbs               v3.ClusterRoleTemplateBindingInterface
+	prtbs               v3.ProjectRoleTemplateBindingInterface
 	clusterName         string
 }
 
@@ -426,11 +436,11 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		return err
 	}
 	for roleName := range roles {
-		rbKey, objectMeta, subjects, roleRef := bindingParts(roleName, string(meta.GetUID()), subject)
+		rbKey, objectMeta, subjects, roleRef := bindingParts(roleName, meta.GetNamespace()+"_"+meta.GetName(), subject)
 		desiredRBs[rbKey] = create(objectMeta, subjects, roleRef)
 	}
 
-	set := labels.Set(map[string]string{rtbOwnerLabel: string(meta.GetUID())})
+	set := labels.Set(map[string]string{rtbOwnerLabel: meta.GetNamespace() + "_" + meta.GetName()})
 	currentRBs, err := list(ns, set.AsSelector())
 	if err != nil {
 		return err
@@ -483,12 +493,12 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	return nil
 }
 
-func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
+func bindingParts(roleName, parentNsAndName string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
 	crbKey := rbRoleSubjectKey(roleName, subject)
 	return crbKey,
 		metav1.ObjectMeta{
 			GenerateName: "clusterrolebinding-",
-			Labels:       map[string]string{rtbOwnerLabel: parentUID},
+			Labels:       map[string]string{rtbOwnerLabel: parentNsAndName},
 		},
 		[]rbacv1.Subject{subject},
 		rbacv1.RoleRef{
@@ -539,6 +549,14 @@ func prtbByUID(obj interface{}) ([]string, error) {
 	return []string{convert.ToString(prtb.UID)}, nil
 }
 
+func prtbByNsName(obj interface{}) ([]string, error) {
+	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
+	if !ok {
+		return []string{}, nil
+	}
+	return []string{prtb.Namespace + "_" + prtb.Name}, nil
+}
+
 func crbRoleSubjectKeys(roleName string, subjects []rbacv1.Subject) []string {
 	var keys []string
 	for _, s := range subjects {
@@ -581,4 +599,8 @@ func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{idx}, nil
+}
+
+func getRTBLabel(bindingMeta metav1.ObjectMeta) string {
+	return bindingMeta.Namespace + "_" + bindingMeta.Name
 }

@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -69,6 +70,9 @@ func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Obj
 	if err != nil {
 		return nil, err
 	}
+	if err := p.reconcileLabels(obj); err != nil {
+		return nil, err
+	}
 	err = p.reconcileBindings(obj)
 	return obj, err
 }
@@ -79,11 +83,12 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 		return nil, errors.Errorf("cannot determine project and cluster from %v", obj.ProjectName)
 	}
 	clusterName := parts[0]
-	err := p.mgr.reconcileProjectMembershipBindingForDelete(clusterName, "", string(obj.UID))
+	rtbNsAndName := getRTBLabelKey(obj.ObjectMeta)
+	err := p.mgr.reconcileProjectMembershipBindingForDelete(clusterName, "", rtbNsAndName)
 	if err != nil {
 		return nil, err
 	}
-	err = p.mgr.reconcileClusterMembershipBindingForDelete("", string(obj.UID))
+	err = p.mgr.reconcileClusterMembershipBindingForDelete("", rtbNsAndName)
 	if err != nil {
 		return nil, err
 	}
@@ -175,10 +180,11 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	if err != nil {
 		return err
 	}
-	if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, string(binding.UID), clusterName, proj, isOwnerRole, subject); err != nil {
+	rtbNsAndName := getRTBLabelKey(binding.ObjectMeta)
+	if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, rtbNsAndName, clusterName, proj, isOwnerRole, subject); err != nil {
 		return err
 	}
-	if err := p.mgr.ensureClusterMembershipBinding(roleName, string(binding.UID), cluster, false, subject); err != nil {
+	if err := p.mgr.ensureClusterMembershipBinding(roleName, rtbNsAndName, cluster, false, subject); err != nil {
 		return err
 	}
 	if err := p.mgr.grantManagementProjectScopedPrivilegesInClusterNamespace(binding.RoleTemplateName, proj.Namespace, prtbClusterManagmentPlaneResources, subject, binding); err != nil {
@@ -190,7 +196,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 // removeMGMTProjectScopedPrivilegesInClusterNamespace revokes access that project roles were granted to certain cluster scoped resources like
 // catalogtemplates, when the prtb is deleted, by deleting the rolebinding created for this prtb in the cluster's namespace
 func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(binding *v3.ProjectRoleTemplateBinding, clusterName string) error {
-	set := labels.Set(map[string]string{string(binding.UID): prtbInClusterBindingOwner})
+	set := labels.Set(map[string]string{getRTBLabelKey(binding.ObjectMeta): prtbInClusterBindingOwner})
 	rbs, err := p.mgr.rbLister.List(clusterName, set.AsSelector())
 	if err != nil {
 		return err
@@ -205,4 +211,79 @@ func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(bind
 		}
 	}
 	return nil
+}
+
+func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) error {
+	/* Prior to 2.5, for every PRTB, following CRBs and RBs are created in the management clusters
+		1. PRTB.UID is the label key for a CRB, PRTB.UID=memberhsip-binding-owner
+	    2. PRTB.UID is label key for the RB, PRTB.UID=memberhsip-binding-owner
+	    3. PRTB.UID is label key for RB, PRTB.UID=prtb-in-cluster-binding-owner
+	*/
+	if binding.Labels[rtbCrbRbLabelsUpdated] == "true" {
+		return nil
+	}
+
+	var returnErr []error
+	requirements, err := getLabelRequirements(binding.Namespace, binding.Name)
+	if err != nil {
+		return err
+	}
+	bindingKey := getRTBLabelKey(binding.ObjectMeta)
+	set := labels.Set(map[string]string{string(binding.UID): membershipBindingOwner})
+	crbs, err := p.mgr.crbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
+	if err != nil {
+		return err
+	}
+	for _, crb := range crbs {
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			crbToUpdate, updateErr := p.mgr.crbClient.Get(crb.Name, v1.GetOptions{})
+			if updateErr != nil {
+				return updateErr
+			}
+			crbToUpdate.Labels[bindingKey] = membershipBindingOwner
+			crbToUpdate.Labels[rtbLabelUpdated] = "true"
+			_, err := p.mgr.crbClient.Update(crbToUpdate)
+			return err
+		})
+		if retryErr != nil {
+			returnErr = append(returnErr, retryErr)
+		}
+	}
+
+	for _, prtbLabel := range []string{membershipBindingOwner, prtbInClusterBindingOwner} {
+		set = map[string]string{string(binding.UID): prtbLabel}
+		rbs, err := p.mgr.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
+		if err != nil {
+			return err
+		}
+		for _, rb := range rbs {
+			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				rbToUpdate, updateErr := p.mgr.rbClient.GetNamespaced(rb.Namespace, rb.Name, v1.GetOptions{})
+				if updateErr != nil {
+					return updateErr
+				}
+				rbToUpdate.Labels[bindingKey] = prtbLabel
+				rbToUpdate.Labels[rtbLabelUpdated] = "true"
+				_, err := p.mgr.rbClient.Update(rbToUpdate)
+				return err
+			})
+			if retryErr != nil {
+				returnErr = append(returnErr, retryErr)
+			}
+		}
+	}
+	if len(returnErr) > 0 {
+		return fmt.Errorf("%v", returnErr)
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		prtbToUpdate, updateErr := p.mgr.prtbs.GetNamespaced(binding.Namespace, binding.Name, v1.GetOptions{})
+		if updateErr != nil {
+			return updateErr
+		}
+		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		_, err := p.mgr.prtbs.Update(prtbToUpdate)
+		return err
+	})
+	return retryErr
 }

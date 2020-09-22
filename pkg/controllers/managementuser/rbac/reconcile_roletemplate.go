@@ -75,7 +75,7 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 		}
 	}
 
-	rtbUID := string(binding.UID)
+	rtbUID := binding.Namespace + "_" + binding.Name
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return nil, err
