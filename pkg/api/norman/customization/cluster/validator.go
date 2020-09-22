@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -338,21 +339,6 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		return nil
 	}
 
-	// check user's access to cloud credential
-	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok {
-		var accessCred mgmtclient.CloudCredential
-		if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, amazonCredential, &accessCred); err != nil {
-			if apiError, ok := err.(*httperror.APIError); ok {
-				if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
-					return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("cloud credential not found"))
-				}
-			}
-			return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("error accessing cloud credential"))
-		}
-	}
-
-	createFromImport := request.Method == http.MethodPost && eksConfig["imported"] == true
-
 	var prevCluster *v3.Cluster
 
 	if request.Method == http.MethodPut {
@@ -362,6 +348,15 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 			return err
 		}
 	}
+
+	// check user's access to cloud credential
+	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok {
+		if err := validateEKSCredentialAuth(request, amazonCredential, prevCluster.Spec.EKSConfig); err != nil {
+			return err
+		}
+	}
+
+	createFromImport := request.Method == http.MethodPost && eksConfig["imported"] == true
 
 	if !createFromImport {
 		if err := validateEKSKubernetesVersion(clusterSpec, prevCluster); err != nil {
@@ -454,6 +449,32 @@ func validateEKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
 	}
 
+	return nil
+}
+
+// validateEKSCredentialAuth validates that a user has access to the credential they are setting and the credential
+// they are overwriting. If there is no previous credential such as during a create or the old credential cannot
+// be found, the auth check will succeed as long as the user can access the new credential.
+func validateEKSCredentialAuth(request *types.APIContext, credential string, prevSpec *eksv1.EKSClusterConfigSpec) error {
+	var accessCred mgmtclient.CloudCredential
+	credentialErr := "error accessing new cloud credential"
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
+		return httperror.NewAPIError(httperror.NotFound, credentialErr)
+	}
+
+	if prevSpec != nil {
+		// validate the user has access to the old cloud credential before allowing them to change it
+		credential = prevSpec.AmazonCredentialSecret
+		if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
+			if apiError, ok := err.(*httperror.APIError); ok {
+				if apiError.Code.Status == httperror.NotFound.Status {
+					// old cloud credential doesn't exist anymore, anyone can change it
+					return nil
+				}
+			}
+			return httperror.NewAPIError(httperror.NotFound, credentialErr)
+		}
+	}
 	return nil
 }
 
