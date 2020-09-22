@@ -522,12 +522,14 @@ func validateEKS(prevCluster, newCluster map[string]interface{}) error {
 	}
 
 	// don't allow for updating subnets
-	if prev, ok := prevCluster["subnets"]; ok {
-		if new, ok := newCluster["subnets"]; ok {
-			if !reflect.DeepEqual(prev, new) {
-				return httperror.NewAPIError(httperror.InvalidBodyContent, "cannot modify EKS subnets after creation")
-			}
-		}
+	prev, _ := prevCluster["subnets"].([]interface{})
+	new, _ := newCluster["subnets"].([]interface{})
+	if len(prev) == 0 && len(new) == 0 {
+		// should treat empty and nil as equal
+		return nil
+	}
+	if !reflect.DeepEqual(prev, new) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "cannot modify EKS subnets after creation")
 	}
 	return nil
 }
