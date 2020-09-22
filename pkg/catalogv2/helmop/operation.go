@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/apiserver/pkg/types"
 	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
@@ -44,6 +45,7 @@ const (
 
 var (
 	badChars = regexp.MustCompile("[^-.0-9a-zA-Z]")
+	thirty   = int64(30)
 )
 
 type Operations struct {
@@ -53,7 +55,7 @@ type Operations struct {
 	clusterRepos   catalogcontrollers.ClusterRepoClient
 	ops            catalogcontrollers.OperationClient
 	pods           corev1controllers.PodClient
-	releases       catalogcontrollers.ReleaseClient
+	apps           catalogcontrollers.AppClient
 	cg             proxy.ClientGetter
 }
 
@@ -70,21 +72,12 @@ func NewOperations(
 		pods:           pods,
 		clusterRepos:   catalog.ClusterRepo(),
 		ops:            catalog.Operation(),
-		releases:       catalog.Release(),
+		apps:           catalog.App(),
 	}
 }
 
 func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
 	status, cmds, err := s.getUninstallArgs(namespace, name, options)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.createOperation(ctx, user, status, cmds)
-}
-
-func (s *Operations) Rollback(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
-	status, cmds, err := s.getRollbackArgs(namespace, name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -219,8 +212,8 @@ func (s *Operations) getUser(userInfo user.Info, namespace, name string) (user.I
 	}, nil
 }
 
-func (s *Operations) getUninstallArgs(releaseNamespace, releaseName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
-	rel, err := s.releases.Get(releaseNamespace, releaseName, metav1.GetOptions{})
+func (s *Operations) getUninstallArgs(appNamespace, appName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
+	rel, err := s.apps.Get(appNamespace, appName, metav1.GetOptions{})
 	if err != nil {
 		return catalog.OperationStatus{}, nil, err
 	}
@@ -242,38 +235,10 @@ func (s *Operations) getUninstallArgs(releaseNamespace, releaseName string, body
 	status := catalog.OperationStatus{
 		Action:    cmd.Operation,
 		Release:   rel.Spec.Name,
-		Namespace: releaseNamespace,
+		Namespace: appNamespace,
 	}
 
 	return status, Commands{cmd}, nil
-}
-
-func (s *Operations) getRollbackArgs(releaseNamespace, releaseName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
-	rel, err := s.releases.Get(releaseNamespace, releaseName, metav1.GetOptions{})
-	if err != nil {
-		return catalog.OperationStatus{}, nil, err
-	}
-
-	rollbackArgs := &types2.ChartRollbackAction{}
-	if err := json.NewDecoder(body).Decode(rollbackArgs); err != nil {
-		return catalog.OperationStatus{}, nil, err
-	}
-
-	cmd := Command{
-		Operation: "rollback",
-		ArgObjects: []interface{}{
-			rollbackArgs,
-		},
-		ReleaseName:      rel.Spec.Name,
-		ReleaseNamespace: rel.Namespace,
-	}
-	status := catalog.OperationStatus{
-		Action:    "rollback",
-		Release:   rel.Spec.Name,
-		Namespace: releaseNamespace,
-	}
-
-	return status, Commands{cmd}, err
 }
 
 func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
@@ -395,6 +360,7 @@ func (c Command) renderArgs() ([]string, error) {
 	delete(dataMap, "charts")
 	delete(dataMap, "releaseName")
 	delete(dataMap, "chartName")
+	delete(dataMap, "projectId")
 	if v, ok := dataMap["disableOpenAPIValidation"]; ok {
 		delete(dataMap, "disableOpenAPIValidation")
 		dataMap["disableOpenapiValidation"] = v
@@ -498,10 +464,12 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 		cmd.ReleaseName = chartInstall.ReleaseName
 
 		status.Release = chartInstall.ReleaseName
-		status.Namespace = namespace(chartInstall.Namespace)
 
 		cmds = append(cmds, cmd)
 	}
+
+	status.Namespace = namespace(installArgs.Namespace)
+	status.ProjectID = installArgs.ProjectID
 
 	return status, cmds, err
 }
@@ -515,7 +483,7 @@ func namespace(ns string) string {
 
 func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands) (*catalog.Operation, error) {
 	if status.Action != "uninstall" {
-		_, err := s.createNamespace(ctx, status.Namespace)
+		_, err := s.createNamespace(ctx, status.Namespace, status.ProjectID)
 		if err != nil {
 			return nil, err
 		}
@@ -557,7 +525,7 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 	return s.ops.UpdateStatus(op)
 }
 
-func (s *Operations) createNamespace(ctx context.Context, namespace string) (*v1.Namespace, error) {
+func (s *Operations) createNamespace(ctx context.Context, namespace, projectID string) (*v1.Namespace, error) {
 	apiContext := types.GetAPIContext(ctx)
 	client, err := s.cg.K8sInterface(apiContext)
 	if err != nil {
@@ -566,13 +534,58 @@ func (s *Operations) createNamespace(ctx context.Context, namespace string) (*v1
 
 	ns, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		return client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
+		annotations := map[string]string{}
+		if projectID != "" {
+			annotations["field.cattle.io/projectId"] = strings.ReplaceAll(projectID, "/", ":")
+		}
+		ns, err = client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
+				Name:        namespace,
+				Annotations: annotations,
 			},
 		}, metav1.CreateOptions{})
 	}
-	return ns, err
+	if err != nil {
+		return nil, err
+	}
+
+	if projectID == "" {
+		return ns, nil
+	}
+
+	if ok, err := namespaces.IsNamespaceConditionSet(ns, string(v3.ProjectConditionInitialRolesPopulated), true); err != nil {
+		return ns, err
+	} else if ok {
+		return ns, nil
+	}
+
+	w, err := client.CoreV1().Namespaces().Watch(ctx, metav1.ListOptions{
+		ResourceVersion:      ns.ResourceVersion,
+		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+		TimeoutSeconds:       &thirty,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		w.Stop()
+		// no clue if this needed, but I'm afraid there will be a stuck producer
+		for range w.ResultChan() {
+		}
+	}()
+
+	for event := range w.ResultChan() {
+		if ns, ok := event.Object.(*v1.Namespace); ok {
+			if ok, err := namespaces.IsNamespaceConditionSet(ns, string(v3.ProjectConditionInitialRolesPopulated), true); err != nil {
+				return ns, err
+			} else if ok {
+				return ns, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("failed to wait for roles to be populated")
 }
 
 func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimpersonation.PodOptions) {

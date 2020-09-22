@@ -11,12 +11,12 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 		wrangler.Core.Secret().Cache(),
 		wrangler.Catalog.ClusterRepo(),
 		wrangler.Core.ConfigMap())
-	RegisterReleases(ctx,
+	RegisterApps(ctx,
 		wrangler.Apply,
 		wrangler.ControllerFactory.SharedCacheFactory().SharedClientFactory(),
 		wrangler.Core.ConfigMap(),
 		wrangler.Core.Secret(),
-		wrangler.Catalog.Release())
+		wrangler.Catalog.App())
 	RegisterOperations(ctx,
 		wrangler.K8s,
 		wrangler.Core.Pod(),

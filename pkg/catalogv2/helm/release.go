@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"strconv"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 
@@ -23,6 +24,39 @@ var (
 )
 
 type IsNamespaced func(gvk schema.GroupVersionKind) bool
+
+func IsLatest(release *v1.ReleaseSpec, others []runtime.Object) bool {
+	for _, other := range others {
+		m, err := meta.Accessor(other)
+		if err != nil {
+			continue
+		}
+		labels := m.GetLabels()
+		name := labels["name"]
+		if name == "" {
+			name = labels["NAME"]
+		}
+		if name != release.Name {
+			continue
+		}
+
+		version := labels["version"]
+		if version == "" {
+			version = labels["VERSION"]
+		}
+
+		v, err := strconv.Atoi(version)
+		if err != nil {
+			continue
+		}
+
+		if v > release.Version {
+			return false
+		}
+	}
+
+	return true
+}
 
 func ToRelease(obj runtime.Object, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
 	releaseData, err := getReleaseDataAndKind(obj)

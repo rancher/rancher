@@ -30,9 +30,9 @@ func init() {
 }
 
 type Interface interface {
+	App() AppController
 	ClusterRepo() ClusterRepoController
 	Operation() OperationController
-	Release() ReleaseController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -45,12 +45,12 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
+func (c *version) App() AppController {
+	return NewAppController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "App"}, "apps", true, c.controllerFactory)
+}
 func (c *version) ClusterRepo() ClusterRepoController {
 	return NewClusterRepoController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "ClusterRepo"}, "clusterrepos", false, c.controllerFactory)
 }
 func (c *version) Operation() OperationController {
 	return NewOperationController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Operation"}, "operations", true, c.controllerFactory)
-}
-func (c *version) Release() ReleaseController {
-	return NewReleaseController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Release"}, "releases", true, c.controllerFactory)
 }

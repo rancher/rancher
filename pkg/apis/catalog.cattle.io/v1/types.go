@@ -109,6 +109,7 @@ type OperationStatus struct {
 	Version            string                              `json:"version,omitempty"`
 	Release            string                              `json:"releaseName,omitempty"`
 	Namespace          string                              `json:"namespace,omitempty"`
+	ProjectID          string                              `json:"projectId,omitempty"`
 	Token              string                              `json:"token,omitempty"`
 	Command            []string                            `json:"command,omitempty"`
 	PodName            string                              `json:"podName,omitempty"`

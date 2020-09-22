@@ -8,7 +8,6 @@ import (
 type ChartInstall struct {
 	ChartName    string                `json:"chartName,omitempty"`
 	Version      string                `json:"version,omitempty"`
-	Namespace    string                `json:"namespace,omitempty"`
 	ReleaseName  string                `json:"releaseName,omitempty"`
 	GenerateName bool                  `json:"generateName,omitempty"`
 	NameTemplate string                `json:"nameTemplate,omitempty"`
@@ -22,6 +21,8 @@ type ChartInstallAction struct {
 	Timeout                  *metav1.Duration `json:"timeout,omitempty"`
 	SkipCRDs                 bool             `json:"skipCRDs,omitempty"`
 	DisableOpenAPIValidation bool             `json:"disableOpenAPIValidation,omitempty"`
+	Namespace                string           `json:"namespace,omitempty"`
+	ProjectID                string           `json:"projectId,omitempty"`
 
 	Charts []ChartInstall `json:"charts,omitempty"`
 }
@@ -62,16 +63,6 @@ type ChartUpgrade struct {
 	ResetValues bool                  `json:"resetValues,omitempty"`
 	Description string                `json:"description,omitempty"`
 	Values      v3.MapStringInterface `json:"values,omitempty"`
-}
-
-type ChartRollbackAction struct {
-	Timeout       *metav1.Duration `json:"timeout,omitempty"`
-	Wait          bool             `json:"wait,omitempty"`
-	DisableHooks  bool             `json:"noHooks,omitempty"`
-	DryRun        bool             `json:"dryRun,omitempty"`
-	Recreate      bool             `json:"recreatePods,omitempty"`
-	Force         bool             `json:"force,omitempty"`
-	CleanupOnFail bool             `json:"cleanupOnFail,omitempty"`
 }
 
 type ChartActionOutput struct {

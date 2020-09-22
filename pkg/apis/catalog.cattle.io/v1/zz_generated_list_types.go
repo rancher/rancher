@@ -26,6 +26,23 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// AppList is a list of App resources
+type AppList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []App `json:"items"`
+}
+
+func NewApp(namespace, name string, obj App) *App {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("App").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ClusterRepoList is a list of ClusterRepo resources
 type ClusterRepoList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -53,23 +70,6 @@ type OperationList struct {
 
 func NewOperation(namespace, name string, obj Operation) *Operation {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Operation").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ReleaseList is a list of Release resources
-type ReleaseList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []Release `json:"items"`
-}
-
-func NewRelease(namespace, name string, obj Release) *Release {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Release").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
