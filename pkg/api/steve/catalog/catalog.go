@@ -34,7 +34,6 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUninstallAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgradeAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgrade{}, nil)
-	server.BaseSchemas.MustImportAndCustomize(types2.ChartRollbackAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartInstallAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartInstall{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartActionOutput{}, nil)
@@ -53,19 +52,14 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 			}
 		},
 	}
-	releaseTemplate := schema2.Template{
+	appTemplate := schema2.Template{
 		Group: catalog.GroupName,
-		Kind:  "Release",
+		Kind:  "App",
 		Customize: func(apiSchema *types.APISchema) {
 			apiSchema.ActionHandlers = map[string]http.Handler{
-				"rollback":  ops,
 				"uninstall": ops,
 			}
 			apiSchema.ResourceActions = map[string]schemas3.Action{
-				"rollback": {
-					Input:  "chartRollbackAction",
-					Output: "chartActionOutput",
-				},
 				"uninstall": {
 					Input:  "chartUninstallAction",
 					Output: "chartActionOutput",
@@ -104,7 +98,7 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 
 	server.SchemaFactory.AddTemplate(
 		operationTemplate,
-		releaseTemplate,
+		appTemplate,
 		repoTemplate,
 		chartRepoTemplate)
 }

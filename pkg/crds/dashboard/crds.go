@@ -51,7 +51,7 @@ func List() []crd.CRD {
 				WithColumn("Target Namespace", ".status.podNamespace").
 				WithColumn("Command", ".status.command")
 		}),
-		newCRD(&catalogv1.Release{}, func(c crd.CRD) crd.CRD {
+		newCRD(&catalogv1.App{}, func(c crd.CRD) crd.CRD {
 			return c.
 				WithStatus().
 				WithCategories("catalog").

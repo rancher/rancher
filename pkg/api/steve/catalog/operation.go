@@ -44,8 +44,6 @@ func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		op, err = o.ops.Install(apiRequest.Context(), user, ns, name, req.Body)
 	case "upgrade":
 		op, err = o.ops.Upgrade(apiRequest.Context(), user, ns, name, req.Body)
-	case "rollback":
-		op, err = o.ops.Rollback(apiRequest.Context(), user, ns, name, req.Body)
 	case "uninstall":
 		op, err = o.ops.Uninstall(apiRequest.Context(), user, ns, name, req.Body)
 	}
