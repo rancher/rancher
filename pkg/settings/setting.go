@@ -85,7 +85,7 @@ var (
 	ClusterTemplateEnforcement        = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir              = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                = NewSetting("chart-default-branch", "v2.5-preview1")
+	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.5")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
 	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
 	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.3")
