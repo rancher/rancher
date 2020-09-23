@@ -26,6 +26,15 @@ var (
 	eksUpstreamRefresher *eksRefreshController
 )
 
+func init() {
+	// possible settings controller, which references refresh
+	// cron job, will run prior to StartEKSUpstreamCronJob.
+	// This ensure the CronJob will not be nil
+	eksUpstreamRefresher = &eksRefreshController{
+		refreshCronJob: cron.New(),
+	}
+}
+
 type eksRefreshController struct {
 	refreshCronJob *cron.Cron
 	secretsCache   wranglerv1.SecretCache
@@ -34,12 +43,9 @@ type eksRefreshController struct {
 }
 
 func StartEKSUpstreamCronJob(wContext *wrangler.Context) {
-	eksUpstreamRefresher = &eksRefreshController{
-		refreshCronJob: cron.New(),
-		secretsCache:   wContext.Core.Secret().Cache(),
-		clusterClient:  wContext.Mgmt.Cluster(),
-		clusterCache:   wContext.Mgmt.Cluster().Cache(),
-	}
+	eksUpstreamRefresher.secretsCache = wContext.Core.Secret().Cache()
+	eksUpstreamRefresher.clusterClient = wContext.Mgmt.Cluster()
+	eksUpstreamRefresher.clusterCache = wContext.Mgmt.Cluster().Cache()
 
 	eksUpstreamRefresher.clusterCache.AddIndexer(isEKSIndexer, func(obj *apimgmtv3.Cluster) ([]string, error) {
 		if obj.Spec.EKSConfig == nil {
