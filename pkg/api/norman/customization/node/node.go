@@ -131,6 +131,10 @@ func drainNode(actionName string, apiContext *types.APIContext, stop bool) error
 		if err != nil {
 			return err
 		}
+		if drainInput != nil && drainInput.IgnoreDaemonSets == nil {
+			trueVal := true
+			drainInput.IgnoreDaemonSets = &trueVal
+		}
 		values.PutValue(node, drainInput, "nodeDrainInput")
 	}
 	values.PutValue(node, actionName, "desiredNodeUnschedulable")
