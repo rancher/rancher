@@ -209,7 +209,7 @@ def create_resources():
 
 def install_cert_manager():
     manifests = "https://github.com/jetstack/cert-manager/releases/download/" \
-                "v0.15.0/cert-manager.crds.yaml"
+                "{0}/cert-manager.crds.yaml".format(CERT_MANAGER_VERSION)
     cm_repo = "https://charts.jetstack.io"
 
     run_command_with_stderr(export_cmd + " && kubectl apply -f " + manifests)
@@ -221,7 +221,7 @@ def install_cert_manager():
                             "helm_v3 install cert-manager "
                             "jetstack/cert-manager "
                             "--namespace cert-manager "
-                            "--version v0.15.0")
+                            "--version {0}".format(CERT_MANAGER_VERSION))
     time.sleep(120)
 
 
