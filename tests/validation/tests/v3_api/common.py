@@ -2715,6 +2715,15 @@ def configure_cis_requirements(aws_nodes, profile, node_roles, client,
     time.sleep(5)
     cluster = validate_cluster_state(client, cluster)
 
+    print("checking if workloads under the system project are active")
+    sys_project = client.list_project(name='System',
+                                      clusterId=cluster.id).data[0]
+    sys_p_client = get_project_client_for_token(sys_project, USER_TOKEN)
+    for wl in sys_p_client.list_workload().data:
+        """to  help run KDM job faster (when there are many clusters), 
+        timeout=300 is set"""
+        wait_for_wl_to_active(sys_p_client, wl, timeout=300)
+
     # the workloads under System project to get active
     time.sleep(20)
     if profile == 'rke-cis-1.5':
