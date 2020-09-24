@@ -65,9 +65,12 @@ func ResetAdmin(_ *cli.Context) error {
 		Version:  "v3",
 		Resource: "settings",
 	})
-
+	clustersClient := client.Resource(schema.GroupVersionResource{
+		Group:    "management.cattle.io",
+		Version:  "v3",
+		Resource: "clusters",
+	})
 	var adminName string
-
 	set := labels.Set(defaultAdminLabel)
 	admins, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
@@ -142,6 +145,10 @@ func ResetAdmin(_ *cli.Context) error {
 			return err
 		}
 		adminName = admin.GetName()
+
+		if err := setClusterAnnotation(ctx, clustersClient, adminName); err != nil {
+			return err
+		}
 
 		bindings, err := grbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
@@ -259,4 +266,23 @@ func ResetAdmin(_ *cli.Context) error {
 	logrus.Infof("Server URL: %v", serverURL)
 	logrus.Infof("Default admin and password created. Username: admin, Password: %v", token)
 	return nil
+}
+
+func setClusterAnnotation(ctx context.Context, clustersClient dynamic.NamespaceableResourceInterface, adminName string) error {
+	cluster, err := clustersClient.Get(ctx, "local", v1.GetOptions{})
+	if err != nil {
+		return errors.Errorf("Cluster %s is not ready yet", cluster.GetName())
+	}
+	if adminName == "" {
+		return errors.Errorf("User is not set yet")
+	}
+	ann := cluster.GetAnnotations()
+	if ann == nil {
+		ann = make(map[string]string)
+	}
+	ann["field.cattle.io/creatorId"] = adminName
+	cluster.SetAnnotations(ann)
+
+	_, err = clustersClient.Update(ctx, cluster, v1.UpdateOptions{})
+	return err
 }
