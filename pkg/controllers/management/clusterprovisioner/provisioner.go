@@ -10,19 +10,15 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
-
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/norman/types/values"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
@@ -31,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1043,14 +1040,15 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 		}
 	} else if strings.Contains(cluster.Status.Version.String(), "rke2") {
 
-		daemonsets, _ := p.DaemonsetLister.List("cattle-system", labels.Everything())
-		for _, daemonset := range daemonsets {
-			if daemonset.GetName() == "rancher" {
-				cluster.Status.Driver = apimgmtv3.ClusterDriverRancherD
-				return nil
-			}
+		_, err := p.DaemonsetLister.Get("cattle-system", "rancher")
+		if apierrors.IsNotFound(err) {
+			cluster.Status.Driver = apimgmtv3.ClusterDriverRke2
+		} else if err != nil {
+			return err
+		} else {
+			cluster.Status.Driver = apimgmtv3.ClusterDriverRancherD
+			return nil
 		}
-		cluster.Status.Driver = apimgmtv3.ClusterDriverRke2
 		if cluster.Spec.Rke2Config == nil {
 			cluster.Spec.Rke2Config = &apimgmtv3.Rke2Config{
 				Version: cluster.Status.Version.String(),
