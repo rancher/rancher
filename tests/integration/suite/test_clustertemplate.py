@@ -367,7 +367,7 @@ def test_updated_members_revision_access(admin_mc, remove_resource,
     rb_name = name + "-ctr-r"
     wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
                                          user_member.user.id, rb_name),
-             timeout=60,
+             timeout=120,
              fail_handler=fail_handler(rb_resource))
     revision = user_member.client.by_id_cluster_template_revision(rev.id)
     assert revision is not None

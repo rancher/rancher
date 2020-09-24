@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
-
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -83,7 +83,7 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 		return nil, errors.Errorf("cannot determine project and cluster from %v", obj.ProjectName)
 	}
 	clusterName := parts[0]
-	rtbNsAndName := getRTBLabelKey(obj.ObjectMeta)
+	rtbNsAndName := pkgrbac.GetRTBLabel(obj.ObjectMeta)
 	err := p.mgr.reconcileProjectMembershipBindingForDelete(clusterName, "", rtbNsAndName)
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	if err != nil {
 		return err
 	}
-	rtbNsAndName := getRTBLabelKey(binding.ObjectMeta)
+	rtbNsAndName := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, rtbNsAndName, clusterName, proj, isOwnerRole, subject); err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 // removeMGMTProjectScopedPrivilegesInClusterNamespace revokes access that project roles were granted to certain cluster scoped resources like
 // catalogtemplates, when the prtb is deleted, by deleting the rolebinding created for this prtb in the cluster's namespace
 func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(binding *v3.ProjectRoleTemplateBinding, clusterName string) error {
-	set := labels.Set(map[string]string{getRTBLabelKey(binding.ObjectMeta): prtbInClusterBindingOwner})
+	set := labels.Set(map[string]string{pkgrbac.GetRTBLabel(binding.ObjectMeta): prtbInClusterBindingOwner})
 	rbs, err := p.mgr.rbLister.List(clusterName, set.AsSelector())
 	if err != nil {
 		return err
@@ -223,13 +223,13 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 		return nil
 	}
 
-	var returnErr []error
+	var returnErr error
 	requirements, err := getLabelRequirements(binding.Namespace, binding.Name)
 	if err != nil {
 		return err
 	}
-	bindingKey := getRTBLabelKey(binding.ObjectMeta)
-	set := labels.Set(map[string]string{string(binding.UID): membershipBindingOwner})
+	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
+	set := labels.Set(map[string]string{string(binding.UID): membershipBindingOwnerLegacy})
 	crbs, err := p.mgr.crbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
 		return err
@@ -246,7 +246,7 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			returnErr = append(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
 
@@ -268,12 +268,12 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 				return err
 			})
 			if retryErr != nil {
-				returnErr = append(returnErr, retryErr)
+				returnErr = multierror.Append(returnErr, retryErr)
 			}
 		}
 	}
-	if len(returnErr) > 0 {
-		return fmt.Errorf("%v", returnErr)
+	if returnErr != nil {
+		return returnErr
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {

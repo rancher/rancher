@@ -10,6 +10,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -141,4 +142,8 @@ func TypeFromContext(apiContext *types.APIContext, resource *types.RawResource) 
 		return apiContext.Type
 	}
 	return resource.Type
+}
+
+func GetRTBLabel(objMeta metav1.ObjectMeta) string {
+	return objMeta.Namespace + "_" + objMeta.Name
 }
