@@ -184,6 +184,7 @@ type ManagementContext struct {
 	Project    projectv3.Interface
 	RBAC       rbacv1.Interface
 	Core       corev1.Interface
+	Apps       appsv1.Interface
 }
 
 type UserContext struct {
@@ -301,6 +302,10 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 	}
 
 	context.Core, err = corev1.NewFromControllerFactory(controllerFactory)
+	if err != nil {
+		return nil, err
+	}
+	context.Apps, err = appsv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}

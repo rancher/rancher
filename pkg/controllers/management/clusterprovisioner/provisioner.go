@@ -74,8 +74,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		Backups:               management.Management.EtcdBackups("").Controller().Lister(),
 		RKESystemImagesLister: management.Management.RkeK8sSystemImages("").Controller().Lister(),
 		RKESystemImages:       management.Management.RkeK8sSystemImages(""),
+		DaemonsetLister:       management.Apps.DaemonSets("").Controller().Lister(),
 	}
-
 	// Add handlers
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
 	management.Management.Nodes("").AddHandler(ctx, "cluster-provisioner-controller", p.machineChanged)
@@ -1042,6 +1042,7 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 			cluster.Spec.K3sConfig.SetStrategy(1, 1)
 		}
 	} else if strings.Contains(cluster.Status.Version.String(), "rke2") {
+
 		daemonsets, _ := p.DaemonsetLister.List("cattle-system", labels.Everything())
 		for _, daemonset := range daemonsets {
 			if daemonset.GetName() == "rancher" {
