@@ -451,6 +451,10 @@ func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool)
 			bindings = &v3.GlobalRoleBindingList{}
 		}
 		if len(bindings.Items) == 0 {
+			adminRole := "admin"
+			if settings.RestrictedDefaultAdmin.Get() == "true" {
+				adminRole = "restricted-admin"
+			}
 			_, err = management.Mgmt.GlobalRoleBinding().Create(
 				&v3.GlobalRoleBinding{
 					ObjectMeta: v1.ObjectMeta{
@@ -458,7 +462,7 @@ func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool)
 						Labels:       defaultAdminLabel,
 					},
 					UserName:       adminName,
-					GlobalRoleName: "admin",
+					GlobalRoleName: adminRole,
 				})
 			if err != nil {
 				logrus.Warnf("Failed to create default admin global role binding: %v", err)

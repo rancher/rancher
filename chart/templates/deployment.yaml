@@ -104,6 +104,10 @@ spec:
         - name: CATTLE_SYSTEM_CATALOG
           value: bundled
 {{- end }}
+{{- if .Values.restrictedAdmin }}
+        - name: CATTLE_RESTRICTED_DEFAULT_ADMIN
+          value: true
+{{- end}}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
