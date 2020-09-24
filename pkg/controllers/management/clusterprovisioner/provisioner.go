@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	rketypes "github.com/rancher/rke/types"
@@ -53,6 +55,7 @@ type Provisioner struct {
 	backoff               *flowcontrol.Backoff
 	KontainerDriverLister v3.KontainerDriverLister
 	DynamicSchemasLister  v3.DynamicSchemaLister
+	DaemonsetLister       v1.DaemonSetLister
 	Backups               v3.EtcdBackupLister
 	RKESystemImages       v3.RkeK8sSystemImageInterface
 	RKESystemImagesLister v3.RkeK8sSystemImageLister
@@ -324,7 +327,7 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	if err != nil {
 		return cluster, err
 	}
-	err = k3sBasedClusterConfig(cluster, nodes)
+	err = p.k3sBasedClusterConfig(cluster, nodes)
 	if err != nil {
 		return cluster, err
 	}
@@ -1007,7 +1010,7 @@ func GetBackupFilename(backup *v3.EtcdBackup) string {
 }
 
 // transform an imported cluster into a k3s or k3os cluster using its discovered version
-func k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
+func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 	// version is not found until cluster is provisioned
 	if cluster.Status.Driver == "" || cluster.Status.Version == nil || len(nodes) == 0 {
 		return &controller.ForgetError{
@@ -1039,9 +1042,12 @@ func k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 			cluster.Spec.K3sConfig.SetStrategy(1, 1)
 		}
 	} else if strings.Contains(cluster.Status.Version.String(), "rke2") {
-		if cluster.Name == "local" {
-			cluster.Status.Driver = apimgmtv3.ClusterDriverRancherD
-			return nil
+		daemonsets, _ := p.DaemonsetLister.List("cattle-system", labels.Everything())
+		for _, daemonset := range daemonsets {
+			if daemonset.GetName() == "rancher" {
+				cluster.Status.Driver = apimgmtv3.ClusterDriverRancherD
+				return nil
+			}
 		}
 		cluster.Status.Driver = apimgmtv3.ClusterDriverRke2
 		if cluster.Spec.Rke2Config == nil {
