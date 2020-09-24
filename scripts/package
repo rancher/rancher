@@ -64,11 +64,11 @@ fi
 
 TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go build/system-charts build/charts $IMAGE $AGENT_IMAGE
 
-if [ "$ARCH" = "amd64" ]; then
+if [ ${ARCH} == amd64 ]; then
     # rancherd tarball
     rm -rf build/rancherd/bundle
     mkdir -p build/rancherd/bundle
     tar c -C ../cmd/rancherd/bundle . | tar x -C build/rancherd/bundle
     cp -vf rancherd build/rancherd/bundle/bin
-    tar czf ../dist/rancherd-${ARCH}.tar.gz -C build/rancherd/bundle .
+    tar czf rancherd-${ARCH}.tar.gz -C build/rancherd/bundle .
 fi
