@@ -46,7 +46,8 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 
 	if setting.Name != settings.ServerURL.Name &&
-		setting.Name != settings.CACerts.Name {
+		setting.Name != settings.CACerts.Name &&
+		setting.Name != settings.SystemDefaultRegistry.Name {
 		return setting, nil
 	}
 
@@ -55,9 +56,15 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		return setting, err
 	}
 
+	systemGlobalRegistry := map[string]interface{}{
+		"cattle": map[string]interface{}{
+			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+		},
+	}
 	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName,
 		map[string]interface{}{
 			"apiServerURL": settings.ServerURL.Get(),
 			"apiServerCA":  settings.CACerts.Get(),
+			"global":       systemGlobalRegistry,
 		})
 }
