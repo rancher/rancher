@@ -37,5 +37,5 @@ done
 echo Running tests
 
 cd $(dirname $0)/../tests/integration
-tox -- -m "not nonparallel" -n $(nproc)
-tox -- -m nonparallel
+tox -e rancher -- -m "not nonparallel" -n $(nproc)
+tox -e rancher -- -m nonparallel
