@@ -28,6 +28,9 @@ busyboxImage: busybox
 # Add debug flag to Rancher server
 debug: false
 
+# When starting Rancher for the first time, bootstrap the admin as restricted-admin
+restrictedAdmin: false
+
 # Extra environment variables passed to the rancher pods.
 # extraEnv:
 # - name: CATTLE_TLS_MIN_VERSION

@@ -73,6 +73,15 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
+	// restricted-admin will get cluster admin access to all downstream clusters but limited access to the local cluster
+	// The validating webhook will ensure GRBs PRTBs and CRTBs are not created by a restricted admin in the local cluster
+	rb.addRole("Restricted Admin", "restricted-admin").
+		addRule().apiGroups("management.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("fleet.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("rancher.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("catalog.cattle.io").resources("*").verbs("*")
+
 	rb.addRole("User", "user").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
@@ -443,6 +452,10 @@ func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool)
 			bindings = &v3.GlobalRoleBindingList{}
 		}
 		if len(bindings.Items) == 0 {
+			adminRole := "admin"
+			if settings.RestrictedDefaultAdmin.Get() == "true" {
+				adminRole = "restricted-admin"
+			}
 			_, err = management.Mgmt.GlobalRoleBinding().Create(
 				&v3.GlobalRoleBinding{
 					ObjectMeta: v1.ObjectMeta{
@@ -450,7 +463,7 @@ func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool)
 						Labels:       defaultAdminLabel,
 					},
 					UserName:       adminName,
-					GlobalRoleName: "admin",
+					GlobalRoleName: adminRole,
 				})
 			if err != nil {
 				logrus.Warnf("Failed to create default admin global role binding: %v", err)

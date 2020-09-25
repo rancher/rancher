@@ -59,41 +59,48 @@ func (h *clusterHandler) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 
 func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 	_, err := v32.ClusterConditionGlobalAdminsSynced.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		grbs, err := h.grbIndexer.ByIndex(grbByRoleIndex, "admin")
-		if err != nil {
-			return nil, err
-		}
-
-		for _, x := range grbs {
-			grb, _ := x.(*v3.GlobalRoleBinding)
-			bindingName := rbac.GrbCRBName(grb)
-			b, err := h.userGRBLister.Get("", bindingName)
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return nil, err
-			}
-
-			if b != nil {
-				// binding exists, nothing to do
+		// Sync both admin types
+		for _, roleName := range []string{rbac.GlobalAdmin, rbac.GlobalRestrictedAdmin} {
+			// Do not sync restricted-admin to the local cluster as 'cluster-admin'
+			if cluster.Name == "local" && roleName == rbac.GlobalRestrictedAdmin {
 				continue
 			}
-
-			_, err = h.userGRB.Create(&k8srbac.ClusterRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: bindingName,
-				},
-				Subjects: []k8srbac.Subject{
-					{
-						Kind: "User",
-						Name: grb.UserName,
-					},
-				},
-				RoleRef: k8srbac.RoleRef{
-					Name: "cluster-admin",
-					Kind: "ClusterRole",
-				},
-			})
-			if err != nil && !k8serrors.IsAlreadyExists(err) {
+			grbs, err := h.grbIndexer.ByIndex(grbByRoleIndex, roleName)
+			if err != nil {
 				return nil, err
+			}
+
+			for _, x := range grbs {
+				grb, _ := x.(*v3.GlobalRoleBinding)
+				bindingName := rbac.GrbCRBName(grb)
+				b, err := h.userGRBLister.Get("", bindingName)
+				if err != nil && !k8serrors.IsNotFound(err) {
+					return nil, err
+				}
+
+				if b != nil {
+					// binding exists, nothing to do
+					continue
+				}
+
+				_, err = h.userGRB.Create(&k8srbac.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: bindingName,
+					},
+					Subjects: []k8srbac.Subject{
+						{
+							Kind: "User",
+							Name: grb.UserName,
+						},
+					},
+					RoleRef: k8srbac.RoleRef{
+						Name: "cluster-admin",
+						Kind: "ClusterRole",
+					},
+				})
+				if err != nil && !k8serrors.IsAlreadyExists(err) {
+					return nil, err
+				}
 			}
 		}
 		return nil, nil

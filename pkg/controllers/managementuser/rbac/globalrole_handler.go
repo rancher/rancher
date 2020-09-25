@@ -58,6 +58,7 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 	informer := workload.Management.Management.GlobalRoleBindings("").Controller().Informer()
 
 	h := &grbHandler{
+		clusterName:         workload.ClusterName,
 		grbIndexer:          informer.GetIndexer(),
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
@@ -70,6 +71,7 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 // grbHandler ensures the global admins have full access to every cluster. If a globalRoleBinding is created that uses
 // the admin role, then the user in that binding gets a clusterRoleBinding in every user cluster to the cluster-admin role
 type grbHandler struct {
+	clusterName         string
 	clusterRoleBindings rbacv1.ClusterRoleBindingInterface
 	crbLister           rbacv1.ClusterRoleBindingLister
 	grbIndexer          cache.Indexer
@@ -85,6 +87,11 @@ func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	if err != nil {
 		return nil, err
 	} else if !isAdmin {
+		return obj, nil
+	}
+
+	// Do not sync restricted-admin to the local cluster as 'cluster-admin'
+	if c.clusterName == "local" && obj.GlobalRoleName == rbac.GlobalRestrictedAdmin {
 		return obj, nil
 	}
 
@@ -128,7 +135,7 @@ func (c *grbHandler) isAdminRole(rtName string) (bool, error) {
 	}
 
 	// global role is builtin admin role
-	if gr.Builtin && gr.Name == "admin" {
+	if gr.Builtin && (gr.Name == rbac.GlobalAdmin || gr.Name == rbac.GlobalRestrictedAdmin) {
 		return true, nil
 	}
 
