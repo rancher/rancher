@@ -3,6 +3,7 @@ package rbac
 import (
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -92,8 +93,8 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 			return err
 		}
 
-		rtbUID := string(prtb.UID)
-		set := labels.Set(map[string]string{rtbUID: owner})
+		rtbNsAndName := rbac.GetRTBLabel(prtb.ObjectMeta)
+		set := labels.Set(map[string]string{rtbNsAndName: owner})
 		existingCrbs, err := c.m.crbLister.List("", set.AsSelector())
 		if err != nil {
 			return err

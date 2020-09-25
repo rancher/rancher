@@ -297,6 +297,76 @@ def test_kubernetes_admin_permissions(admin_mc, remove_resource, user_factory,
     assert 'enableMonitoring' not in project.actions
 
 
+def test_role_template_changes_revoke_permissions(admin_mc, remove_resource,
+                                                  user_factory, admin_pc):
+    client = admin_mc.client
+    name = random_str()
+    # clone project-owner role
+    po = client.by_id_role_template("project-owner")
+    cloned_po = client.create_role_template(name=name, context="project",
+                                            rules=po.rules,
+                                            roleTemplateIds=["admin"])
+    remove_resource(cloned_po)
+    wait_for_role_template_creation(admin_mc, name)
+    role_template_id = cloned_po['id']
+
+    user = user_factory()
+    # add a user with this cloned project-owner role to a project
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user.user.id,
+        projectId=admin_pc.project.id,
+        roleTemplateId=role_template_id
+    )
+    remove_resource(prtb)
+    wait_until_available(user.client, admin_pc.project)
+
+    # this user should be able to add users to the project
+    user1 = user_factory()
+    prtb1 = user.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user1.user.id,
+        projectId=admin_pc.project.id,
+        roleTemplateId="project-member"
+    )
+    remove_resource(prtb1)
+    wait_until_available(user1.client, admin_pc.project)
+
+    # now edit the cloned roletemplate to remove permission
+    # to create projectroletemplatebindings
+    rules = cloned_po['rules']
+    for ind, rule in enumerate(rules):
+        if 'projectroletemplatebindings' in rule['resources']:
+            setattr(rule, 'verbs', ['get', 'list', 'watch'])
+
+    client.update(cloned_po, rules=rules)
+
+    def role_template_update_check():
+        rt = client.by_id_role_template(role_template_id)
+        for rule in rt['rules']:
+            if 'projectroletemplatebindings' in rule['resources']:
+                return rule['verbs'] == ['get', 'list', 'watch']
+
+    def fail_handler():
+        return "failed waiting for cloned roletemplate to be updated"
+
+    wait_for(role_template_update_check, fail_handler=fail_handler(),
+             timeout=120)
+
+    # now as the same user again try adding another user to a project, this
+    # should not work since the user with cloned_po role can no longer create
+    # projectroletemplatebindings
+    user2 = user_factory()
+    with pytest.raises(ApiError) as e:
+        user.client.create_project_role_template_binding(
+            name="prtb-" + random_str(),
+            userId=user2.user.id,
+            projectId=admin_pc.project.id,
+            roleTemplateId="project-member"
+        )
+    assert e.value.error.status == 403
+
+
 def wait_for_role_template_creation(admin_mc, rt_name, timeout=60):
     start = time.time()
     interval = 0.5

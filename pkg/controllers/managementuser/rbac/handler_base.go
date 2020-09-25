@@ -600,7 +600,3 @@ func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
 	}
 	return []string{idx}, nil
 }
-
-func getRTBLabel(bindingMeta metav1.ObjectMeta) string {
-	return bindingMeta.Namespace + "_" + bindingMeta.Name
-}

@@ -1,10 +1,10 @@
 package rbac
 
 import (
-	"fmt"
-
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +72,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 }
 
 func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding) error {
-	set := labels.Set(map[string]string{rtbOwnerLabel: getRTBLabel(binding.ObjectMeta)})
+	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	bindingCli := c.m.workload.RBAC.ClusterRoleBindings("")
 	rbs, err := c.m.crbLister.List("", set.AsSelector())
 	if err != nil {
@@ -99,7 +99,7 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 		return nil
 	}
 
-	var returnErr []error
+	var returnErr error
 	set := labels.Set(map[string]string{rtbOwnerLabelLegacy: string(binding.UID)})
 	reqUpdatedLabel, err := labels.NewRequirement(rtbLabelUpdated, selection.DoesNotExist, []string{})
 	if err != nil {
@@ -114,23 +114,24 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 	if err != nil {
 		return err
 	}
+	bindingValue := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, crb := range userCRBs.Items {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			crbToUpdate, updateErr := c.m.clusterRoleBindings.Get(crb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}
-			crbToUpdate.Labels[rtbOwnerLabel] = getRTBLabel(binding.ObjectMeta)
+			crbToUpdate.Labels[rtbOwnerLabel] = bindingValue
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := c.m.clusterRoleBindings.Update(crbToUpdate)
 			return err
 		})
 		if retryErr != nil {
-			returnErr = append(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
-	if len(returnErr) > 0 {
-		return fmt.Errorf("%v", returnErr)
+	if returnErr != nil {
+		return returnErr
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {

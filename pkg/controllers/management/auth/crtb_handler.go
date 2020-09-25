@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
@@ -15,16 +16,23 @@ import (
 )
 
 const (
-	clusterResource             = "clusters"
-	membershipBindingOwner      = "memberhsip-binding-owner"
-	membershipBindingOwnerIndex = "auth.management.cattle.io/membership-binding-owner"
-	crtbInProjectBindingOwner   = "crtb-in-project-binding-owner"
-	prtbInClusterBindingOwner   = "prtb-in-cluster-binding-owner"
-	rbByOwnerIndex              = "auth.management.cattle.io/rb-by-owner"
-	rbByRoleAndSubjectIndex     = "auth.management.cattle.io/crb-by-role-and-subject"
-	ctrbMGMTController          = "mgmt-auth-crtb-controller"
-	rtbLabelUpdated             = "auth.management.cattle.io/rtb-label-updated"
-	rtbCrbRbLabelsUpdated       = "auth.management.cattle.io/crb-rb-labels-updated"
+	/* Prior to 2.5, the label "memberhsip-binding-owner" was set on the CRB/RBs for a roleTemplateBinding with the key being the roleTemplateBinding's UID.
+	2.5 onwards, instead of the roleTemplateBinding's UID, a combination of its namespace and name will be used in this label.
+	CRB/RBs on clusters upgraded from 2.4.x to 2.5 will continue to carry the original label with UID. To ensure permissions are managed properly on upgrade,
+	we need to change the label value as well.
+	So the older label value, membershipBindingOwnerLegacy (<=2.4.x) will continue to be "memberhsip-binding-owner" (notice the spelling mistake),
+	and the new label, membershipBindingOwner will be "membership-binding-owner" (a different label value with the right spelling)*/
+	membershipBindingOwnerLegacy = "memberhsip-binding-owner"
+	membershipBindingOwner       = "membership-binding-owner"
+	clusterResource              = "clusters"
+	membershipBindingOwnerIndex  = "auth.management.cattle.io/membership-binding-owner"
+	crtbInProjectBindingOwner    = "crtb-in-project-binding-owner"
+	prtbInClusterBindingOwner    = "prtb-in-cluster-binding-owner"
+	rbByOwnerIndex               = "auth.management.cattle.io/rb-by-owner"
+	rbByRoleAndSubjectIndex      = "auth.management.cattle.io/crb-by-role-and-subject"
+	ctrbMGMTController           = "mgmt-auth-crtb-controller"
+	rtbLabelUpdated              = "auth.management.cattle.io/rtb-label-updated"
+	rtbCrbRbLabelsUpdated        = "auth.management.cattle.io/crb-rb-labels-updated"
 )
 
 var clusterManagmentPlaneResources = map[string]string{
@@ -74,7 +82,7 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
-	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", getRTBLabelKey(obj.ObjectMeta)); err != nil {
+	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
 		return nil, err
 	}
 	err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj)
@@ -148,7 +156,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	if err != nil {
 		return err
 	}
-	if err := c.mgr.ensureClusterMembershipBinding(clusterRoleName, getRTBLabelKey(binding.ObjectMeta), cluster, isOwnerRole, subject); err != nil {
+	if err := c.mgr.ensureClusterMembershipBinding(clusterRoleName, pkgrbac.GetRTBLabel(binding.ObjectMeta), cluster, isOwnerRole, subject); err != nil {
 		return err
 	}
 
@@ -174,7 +182,7 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	if err != nil {
 		return err
 	}
-	bindingKey := getRTBLabelKey(binding.ObjectMeta)
+	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, p := range projects {
 		set := labels.Set(map[string]string{bindingKey: crtbInProjectBindingOwner})
 		rbs, err := c.mgr.rbLister.List(p.Name, set.AsSelector())
@@ -201,18 +209,18 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 		return nil
 	}
 
-	var returnErr []error
+	var returnErr error
 	requirements, err := getLabelRequirements(binding.Namespace, binding.Name)
 	if err != nil {
 		return err
 	}
 
-	set := labels.Set(map[string]string{string(binding.UID): membershipBindingOwner})
+	set := labels.Set(map[string]string{string(binding.UID): membershipBindingOwnerLegacy})
 	crbs, err := c.mgr.crbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
 		return err
 	}
-	bindingKey := getRTBLabelKey(binding.ObjectMeta)
+	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, crb := range crbs {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			crbToUpdate, updateErr := c.mgr.crbClient.Get(crb.Name, v1.GetOptions{})
@@ -225,7 +233,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			returnErr = append(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
 
@@ -247,11 +255,11 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			returnErr = append(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
-	if len(returnErr) > 0 {
-		return fmt.Errorf("%v", returnErr)
+	if returnErr != nil {
+		return returnErr
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {

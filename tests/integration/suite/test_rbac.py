@@ -233,8 +233,7 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
     to see the cluster.
     """
 
-    # Yes, this is misspelled, it's how the actual label is spelled.
-    mbo = 'memberhsip-binding-owner'
+    mbo = 'membership-binding-owner'
 
     admin_client = admin_mc.client
     prtb = admin_client.create_project_role_template_binding(
@@ -271,13 +270,86 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
     def fail_handler():
         return "failed waiting for cluster role binding to be deleted"
 
-    wait_for(crb_callback, fail_handler=fail_handler)
+    wait_for(crb_callback, fail_handler=fail_handler, timeout=120)
 
-    try:
-        cluster = user_mc.client.by_id_cluster(admin_cc.cluster.id)
-        assert cluster is None
-    except ApiError as e:
-        assert e.error.status == 403
+    with pytest.raises(ApiError) as e:
+        user_mc.client.by_id_cluster(admin_cc.cluster.id)
+    assert e.value.error.status == 403
+
+
+def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
+                                                   user_mc, admin_cc,
+                                                   remove_resource):
+    """Test that a user added to a project in a cluster prior to 2.5, upon
+    upgrade is able to see that cluster, and after being removed from the
+    project they are no longer able to see the cluster.
+    Upgrade will be simulated by editing the CRB to include the older label
+    format, containing the PRTB UID
+    """
+
+    mbo = 'membership-binding-owner'
+
+    # Yes, this is misspelled, it's how the actual label was spelled
+    #  prior to 2.5.
+    mbo_legacy = 'memberhsip-binding-owner'
+
+    admin_client = admin_mc.client
+    prtb = admin_client.create_project_role_template_binding(
+        userId=user_mc.user.id,
+        roleTemplateId="project-member",
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(prtb)
+
+    # Verify the user can see the cluster
+    wait_until_available(user_mc.client, admin_cc.cluster)
+
+    api_instance = kubernetes.client.RbacAuthorizationV1Api(
+        admin_mc.k8s_client)
+
+    split = str.split(prtb.id, ":")
+    prtb_key = split[0]+"_"+split[1]
+
+    # Find the expected k8s clusterRoleBinding
+    crbs = api_instance.list_cluster_role_binding(
+        label_selector=prtb_key + "=" + mbo)
+
+    assert len(crbs.items) == 1
+
+    # edit this CRB to add in the legacy label to simulate an upgraded setup
+    crb = crbs.items[0]
+    crb.metadata.labels[prtb.uuid] = mbo_legacy
+    api_instance.patch_cluster_role_binding(crb.metadata.name, crb)
+
+    def crb_label_updated():
+        crbs = api_instance.list_cluster_role_binding(
+            label_selector=prtb.uuid + "=" + mbo_legacy)
+        return len(crbs.items) == 1
+
+    wait_for(crb_label_updated,
+             fail_handler=lambda: "failed waiting for cluster role binding to"
+                                  "be updated", timeout=120)
+
+    # Delete the projectRoleTemplateBinding, this should cause the user to no
+    # longer be able to see the cluster
+    admin_mc.client.delete(prtb)
+
+    def crb_callback():
+        crbs_listed_with_new_label = api_instance.list_cluster_role_binding(
+            label_selector=prtb_key + "=" + mbo)
+        crbs_listed_with_old_label = api_instance.list_cluster_role_binding(
+            label_selector=prtb.uuid + "=" + mbo_legacy)
+        return len(crbs_listed_with_new_label.items) == 0 and\
+            len(crbs_listed_with_old_label.items) == 0
+
+    def fail_handler():
+        return "failed waiting for cluster role binding to be deleted"
+
+    wait_for(crb_callback, fail_handler=fail_handler, timeout=120)
+
+    with pytest.raises(ApiError) as e:
+        user_mc.client.by_id_cluster(admin_cc.cluster.id)
+    assert e.value.error.status == 403
 
 
 def test_user_role_permissions(admin_mc, user_factory, remove_resource):

@@ -11,6 +11,7 @@ import (
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
@@ -338,8 +339,8 @@ func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, roleToKe
 
 type convertFn func(i interface{}) string
 
-func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbUID string, index cache.Indexer, convert convertFn, client *objectclient.ObjectClient) error {
-	roleBindings, err := index.ByIndex(membershipBindingOwnerIndex, namespace+"/"+rtbUID)
+func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbNsAndName string, index cache.Indexer, convert convertFn, client *objectclient.ObjectClient) error {
+	roleBindings, err := index.ByIndex(membershipBindingOwnerIndex, namespace+"/"+rtbNsAndName)
 	if err != nil {
 		return err
 	}
@@ -362,10 +363,9 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 		if roleName == roleToKeep {
 			continue
 		}
-
 		var otherOwners bool
 		for k, v := range objMeta.GetLabels() {
-			if k == rtbUID && v == membershipBindingOwner {
+			if k == rtbNsAndName && v == membershipBindingOwner {
 				delete(objMeta.GetLabels(), k)
 			} else if v == membershipBindingOwner {
 				// Another rtb is also linked to this roleBinding so don't delete
@@ -477,7 +477,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 
 	desiredRBs := map[string]*v1.RoleBinding{}
 	roleBindings := m.mgmt.RBAC.RoleBindings(projectNamespace)
-	bindingKey := getRTBLabelKey(binding.ObjectMeta)
+	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]bool{}
 		for resource, apiGroup := range resources {
@@ -543,7 +543,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 
 	desiredRBs := map[string]*v1.RoleBinding{}
 	roleBindings := m.mgmt.RBAC.RoleBindings(clusterNamespace)
-	bindingKey := getRTBLabelKey(binding.ObjectMeta)
+	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]bool{}
 		for resource, apiGroup := range resources {
@@ -818,8 +818,4 @@ func getLabelRequirements(bindingNamespace, bindingName string) ([]labels.Requir
 		return []labels.Requirement{}, err
 	}
 	return []labels.Requirement{*reqUpdatedLabel, *reqNsAndNameLabel}, nil
-}
-
-func getRTBLabelKey(bindingMeta metav1.ObjectMeta) string {
-	return bindingMeta.Namespace + "_" + bindingMeta.Name
 }

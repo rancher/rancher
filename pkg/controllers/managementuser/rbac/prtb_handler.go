@@ -1,13 +1,14 @@
 package rbac
 
 import (
-	"fmt"
 	"reflect"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -108,7 +109,7 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
 	}
 
-	set := labels.Set(map[string]string{rtbOwnerLabel: getRTBLabel(binding.ObjectMeta)})
+	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
 		bindingCli := p.m.workload.RBAC.RoleBindings(ns.Name)
@@ -139,7 +140,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding *v3.ProjectRoleTemplateBinding) error {
 	bindingCli := p.m.workload.RBAC.ClusterRoleBindings("")
-	rtbNsAndName := getRTBLabel(binding.ObjectMeta)
+	rtbNsAndName := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	set := labels.Set(map[string]string{rtbNsAndName: owner})
 	crbs, err := p.m.crbLister.List("", set.AsSelector())
 	if err != nil {
@@ -330,7 +331,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 		return nil
 	}
 
-	var returnErr []error
+	var returnErr error
 	reqUpdatedLabel, err := labels.NewRequirement(rtbLabelUpdated, selection.DoesNotExist, []string{})
 	if err != nil {
 		return err
@@ -344,7 +345,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 	if err != nil {
 		return err
 	}
-	bindingLabel := getRTBLabel(binding.ObjectMeta)
+	bindingLabel := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 
 	for _, crb := range userCRBs.Items {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -358,7 +359,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			return err
 		})
 		if retryErr != nil {
-			returnErr = append(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
 
@@ -383,12 +384,12 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			return err
 		})
 		if retryErr != nil {
-			returnErr = append(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
 
-	if len(returnErr) > 0 {
-		return fmt.Errorf("%v", returnErr)
+	if returnErr != nil {
+		return returnErr
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
