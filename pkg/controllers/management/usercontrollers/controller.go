@@ -74,7 +74,8 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 	} else if obj.Status.Driver == v32.ClusterDriverImported ||
 		obj.Status.Driver == v32.ClusterDriverK3s ||
 		obj.Status.Driver == v32.ClusterDriverK3os ||
-		obj.Status.Driver == v32.ClusterDriverRke2 {
+		obj.Status.Driver == v32.ClusterDriverRke2 ||
+		obj.Status.Driver == v32.ClusterDriverRancherD {
 		err = c.cleanupImportedCluster(obj)
 	}
 	if err != nil {

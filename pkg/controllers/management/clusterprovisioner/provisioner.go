@@ -10,17 +10,15 @@ import (
 	"strings"
 	"time"
 
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/norman/types/values"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
@@ -29,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,6 +52,7 @@ type Provisioner struct {
 	backoff               *flowcontrol.Backoff
 	KontainerDriverLister v3.KontainerDriverLister
 	DynamicSchemasLister  v3.DynamicSchemaLister
+	DaemonsetLister       v1.DaemonSetLister
 	Backups               v3.EtcdBackupLister
 	RKESystemImages       v3.RkeK8sSystemImageInterface
 	RKESystemImagesLister v3.RkeK8sSystemImageLister
@@ -71,8 +71,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		Backups:               management.Management.EtcdBackups("").Controller().Lister(),
 		RKESystemImagesLister: management.Management.RkeK8sSystemImages("").Controller().Lister(),
 		RKESystemImages:       management.Management.RkeK8sSystemImages(""),
+		DaemonsetLister:       management.Apps.DaemonSets("").Controller().Lister(),
 	}
-
 	// Add handlers
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
 	management.Management.Nodes("").AddHandler(ctx, "cluster-provisioner-controller", p.machineChanged)
@@ -324,7 +324,7 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	if err != nil {
 		return cluster, err
 	}
-	err = k3sBasedClusterConfig(cluster, nodes)
+	err = p.k3sBasedClusterConfig(cluster, nodes)
 	if err != nil {
 		return cluster, err
 	}
@@ -686,7 +686,8 @@ func skipLocalK3sImported(cluster *apimgmtv3.Cluster) bool {
 		cluster.Status.Driver == apimgmtv3.ClusterDriverImported ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3s ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
-		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD
 }
 
 func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, driverName, clusterName string) (*apimgmtv3.ClusterSpec, interface{}, error) {
@@ -1006,7 +1007,7 @@ func GetBackupFilename(backup *v3.EtcdBackup) string {
 }
 
 // transform an imported cluster into a k3s or k3os cluster using its discovered version
-func k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
+func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 	// version is not found until cluster is provisioned
 	if cluster.Status.Driver == "" || cluster.Status.Version == nil || len(nodes) == 0 {
 		return &controller.ForgetError{
@@ -1015,7 +1016,8 @@ func k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 	}
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverK3s ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
-		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 {
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD {
 		return nil //no-op
 	}
 
@@ -1037,7 +1039,16 @@ func k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Node) error {
 			cluster.Spec.K3sConfig.SetStrategy(1, 1)
 		}
 	} else if strings.Contains(cluster.Status.Version.String(), "rke2") {
-		cluster.Status.Driver = apimgmtv3.ClusterDriverRke2
+
+		_, err := p.DaemonsetLister.Get("cattle-system", "rancher")
+		if apierrors.IsNotFound(err) {
+			cluster.Status.Driver = apimgmtv3.ClusterDriverRke2
+		} else if err != nil {
+			return err
+		} else {
+			cluster.Status.Driver = apimgmtv3.ClusterDriverRancherD
+			return nil
+		}
 		if cluster.Spec.Rke2Config == nil {
 			cluster.Spec.Rke2Config = &apimgmtv3.Rke2Config{
 				Version: cluster.Status.Version.String(),
