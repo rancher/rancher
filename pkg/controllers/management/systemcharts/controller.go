@@ -7,6 +7,7 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
@@ -52,8 +53,15 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		return repo, nil
 	}
 
+	systemGlobalRegistry := map[string]interface{}{
+		"cattle": map[string]interface{}{
+			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+		},
+	}
 	for _, chartDef := range toInstall {
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, nil); err != nil {
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, map[string]interface{}{
+			"global": systemGlobalRegistry,
+		}); err != nil {
 			return repo, err
 		}
 	}
