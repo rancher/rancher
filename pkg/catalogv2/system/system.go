@@ -174,11 +174,11 @@ func (m *Manager) install(namespace, name string, values map[string]interface{})
 		Wait:       true,
 		Install:    true,
 		MaxHistory: 5,
+		Namespace:  namespace,
 		Charts: []types.ChartUpgrade{
 			{
 				ChartName:   name,
 				Version:     chart.Version,
-				Namespace:   namespace,
 				ReleaseName: name,
 				Values:      values,
 				ResetValues: true,

@@ -1,6 +1,9 @@
 package helmop
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,6 +28,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
+	data2 "github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
@@ -37,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -44,8 +49,14 @@ const (
 )
 
 var (
-	badChars = regexp.MustCompile("[^-.0-9a-zA-Z]")
-	thirty   = int64(30)
+	badChars  = regexp.MustCompile("[^-.0-9a-zA-Z]")
+	thirty    = int64(30)
+	chartYAML = map[string]bool{
+		"chart.yaml": true,
+		"Chart.yaml": true,
+		"chart.yml":  true,
+		"Chart.yml":  true,
+	}
 )
 
 type Operations struct {
@@ -253,12 +264,18 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 		return catalog.OperationStatus{}, nil, err
 	}
 
+	if upgradeArgs.MaxHistory == 0 {
+		upgradeArgs.MaxHistory = 5
+	}
+	upgradeArgs.Install = true
+
 	status := catalog.OperationStatus{
-		Action: "upgrade",
+		Action:    "upgrade",
+		Namespace: namespace(upgradeArgs.Namespace),
 	}
 
 	for _, chartUpgrade := range upgradeArgs.Charts {
-		cmd, err := s.getChartCommand(repoNamespace, repoName, chartUpgrade.ChartName, chartUpgrade.Version, chartUpgrade.Values)
+		cmd, err := s.getChartCommand(repoNamespace, repoName, chartUpgrade.ChartName, chartUpgrade.Version, chartUpgrade.Annotations, chartUpgrade.Values)
 		if err != nil {
 			return status, nil, err
 		}
@@ -270,8 +287,6 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 		}
 
 		status.Release = chartUpgrade.ReleaseName
-		status.Namespace = namespace(chartUpgrade.Namespace)
-
 		commands = append(commands, cmd)
 	}
 
@@ -358,6 +373,7 @@ func (c Command) renderArgs() ([]string, error) {
 		}
 	}
 
+	delete(dataMap, "annotations")
 	delete(dataMap, "values")
 	delete(dataMap, "charts")
 	delete(dataMap, "releaseName")
@@ -366,9 +382,6 @@ func (c Command) renderArgs() ([]string, error) {
 	if v, ok := dataMap["disableOpenAPIValidation"]; ok {
 		delete(dataMap, "disableOpenAPIValidation")
 		dataMap["disableOpenapiValidation"] = v
-	}
-	if c.Operation == "install" {
-		dataMap["createNamespace"] = true
 	}
 
 	for k, v := range dataMap {
@@ -398,20 +411,101 @@ func (c Command) renderArgs() ([]string, error) {
 		args = append(args, filepath.Join(helmDataPath, c.ChartFile))
 	}
 
-	return append([]string{"--debug", c.Operation}, args...), nil
+	return append([]string{c.Operation}, args...), nil
 }
 
 func sanitizeVersion(chartVersion string) string {
 	return badChars.ReplaceAllString(chartVersion, "-")
 }
 
-func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, values map[string]interface{}) (Command, error) {
+func injectAnnotation(data []byte, annotations map[string]string) ([]byte, error) {
+	if len(annotations) == 0 {
+		return data, nil
+	}
+
+	tgz, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		dest    = &bytes.Buffer{}
+		destGz  = gzip.NewWriter(dest)
+		destTar = tar.NewWriter(destGz)
+		tar     = tar.NewReader(tgz)
+	)
+
+	for {
+		header, err := tar.Next()
+		if err == io.EOF {
+			break
+		}
+
+		data, err := ioutil.ReadAll(tar)
+		if err != nil {
+			return nil, err
+		}
+
+		parts := strings.Split(header.Name, "/")
+		if len(parts) == 2 && chartYAML[parts[1]] {
+			data, err = addAnnotations(data, annotations)
+			if err != nil {
+				return nil, err
+			}
+			header.Size = int64(len(data))
+		}
+
+		if err := destTar.WriteHeader(header); err != nil {
+			return nil, err
+		}
+
+		_, err = destTar.Write(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err = destTar.Close(); err != nil {
+		return nil, err
+	}
+
+	if err = destGz.Close(); err != nil {
+		return nil, err
+	}
+
+	return dest.Bytes(), nil
+}
+
+func addAnnotations(data []byte, annotations map[string]string) ([]byte, error) {
+	chartData := map[string]interface{}{}
+	if err := yaml.Unmarshal(data, &chartData); err != nil {
+		return nil, err
+	}
+
+	chartAnnotations := data2.Object(chartData).Map("annotations")
+	if chartAnnotations == nil {
+		chartAnnotations = map[string]interface{}{}
+	}
+	for k, v := range annotations {
+		chartAnnotations[k] = v
+	}
+
+	chartData["annotations"] = chartAnnotations
+	return yaml.Marshal(chartData)
+}
+
+func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, annotations map[string]string, values map[string]interface{}) (Command, error) {
 	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion)
 	if err != nil {
 		return Command{}, err
 	}
 	chartData, err := ioutil.ReadAll(chart)
 	chart.Close()
+	if err != nil {
+		return Command{}, err
+	}
+
+	chartData, err = injectAnnotation(chartData, annotations)
 	if err != nil {
 		return Command{}, err
 	}
@@ -447,14 +541,7 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 	)
 
 	for _, chartInstall := range installArgs.Charts {
-		var suffix []string
-		if chartInstall.ReleaseName == "" {
-			chartInstall.GenerateName = true
-		} else {
-			suffix = append(suffix, chartInstall.ReleaseName)
-		}
-
-		cmd, err := s.getChartCommand(repoNamespace, repoName, chartInstall.ChartName, chartInstall.Version, chartInstall.Values)
+		cmd, err := s.getChartCommand(repoNamespace, repoName, chartInstall.ChartName, chartInstall.Version, chartInstall.Annotations, chartInstall.Values)
 		if err != nil {
 			return status, nil, err
 		}
@@ -464,6 +551,19 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 			installArgs,
 		}
 		cmd.ReleaseName = chartInstall.ReleaseName
+
+		if len(installArgs.Charts) == 1 {
+			if cmd.ReleaseName == "" {
+				cmd.ArgObjects = append(cmd.ArgObjects, map[string]interface{}{
+					"generateName": "true",
+				})
+			}
+		} else {
+			cmd.Operation = "upgrade"
+			cmd.ArgObjects = append(cmd.ArgObjects, map[string]interface{}{
+				"install": "true",
+			})
+		}
 
 		status.Release = chartInstall.ReleaseName
 
