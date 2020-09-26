@@ -69,6 +69,8 @@ func (s *shell) proxyRequest(rw http.ResponseWriter, req *http.Request, pod *v1.
 		Director: func(req *http.Request) {
 			req.URL = attachURL
 			req.Host = attachURL.Host
+			delete(req.Header, "Impersonate-Group")
+			delete(req.Header, "Impersonate-User")
 			delete(req.Header, "Authorization")
 			delete(req.Header, "Cookie")
 		},
