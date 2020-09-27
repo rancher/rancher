@@ -106,7 +106,7 @@ spec:
 {{- end }}
 {{- if .Values.restrictedAdmin }}
         - name: CATTLE_RESTRICTED_DEFAULT_ADMIN
-          value: true
+          value: "true"
 {{- end}}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
