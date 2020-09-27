@@ -36,6 +36,9 @@ var globalResourcesNeededInProjects = map[string]map[string]bool{
 	"clusterrepos": {
 		"catalog.cattle.io": true,
 	},
+	"clusters": {
+		"management.cattle.io": true,
+	},
 }
 
 func newPRTBLifecycle(m *manager) *prtbLifecycle {
