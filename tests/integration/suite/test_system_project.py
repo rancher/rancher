@@ -93,12 +93,7 @@ def test_system_namespaces_default_svc_account(admin_mc):
                 else:
                     return False
             else:
-                if sa.automount_service_account_token is None:
-                    return True
-                elif sa.automount_service_account_token is True:
-                    return True
-                else:
-                    return False
+                return True
 
         def _sa_update_fail():
             name = sa.metadata.name
