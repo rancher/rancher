@@ -231,6 +231,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("own").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos", "operations", "releases", "apps").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", false, false, false).
@@ -263,6 +264,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos", "operations", "releases", "apps").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", false, false, false).
@@ -291,6 +293,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos", "operations", "releases", "apps").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
 		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", false, false, false).
