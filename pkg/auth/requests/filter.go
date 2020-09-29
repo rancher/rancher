@@ -48,3 +48,30 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	h.next.ServeHTTP(rw, req)
 }
+
+func NewRequireAuthenticatedFilter(pathPrefix string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return &authedFilter{
+			next:       next,
+			pathPrefix: pathPrefix,
+		}
+	}
+}
+
+type authedFilter struct {
+	next       http.Handler
+	pathPrefix string
+}
+
+func (h authedFilter) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if strings.HasPrefix(req.URL.Path, h.pathPrefix) {
+		userInfo, authed := request.UserFrom(req.Context())
+		// checking for system:cattle:error user keeps the old behavior of always returning 401 when authentication fails
+		if !authed || userInfo.GetName() == "system:cattle:error" {
+			util.ReturnHTTPError(rw, req, 401, ErrMustAuthenticate.Error())
+			return
+		}
+	}
+
+	h.next.ServeHTTP(rw, req)
+}
