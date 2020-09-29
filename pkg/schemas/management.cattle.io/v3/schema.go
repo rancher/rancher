@@ -50,11 +50,16 @@ var (
 		Init(clusterTemplateTypes).
 		Init(driverMetadataTypes).
 		Init(driverMetadataCisTypes).
-		Init(encryptionTypes)
+		Init(encryptionTypes).
+		Init(fleetTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
 )
+
+func fleetTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(&Version, v3.FleetWorkspace{})
+}
 
 func rkeTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.AddMapperForType(&Version, rketypes.BaseService{}, m.Drop{Field: "image"}).

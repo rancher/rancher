@@ -101,6 +101,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.DynamicSchemaType,
 		client.EtcdBackupType,
 		client.FeatureType,
+		client.FleetWorkspaceType,
 		client.GlobalRoleBindingType,
 		client.GlobalRoleType,
 		client.GroupMemberType,

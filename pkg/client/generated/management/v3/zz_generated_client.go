@@ -71,6 +71,7 @@ type Client struct {
 	RkeAddon                                RkeAddonOperations
 	CisConfig                               CisConfigOperations
 	CisBenchmarkVersion                     CisBenchmarkVersionOperations
+	FleetWorkspace                          FleetWorkspaceOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -147,6 +148,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.RkeAddon = newRkeAddonClient(client)
 	client.CisConfig = newCisConfigClient(client)
 	client.CisBenchmarkVersion = newCisBenchmarkVersionClient(client)
+	client.FleetWorkspace = newFleetWorkspaceClient(client)
 
 	return client, nil
 }
