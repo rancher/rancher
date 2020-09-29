@@ -80,7 +80,7 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.10.0
-	github.com/rancher/apiserver v0.0.0-20200926010459-c4df032497cf
+	github.com/rancher/apiserver v0.0.0-20200929180641-c15599e9fab9
 	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
 	github.com/rancher/eks-operator v0.1.0-rc30
 	github.com/rancher/kubernetes-provider-detector v0.1.0
