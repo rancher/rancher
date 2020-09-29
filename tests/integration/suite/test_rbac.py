@@ -246,31 +246,44 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
     # Verify the user can see the cluster
     wait_until_available(user_mc.client, admin_cc.cluster)
 
+    split = str.split(prtb.id, ":")
+    prtb_key = split[0] + "_" + split[1]
     api_instance = kubernetes.client.RbacAuthorizationV1Api(
         admin_mc.k8s_client)
 
-    split = str.split(prtb.id, ":")
-    prtb_key = split[0]+"_"+split[1]
+    def crb_created():
+        crbs = api_instance.list_cluster_role_binding(
+            label_selector=prtb_key + "=" + mbo)
+        return len(crbs.items) == 1
 
     # Find the expected k8s clusterRoleBinding
-    crbs = api_instance.list_cluster_role_binding(
-        label_selector=prtb_key + "=" + mbo)
-
-    assert len(crbs.items) == 1
+    wait_for(crb_created,
+             fail_handler=lambda: "failed waiting for clusterRoleBinding"
+                                  " to get created",
+             timeout=120)
 
     # Delete the projectRoleTemplateBinding, this should cause the user to no
     # longer be able to see the cluster
     admin_mc.client.delete(prtb)
 
-    def crb_callback():
+    def crb_deleted():
         crbs = api_instance.list_cluster_role_binding(
             label_selector=prtb_key + "=" + mbo)
         return len(crbs.items) == 0
 
-    def fail_handler():
-        return "failed waiting for cluster role binding to be deleted"
+    wait_for(crb_deleted,
+             fail_handler=lambda: "failed waiting for clusterRoleBinding"
+                                  " to get deleted",
+             timeout=120)
 
-    wait_for(crb_callback, fail_handler=fail_handler, timeout=120)
+    # user should now have no access to any clusters
+    def list_clusters():
+        clusters = user_mc.client.list_cluster()
+        return len(clusters.data) == 0
+
+    wait_for(list_clusters,
+             fail_handler=lambda: "failed revoking access to cluster",
+             timeout=120)
 
     with pytest.raises(ApiError) as e:
         user_mc.client.by_id_cluster(admin_cc.cluster.id)
@@ -310,7 +323,16 @@ def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
     split = str.split(prtb.id, ":")
     prtb_key = split[0]+"_"+split[1]
 
+    def crb_created():
+        crbs = api_instance.list_cluster_role_binding(
+            label_selector=prtb_key + "=" + mbo)
+        return len(crbs.items) == 1
+
     # Find the expected k8s clusterRoleBinding
+    wait_for(crb_created,
+             fail_handler=lambda: "failed waiting for clusterRoleBinding to"
+                                  "get created", timeout=120)
+
     crbs = api_instance.list_cluster_role_binding(
         label_selector=prtb_key + "=" + mbo)
 
@@ -346,6 +368,15 @@ def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
         return "failed waiting for cluster role binding to be deleted"
 
     wait_for(crb_callback, fail_handler=fail_handler, timeout=120)
+
+    # user should now have no access to any clusters
+    def list_clusters():
+        clusters = user_mc.client.list_cluster()
+        return len(clusters.data) == 0
+
+    wait_for(list_clusters,
+             fail_handler=lambda: "failed revoking access to cluster",
+             timeout=120)
 
     with pytest.raises(ApiError) as e:
         user_mc.client.by_id_cluster(admin_cc.cluster.id)
