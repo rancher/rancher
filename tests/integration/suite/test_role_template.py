@@ -321,23 +321,19 @@ def test_role_template_changes_revoke_permissions(admin_mc, remove_resource,
     remove_resource(prtb)
     wait_until_available(user.client, admin_pc.project)
 
-    # this user should be able to add users to the project
-    user1 = user_factory()
-    prtb1 = user.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
-        userId=user1.user.id,
-        projectId=admin_pc.project.id,
-        roleTemplateId="project-member"
-    )
-    remove_resource(prtb1)
-    wait_until_available(user1.client, admin_pc.project)
+    # this user should be able to list PRTBs
+    def _list_prtbs():
+        prtbs = user.client.list_project_role_template_binding()
+        return len(prtbs.data) > 0
+
+    wait_for(_list_prtbs, fail_handler=lambda: "user was unable to list PRTBs")
 
     # now edit the cloned roletemplate to remove permission
-    # to create projectroletemplatebindings
+    # to list projectroletemplatebindings
     rules = cloned_po['rules']
     for ind, rule in enumerate(rules):
         if 'projectroletemplatebindings' in rule['resources']:
-            setattr(rule, 'verbs', ['get', 'list', 'watch'])
+            del rules[ind]
 
     client.update(cloned_po, rules=rules)
 
@@ -345,26 +341,23 @@ def test_role_template_changes_revoke_permissions(admin_mc, remove_resource,
         rt = client.by_id_role_template(role_template_id)
         for rule in rt['rules']:
             if 'projectroletemplatebindings' in rule['resources']:
-                return rule['verbs'] == ['get', 'list', 'watch']
+                return False
+        return True
 
     def fail_handler():
         return "failed waiting for cloned roletemplate to be updated"
 
+    # Validate the rule was dropped
     wait_for(role_template_update_check, fail_handler=fail_handler(),
              timeout=120)
 
-    # now as the same user again try adding another user to a project, this
-    # should not work since the user with cloned_po role can no longer create
-    # projectroletemplatebindings
-    user2 = user_factory()
-    with pytest.raises(ApiError) as e:
-        user.client.create_project_role_template_binding(
-            name="prtb-" + random_str(),
-            userId=user2.user.id,
-            projectId=admin_pc.project.id,
-            roleTemplateId="project-member"
-        )
-    assert e.value.error.status == 403
+    # this user should NOT be able to list PRTBs
+    def _list_prtbs_empty():
+        prtbs = user.client.list_project_role_template_binding()
+        return len(prtbs.data) == 0
+
+    wait_for(_list_prtbs_empty,
+             fail_handler=lambda: "user was able to list PRTBs")
 
 
 def wait_for_role_template_creation(admin_mc, rt_name, timeout=60):
