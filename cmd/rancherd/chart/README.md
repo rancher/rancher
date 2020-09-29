@@ -34,7 +34,7 @@ spec:
     publicCA: true
 ```
 
-Put this manifest on your host `/var/lib/rancher/rke2/server/manifest` before running rancherd.
+Put this manifest on your host `/var/lib/rancher/rke2/server/manifests` before running rancherd.
 
 #### Common Options
 
