@@ -74,6 +74,7 @@ type Interface interface {
 	RkeAddonsGetter
 	CisConfigsGetter
 	CisBenchmarkVersionsGetter
+	FleetWorkspacesGetter
 }
 
 type Client struct {
@@ -990,6 +991,20 @@ func (c *Client) CisBenchmarkVersions(namespace string) CisBenchmarkVersionInter
 	sharedClient := c.clientFactory.ForResourceKind(CisBenchmarkVersionGroupVersionResource, CisBenchmarkVersionGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CisBenchmarkVersionResource, CisBenchmarkVersionGroupVersionKind, cisBenchmarkVersionFactory{})
 	return &cisBenchmarkVersionClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type FleetWorkspacesGetter interface {
+	FleetWorkspaces(namespace string) FleetWorkspaceInterface
+}
+
+func (c *Client) FleetWorkspaces(namespace string) FleetWorkspaceInterface {
+	sharedClient := c.clientFactory.ForResourceKind(FleetWorkspaceGroupVersionResource, FleetWorkspaceGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &FleetWorkspaceResource, FleetWorkspaceGroupVersionKind, fleetWorkspaceFactory{})
+	return &fleetWorkspaceClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
