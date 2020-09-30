@@ -8,15 +8,15 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	systemimage "github.com/rancher/rancher/pkg/controllers/managementuser/systemimage"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -535,20 +535,42 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 
 	annoMap := make(map[string][]string)
 
+	var restrictedAdmin bool
+	if settings.RestrictedDefaultAdmin.Get() == "true" {
+		restrictedAdmin = true
+	}
+
+	annoMap["created"] = []string{}
+	annoMap["required"] = []string{}
+
 	switch context {
 	case "project":
+		// If we are in restricted mode, ensure the default projects are not granting
+		// permissions to the restricted-admin
+		if restrictedAdmin {
+			proj := obj.(*v3.Project)
+			if proj.Spec.ClusterName == "local" && (proj.Spec.DisplayName == "Default" || proj.Spec.DisplayName == "System") {
+				break
+			}
+		}
+
 		for _, role := range rt {
 			if role.ProjectCreatorDefault && !role.Locked {
 				annoMap["required"] = append(annoMap["required"], role.Name)
 			}
 		}
 	case "cluster":
+		// If we are in restricted mode, ensure we don't give the default restricted-admin
+		// the default permissions in the cluster
+		if restrictedAdmin && meta.GetName() == "local" {
+			break
+		}
+
 		for _, role := range rt {
 			if role.ClusterCreatorDefault && !role.Locked {
 				annoMap["required"] = append(annoMap["required"], role.Name)
 			}
 		}
-		annoMap["created"] = []string{}
 	}
 
 	d, err := json.Marshal(annoMap)
