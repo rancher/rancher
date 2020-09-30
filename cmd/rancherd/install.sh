@@ -51,7 +51,7 @@ setup_env() {
 
     # --- make sure install channel has a value
     if [ -z "${INSTALL_RANCHERD_CHANNEL}" ]; then
-        INSTALL_RANCHERD_CHANNEL="testing"
+        INSTALL_RANCHERD_CHANNEL="latest"
     fi
 
     # --- make sure install type has a value
@@ -117,7 +117,6 @@ get_release_version() {
     else
         info "finding release for channel ${INSTALL_RANCHERD_CHANNEL}"
         INSTALL_RANCHERD_CHANNEL_URL=${INSTALL_RANCHERD_CHANNEL_URL:-'https://update.rancher.io/v1-release/channels'}
-        INSTALL_RANCHERD_CHANNEL=${INSTALL_RANCHERD_CHANNEL:-'latest'}
         version_url="${INSTALL_RANCHERD_CHANNEL_URL}/${INSTALL_RANCHERD_CHANNEL}"
         case ${DOWNLOADER} in
         *curl)
