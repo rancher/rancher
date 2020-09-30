@@ -296,7 +296,7 @@ func (m *MCAppManager) updateApp(app *pv3.App, answerMap map[string]map[string]s
 func (m *MCAppManager) createRevision(mcapp *v3.MultiClusterApp, creatorID string) (*v3.MultiClusterAppRevision, error) {
 	ownerReference := metav1.OwnerReference{
 		APIVersion: "management.cattle.io/v3",
-		Kind:       rbac.MultiClusterAppResource,
+		Kind:       v3.MultiClusterAppGroupVersionKind.Kind,
 		Name:       mcapp.Name,
 		UID:        mcapp.UID,
 	}
