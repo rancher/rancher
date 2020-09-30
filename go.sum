@@ -993,8 +993,8 @@ github.com/rancher/apimachinery v0.19.0-rancher1 h1:8eD7WxSeGk6UmvQptygPJ59jhRXo
 github.com/rancher/apimachinery v0.19.0-rancher1/go.mod h1:DnPGDnARWFvYa3pMHgSxtbZb7gpzzAZ1pTfaUNDVlmA=
 github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48 h1:XmhN3O0azgyrMRTX3v/MEHfb5BSjdbRUYJijiJ7Gs5s=
 github.com/rancher/apiserver v0.0.0-20200730050206-780f0e4c5f48/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
-github.com/rancher/apiserver v0.0.0-20200929180641-c15599e9fab9 h1:VvpE3Qsiw+QFM7Mza2fYbMPqDHCftVqHOQDtwrsePPw=
-github.com/rancher/apiserver v0.0.0-20200929180641-c15599e9fab9/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
+github.com/rancher/apiserver v0.0.0-20200930005138-e90b0a39d0c0 h1:8B+JgDR/4SoY3Z5Z1E0iMGDmnVg9prqM2HuZmOs4ft8=
+github.com/rancher/apiserver v0.0.0-20200930005138-e90b0a39d0c0/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/client-go v1.19.0-rancher.1 h1:O6NXYfWsavvTgSQP5/xchVjxG+34hWWMVp31fF+91C8=
 github.com/rancher/client-go v1.19.0-rancher.1/go.mod h1:H9E/VT95blcFQnlyShFgnFT9ZnJOAceiUHM3MlRC+mU=
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
