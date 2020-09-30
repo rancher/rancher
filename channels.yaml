@@ -1,7 +1,6 @@
 channels:
 - name: latest
   latestRegexp: .*
-  excludeRegexp: ^[^+]+-
 - name: testing
   latestRegexp: .*
 github:
