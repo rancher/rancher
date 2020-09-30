@@ -6,6 +6,7 @@ WORKDIR $WORKSPACE
 ENV PYTHONPATH /src/rancher-validation
 ARG RKE_VERSION=v1.0.2
 ARG CLI_VERSION=v2.3.2
+ARG RANCHER_HELM_VERSION=v3.3.4
 ARG SONOBUOY_VERSION=0.18.2
 
 
@@ -21,8 +22,8 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     tar -x -f rancher-linux-amd64-$CLI_VERSION.tar.gz && \
     mv rancher-$CLI_VERSION/rancher /bin/rancherctl && \
     chmod +x /bin/rancherctl && \
-    wget https://get.helm.sh/helm-v3.0.2-linux-amd64.tar.gz && \
-    tar -x -f helm-v3.0.2-linux-amd64.tar.gz && \
+    wget https://get.helm.sh/helm-$RANCHER_HELM_VERSION-linux-amd64.tar.gz && \
+    tar -x -f helm-$RANCHER_HELM_VERSION-linux-amd64.tar.gz && \
     mv linux-amd64/helm /bin/helm_v3 && \
     chmod +x /bin/helm_v3 && \
     wget https://releases.hashicorp.com/terraform/0.12.10/terraform_0.12.10_linux_amd64.zip && \
