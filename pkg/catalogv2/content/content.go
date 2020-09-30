@@ -24,12 +24,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
 )
 
 type Manager struct {
 	configMaps   corecontrollers.ConfigMapCache
 	secrets      corecontrollers.SecretCache
 	clusterRepos catalogcontrollers.ClusterRepoCache
+	discovery    discovery.DiscoveryInterface
 	IndexCache   map[string]indexCache
 	lock         sync.RWMutex
 }
@@ -40,10 +42,12 @@ type indexCache struct {
 }
 
 func NewManager(
+	discovery discovery.DiscoveryInterface,
 	configMaps corecontrollers.ConfigMapCache,
 	secrets corecontrollers.SecretCache,
 	clusterRepos catalogcontrollers.ClusterRepoCache) *Manager {
 	return &Manager{
+		discovery:    discovery,
 		configMaps:   configMaps,
 		secrets:      secrets,
 		clusterRepos: clusterRepos,
@@ -86,11 +90,16 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 		return nil, err
 	}
 
+	k8sVersion, err := c.k8sVersion()
+	if err != nil {
+		return nil, err
+	}
+
 	c.lock.RLock()
 	if cache, ok := c.IndexCache[fmt.Sprintf("%s/%s", r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)]; ok {
 		if cm.ResourceVersion == cache.revision {
 			c.lock.RUnlock()
-			return c.filterReleases(deepCopyIndex(cache.index)), nil
+			return c.filterReleases(deepCopyIndex(cache.index), k8sVersion), nil
 		}
 	}
 	c.lock.RUnlock()
@@ -122,7 +131,15 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	}
 	c.lock.Unlock()
 
-	return c.filterReleases(deepCopyIndex(index)), nil
+	return c.filterReleases(deepCopyIndex(index), k8sVersion), nil
+}
+
+func (c *Manager) k8sVersion() (*semver.Version, error) {
+	info, err := c.discovery.ServerVersion()
+	if err != nil {
+		return nil, err
+	}
+	return semver.NewVersion(info.GitVersion)
 }
 
 func deepCopyIndex(src *repo.IndexFile) *repo.IndexFile {
@@ -151,7 +168,7 @@ func deepCopyIndex(src *repo.IndexFile) *repo.IndexFile {
 	return &deepcopy
 }
 
-func (c *Manager) filterReleases(index *repo.IndexFile) *repo.IndexFile {
+func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Version) *repo.IndexFile {
 	if !settings.IsRelease() {
 		return index
 	}
@@ -171,8 +188,19 @@ func (c *Manager) filterReleases(index *repo.IndexFile) *repo.IndexFile {
 						continue
 					}
 				} else {
-					logrus.Errorf("failed to parse constraint version %s: %v", settings.ServerVersion.Get(), err)
+					logrus.Errorf("failed to parse constraint version %s: %v", constraintStr, err)
 				}
+			}
+
+			if version.KubeVersion != "" {
+				if constraint, err := semver.NewConstraint(version.KubeVersion); err == nil {
+					if !constraint.Check(k8sVersion) {
+						continue
+					}
+				} else {
+					logrus.Errorf("failed to parse constraint for kubeversion %s: %v", version.KubeVersion, err)
+				}
+
 			}
 			newVersions = append(newVersions, version)
 		}
