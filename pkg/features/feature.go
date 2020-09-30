@@ -43,10 +43,10 @@ var (
 		false)
 	Fleet = newFeature(
 		"fleet",
-		"Install fleet by default on start",
+		"Install Fleet when starting Rancher",
 		true,
 		false,
-		false)
+		true)
 )
 
 type Feature struct {
