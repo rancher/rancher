@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/wrangler/pkg/randomtoken"
@@ -37,7 +38,12 @@ func ResetAdmin(_ *cli.Context) error {
 		return err
 	}
 
-	conf, err := clientcmd.BuildConfigFromFlags("", "/etc/rancher/rke2/rke2.yaml")
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		kubeconfig = "/etc/rancher/rke2/rke2.yaml"
+	}
+
+	conf, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -145,7 +151,6 @@ func ResetAdmin(_ *cli.Context) error {
 			return err
 		}
 		adminName = admin.GetName()
-
 		if err := setClusterAnnotation(ctx, clustersClient, adminName); err != nil {
 			return err
 		}
@@ -283,6 +288,32 @@ func setClusterAnnotation(ctx context.Context, clustersClient dynamic.Namespacea
 	ann["field.cattle.io/creatorId"] = adminName
 	cluster.SetAnnotations(ann)
 
+	// reset CreatorMadeOwner condition so that controller will reconcile and reassign admin to the default user
+	setConditionToFalse(cluster.Object, "DefaultProjectCreated")
+	setConditionToFalse(cluster.Object, "SystemProjectCreated")
+	setConditionToFalse(cluster.Object, "CreatorMadeOwner")
+
 	_, err = clustersClient.Update(ctx, cluster, v1.UpdateOptions{})
 	return err
+}
+
+func setConditionToFalse(object map[string]interface{}, cond string) {
+	status, ok := object["status"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	conditions, ok := status["conditions"].([]interface{})
+	if !ok {
+		return
+	}
+	for _, condition := range conditions {
+		m, ok := condition.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if t, ok := m["type"].(string); ok && t == cond {
+			m["status"] = "False"
+		}
+	}
+	return
 }
