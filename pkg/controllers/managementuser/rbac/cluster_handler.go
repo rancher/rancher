@@ -59,6 +59,10 @@ func (h *clusterHandler) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 
 func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 	_, err := v32.ClusterConditionGlobalAdminsSynced.DoUntilTrue(cluster, func() (runtime.Object, error) {
+		// We recieve clusters with no data, when that happens no checks will work so just ignore them
+		if cluster.Name == "" {
+			return nil, nil
+		}
 		// Sync both admin types
 		for _, roleName := range []string{rbac.GlobalAdmin, rbac.GlobalRestrictedAdmin} {
 			// Do not sync restricted-admin to the local cluster as 'cluster-admin'

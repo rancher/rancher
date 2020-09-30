@@ -475,7 +475,7 @@ func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool)
 			}
 		}
 
-		if createClusterRoleBinding {
+		if createClusterRoleBinding && settings.RestrictedDefaultAdmin.Get() != "true" {
 			users, err := management.Mgmt.User().List(v1.ListOptions{
 				LabelSelector: set.String(),
 			})
