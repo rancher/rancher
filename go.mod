@@ -86,7 +86,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.0
 	github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200908202416-992a35eef40f
+	github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
