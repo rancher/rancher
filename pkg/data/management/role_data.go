@@ -80,7 +80,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("project.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("fleet.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("rancher.cattle.io").resources("*").verbs("*").
-		addRule().apiGroups("catalog.cattle.io").resources("*").verbs("*")
+		addRule().apiGroups("catalog.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("").resources("secrets").verbs("create")
 
 	rb.addRole("User", "user").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
