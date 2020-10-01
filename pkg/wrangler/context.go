@@ -184,6 +184,7 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 	}
 
 	content := content.NewManager(
+		steveControllers.K8s.Discovery(),
 		steveControllers.Core.ConfigMap().Cache(),
 		steveControllers.Core.Secret().Cache(),
 		helm.Catalog().V1().ClusterRepo().Cache())
