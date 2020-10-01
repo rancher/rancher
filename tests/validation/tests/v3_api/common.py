@@ -2916,7 +2916,6 @@ def wait_until_app_v2_deployed(client, app_name, timeout=DEFAULT_APP_V2_TIMEOUT)
                 if app["status"]["summary"]["state"] == "deployed":
                     return app_list
         app = client.list_catalog_cattle_io_app()
-    return
 
 
 def wait_until_app_v2_uninstall(client, app_name, timeout=DEFAULT_APP_V2_TIMEOUT):
@@ -2940,7 +2939,6 @@ def wait_until_app_v2_uninstall(client, app_name, timeout=DEFAULT_APP_V2_TIMEOUT
         if app_name not in app_list:
             return app_list
         app = client.list_catalog_cattle_io_app()
-    return
 
 
 def check_v2_app_and_uninstall(client, chart_name):
@@ -2976,3 +2974,18 @@ def update_and_validate_kdm(kdm_url, admin_token=ADMIN_TOKEN,
     kdm_refresh_url = rancher_api_url + "/kontainerdrivers?action=refresh"
     response = requests.post(kdm_refresh_url, verify=False, headers=header)
     assert response.ok
+
+
+def install_v2_app(client, rancher_repo, chart_values, chart_name, ns):
+    response = client.action(obj=rancher_repo, action_name="install",
+                             charts=[chart_values],
+                             namespace=ns,
+                             disableOpenAPIValidation=False,
+                             noHooks=False,
+                             projectId=None,
+                             skipCRDs=False,
+                             timeout="600s",
+                             wait=True)
+    print("response", response)
+    app_list = wait_until_app_v2_deployed(client, chart_name)
+    assert chart_name in app_list
