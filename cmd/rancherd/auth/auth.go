@@ -169,7 +169,7 @@ func ResetAdmin(_ *cli.Context) error {
 						},
 						"apiVersion":     "management.cattle.io/v3",
 						"kind":           "GlobalRoleBinding",
-						"username":       adminName,
+						"userName":       adminName,
 						"globalRoleName": "admin",
 					},
 				}, v1.CreateOptions{})
