@@ -230,7 +230,10 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("own").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos", "operations", "releases", "apps").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
 		setRoleTemplateNames("admin")
 
@@ -263,7 +266,10 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos", "operations", "releases", "apps").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
 		setRoleTemplateNames("edit")
 
@@ -292,7 +298,10 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("get", "list", "watch").
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("get", "list", "watch").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos", "operations", "releases", "apps").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
 		setRoleTemplateNames("view")
 
