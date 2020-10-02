@@ -207,7 +207,7 @@ func newVersionInfo() *VersionInfo {
 
 func GetRancherVersion() string {
 	rancherVersion := settings.ServerVersion.Get()
-	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") {
+	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
 		return RancherVersionDev
 	}
 	if strings.HasPrefix(rancherVersion, "v") {
