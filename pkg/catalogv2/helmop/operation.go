@@ -34,7 +34,6 @@ import (
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -634,37 +633,30 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 		return nil, err
 	}
 
-	ns, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		annotations := map[string]string{}
-		if projectID != "" {
-			annotations["field.cattle.io/projectId"] = strings.ReplaceAll(projectID, "/", ":")
-		}
-		ns, err = client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        namespace,
-				Annotations: annotations,
-			},
-		}, metav1.CreateOptions{})
+	annotations := map[string]string{}
+	if projectID != "" {
+		annotations["field.cattle.io/projectId"] = strings.ReplaceAll(projectID, "/", ":")
 	}
+	// We just always try to create an ignore the error. This is because you might have create but not get privileges
+	_, _ = client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        namespace,
+			Annotations: annotations,
+		},
+	}, metav1.CreateOptions{})
+
+	if projectID == "" {
+		return client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	}
+
+	adminClient, err := s.cg.AdminK8sInterface()
 	if err != nil {
 		return nil, err
 	}
 
-	if projectID == "" {
-		return ns, nil
-	}
-
-	if ok, err := namespaces.IsNamespaceConditionSet(ns, string(v3.ProjectConditionInitialRolesPopulated), true); err != nil {
-		return ns, err
-	} else if ok {
-		return ns, nil
-	}
-
-	w, err := client.CoreV1().Namespaces().Watch(ctx, metav1.ListOptions{
-		ResourceVersion:      ns.ResourceVersion,
-		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
-		TimeoutSeconds:       &thirty,
+	w, err := adminClient.CoreV1().Namespaces().Watch(ctx, metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + namespace,
+		TimeoutSeconds: &thirty,
 	})
 	if err != nil {
 		return nil, err
