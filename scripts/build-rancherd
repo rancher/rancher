@@ -16,7 +16,7 @@ echo "RUNTIME_TAG: $RUNTIME_TAG"
 
 K8S_VERSION=$(grep 'ARG RKE2_VERSION=' ../../package/Dockerfile.runtime | sed 's/.*RKE2_VERSION=//')
 go build -o ../../bin/rancherd-${ARCH} \
-    -ldflags '-extldflags "-static"
+    -ldflags '-w -s -extldflags "-static"
     -X github.com/rancher/rke2/pkg/images.KubernetesVersion='$K8S_VERSION'-'$ARCH'
     -X github.com/rancher/rke2/pkg/images.RuntimeImageName=rancher-runtime
     -X github.com/rancher/k3s/pkg/version.Program=rke2
