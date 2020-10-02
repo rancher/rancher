@@ -325,9 +325,12 @@ func (a *clusterRepoStatusHandler) sync(key string, obj *v1.ClusterRepo) (*v1.Cl
 
 		var newErr error
 		obj.Status = newStatus
-		obj, newErr = a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
+		}
+		if newErr == nil {
+			obj = newObj
 		}
 	}
 	return obj, err
