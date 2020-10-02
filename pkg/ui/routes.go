@@ -67,9 +67,9 @@ func PreferredIndex(prefs v3.PreferenceCache) http.Handler {
 }
 
 func serveIndexFromSetting(rw http.ResponseWriter, req *http.Request, setting string) {
-	if strings.Contains(setting, "ember") {
-		emberIndex.ServeHTTP(rw, req)
-	} else {
+	if strings.Contains(setting, "vue") {
 		http.Redirect(rw, req, "/dashboard/", http.StatusFound)
+	} else {
+		emberIndex.ServeHTTP(rw, req)
 	}
 }
