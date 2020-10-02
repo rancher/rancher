@@ -325,9 +325,12 @@ func (a *planStatusHandler) sync(key string, obj *v1.Plan) (*v1.Plan, error) {
 
 		var newErr error
 		obj.Status = newStatus
-		obj, newErr = a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
+		}
+		if newErr == nil {
+			obj = newObj
 		}
 	}
 	return obj, err
