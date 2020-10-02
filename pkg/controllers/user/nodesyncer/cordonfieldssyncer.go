@@ -156,8 +156,8 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, nodeName string, ca
 				return obj, err
 			}
 			logrus.Infof("Draining node %s in %s with flags %v", nodeName, obj.Namespace,
-				strings.Join(getFlags(nodeObj.Spec.NodeDrainInput), " "))
-			_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeName, getFlags(nodeObj.Spec.NodeDrainInput))
+				strings.Join(nodehelper.GetDrainFlags(nodeObj), " "))
+			_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeName, nodehelper.GetDrainFlags(nodeObj))
 			if err != nil {
 				if ctx.Err() == context.Canceled {
 					stopped = true

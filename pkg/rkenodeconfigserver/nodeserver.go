@@ -13,13 +13,13 @@ import (
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	rkepki "github.com/rancher/rke/pki"
-	rkeservices "github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -97,7 +97,7 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	var nodeConfig *rkeworker.NodeConfig
-	if IsNonWorker(client.Node.Status.NodeConfig.Role) {
+	if nodehelper.IsNonWorker(client.Node.Status.NodeConfig) {
 		nodeConfig, err = n.nonWorkerConfig(req.Context(), client.Cluster, client.Node)
 	} else {
 		if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
@@ -137,18 +137,6 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if err := json.NewEncoder(rw).Encode(nodeConfig); err != nil {
 		logrus.Errorf("failed to write nodeConfig to agent: %v", err)
 	}
-}
-
-func IsNonWorker(roles []string) bool {
-	for _, role := range roles {
-		if role == rkeservices.ETCDRole {
-			return true
-		}
-		if role == rkeservices.ControlRole {
-			return true
-		}
-	}
-	return false
 }
 
 func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
@@ -244,7 +232,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 func FilterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
 	nodeList := make([]v3.RKEConfigNode, 0)
 	for _, node := range spec.Nodes {
-		if IsNonWorker(node.Role) || node.NodeName == n.Status.NodeConfig.NodeName {
+		if nodehelper.IsNonWorker(&node) || node.NodeName == n.Status.NodeConfig.NodeName {
 			nodeList = append(nodeList, node)
 		}
 	}
