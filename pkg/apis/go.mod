@@ -9,10 +9,10 @@ replace (
 
 require (
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/eks-operator v0.1.0-rc30
-	github.com/rancher/norman v0.0.0-20200908202416-992a35eef40f
-	github.com/rancher/rke v1.2.0-rc15
-	github.com/rancher/wrangler v0.6.2-0.20200916052259-24781350894c
+	github.com/rancher/eks-operator v1.0.1
+	github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3
+	github.com/rancher/rke v1.2.0-rc16
+	github.com/rancher/wrangler v0.6.2-0.20200922204249-68dfef44d080
 	github.com/sirupsen/logrus v1.6.0
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
 	k8s.io/api v0.18.8
