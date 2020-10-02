@@ -12,7 +12,7 @@ require (
 	github.com/rancher/eks-operator v1.0.1
 	github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3
 	github.com/rancher/rke v1.2.0-rc16
-	github.com/rancher/wrangler v0.6.2-0.20200922204249-68dfef44d080
+	github.com/rancher/wrangler v0.7.2
 	github.com/sirupsen/logrus v1.6.0
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
 	k8s.io/api v0.18.8
