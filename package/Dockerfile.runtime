@@ -1,3 +1,4 @@
-ARG RKE2_VERSION=v1.18.9-rc1-rke2 # if you’re changing this, also change rancher/cmd/rancherd/go.mod
+ARG RKE2_VERSION=v1.18.9-rc1-rke2
+# if you’re changing this, also change rancher/cmd/rancherd/go.mod
 FROM rancher/rke2-runtime:${RKE2_VERSION}
 COPY rancher.yaml /charts/
