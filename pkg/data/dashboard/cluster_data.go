@@ -15,11 +15,11 @@ func addLocalCluster(embedded bool, adminName string, wrangler *wrangler.Context
 			Name: "local",
 		},
 		Spec: v32.ClusterSpec{
-			Internal:    true,
-			DisplayName: "local",
+			Internal:           true,
+			DisplayName:        "local",
+			FleetWorkspaceName: "fleet-local",
 			ClusterSpecBase: v32.ClusterSpecBase{
-				DockerRootDir:      settings.InitialDockerRootDir.Get(),
-				FleetWorkspaceName: "fleet-local",
+				DockerRootDir: settings.InitialDockerRootDir.Get(),
 			},
 		},
 		Status: v32.ClusterStatus{
