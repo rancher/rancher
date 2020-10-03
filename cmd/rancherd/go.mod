@@ -64,7 +64,7 @@ replace (
 
 require (
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/rke2 v1.18.9-rc1.0.20201001233850-e08dea90e3f9 // v1.18.8-beta19+rke2
+	github.com/rancher/rke2 v1.18.9-rc1.0.20201001233850-e08dea90e3f9 // v1.18.9-rc1+rke2 ... If you update this, also update rancher/package/Dockerfile.runtime
 	github.com/rancher/wrangler v0.6.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/urfave/cli v1.22.2
