@@ -11,7 +11,6 @@ const (
 	ClusterSpecBaseFieldEnableClusterAlerting               = "enableClusterAlerting"
 	ClusterSpecBaseFieldEnableClusterMonitoring             = "enableClusterMonitoring"
 	ClusterSpecBaseFieldEnableNetworkPolicy                 = "enableNetworkPolicy"
-	ClusterSpecBaseFieldFleetWorkspaceName                  = "fleetWorkspaceName"
 	ClusterSpecBaseFieldLocalClusterAuthEndpoint            = "localClusterAuthEndpoint"
 	ClusterSpecBaseFieldRancherKubernetesEngineConfig       = "rancherKubernetesEngineConfig"
 	ClusterSpecBaseFieldScheduledClusterScan                = "scheduledClusterScan"
@@ -28,7 +27,6 @@ type ClusterSpecBase struct {
 	EnableClusterAlerting               bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
 	EnableClusterMonitoring             bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                 *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
-	FleetWorkspaceName                  string                         `json:"fleetWorkspaceName,omitempty" yaml:"fleetWorkspaceName,omitempty"`
 	LocalClusterAuthEndpoint            *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
 	ScheduledClusterScan                *ScheduledClusterScan          `json:"scheduledClusterScan,omitempty" yaml:"scheduledClusterScan,omitempty"`
