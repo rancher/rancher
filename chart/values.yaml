@@ -111,3 +111,7 @@ useBundledSystemChart: false
 # Certmanager version compatibility
 certmanager: 
   version: ""
+
+# annotations to add to the pod container metadata
+podAnnotations: {}
+  # iam.amazonaws.com/role: rancher-s3-backups

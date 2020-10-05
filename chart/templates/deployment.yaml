@@ -22,6 +22,10 @@ spec:
       labels:
         app: {{ template "rancher.fullname" . }}
         release: {{ .Release.Name }}
+        {{- if .Values.podAnnotations }}
+      annotations:
+{{ toYaml .Values.podAnnotations | indent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}
 {{- if .Values.imagePullSecrets }}
