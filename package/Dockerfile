@@ -13,7 +13,7 @@ WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.4
+ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.4
 ARG CHART_DEFAULT_BRANCH=main
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
@@ -108,7 +108,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
 ENV CATTLE_UI_VERSION 2.5.0-rc5.2
-ENV CATTLE_DASHBOARD_UI_VERSION v2.5.0-rc6
+ENV CATTLE_DASHBOARD_UI_VERSION v2.5.0-rc8
 ENV CATTLE_CLI_VERSION v2.4.6
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
