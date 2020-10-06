@@ -29,6 +29,8 @@ RANCHER_PRIVATE_CA_CERT = os.environ.get("RANCHER_PRIVATE_CA_CERT")
 RANCHER_LOCAL_CLUSTER_TYPE = os.environ.get("RANCHER_LOCAL_CLUSTER_TYPE")
 RANCHER_ADD_CUSTOM_CLUSTER = os.environ.get("RANCHER_ADD_CUSTOM_CLUSTER",
                                             "True")
+KUBERNETES_VERSION = os.environ.get("RANCHER_LOCAL_KUBERNETES_VERSION",
+                                            "")
 
 kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
 export_cmd = "export KUBECONFIG=" + kubeconfig_path
@@ -391,6 +393,7 @@ def create_rke_cluster_config(aws_nodes):
     rkeconfig = rkeconfig.replace("$user3", aws_nodes[2].ssh_user)
 
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
+    rkeconfig = rkeconfig.replace("$KUBERNETES_VERSION", KUBERNETES_VERSION)
     print("cluster-ha-filled.yml: \n" + rkeconfig + "\n")
 
     clusterfilepath = DATA_SUBDIR + "/" + "cluster-ha-filled.yml"
