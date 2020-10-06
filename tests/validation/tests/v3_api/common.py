@@ -25,6 +25,7 @@ DEFAULT_MONITORING_TIMEOUT = 180
 DEFAULT_CLUSTER_STATE_TIMEOUT = 240
 DEFAULT_MULTI_CLUSTER_APP_TIMEOUT = 300
 DEFAULT_APP_DELETION_TIMEOUT = 360
+DEFAULT_APP_V2_TIMEOUT = 60
 
 CATTLE_TEST_URL = os.environ.get('CATTLE_TEST_URL', "")
 CATTLE_API_URL = CATTLE_TEST_URL + "/v3"
@@ -223,6 +224,11 @@ def random_int(start, end):
 
 def random_test_name(name="test"):
     return name + "-" + str(random_int(10000, 99999))
+
+
+def get_cluster_client_for_token_v1(cluster_id, token):
+    url = CATTLE_TEST_URL + "/k8s/clusters/" + cluster_id + "/v1/schemas"
+    return rancher.Client(url=url, token=token, verify=False)
 
 
 def get_admin_client():
@@ -2867,3 +2873,62 @@ def validate_cluster_role_rbac(cluster_role, command, authorization, name):
             "{} should NOT have the authorization to run {}".format(
                 cluster_role, command)
 
+
+def wait_until_app_v2_deployed(client, app_name, timeout=DEFAULT_APP_V2_TIMEOUT):
+    """
+    List all installed apps and check for the state of "app_name" to see
+    if it == "deployed"
+    :param client: cluster client for the user
+    :param app_name: app which is being installed
+    :param timeout: time for the app to come to Deployed state
+    :return:
+    """
+    start = time.time()
+    app = client.list_catalog_cattle_io_app()
+    while True:
+        app_list = []
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to Deployed")
+        time.sleep(.5)
+        for app in app["data"]:
+            app_list.append(app["metadata"]["name"])
+            if app["metadata"]["name"] == app_name:
+                if app["status"]["summary"]["state"] == "deployed":
+                    return app_list
+        app = client.list_catalog_cattle_io_app()
+    return
+
+
+def wait_until_app_v2_uninstall(client, app_name, timeout=DEFAULT_APP_V2_TIMEOUT):
+    """
+    list all installed apps. search for "app_name" in the list
+    if app_name is NOT in list, indicates the app has been uninstalled successfully
+    :param client: cluster client for the user
+    :param app_name: app which is being unstalled
+    :param timeout: time for app to be uninstalled
+    """
+    start = time.time()
+    app = client.list_catalog_cattle_io_app()
+    while True:
+        app_list = []
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to Uninstalled")
+        time.sleep(.5)
+        for app in app["data"]:
+            app_list.append(app["metadata"]["name"])
+        if app_name not in app_list:
+            return app_list
+        app = client.list_catalog_cattle_io_app()
+    return
+
+
+def check_v2_app_and_uninstall(client, chart_name):
+    app = client.list_catalog_cattle_io_app()
+    for app in app["data"]:
+        if app["metadata"]["name"] == chart_name:
+            response = client.action(obj=app, action_name="uninstall")
+            app_list = wait_until_app_v2_uninstall(client, chart_name)
+            assert chart_name not in app_list, \
+                "App has not uninstalled"
