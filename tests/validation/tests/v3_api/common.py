@@ -88,6 +88,7 @@ DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
 CIS_SCAN_PROFILE = os.environ.get('RANCHER_CIS_SCAN_PROFILE', "rke-cis-1.4")
 
 # here are all supported roles for RBAC testing
+RESTRICTED_ADMIN = "restricted-admin"
 CLUSTER_MEMBER = "cluster-member"
 CLUSTER_OWNER = "cluster-owner"
 PROJECT_MEMBER = "project-member"
@@ -102,6 +103,7 @@ rbac_data = {
     "ns_unshared": None,
     "wl_unshared": None,
     "users": {
+        RESTRICTED_ADMIN: {},
         CLUSTER_OWNER: {},
         CLUSTER_MEMBER: {},
         PROJECT_OWNER: {},
@@ -1958,7 +1960,10 @@ def rbac_prepare():
         rbac_data["users"][key]["user"] = user1
         rbac_data["users"][key]["token"] = token1
 
-    # assign different role to each user
+    # assign the restricted admin role to the user, So he is standard user + restricted admin now
+    admin_client.create_global_role_binding(globalRoleId=RESTRICTED_ADMIN,
+                                            userId=rbac_data["users"][RESTRICTED_ADMIN]["user"].id)
+    # assign different cluster-level role to each user
     assign_members_to_cluster(admin_client,
                               rbac_data["users"][CLUSTER_OWNER]["user"],
                               cluster,
@@ -1967,6 +1972,7 @@ def rbac_prepare():
                               rbac_data["users"][CLUSTER_MEMBER]["user"],
                               cluster,
                               CLUSTER_MEMBER)
+    # assign different project-level role to each user
     assign_members_to_project(admin_client,
                               rbac_data["users"][PROJECT_MEMBER]["user"],
                               project,

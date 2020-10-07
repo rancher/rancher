@@ -15,8 +15,8 @@ AWS_HOSTED_ZONE_ID - Zone Id in AWS route53 where route53 will be created.
 RANCHER_TEST_RBAC - To enable rbac tests
 """
 
-from .common import (ApiError, CLUSTER_MEMBER, CLUSTER_OWNER, create_kubeconfig,
-                     create_ns, create_project_and_ns,
+from .common import (ApiError, RESTRICTED_ADMIN, CLUSTER_MEMBER, CLUSTER_OWNER,
+                     create_kubeconfig, create_ns, create_project_and_ns,
                      get_cluster_client_for_token, get_project_client_for_token,
                      get_user_client, get_user_client_and_cluster, if_test_rbac,
                      PROJECT_OWNER, PROJECT_MEMBER, PROJECT_READ_ONLY,
@@ -64,12 +64,13 @@ rancher_ssc_private_key = get_private_key('RANCHER_BYO_TLS_KEY',
 rancher_ssc_cert = get_private_key('RANCHER_BYO_TLS_CERT', 'cert.pem')
 
 rbac_role_list = [
-                  CLUSTER_OWNER,
-                  CLUSTER_MEMBER,
-                  PROJECT_OWNER,
-                  PROJECT_MEMBER,
-                  PROJECT_READ_ONLY
-                 ]
+    RESTRICTED_ADMIN,
+    CLUSTER_OWNER,
+    CLUSTER_MEMBER,
+    PROJECT_OWNER,
+    PROJECT_MEMBER,
+    PROJECT_READ_ONLY
+]
 
 
 @pytest.mark.usefixtures("create_project_client")
@@ -177,8 +178,7 @@ class TestCertificate:
         ns_2 = create_ns(self.c_client, self.cluster, self.project)
         self.workload_2 = self.p_client.create_workload(
             name=wl_name, containers=wl_con, namespaceId=ns_2.id,
-            scheduling=scheduling
-            )
+            scheduling=scheduling)
         validate_workload(self.p_client, self.workload_2, "deployment",
                           ns_2.name)
         ingress_name = random_test_name("ingress-test")
@@ -241,7 +241,9 @@ class TestCertificate:
                 "paths": [{"path": path, "workloadIds": [self.workload.id],
                            "targetPort": "80"}]
                 }
-        tls = {"certificateId": self.certificate_all_ns_ssc.id, "hosts": [host]}
+        tls = {"certificateId": self.certificate_all_ns_ssc.id,
+               "hosts": [host]
+               }
         self.ingress = self.p_client.create_ingress(
             name=ingress_name, namespaceId=self.ns.id, rules=[rule], tls=[tls]
         )
@@ -279,10 +281,12 @@ class TestCertificate:
                 "paths": [{"path": path, "workloadIds": [self.workload_2.id],
                            "targetPort": "80"}]
                 }
-        tls = {"certificateId": self.certificate_all_ns_ssc.id, "hosts": [host]}
+        tls = {"certificateId": self.certificate_all_ns_ssc.id,
+               "hosts": [host]
+               }
         self.ingress = self.p_client.create_ingress(
-            name="{}-2".format(ingress_name), namespaceId=ns_2.id, rules=[rule],
-            tls=[tls])
+            name="{}-2".format(ingress_name), namespaceId=ns_2.id,
+            rules=[rule], tls=[tls])
         wait_for_ingress_to_active(self.p_client, self.ingress)
         validate_ingress_using_endpoint(
             self.p_client, self.ingress, [self.workload_2], certcheck=True,
@@ -312,7 +316,7 @@ class TestCertificate:
         tls = {"certificateId": self.certificate_ssc.id, "hosts": [host_1]}
         tls_2 = {"certificateId": self.certificate_ssc.id, "hosts": [host_2]}
         self.ingress = self.p_client.create_ingress(
-            name=ingress_name,  namespaceId=self.ns.id, rules=[rule_1],
+            name=ingress_name, namespaceId=self.ns.id, rules=[rule_1],
             tls=[tls]
         )
         wait_for_ingress_to_active(self.p_client, self.ingress)
@@ -649,12 +653,12 @@ class TestCertificate:
         project = rbac_get_project()
         p_client = get_project_client_for_token(project, token)
         default_p_client = self.p_client
-        cert_count_by_role = p_client.list_certificate(name='cert-all-ns-valid')
-        cert_count_default = default_p_client.list_certificate(
+        count_by_role = p_client.list_certificate(name='cert-all-ns-valid')
+        count_default = default_p_client.list_certificate(
             name='cert-all-ns-valid')
-        assert len(cert_count_default) > 0, "{} couldn't to list the " \
+        assert len(count_default) > 0, "{} couldn't to list the " \
                                             "certificate".format(role)
-        assert len(cert_count_by_role) == 0, "{} could list certificate in " \
+        assert len(count_by_role) == 0, "{} could list certificate in " \
                                              "'Test Certificate' project."
 
     @if_test_rbac

@@ -1,6 +1,7 @@
 import pytest
 import time
 from .common import create_kubeconfig
+from .common import RESTRICTED_ADMIN
 from .common import CLUSTER_MEMBER
 from .common import CLUSTER_OWNER
 from .common import PROJECT_MEMBER
@@ -16,8 +17,14 @@ from .common import rbac_get_user_token_by_role
 from rancher import ApiError
 
 cluster_detail = {"cluster": None, "client": None}
-roles = [CLUSTER_MEMBER, CLUSTER_OWNER, PROJECT_OWNER, PROJECT_MEMBER,
-         PROJECT_READ_ONLY]
+roles = [
+    RESTRICTED_ADMIN,
+    CLUSTER_MEMBER,
+    CLUSTER_OWNER,
+    PROJECT_OWNER,
+    PROJECT_MEMBER,
+    PROJECT_READ_ONLY
+]
 
 
 def test_node_annotation_add():
@@ -490,7 +497,7 @@ def test_rbac_node_annotation_add(role):
 
     node_annotations[annotation_key] = annotation_value
 
-    if role == CLUSTER_OWNER:
+    if role in [RESTRICTED_ADMIN, CLUSTER_OWNER]:
         user_client.update(node, annotations=node_annotations)
         node = client.reload(node)
         time.sleep(2)
@@ -537,7 +544,7 @@ def test_rbac_node_annotation_delete(role):
     print("token: ", token)
     user_client = get_client_for_token(token)
 
-    if role == CLUSTER_OWNER:
+    if role in [RESTRICTED_ADMIN, CLUSTER_OWNER]:
         user_client.update(node, annotations=node_annotations)
         node = client.reload(node)
         time.sleep(2)
@@ -549,7 +556,7 @@ def test_rbac_node_annotation_delete(role):
             user_client.update(node, annotations=node_annotations)
         assert e.value.error.status == 403
         assert e.value.error.code == 'Forbidden'
-    if role != CLUSTER_OWNER:
+    if role not in [RESTRICTED_ADMIN, CLUSTER_OWNER]:
         # cleanup annotation
         delete_node_annotation(annotation_key, node, client)
 
@@ -584,7 +591,7 @@ def test_rbac_node_annotation_edit(role):
     print("token: ", token)
     user_client = get_client_for_token(token)
 
-    if role == CLUSTER_OWNER:
+    if role in [RESTRICTED_ADMIN, CLUSTER_OWNER]:
         user_client.update(node, annotations=node_annotations)
         node = client.reload(node)
         time.sleep(2)
@@ -624,7 +631,7 @@ def test_rbac_node_annotation_add_kubectl(role):
     command = "annotate nodes " + node_name + " " + \
               annotation_key + "=" + annotation_value
 
-    if role == CLUSTER_OWNER:
+    if role in [RESTRICTED_ADMIN, CLUSTER_OWNER]:
         execute_kubectl_cmd(command, False)
         node = client.reload(node)
         time.sleep(2)
@@ -678,7 +685,7 @@ def test_rbac_node_annotation_delete_kubectl(role):
     # remove annotation through kubectl
     command = "annotate node " + node_name + " " + annotation_key + "-"
 
-    if role == CLUSTER_OWNER:
+    if role in [RESTRICTED_ADMIN, CLUSTER_OWNER]:
         execute_kubectl_cmd(command, False)
         time.sleep(2)
         # annotation should be deleted
@@ -733,7 +740,7 @@ def test_rbac_node_annotation_edit_kubectl(role):
     command = "annotate nodes " + node_name + " " + \
               annotation_key + "=" + annotation_value_new + " --overwrite"
 
-    if role == CLUSTER_OWNER:
+    if role in [RESTRICTED_ADMIN, CLUSTER_OWNER]:
         execute_kubectl_cmd(command, False)
         time.sleep(2)
         # annotation should be deleted
@@ -745,13 +752,12 @@ def test_rbac_node_annotation_edit_kubectl(role):
         result = result.decode('ascii')
         assert "cannot patch resource \"nodes\"" in result
         assert "forbidden" in result
-        # cleanup annotation
     else:
         result = execute_kubectl_cmd(command, False, stderr=True)
         result = result.decode('ascii')
         assert "cannot get resource \"nodes\"" in result
         assert "forbidden" in result
-        # cleanup annotation
+    # cleanup annotation
     delete_node_annotation(annotation_key, node, client)
 
 

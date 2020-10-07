@@ -8,6 +8,12 @@ from .common import get_client_for_token
 from .common import get_user_client_and_cluster
 from .common import validate_cluster_state
 from .common import get_etcd_nodes
+from .common import CLUSTER_OWNER
+from .common import CLUSTER_MEMBER
+from .common import PROJECT_MEMBER
+from .common import PROJECT_OWNER
+from .common import PROJECT_READ_ONLY
+from .common import RESTRICTED_ADMIN
 from rancher import ApiError
 
 
@@ -20,30 +26,11 @@ TEST_RBAC = ast.literal_eval(os.environ.get('RANCHER_TEST_RBAC', "False"))
 if_test_rbac = pytest.mark.skipif(TEST_RBAC is False,
                                   reason='rbac tests are skipped')
 CLUSTER_NAME = os.environ.get("RANCHER_CLUSTER_NAME", "")
-# here are all supported roles for RBAC testing
-CLUSTER_MEMBER = "cluster-member"
-CLUSTER_OWNER = "cluster-owner"
-PROJECT_MEMBER = "project-member"
-PROJECT_OWNER = "project-owner"
-PROJECT_READ_ONLY = "read-only"
-rbac_data = {
-    "project": None,
-    "namespace": None,
-    "workload": None,
-    "p_unshared": None,
-    "ns_unshared": None,
-    "wl_unshared": None,
-    "users": {
-        CLUSTER_OWNER: {},
-        CLUSTER_MEMBER: {},
-        PROJECT_OWNER: {},
-        PROJECT_MEMBER: {},
-        PROJECT_READ_ONLY: {},
-    }
-}
+
+
 # --------------------- rbac test -----------------------
 @if_test_rbac
-@pytest.mark.parametrize("role", [CLUSTER_MEMBER,
+@pytest.mark.parametrize("role", [RESTRICTED_ADMIN, CLUSTER_MEMBER,
                                   PROJECT_MEMBER, PROJECT_OWNER,
                                   PROJECT_READ_ONLY, CLUSTER_OWNER])
 def test_rbac_cert_rotation(role):
@@ -135,7 +122,7 @@ def get_certs():
     nodes = get_etcd_nodes(cluster)
     for node in nodes:
         if node["labels"]["node-role.kubernetes.io/etcd"] == "true":
-            ipKey = "kube-etcd-"+node["ipAddress"].replace(".", "-")
+            ipKey = "kube-etcd-" + node["ipAddress"].replace(".", "-")
             certs[ipKey] = parse_datetime(cluster.certificatesExpiration[ipKey]
                                           ["expirationDate"])
     return certs

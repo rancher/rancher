@@ -22,12 +22,13 @@ TEST_CLIENT_IMAGE = os.environ.get('RANCHER_TEST_CLIENT_IMAGE', "None")
 REGISTRY = os.environ.get('RANCHER_REGISTRY', "None")
 
 rbac_role_list = [
-                  CLUSTER_OWNER,
-                  CLUSTER_MEMBER,
-                  PROJECT_OWNER,
-                  PROJECT_MEMBER,
-                  PROJECT_READ_ONLY
-                 ]
+    RESTRICTED_ADMIN,
+    CLUSTER_OWNER,
+    CLUSTER_MEMBER,
+    PROJECT_OWNER,
+    PROJECT_MEMBER,
+    PROJECT_READ_ONLY
+]
 
 
 def test_create_registry_single_namespace():

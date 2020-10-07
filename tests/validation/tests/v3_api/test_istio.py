@@ -18,6 +18,7 @@ from .common import AUTH_USER_PASSWORD
 from .common import apply_crd
 from .common import check_condition
 from .common import compare_versions
+from .common import RESTRICTED_ADMIN
 from .common import CLUSTER_MEMBER
 from .common import CLUSTER_OWNER
 from .common import create_kubeconfig
@@ -203,6 +204,22 @@ def test_istio_certmanager_enables(skipif_unsupported_istio_version,
 
 
 @if_test_rbac
+def test_rbac_istio_metrics_allow_all_restricted_admin(allow_all_access):
+    kiali_url, tracing_url, _, _ = get_urls()
+    user = rbac_get_user_token_by_role(RESTRICTED_ADMIN)
+    validate_access(kiali_url, user)
+    validate_access(tracing_url, user)
+
+
+@if_test_rbac
+def test_rbac_istio_monitoring_allow_all_restricted_admin(allow_all_access):
+    _, _, grafana_url, prometheus_url = get_urls()
+    user = rbac_get_user_token_by_role(RESTRICTED_ADMIN)
+    validate_access(grafana_url, user)
+    validate_access(prometheus_url, user)
+
+
+@if_test_rbac
 def test_rbac_istio_metrics_allow_all_cluster_owner(allow_all_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_owner = rbac_get_user_token_by_role(CLUSTER_OWNER)
@@ -280,6 +297,22 @@ def test_rbac_istio_monitoring_allow_all_project_read(allow_all_access):
     cluster_member = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
     validate_no_access(grafana_url, cluster_member)
     validate_no_access(prometheus_url, cluster_member)
+
+
+@if_test_rbac
+def test_rbac_istio_metrics_allow_none_restricted_admin(default_access):
+    kiali_url, tracing_url, _, _ = get_urls()
+    user = rbac_get_user_token_by_role(RESTRICTED_ADMIN)
+    validate_access(kiali_url, user)
+    validate_access(tracing_url, user)
+
+
+@if_test_rbac
+def test_rbac_istio_monitoring_allow_none_restricted_admin(default_access):
+    _, _, grafana_url, prometheus_url = get_urls()
+    user = rbac_get_user_token_by_role(RESTRICTED_ADMIN)
+    validate_access(grafana_url, user)
+    validate_access(prometheus_url, user)
 
 
 @if_test_rbac
