@@ -63,7 +63,9 @@ func (uh *upgradeHandler) Sync(key string, node *v3.Node) (runtime.Object, error
 	if strings.HasSuffix(key, "upgrade_") {
 
 		cName := strings.Split(key, "/")[0]
-		cluster, err := uh.clusterLister.Get("", cName)
+		// provisioner.go updates cluster's AppliedSpec and then enqueues "upgrade_" key to call this sync.
+		// Node plan gets calculated using cluster's AppliedSpec, so fetch the object from db instead of Lister to avoid race.
+		cluster, err := uh.clusters.Get(cName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
