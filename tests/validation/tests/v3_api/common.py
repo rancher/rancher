@@ -1643,7 +1643,9 @@ def wait_for_app_to_active(client, app_id,
     while application.state != "active":
         if time.time() - start > timeout:
             raise AssertionError(
-                "Timed out waiting for state to get to active")
+                "Timed out waiting for {0} to get to active,"
+                " the actual state: {1}".format(application.name,
+                                                application.state))
         time.sleep(.5)
         app = client.list_app(id=app_id).data
         assert len(app) >= 1
