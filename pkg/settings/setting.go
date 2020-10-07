@@ -85,7 +85,7 @@ var (
 	ClusterTemplateEnforcement        = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir              = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.5")
+	ChartDefaultBranch                = NewSetting("chart-default-branch", "main")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
 	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
 	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.4")
@@ -214,7 +214,7 @@ func GetEnvKey(key string) string {
 func getMetadataConfig() string {
 	branch := os.Getenv("RANCHER_METADATA_BRANCH")
 	if branch == "" {
-		branch = "dev-v2.5"
+		branch = "release-v2.5"
 	}
 	data := map[string]interface{}{
 		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
