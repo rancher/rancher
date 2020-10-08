@@ -117,3 +117,85 @@ tests:
       content:
         name: CATTLE_SYSTEM_CATALOG
         value: "bundled"
+- it: should create custom-logos volume if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim using default volumeName
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: persistentVolumeClaim
+  asserts:
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: custom-logos
+        persistentVolumeClaim:
+          claimName: RELEASE-NAME-rancher-custom-logos
+- it: should create custom-logos volume customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim using customLogos.volumeName
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: persistentVolumeClaim
+    customLogos.volumeName: existing-pvc
+  asserts:
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: custom-logos
+        persistentVolumeClaim:
+          claimName: existing-pvc
+- it: should create custom-logos volume customLogos.enabled and customLogos.volumeKind=configMap using customLogos.volumeName
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: configMap
+    customLogos.volumeName: existing-configMap
+  asserts:
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: custom-logos
+        configMap:
+          name: existing-configMap
+- it: should not create custom-logos volume if customLogos.enabled and customLogos.volumeKind=configMap but no customLogos.volumeName
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: configMap
+  asserts:
+  - isNull:
+      path: spec.template.spec.volumes
+- it: should not create custom-logos volume if not customLogos.enabled
+  set:
+    customLogos.enabled: false
+  asserts:
+  - isNull:
+      path: spec.template.spec.volumes
+- it: should mount custom-logos volume if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: persistentVolumeClaim
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].volumeMounts
+      content:
+        mountPath: /usr/share/rancher/ui/assets/images/logos
+        name: custom-logos
+- it: should mount custom-logos volume if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeName
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: configMap
+    customLogos.volumeName: existing-configMap
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].volumeMounts
+      content:
+        mountPath: /usr/share/rancher/ui/assets/images/logos
+        name: custom-logos
+- it: should not mount custom-logos volume if customLogos.enabled and customLogos.volumeKind=configMap but no customLogos.volumeName
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: configMap
+  asserts:
+  - isNull:
+      path: spec.template.spec.containers[0].volumeMounts
+- it: should not mount custom-logos volume if not customLogos.enabled
+  set:
+    customLogos.enabled: false
+  asserts:
+  - isNull:
+      path: spec.template.spec.containers[0].volumeMounts
