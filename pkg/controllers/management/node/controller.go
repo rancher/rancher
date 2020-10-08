@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/jailer"
@@ -275,12 +276,13 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 	}
 
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
-	cmd, err := buildCommand(nodeDir, obj, createCommandsArgs)
+	cmd, err := buildCommand(nodeDir, obj, nodeCmd, createCommandsArgs, nil)
 	if err != nil {
 		return obj, err
 	}
 
 	logrus.Infof("Provisioning node %s", obj.Spec.RequestedHostname)
+	logrus.Tracef("[node-controller-rancher-machine] node provision command: %s", cmd.String())
 
 	stdoutReader, stderrReader, err := startReturnOutput(cmd)
 	if err != nil {
@@ -375,13 +377,64 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 		return err
 	}
 
-	drun := clusterregistrationtokens.NodeCommand(token, nil)
-	args := buildAgentCommand(obj, drun)
-	cmd, err := buildCommand(nodeDir, obj, args)
+	cluster, err := m.clusterLister.Get("", obj.Namespace)
 	if err != nil {
 		return err
 	}
+
+	err = m.prePullAgentImage(nodeDir, obj, cluster)
+	if err != nil {
+		return err
+	}
+
+	drun := clusterregistrationtokens.NodeCommand(token, cluster)
+	cmd, err := buildCommand(nodeDir, obj, nodeCmd, buildAgentCommand(obj, drun), nil)
+	if err != nil {
+		return err
+	}
+
+	logrus.Tracef("[node-controller-rancher-machine] deployAgent command: %s", cmd.String())
+
 	output, err := cmd.CombinedOutput()
+	logrus.Tracef("[node-controller-rancher-machine] deployAgent output: %s", string(output))
+	if err != nil {
+		return errors.Wrap(err, string(output))
+	}
+
+	return nil
+}
+
+// prePullAgentImage uses the local docker cli connected to the remote daemon to login and pre-pull the agent image from the private registry, if there is one.
+func (m *Lifecycle) prePullAgentImage(nodeDir string, node *v3.Node, cluster *v3.Cluster) error {
+	reg := util.GetPrivateRepo(cluster)
+	if reg == nil { // if there is no private registry defined pre-pulling is not required as agent image will come from docker.io
+		return nil
+	}
+
+	login, extraEnv := clusterregistrationtokens.LoginCommand(reg, node)
+	cmd, err := buildCommand(nodeDir, node, bashCmd, login, extraEnv)
+	if err != nil {
+		return err
+	}
+
+	logrus.Tracef("[node-controller-rancher-machine] login command: %s", cmd.String())
+
+	output, err := cmd.CombinedOutput()
+	logrus.Tracef("[node-controller-rancher-machine] login output: %s", string(output))
+	if err != nil {
+		return errors.Wrap(err, string(output))
+	}
+
+	pull := clusterregistrationtokens.PullCommand(cluster, node)
+	cmd, err = buildCommand(nodeDir, node, bashCmd, pull, nil)
+	if err != nil {
+		return err
+	}
+
+	logrus.Tracef("[node-controller-rancher-machine] pull command: %s", cmd.String())
+
+	output, err = cmd.CombinedOutput()
+	logrus.Tracef("[node-controller-rancher-machine] pull output: %s", string(output))
 	if err != nil {
 		return errors.Wrap(err, string(output))
 	}

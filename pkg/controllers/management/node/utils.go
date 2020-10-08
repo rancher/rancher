@@ -34,6 +34,7 @@ const (
 	errorCreatingNode = "Error creating machine: "
 	nodeDirEnvKey     = "MACHINE_STORAGE_PATH="
 	nodeCmd           = "rancher-machine"
+	bashCmd           = "/bin/bash"
 	ec2TagFlag        = "tags"
 )
 
@@ -106,11 +107,11 @@ func mapToSlice(m map[string]string) []string {
 	return ret
 }
 
-func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, error) {
+func buildCommand(nodeDir string, node *v3.Node, cmd string, cmdArgs []string, extraEnv []string) (*exec.Cmd, error) {
 	// In dev_mode, don't need jail or reference to jail in command
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
-		env := initEnviron(nodeDir)
-		command := exec.Command(nodeCmd, cmdArgs...)
+		env := append(initEnviron(nodeDir), extraEnv...)
+		command := exec.Command(cmd, cmdArgs...)
 		command.Env = env
 		return command, nil
 	}
@@ -128,6 +129,7 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, e
 		nodeDirEnvKey + nodeDir,
 		"PATH=/usr/bin:/var/lib/rancher/management-state/bin",
 	}
+	envvars = append(envvars, extraEnv...)
 	command.Env = jailer.WhitelistEnvvars(envvars)
 	return command, nil
 }
@@ -225,7 +227,7 @@ func filterDockerMessage(msg string, node *v3.Node) (string, error) {
 }
 
 func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
-	command, err := buildCommand(nodeDir, node, []string{"ls", "-q"})
+	command, err := buildCommand(nodeDir, node, nodeCmd, []string{"ls", "-q"}, nil)
 	if err != nil {
 		return false, err
 	}
@@ -259,7 +261,7 @@ func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
 }
 
 func deleteNode(nodeDir string, node *v3.Node) error {
-	command, err := buildCommand(nodeDir, node, []string{"rm", "-f", node.Spec.RequestedHostname})
+	command, err := buildCommand(nodeDir, node, nodeCmd, []string{"rm", "-f", node.Spec.RequestedHostname}, nil)
 	if err != nil {
 		return err
 	}

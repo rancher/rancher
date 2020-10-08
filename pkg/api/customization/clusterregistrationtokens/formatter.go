@@ -3,6 +3,7 @@ package clusterregistrationtokens
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
@@ -18,6 +19,10 @@ const (
 	commandFormat            = "kubectl apply -f %s"
 	insecureCommandFormat    = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
+	loginCommandFormat       = "docker $(rancher-machine config %s) login --username $%s --password $%s %s" // needs bash for command substitution
+	pullCommandFormat        = "docker $(rancher-machine config %s) pull %s"                                // needs bash for command substitution
+	dockerUserEnvKey         = "DOCKER_USER"
+	dockerPassEnvKey         = "DOCKER_PASSWORD"
 	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
 
@@ -103,6 +108,30 @@ func NodeCommand(token string, cluster *v3.Cluster) string {
 		getRootURL(nil),
 		token,
 		ca)
+}
+
+// LoginCommand returns a docker login command for a private registry, with the username and password stored in a slice of env vars
+func LoginCommand(reg *v3.PrivateRegistry, node *v3.Node) ([]string, []string) {
+	userEnv := strings.Join([]string{dockerUserEnvKey, reg.User}, "=")
+	passEnv := strings.Join([]string{dockerPassEnvKey, reg.Password}, "=")
+	login := fmt.Sprintf(
+		loginCommandFormat,
+		node.Spec.RequestedHostname,
+		dockerUserEnvKey,
+		dockerPassEnvKey,
+		reg.URL,
+	)
+	return []string{"-c", login}, []string{userEnv, passEnv}
+}
+
+// PullCommand returns a docker pull command for the agent image from a private registry
+func PullCommand(cluster *v3.Cluster, node *v3.Node) []string {
+	pull := fmt.Sprintf(
+		pullCommandFormat,
+		node.Spec.RequestedHostname,
+		image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
+	)
+	return []string{"-c", pull}
 }
 
 func getRootURL(request *types.APIContext) string {
