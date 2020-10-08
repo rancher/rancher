@@ -143,6 +143,11 @@ spec:
           subPath: cacerts.pem
           readOnly: true
 {{- end }}
+{{- if and .Values.customLogos.enabled (or (eq .Values.customLogos.volumeKind "persistentVolumeClaim") (and (eq .Values.customLogos.volumeKind "configMap") (.Values.customLogos.volumeName))) }}
+        # Mount rancher custom-logos volume
+        - mountPath: /usr/share/rancher/ui/assets/images/logos
+          name: custom-logos
+{{- end }}
 {{- if gt (int .Values.auditLog.level) 0 }}
         - mountPath: /var/log/auditlog
           name: audit-log
@@ -179,5 +184,15 @@ spec:
   {{- else }}
       - name: audit-log
         emptyDir: {}
+  {{- end }}
+{{- end }}
+{{- if and .Values.customLogos.enabled (or (eq .Values.customLogos.volumeKind "persistentVolumeClaim") (and (eq .Values.customLogos.volumeKind "configMap") (.Values.customLogos.volumeName))) }}
+      - name: custom-logos
+  {{- if (eq .Values.customLogos.volumeKind "persistentVolumeClaim") }}
+        persistentVolumeClaim:
+          claimName: {{ .Values.customLogos.volumeName | default (printf "%s-custom-logos" (include "rancher.fullname" .)) }}
+  {{- else if (eq .Values.customLogos.volumeKind "configMap") }}
+        configMap:
+          name: {{ .Values.customLogos.volumeName }}
   {{- end }}
 {{- end }}

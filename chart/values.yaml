@@ -111,3 +111,16 @@ useBundledSystemChart: false
 # Certmanager version compatibility
 certmanager: 
   version: ""
+
+# Rancher custom logos persistence
+customLogos:
+  enabled: false
+  ## Volume kind to use for persistence: persistentVolumeClaim, configMap
+  volumeKind: persistentVolumeClaim
+  ## Use an existing volume. Custom logos should be copied to the volume by the user
+  # volumeName: custom-logos
+  ## Just for volumeKind: persistentVolumeClaim 
+  ## To disables dynamic provisioning, set storageClass: "" or storageClass: "-"
+  # storageClass: "-"
+  accessMode: ReadWriteOnce
+  size: 1Gi

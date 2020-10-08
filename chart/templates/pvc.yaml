@@ -1,0 +1,19 @@
+{{- if and (.Values.customLogos.enabled) (eq .Values.customLogos.volumeKind "persistentVolumeClaim") (not .Values.customLogos.volumeName) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ template "rancher.fullname" . }}-custom-logos
+spec:
+  accessModes:
+    - {{ .Values.customLogos.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.customLogos.size | quote }}
+  storageClassName: {{ if .Values.customLogos.storageClass }}
+        {{- if (eq "-" .Values.customLogos.storageClass) -}}
+            ""
+        {{- else }}
+            {{- .Values.customLogos.storageClass }}
+        {{- end -}}
+    {{- end }}
+{{- end }}
