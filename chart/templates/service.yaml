@@ -13,5 +13,11 @@ spec:
     targetPort: 80
     protocol: TCP
     name: http
+{{- if eq .Values.tls "internal" }}
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+{{- end }}
   selector:
     app: {{ template "rancher.fullname" . }}

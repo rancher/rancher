@@ -58,6 +58,10 @@ spec:
         ports:
         - containerPort: 80
           protocol: TCP
+{{- if eq .Values.tls "internal" }}
+        - containerPort: 443
+          protocol: TCP
+{{- end }}
         args:
 {{- if .Values.debug }}
         - "--debug"
@@ -65,6 +69,8 @@ spec:
 {{- if .Values.privateCA }}
         # Private CA - don't clear ca certs
 {{- else if and (eq .Values.tls "ingress") (eq .Values.ingress.tls.source "rancher") }}
+        # Rancher self-signed - don't clear ca certs
+{{- else if and (eq .Values.tls "internal") (eq .Values.ingress.tls.source "rancher") }}
         # Rancher self-signed - don't clear ca certs
 {{- else }}
         # Public trusted CA - clear ca certs
@@ -139,9 +145,21 @@ spec:
 {{- if .Values.privateCA }}
         # Pass CA cert into rancher for private CA
         - mountPath: /etc/rancher/ssl/cacerts.pem
-          name: tls-ca-volume
-          subPath: cacerts.pem
+          name: {{ .Values.tlsSecret.name }}-volume
+          subPath: {{ .Values.tlsSecret.cafile }}
           readOnly: true
+{{- if .Values.tlsSecret.certs }}
+        # Pass cert into rancher for private CA
+        - mountPath: /etc/rancher/ssl/cert.pem
+          name: {{ .Values.tlsSecret.name }}-volume
+          subPath: {{ .Values.tlsSecret.certfile }}
+          readOnly: true
+        # Pass key into rancher for private CA
+        - mountPath: /etc/rancher/ssl/key.pem
+          name: {{ .Values.tlsSecret.name }}-volume
+          subPath: {{ .Values.tlsSecret.keyfile }}
+          readOnly: true
+{{- end }}
 {{- end }}
 {{- if gt (int .Values.auditLog.level) 0 }}
         - mountPath: /var/log/auditlog
@@ -165,10 +183,10 @@ spec:
           secretName: tls-ca-additional
 {{- end }}
 {{- if .Values.privateCA }}
-      - name: tls-ca-volume
+      - name: {{ .Values.tlsSecret.name }}-volume
         secret:
           defaultMode: 0400
-          secretName: tls-ca
+          secretName: {{ .Values.tlsSecret.name }}
 {{- end }}
 {{- if gt (int .Values.auditLog.level) 0 }}
   {{- if eq .Values.auditLog.destination "hostPath" }}

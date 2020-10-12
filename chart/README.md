@@ -193,8 +193,12 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `certmanager.version`          | " "                                                   | ***string*** - set cert-manager compatibility                                                                                                                                                                |
 | `extraEnv`                     | []                                                    | ***list*** - set additional environment variables for Rancher Note: *Available as of v2.2.0*                                                                                                                 |
 | `imagePullSecrets`             | []                                                    | ***list*** - list of names of Secret resource containing private registry credentials                                                                                                                        |
+| `ingress.disabled`             | false                                                 | ***bool*** - disables ingress object completely, defaults to **false**
+                                                                                   |
 | `ingress.extraAnnotations`     | {}                                                    | ***map*** - additional annotations to customize the ingress                                                                                                                                                  |
 | `ingress.configurationSnippet` | " "                                                   | ***string*** - Add additional Nginx configuration. Can be used for proxy configuration. Note: *Available as of v2.0.15, v2.1.10 and v2.2.4*                                                                  |
+| `ingressType`                  | "nginx"                                               | ***string*** - nginx,custom custom being you'll supply your own
+                                                                                   |
 | `letsEncrypt.ingress.class`    | " "                                                   | ***string*** - optional ingress class for the cert-manager acmesolver ingress that responds to the Let’s *Encrypt ACME challenges*                                                                           |
 | `proxy`                        | " "                                                   | ***string** - HTTP[S] proxy server for Rancher                                                                                                                                                               |
 | `noProxy`                      | "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16" | ***string*** - comma separated list of hostnames or ip address not to use the proxy                                                                                                                          |
@@ -202,6 +206,18 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `rancherImage`                 | "rancher/rancher"                                     | ***string*** - rancher image source                                                                                                                                                                          |
 | `rancherImageTag`              | same as chart version                                 | ***string*** - rancher/rancher image tag                                                                                                                                                                     |
 | `rancherImagePullPolicy`       | "IfNotPresent"                                        | ***string*** - Override imagePullPolicy for rancher server images - *"Always", "Never", "IfNotPresent"*                                                                                                      |
-| `tls`                          | "ingress"                                             | ***string*** - See External TLS Termination for details. - *"ingress, external"*                                                                                                                             |
+| `tls`                          | "ingress"                                             | ***string*** - See External TLS Termination for details. - *"ingress, external, internal"*                                                                                                                             |
+| `tlsSecret.name`               | "tls-ca"                                              | ***string*** - Secret name to use for custom ca certs
+                                                                                   |
+| `tlsSecret.cafile`             | "cacerts.pem"                                         | ***string*** - Secret path to ca file
+                                                                                   |
+| `tlsSecret.certs`              | false                                                 | ***bool*** - If you also supply your own server certificates for rancher pods
+                                                                                   |
+| `tlsSecret.certfile`           | "cert.pem"                                            | ***string*** - Secret path to certificate file
+                                                                                   |
+| `tlsSecret.keyfile`            | "key.pem"                                             | ***string*** - Secret path to certificate key file
+                                                                                   |
 | `systemDefaultRegistry`        | ""                                                    | ***string*** - private registry to be used for all system Docker images, e.g., [http://registry.example.com/] *Available as of v2.3.0*                                                                       |
 | `useBundledSystemChart`        | false                                                 | ***bool*** - select to use the system-charts packaged with Rancher server. This option is used for air gapped installations.  *Available as of v2.3.0*                                                       |
+
+

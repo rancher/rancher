@@ -46,7 +46,9 @@ imagePullSecrets: []
 
 ### ingress ###
 # Readme for details and instruction on adding tls secrets.
+ingressType: nginx #options nginx,custom (being you provide your own, ala traefik)
 ingress:
+  disabled: false
   extraAnnotations:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
@@ -101,7 +103,15 @@ resources: {}
 #   Where to offload the TLS/SSL encryption
 # - ingress (default)
 # - external
+# - internal
+# - disabled
 tls: ingress
+tlsSecret:
+  name: tls-ca
+  cafile: cacerts.pem
+  certs: false
+  certfile: cert.pem
+  keyfile: key.pem
 
 systemDefaultRegistry: ""
 
