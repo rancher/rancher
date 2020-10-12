@@ -123,7 +123,7 @@ func (d *ConfigSyncer) sync() error {
 	}
 
 	systemProjectName := project.Name
-	isDeployed, err := d.isAppDeploy(systemProjectName)
+	isDeployed, webhookReceiverEnabled, err := d.isAppDeploy(systemProjectName)
 	if err != nil {
 		return err
 	}
@@ -255,8 +255,10 @@ func (d *ConfigSyncer) sync() error {
 		logrus.Debug("The config stay the same, will not update the secret")
 	}
 
-	if err := d.syncReceiver(notifiers, cAlertGroupsMap, pAlertGroupsMap); err != nil {
-		return errors.Wrapf(err, "Update Webhook Receiver Config")
+	if webhookReceiverEnabled {
+		if err := d.syncWebhookConfig(notifiers, cAlertGroupsMap, pAlertGroupsMap); err != nil {
+			return errors.Wrapf(err, "Update Webhook Receiver Config")
+		}
 	}
 
 	return nil
@@ -644,22 +646,26 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 }
 
-func (d *ConfigSyncer) isAppDeploy(appNamespace string) (bool, error) {
+func (d *ConfigSyncer) isAppDeploy(appNamespace string) (bool, bool, error) {
 	appName, _ := monitorutil.ClusterAlertManagerInfo()
 	app, err := d.appLister.Get(appNamespace, appName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return false, nil
+			return false, false, nil
 		}
 
-		return false, errors.Wrapf(err, "get app %s failed", appName)
+		return false, false, errors.Wrapf(err, "get app %s failed", appName)
 	}
 
 	if app.DeletionTimestamp != nil {
-		return false, nil
+		return false, false, nil
 	}
 
-	return true, nil
+	if webhookReceiverEnabled, ok := app.Spec.Answers[deployer.WebhookReceiverEnable]; ok && webhookReceiverEnabled == "true" {
+		return true, true, nil
+	}
+
+	return true, false, nil
 }
 
 func includeProjectMetrics(projectAlerts []*v3.ProjectAlertRule) bool {
@@ -705,7 +711,7 @@ func toAlertManagerURL(urlStr string) (*alertconfig.URL, error) {
 	return &alertconfig.URL{URL: url}, nil
 }
 
-func (d *ConfigSyncer) syncReceiver(notifiers []*v3.Notifier, cAlertGroupsMap map[string]*v3.ClusterAlertGroup, pAlertGroupsMap map[string]*v3.ProjectAlertGroup) error {
+func (d *ConfigSyncer) syncWebhookConfig(notifiers []*v3.Notifier, cAlertGroupsMap map[string]*v3.ClusterAlertGroup, pAlertGroupsMap map[string]*v3.ProjectAlertGroup) error {
 	var recipients []v32.Recipient
 	for _, group := range cAlertGroupsMap {
 		recipients = append(recipients, group.Spec.Recipients...)

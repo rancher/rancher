@@ -36,7 +36,7 @@ import (
 var (
 	creatorIDAnn          = "field.cattle.io/creatorId"
 	systemProjectLabel    = map[string]string{"authz.management.cattle.io/system-project": "true"}
-	webhookReceiverEnable = "webhook-receiver.enabled"
+	WebhookReceiverEnable = "webhook-receiver.enabled"
 
 	webhookReceiverTypes = []string{
 		"dingtalk",
@@ -321,9 +321,9 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 			return false, fmt.Errorf("stale %q App in %s Project is still on terminating", appName, systemProjectName)
 		}
 
-		if app.Spec.Answers[webhookReceiverEnable] != enableWebhookReceiver {
+		if app.Spec.Answers[WebhookReceiverEnable] != enableWebhookReceiver {
 			copy := app.DeepCopy()
-			copy.Spec.Answers[webhookReceiverEnable] = enableWebhookReceiver
+			copy.Spec.Answers[WebhookReceiverEnable] = enableWebhookReceiver
 			_, err := d.appsGetter.Apps(systemProjectName).Update(copy)
 			if err != nil {
 				return false, fmt.Errorf("failed to update %q App, %v", appName, err)
@@ -363,7 +363,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 				"alertmanager.enabledRBAC":            "false",
 				"alertmanager.configFromSecret":       secret.Name,
 				"operator.enabled":                    "false",
-				webhookReceiverEnable:                 enableWebhookReceiver,
+				WebhookReceiverEnable:                 enableWebhookReceiver,
 			},
 			Description:     "Alertmanager for Rancher Monitoring",
 			ExternalID:      templateVersion.ExternalID,
