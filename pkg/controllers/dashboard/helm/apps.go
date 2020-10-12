@@ -13,6 +13,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -119,6 +120,10 @@ func (a *appHandler) OnConfigMapChange(key string, configMap *corev1.ConfigMap) 
 	spec, err := helm.ToRelease(configMap, a.isNamespaced)
 	if err == helm.ErrNotHelmRelease {
 		return configMap, nil
+	} else if err != nil {
+		logrus.Errorf("Failed to process configmap %s for helm data: %v", key, err)
+		// ignore error
+		return configMap, nil
 	}
 
 	a.locker.Lock(spec.Name)
@@ -143,6 +148,10 @@ func (a *appHandler) OnConfigMapChange(key string, configMap *corev1.ConfigMap) 
 func (a *appHandler) OnSecretChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
 	spec, err := helm.ToRelease(secret, a.isNamespaced)
 	if err == helm.ErrNotHelmRelease {
+		return secret, nil
+	} else if err != nil {
+		logrus.Errorf("Failed to process secret %s for helm data: %v", key, err)
+		// ignore error
 		return secret, nil
 	}
 
