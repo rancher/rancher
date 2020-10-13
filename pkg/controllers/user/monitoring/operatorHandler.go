@@ -183,7 +183,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 	// take operator answers from overwrite answers
 	answers, version := monitoring.GetOverwroteAppAnswersAndVersion(cluster.Annotations)
 	for ansKey, ansVal := range answers {
-		if strings.HasPrefix(ansKey, "operator.") {
+		if strings.HasPrefix(ansKey, "operator.") || strings.HasPrefix(ansKey, "operator-init.") {
 			appAnswers[ansKey] = ansVal
 		}
 	}
