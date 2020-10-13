@@ -195,7 +195,9 @@ func setSelector(schemaID string, data map[string]interface{}) {
 }
 
 func getSecrets(apiContext *types.APIContext, data map[string]interface{}, namespaceID string) *[]corev1.LocalObjectReference {
-	imagePullSecrets, _ := data["imagePullSecrets"].([]corev1.LocalObjectReference)
+	bytes, _ := json.Marshal(data["imagePullSecrets"])
+	var imagePullSecrets []corev1.LocalObjectReference
+	_ = json.Unmarshal(bytes, &imagePullSecrets)
 	if containers, _ := values.GetSlice(data, "containers"); len(containers) > 0 {
 		domainToCreds := getCreds(apiContext, namespaceID)
 		for _, container := range containers {
