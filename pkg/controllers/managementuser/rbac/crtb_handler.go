@@ -121,6 +121,9 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 			if updateErr != nil {
 				return updateErr
 			}
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
 			crbToUpdate.Labels[rtbOwnerLabel] = bindingValue
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := c.m.clusterRoleBindings.Update(crbToUpdate)
