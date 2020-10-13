@@ -139,7 +139,10 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 		if updateErr != nil {
 			return updateErr
 		}
-		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		if crtbToUpdate.Labels == nil {
+			crtbToUpdate.Labels = make(map[string]string)
+		}
+		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
 		_, err := c.m.crtbs.Update(crtbToUpdate)
 		return err
 	})
