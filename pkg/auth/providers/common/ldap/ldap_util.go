@@ -98,7 +98,7 @@ func HasPermission(attributes []*ldapv2.EntryAttribute, userObjectClass string, 
 
 func IsType(search []*ldapv2.EntryAttribute, varType string) bool {
 	for _, attrib := range search {
-		if attrib.Name == "objectClass" {
+		if strings.EqualFold(attrib.Name, "objectClass") {
 			for _, val := range attrib.Values {
 				if strings.EqualFold(val, varType) {
 					logrus.Debugf("ldap IsType found object of type %s", varType)
