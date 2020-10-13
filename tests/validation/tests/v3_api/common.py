@@ -678,10 +678,9 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
                         schedulable_nodes.append(node)
                         break
         # Including master in list of nodes as master is also schedulable
-        if 'k3s' in cluster.version["gitVersion"] and node.controlPlane:
-            schedulable_nodes.append(node)
+        if ('k3s' in cluster.version["gitVersion"] or 'rke2' in cluster.version["gitVersion"]) and node.controlPlane:
+                schedulable_nodes.append(node)
     return schedulable_nodes
-
 
 def get_etcd_nodes(cluster, client=None):
     if not client:
