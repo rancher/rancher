@@ -17,10 +17,13 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/jailer"
+	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/namespace"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -28,6 +31,7 @@ import (
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
@@ -57,7 +61,7 @@ var aliases = map[string]map[string]string{
 	"vmwarevsphere": map[string]string{"cloudConfig": "cloud-config"},
 }
 
-func Register(ctx context.Context, management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
 	if err != nil {
 		logrus.Fatal(err)
@@ -66,6 +70,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	nodeClient := management.Management.Nodes("")
 
 	nodeLifecycle := &Lifecycle{
+		ctx:                       ctx,
 		systemAccountManager:      systemaccount.NewManager(management),
 		secretStore:               secretStore,
 		nodeClient:                nodeClient,
@@ -76,6 +81,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
 		credLister:                management.Core.Secrets("").Controller().Lister(),
+		userManager:               management.UserManager,
+		clusterManager:            clusterManager,
 		devMode:                   os.Getenv("CATTLE_DEV_MODE") != "",
 	}
 
@@ -83,6 +90,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 type Lifecycle struct {
+	ctx                       context.Context
 	systemAccountManager      *systemaccount.Manager
 	secretStore               *encryptedstore.GenericEncryptedStore
 	nodeTemplateGenericClient objectclient.GenericClient
@@ -93,6 +101,8 @@ type Lifecycle struct {
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
 	credLister                corev1.SecretLister
+	userManager               user.Manager
+	clusterManager            *clustermanager.Manager
 	devMode                   bool
 }
 
@@ -203,7 +213,7 @@ func (m *Lifecycle) getNodePool(nodePoolName string) (*v3.NodePool, error) {
 
 func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 	if obj.Status.NodeTemplateSpec == nil {
-		return obj, nil
+		return m.deleteV1Node(obj)
 	}
 
 	newObj, err := v3.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
@@ -245,6 +255,9 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 
 		if mExists {
 			logrus.Infof("Removing node %s", obj.Spec.RequestedHostname)
+			if err := m.drainNode(obj); err != nil {
+				return obj, err
+			}
 			if err := deleteNode(config.Dir(), obj); err != nil {
 				return obj, err
 			}
@@ -254,7 +267,11 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 		return obj, nil
 	})
 
-	return newObj.(*v3.Node), err
+	if err != nil {
+		return newObj.(*v3.Node), err
+	}
+
+	return m.deleteV1Node(newObj.(*v3.Node))
 }
 
 func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
@@ -440,6 +457,14 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
+	if nodehelper.HasFinalizerWithPrefix(obj, "clusterscoped.controller.cattle.io/user-node-remove_") {
+		// user-node-remove controller functionality is now merged into this controller
+		logrus.Infof("node [%s] has a finalizer for user-node-remove controller and it will be removed",
+			obj.Spec.RequestedHostname)
+		return m.nodeClient.Update(nodehelper.RemoveFinalizerWithPrefix(
+			obj.DeepCopy(), "clusterscoped.controller.cattle.io/user-node-remove_"))
+	}
+
 	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
@@ -715,5 +740,83 @@ func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, r
 			return errors.Wrap(err, "failed to set credential fields")
 		}
 	}
+	return nil
+}
+
+func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
+	logrus.Debugf("Deleting v1.node for [%v] node", node.Status.NodeName)
+	if nodehelper.IgnoreNode(node.Status.NodeName, node.Status.NodeLabels) {
+		logrus.Debugf("Skipping v1.node removal for [%v] node", node.Status.NodeName)
+		return node, nil
+	}
+
+	if node.Status.NodeName == "" {
+		return node, nil
+	}
+
+	// get user context k8s client to delete downstream cluster node
+	cluster, err := m.clusterLister.Get("", node.Namespace)
+	if err != nil {
+		return node, err
+	}
+
+	userClient, err := m.clusterManager.UserContext(cluster.Name)
+	if err != nil {
+		return node, err
+	}
+
+	err = userClient.K8sClient.CoreV1().Nodes().Delete(
+		context.TODO(), node.Status.NodeName, metav1.DeleteOptions{})
+	if !kerror.IsNotFound(err) {
+		return node, err
+	}
+
+	return node, nil
+}
+
+func (m *Lifecycle) drainNode(node *v3.Node) error {
+	nodeCopy := node.DeepCopy() // copy for cache protection as we do no updating but need things set for the drain
+	cluster, err := m.clusterLister.Get("", nodeCopy.Namespace)
+	if err != nil {
+		return err
+	}
+
+	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster) {
+		return nil
+	}
+
+	logrus.Infof("node [%s] requires draining before delete, attempting to drain", nodeCopy.Spec.RequestedHostname)
+	kubeConfig, err := m.getKubeConfig(cluster)
+	if err != nil {
+		return fmt.Errorf("node [%s] error getting kubeConfig", nodeCopy.Spec.RequestedHostname)
+	}
+
+	if nodeCopy.Spec.NodeDrainInput == nil {
+		logrus.Debugf("node [%s] has no NodeDrainInput, creating one with 60s timeout",
+			nodeCopy.Spec.RequestedHostname)
+		nodeCopy.Spec.NodeDrainInput = &v3.NodeDrainInput{
+			Force:           false,
+			DeleteLocalData: false,
+			GracePeriod:     60,
+			Timeout:         60,
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(m.ctx, time.Duration(nodeCopy.Spec.NodeDrainInput.Timeout)*time.Second)
+	defer cancel()
+
+	_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeCopy.Status.NodeName, nodehelper.GetDrainFlags(nodeCopy))
+	select {
+	case <-ctx.Done():
+		if ctx.Err() != nil {
+			logrus.Errorf("node [%s] drain failed: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
+		}
+		if err != nil {
+			// kubectl failed continue on with delete any way
+			logrus.Errorf("node [%s] kubectl drain error: %s", nodeCopy.Spec.RequestedHostname, err)
+		}
+	}
+
+	logrus.Infof("node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
 	return nil
 }

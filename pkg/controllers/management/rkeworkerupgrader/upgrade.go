@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/pkg/locker"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	rkedefaults "github.com/rancher/rke/cluster"
@@ -220,7 +221,7 @@ func (uh *upgradeHandler) getNodePlan(node *v3.Node, cluster *v3.Cluster) (*v3.R
 		nodePlan *v3.RKEConfigNodePlan
 		err      error
 	)
-	if nodeserver.IsNonWorker(node.Status.NodeConfig.Role) {
+	if nodehelper.IsNonWorker(node.Status.NodeConfig) {
 		nodePlan, err = uh.nonWorkerPlan(node, cluster)
 	} else {
 		nodePlan, err = uh.workerPlan(node, cluster)
