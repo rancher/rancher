@@ -67,6 +67,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 	ch := &clusterHandler{
 		clusterName:          clusterName,
 		cattleClustersClient: cattleClustersClient,
+		cattleCatalogManager: cattleContext.CatalogManager,
 		agentEndpointsLister: agentClusterMonitoringEndpointLister,
 		app:                  ah,
 	}
