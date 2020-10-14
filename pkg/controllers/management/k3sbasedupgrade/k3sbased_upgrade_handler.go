@@ -10,7 +10,6 @@ import (
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/rancher/rancher/pkg/catalog/utils"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
@@ -113,7 +112,7 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 		return err
 	}
 
-	latestTemplateVersion, err := utils.LatestAvailableTemplateVersion(template)
+	latestTemplateVersion, err := h.catalogManager.LatestAvailableTemplateVersion(template, clusterName)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -67,6 +68,10 @@ func (a ActionHandler) editMonitoring(actionName string, action *types.Action, a
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}
 
+	if err := a.validateChartCompatibility(input.Version, apiContext.ID); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
 	cluster = cluster.DeepCopy()
 	cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
 
@@ -100,6 +105,10 @@ func (a ActionHandler) enableMonitoring(actionName string, action *types.Action,
 	var input v32.MonitoringInput
 	if err = json.Unmarshal(data, &input); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
+	}
+
+	if err := a.validateChartCompatibility(input.Version, apiContext.ID); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
 	cluster = cluster.DeepCopy()
@@ -139,4 +148,16 @@ func (a ActionHandler) disableMonitoring(actionName string, action *types.Action
 
 	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 	return nil
+}
+
+func (a ActionHandler) validateChartCompatibility(version, clusterName string) error {
+	if version == "" {
+		return nil
+	}
+	templateVersionID := fmt.Sprintf("system-library-rancher-monitoring-%s", version)
+	templateVersion, err := a.CatalogTemplateVersionLister.Get("cattle-global-data", templateVersionID)
+	if err != nil {
+		return err
+	}
+	return a.CatalogManager.ValidateChartCompatibility(templateVersion, clusterName)
 }
