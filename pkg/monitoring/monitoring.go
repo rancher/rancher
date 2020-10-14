@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
-	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	ns "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -207,7 +207,7 @@ grafana.persistence.size             	| 50Gi
 
 */
 func OverwriteAppAnswersAndCatalogID(rawAnswers map[string]string, annotations map[string]string,
-	catalogTemplateLister mgmtv3.CatalogTemplateLister) (map[string]string, string, error) {
+	catalogTemplateLister mgmtv3.CatalogTemplateLister, catalogManager manager.CatalogManager, clusterName string) (map[string]string, string, error) {
 	overwriteAnswers, version := GetOverwroteAppAnswersAndVersion(annotations)
 	for specialKey, value := range overwriteAnswers {
 		if strings.HasPrefix(specialKey, "_tpl-") {
@@ -231,19 +231,19 @@ func OverwriteAppAnswersAndCatalogID(rawAnswers map[string]string, annotations m
 	for key, value := range overwriteAnswers {
 		rawAnswers[key] = value
 	}
-	catalogID, err := GetMonitoringCatalogID(version, catalogTemplateLister)
+	catalogID, err := GetMonitoringCatalogID(version, catalogTemplateLister, catalogManager, clusterName)
 
 	return rawAnswers, catalogID, err
 }
 
-func GetMonitoringCatalogID(version string, catalogTemplateLister mgmtv3.CatalogTemplateLister) (string, error) {
+func GetMonitoringCatalogID(version string, catalogTemplateLister mgmtv3.CatalogTemplateLister, catalogManager manager.CatalogManager, clusterName string) (string, error) {
 	if version == "" {
 		template, err := catalogTemplateLister.Get(ns.GlobalNamespace, RancherMonitoringTemplateName)
 		if err != nil {
 			return "", err
 		}
 
-		templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+		templateVersion, err := catalogManager.LatestAvailableTemplateVersion(template, clusterName)
 		if err != nil {
 			return "", err
 		}

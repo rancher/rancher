@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/cron"
@@ -157,6 +158,7 @@ func buildScaledContext(ctx context.Context, clientConfig clientcmd.ClientConfig
 
 	scaledContext.UserManager = userManager
 	scaledContext.RunContext = ctx
+	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
 
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
 	scaledContext.AccessControl = manager

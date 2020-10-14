@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -25,6 +26,7 @@ const (
 type projectHandler struct {
 	clusterName         string
 	clusterLister       mgmtv3.ClusterLister
+	catalogManager      manager.CatalogManager
 	cattleProjectClient mgmtv3.ProjectInterface
 	prtbClient          mgmtv3.ProjectRoleTemplateBindingInterface
 	prtbIndexer         cache.Indexer
@@ -192,7 +194,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.cluster.alertManagerNamespace": clusterAlertManagerSvcNamespaces,
 	}
 
-	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, project.Annotations, ph.app.catalogTemplateLister)
+	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, project.Annotations, ph.app.catalogTemplateLister, ph.catalogManager, ph.clusterName)
 	if err != nil {
 		return err
 	}
