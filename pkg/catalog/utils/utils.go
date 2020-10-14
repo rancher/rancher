@@ -92,13 +92,13 @@ func ValidateURL(pathURL string) error {
 	return nil
 }
 
-func GetSystemAppCatalogID(templateVersionID string, templateLister v3.CatalogTemplateLister) (string, error) {
+func GetSystemAppCatalogID(templateVersionID string, templateLister v3.CatalogTemplateLister, clusterLister v3.ClusterLister, clusterName string) (string, error) {
 	template, err := templateLister.Get(namespace.GlobalNamespace, templateVersionID)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to find template by ID %s", templateVersionID)
 	}
 
-	templateVersion, err := LatestAvailableTemplateVersion(template)
+	templateVersion, err := LatestAvailableTemplateVersion(template, clusterLister, clusterName)
 	if err != nil {
 		return "", err
 	}

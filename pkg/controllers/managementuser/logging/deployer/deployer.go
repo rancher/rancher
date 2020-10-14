@@ -147,7 +147,7 @@ func (d *Deployer) deployRancherLogging(systemProjectID, appCreator string) erro
 		return errors.Wrapf(err, "failed to find template by ID %s", templateVersionID)
 	}
 
-	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template, d.clusterLister, d.clusterName)
 	if err != nil {
 		return err
 	}

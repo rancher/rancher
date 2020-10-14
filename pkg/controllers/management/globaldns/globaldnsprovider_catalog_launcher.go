@@ -43,6 +43,7 @@ type ProviderCatalogLauncher struct {
 	userManager       user.Manager
 	secrets           v1.SecretInterface
 	templateLister    v3.CatalogTemplateLister
+	clusterLister     v3.ClusterLister
 }
 
 func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderCatalogLauncher {
@@ -54,6 +55,7 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 		userManager:       mgmt.UserManager,
 		secrets:           mgmt.Core.Secrets(""),
 		templateLister:    mgmt.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
+		clusterLister:     mgmt.Management.Clusters("").Controller().Lister(),
 	}
 	return n
 }
@@ -213,7 +215,7 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDnsPr
 		}
 	} else {
 		//create new app
-		appCatalogID, err := n.getExternalDNSCatalogID()
+		appCatalogID, err := n.getExternalDNSCatalogID(localClusterName)
 		if err != nil {
 			return nil, err
 		}
@@ -285,9 +287,9 @@ func (n *ProviderCatalogLauncher) getSystemProjectID() (string, error) {
 	return systemProject.Name, nil
 }
 
-func (n *ProviderCatalogLauncher) getExternalDNSCatalogID() (string, error) {
+func (n *ProviderCatalogLauncher) getExternalDNSCatalogID(clusterName string) (string, error) {
 	templateVersionID := n.getRancherExternalDNSTemplateID()
-	return versionutil.GetSystemAppCatalogID(templateVersionID, n.templateLister)
+	return versionutil.GetSystemAppCatalogID(templateVersionID, n.templateLister, n.clusterLister, clusterName)
 }
 
 func (n *ProviderCatalogLauncher) getRancherExternalDNSTemplateID() string {

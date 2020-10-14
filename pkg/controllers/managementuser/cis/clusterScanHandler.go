@@ -332,7 +332,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 }
 
 func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
-	appCatalogID, err := csh.getCISBenchmarkCatalogID()
+	appCatalogID, err := csh.getCISBenchmarkCatalogID(appInfo.clusterName)
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}
@@ -476,9 +476,9 @@ func (csh *cisScanHandler) ensureCleanup(cs *v3.ClusterScan) error {
 	return err
 }
 
-func (csh *cisScanHandler) getCISBenchmarkCatalogID() (string, error) {
+func (csh *cisScanHandler) getCISBenchmarkCatalogID(clusterName string) (string, error) {
 	templateVersionID := csh.getRancherCISBenchmarkTemplateID()
-	return versionutil.GetSystemAppCatalogID(templateVersionID, csh.templateLister)
+	return versionutil.GetSystemAppCatalogID(templateVersionID, csh.templateLister, csh.clusterLister, clusterName)
 }
 
 func (csh *cisScanHandler) getRancherCISBenchmarkTemplateID() string {

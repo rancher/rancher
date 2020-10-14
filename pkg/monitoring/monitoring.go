@@ -209,7 +209,7 @@ grafana.persistence.size             	| 50Gi
 
 */
 func OverwriteAppAnswersAndCatalogID(rawAnswers map[string]string, annotations map[string]string,
-	catalogTemplateLister mgmtv3.CatalogTemplateLister) (map[string]string, string, error) {
+	catalogTemplateLister mgmtv3.CatalogTemplateLister, clusterLister mgmtv3.ClusterLister, clusterName string) (map[string]string, string, error) {
 	overwriteAnswers, version := GetOverwroteAppAnswersAndVersion(annotations)
 	for specialKey, value := range overwriteAnswers {
 		if strings.HasPrefix(specialKey, "_tpl-") {
@@ -233,19 +233,19 @@ func OverwriteAppAnswersAndCatalogID(rawAnswers map[string]string, annotations m
 	for key, value := range overwriteAnswers {
 		rawAnswers[key] = value
 	}
-	catalogID, err := GetMonitoringCatalogID(version, catalogTemplateLister)
+	catalogID, err := GetMonitoringCatalogID(version, catalogTemplateLister, clusterLister, clusterName)
 
 	return rawAnswers, catalogID, err
 }
 
-func GetMonitoringCatalogID(version string, catalogTemplateLister mgmtv3.CatalogTemplateLister) (string, error) {
+func GetMonitoringCatalogID(version string, catalogTemplateLister mgmtv3.CatalogTemplateLister, clusterLister mgmtv3.ClusterLister, clusterName string) (string, error) {
 	if version == "" {
 		template, err := catalogTemplateLister.Get(ns.GlobalNamespace, RancherMonitoringTemplateName)
 		if err != nil {
 			return "", err
 		}
 
-		templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+		templateVersion, err := versionutil.LatestAvailableTemplateVersion(template, clusterLister, clusterName)
 		if err != nil {
 			return "", err
 		}

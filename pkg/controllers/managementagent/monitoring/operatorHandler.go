@@ -44,7 +44,7 @@ func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.
 	if obj.Spec.EnableClusterAlerting || obj.Spec.EnableClusterMonitoring {
 		newObj, err := v32.ClusterConditionPrometheusOperatorDeployed.Do(obj, func() (runtime.Object, error) {
 			cpy := obj.DeepCopy()
-			return cpy, deploySystemMonitor(cpy, h.app)
+			return cpy, deploySystemMonitor(cpy, h.app, h.clusterLister, h.clusterName)
 		})
 		if err != nil {
 			logrus.Warnf("deploy prometheus operator error, %v", err)
@@ -86,7 +86,7 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 	if cluster.Spec.EnableClusterAlerting || project.Spec.EnableProjectMonitoring {
 		newObj, err := v32.ClusterConditionPrometheusOperatorDeployed.Do(cluster, func() (runtime.Object, error) {
 			cpy := cluster.DeepCopy()
-			return cpy, deploySystemMonitor(cpy, h.app)
+			return cpy, deploySystemMonitor(cpy, h.app, h.clusterLister, cluster.Name)
 		})
 		if err != nil {
 			logrus.Warnf("deploy prometheus operator error, %v", err)
@@ -154,7 +154,7 @@ func allOwnedProjectsMonitoringDisabling(projectClient mgmtv3.ProjectLister) (bo
 	return true, nil
 }
 
-func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr error) {
+func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler, clusterLister mgmtv3.ClusterLister, clusterName string) (backErr error) {
 	appName, appTargetNamespace := monitoring.SystemMonitoringInfo()
 
 	appDeployProjectID, err := app2.GetSystemProjectID(cluster.Name, app.projectLister)
@@ -202,7 +202,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		creatorIDAnno:             creator.Name,
 	}
 
-	appCatalogID, err := monitoring.GetMonitoringCatalogID(version, app.catalogTemplateLister)
+	appCatalogID, err := monitoring.GetMonitoringCatalogID(version, app.catalogTemplateLister, clusterLister, clusterName)
 	if err != nil {
 		return err
 	}

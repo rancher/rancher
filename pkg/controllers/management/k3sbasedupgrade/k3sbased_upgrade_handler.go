@@ -112,7 +112,7 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 		return err
 	}
 
-	latestTemplateVersion, err := utils.LatestAvailableTemplateVersion(template)
+	latestTemplateVersion, err := utils.LatestAvailableTemplateVersion(template, h.clusterLister, clusterName)
 	if err != nil {
 		return err
 	}

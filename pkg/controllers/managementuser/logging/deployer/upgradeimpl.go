@@ -74,7 +74,7 @@ func (l *LoggingService) Upgrade(currentVersion string) (string, error) {
 		return "", errors.Wrapf(err, "get template %s failed", templateID)
 	}
 
-	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template, l.clusterLister, l.clusterName)
 	if err != nil {
 		return "", err
 	}

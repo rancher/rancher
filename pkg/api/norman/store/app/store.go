@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -23,6 +24,7 @@ type Store struct {
 	types.Store
 	Apps                  pv3.AppLister
 	TemplateVersionLister v3.CatalogTemplateVersionLister
+	ClusterLister         v3.ClusterLister
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -34,7 +36,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	if err := s.validateRancherVersion(data); err != nil {
+	if err := s.validateChartCompatibility(data); err != nil {
 		return nil, err
 	}
 
@@ -57,7 +59,7 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	if err := s.validateRancherVersion(data); err != nil {
+	if err := s.validateChartCompatibility(data); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +88,7 @@ func (s *Store) validateForMultiClusterApp(id string, msg string) error {
 	return nil
 }
 
-func (s *Store) validateRancherVersion(data map[string]interface{}) error {
+func (s *Store) validateChartCompatibility(data map[string]interface{}) error {
 	externalID := convert.ToString(data["externalId"])
 	if externalID == "" {
 		return nil
@@ -102,7 +104,13 @@ func (s *Store) validateRancherVersion(data map[string]interface{}) error {
 		return err
 	}
 
-	return catUtil.ValidateRancherVersion(template)
+	projectID := convert.ToString(data["projectId"])
+	parts := strings.SplitN(projectID, ":", 2)
+	if len(parts) != 2 {
+		return nil
+	}
+
+	return catUtil.ValidateChartCompatibility(template, s.ClusterLister, parts[1])
 }
 
 func (s *Store) checkAccessToTemplateVersion(apiContext *types.APIContext, data map[string]interface{}) error {

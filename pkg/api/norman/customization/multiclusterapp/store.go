@@ -65,6 +65,7 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 		templateVersionLister: mgmt.Management.CatalogTemplateVersions("").Controller().Lister(),
 		users:                 mgmt.Management.Users(""),
 		rtLister:              mgmt.Management.RoleTemplates("").Controller().Lister(),
+		clusterLister:         mgmt.Management.Clusters("").Controller().Lister(),
 	}
 
 	schema.Store = s
@@ -80,10 +81,12 @@ type Store struct {
 	templateVersionLister v3.CatalogTemplateVersionLister
 	users                 v3.UserInterface
 	rtLister              v3.RoleTemplateLister
+	clusterLister         v3.ClusterLister
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if err := s.validateRancherVersion(data); err != nil {
+	// validate target's clusters
+	if err := s.validateChartCompatibility(data); err != nil {
 		return nil, err
 	}
 
@@ -101,7 +104,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if err := s.validateRancherVersion(data); err != nil {
+	if err := s.validateChartCompatibility(data); err != nil {
 		return nil, err
 	}
 
@@ -165,7 +168,7 @@ func (s *Store) ensureRolesNotDisabled(apiContext *types.APIContext, data map[st
 	return nil
 }
 
-func (s *Store) validateRancherVersion(data map[string]interface{}) error {
+func (s *Store) validateChartCompatibility(data map[string]interface{}) error {
 	rawTempVersion, ok := data["templateVersionId"]
 	if !ok {
 		return nil
@@ -183,7 +186,21 @@ func (s *Store) validateRancherVersion(data map[string]interface{}) error {
 		return err
 	}
 
-	return catUtil.ValidateRancherVersion(template)
+	if err := catUtil.ValidateRancherVersion(template); err != nil {
+		return err
+	}
+
+	targets, _ := data["targets"].([]interface{})
+	for _, target := range targets {
+		parts := strings.SplitN(target.(string), ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		if err := catUtil.ValidateKubeVersion(template, s.clusterLister, parts[0]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func checkDuplicateTargets(data map[string]interface{}) error {

@@ -91,7 +91,7 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 		return "", fmt.Errorf("get template %s:%s failed, %v", namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName, err)
 	}
 
-	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template, l.clusterLister, l.clusterName)
 	if err != nil {
 		return "", err
 	}

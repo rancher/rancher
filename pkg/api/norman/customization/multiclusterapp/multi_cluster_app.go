@@ -77,10 +77,13 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if obj.Status.RevisionName == revision.Name {
 			return nil
 		}
-		err = w.validateRancherVersion(revision.TemplateVersionName)
-		if err != nil {
+		if err := w.validateRancherVersion(revision.TemplateVersionName); err != nil {
 			return err
 		}
+		if err := w.validateKubeVersions(revision.TemplateVersionName, obj.Spec.Targets); err != nil {
+			return err
+		}
+		// validate targets' clusters
 		toUpdate := obj.DeepCopy()
 		toUpdate.Spec.TemplateVersionName = revision.TemplateVersionName
 		toUpdate.Spec.Answers = revision.Answers
@@ -288,4 +291,23 @@ func (w Wrapper) validateRancherVersion(tempVersion string) error {
 	}
 
 	return catUtil.ValidateRancherVersion(template)
+}
+
+func (w Wrapper) validateKubeVersions(tempVersion string, targets []v32.Target) error {
+	parts := strings.Split(tempVersion, ":")
+	if len(parts) != 2 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid templateVersionId")
+	}
+
+	template, err := w.TemplateVersionLister.Get(namespace.GlobalNamespace, parts[1])
+	if err != nil {
+		return err
+	}
+
+	for _, target := range targets {
+		if err := catUtil.ValidateKubeVersion(template, w.ClusterLister, target.ObjClusterName()); err != nil {
+			return err
+		}
+	}
+	return nil
 }

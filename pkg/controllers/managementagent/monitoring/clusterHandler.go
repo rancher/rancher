@@ -45,6 +45,7 @@ type etcdTLSConfig struct {
 type clusterHandler struct {
 	clusterName          string
 	cattleClustersClient mgmtv3.ClusterInterface
+	cattleClusterLister  mgmtv3.ClusterLister
 	agentEndpointsLister corev1.EndpointsLister
 	app                  *appHandler
 }
@@ -346,7 +347,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.ruleSelector.matchExpressions[0].values[1]":                             monitoring.CattleMonitoringPrometheusRuleLabelValue,
 	}
 
-	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, cluster.Annotations, ch.app.catalogTemplateLister)
+	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, cluster.Annotations, ch.app.catalogTemplateLister, ch.cattleClusterLister, ch.clusterName)
 	if err != nil {
 		return nil, err
 	}

@@ -66,6 +66,7 @@ type eksOperatorController struct {
 	appClient            projectv3.AppInterface
 	nsClient             corev1.NamespaceInterface
 	clusterClient        v3.ClusterClient
+	clusterLister        mgmtv3.ClusterLister
 	systemAccountManager *systemaccount.Manager
 	dynamicClient        dynamic.NamespaceableResourceInterface
 }
@@ -87,6 +88,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		appClient:            mgmtCtx.Project.Apps(""),
 		nsClient:             mgmtCtx.Core.Namespaces(""),
 		clusterClient:        wContext.Mgmt.Cluster(),
+		clusterLister:        mgmtCtx.Management.Clusters("").Controller().Lister(),
 		systemAccountManager: systemaccount.NewManager(mgmtCtx),
 		dynamicClient:        eksCCDynamicClient,
 	}
@@ -481,7 +483,7 @@ func (e *eksOperatorController) deployEKSOperator() error {
 		return err
 	}
 
-	latestTemplateVersion, err := utils.LatestAvailableTemplateVersion(template)
+	latestTemplateVersion, err := utils.LatestAvailableTemplateVersion(template, e.clusterLister, "local")
 	if err != nil {
 		return err
 	}

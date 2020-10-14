@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/utils/version"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/sirupsen/logrus"
 )
 
 func VersionBetween(a, b, c string) bool {
@@ -63,6 +65,41 @@ func VersionGreaterThan(a, b string) bool {
 	return version.GreaterThan(a, b)
 }
 
+func ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterlister v3.ClusterLister, clusterName string) error {
+	if err := ValidateRancherVersion(template); err != nil {
+		return err
+	}
+	if err := ValidateKubeVersion(template, clusterlister, clusterName); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ValidateKubeVersion(template *v3.CatalogTemplateVersion, clusterlister v3.ClusterLister, clusterName string) error {
+	if template.Spec.KubeVersion == "" {
+		return nil
+	}
+	constraint, err := semver.ParseRange(template.Spec.KubeVersion)
+	if err != nil {
+		logrus.Errorf("failed to parse constraint for kubeversion %s: %v", template.Spec.KubeVersion, err)
+		return nil
+	}
+
+	cluster, err := clusterlister.Get("", clusterName)
+	if err != nil {
+		return err
+	}
+
+	k8sVersion, err := semver.Parse(cluster.Status.Version.String())
+	if err != nil {
+		return err
+	}
+	if !constraint(k8sVersion) {
+		return fmt.Errorf("incompatible kubernetes version [%s] for template template [%s]", k8sVersion.String(), template.Name)
+	}
+	return nil
+}
+
 func ValidateRancherVersion(template *v3.CatalogTemplateVersion) error {
 	rancherMin := template.Spec.RancherMinVersion
 	rancherMax := template.Spec.RancherMaxVersion
@@ -95,7 +132,7 @@ func ReleaseServerVersion(serverVersion string) bool {
 	return true
 }
 
-func LatestAvailableTemplateVersion(template *v3.CatalogTemplate) (*v32.TemplateVersionSpec, error) {
+func LatestAvailableTemplateVersion(template *v3.CatalogTemplate, clusterLister v3.ClusterLister, clusterName string) (*v32.TemplateVersionSpec, error) {
 	versions := template.DeepCopy().Spec.Versions
 	if len(versions) == 0 {
 		return nil, errors.New("empty catalog template version list")
@@ -121,7 +158,8 @@ func LatestAvailableTemplateVersion(template *v3.CatalogTemplate) (*v32.Template
 				Spec: templateVersion,
 			},
 		}
-		if err := ValidateRancherVersion(catalogTemplateVersion); err == nil {
+		// validate cluster version
+		if err := ValidateChartCompatibility(catalogTemplateVersion, clusterLister, clusterName); err == nil {
 			return &templateVersion, nil
 		}
 	}

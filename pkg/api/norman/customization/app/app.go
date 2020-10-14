@@ -30,6 +30,7 @@ import (
 
 type Wrapper struct {
 	Clusters              v3.ClusterInterface
+	ClusterLister         v3.ClusterLister
 	TemplateVersionClient v3.CatalogTemplateVersionInterface
 	TemplateVersionLister v3.CatalogTemplateVersionLister
 	KubeConfigGetter      common.KubeConfigGetter
@@ -116,12 +117,17 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	if err != nil {
 		return err
 	}
+	_, namespace := ref.Parse(app.ProjectID)
+	obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 	switch actionName {
 	case "upgrade":
 		externalID := convert.ToString(actionInput["externalId"])
 
-		err := w.validateRancherVersion(externalID)
-		if err != nil {
+		// validate cluster version
+		if err := w.validateChartCompatibility(externalID, obj.GetClusterName()); err != nil {
 			return err
 		}
 
@@ -129,8 +135,6 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		forceUpgrade := actionInput["forceUpgrade"]
 		files := actionInput["files"]
 		valuesYaml := actionInput["valuesYaml"]
-		_, namespace := ref.Parse(app.ProjectID)
-		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -189,7 +193,8 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return err
 		}
 
-		err := w.validateRancherVersion(appRevision.Status.ExternalID)
+		// validate cluster version
+		err := w.validateChartCompatibility(appRevision.Status.ExternalID, obj.GetClusterName())
 		if err != nil {
 			return err
 		}
@@ -244,7 +249,7 @@ func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	return nil
 }
 
-func (w Wrapper) validateRancherVersion(externalID string) error {
+func (w Wrapper) validateChartCompatibility(externalID, clusterName string) error {
 	if externalID == "" {
 		return nil
 	}
@@ -256,5 +261,5 @@ func (w Wrapper) validateRancherVersion(externalID string) error {
 	if err != nil {
 		return err
 	}
-	return catUtil.ValidateRancherVersion(template)
+	return catUtil.ValidateChartCompatibility(template, w.ClusterLister, clusterName)
 }

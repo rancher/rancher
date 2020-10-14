@@ -18,6 +18,7 @@ type handler struct {
 	systemUpgradeNamespace string
 	clusterCache           wranglerv3.ClusterCache
 	clusterClient          wranglerv3.ClusterClient
+	clusterLister          v3.ClusterLister
 	apps                   projectv3.AppInterface
 	appLister              projectv3.AppLister
 	templateLister         v3.CatalogTemplateLister
@@ -39,6 +40,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		systemUpgradeNamespace: systemUpgradeNS,
 		clusterCache:           wContext.Mgmt.Cluster().Cache(),
 		clusterClient:          wContext.Mgmt.Cluster(),
+		clusterLister:          mgmtCtx.Management.Clusters("").Controller().Lister(),
 		clusterEnqueueAfter:    wContext.Mgmt.Cluster().EnqueueAfter,
 		apps:                   mgmtCtx.Project.Apps(metav1.NamespaceAll),
 		appLister:              mgmtCtx.Project.Apps("").Controller().Lister(),

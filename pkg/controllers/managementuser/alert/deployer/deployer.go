@@ -151,7 +151,7 @@ func (d *Deployer) sync() error {
 			newCluster = cluster.DeepCopy()
 		}
 
-		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, needWebhookReceiver); err != nil {
+		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, needWebhookReceiver, d.clusterLister, d.clusterName); err != nil {
 			return fmt.Errorf("deploy alertmanager failed, %v", err)
 		}
 
@@ -291,7 +291,7 @@ func (d *appDeployer) getSecret(secretName, secretNamespace string) *corev1.Secr
 	}
 }
 
-func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string, needWebhookReceiver bool) (bool, error) {
+func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string, needWebhookReceiver bool, clusterLister mgmtv3.ClusterLister, clusterName string) (bool, error) {
 	clusterName, systemProjectName := ref.Parse(systemProjectID)
 
 	ns := &corev1.Namespace{
@@ -336,7 +336,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 	if err != nil {
 		return false, fmt.Errorf("get template %s:%s failed, %v", namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName, err)
 	}
-	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template, clusterLister, clusterName)
 	if err != nil {
 		return false, err
 	}
