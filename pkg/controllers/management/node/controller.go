@@ -39,12 +39,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
-	defaultEngineInstallURL = "https://releases.rancher.com/install-docker/17.03.2.sh"
-	amazonec2               = "amazonec2"
+	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2                       = "amazonec2"
+	userNodeRemoveCleanupAnnotation = "nodes.management.cattle.io/user-node-remove-cleanup"
 )
 
 // aliases maps Schema field => driver field
@@ -457,12 +459,9 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
-	if nodehelper.HasFinalizerWithPrefix(obj, "clusterscoped.controller.cattle.io/user-node-remove_") {
-		// user-node-remove controller functionality is now merged into this controller
-		logrus.Infof("node [%s] has a finalizer for user-node-remove controller and it will be removed",
-			obj.Spec.RequestedHostname)
-		return m.nodeClient.Update(nodehelper.RemoveFinalizerWithPrefix(
-			obj.DeepCopy(), "clusterscoped.controller.cattle.io/user-node-remove_"))
+	if cleanupAnnotation, ok := obj.Annotations[userNodeRemoveCleanupAnnotation]; !ok || cleanupAnnotation != "true" {
+		// finalizer from user-node-remove has to be checked/cleaned
+		return m.userNodeRemoveCleanup(obj)
 	}
 
 	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
@@ -785,7 +784,7 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		return nil
 	}
 
-	logrus.Infof("node [%s] requires draining before delete, attempting to drain", nodeCopy.Spec.RequestedHostname)
+	logrus.Infof("node [%s] requires draining before delete", nodeCopy.Spec.RequestedHostname)
 	kubeConfig, err := m.getKubeConfig(cluster)
 	if err != nil {
 		return fmt.Errorf("node [%s] error getting kubeConfig", nodeCopy.Spec.RequestedHostname)
@@ -802,21 +801,69 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(m.ctx, time.Duration(nodeCopy.Spec.NodeDrainInput.Timeout)*time.Second)
-	defer cancel()
-
-	_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeCopy.Status.NodeName, nodehelper.GetDrainFlags(nodeCopy))
-	select {
-	case <-ctx.Done():
-		if ctx.Err() != nil {
-			logrus.Errorf("node [%s] drain failed: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
-		}
-		if err != nil {
-			// kubectl failed continue on with delete any way
-			logrus.Errorf("node [%s] kubectl drain error: %s", nodeCopy.Spec.RequestedHostname, err)
-		}
+	backoff := wait.Backoff{
+		Duration: 2 * time.Second,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    3,
 	}
 
-	logrus.Infof("node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
+	logrus.Infof("node [%s] attempting to drain, retrying up to 3 times", nodeCopy.Spec.RequestedHostname)
+	// purposefully ignoring error, if the drain fails this falls back to deleting the node as usual
+	wait.ExponentialBackoff(backoff, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, time.Duration(nodeCopy.Spec.NodeDrainInput.Timeout)*time.Second)
+		defer cancel()
+
+		_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeCopy.Status.NodeName, nodehelper.GetDrainFlags(nodeCopy))
+		select {
+		case <-ctx.Done():
+			if ctx.Err() != nil {
+				logrus.Errorf("node [%s] kubectl drain failed, retrying: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
+				return false, nil
+			}
+			if err != nil {
+				// kubectl failed continue on with delete any way
+				logrus.Errorf("node [%s] kubectl drain error, retrying: %s", nodeCopy.Spec.RequestedHostname, err)
+				return false, nil
+			}
+		}
+
+		logrus.Infof("node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
+		return true, nil
+	})
+
 	return nil
+}
+
+func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
+	copy := obj.DeepCopy()
+	copy.Annotations[userNodeRemoveCleanupAnnotation] = "true"
+	if hasFinalizerWithPrefix(copy, "clusterscoped.controller.cattle.io/user-node-remove_") {
+		// user-node-remove controller functionality is now merged into this controller
+		logrus.Infof("node [%s] has a finalizer for user-node-remove controller and it will be removed",
+			copy.Spec.RequestedHostname)
+		copy = removeFinalizerWithPrefix(copy, "clusterscoped.controller.cattle.io/user-node-remove_")
+	}
+	return m.nodeClient.Update(copy)
+}
+
+func hasFinalizerWithPrefix(node *v3.Node, prefix string) bool {
+	for _, finalizer := range node.Finalizers {
+		if strings.HasPrefix(finalizer, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func removeFinalizerWithPrefix(node *v3.Node, prefix string) *v3.Node {
+	var newFinalizers []string
+	for _, finalizer := range node.Finalizers {
+		if strings.HasPrefix(finalizer, prefix) {
+			continue
+		}
+		newFinalizers = append(newFinalizers, finalizer)
+	}
+	node.SetFinalizers(newFinalizers)
+	return node
 }
