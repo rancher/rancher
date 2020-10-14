@@ -21,6 +21,7 @@ var (
 	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds  = NewSetting("authorization-deny-cache-ttl-seconds", "10")
+	AzureGroupCacheSize               = NewSetting("azure-group-cache-size", "10000")
 	CACerts                           = NewSetting("cacerts", "")
 	CLIURLDarwin                      = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLLinux                       = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
