@@ -1020,6 +1020,7 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD {
 		return nil //no-op
 	}
+	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
 
 	if strings.Contains(cluster.Status.Version.String(), "k3s") {
 		for _, node := range nodes {
@@ -1031,8 +1032,8 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 		if cluster.Status.Driver != apimgmtv3.ClusterDriverK3os {
 			cluster.Status.Driver = apimgmtv3.ClusterDriverK3s
 		}
-		// only set these values on init
-		if cluster.Spec.K3sConfig == nil {
+		// only set these values on init, and not for embedded clusters as those shouldn't be upgraded
+		if cluster.Spec.K3sConfig == nil && !isEmbedded {
 			cluster.Spec.K3sConfig = &apimgmtv3.K3sConfig{
 				Version: cluster.Status.Version.String(),
 			}
