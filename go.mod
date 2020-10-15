@@ -5,7 +5,7 @@ go 1.14
 replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v12.2.0+incompatible
-	github.com/crewjam/saml => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
+	github.com/crewjam/saml => github.com/rancher/saml v0.0.3-rancher1
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
