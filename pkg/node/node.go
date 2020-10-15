@@ -2,7 +2,6 @@ package node
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/settings"
@@ -244,25 +243,4 @@ func GetDrainFlags(node *v3.Node) []string {
 		fmt.Sprintf("--grace-period=%v", input.GracePeriod),
 		fmt.Sprintf("--ignore-daemonsets=%v", ignoreDaemonSets),
 		fmt.Sprintf("--timeout=%s", convert.ToString(input.Timeout)+"s")}
-}
-
-func HasFinalizerWithPrefix(node *v3.Node, prefix string) bool {
-	for _, finalizer := range node.Finalizers {
-		if strings.HasPrefix(finalizer, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
-func RemoveFinalizerWithPrefix(node *v3.Node, prefix string) *v3.Node {
-	var newFinalizers []string
-	for _, finalizer := range node.Finalizers {
-		if strings.HasPrefix(finalizer, prefix) {
-			continue
-		}
-		newFinalizers = append(newFinalizers, finalizer)
-	}
-	node.SetFinalizers(newFinalizers)
-	return node
 }
