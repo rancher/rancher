@@ -40,6 +40,7 @@ import (
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 	rkedefaults "github.com/rancher/rke/cluster"
 	rkeservices "github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
@@ -62,6 +63,7 @@ type Store struct {
 	ClusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
 	NodeLister                    v3.NodeLister
 	ClusterLister                 v3.ClusterLister
+	DialerFactory                 dialer.Factory
 }
 
 type transformer struct {
@@ -133,6 +135,7 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 		ClusterTemplateRevisionLister: mgmt.Management.ClusterTemplateRevisions("").Controller().Lister(),
 		ClusterLister:                 mgmt.Management.Clusters("").Controller().Lister(),
 		NodeLister:                    mgmt.Management.Nodes("").Controller().Lister(),
+		DialerFactory:                 mgmt.Dialer,
 	}
 	schema.Store = s
 	return s
@@ -234,7 +237,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err = setInitialConditions(data); err != nil {
 		return nil, err
 	}
-	if err := validateS3Credentials(data); err != nil {
+	if err := validateS3Credentials(data, nil); err != nil {
 		return nil, err
 	}
 
@@ -524,7 +527,11 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
 	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
 	setWeavePasswordFieldsIfNotExists(existingCluster, data)
-	if err := validateUpdatedS3Credentials(existingCluster, data); err != nil {
+	dialer, err := r.DialerFactory.ClusterDialer(id)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting dialer")
+	}
+	if err := validateUpdatedS3Credentials(existingCluster, data, dialer); err != nil {
 		return nil, err
 	}
 	handleScheduledScan(data)
@@ -854,7 +861,7 @@ func setWeavePasswordFieldsIfNotExists(oldData, newData map[string]interface{}) 
 	}
 }
 
-func validateUpdatedS3Credentials(oldData, newData map[string]interface{}) error {
+func validateUpdatedS3Credentials(oldData, newData map[string]interface{}, dialer dialer.Dialer) error {
 	newConfig := convert.ToMapInterface(values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
 	if newConfig == nil {
 		return nil
@@ -862,17 +869,17 @@ func validateUpdatedS3Credentials(oldData, newData map[string]interface{}) error
 
 	oldConfig := convert.ToMapInterface(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
 	if oldConfig == nil {
-		return validateS3Credentials(newData)
+		return validateS3Credentials(newData, dialer)
 	}
 	// remove "type" since it's added to the object by API, and it's not present in newConfig yet.
 	delete(oldConfig, "type")
 	if !reflect.DeepEqual(newConfig, oldConfig) {
-		return validateS3Credentials(newData)
+		return validateS3Credentials(newData, dialer)
 	}
 	return nil
 }
 
-func validateS3Credentials(data map[string]interface{}) error {
+func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) error {
 	s3BackupConfig := values.GetValueN(data, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
 	if s3BackupConfig == nil {
 		return nil
@@ -893,7 +900,7 @@ func validateS3Credentials(data map[string]interface{}) error {
 	if bucket == "" {
 		return fmt.Errorf("Empty bucket name")
 	}
-	s3Client, err := etcdbackup.GetS3Client(sbc, s3TransportTimeout)
+	s3Client, err := etcdbackup.GetS3Client(sbc, s3TransportTimeout, dialer)
 	if err != nil {
 		return err
 	}
