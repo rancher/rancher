@@ -370,6 +370,7 @@ type SamlConfig struct {
 	UserNameField      string `json:"userNameField"      norman:"required"`
 	UIDField           string `json:"uidField"           norman:"required"`
 	RancherAPIHost     string `json:"rancherApiHost"     norman:"required"`
+	EntityID           string `json:"entityID"`
 }
 
 type SamlConfigTestInput struct {

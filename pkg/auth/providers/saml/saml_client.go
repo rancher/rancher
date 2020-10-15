@@ -133,6 +133,7 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 		Certificate: cert,
 		MetadataURL: metadataURL,
 		AcsURL:      acsURL,
+		EntityID:    configToSet.EntityID,
 	}
 
 	// XML unmarshal throws an error for IdP Metadata cacheDuration field, as it's of type xml Duration. Using a separate struct for unmarshaling for now
