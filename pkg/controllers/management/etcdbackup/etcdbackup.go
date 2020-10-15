@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -24,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -385,18 +385,15 @@ func generateBackupFilename(snapshotName string, backupConfig *v3.BackupConfig) 
 
 }
 
-func GetS3Client(sbc *v3.S3BackupConfig, timeout int) (*minio.Client, error) {
+func GetS3Client(sbc *v3.S3BackupConfig, timeout int, dialer dialer.Dialer) (*minio.Client, error) {
 	if sbc == nil {
 		return nil, fmt.Errorf("Can't find S3 backup target configuration")
 	}
 	var s3Client = &minio.Client{}
 	var creds *credentials.Credentials
 	var tr http.RoundTripper = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(timeout) * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		Proxy:                 http.ProxyFromEnvironment,
+		Dial:                  dialer,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
@@ -428,8 +425,8 @@ func GetS3Client(sbc *v3.S3BackupConfig, timeout int) (*minio.Client, error) {
 	}
 	if sbc.CustomCA != "" {
 		tr = getCustomCATransport(tr, sbc.CustomCA)
-		s3Client.SetCustomTransport(tr)
 	}
+	s3Client.SetCustomTransport(tr)
 	return s3Client, nil
 }
 
