@@ -108,7 +108,7 @@ func PrefixPrivateRegistry(image string) string {
 }
 
 func IsRelease() bool {
-	return releasePattern.MatchString(ServerVersion.Get())
+	return !strings.Contains(ServerVersion.Get(), "head") && releasePattern.MatchString(ServerVersion.Get())
 }
 
 func init() {
