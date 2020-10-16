@@ -1,9 +1,11 @@
 [Unit]
-Description=Rancher Kubernetes Engine v2 (agent)
+Description=Rancher Kubernetes Engine v2 (server)
 Documentation=https://rancher.com/docs/rancher/v2.x/en/
 Wants=network-online.target
 After=network-online.target
-Conflicts=rancherd-agent.service,rke2-agent.service,rke2-server.service
+Conflicts=rancherd-agent.service
+Conflicts=rke2-agent.service
+Conflicts=rke2-server.service
 
 [Install]
 WantedBy=multi-user.target

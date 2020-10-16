@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/rancher/k3s/pkg/configfilearg"
 	"github.com/rancher/rancher/cmd/rancherd/auth"
 	"github.com/rancher/rke2/pkg/cli/cmds"
 	"github.com/sirupsen/logrus"
@@ -22,7 +23,7 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(configfilearg.MustParse(os.Args)); err != nil {
 		logrus.Fatal(err)
 	}
 }
