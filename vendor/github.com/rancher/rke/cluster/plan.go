@@ -602,11 +602,7 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, serviceOptions v3.Kube
 			"/run:/run",
 		}
 
-		BindModules := "/lib/modules:/lib/modules:z,ro"
-		if hosts.IsEnterpriseLinuxHost(host) && hosts.IsDockerSELinuxEnabled(host) && !hosts.IsEnterpriseLinuxDocker(host) {
-			// Avoid relabing on Enterprise Linux with Docker SELinux and upstream Docker
-			BindModules = "/lib/modules:/lib/modules:ro"
-		}
+		BindModules := "/lib/modules:/lib/modules:ro"
 		Binds = append(Binds, BindModules)
 	}
 	Binds = append(Binds, host.GetExtraBinds(kubeproxy.BaseService)...)

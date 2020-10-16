@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -1121,7 +1120,7 @@ func (c *Cluster) getPrefixPath(os string) string {
 	case os == "windows" && c.WindowsPrefixPath != "":
 		return util.CleanWindowsPath(c.WindowsPrefixPath)
 	default:
-		return filepath.Clean(c.PrefixPath)
+		return c.PrefixPath
 	}
 }
 
