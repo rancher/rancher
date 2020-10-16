@@ -94,7 +94,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("create").
-		addRule().apiGroups("*").resources("secrets").verbs("create").
+		addRule().apiGroups("").resources("secrets").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplaterevisions").verbs("create").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
