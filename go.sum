@@ -845,6 +845,8 @@ github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234 h1:wZ1Zh
 github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200805195909-3e842ecc0384 h1:84KSQEqcY2yaFn6ANcvY+VEDUQazRG94DGd9O+d1tlw=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20200805195909-3e842ecc0384/go.mod h1:CofnuNGQefXjvq95fwXNVFJzOdrVW3ZUtQZC9ezQzHQ=
+github.com/rancher/kontainer-engine v0.0.4-dev.0.20201015171854-580147bc78de h1:7ky9jVXSTSYiau1sc/P1Osxj1jMuMfp9nBp3QTJ4ouE=
+github.com/rancher/kontainer-engine v0.0.4-dev.0.20201015171854-580147bc78de/go.mod h1:CofnuNGQefXjvq95fwXNVFJzOdrVW3ZUtQZC9ezQzHQ=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
