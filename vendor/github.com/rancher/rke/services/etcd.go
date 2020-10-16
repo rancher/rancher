@@ -192,8 +192,8 @@ func AddEtcdMember(ctx context.Context, toAddEtcdHost *hosts.Host, etcdHosts []*
 	return nil
 }
 
-func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte) error {
-	log.Infof(ctx, "[remove/%s] Removing member [etcd-%s] from etcd cluster", ETCDRole, etcdHost.HostnameOverride)
+func RemoveEtcdMember(ctx context.Context, toDeleteEtcdHost *hosts.Host, etcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte, etcdNodePlanMap map[string]v3.RKEConfigNodePlan) error {
+	log.Infof(ctx, "[remove/%s] Removing member [etcd-%s] from etcd cluster", ETCDRole, toDeleteEtcdHost.HostnameOverride)
 	var mID string
 	removed := false
 	for _, host := range etcdHosts {
@@ -209,7 +209,7 @@ func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*ho
 			continue
 		}
 		for _, member := range members {
-			if member.Name == fmt.Sprintf("etcd-%s", etcdHost.HostnameOverride) {
+			if member.Name == fmt.Sprintf("etcd-%s", toDeleteEtcdHost.HostnameOverride) {
 				mID = member.ID
 				break
 			}
@@ -218,13 +218,28 @@ func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*ho
 			logrus.Debugf("Failed to list etcd members from host [%s]: %v", host.Address, err)
 			continue
 		}
-		removed = true
-		break
+		etcdMemberDeletedTime := time.Now()
+		// Need to health check after successful member remove (especially for leader re-election)
+		// We will check all hosts to see if the cluster becomes healthy
+		var healthError error
+		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName], host)
+		logrus.Infof("[remove/%s] Checking etcd cluster health on [etcd-%s] after removing [etcd-%s]", ETCDRole, host.HostnameOverride, toDeleteEtcdHost.HostnameOverride)
+		logrus.Debugf("[remove/%s] healthCheckURL for checking etcd cluster health on [etcd-%s] after removing [%s]: [%s]", ETCDRole, host.HostnameOverride, toDeleteEtcdHost.HostnameOverride, healthCheckURL)
+		healthError = isEtcdHealthy(localConnDialerFactory, host, cert, key, healthCheckURL)
+		if healthError == nil {
+			logrus.Infof("[remove/%s] etcd cluster health is healthy on [etcd-%s] after removing [etcd-%s]", ETCDRole, host.HostnameOverride, toDeleteEtcdHost.HostnameOverride)
+			etcdHealthyTime := time.Now()
+			diffTime := etcdHealthyTime.Sub(etcdMemberDeletedTime)
+			logrus.Debugf("Total time between etcd member deleted and etcd cluster healthy is: [%s]", diffTime)
+			removed = true
+			break
+		}
+		logrus.Warn(healthError)
 	}
 	if !removed {
-		return fmt.Errorf("Failed to delete etcd member [etcd-%s] from etcd cluster", etcdHost.HostnameOverride)
+		return fmt.Errorf("Failed to delete etcd member [etcd-%s] from etcd cluster", toDeleteEtcdHost.HostnameOverride)
 	}
-	log.Infof(ctx, "[remove/%s] Successfully removed member [etcd-%s] from etcd cluster", ETCDRole, etcdHost.HostnameOverride)
+	log.Infof(ctx, "[remove/%s] Successfully removed member [etcd-%s] from etcd cluster", ETCDRole, toDeleteEtcdHost.HostnameOverride)
 	return nil
 }
 

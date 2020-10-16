@@ -44,7 +44,9 @@ func isEtcdHealthy(localConnDialerFactory hosts.DialerFactory, host *hosts.Host,
 	logrus.Debugf("[etcd] check etcd cluster health on host [%s]", host.Address)
 	var finalErr error
 	var healthy string
-	for i := 0; i < 3; i++ {
+	// given a max election timeout of 50000ms (50s), max re-election of 77 seconds was seen
+	// this allows for 18 * 5 seconds = 90 seconds of re-election
+	for i := 0; i < 18; i++ {
 		dialer, err := getEtcdDialer(localConnDialerFactory, host)
 		if err != nil {
 			return err
@@ -67,12 +69,12 @@ func isEtcdHealthy(localConnDialerFactory hosts.DialerFactory, host *hosts.Host,
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		// log in debug here as we don't want to log in warn on every iteration
-		// the error will be logged in the caller stack
-		logrus.Debugf("[etcd] etcd host [%s] reported healthy=%s", host.Address, healthy)
+		// Changed this from Debug to Info to inform user on what is happening
+		logrus.Infof("[etcd] etcd host [%s] reported healthy=%s", host.Address, healthy)
 		if healthy == "true" {
 			return nil
 		}
+		time.Sleep(5 * time.Second)
 	}
 	if finalErr != nil {
 		return fmt.Errorf("[etcd] host [%s] failed to check etcd health: %v", host.Address, finalErr)
