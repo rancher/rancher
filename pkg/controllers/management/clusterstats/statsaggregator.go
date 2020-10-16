@@ -9,6 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -63,6 +64,10 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	var machines []*v3.Node
 	// only include worker nodes
 	for _, m := range allMachines {
+		// if none are set, then nodes syncer has not completed
+		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
+			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying...", m.Status.NodeName)
+		}
 		if m.Spec.Worker && !m.Spec.InternalNodeSpec.Unschedulable {
 			machines = append(machines, m)
 		}
