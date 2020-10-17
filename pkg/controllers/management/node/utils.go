@@ -13,14 +13,14 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 var regExHyphen = regexp.MustCompile("([a-z])([A-Z])")
@@ -311,4 +311,18 @@ func setEc2ClusterIDTag(data interface{}, clusterID string) {
 			m[ec2TagFlag] = convert.ToString(tags) + "," + tagValue
 		}
 	}
+}
+
+func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
+	user, err := m.systemAccountManager.GetSystemUser(cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := m.userManager.EnsureToken("node-removal-drain-"+user.Name, "token for node drain during removal", "agent", user.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.clusterManager.KubeConfig(cluster.Name, token), nil
 }
