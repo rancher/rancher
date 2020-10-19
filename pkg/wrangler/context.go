@@ -95,6 +95,7 @@ type Context struct {
 type MultiClusterManager interface {
 	ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error)
 	Start(ctx context.Context) error
+	Wait(ctx context.Context)
 	Middleware(next http.Handler) http.Handler
 	K8sClient(clusterName string) (kubernetes.Interface, error)
 }
@@ -234,6 +235,9 @@ func (n noopMCM) ClusterDialer(clusterID string) func(ctx context.Context, netwo
 	return func(ctx context.Context, network string, address string) (net.Conn, error) {
 		return nil, fmt.Errorf("no cluster manager")
 	}
+}
+
+func (n noopMCM) Wait(ctx context.Context) {
 }
 
 func (n noopMCM) Start(ctx context.Context) error {

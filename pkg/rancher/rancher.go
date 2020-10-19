@@ -203,6 +203,8 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 		return err
 	}
 
+	r.Wrangler.MultiClusterManager.Wait(ctx)
+
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
