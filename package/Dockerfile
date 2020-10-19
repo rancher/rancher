@@ -109,7 +109,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 
 ENV CATTLE_UI_VERSION 2.5.2-rc2
 ENV CATTLE_DASHBOARD_UI_VERSION v2.5.2-rc2
-ENV CATTLE_CLI_VERSION 2.4.7-rc1
+ENV CATTLE_CLI_VERSION v2.4.7-rc1
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION 1.1.9
