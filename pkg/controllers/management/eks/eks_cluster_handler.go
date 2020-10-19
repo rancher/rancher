@@ -116,12 +116,12 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		var conditionErr error
 		if cluster.Spec.EKSConfig.Imported {
 			cluster, conditionErr = e.setFalse(cluster, apimgmtv3.ClusterConditionPending, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
-			if err != nil {
+			if conditionErr != nil {
 				return cluster, conditionErr
 			}
 		} else {
 			cluster, conditionErr = e.setFalse(cluster, apimgmtv3.ClusterConditionProvisioned, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
-			if err != nil {
+			if conditionErr != nil {
 				return cluster, conditionErr
 			}
 		}
