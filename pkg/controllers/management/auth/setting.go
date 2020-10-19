@@ -2,6 +2,7 @@ package auth
 
 import (
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +34,8 @@ func (n *SettingController) sync(key string, obj *v3.Setting) (runtime.Object, e
 		providerrefresh.UpdateRefreshCronTime(obj.Value)
 	case "auth-user-info-max-age-seconds":
 		providerrefresh.UpdateRefreshMaxAge(obj.Value)
+	case "azure-group-cache-size":
+		azure.UpdateGroupCacheSize(obj.Value)
 	}
 
 	return nil, nil
