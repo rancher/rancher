@@ -469,7 +469,7 @@ func (ap *azureProvider) userGroupsToPrincipals(azureClient *azureClient, groups
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-	logrus.Infof("[AZURE_PROVIDER] Completed gathering users groups, took %v, keys in cache:%v", time.Since(start), groupCache.Len())
+	logrus.Debugf("[AZURE_PROVIDER] Completed gathering users groups, took %v, keys in cache:%v", time.Since(start), groupCache.Len())
 	return groupPrincipals, nil
 }
 
