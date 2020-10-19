@@ -6,14 +6,15 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	metv1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -30,11 +31,19 @@ type WorkloadEndpointsController struct {
 	nodeLister         v1.NodeLister
 	clusterName        string
 	isRKE              bool
+	isInternal         bool
 }
 
 func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadutil.Workload) error {
 	if obj == nil && key != allEndpoints {
 		return nil
+	}
+
+	if c.isInternal {
+		// Do not run endpoints on a local cluster that has a cluster-agent because it will conflict and cause non-stop writes
+		if _, err := c.WorkloadController.Deployments.GetNamespaced(namespace.System, "cattle-cluster-agent", metv1.GetOptions{}); err == nil {
+			return nil
+		}
 	}
 
 	var workloads []*workloadutil.Workload
