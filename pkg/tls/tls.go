@@ -147,7 +147,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		return "", noCACerts, nil, errors.Wrapf(err, "parsing %s", settings.RotateCertsIfExpiringInDays.Get())
 	}
 
-	sans := []string{"localhost", "127.0.0.1"}
+	sans := []string{"localhost", "127.0.0.1", "rancher.cattle-system"}
 	ip, err := net.ChooseHostInterface()
 	if err == nil {
 		sans = append(sans, ip.String())
