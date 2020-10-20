@@ -10,8 +10,8 @@ spec:
       protocol: TCP
       name: http
     - port: 443
-      targetPort: 443
+      targetPort: 444
       protocol: TCP
-      name: https
+      name: https-internal
   selector:
     app: rancher
