@@ -327,6 +327,11 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
+# github.com/oracle/oci-go-sdk v18.0.0+incompatible
+github.com/oracle/oci-go-sdk/common
+github.com/oracle/oci-go-sdk/containerengine
+github.com/oracle/oci-go-sdk/core
+github.com/oracle/oci-go-sdk/identity
 # github.com/opencontainers/runc v1.0.0-rc10
 github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
