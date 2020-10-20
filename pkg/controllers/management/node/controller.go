@@ -753,14 +753,11 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 		return node, nil
 	}
 
-	// get user context k8s client to delete downstream cluster node
-	cluster, err := m.clusterLister.Get("", node.Namespace)
+	userClient, err := m.clusterManager.UserContext(node.Namespace)
 	if err != nil {
-		return node, err
-	}
-
-	userClient, err := m.clusterManager.UserContext(cluster.Name)
-	if err != nil {
+		if kerror.IsNotFound(err) {
+			return node, nil
+		}
 		return node, err
 	}
 
@@ -777,6 +774,9 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 	nodeCopy := node.DeepCopy() // copy for cache protection as we do no updating but need things set for the drain
 	cluster, err := m.clusterLister.Get("", nodeCopy.Namespace)
 	if err != nil {
+		if kerror.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
