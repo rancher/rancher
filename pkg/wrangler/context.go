@@ -90,6 +90,7 @@ type Context struct {
 	CatalogContentManager *content.Manager
 	HelmOperations        *helmop.Operations
 	SystemChartsManager   *system.Manager
+	Agent                 bool
 }
 
 type MultiClusterManager interface {

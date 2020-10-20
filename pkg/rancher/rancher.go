@@ -91,6 +91,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
+	wranglerContext.Agent = opts.Agent
 
 	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
 	kontainerdriver.RegisterIndexers(wranglerContext)
