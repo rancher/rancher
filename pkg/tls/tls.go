@@ -56,6 +56,17 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		return err
 	}
 
+	if err := server.ListenAndServe(ctx, httpsPort+1, 0, handler, &server.ListenOpts{
+		Storage:       opts.Storage,
+		Secrets:       opts.Secrets,
+		CAName:        "tls-rancher-internal-ca",
+		CANamespace:   "cattle-system",
+		CertNamespace: "cattle-system",
+		CertName:      "tls-rancher-internal",
+	}); err != nil {
+		return err
+	}
+
 	if err := core.Start(ctx, 5); err != nil {
 		return err
 	}
