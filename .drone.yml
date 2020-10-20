@@ -231,6 +231,24 @@ steps:
     - drone-publish.rancher.io
     status:
     - failure
+- name: docker-publish-rancherd
+  image: plugins/docker
+  settings:
+    build_args:
+      - ARCH=amd64
+      - "TAG=${DRONE_TAG}"
+    context: cmd/rancherd/package
+    custom_dns: 1.1.1.1
+    dockerfile: cmd/rancherd/package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: rancher/rancherd-upgrade
+    tag: "${DRONE_TAG}-linux-amd64"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
 
 volumes:
 - name: docker
