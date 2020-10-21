@@ -14,5 +14,5 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 	mcmstart.Register(ctx, wrangler.Mgmt.Feature(), wrangler.MultiClusterManager)
 	feature.Register(ctx, wrangler.Mgmt.Feature())
 	helm.RegisterReposForFollowers(ctx, wrangler.Core.Secret().Cache(), wrangler.Catalog.ClusterRepo())
-	return settings.Register(wrangler.Mgmt.Setting())
+	return settings.Register(wrangler.Mgmt.Setting(), !wrangler.Agent)
 }

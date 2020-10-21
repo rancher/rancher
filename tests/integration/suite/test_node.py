@@ -180,7 +180,7 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
             except FileNotFoundError:
                 return False
 
-        wait_for(file_exists, timeout=10,
+        wait_for(file_exists, timeout=120,
                  fail_handler=lambda: 'file is missing from disk')
 
         with open(full_path, 'r') as f:

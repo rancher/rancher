@@ -216,7 +216,7 @@ func (s *Operations) getUser(userInfo user.Info, namespace, name string) (user.I
 		return userInfo, nil
 	}
 	return &user.DefaultInfo{
-		Name: fmt.Sprintf("system:serviceaccount:%s:%s", repoSpec.ServiceAccount, serviceAccountNS),
+		Name: fmt.Sprintf("system:serviceaccount:%s:%s", serviceAccountNS, repoSpec.ServiceAccount),
 		Groups: []string{
 			"system:serviceaccounts",
 			"system:serviceaccounts:" + serviceAccountNS,

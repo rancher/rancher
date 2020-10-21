@@ -24,6 +24,7 @@ var (
 	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds  = NewSetting("authorization-deny-cache-ttl-seconds", "10")
+	AzureGroupCacheSize               = NewSetting("azure-group-cache-size", "10000")
 	CACerts                           = NewSetting("cacerts", "")
 	CLIURLDarwin                      = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLLinux                       = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
@@ -85,7 +86,7 @@ var (
 	ClusterTemplateEnforcement        = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir              = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                = NewSetting("chart-default-branch", "main")
+	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.5")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
 	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
 	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.4")
@@ -108,7 +109,7 @@ func PrefixPrivateRegistry(image string) string {
 }
 
 func IsRelease() bool {
-	return releasePattern.MatchString(ServerVersion.Get())
+	return !strings.Contains(ServerVersion.Get(), "head") && releasePattern.MatchString(ServerVersion.Get())
 }
 
 func init() {
@@ -214,7 +215,7 @@ func GetEnvKey(key string) string {
 func getMetadataConfig() string {
 	branch := os.Getenv("RANCHER_METADATA_BRANCH")
 	if branch == "" {
-		branch = "release-v2.5"
+		branch = "dev-v2.5"
 	}
 	data := map[string]interface{}{
 		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),

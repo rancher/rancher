@@ -6,17 +6,16 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/docker/docker/pkg/locker"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	rkedefaults "github.com/rancher/rke/cluster"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -224,7 +223,7 @@ func (uh *upgradeHandler) getNodePlan(node *v3.Node, cluster *v3.Cluster) (*rket
 		nodePlan *rketypes.RKEConfigNodePlan
 		err      error
 	)
-	if nodeserver.IsNonWorker(node.Status.NodeConfig.Role) {
+	if nodehelper.IsNonWorker(node.Status.NodeConfig) {
 		nodePlan, err = uh.nonWorkerPlan(node, cluster)
 	} else {
 		nodePlan, err = uh.workerPlan(node, cluster)
