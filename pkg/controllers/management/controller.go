@@ -56,7 +56,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	nodedriver.Register(ctx, management)
 	nodepool.Register(ctx, management)
 	cloudcredential.Register(ctx, management)
-	node.Register(ctx, management)
+	node.Register(ctx, management, manager)
 	podsecuritypolicy.Register(ctx, management)
 	etcdbackup.Register(ctx, management)
 	cis.Register(ctx, management)
