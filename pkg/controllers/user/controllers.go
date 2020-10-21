@@ -24,7 +24,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
 	"github.com/rancher/rancher/pkg/controllers/user/monitoring"
 	"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
-	"github.com/rancher/rancher/pkg/controllers/user/noderemove"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/user/nsserviceaccount"
@@ -52,7 +51,6 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	logging.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	cis.Register(ctx, cluster)
-	noderemove.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
 	pipeline.Register(ctx, cluster)
 	podsecuritypolicy.RegisterCluster(ctx, cluster)

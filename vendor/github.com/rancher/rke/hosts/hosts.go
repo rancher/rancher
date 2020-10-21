@@ -52,14 +52,16 @@ const (
 	LogCleanerContainerName = "rke-log-cleaner"
 	RKELogsPath             = "/var/lib/rancher/rke/log"
 
-	B2DOS             = "Boot2Docker"
-	B2DPrefixPath     = "/mnt/sda1/rke"
-	ROS               = "RancherOS"
-	ROSPrefixPath     = "/opt/rke"
-	CoreOS            = "CoreOS"
-	CoreOSPrefixPath  = "/opt/rke"
-	WindowsOS         = "Windows"
-	WindowsPrefixPath = "c:/"
+	B2DOS               = "Boot2Docker"
+	B2DPrefixPath       = "/mnt/sda1/rke"
+	ROS                 = "RancherOS"
+	ROSPrefixPath       = "/opt/rke"
+	CoreOS              = "CoreOS"
+	CoreOSPrefixPath    = "/opt/rke"
+	FlatcarOS           = "Flatcar"
+	FlatcarOSPrefixPath = "/opt/rke"
+	WindowsOS           = "Windows"
+	WindowsPrefixPath   = "c:/"
 )
 
 func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[string]v3.PrivateRegistry, externalEtcd bool) error {
@@ -366,6 +368,8 @@ func (h *Host) SetPrefixPath(clusterPrefixPath string) {
 		prefixPath = ROSPrefixPath
 	case strings.Contains(h.DockerInfo.OperatingSystem, CoreOS):
 		prefixPath = CoreOSPrefixPath
+	case strings.Contains(h.DockerInfo.OperatingSystem, FlatcarOS):
+		prefixPath = FlatcarOSPrefixPath
 	case strings.Contains(h.DockerInfo.OperatingSystem, WindowsOS):
 		prefixPath = WindowsPrefixPath
 	default:

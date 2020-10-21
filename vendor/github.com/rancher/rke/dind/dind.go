@@ -63,6 +63,7 @@ func StartUpDindContainer(ctx context.Context, dindAddress, dindNetwork, dindSto
 				"sh",
 				"-c",
 				"mount --make-shared / && " +
+					"mount --make-shared /sys && " +
 					"mount --make-shared /var/lib/docker && " +
 					"dockerd-entrypoint.sh --storage-driver=" + storageDriver,
 			},

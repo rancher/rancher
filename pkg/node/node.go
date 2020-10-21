@@ -1,7 +1,11 @@
 package node
 
 import (
+	"fmt"
+
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/settings"
+	rkeservices "github.com/rancher/rke/services"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -172,4 +176,71 @@ func IsMachineReady(machine *v3.Node) bool {
 		}
 	}
 	return false
+}
+
+func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster) bool {
+	// never drain an etcd node, you will regret it
+	if IsEtcd(node.Status.NodeConfig) {
+		return false
+	}
+
+	// vsphere nodes with cloud providers need to be drained to unmount vmdk files as vsphere deletes them automatically
+	if nil != cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider {
+		return true
+	}
+
+	return false
+}
+
+func IsEtcd(node *v3.RKEConfigNode) bool {
+	roles := node.Role
+	for _, role := range roles {
+		if role == rkeservices.ETCDRole {
+			return true
+		}
+	}
+	return false
+}
+
+func IsControlPlane(node *v3.RKEConfigNode) bool {
+	for _, role := range node.Role {
+		if role == rkeservices.ControlRole {
+			return true
+		}
+	}
+	return false
+}
+
+func IsWorker(node *v3.RKEConfigNode) bool {
+	roles := node.Role
+	for _, role := range roles {
+		if role == rkeservices.WorkerRole {
+			return true
+		}
+	}
+	return false
+}
+
+func IsNonWorker(node *v3.RKEConfigNode) bool {
+	return IsControlPlane(node) || IsEtcd(node)
+}
+
+func GetDrainFlags(node *v3.Node) []string {
+	input := node.Spec.NodeDrainInput
+	if input == nil {
+		return []string{}
+	}
+
+	var ignoreDaemonSets bool
+	if input.IgnoreDaemonSets == nil {
+		ignoreDaemonSets = true
+	} else {
+		ignoreDaemonSets = *input.IgnoreDaemonSets
+	}
+	return []string{
+		fmt.Sprintf("--delete-local-data=%v", input.DeleteLocalData),
+		fmt.Sprintf("--force=%v", input.Force),
+		fmt.Sprintf("--grace-period=%v", input.GracePeriod),
+		fmt.Sprintf("--ignore-daemonsets=%v", ignoreDaemonSets),
+		fmt.Sprintf("--timeout=%s", convert.ToString(input.Timeout)+"s")}
 }

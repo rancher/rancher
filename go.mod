@@ -70,6 +70,7 @@ require (
 	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
+	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pierrec/lz4 v2.2.6+incompatible // indirect
 	github.com/pkg/errors v0.8.1
@@ -78,12 +79,12 @@ require (
 	github.com/prometheus/common v0.9.1
 	github.com/prometheus/tsdb v0.8.0 // indirect
 	github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234
-	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200805195909-3e842ecc0384
+	github.com/rancher/kontainer-engine v0.0.4-dev.0.20201015171854-580147bc78de
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20200806175025-f974dbfb2734
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83
-	github.com/rancher/rke v1.1.9-rc2
+	github.com/rancher/rke v1.1.11-rc1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200522224200-dc9f969673f8
 	github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551bd

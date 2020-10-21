@@ -121,14 +121,8 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 
 	logrus.Debugf("SearchResult memberOf attribute {%s}", userMemberAttribute)
 
-	isType := false
-	objectClass := entry.GetAttributeValues(ObjectClass)
-	for _, obj := range objectClass {
-		if strings.EqualFold(string(obj), config.UserObjectClass) {
-			isType = true
-		}
-	}
-	if !isType {
+	if !ldap.IsType(userAttributes, config.UserObjectClass) {
+		logrus.Debugf("The objectClass %s was not found in the user attributes", config.UserObjectClass)
 		return v3.Principal{}, nil, nil
 	}
 

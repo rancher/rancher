@@ -194,7 +194,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 		}
 	}
 	// handle etcd member delete
-	if err := deleteEtcdMembers(ctx, currentCluster, kubeCluster, kubeClient, clientCert, clientKey, etcdToDelete); err != nil {
+	if err := deleteEtcdMembers(ctx, currentCluster, kubeCluster, kubeClient, svcOptionData, clientCert, clientKey, etcdToDelete); err != nil {
 		return err
 	}
 	// handle etcd member add
@@ -238,11 +238,20 @@ func addEtcdMembers(ctx context.Context, currentCluster, kubeCluster *Cluster, k
 	return nil
 }
 
-func deleteEtcdMembers(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset, clientCert, clientKey []byte, etcdToDelete []*hosts.Host) error {
+func deleteEtcdMembers(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset, svcOptionData map[string]*v3.KubernetesServicesOptions, clientCert, clientKey []byte, etcdToDelete []*hosts.Host) error {
 	log.Infof(ctx, "[reconcile] Check etcd hosts to be deleted")
+	etcdNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
+	for _, etcdMapHost := range kubeCluster.EtcdHosts {
+		svcOptions, err := kubeCluster.GetKubernetesServicesOptions(etcdMapHost.DockerInfo.OSType, svcOptionData)
+		if err != nil {
+			return err
+		}
+		etcdNodePlanMap[etcdMapHost.Address] = BuildRKEConfigNodePlan(ctx, kubeCluster, etcdMapHost, svcOptions)
+	}
+
 	for _, etcdHost := range etcdToDelete {
 		etcdHost.IsEtcd = false
-		if err := services.RemoveEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientKey); err != nil {
+		if err := services.RemoveEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientKey, etcdNodePlanMap); err != nil {
 			log.Warnf(ctx, "[reconcile] %v", err)
 			continue
 		}
