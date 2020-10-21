@@ -257,7 +257,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 		clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &rketypes.NodeUpgradeStrategy{
 			MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
 			MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
-			Drain:                      false,
+			Drain:                      func() *bool { b := false; return &b }(),
 		}
 	}
 	if clusterCopy != nil {
@@ -276,7 +276,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	}
 
 	upgradeStrategy := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy
-	toDrain := upgradeStrategy.Drain
+	toDrain := upgradeStrategy.Drain != nil && *upgradeStrategy.Drain
 
 	// get current upgrade status of nodes
 	status := uh.filterNodes(nodes, cluster.Status.NodeVersion, toDrain)
