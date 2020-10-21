@@ -395,6 +395,10 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, err
 		}
 
 		if node.Status.NodePlan == nil || v3.NodeConditionRegistered.IsUnknown(node) {
+			// enqueue if node plan isn't initialized yet
+			if node.Status.NodePlan == nil {
+				uh.nodes.Controller().Enqueue(node.Namespace, node.Name)
+			}
 			// node's not yet registered, change in its node plan should do nothing for cluster upgrade
 			continue
 		}
