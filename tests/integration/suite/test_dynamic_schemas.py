@@ -1,7 +1,7 @@
 import copy
 import pytest
 
-from .conftest import wait_until
+from .conftest import wait_for
 
 
 @pytest.mark.nonparallel
@@ -17,7 +17,10 @@ def test_dynamic_schemas_update(request, admin_mc):
 
     admin_mc.client.update_by_id_dynamicSchema(eks_schema.id, eks_schema)
     request.addfinalizer(lambda: cleanup_extra_field(admin_mc))
-    assert schema_has_field(admin_mc)
+
+    wait_for(lambda: schema_has_field(admin_mc),
+             fail_handler=lambda: "could not add extra field",
+             timeout=120)
 
 
 def cleanup_extra_field(admin_mc):
@@ -27,7 +30,9 @@ def cleanup_extra_field(admin_mc):
     admin_mc.client.delete(eks_schema)
     admin_mc.client.create_dynamicSchema(eks_schema)
 
-    wait_until(lambda: not schema_has_field(admin_mc))
+    wait_for(lambda: not schema_has_field(admin_mc),
+             fail_handler=lambda: "could not clean up extra field",
+             timeout=120)
 
 
 def schema_has_field(admin_mc):
