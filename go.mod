@@ -11,6 +11,7 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/rke => github.com/paynejacob/rke v1.2.1-0.20201015230500-c476d52790e6
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190921190940-14da1ac737cc // This is because docker/docker/pkg/archive has a dependency on an old x/sys
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.3.0-rancher1
 
@@ -91,7 +92,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee
-	github.com/rancher/rke v1.2.2-rc3
+	github.com/rancher/rke v1.2.2-rc3.0.20201021225325-b2197f54b7e5
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20201001183606-e0e2eddcb1b2
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
