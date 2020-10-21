@@ -13,5 +13,9 @@ spec:
     targetPort: 80
     protocol: TCP
     name: http
+  - port: 443
+    targetPort: 444
+    protocol: TCP
+    name: https-internal
   selector:
     app: {{ template "rancher.fullname" . }}
