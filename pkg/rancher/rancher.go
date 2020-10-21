@@ -91,6 +91,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
+	wranglerContext.Agent = opts.Agent
 
 	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
 	kontainerdriver.RegisterIndexers(wranglerContext)
@@ -202,6 +203,8 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 	if err := r.Start(ctx); err != nil {
 		return err
 	}
+
+	r.Wrangler.MultiClusterManager.Wait(ctx)
 
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),

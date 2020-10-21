@@ -313,6 +313,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 				NotApplicable: r.NotApplicable,
 			}
 
+			cs = cs.DeepCopy()
 			cs.Status.CisScanStatus = cisScanStatus
 		}
 		v32.ClusterScanConditionCompleted.True(cs)
@@ -324,8 +325,8 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 		updatedCluster := cluster.DeepCopy()
 		updatedCluster.Status.CurrentCisRunName = ""
-		if _, err := csh.clusterClient.Update(updatedCluster); err != nil {
-			return nil, fmt.Errorf("cisScanHandler: Updated: failed to update cluster about CIS scan completion with error %v", err)
+		if cs, err := csh.clusterClient.Update(updatedCluster); err != nil {
+			return cs, fmt.Errorf("cisScanHandler: Updated: failed to update cluster about CIS scan completion with error %v", err)
 		}
 	}
 	return cs, nil

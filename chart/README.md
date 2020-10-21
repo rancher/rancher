@@ -174,8 +174,6 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 
 #### Advanced Options
 
-
-
 | Parameter                      | Default Value                                         | Description                                                                                                                                                                                                  |
 | ------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `additionalTrustedCAs`         | false                                                 | ***bool*** - [See Additional Trusted CAs Server](https://rancher.com/docs/rancher/v2.x/en/installation/options/chart-options/#additional-trusted-cas)                                                        |

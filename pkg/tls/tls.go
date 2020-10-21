@@ -38,21 +38,42 @@ const (
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, bindHost string, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 10 * time.Minute
+	opts := &server.ListenOpts{}
+	var err error
 
 	core, err := core.NewFactoryFromConfig(restConfig)
 	if err != nil {
 		return err
 	}
 
-	opts, err := SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
-	if err != nil {
-		return errors.Wrap(err, "failed to setup TLS listener")
+	if httpsPort != 0 {
+		opts, err = SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
+		if err != nil {
+			return errors.Wrap(err, "failed to setup TLS listener")
+		}
 	}
+
 	opts.BindHost = bindHost
 
 	migrateConfig(ctx, restConfig, opts)
 
 	if err := server.ListenAndServe(ctx, httpsPort, httpPort, handler, opts); err != nil {
+		return err
+	}
+
+	internalPort := 0
+	if httpsPort != 0 {
+		internalPort = httpsPort + 1
+	}
+
+	if err := server.ListenAndServe(ctx, internalPort, 0, handler, &server.ListenOpts{
+		Storage:       opts.Storage,
+		Secrets:       opts.Secrets,
+		CAName:        "tls-rancher-internal-ca",
+		CANamespace:   "cattle-system",
+		CertNamespace: "cattle-system",
+		CertName:      "tls-rancher-internal",
+	}); err != nil {
 		return err
 	}
 
@@ -147,7 +168,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		return "", noCACerts, nil, errors.Wrapf(err, "parsing %s", settings.RotateCertsIfExpiringInDays.Get())
 	}
 
-	sans := []string{"localhost", "127.0.0.1"}
+	sans := []string{"localhost", "127.0.0.1", "rancher.cattle-system"}
 	ip, err := net.ChooseHostInterface()
 	if err == nil {
 		sans = append(sans, ip.String())
