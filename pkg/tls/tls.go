@@ -38,16 +38,21 @@ const (
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, bindHost string, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 10 * time.Minute
+	opts := &server.ListenOpts{}
+	var err error
 
 	core, err := core.NewFactoryFromConfig(restConfig)
 	if err != nil {
 		return err
 	}
 
-	opts, err := SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
-	if err != nil {
-		return errors.Wrap(err, "failed to setup TLS listener")
+	if httpsPort != 0 {
+		opts, err = SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
+		if err != nil {
+			return errors.Wrap(err, "failed to setup TLS listener")
+		}
 	}
+
 	opts.BindHost = bindHost
 
 	migrateConfig(ctx, restConfig, opts)
@@ -56,7 +61,12 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		return err
 	}
 
-	if err := server.ListenAndServe(ctx, httpsPort+1, 0, handler, &server.ListenOpts{
+	internalPort := 0
+	if httpsPort != 0 {
+		internalPort = httpsPort + 1
+	}
+
+	if err := server.ListenAndServe(ctx, internalPort, 0, handler, &server.ListenOpts{
 		Storage:       opts.Storage,
 		Secrets:       opts.Secrets,
 		CAName:        "tls-rancher-internal-ca",
