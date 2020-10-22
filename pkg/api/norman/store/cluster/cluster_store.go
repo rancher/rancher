@@ -714,7 +714,7 @@ func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
 			upgradeStrategy = &rketypes.NodeUpgradeStrategy{
 				MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
 				MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
-				Drain:                      false,
+				Drain:                      func() *bool { b := false; return &b }(),
 			}
 		}
 		values.PutValue(newData, upgradeStrategy, "rancherKubernetesEngineConfig", "upgradeStrategy")
