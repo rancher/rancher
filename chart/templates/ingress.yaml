@@ -1,4 +1,4 @@
-{{- if (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") }}
+{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
 apiVersion: networking.k8s.io/v1
 {{- else }}
 apiVersion: networking.k8s.io/v1beta1
@@ -38,8 +38,15 @@ spec:
     http:
       paths:
       - backend:
+          {{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+          service:
+            name: {{ template "rancher.fullname" . }}
+            port:
+              number: 80
+          {{- else }}
           serviceName: {{ template "rancher.fullname" . }}
           servicePort: 80
+          {{- end }}
 {{- if eq .Values.tls "ingress" }}
   tls:
   - hosts:
