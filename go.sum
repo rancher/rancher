@@ -909,8 +909,6 @@ github.com/pact-foundation/pact-go v1.0.4/go.mod h1:uExwJY4kCzNPcHRj+hCR/HBbOOIw
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pascaldekloe/goe v0.1.0/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/paulmach/orb v0.1.3/go.mod h1:VFlX/8C+IQ1p6FTRRKzKoOPJnvEtA5G0Veuqwbu//Vk=
-github.com/paynejacob/rke v1.2.1-0.20201015230500-c476d52790e6 h1:W4vc8FsCeXZFSuQ5jeOsDQ5HzsJJ7w/ZCZt2jWq6uEo=
-github.com/paynejacob/rke v1.2.1-0.20201015230500-c476d52790e6/go.mod h1:aPSc14Hp8UGLscL/wB9ZZQHPX/kjDiPXLcoMTCY2NS4=
 github.com/pborman/uuid v1.2.0 h1:J7Q5mO4ysT1dv8hyrUGHb9+ooztCXu1D8MY8DZYsu3g=
 github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtPdI/k=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
@@ -1030,6 +1028,9 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAX
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
 github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee h1:hAHJO9u3nF4NMoHC3FwdlQ+O/WnBvehkr9Ubwt3jk+g=
 github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
+github.com/rancher/rke v1.2.2-rc3/go.mod h1:aPSc14Hp8UGLscL/wB9ZZQHPX/kjDiPXLcoMTCY2NS4=
+github.com/rancher/rke v1.2.2-rc3.0.20201021225325-b2197f54b7e5 h1:uUt2dv3nmMxEuQ3zw0kX9vpDwFC4jBVlwEZK7SLJckg=
+github.com/rancher/rke v1.2.2-rc3.0.20201021225325-b2197f54b7e5/go.mod h1:aPSc14Hp8UGLscL/wB9ZZQHPX/kjDiPXLcoMTCY2NS4=
 github.com/rancher/saml v0.0.3-rancher1 h1:rX1UIHVGn8v8AXG8GyMHezXU9+l8zs6o+Psk7OmylEs=
 github.com/rancher/saml v0.0.3-rancher1/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
