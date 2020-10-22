@@ -5,6 +5,7 @@ import (
 	"regexp"
 
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -67,5 +68,17 @@ func shouldDelete(meta *metav1.ObjectMeta, pod *corev1.PodTemplateSpec) bool {
 		return false
 	}
 
-	return imageRegexp.MatchString(pod.Spec.Containers[0].Image)
+	if !imageRegexp.MatchString(pod.Spec.Containers[0].Image) {
+		return false
+	}
+
+	for _, container := range pod.Spec.Containers {
+		for _, env := range container.Env {
+			if env.Name == "CATTLE_SERVER" && env.Value == settings.ServerURL.Get() {
+				return true
+			}
+		}
+	}
+
+	return false
 }
