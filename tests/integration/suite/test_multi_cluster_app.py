@@ -1,6 +1,8 @@
 from .common import random_str, check_subject_in_rb
 from rancher import ApiError
-from .conftest import wait_until, wait_for, set_server_version
+from .conftest import (
+    wait_until, wait_for, set_server_version, wait_until_available
+)
 import time
 import pytest
 import kubernetes
@@ -369,8 +371,7 @@ def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
                                  roles=["project-member"])
     remove_resource(mcapp1)
     wait_for_app(admin_pc, mcapp_name, 60)
-    client.action(obj=mcapp1, action_name="removeProjects",
-                  projects=[p.id])
+    client.action(obj=mcapp1, action_name="removeProjects", projects=[p.id])
     new_projects = [admin_pc.project.id]
     wait_for(lambda: check_updated_projects(admin_mc, mcapp_name,
                                             new_projects), timeout=60,
@@ -612,6 +613,57 @@ def test_mcapp_rollback_validation(admin_mc, admin_pc, custom_catalog,
                       revisionId=original_rev)
     assert e.value.error.status == 422
     assert e.value.error.message == 'rancher max version exceeded'
+
+
+def test_perform_mca_action_read_only(admin_mc, admin_pc, remove_resource,
+                                      user_mc):
+    """Tests MCA actions with a read-only user."""
+    client = admin_mc.client
+    project = admin_pc.project
+    user = user_mc
+
+    ns = admin_pc.cluster.client.create_namespace(
+        name=random_str(),
+        projectId=project.id)
+    remove_resource(ns)
+
+    prtb = client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user.user.id,
+        projectId=project.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb)
+
+    wait_until_available(user.client, project)
+
+    mcapp_name = random_str()
+    mcapp_user_read_only = "local://" + user.user.id,
+    mcapp = client.create_multi_cluster_app(
+        name=mcapp_name,
+        templateVersionId="cattle-global-data:library-docker-registry-1.9.2",
+        targets=[{"projectId": admin_pc.project.id}],
+        members=[{"userPrincipalId": mcapp_user_read_only,
+                  "accessType": "read-only"}],
+        roles=["cluster-owner", "project-member"])
+    remove_resource(mcapp)
+    wait_for_app(admin_pc, mcapp_name)
+
+    # Read-only users should receive a 404 error.
+    with pytest.raises(ApiError) as e:
+        user.client.action(
+            obj=mcapp,
+            action_name="rollback",
+            answers={"asdf": "asdf"})
+    assert e.value.error.status == 404
+
+    # There are no revisions, so a HTTP 500 error should appear here for the
+    # admin user.
+    with pytest.raises(ApiError) as e:
+        client.action(
+            obj=mcapp,
+            action_name="rollback",
+            answers={"asdf": "asdf"})
+    assert e.value.error.status == 500
 
 
 def wait_for_app(admin_pc, name, timeout=60):
