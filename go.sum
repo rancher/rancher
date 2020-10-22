@@ -1006,8 +1006,8 @@ github.com/rancher/eks-operator v0.1.0-rc30 h1:5Q/TWFRzHX7O4ZsNAdaSMSSHVHoxYxB5G
 github.com/rancher/eks-operator v0.1.0-rc30/go.mod h1:Q9J5NGpq/y1qdog+6YzYmvhPDKgJ7F/8vOgza9+HF6M=
 github.com/rancher/helm/v3 v3.3.0-rancher1 h1:i9uzKgPbt15FTn0rHMt22sA4rdHPq4iJ8gmohSWPR1o=
 github.com/rancher/helm/v3 v3.3.0-rancher1/go.mod h1:qUawjWz9THVCBVsNPJ/Q20VNEyrK7kN6lYf5loyp194=
-github.com/rancher/kubernetes-provider-detector v0.1.0 h1:lQl16AX7UkHPKMaam+Aubu90nvovyzSbbE3SOBBXdbQ=
-github.com/rancher/kubernetes-provider-detector v0.1.0/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
+github.com/rancher/kubernetes-provider-detector v0.1.1-0.20201022034134-8f971d9f77cf h1:BY7n2YqMwAKODfYgZw0UJZ8XmfwtEImWF1bCscForUI=
+github.com/rancher/kubernetes-provider-detector v0.1.1-0.20201022034134-8f971d9f77cf/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
 github.com/rancher/lasso v0.0.0-20200427171700-e0509f89f319/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
 github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB2YjTVagmu4NkhBvbE8nBcGykHRENH6arI=
 github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
