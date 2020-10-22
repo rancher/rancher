@@ -430,6 +430,8 @@ func (m *Lifecycle) prePullAgentImage(nodeDir string, node *v3.Node, cluster *v3
 		return nil
 	}
 
+	logrus.Tracef("[node-controller-rancher-machine] private registry detected, pre pulling agent image for %s", node.Spec.RequestedHostname)
+
 	login, extraEnv := clusterregistrationtokens.LoginCommand(reg, node)
 	cmd, err := buildCommand(nodeDir, node, bashCmd, login, extraEnv)
 	if err != nil {

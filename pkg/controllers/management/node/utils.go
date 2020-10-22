@@ -108,8 +108,8 @@ func mapToSlice(m map[string]string) []string {
 }
 
 func buildCommand(nodeDir string, node *v3.Node, cmd string, cmdArgs []string, extraEnv []string) (*exec.Cmd, error) {
-	// only in trace because machine has sensitive details and we can't control who debugs what in there easily
-	if logrus.GetLevel() >= logrus.TraceLevel {
+	// only for machine commands and trace log level, sensitive details may be logged
+	if cmd == nodeCmd && logrus.GetLevel() >= logrus.TraceLevel {
 		// prepend --debug to pass directly to machine
 		cmdArgs = append([]string{"--debug"}, cmdArgs...)
 	}
@@ -128,7 +128,7 @@ func buildCommand(nodeDir string, node *v3.Node, cmd string, cmdArgs []string, e
 		return nil, errors.WithMessage(err, "get user cred error")
 	}
 
-	command := exec.Command(nodeCmd, cmdArgs...)
+	command := exec.Command(cmd, cmdArgs...)
 	command.SysProcAttr = &syscall.SysProcAttr{}
 	command.SysProcAttr.Credential = cred
 	command.SysProcAttr.Chroot = path.Join(jailer.BaseJailPath, node.Namespace)
