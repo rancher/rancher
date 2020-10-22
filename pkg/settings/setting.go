@@ -94,6 +94,7 @@ var (
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
 	EKSUpstreamRefreshCron            = NewSetting("eks-refresh-cron", "*/5 * * * *")
+	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
 )
 
 func FullShellImage() string {
