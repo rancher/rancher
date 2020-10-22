@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/rbac"
 	appsv1 "github.com/rancher/types/apis/apps/v1"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
@@ -39,6 +40,9 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	accessError := access.ByID(apiContext, &projectschema.Version, "workload", apiContext.ID, &deployment)
 	if accessError != nil {
 		return httperror.NewAPIError(httperror.InvalidReference, "Error accessing workload")
+	}
+	if canUpdateDeployment(apiContext, nil) != nil {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 	namespace, name := splitID(deployment.ID)
 	switch actionName {
@@ -233,9 +237,11 @@ func DeploymentFormatter(apiContext *types.APIContext, resource *types.RawResour
 	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
 	Formatter(apiContext, resource)
 	resource.Links["revisions"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID) + "/" + workloadRevisions
-	resource.Actions["pause"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "pause")
-	resource.Actions["resume"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "resume")
-	resource.Actions["rollback"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "rollback")
+	if canUpdateDeployment(apiContext, resource) == nil {
+		resource.Actions["pause"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "pause")
+		resource.Actions["resume"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "resume")
+		resource.Actions["rollback"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "rollback")
+	}
 }
 
 type Handler struct {
@@ -250,4 +256,9 @@ func splitID(id string) (string, string) {
 	}
 
 	return namespace, id
+}
+
+func canUpdateDeployment(apiContext *types.APIContext, resource *types.RawResource) error {
+	return apiContext.AccessControl.CanDo(k8sappsv1.GroupName, "deployments", "update", apiContext,
+		rbac.ObjFromContext(apiContext, resource), apiContext.Schema)
 }

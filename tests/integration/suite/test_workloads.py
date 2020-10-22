@@ -1,5 +1,6 @@
 from .common import random_str
 from rancher import ApiError
+from .conftest import wait_until_available
 
 import time
 import pytest
@@ -310,6 +311,58 @@ def test_statefulset_workload_volumemount_subpath(admin_pc):
         assert e.value.error.status == 422
 
 
+def test_perform_workload_action_read_only(admin_mc, admin_pc,
+                                           remove_resource, user_mc):
+    """Tests workload actions with a read-only user."""
+    client = admin_pc.client
+    project = admin_pc.project
+    user = user_mc
+
+    ns = admin_pc.cluster.client.create_namespace(
+        name=random_str(),
+        projectId=project.id)
+    remove_resource(ns)
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user.user.id,
+        projectId=project.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb)
+
+    wait_until_available(user.client, project)
+
+    workload_name = random_str()
+    workload = client.create_workload(
+        name=workload_name,
+        namespaceId=ns.id,
+        scale=1,
+        containers=[{
+            'name': 'one',
+            'image': 'nginx',
+        }])
+    remove_resource(workload)
+
+    wait_for_workload(client, workload_name)
+
+    # Read-only users should receive a 404 error.
+    with pytest.raises(ApiError) as e:
+        user.client.action(
+            obj=workload,
+            action_name="rollback",
+            answers={"asdf": "asdf"})
+    assert e.value.error.status == 404
+
+    # There are no revisions, so a HTTP 500 error should appear here for the
+    # admin user.
+    with pytest.raises(ApiError) as e:
+        client.action(
+            obj=workload,
+            action_name="rollback",
+            answers={"asdf": "asdf"})
+    assert e.value.error.status == 500
+
+
 def wait_for_service_create(client, name, timeout=30):
     start = time.time()
     services = client.list_service(name=name, kind="ClusterIP")
@@ -341,3 +394,20 @@ def wait_for_service_cluserip_reset(client, name, timeout=30):
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for workload service')
     return services.data[0]
+
+
+def wait_for_workload(client, name, timeout=30):
+    """Wait for a given workload to be active."""
+    def _get_curr_workload():
+        """Return an empty string if the workload is not initialized yet."""
+        if len(client.list_workload()["data"]) > 0:
+            return client.list_workload()["data"][0]
+        return ""
+    start = time.time()
+    curr = _get_curr_workload()
+    while (curr["name"] != name) and (curr["status"] != "active"):
+        time.sleep(.5)
+        curr = _get_curr_workload()
+        if time.time() - start > timeout:
+            raise Exception("Timeout waiting for workload")
+    return curr
