@@ -65,7 +65,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		nodeLister:     workload.Core.Nodes("").Controller().Lister(),
 		clusterName:    workload.ClusterName,
 		isRKE:          isRKE,
-		isInternal:     cluster.Spec.Internal,
 	}
 	w.WorkloadController = workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), w.UpdateEndpoints)
 
