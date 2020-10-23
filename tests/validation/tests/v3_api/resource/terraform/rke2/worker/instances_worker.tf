@@ -21,26 +21,22 @@ resource "aws_instance" "worker" {
   vpc_security_group_ids = [
     "${var.sg_id}"
   ]
-
   key_name = "jenkins-rke-validation"
   tags = {
-    Name = "${var.resource_name}-rke2-worker"
+    Name = "${var.resource_name}-worker"
     "kubernetes.io/cluster/clusterid" = "owned"
   }
-
   provisioner "file" {
     source = "join_agent.sh"
     destination = "/tmp/join_agent.sh"
   }
-
   provisioner "remote-exec" {
     inline = [
       "chmod +x /tmp/join_agent.sh",
-      "sudo /tmp/join_agent.sh ${var.ctype} ${local.master_fixed_reg_addr} ${local.master_ip} \"${local.node_token}\" ${var.rke2_version} ${var.username} ${var.password} ",
+      "sudo /tmp/join_agent.sh ${var.node_os} ${local.master_fixed_reg_addr} ${local.master_ip} \"${local.node_token}\" ${var.rke2_version} ${var.cluster_type} \"${var.worker_flags}\" ${var.username} ${var.password} ",
     ]
   }
 }
-
 
 data "local_file" "master_ip" {
   depends_on = [var.dependency]
@@ -67,9 +63,4 @@ data "local_file" "master_fixed_reg_addr" {
 
 locals {
   master_fixed_reg_addr = trimspace("${data.local_file.master_fixed_reg_addr.content}")
-}
-
-resource "local_file" "worker_ips" {
-  content     = join(",", aws_instance.worker.*.public_ip)
-  filename = "/tmp/${var.resource_name}_worker_ips"
 }

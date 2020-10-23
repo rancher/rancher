@@ -1,4 +1,5 @@
 #!/bin/bash
+# This script is used to join one or more nodes as agents
 set -x
 echo $@
 hostname=`hostname -f`
@@ -10,12 +11,27 @@ node-name: "${hostname}"
 cloud-provider-name:  "aws"
 EOF
 
-if [ ${1} = "rhel" ]
+echo "$7"
+if [[ ! -z "$7" ]] && [[ "$7" == *":"* ]]
 then
-    subscription-manager register --auto-attach --username=${6} --password=${7}
-    subscription-manager repos --enable=rhel-7-server-extras-rpms
+   echo "$7"
+   echo -e "$7" >> /etc/rancher/rke2/config.yaml
+   cat /etc/rancher/rke2/config.yaml
 fi
 
-curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5} INSTALL_RKE2_TYPE='agent' sh -
-systemctl enable rke2-agent
-systemctl start rke2-agent
+if [ ${1} = "rhel" ]
+then
+   subscription-manager register --auto-attach --username=${8} --password=${9}
+   subscription-manager repos --enable=rhel-7-server-extras-rpms
+fi
+
+if [ ${6} = "rke2" ]
+then
+   curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5} INSTALL_RKE2_TYPE='agent' sh -
+   sudo systemctl enable rke2-agent
+   sudo systemctl start rke2-agent
+else
+   curl -sfL https://get.rancher.io | INSTALL_RANCHERD_VERSION=${5} INSTALL_RKE2_TYPE='agent' sh -
+   sudo systemctl enable rancherd-agent
+   sudo systemctl start rancherd-agent
+fi

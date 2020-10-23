@@ -1,4 +1,5 @@
 #!/bin/bash
+# This script is used to join one or more nodes as masters to the first master
 set -x
 echo $@
 hostname=`hostname -f`
@@ -13,37 +14,27 @@ cloud-provider-name:  "aws"
 node-name: "${hostname}"
 EOF
 
-if [ ${1} = "rhel" ]
+echo "$7"
+if [[ ! -z "$7" ]] && [[ "$7" == *":"* ]]
 then
-    subscription-manager register --auto-attach --username=${6} --password=${7}
-    subscription-manager repos --enable=rhel-7-server-extras-rpms
+   echo "$7"
+   echo -e "$7" >> /etc/rancher/rke2/config.yaml
+   cat /etc/rancher/rke2/config.yaml
 fi
 
-curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5} sh -
-systemctl enable rke2-server
-systemctl start rke2-server
+if [ ${1} = "rhel" ]
+then
+   subscription-manager register --auto-attach --username=${8} --password=${9}
+   subscription-manager repos --enable=rhel-7-server-extras-rpms
+fi
 
-export KUBECONFIG=/etc/rancher/rke2/rke2.yaml PATH=$PATH:/var/lib/rancher/rke2/bin
-
-IFS=$'\n'
-notready=false
-timeElapsed=0
-sleep 60
-while [[ $timeElapsed -lt 240 ]]
-do
-   for rec in `kubectl get nodes --kubeconfig=/etc/rancher/rke2/rke2.yaml`
-   do
-       echo $rec
-       if [[ "$rec" == *"NotReady"* ]]
-       then
-          notready=true
-       fi
-   done
-   echo "Node state $notready"
-   if [[ $notready == false ]]
-   then
-        break
-   fi
-   sleep 20
-   timeElapsed=`expr $timeElapsed + 20`
-done
+if [ ${6} = "rke2" ]
+then
+   curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5} sh -
+   sudo systemctl enable rke2-server
+   sudo systemctl start rke2-server
+else
+   curl -sfL https://get.rancher.io | INSTALL_RANCHERD_VERSION=${5} sh -
+   sudo systemctl enable rancherd-server
+   sudo systemctl start rancherd-server
+fi

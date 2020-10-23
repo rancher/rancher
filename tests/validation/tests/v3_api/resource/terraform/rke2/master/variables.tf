@@ -1,27 +1,23 @@
+variable "access_key" {}
+variable "availability_zone" {}
 variable "aws_ami" {}
 variable "aws_user" {}
-variable "region" {}
-variable "access_key" {}
-variable "vpc_id" {}
-variable "subnets" {}
-variable "qa_space" {}
-variable "resource_name" {}
-variable "rke2_version" {}
-variable "server_flags" {}
+variable "cluster_type" {}
 variable "ec2_instance_class" {}
-variable "availability_zone" {}
-variable "sg_id" {}
+variable "iam_role" {}
+variable "node_os" {}
 variable "no_of_server_nodes" {}
-variable "username" {
-  default = "username"
-}
 variable "password" {
   default = "password"
 }
-variable "ctype" {
-  default = "centos"
-}
-variable "iam_role" {
-  default = ""
-  type = string
+variable "qa_space" {}
+variable "region" {}
+variable "resource_name" {}
+variable "rke2_version" {}
+variable "server_flags" {}
+variable "sg_id" {}
+variable "subnets" {}
+variable "vpc_id" {}
+variable "username" {
+  default = "username"
 }
