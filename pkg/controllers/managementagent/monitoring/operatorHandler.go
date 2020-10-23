@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
@@ -23,10 +24,11 @@ import (
 )
 
 type operatorHandler struct {
-	clusterName   string
-	clusters      mgmtv3.ClusterInterface
-	clusterLister mgmtv3.ClusterLister
-	app           *appHandler
+	clusterName    string
+	clusters       mgmtv3.ClusterInterface
+	clusterLister  mgmtv3.ClusterLister
+	catalogManager manager.CatalogManager
+	app            *appHandler
 }
 
 func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.Object, error) {
@@ -44,7 +46,7 @@ func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.
 	if obj.Spec.EnableClusterAlerting || obj.Spec.EnableClusterMonitoring {
 		newObj, err := v32.ClusterConditionPrometheusOperatorDeployed.Do(obj, func() (runtime.Object, error) {
 			cpy := obj.DeepCopy()
-			return cpy, deploySystemMonitor(cpy, h.app)
+			return cpy, deploySystemMonitor(cpy, h.app, h.catalogManager, h.clusterName)
 		})
 		if err != nil {
 			logrus.Warnf("deploy prometheus operator error, %v", err)
@@ -86,7 +88,7 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 	if cluster.Spec.EnableClusterAlerting || project.Spec.EnableProjectMonitoring {
 		newObj, err := v32.ClusterConditionPrometheusOperatorDeployed.Do(cluster, func() (runtime.Object, error) {
 			cpy := cluster.DeepCopy()
-			return cpy, deploySystemMonitor(cpy, h.app)
+			return cpy, deploySystemMonitor(cpy, h.app, h.catalogManager, cluster.Name)
 		})
 		if err != nil {
 			logrus.Warnf("deploy prometheus operator error, %v", err)
@@ -154,7 +156,7 @@ func allOwnedProjectsMonitoringDisabling(projectClient mgmtv3.ProjectLister) (bo
 	return true, nil
 }
 
-func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr error) {
+func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler, catalogManager manager.CatalogManager, clusterName string) (backErr error) {
 	appName, appTargetNamespace := monitoring.SystemMonitoringInfo()
 
 	appDeployProjectID, err := app2.GetSystemProjectID(cluster.Name, app.projectLister)
@@ -202,7 +204,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		creatorIDAnno:             creator.Name,
 	}
 
-	appCatalogID, err := monitoring.GetMonitoringCatalogID(version, app.catalogTemplateLister)
+	appCatalogID, err := monitoring.GetMonitoringCatalogID(version, app.catalogTemplateLister, catalogManager, clusterName)
 	if err != nil {
 		return err
 	}

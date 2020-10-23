@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	manager2 "github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -18,6 +19,7 @@ type handler struct {
 	systemUpgradeNamespace string
 	clusterCache           wranglerv3.ClusterCache
 	clusterClient          wranglerv3.ClusterClient
+	catalogManager         manager2.CatalogManager
 	apps                   projectv3.AppInterface
 	appLister              projectv3.AppLister
 	templateLister         v3.CatalogTemplateLister

@@ -5,15 +5,14 @@ import (
 	"net/http"
 	"reflect"
 
-	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	clusterv3 "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	projectv3 "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
@@ -30,6 +29,7 @@ import (
 
 type Wrapper struct {
 	Clusters              v3.ClusterInterface
+	CatalogManager        manager.CatalogManager
 	TemplateVersionClient v3.CatalogTemplateVersionInterface
 	TemplateVersionLister v3.CatalogTemplateVersionLister
 	KubeConfigGetter      common.KubeConfigGetter
@@ -116,24 +116,24 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	if err != nil {
 		return err
 	}
+	clusterName, namespace := ref.Parse(app.ProjectID)
+	obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 	switch actionName {
 	case "upgrade":
 		externalID := convert.ToString(actionInput["externalId"])
 
-		err := w.validateRancherVersion(externalID)
-		if err != nil {
-			return err
+		if err := w.validateChartCompatibility(externalID, clusterName); err != nil {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 		}
 
 		answers := actionInput["answers"]
 		forceUpgrade := actionInput["forceUpgrade"]
 		files := actionInput["files"]
 		valuesYaml := actionInput["valuesYaml"]
-		_, namespace := ref.Parse(app.ProjectID)
-		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
+
 		if answers != nil {
 			m, ok := answers.(map[string]interface{})
 			if ok {
@@ -189,9 +189,8 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return err
 		}
 
-		err := w.validateRancherVersion(appRevision.Status.ExternalID)
-		if err != nil {
-			return err
+		if err := w.validateChartCompatibility(appRevision.Status.ExternalID, clusterName); err != nil {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 		}
 
 		_, namespace := ref.Parse(app.ProjectID)
@@ -244,7 +243,7 @@ func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	return nil
 }
 
-func (w Wrapper) validateRancherVersion(externalID string) error {
+func (w Wrapper) validateChartCompatibility(externalID, clusterName string) error {
 	if externalID == "" {
 		return nil
 	}
@@ -256,5 +255,5 @@ func (w Wrapper) validateRancherVersion(externalID string) error {
 	if err != nil {
 		return err
 	}
-	return catUtil.ValidateRancherVersion(template)
+	return w.CatalogManager.ValidateChartCompatibility(template, clusterName)
 }

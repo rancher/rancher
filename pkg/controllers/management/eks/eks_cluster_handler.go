@@ -18,7 +18,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apiprojv3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	utils2 "github.com/rancher/rancher/pkg/app"
-	"github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/controllers/management/eksupstreamrefresh"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -74,6 +74,7 @@ type eksOperatorController struct {
 	appClient            projectv3.AppInterface
 	nsClient             corev1.NamespaceInterface
 	clusterClient        v3.ClusterClient
+	catalogManager       manager.CatalogManager
 	systemAccountManager *systemaccount.Manager
 	dynamicClient        dynamic.NamespaceableResourceInterface
 }
@@ -489,7 +490,7 @@ func (e *eksOperatorController) deployEKSOperator() error {
 		return err
 	}
 
-	latestTemplateVersion, err := utils.LatestAvailableTemplateVersion(template)
+	latestTemplateVersion, err := e.catalogManager.LatestAvailableTemplateVersion(template, "local")
 	if err != nil {
 		return err
 	}

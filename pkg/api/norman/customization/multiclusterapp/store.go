@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -65,6 +65,7 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 		templateVersionLister: mgmt.Management.CatalogTemplateVersions("").Controller().Lister(),
 		users:                 mgmt.Management.Users(""),
 		rtLister:              mgmt.Management.RoleTemplates("").Controller().Lister(),
+		catalogManager:        mgmt.CatalogManager,
 	}
 
 	schema.Store = s
@@ -80,10 +81,11 @@ type Store struct {
 	templateVersionLister v3.CatalogTemplateVersionLister
 	users                 v3.UserInterface
 	rtLister              v3.RoleTemplateLister
+	catalogManager        manager.CatalogManager
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if err := s.validateRancherVersion(data); err != nil {
+	if err := s.validateChartCompatibility(data); err != nil {
 		return nil, err
 	}
 
@@ -101,7 +103,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if err := s.validateRancherVersion(data); err != nil {
+	if err := s.validateChartCompatibility(data); err != nil {
 		return nil, err
 	}
 
@@ -165,7 +167,7 @@ func (s *Store) ensureRolesNotDisabled(apiContext *types.APIContext, data map[st
 	return nil
 }
 
-func (s *Store) validateRancherVersion(data map[string]interface{}) error {
+func (s *Store) validateChartCompatibility(data map[string]interface{}) error {
 	rawTempVersion, ok := data["templateVersionId"]
 	if !ok {
 		return nil
@@ -183,7 +185,25 @@ func (s *Store) validateRancherVersion(data map[string]interface{}) error {
 		return err
 	}
 
-	return catUtil.ValidateRancherVersion(template)
+	if err := s.catalogManager.ValidateRancherVersion(template); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
+	targets, _ := data["targets"].([]interface{})
+	for _, target := range targets {
+		targetMap, ok := target.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		parts := strings.SplitN(targetMap["projectId"].(string), ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		if err := s.catalogManager.ValidateKubeVersion(template, parts[0]); err != nil {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+		}
+	}
+	return nil
 }
 
 func checkDuplicateTargets(data map[string]interface{}) error {
