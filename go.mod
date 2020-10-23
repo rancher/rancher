@@ -11,7 +11,6 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	github.com/rancher/rke => github.com/paynejacob/rke v1.2.1-0.20201015230500-c476d52790e6
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190921190940-14da1ac737cc // This is because docker/docker/pkg/archive has a dependency on an old x/sys
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.3.0-rancher1
 
