@@ -81,7 +81,7 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.10.0
-	github.com/rancher/apiserver v0.0.0-20200930005138-e90b0a39d0c0
+	github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197
 	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
 	github.com/rancher/eks-operator v0.1.0-rc30
 	github.com/rancher/kubernetes-provider-detector v0.1.1-0.20201022034134-8f971d9f77cf
@@ -94,7 +94,7 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee
 	github.com/rancher/rke v1.2.2-rc3.0.20201021225325-b2197f54b7e5
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20201022053934-c84c1b52af1b
+	github.com/rancher/steve v0.0.0-20201023000418-e29561cbf990
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
 	github.com/rancher/wrangler v0.7.2
 	github.com/robfig/cron v1.1.0
