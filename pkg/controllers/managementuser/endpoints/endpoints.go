@@ -11,10 +11,10 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-
 	workloadUtil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -23,6 +23,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -43,19 +44,40 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		isRKE = cluster.Spec.RancherKubernetesEngineConfig != nil
 	}
 
+	ignore := func() bool {
+		return false
+	}
+	if cluster.Spec.Internal {
+		deployments := workload.Apps.Deployments("").Controller().Lister()
+		ignore = func() bool {
+			_, err := deployments.Get(namespace.System, "cattle-cluster-agent")
+			return err == nil
+		}
+	}
+
 	s := &ServicesController{
 		services:           workload.Core.Services(""),
 		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
 		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
 		clusterName:        workload.ClusterName,
 	}
-	workload.Core.Services("").AddHandler(ctx, "servicesEndpointsController", s.sync)
+	workload.Core.Services("").AddHandler(ctx, "servicesEndpointsController", func(key string, obj *corev1.Service) (runtime.Object, error) {
+		if ignore() {
+			return obj, nil
+		}
+		return s.sync(key, obj)
+	})
 
 	p := &PodsController{
 		podLister:          workload.Core.Pods("").Controller().Lister(),
 		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
 	}
-	workload.Core.Pods("").AddHandler(ctx, "hostPortEndpointsController", p.sync)
+	workload.Core.Pods("").AddHandler(ctx, "hostPortEndpointsController", func(key string, obj *corev1.Pod) (runtime.Object, error) {
+		if ignore() {
+			return obj, nil
+		}
+		return p.sync(key, obj)
+	})
 
 	w := &WorkloadEndpointsController{
 		ingressLister:  workload.Extensions.Ingresses("").Controller().Lister(),
@@ -66,14 +88,24 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		clusterName:    workload.ClusterName,
 		isRKE:          isRKE,
 	}
-	w.WorkloadController = workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), w.UpdateEndpoints)
+	w.WorkloadController = workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), func(key string, workload *workloadUtil.Workload) error {
+		if ignore() {
+			return nil
+		}
+		return w.UpdateEndpoints(key, workload)
+	})
 
 	i := &IngressEndpointsController{
 		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
 		ingressInterface:   workload.Extensions.Ingresses(""),
 		isRKE:              isRKE,
 	}
-	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", i.sync)
+	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", func(key string, obj *extensionsv1beta1.Ingress) (runtime.Object, error) {
+		if ignore() {
+			return obj, nil
+		}
+		return i.sync(key, obj)
+	})
 }
 
 func areEqualEndpoints(one []v32.PublicEndpoint, two []v32.PublicEndpoint) bool {
