@@ -227,8 +227,8 @@ steps:
     dockerfile: cmd/rancherd/package/Dockerfile
     password:
       from_secret: docker_password
-    repo: rancher/rancherd-upgrade
-    tag: "${DRONE_TAG}-linux-amd64"
+    repo: mennaelmasry/rancherd-upgrade
+    tag: "${DRONE_TAG}"
     username:
       from_secret: docker_username
   when:
