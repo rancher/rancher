@@ -438,6 +438,12 @@ type IngressConfig struct {
 	ExtraVolumeMounts []ExtraVolumeMount `yaml:"extra_volume_mounts" json:"extraVolumeMounts,omitempty" norman:"type=array[json]"`
 	// nginx daemonset upgrade strategy
 	UpdateStrategy *DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
+	// Http port for ingress controller daemonset
+	HTTPPort int `yaml:"http_port" json:"httpPort,omitempty"`
+	// Https port for ingress controller daemonset
+	HTTPSPort int `yaml:"https_port" json:"httpsPort,omitempty"`
+	// NetworkMode selector for ingress controller pods. Default is HostNetwork
+	NetworkMode string `yaml:"network_mode" json:"networkMode,omitempty"`
 }
 
 type ExtraEnv struct {

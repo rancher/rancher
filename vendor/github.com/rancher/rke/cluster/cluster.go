@@ -514,6 +514,9 @@ func parseIngressConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngin
 	if err := parseIngressExtraVolumeMounts(ingressMap, rkeConfig); err != nil {
 		return err
 	}
+	if err := parseIngressDefaults(ingressMap, rkeConfig); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -595,6 +598,21 @@ func parseIngressExtraVolumeMounts(ingressMap map[string]interface{}, rkeConfig 
 		return fmt.Errorf("[parseIngressExtraVolumeMounts] error unmarshaling ingress config extraVolumeMounts: %v", err)
 	}
 	rkeConfig.Ingress.ExtraVolumeMounts = volumeMounts
+	return nil
+}
+
+func parseIngressDefaults(ingressMap map[string]interface{}, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+	// Setting up default behaviour so as to not catch out
+	// existing users who use new version of RKE
+	if _, ok := ingressMap["network_mode"]; !ok {
+		rkeConfig.Ingress.NetworkMode = DefaultNetworkMode
+	}
+	if _, ok := ingressMap["http_port"]; !ok {
+		rkeConfig.Ingress.HTTPPort = DefaultHTTPPort
+	}
+	if _, ok := ingressMap["https_port"]; !ok {
+		rkeConfig.Ingress.HTTPSPort = DefaultHTTPSPort
+	}
 	return nil
 }
 
