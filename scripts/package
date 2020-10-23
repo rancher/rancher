@@ -71,6 +71,4 @@ if [ ${ARCH} == amd64 ]; then
     tar c -C ../cmd/rancherd/bundle . | tar x -C build/rancherd/bundle
     cp -vf rancherd build/rancherd/bundle/bin
     tar czf rancherd-${ARCH}.tar.gz -C build/rancherd/bundle .
-    docker build --build-arg ARCH --build-arg TAG --tag ${REPO:=rancher}/rancherd-upgrade:${TAG/+/-}  ../cmd/rancherd/package/Dockerfile.
-
 fi

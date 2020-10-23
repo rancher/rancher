@@ -216,21 +216,6 @@ steps:
       - "refs/tags/*rc*"
       - "refs/tags/*alpha*"
 
-- name: slack_notify
-  image: plugins/slack
-  settings:
-    template: "Build {{build.link}} failed to publish an image/artifact.\n"
-    username: Drone_Publish
-    webhook:
-      from_secret: slack_webhook
-  when:
-    event:
-      exclude:
-      - pull_request
-    instance:
-    - drone-publish.rancher.io
-    status:
-    - failure
 - name: docker-publish-rancherd
   image: plugins/docker
   settings:
@@ -248,7 +233,23 @@ steps:
       from_secret: docker_username
   when:
     event:
-    - tag
+      - tag
+
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to publish an image/artifact.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+  when:
+    event:
+      exclude:
+      - pull_request
+    instance:
+    - drone-publish.rancher.io
+    status:
+    - failure
 
 volumes:
 - name: docker

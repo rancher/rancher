@@ -1,4 +1,3 @@
----
 kind: pipeline
 name: amd64
 
@@ -39,40 +38,3 @@ volumes:
 - name: docker
   host:
     path: /var/run/docker.sock
-
-
----
-kind: pipeline
-name: manifest
-
-platform:
-  os: linux
-  arch: amd64
-
-steps:
-  - name: manifest
-    image: plugins/docker
-    environment:
-      DOCKER_USERNAME:
-        from_secret: docker_username
-      DOCKER_PASSWORD:
-        from_secret: docker_password
-    settings:
-      dry_run: true
-      dockerfile: Dockerfile.manifest
-      repo: "rancher/rancherd-upgrade-manifest"
-      build_args_from_env:
-        - DOCKER_USERNAME
-        - DOCKER_PASSWORD
-        - DRONE_TAG
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        - refs/head/master
-        - refs/tags/*
-      event:
-        - tag
-
-depends_on:
-  - amd64
