@@ -24,8 +24,8 @@ func Register(ctx context.Context, server *steve.Server) error {
 	}
 
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
-	server.ClusterCache.OnChange(ctx, func(gvr schema.GroupVersionResource, key string, obj, oldObj runtime.Object) error {
-		return shell.impersonator.PurgeOldRoles(gvr, key, obj)
+	server.ClusterCache.OnChange(ctx, func(gvk schema.GroupVersionKind, key string, obj, oldObj runtime.Object) error {
+		return shell.impersonator.PurgeOldRoles(gvk, key, obj)
 	})
 
 	server.SchemaFactory.AddTemplate(schema2.Template{
