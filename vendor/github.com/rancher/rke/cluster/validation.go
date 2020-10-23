@@ -177,6 +177,24 @@ func validateIngressOptions(c *Cluster) error {
 		return fmt.Errorf("DNSPolicy %s was not a valid DNS Policy", c.Ingress.DNSPolicy)
 	}
 
+	if c.Ingress.NetworkMode == "hostPort" {
+		if !(c.Ingress.HTTPPort >= 0 && c.Ingress.HTTPPort <= 65535) {
+			return fmt.Errorf("https port is invalid. Needs to be within 0 to 65535")
+		}
+		if !(c.Ingress.HTTPPort >= 0 && c.Ingress.HTTPPort <= 65535) {
+			return fmt.Errorf("http port is invalid. Needs to be within 0 to 65535")
+		}
+		if c.Ingress.HTTPPort != 0 && c.Ingress.HTTPSPort != 0 &&
+			(c.Ingress.HTTPPort == c.Ingress.HTTPSPort) {
+			return fmt.Errorf("http and https ports need to be different")
+		}
+	}
+
+	if !(c.Ingress.NetworkMode == "" ||
+		c.Ingress.NetworkMode == "hostNetwork" || c.Ingress.NetworkMode == "hostPort" ||
+		c.Ingress.NetworkMode == "none") {
+		return fmt.Errorf("NetworkMode %s was not a valid network mode", c.Ingress.NetworkMode)
+	}
 	return nil
 }
 

@@ -62,6 +62,9 @@ type ingressOptions struct {
 	AlpineImage       string
 	IngressImage      string
 	IngressBackend    string
+	HTTPPort          int
+	HTTPSPort         int
+	NetworkMode       string
 	UpdateStrategy    *appsv1.DaemonSetUpdateStrategy
 }
 
@@ -565,6 +568,9 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 		ExtraEnvs:         c.Ingress.ExtraEnvs,
 		ExtraVolumes:      c.Ingress.ExtraVolumes,
 		ExtraVolumeMounts: c.Ingress.ExtraVolumeMounts,
+		HTTPPort:          c.Ingress.HTTPPort,
+		HTTPSPort:         c.Ingress.HTTPSPort,
+		NetworkMode:       c.Ingress.NetworkMode,
 		UpdateStrategy: &appsv1.DaemonSetUpdateStrategy{
 			Type:          c.Ingress.UpdateStrategy.Strategy,
 			RollingUpdate: c.Ingress.UpdateStrategy.RollingUpdate,

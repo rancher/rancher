@@ -89,6 +89,9 @@ const (
 	DefaultMaxUnavailableControlplane = "1"
 	DefaultNodeDrainTimeout           = 120
 	DefaultNodeDrainGracePeriod       = -1
+	DefaultHTTPPort                   = 80
+	DefaultHTTPSPort                  = 443
+	DefaultNetworkMode                = "hostNetwork"
 )
 
 var (
