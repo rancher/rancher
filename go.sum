@@ -871,6 +871,8 @@ github.com/rancher/rke v1.1.11-rc1 h1:dI3GVGyQh30y0EgnGA5I8U7bTkkip6T+ccg5GKRG6c
 github.com/rancher/rke v1.1.11-rc1/go.mod h1:ixdG4yOKf6yJxmj/wqHJniMHOgParBzS1cQ9u3Mq4no=
 github.com/rancher/rke v1.1.11-rc2 h1:OS0OJ+U/DMJur1pcQWSFLs5Uw0bwFYugdv0Rl7QhBiI=
 github.com/rancher/rke v1.1.11-rc2/go.mod h1:f/nPJmOVauewn5o8tPbGBVmaQpLmghYqksmzsmBOltI=
+github.com/rancher/rke v1.1.11-rc3 h1:xzE1TVhsHVczWKYeX04xYmIS2P66tg7vew2RaV9kE6A=
+github.com/rancher/rke v1.1.11-rc3/go.mod h1:f/nPJmOVauewn5o8tPbGBVmaQpLmghYqksmzsmBOltI=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
