@@ -96,6 +96,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		appClient:            mgmtCtx.Project.Apps(""),
 		nsClient:             mgmtCtx.Core.Namespaces(""),
 		clusterClient:        wContext.Mgmt.Cluster(),
+		catalogManager:       mgmtCtx.CatalogManager,
 		systemAccountManager: systemaccount.NewManager(mgmtCtx),
 		dynamicClient:        eksCCDynamicClient,
 	}
