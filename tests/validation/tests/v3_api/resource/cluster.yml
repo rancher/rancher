@@ -1,4 +1,5 @@
 ssh_key_path: .ssh/$AWS_SSH_KEY_NAME
+kubernetes_version: $KUBERNETES_VERSION
 auth:
   strategy: x509
 nodes:
