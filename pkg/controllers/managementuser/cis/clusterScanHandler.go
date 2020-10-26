@@ -14,8 +14,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
-	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	rcorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -53,6 +53,7 @@ type cisScanHandler struct {
 	clusterNamespace             string
 	clusterClient                v3.ClusterInterface
 	clusterLister                v3.ClusterLister
+	catalogManager               manager.CatalogManager
 	projectLister                v3.ProjectLister
 	nodeLister                   corev1.NodeLister
 	appClient                    projv3.AppInterface
@@ -333,7 +334,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 }
 
 func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
-	appCatalogID, err := csh.getCISBenchmarkCatalogID()
+	appCatalogID, err := csh.getCISBenchmarkCatalogID(appInfo.clusterName)
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}
@@ -477,9 +478,9 @@ func (csh *cisScanHandler) ensureCleanup(cs *v3.ClusterScan) error {
 	return err
 }
 
-func (csh *cisScanHandler) getCISBenchmarkCatalogID() (string, error) {
+func (csh *cisScanHandler) getCISBenchmarkCatalogID(clusterName string) (string, error) {
 	templateVersionID := csh.getRancherCISBenchmarkTemplateID()
-	return versionutil.GetSystemAppCatalogID(templateVersionID, csh.templateLister)
+	return csh.catalogManager.GetSystemAppCatalogID(templateVersionID, clusterName)
 }
 
 func (csh *cisScanHandler) getRancherCISBenchmarkTemplateID() string {

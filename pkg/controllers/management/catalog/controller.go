@@ -80,7 +80,7 @@ func doUntilSucceeds(ctx context.Context, retryPeriod time.Duration, f func() bo
 
 func Run(ctx context.Context, refreshInterval int, management *config.ManagementContext) error {
 	logrus.Infof("Starting catalog controller")
-	m := manager.New(management)
+	m := manager.New(management.Management, management.Project)
 
 	controller := management.Management.Catalogs("").Controller()
 	controller.AddHandler(ctx, "catalog", m.Sync)

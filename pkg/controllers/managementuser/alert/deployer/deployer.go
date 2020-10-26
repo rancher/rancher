@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
+	manager2 "github.com/rancher/rancher/pkg/catalog/manager"
 	alertutil "github.com/rancher/rancher/pkg/controllers/managementuser/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/alert/manager"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
@@ -59,6 +59,7 @@ type Deployer struct {
 type appDeployer struct {
 	appsGetter           projectv3.AppsGetter
 	appsLister           projectv3.AppLister
+	catalogManager       manager2.CatalogManager
 	namespaces           v1.NamespaceInterface
 	secrets              v1.SecretInterface
 	templateLister       mgmtv3.CatalogTemplateLister
@@ -151,7 +152,7 @@ func (d *Deployer) sync() error {
 			newCluster = cluster.DeepCopy()
 		}
 
-		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, needWebhookReceiver); err != nil {
+		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, needWebhookReceiver, d.clusterLister, d.clusterName); err != nil {
 			return fmt.Errorf("deploy alertmanager failed, %v", err)
 		}
 
@@ -291,7 +292,7 @@ func (d *appDeployer) getSecret(secretName, secretNamespace string) *corev1.Secr
 	}
 }
 
-func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string, needWebhookReceiver bool) (bool, error) {
+func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string, needWebhookReceiver bool, clusterLister mgmtv3.ClusterLister, clusterName string) (bool, error) {
 	clusterName, systemProjectName := ref.Parse(systemProjectID)
 
 	ns := &corev1.Namespace{
@@ -336,7 +337,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 	if err != nil {
 		return false, fmt.Errorf("get template %s:%s failed, %v", namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName, err)
 	}
-	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	templateVersion, err := d.catalogManager.LatestAvailableTemplateVersion(template, clusterName)
 	if err != nil {
 		return false, err
 	}
