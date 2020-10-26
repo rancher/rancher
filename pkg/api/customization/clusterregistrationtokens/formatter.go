@@ -18,6 +18,7 @@ const (
 	commandFormat            = "kubectl apply -f %s"
 	insecureCommandFormat    = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
+	loginCommandFormat       = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
 
@@ -103,6 +104,30 @@ func NodeCommand(token string, cluster *v3.Cluster) string {
 		getRootURL(nil),
 		token,
 		ca)
+}
+
+func LoginCommand(reg v3.PrivateRegistry) string {
+	return fmt.Sprintf(
+		loginCommandFormat,
+		// escape password special characters so it is interpreted correctly when command is executed
+		escapeSpecialChars(reg.Password),
+		reg.User,
+		reg.URL,
+	)
+}
+
+// escapeSpecialChars escapes ", `, $, \ from a string s
+func escapeSpecialChars(s string) string {
+	var escaped []rune
+	for _, r := range s {
+		switch r {
+		case '"', '`', '$', '\\': // escape
+			escaped = append(escaped, '\\', r)
+		default: // no escape
+			escaped = append(escaped, r)
+		}
+	}
+	return string(escaped)
 }
 
 func getRootURL(request *types.APIContext) string {
