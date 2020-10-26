@@ -68,7 +68,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
 			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying...", m.Status.NodeName)
 		}
-		if m.Spec.Worker && !m.Spec.InternalNodeSpec.Unschedulable {
+		if (m.Spec.Worker || isNotTainted(m)) && !m.Spec.InternalNodeSpec.Unschedulable {
 			machines = append(machines, m)
 		}
 	}
@@ -224,4 +224,13 @@ func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.
 		s.Clusters.Controller().Enqueue("", machine.Namespace)
 	}
 	return nil, nil
+}
+
+func isNotTainted(m *v3.Node) bool {
+	for _, taint := range m.Spec.InternalNodeSpec.Taints {
+		if taint.Value == "true" && (taint.Effect == "NoSchedule" || taint.Effect == "NoExecute") {
+			return false
+		}
+	}
+	return true
 }
