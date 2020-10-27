@@ -187,7 +187,7 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 
 	cm, err := r.createOrUpdateMap(metadata.Namespace, name, index, owner)
 	if err != nil {
-		return status, nil
+		return status, err
 	}
 
 	status.IndexConfigMapName = cm.Name
