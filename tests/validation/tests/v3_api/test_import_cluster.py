@@ -17,6 +17,7 @@ DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
 AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME")
 AWS_NODE_COUNT = int(os.environ.get("AWS_NODE_COUNT", 3))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
+RKE_K8S_VERSION = os.environ.get("RANCHER_RKE_K8S_VERSION","")
 
 
 def test_import_rke_cluster():
@@ -115,6 +116,7 @@ def create_rke_cluster_config(aws_nodes, cluster_filename):
         rkeconfig = rkeconfig.replace(intipstring,
                                       aws_nodes[i].private_ip_address)
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
+    rkeconfig = rkeconfig.replace("$KUBERNETES_VERSION", RKE_K8S_VERSION)
 
     clusterfilepath = DATA_SUBDIR + "/" + cluster_filename + ".yml"
     print(clusterfilepath)
