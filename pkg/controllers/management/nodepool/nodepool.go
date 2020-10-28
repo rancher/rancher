@@ -24,12 +24,7 @@ import (
 )
 
 var (
-	nameRegexp       = regexp.MustCompile("^(.*?)([0-9]+)$")
-	unReachableTaint = v1.Taint{
-		Key:    "node.kubernetes.io/unreachable",
-		Effect: "NoExecute",
-	}
-	falseValue = false
+	nameRegexp = regexp.MustCompile("^(.*?)([0-9]+)$")
 )
 
 type Controller struct {
@@ -221,7 +216,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 			}
 		}
 		// remove unreachable node with the unreachable taint & status of Ready being Unknown
-		q := getTaint(node.Spec.InternalNodeSpec.Taints, &unReachableTaint)
+		q := getUnreachableTaint(node.Spec.InternalNodeSpec.Taints)
 		if q != nil && deleteNotReadyAfter > 0 {
 			changed = true
 			if isNodeReadyUnknown(node) && !simulate {
@@ -363,14 +358,14 @@ func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, s
 // requeue checks every 5 seconds if the node is still unreachable with one goroutine per node
 func (c *Controller) requeue(timeout time.Duration, np *v3.NodePool, node *v3.Node) {
 
-	t := getTaint(node.Spec.InternalNodeSpec.Taints, &unReachableTaint)
+	t := getUnreachableTaint(node.Spec.InternalNodeSpec.Taints)
 	for t != nil {
 		time.Sleep(5 * time.Second)
 		exist, err := c.NodeLister.Get(node.Namespace, node.Name)
 		if err != nil {
 			break
 		}
-		t = getTaint(exist.Spec.InternalNodeSpec.Taints, &unReachableTaint)
+		t = getUnreachableTaint(exist.Spec.InternalNodeSpec.Taints)
 		if t != nil && time.Since(t.TimeAdded.Time) > timeout {
 			logrus.Debugf("Enqueue nodepool controller: %s %s", np.Namespace, np.Name)
 			c.NodePoolController.Enqueue(np.Namespace, np.Name)
@@ -382,10 +377,9 @@ func (c *Controller) requeue(timeout time.Duration, np *v3.NodePool, node *v3.No
 	c.mutex.Unlock()
 }
 
-// getTaint returns the taint that matches the given request
-func getTaint(taints []v1.Taint, taintToFind *v1.Taint) *v1.Taint {
+func getUnreachableTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
+		if taint.Key == v1.TaintNodeUnreachable {
 			return &taint
 		}
 	}
