@@ -212,12 +212,12 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	u.RawQuery = req.URL.RawQuery
 
 	proto := req.Header.Get("X-Forwarded-Proto")
-	if proto != "" {
+	req.URL.Scheme = "https"
+	// Certain reverse proxies may use the non-standard wss for websockets; allow https to remain the default.
+	if proto != "" && proto != "wss" {
 		req.URL.Scheme = proto
 	} else if req.TLS == nil {
 		req.URL.Scheme = "http"
-	} else {
-		req.URL.Scheme = "https"
 	}
 
 	req.URL.Host = req.Host
