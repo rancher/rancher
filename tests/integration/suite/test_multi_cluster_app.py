@@ -1,6 +1,9 @@
 from .common import random_str, check_subject_in_rb
 from rancher import ApiError
-from .conftest import wait_until, wait_for, set_server_version
+from .conftest import (
+    wait_until, wait_for, set_server_version, wait_until_available,
+    user_project_client
+)
 import time
 import pytest
 import kubernetes
@@ -369,8 +372,7 @@ def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
                                  roles=["project-member"])
     remove_resource(mcapp1)
     wait_for_app(admin_pc, mcapp_name, 60)
-    client.action(obj=mcapp1, action_name="removeProjects",
-                  projects=[p.id])
+    client.action(obj=mcapp1, action_name="removeProjects", projects=[p.id])
     new_projects = [admin_pc.project.id]
     wait_for(lambda: check_updated_projects(admin_mc, mcapp_name,
                                             new_projects), timeout=60,
@@ -612,6 +614,78 @@ def test_mcapp_rollback_validation(admin_mc, admin_pc, custom_catalog,
                       revisionId=original_rev)
     assert e.value.error.status == 422
     assert e.value.error.message == 'rancher max version exceeded'
+
+
+def test_perform_mca_action_read_only(admin_mc, admin_pc, remove_resource,
+                                      user_mc, user_factory):
+    """Tests MCA actions with a read-only user and a member user."""
+    client = admin_mc.client
+    project = admin_pc.project
+    user = user_mc
+    user_member = user_factory()
+
+    ns = admin_pc.cluster.client.create_namespace(
+        name=random_str(),
+        projectId=project.id)
+    remove_resource(ns)
+
+    # Create a read-only user binding.
+    prtb1 = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user.user.id,
+        projectId=project.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb1)
+    wait_until_available(user.client, project)
+
+    # Then, create a member user binding.
+    prtb2 = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_member.user.id,
+        projectId=project.id,
+        roleTemplateId="project-member")
+    remove_resource(prtb2)
+    wait_until_available(user_member.client, project)
+    user_pc = user_project_client(user, project)
+    user_member_pc = user_project_client(user_member, project)
+
+    # Admin user creates the MCA and specifically adds both users. The
+    # project-member user should have permissions by default since their role
+    # is specified in the MCA creation.
+    mcapp_name = random_str()
+    mcapp_user_read_only = "local://" + user.user.id
+    mcapp_user_member = "local://" + user_member.user.id
+    mcapp = client.create_multi_cluster_app(
+        name=mcapp_name,
+        templateVersionId="cattle-global-data:library-docker-registry-1.9.2",
+        targets=[{"projectId": admin_pc.project.id}],
+        members=[{"userPrincipalId": mcapp_user_read_only,
+                  "accessType": "read-only"},
+                 {"userPrincipalId": mcapp_user_member,
+                  "accessType": "member"}],
+        roles=["cluster-owner", "project-member"])
+    remove_resource(mcapp)
+    wait_for_app(admin_pc, mcapp_name)
+
+    # Admin user updates the MCA to yield a rollback option. We change the
+    # image version below.
+    mcapp = client.reload(mcapp)
+    original_rev = mcapp.revisions().data[0].name
+    mcapp.templateVersionId = (
+        "cattle-global-data:library-docker-registry-1.8.1")
+    mcapp = client.update_by_id_multi_cluster_app(mcapp.id, mcapp)
+    wait_for_app(admin_pc, mcapp_name)
+    mcapp = client.reload(mcapp)
+
+    # Read-only users should receive a 404 error.
+    with pytest.raises(ApiError) as e:
+        user_pc.action(obj=mcapp, action_name="rollback",
+                       revisionId=original_rev)
+    assert e.value.error.status == 404
+
+    # Member users will be able to perform the rollback.
+    user_member_pc.action(obj=mcapp, action_name="rollback",
+                          revisionId=original_rev)
 
 
 def wait_for_app(admin_pc, name, timeout=60):
