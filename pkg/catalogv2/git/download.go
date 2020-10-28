@@ -27,12 +27,12 @@ func gitDir(namespace, name, gitURL string) string {
 	return filepath.Join(stateDir, namespace, name, hash(gitURL))
 }
 
-func Head(secret *corev1.Secret, namespace, name, gitURL, branch string) (string, error) {
+func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool) (string, error) {
 	if branch == "" {
 		branch = "master"
 	}
 
-	git, err := gitForRepo(secret, namespace, name, gitURL)
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS)
 	if err != nil {
 		return "", err
 	}
@@ -40,32 +40,32 @@ func Head(secret *corev1.Secret, namespace, name, gitURL, branch string) (string
 	return git.Head(branch)
 }
 
-func Update(secret *corev1.Secret, namespace, name, gitURL, branch string) (string, error) {
+func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool) (string, error) {
 	if branch == "" {
 		branch = "master"
 	}
 
-	git, err := gitForRepo(secret, namespace, name, gitURL)
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS)
 	if err != nil {
 		return "", err
 	}
 
 	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
-		return Head(secret, namespace, name, gitURL, branch)
+		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS)
 	}
 
 	commit, err := git.Update(branch)
 	if err != nil && isBundled(git) {
-		return Head(secret, namespace, name, gitURL, branch)
+		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS)
 	}
 	return commit, err
 }
 
-func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string) error {
+func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool) error {
 	if commit == "" {
 		return nil
 	}
-	git, err := gitForRepo(secret, namespace, name, gitURL)
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func isBundled(git *git.Git) bool {
 	return strings.HasPrefix(git.Directory, staticDir)
 }
 
-func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string) (*git.Git, error) {
+func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool) (*git.Git, error) {
 	if !strings.HasPrefix(gitURL, "git@") {
 		u, err := url.Parse(gitURL)
 		if err != nil {
@@ -93,8 +93,9 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string) (*git.Git
 		headers["X-Install-Uuid"] = settings.InstallUUID.Get()
 	}
 	return git.NewGit(dir, gitURL, &git.Options{
-		Credential: secret,
-		Headers:    headers,
+		Credential:        secret,
+		Headers:           headers,
+		InsecureTLSVerify: insecureSkipTLS,
 	})
 }
 
