@@ -92,6 +92,11 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
+	user, err = s.getUser(user, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
 	return s.createOperation(ctx, user, status, cmds)
 }
 
