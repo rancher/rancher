@@ -761,9 +761,11 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 		return node, err
 	}
 
+	ctx, cancel := context.WithTimeout(context.TODO(), 45*time.Second)
+	defer cancel()
 	err = userClient.K8sClient.CoreV1().Nodes().Delete(
-		context.TODO(), node.Status.NodeName, metav1.DeleteOptions{})
-	if !kerror.IsNotFound(err) {
+		ctx, node.Status.NodeName, metav1.DeleteOptions{})
+	if !kerror.IsNotFound(err) && ctx.Err() != context.DeadlineExceeded {
 		return node, err
 	}
 
@@ -815,17 +817,14 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		defer cancel()
 
 		_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeCopy.Status.NodeName, nodehelper.GetDrainFlags(nodeCopy))
-		select {
-		case <-ctx.Done():
-			if ctx.Err() != nil {
-				logrus.Errorf("node [%s] kubectl drain failed, retrying: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
-				return false, nil
-			}
-			if err != nil {
-				// kubectl failed continue on with delete any way
-				logrus.Errorf("node [%s] kubectl drain error, retrying: %s", nodeCopy.Spec.RequestedHostname, err)
-				return false, nil
-			}
+		if ctx.Err() != nil {
+			logrus.Errorf("node [%s] kubectl drain failed, retrying: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
+			return false, nil
+		}
+		if err != nil {
+			// kubectl failed continue on with delete any way
+			logrus.Errorf("node [%s] kubectl drain error, retrying: %s", nodeCopy.Spec.RequestedHostname, err)
+			return false, nil
 		}
 
 		logrus.Infof("node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
