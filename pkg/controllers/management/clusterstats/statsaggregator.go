@@ -18,6 +18,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+const (
+	nodeRoleControlPlane       = "node-role.kubernetes.io/controlplane"
+	nodeRoleControlPlaneHyphen = "node-role.kubernetes.io/control-plane"
+	nodeRoleETCD               = "node-role.kubernetes.io/etcd"
+	nodeRoleMaster             = "node-role.kubernetes.io/master"
+)
+
 type StatsAggregator struct {
 	NodesLister    v3.NodeLister
 	Clusters       v3.ClusterInterface
@@ -68,9 +75,13 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
 			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying...", m.Status.NodeName)
 		}
-		if m.Spec.Worker && !m.Spec.InternalNodeSpec.Unschedulable {
-			machines = append(machines, m)
+		if isTaintedNoExecuteNoSchedule(m) && !m.Spec.Worker {
+			continue
 		}
+		if m.Spec.InternalNodeSpec.Unschedulable {
+			continue
+		}
+		machines = append(machines, m)
 	}
 
 	origStatus := cluster.Status.DeepCopy()
@@ -224,4 +235,15 @@ func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.
 		s.Clusters.Controller().Enqueue("", machine.Namespace)
 	}
 	return nil, nil
+}
+
+func isTaintedNoExecuteNoSchedule(m *v3.Node) bool {
+	for _, taint := range m.Spec.InternalNodeSpec.Taints {
+		isETCDOrControlPlane := taint.Key == nodeRoleControlPlane || taint.Key == nodeRoleETCD ||
+			taint.Key == nodeRoleControlPlaneHyphen || taint.Key == nodeRoleMaster
+		if isETCDOrControlPlane && (taint.Effect == "NoSchedule" || taint.Effect == "NoExecute") {
+			return true
+		}
+	}
+	return false
 }
