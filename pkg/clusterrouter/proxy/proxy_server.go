@@ -213,7 +213,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	proto := req.Header.Get("X-Forwarded-Proto")
 	if proto != "" {
-		// Certain reverse proxies may use the non-standard wss for websockets; allow https to remain the default.
+	    // Certain reverse proxies may use the non-standard wss for websockets; allow https to remain the default.
 	    if proto == "wss" {
 	        proto = "https"
 	    }
