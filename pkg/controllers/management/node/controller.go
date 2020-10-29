@@ -763,10 +763,15 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 		return node, err
 	}
 
+	ctx, cancel := context.WithTimeout(context.TODO(), 45*time.Second)
+	defer cancel()
 	err = userClient.K8sClient.CoreV1().Nodes().Delete(
-		context.TODO(), node.Status.NodeName, metav1.DeleteOptions{})
-	if !kerror.IsNotFound(err) {
-		return node, err
+		ctx, node.Status.NodeName, metav1.DeleteOptions{})
+	select {
+	case <-ctx.Done():
+		if !kerror.IsNotFound(err) && ctx.Err() != context.DeadlineExceeded {
+			return node, err
+		}
 	}
 
 	return node, nil
