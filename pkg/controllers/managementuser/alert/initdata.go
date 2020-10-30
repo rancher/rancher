@@ -284,7 +284,7 @@ var entries = []entry{
 					},
 					MetricRule: &v32.MetricRule{
 						Description:    "The cpu load is higher than 100",
-						Expression:     `sum(node_load1) by (node)  / sum(machine_cpu_cores) by (node) * 100`,
+						Expression:     `sum(node_load1) by (node)  / sum(kube_node_status_capacity_cpu_cores) by (node) * 100`,
 						Comparison:     manager.ComparisonGreaterThan,
 						Duration:       "3m",
 						ThresholdValue: 100,
