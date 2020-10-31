@@ -41,6 +41,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		systemUpgradeNamespace: systemUpgradeNS,
 		clusterCache:           wContext.Mgmt.Cluster().Cache(),
 		clusterClient:          wContext.Mgmt.Cluster(),
+		catalogManager:         mgmtCtx.CatalogManager,
 		clusterEnqueueAfter:    wContext.Mgmt.Cluster().EnqueueAfter,
 		apps:                   mgmtCtx.Project.Apps(metav1.NamespaceAll),
 		appLister:              mgmtCtx.Project.Apps("").Controller().Lister(),
