@@ -70,6 +70,7 @@ func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *De
 	ad := &appDeployer{
 		appsGetter:           appsgetter,
 		appsLister:           cluster.Management.Project.Apps("").Controller().Lister(),
+		catalogManager:       cluster.Management.CatalogManager,
 		namespaces:           cluster.Core.Namespaces(metav1.NamespaceAll),
 		secrets:              cluster.Core.Secrets(metav1.NamespaceAll),
 		templateLister:       cluster.Management.Management.CatalogTemplates(namespace.GlobalNamespace).Controller().Lister(),

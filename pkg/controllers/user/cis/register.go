@@ -38,6 +38,8 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	clusterLister := clusterClient.Controller().Lister()
 	projectLister := userContext.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister()
 
+	catalogManager := userContext.Management.CatalogManager
+
 	nsClient := userContext.Core.Namespaces(metav1.NamespaceAll)
 	cmClient := userContext.Core.ConfigMaps(v3.DefaultNamespaceForCis)
 	cmLister := cmClient.Controller().Lister()
@@ -83,6 +85,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		nodeLister:                   userContext.Core.Nodes("").Controller().Lister(),
 		cmLister:                     cmLister,
 		clusterLister:                clusterLister,
+		catalogManager:               catalogManager,
 		projectLister:                projectLister,
 		cmClient:                     cmClient,
 		cisConfigClient:              cisConfig,
