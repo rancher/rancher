@@ -20,6 +20,18 @@ func main() {
 			Usage:       "Bootstrap and reset admin password",
 			Description: "Bootstrap and reset admin password",
 			Action:      auth.ResetAdmin,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "password",
+					Usage:  "Password for Rancher login",
+					EnvVar: "PASSWORD",
+				},
+				cli.StringFlag{
+					Name:   "password-file",
+					Usage:  "Password for Rancher login, from file",
+					EnvVar: "PASSWORD_FILE",
+				},
+			},
 		},
 	}
 
