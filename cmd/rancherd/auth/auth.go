@@ -276,7 +276,7 @@ func ResetAdmin(_ *cli.Context) error {
 func setClusterAnnotation(ctx context.Context, clustersClient dynamic.NamespaceableResourceInterface, adminName string) error {
 	cluster, err := clustersClient.Get(ctx, "local", v1.GetOptions{})
 	if err != nil {
-		return errors.Errorf("Cluster %s is not ready yet", cluster.GetName())
+		return errors.Errorf("Local cluster is not ready yet")
 	}
 	if adminName == "" {
 		return errors.Errorf("User is not set yet")
