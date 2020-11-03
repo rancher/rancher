@@ -31,7 +31,14 @@ var (
 	defaultAdminLabel      = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 )
 
-func ResetAdmin(_ *cli.Context) error {
+func ResetAdmin(ctx *cli.Context) error {
+	if err := resetAdmin(ctx); err != nil {
+		return errors.Wrap(err, "Cluster and rancher are not ready. Please try later! ")
+	}
+	return nil
+}
+
+func resetAdmin(_ *cli.Context) error {
 	ctx := context.Background()
 	token, err := randomtoken.Generate()
 	if err != nil {
