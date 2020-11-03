@@ -541,7 +541,8 @@ func (client ContainerServicesClient) ListByResourceGroupComplete(ctx context.Co
 }
 
 // ListOrchestrators gets a list of supported orchestrators in the specified subscription. The operation returns
-// properties of each orchestrator including version and available upgrades.
+// properties of each orchestrator including version, available upgrades and whether that version or upgrades are in
+// preview.
 // Parameters:
 // location - the name of a supported Azure region.
 // resourceType - resource type for which the list of orchestrators needs to be returned
@@ -584,7 +585,7 @@ func (client ContainerServicesClient) ListOrchestratorsPreparer(ctx context.Cont
 		"subscriptionId": autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2017-09-30"
+	const APIVersion = "2019-08-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
