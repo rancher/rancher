@@ -33,7 +33,7 @@ var (
 
 func ResetAdmin(ctx *cli.Context) error {
 	if err := resetAdmin(ctx); err != nil {
-		return errors.Wrap(err, "Cluster and rancher are not ready. Please try later! ")
+		return errors.Wrap(err, "cluster and rancher are not ready. Please try later.")
 	}
 	return nil
 }
