@@ -24,7 +24,7 @@ import (
 type Manager struct {
 	catalogClient         v3.CatalogInterface
 	CatalogLister         v3.CatalogLister
-	clusterLister         v3.ClusterLister
+	ClusterLister         v3.ClusterLister
 	templateClient        v3.CatalogTemplateInterface
 	templateContentClient v3.TemplateContentInterface
 	templateVersionClient v3.CatalogTemplateVersionInterface
@@ -55,7 +55,7 @@ func New(management v3.Interface, project projectv3.Interface) *Manager {
 	return &Manager{
 		catalogClient:         management.Catalogs(""),
 		CatalogLister:         management.Catalogs("").Controller().Lister(),
-		clusterLister:         management.Clusters("").Controller().Lister(),
+		ClusterLister:         management.Clusters("").Controller().Lister(),
 		templateClient:        management.CatalogTemplates(""),
 		templateContentClient: management.TemplateContents(""),
 		templateVersionClient: management.CatalogTemplateVersions(""),
@@ -219,7 +219,7 @@ func (m *Manager) ValidateKubeVersion(template *v3.CatalogTemplateVersion, clust
 		return nil
 	}
 
-	cluster, err := m.clusterLister.Get("", clusterName)
+	cluster, err := m.ClusterLister.Get("", clusterName)
 	if err != nil {
 		return err
 	}
