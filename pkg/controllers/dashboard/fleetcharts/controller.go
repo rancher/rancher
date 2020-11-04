@@ -2,6 +2,7 @@ package fleetcharts
 
 import (
 	"context"
+	"os"
 	"sync"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -61,10 +62,25 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 		},
 	}
-	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName,
-		map[string]interface{}{
-			"apiServerURL": settings.ServerURL.Get(),
-			"apiServerCA":  settings.CACerts.Get(),
-			"global":       systemGlobalRegistry,
-		})
+
+	fleetChartValues := map[string]interface{}{
+		"apiServerURL": settings.ServerURL.Get(),
+		"apiServerCA":  settings.CACerts.Get(),
+		"global":       systemGlobalRegistry,
+	}
+
+	gitjobChartValues := map[string]interface{}{}
+
+	if envVal, ok := os.LookupEnv("HTTP_PROXY"); ok {
+		gitjobChartValues["proxy"] = envVal
+	}
+	if envVal, ok := os.LookupEnv("NO_PROXY"); ok {
+		gitjobChartValues["noProxy"] = envVal
+	}
+
+	if len(gitjobChartValues) > 0 {
+		fleetChartValues["gitjob"] = gitjobChartValues
+	}
+
+	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, fleetChartValues)
 }
