@@ -31,7 +31,14 @@ var (
 	defaultAdminLabel      = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 )
 
-func ResetAdmin(_ *cli.Context) error {
+func ResetAdmin(ctx *cli.Context) error {
+	if err := resetAdmin(ctx); err != nil {
+		return errors.Wrap(err, "cluster and rancher are not ready. Please try later.")
+	}
+	return nil
+}
+
+func resetAdmin(_ *cli.Context) error {
 	ctx := context.Background()
 	token, err := randomtoken.Generate()
 	if err != nil {
@@ -276,7 +283,7 @@ func ResetAdmin(_ *cli.Context) error {
 func setClusterAnnotation(ctx context.Context, clustersClient dynamic.NamespaceableResourceInterface, adminName string) error {
 	cluster, err := clustersClient.Get(ctx, "local", v1.GetOptions{})
 	if err != nil {
-		return errors.Errorf("Cluster %s is not ready yet", cluster.GetName())
+		return errors.Errorf("Local cluster is not ready yet")
 	}
 	if adminName == "" {
 		return errors.Errorf("User is not set yet")
