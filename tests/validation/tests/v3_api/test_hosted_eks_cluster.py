@@ -34,9 +34,18 @@ eks_config = {
         "kubernetesVersion": EKS_K8S_VERSION,
         "privateAccess": False,
         "publicAccess": True,
+        "publicAccessSources": [],
+        "securityGroups": [],
+        "serviceRole": "",
+        "subnets": [],
+        "tags": {},
+        "loggingTypes": [],
+        "secretsEncryption": False,
+        "kmsKey": "",
         "region": EKS_REGION,
         "type": "eksclusterconfigspec",
         "nodeGroups": [{
+            "version": EKS_K8S_VERSION,
             "desiredSize": EKS_NODESIZE,
             "diskSize": 20,
             "gpu": False,
@@ -44,13 +53,21 @@ eks_config = {
             "maxSize": EKS_NODESIZE,
             "minSize": EKS_NODESIZE,
             "nodegroupName": random_test_name("test-ng"),
-            "type": "nodeGroup"
+            "type": "nodeGroup",
+            "subnets": [],
+            "tags": {},
+            "labels": {},
+            "ec2SshKey": ""
+
         }]
     }
 
 
 @ekscredential
 def test_eks_v2_hosted_cluster_create_basic():
+    """
+    Create a hosted EKS v2 cluster with all default values from the UI
+    """
     cluster_name = random_test_name("test-auto-eks")
     eks_config_temp = get_eks_config_basic(cluster_name)
     cluster_config = {
@@ -73,6 +90,10 @@ def test_eks_v2_hosted_cluster_create_basic():
 
 @ekscredential
 def test_eks_v2_hosted_cluster_create_all():
+    """
+    Create a hosted EKS v2 cluster by giving in value of
+    every param of eks config from UI
+    """
     cluster_name = random_test_name("test-auto-eks")
     eks_config_temp = get_eks_config_all(cluster_name)
     cluster_config = {
@@ -95,6 +116,12 @@ def test_eks_v2_hosted_cluster_create_all():
 
 @ekscredential
 def test_eks_v2_hosted_cluster_edit():
+    """
+    Create a hosted EKS v2 cluster.
+    Edit the following input fields:
+    cluster level tags, add node groups,
+    add/delete logging types, add new cloud cred
+    """
     cluster_name = random_test_name("test-auto-eks")
     eks_config_temp = get_eks_config_basic(cluster_name)
     cluster_config = {
@@ -120,6 +147,9 @@ def test_eks_v2_hosted_cluster_edit():
 
 @ekscredential
 def test_eks_v2_hosted_cluster_delete():
+    """
+    Delete a created hosted EKS v2 cluster and verify it is deleted in the backend
+    """
     cluster_name = random_test_name("test-auto-eks")
     eks_config_temp = get_eks_config_basic(cluster_name)
     cluster_config = {
@@ -188,6 +218,12 @@ def create_project_client(request):
 
 
 def create_and_validate_eks_cluster(cluster_config, imported=False):
+    """
+    Create and validate EKS cluster
+    :param cluster_config: config of the cluster
+    :param imported: imported is true when user creates an imported cluster
+    :return: client, cluster
+    """
     client = get_user_client()
     print("Creating EKS cluster")
     print("\nEKS Configuration: {}".format(cluster_config))
@@ -203,6 +239,10 @@ def create_and_validate_eks_cluster(cluster_config, imported=False):
 
 
 def get_aws_cloud_credential():
+    """
+    Create an AWS cloud creds
+    :return:  ec2_cloud_credential
+    """
     client = get_user_client()
     ec2_cloud_credential_config = {
         "accessKey": EKS_ACCESS_KEY,
@@ -215,6 +255,10 @@ def get_aws_cloud_credential():
 
 
 def get_logging_types():
+    """
+    Split all logging types
+    :return: logging_types
+    """
     logging_types = []
     if LOGGING_TYPES is not None:
         temp = LOGGING_TYPES.split(",")
@@ -224,6 +268,12 @@ def get_logging_types():
 
 
 def get_eks_config_basic(cluster_name):
+    """
+    FIlling in params for a basic EKS  v2 cluster
+    created through UI with default values
+    :param cluster_name:
+    :return: eks_config
+    """
     ec2_cloud_credential = get_aws_cloud_credential()
     global eks_config
     eks_config_temp = eks_config.copy()
@@ -233,6 +283,12 @@ def get_eks_config_basic(cluster_name):
 
 
 def get_eks_config_all(cluster_name):
+    """
+    FIlling in params for a EKS  v2 cluster
+    created through UI with all values give
+    :param cluster_name:
+    :return: eks_config
+    """
     ec2_cloud_credential = get_aws_cloud_credential()
     global eks_config
     public_access = [] if EKS_PUBLIC_ACCESS_SOURCES \
@@ -261,6 +317,10 @@ def get_eks_config_all(cluster_name):
 
 
 def get_new_node():
+    """
+    Create a new node group
+    :return: new_nodegroup
+    """
     new_nodegroup = {
         "desiredSize": EKS_NODESIZE,
         "diskSize": 20,
@@ -276,6 +336,12 @@ def get_new_node():
 
 
 def validate_eks_cluster(cluster_name, eks_config_temp):
+    """
+    Validate EKS cluster details
+    :param cluster_name: cluster name to be validated
+    :param eks_config_temp: eks_config
+    :return:
+    """
     eks_cluster = AmazonWebServices().describe_eks_cluster(cluster_name)
     print("\nEKS cluster deployed in EKS Console: {}".
           format(eks_cluster["cluster"]))
@@ -289,9 +355,7 @@ def validate_eks_cluster(cluster_name, eks_config_temp):
         "Cluster is NOT in active state"
 
     # verify security groups
-    if "securityGroups" in eks_config_temp.keys():
-        assert \
-    eks_cluster["cluster"]["resourcesVpcConfig"]["securityGroupIds"].sort() \
+    assert eks_cluster["cluster"]["resourcesVpcConfig"]["securityGroupIds"].sort() \
     == eks_config_temp["securityGroups"].sort()\
         , "Mismatch in Security Groups"
 
@@ -321,6 +385,12 @@ def validate_eks_cluster(cluster_name, eks_config_temp):
 
 
 def edit_eks_cluster(cluster, eks_config_temp):
+    """
+    Edit EKS v2 cluster
+    :param cluster: cluster
+    :param eks_config_temp: eks_config
+    :return: cluster
+    """
     # edit eks_config_temp
     # add new cloud cred
     ec2_cloud_credential_new = get_aws_cloud_credential()
@@ -330,7 +400,7 @@ def edit_eks_cluster(cluster, eks_config_temp):
     # add node group
     new_nodegroup = get_new_node()
     eks_config_temp["nodeGroups"].append(new_nodegroup)
-    # remove all logging
+    # modify logging
     eks_config_temp["loggingTypes"] = ["audit","api","authenticator"]
     client = get_user_client()
     client.update(cluster, name=cluster.name, eksConfig=eks_config_temp)
@@ -342,6 +412,12 @@ def edit_eks_cluster(cluster, eks_config_temp):
 
 
 def validate_nodegroup(nodegroup_list, cluster_name):
+    """
+    Validate nodegroup details
+    :param nodegroup_list: list of nodegroups
+    :param cluster_name:  cluster name
+    :return:
+    """
     for nodegroup in nodegroup_list:
         print("nodegroup:", nodegroup)
         eks_nodegroup = AmazonWebServices().describe_eks_nodegroup(
@@ -380,7 +456,8 @@ def validate_nodegroup(nodegroup_list, cluster_name):
                == eks_nodegroup["nodegroup"]["diskSize"], \
             "diskSize is incorrect on the nodes"
         # check ec2SshKey
-        if "ec2SshKey" in nodegroup.keys():
+        if "ec2SshKey" in nodegroup.keys() and \
+                nodegroup["ec2SshKey"] is not "":
             assert nodegroup["ec2SshKey"] \
-                   == eks_nodegroup["nodegroup"]["remoteAccess"]["ec2SshKey"], \
+                == eks_nodegroup["nodegroup"]["remoteAccess"]["ec2SshKey"], \
                 "Ssh key is incorrect on the nodes"
