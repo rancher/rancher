@@ -243,7 +243,6 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["load-balancer-sku"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "The LoadBalancer SKU of the cluster.",
-		Value: string(containerservice.Standard),
 	}
 	driverFlag.Options["virtual-network-resource-group"] = &types.Flag{
 		Type:  types.StringType,
@@ -630,7 +629,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *t
 	return d.createOrUpdate(ctx, options, false)
 }
 
-func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOptions, sendRBAC bool) (*types.ClusterInfo, error) {
+func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOptions, create bool) (*types.ClusterInfo, error) {
 	driverState, err := getStateFromOptions(options)
 	if err != nil {
 		return nil, err
@@ -773,7 +772,16 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		}
 	}
 
-	networkProfile.LoadBalancerSku = containerservice.LoadBalancerSku(driverState.LoadBalancerSku)
+	// Only set the LoadBalancerSKU if we are creating a cluster. If the LoadBalancerSKU is omitted, then set it to
+	// "Standard" as the default. If a LoadBalancerSKU is provided, then set it accordingly.
+	if create {
+		if driverState.LoadBalancerSku == "" {
+			networkProfile.LoadBalancerSku = containerservice.Standard
+		} else {
+			networkProfile.LoadBalancerSku = containerservice.LoadBalancerSku(driverState.LoadBalancerSku)
+		}
+	}
+
 	var agentPoolProfiles *[]containerservice.ManagedClusterAgentPoolProfile
 	if driverState.hasAgentPoolProfile() {
 		var countPointer *int32
@@ -845,7 +853,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		},
 	}
 
-	if sendRBAC {
+	if create {
 		managedCluster.ManagedClusterProperties.EnableRBAC = to.BoolPtr(true)
 	}
 
