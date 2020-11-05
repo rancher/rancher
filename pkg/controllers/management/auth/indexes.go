@@ -3,6 +3,7 @@ package auth
 import (
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/rbac/v1"
 	meta2 "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,14 +40,15 @@ func rbRoleSubjectKeys(roleName string, subjects []v1.Subject) []string {
 }
 
 func indexByMembershipBindingOwner(obj interface{}) ([]string, error) {
-	obj, ok := obj.(runtime.Object)
+	ro, ok := obj.(runtime.Object)
 	if !ok {
 		return []string{}, nil
 	}
 
-	meta, err := meta2.Accessor(obj)
+	meta, err := meta2.Accessor(ro)
 	if err != nil {
-		return nil, err
+		logrus.Warnf("[indexByMembershipBindingOwner] unexpected object type: %T, err: %v", obj, err.Error())
+		return []string{}, nil
 	}
 
 	ns := meta.GetNamespace()
