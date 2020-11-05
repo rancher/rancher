@@ -66,7 +66,7 @@ var (
 	UIBanners                         = NewSetting("ui-banners", "{}")
 	UIDefaultLanding                  = NewSetting("ui-default-landing", "")
 	UIFeedBackForm                    = NewSetting("ui-feedback-form", "")
-	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
+	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest-2.5/index.html")
 	UIPath                            = NewSetting("ui-path", "/usr/share/rancher/ui")
 	UIDashboardIndex                  = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
 	UIDashboardPath                   = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
