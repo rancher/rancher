@@ -772,14 +772,9 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		}
 	}
 
-	// Only set the LoadBalancerSKU if we are creating a cluster. If the LoadBalancerSKU is omitted, then set it to
-	// "Standard" as the default. If a LoadBalancerSKU is provided, then set it accordingly.
-	if create {
-		if driverState.LoadBalancerSku == "" {
-			networkProfile.LoadBalancerSku = containerservice.Standard
-		} else {
-			networkProfile.LoadBalancerSku = containerservice.LoadBalancerSku(driverState.LoadBalancerSku)
-		}
+	loadBalancerSku := containerservice.LoadBalancerSku(driverState.LoadBalancerSku)
+	if create && containerservice.Standard == loadBalancerSku {
+		networkProfile.LoadBalancerSku = loadBalancerSku
 	}
 
 	var agentPoolProfiles *[]containerservice.ManagedClusterAgentPoolProfile
