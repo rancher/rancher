@@ -107,9 +107,9 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry /usr/bin/k3s /usr/bin/kubectl /usr/bin/channelserver && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.5.2-rc4
-ENV CATTLE_DASHBOARD_UI_VERSION v2.5.2-rc4
-ENV CATTLE_CLI_VERSION v2.4.7
+ENV CATTLE_UI_VERSION 2.5.2-rc8.1
+ENV CATTLE_DASHBOARD_UI_VERSION v2.5.2-rc5
+ENV CATTLE_CLI_VERSION v2.4.8-rc1
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION 1.1.9
