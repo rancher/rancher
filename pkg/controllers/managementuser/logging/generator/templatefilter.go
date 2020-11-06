@@ -36,7 +36,7 @@ var FilterTemplate = `
 
 {{define "filter-custom-tags"}}
 {{- if .OutputTags}}
-<filter {{ .ContainerLogSourceTag }}.**>
+<filter {{ .ContainerLogSourceTag }}.** {{ if .IncludeRke }}{{ .RkeLogTag }}.**{{end}}>
   @type record_transformer
   <record>
     tag ${tag}
