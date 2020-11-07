@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/systemtokens"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -85,6 +86,9 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 
 	scaledContext.UserManager = userManager
 	scaledContext.RunContext = ctx
+
+	systemTokens := systemtokens.NewSystemTokensFromScale(scaledContext)
+	scaledContext.SystemTokens = systemTokens
 
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
 
