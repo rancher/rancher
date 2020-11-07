@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/compose"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,7 @@ const (
 type Lifecycle struct {
 	TokenClient     v3.TokenInterface
 	UserClient      v3.UserInterface
+	systemTokens    systemtokens.Interface
 	UserManager     user.Manager
 	HTTPSPortGetter common.KubeConfigGetter
 	ComposeClient   v3.ComposeConfigInterface
@@ -46,6 +48,7 @@ func Register(ctx context.Context, managementContext *config.ManagementContext, 
 	tokenClient := managementContext.Management.Tokens("")
 	userClient := managementContext.Management.Users("")
 	l := Lifecycle{
+		systemTokens:    managementContext.SystemTokens,
 		HTTPSPortGetter: portGetter,
 		UserManager:     managementContext.UserManager,
 		TokenClient:     tokenClient,
@@ -79,7 +82,7 @@ func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if err != nil {
 		return obj, err
 	}
-	token, err := l.UserManager.EnsureToken(composeTokenPrefix+user.Name, description, "compose", user.Name)
+	token, err := l.systemTokens.EnsureSystemToken(composeTokenPrefix+user.Name, description, "compose", user.Name, nil)
 	if err != nil {
 		return obj, err
 	}
