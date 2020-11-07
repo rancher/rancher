@@ -86,6 +86,9 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	scaledContext.UserManager = userManager
 	scaledContext.RunContext = ctx
 
+	systemTokens := systemtokens.NewSystemTokensFromScale(scaledContext)
+	scaledContext.SystemTokens = systemTokens
+
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
 
 	scaledContext.AccessControl = manager
