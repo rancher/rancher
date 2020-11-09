@@ -36,8 +36,8 @@ const (
 	userPrincipalIndex     = "authn.management.cattle.io/user-principal-index"
 	UserIDLabel            = "authn.management.cattle.io/token-userId"
 	TokenKindLabel         = "authn.management.cattle.io/kind"
-	HAIdentifier       = "authn.management.cattle.io/token-creator"
-	TokenHashed        = "authn.management.cattle.io/token-hashed"
+	HAIdentifier           = "authn.management.cattle.io/token-creator"
+	TokenHashed            = "authn.management.cattle.io/token-hashed"
 	tokenKeyIndex          = "authn.management.cattle.io/token-key-index"
 	secretNameEnding       = "-secret"
 	secretNamespace        = "cattle-system"
@@ -106,7 +106,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 
 	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
 	if err != nil {
-		return v3.Token{}, 500, fmt.Errorf("error validating max-ttl %v", err)
+		return v3.Token{}, "", 500, fmt.Errorf("error validating max-ttl %v", err)
 	}
 
 	var unhashedTokenKey string

@@ -124,7 +124,6 @@ func GetKubeConfigToken(userName, responseType string, userMGR user.Manager) (*v
 	return token, err
 }
 
-
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
 func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error) {
 	if storedToken.ObjectMeta.Name != tokenName {

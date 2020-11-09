@@ -451,7 +451,7 @@ func setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Ma
 	}
 	tokenCookie := &http.Cookie{
 		Name:     "R_SESS",
-		Value:    Value:    rToken.ObjectMeta.Name + ":" + unhashedTokenKey,
+		Value:    rToken.ObjectMeta.Name + ":" + unhashedTokenKey,
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
