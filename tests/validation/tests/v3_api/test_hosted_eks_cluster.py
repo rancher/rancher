@@ -170,17 +170,13 @@ def test_eks_v2_hosted_cluster_delete():
 
 @ekscredential
 def test_eks_v2_create_import_cluster():
-    ec2_cloud_credential = get_aws_cloud_credential()
+    """
+    Create an imported EKS cluster with some default values in EKS config
+    """
     display_name = create_resources_eks()
     cluster_name = random_test_name("test-auto-eks")
-
-    eks_config_temp = {
-        "amazonCredentialSecret": ec2_cloud_credential.id,
-        "displayName": display_name,
-        "imported": True,
-        "region": EKS_REGION,
-        "type": "eksclusterconfigspec"
-    }
+    eks_config_temp = get_eks_config_basic(cluster_name)
+    eks_config_temp["imported"] = True
 
     cluster_config = {
         "eksConfig": eks_config_temp,
@@ -196,6 +192,9 @@ def test_eks_v2_create_import_cluster():
 
 
 def create_resources_eks():
+    """
+    Create an EKS cluster from the EKS console
+    """
     cluster_name = resource_prefix + "-ekscluster"
     AmazonWebServices().create_eks_cluster(cluster_name)
     IMPORTED_EKS_CLUSTERS.append(cluster_name)
