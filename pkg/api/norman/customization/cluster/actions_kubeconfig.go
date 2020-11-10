@@ -29,9 +29,9 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 	if generateToken {
 		// generate token and place it in kubeconfig, token doesn't expire
 		if endpointEnabled {
-			token, err = a.getClusterToken(cluster.ID, apiContext)
+			token, err = a.ensureClusterToken(cluster.ID, apiContext)
 		} else {
-			token, err = a.getToken(apiContext)
+			token, err = a.ensureToken(apiContext)
 		}
 		if err != nil {
 			return err

@@ -3,11 +3,7 @@ package systemtokens
 import (
 	"errors"
 	"fmt"
-	"math/rand"
-	"os"
-	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -20,75 +16,44 @@ import (
 
 func NewSystemTokensFromScale(mgmt *config.ScaledContext) *SystemTokens {
 	return &SystemTokens{
-		tokenLister:  mgmt.Management.Tokens("").Controller().Lister(),
-		tokenClient:  mgmt.Management.Tokens(""),
-		tokenCache:   map[string]string{},
-		isHA:         mgmt.PeerManager != nil,
-		haIdentifier: getIdentifier(),
+		tokenLister: mgmt.Management.Tokens("").Controller().Lister(),
+		tokenClient: mgmt.Management.Tokens(""),
 	}
 }
 
 type SystemTokens struct {
-	isHA            bool
-	tokenClient     v3.TokenInterface
-	tokenLister     v3.TokenLister
-	haIdentifier    string
-	tokenCache      map[string]string
-	tokenCacheMutex sync.RWMutex
+	tokenClient v3.TokenInterface
+	tokenLister v3.TokenLister
 }
 
-// Multiple rancher management servers might attempt to use the same token name
-// Because the token is hashed, any regeneration of an existing token name invalidates all previous tokens
-// So to avoid those HA bugs, we need to uniquely create and re-use each token for each
-// requesting management server, which we do here by generating a random string.
-func getIdentifier() string {
-	randString, err := randomtoken.Generate()
-	if err != nil {
-		return strconv.Itoa(rand.Intn(10000))
-	}
-	return randString[0:5]
-}
-
-// EnsureSystemToken gets or creates tokens for management use, and keeps them in memory inside contexts.
-// Appends identifier to token name
+// EnsureSystemToken creates tokens or updates their values if they already exist and returns their value.
 // TTL defaults to 1 hour, after that this method will auto-refresh. If your token will be in use for more
 // than one hour without calling this method again you must pass in an overrideTTL.
 // However, the overrideTTL must not be 0, otherwise the token will never be cleaned up.
-func (t *SystemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64) (string, error) {
-	if overrideTTL != nil && *overrideTTL == 0 {
-		return "", errors.New("TTL for system token must not be zero") // no way to cleanup token
-	}
-	tokenName = fmt.Sprintf("%s-%s", tokenName, t.haIdentifier) // append hashed identifier, see getIdentifier
-	token, err := t.tokenLister.Get("", tokenName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
-	}
-
-	if err == nil && !tokens.IsExpired(*token) {
-		if tokenVal := t.getTokenValue(tokenName); tokenVal != "" {
-			return tokenVal, nil
+func (t *SystemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64, randomize bool) (string, error) {
+	var err error
+	if !randomize {
+		_, err = t.tokenLister.Get("", tokenName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return "", err
 		}
 	}
+
 	// needs fresh token because its missing or expired
-	val, err := t.createOrUpdateSystemToken(tokenName, description, kind, username, overrideTTL)
+	val, err := t.createOrUpdateSystemToken(tokenName, description, kind, username, overrideTTL, randomize)
 	if err != nil {
 		return "", err
 	}
+
 	return val, nil
 }
 
-func (t *SystemTokens) getTokenValue(tokenName string) string {
-	t.tokenCacheMutex.RLock()
-	val, ok := t.tokenCache[tokenName]
-	t.tokenCacheMutex.RUnlock()
-	if ok {
-		return val
-	}
-	return ""
+func (t *SystemTokens) DeleteToken(tokenName string) error {
+	return t.tokenClient.Delete(tokenName, &v1.DeleteOptions{})
 }
 
 // Creates token obj with hashed token, returns token. Overwrites if pre-existing.
-func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, userName string, overrideTTL *int64) (string, error) {
+func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, userName string, overrideTTL *int64, randomize bool) (string, error) {
 	if strings.HasPrefix(tokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
 	}
@@ -121,12 +86,9 @@ func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 		if overrideTTL != nil {
 			token.TTLMillis = *overrideTTL
 		}
-		if t.isHA {
-			if token.Annotations == nil {
-				token.Annotations = make(map[string]string)
-			}
-			// For debugging purposes we set hostname as annotation, which in HA is the pod name
-			token.Annotations[tokens.HAIdentifier] = os.Getenv("HOSTNAME")
+		if randomize {
+			token.ObjectMeta.Name = ""
+			token.ObjectMeta.GenerateName = tokenName
 		}
 
 		err = tokens.ConvertTokenKeyToHash(token)
@@ -136,13 +98,6 @@ func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 		logrus.Infof("Creating system token for %v, token: %v", userName, tokenName)
 		token, err = t.tokenClient.Create(token)
 		if err != nil {
-			// race condition on create, someone else just created so return that val instead
-			if apierrors.IsAlreadyExists(err) {
-				if tokenVal := t.getTokenValue(tokenName); tokenVal != "" {
-					return tokenVal, nil
-				}
-				return "", fmt.Errorf("system token not found in cache: %s", tokenName)
-			}
 			return "", err
 		}
 	} else {
@@ -157,10 +112,7 @@ func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 			return "", err
 		}
 	}
-	// Fresh token needs saving in cache
+
 	fullVal := fmt.Sprintf("%s:%s", token.Name, key)
-	t.tokenCacheMutex.Lock()
-	defer t.tokenCacheMutex.Unlock()
-	t.tokenCache[tokenName] = fullVal
 	return fullVal, nil
 }
