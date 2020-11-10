@@ -787,10 +787,16 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 	}
 
 	logrus.Infof("node [%s] requires draining before delete", nodeCopy.Spec.RequestedHostname)
-	kubeConfig, err := m.getKubeConfig(cluster)
+	kubeConfig, tokenName, err := m.getKubeConfig(cluster)
 	if err != nil {
 		return fmt.Errorf("node [%s] error getting kubeConfig", nodeCopy.Spec.RequestedHostname)
 	}
+
+	defer func() {
+		if err := m.userManager.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for node token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
 
 	if nodeCopy.Spec.NodeDrainInput == nil {
 		logrus.Debugf("node [%s] has no NodeDrainInput, creating one with 60s timeout",

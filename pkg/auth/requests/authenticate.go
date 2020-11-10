@@ -2,10 +2,11 @@ package requests
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/steve/pkg/auth"
@@ -15,6 +16,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/cache"
+)
+
+var (
+	ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
 )
 
 type Authenticator interface {
@@ -77,10 +82,10 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 	}
 
 	if token.Enabled != nil && !*token.Enabled {
-		return false, "", []string{}, fmt.Errorf("user's token is not enabled")
+		return false, "", []string{}, errors.Wrapf(ErrMustAuthenticate, "user's token is not enabled")
 	}
 	if token.ClusterName != "" && token.ClusterName != clusterrouter.GetClusterID(req) {
-		return false, "", []string{}, fmt.Errorf("clusterID does not match")
+		return false, "", []string{}, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
 
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
@@ -94,7 +99,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 	}
 
 	if u.Enabled != nil && !*u.Enabled {
-		return false, "", []string{}, fmt.Errorf("user is not enabled")
+		return false, "", []string{}, errors.Wrapf(ErrMustAuthenticate, "user is not enabled")
 	}
 
 	var groups []string
@@ -128,12 +133,12 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 	if tokenAuthValue == "" {
-		return nil, fmt.Errorf("must authenticate")
+		return nil, ErrMustAuthenticate
 	}
 
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)
 	if tokenName == "" || tokenKey == "" {
-		return nil, fmt.Errorf("must authenticate")
+		return nil, ErrMustAuthenticate
 	}
 
 	lookupUsingClient := false
@@ -142,7 +147,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 		if apierrors.IsNotFound(err) {
 			lookupUsingClient = true
 		} else {
-			return nil, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
+			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve auth token from cache, error: %v", err)
 		}
 	} else if len(objs) == 0 {
 		lookupUsingClient = true
@@ -153,16 +158,16 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 		storedToken, err = a.tokenClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				return nil, fmt.Errorf("must authenticate")
+				return nil, ErrMustAuthenticate
 			}
-			return nil, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
+			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve auth token, error: %#v", err)
 		}
 	} else {
 		storedToken = objs[0].(*v3.Token)
 	}
 
 	if _, err := tokens.VerifyToken(storedToken, tokenName, tokenKey); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
 	}
 
 	return storedToken, nil

@@ -70,6 +70,7 @@ type Lifecycle struct {
 	namespaceLister      v1.NamespaceLister
 	namespaces           v1.NamespaceInterface
 	secrets              v1.SecretInterface
+	secretLister         v1.SecretLister
 	serviceLister        v1.ServiceLister
 	managementSecrets    v1.SecretInterface
 	services             v1.ServiceInterface
@@ -86,6 +87,7 @@ type Lifecycle struct {
 	daemonsets          appsv1.DaemonSetInterface
 
 	notifierLister             mv3.NotifierLister
+	tokenLister                mv3.TokenLister
 	pipelineLister             v3.PipelineLister
 	pipelines                  v3.PipelineInterface
 	pipelineExecutionLister    v3.PipelineExecutionLister
@@ -126,6 +128,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	pipelineSettingLister := cluster.Management.Project.PipelineSettings("").Controller().Lister()
 	sourceCodeCredentialLister := cluster.Management.Project.SourceCodeCredentials("").Controller().Lister()
 	notifierLister := cluster.Management.Management.Notifiers("").Controller().Lister()
+	tokenLister := cluster.Management.Management.Tokens("").Controller().Lister()
 
 	pipelineEngine := engine.New(cluster, true)
 	pipelineExecutionLifecycle := &Lifecycle{
@@ -154,6 +157,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		pipelineEngine:             pipelineEngine,
 		sourceCodeCredentialLister: sourceCodeCredentialLister,
 		notifierLister:             notifierLister,
+		tokenLister:                tokenLister,
 
 		DialerFactory: cluster.Management.Dialer,
 	}

@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"github.com/rancher/rancher/pkg/systemtokens"
 	"net/http"
 	"os"
 	"time"
@@ -24,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/steve"
 	"github.com/rancher/rancher/pkg/steve/pkg/clusterapi"
+	"github.com/rancher/rancher/pkg/systemtokens"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/tunnelserver"

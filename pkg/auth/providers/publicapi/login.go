@@ -192,13 +192,12 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
 	}
 
-	// TODO: ask about this code
 	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
 		token, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR)
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
-		return *token, "", responseType, nil
+		return *token, token.Token, responseType, nil
 	}
 
 	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)

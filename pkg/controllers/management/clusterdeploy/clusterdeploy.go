@@ -12,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
@@ -244,10 +245,15 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	kubeConfig, err := cd.getKubeConfig(cluster)
+	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err := cd.mgmt.SystemTokens.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
 
 	if _, err = v3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
 		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures)
@@ -323,20 +329,21 @@ func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 	return nil
 }
 
-func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
+func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, string, error) {
 	logrus.Tracef("clusterDeploy: getKubeConfig called for cluster [%s]", cluster.Name)
 	systemUser, err := cd.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	key := fmt.Sprintf("%s-%s", "agent", systemUser.Name)
-	token, err := cd.mgmt.SystemTokens.EnsureSystemToken(key, "token for agent deployment", "agent", systemUser.Name, nil)
+	tokenPrefix := fmt.Sprintf("%s-%s", "agent", systemUser.Name)
+	token, err := cd.mgmt.SystemTokens.EnsureSystemToken(tokenPrefix, "token for agent deployment", "agent", systemUser.Name, nil, true)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return cd.clusterManager.KubeConfig(cluster.Name, token), nil
+	tokenName, _ := tokens.SplitTokenParts(token)
+	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
 func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool) ([]byte, error) {

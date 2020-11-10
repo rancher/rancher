@@ -200,21 +200,27 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 }
 
 // creates tokens with 0 ttl and returns token in 'token.Name:token.Token' format
-func (m *userManager) EnsureToken(tokenName, description, kind, userName string, ttl *int64) (string, error) {
-	return m.EnsureClusterToken("", tokenName, description, kind, userName, ttl)
+func (m *userManager) EnsureToken(tokenName, description, kind, userName string, ttl *int64, randomize bool) (string, error) {
+	return m.EnsureClusterToken("", tokenName, description, kind, userName, ttl, randomize)
 }
 
-func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string, ttl *int64) (string, error) {
+func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string, ttl *int64, randomize bool) (string, error) {
 	if strings.HasPrefix(tokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
 	}
+
+	var err error
+	var token *v3.Token
+	if !randomize {
+		token, err = m.tokenLister.Get("", tokenName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return "", err
+		}
+	}
+
 	key, err := randomtoken.Generate()
 	if err != nil {
 		return "", errors.New("failed to generate token key")
-	}
-	token, err := m.tokenLister.Get("", tokenName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
 	}
 
 	if token != nil {
@@ -229,41 +235,37 @@ func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, ki
 			return "", err
 		}
 	} else {
-		if token == nil {
-			key, err := randomtoken.Generate()
-			if err != nil {
-				return "", fmt.Errorf("failed to generate token key")
-			}
-
-			token = &v3.Token{
-				ObjectMeta: v1.ObjectMeta{
-					Name: tokenName,
-					Labels: map[string]string{
-						tokens.UserIDLabel:    userName,
-						tokens.TokenKindLabel: kind,
-					},
+		token = &v3.Token{
+			ObjectMeta: v1.ObjectMeta{
+				Name: tokenName,
+				Labels: map[string]string{
+					tokens.UserIDLabel:    userName,
+					tokens.TokenKindLabel: kind,
 				},
-				TTLMillis:    0,
-				Description:  description,
-				UserID:       userName,
-				AuthProvider: "local",
-				IsDerived:    true,
-				Token:        key,
-				ClusterName:  clusterName,
-			}
-			if ttl != nil {
-				token.TTLMillis = *ttl
-			}
-
-			err = tokens.ConvertTokenKeyToHash(token)
-			if err != nil {
-				return "", err
-			}
-			logrus.Infof("Creating token for user %v", userName)
-			token, err = m.tokens.Create(token)
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				return "", err
-			}
+			},
+			TTLMillis:    0,
+			Description:  description,
+			UserID:       userName,
+			AuthProvider: "local",
+			IsDerived:    true,
+			Token:        key,
+			ClusterName:  clusterName,
+		}
+		if ttl != nil {
+			token.TTLMillis = *ttl
+		}
+		if randomize {
+			token.ObjectMeta.Name = ""
+			token.ObjectMeta.GenerateName = tokenName
+		}
+		err = tokens.ConvertTokenKeyToHash(token)
+		if err != nil {
+			return "", err
+		}
+		logrus.Infof("Creating token for user %v", userName)
+		token, err = m.tokens.Create(token)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return "", err
 		}
 	}
 
@@ -673,6 +675,10 @@ func (m *userManager) GetUserByPrincipalID(principalName string) (*v3.User, erro
 		}
 	}
 	return user, nil
+}
+
+func (m *userManager) DeleteToken(tokenName string) error {
+	return m.tokens.Delete(tokenName, &v1.DeleteOptions{})
 }
 
 func (m *userManager) checkCache(principalName string) (*v3.User, error) {
