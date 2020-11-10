@@ -8,28 +8,28 @@ resource "aws_instance" "master" {
     host        = self.public_ip
     private_key = "${file(var.access_key)}"
   }
+  root_block_device {
+    volume_size = "20"
+    volume_type = "standard"
+  }
   subnet_id = var.subnets
   availability_zone = var.availability_zone
   vpc_security_group_ids = ["${var.sg_id}"]
-
   key_name = "jenkins-rke-validation"
   tags = {
-    Name = "${var.resource_name}-rke2-server"
+    Name = "${var.resource_name}-server"
     "kubernetes.io/cluster/clusterid" = "owned"
   }
-
   provisioner "file" {
-    source      = "install_rke2_on_first_node.sh"
-    destination = "/tmp/install_rke2_on_first_node.sh"
+    source      = "install_master.sh"
+    destination = "/tmp/install_master.sh"
   }
-
   provisioner "remote-exec" {
     inline = [
-      "chmod +x /tmp/install_rke2_on_first_node.sh",
-      "sudo /tmp/install_rke2_on_first_node.sh ${var.ctype} ${aws_route53_record.aws_route53.fqdn} ${var.rke2_version} ${var.username} ${var.password}",
+      "chmod +x /tmp/install_master.sh",
+      "sudo /tmp/install_master.sh ${var.node_os} ${aws_route53_record.aws_route53.fqdn} ${var.rke2_version} ${var.cluster_type} \"${var.server_flags}\" ${var.username} ${var.password}",
     ]
   }
-
   provisioner "local-exec" {
     command = "echo ${aws_instance.master.public_ip} >/tmp/${var.resource_name}_master_ip"
   }
@@ -62,30 +62,25 @@ resource "aws_instance" "master2" {
     volume_size = "20"
     volume_type = "standard"
   }
-
   subnet_id = var.subnets
   availability_zone = var.availability_zone
   vpc_security_group_ids = ["${var.sg_id}"]
-
   key_name = "jenkins-rke-validation"
   tags = {
-    Name = "${var.resource_name}-rke2-servers"
+    Name = "${var.resource_name}-servers"
     "kubernetes.io/cluster/clusterid" = "owned"
   }
   depends_on       = ["aws_instance.master"]
-
   provisioner "file" {
     source      = "join_master.sh"
     destination = "/tmp/join_master.sh"
   }
-
   provisioner "remote-exec" {
     inline = [
       "chmod +x /tmp/join_master.sh",
-      "sudo /tmp/join_master.sh ${var.ctype} ${aws_route53_record.aws_route53.fqdn} ${aws_instance.master.public_ip} ${local.node_token} ${var.rke2_version} ${var.username} ${var.password}",
+      "sudo /tmp/join_master.sh ${var.node_os} ${aws_route53_record.aws_route53.fqdn} ${aws_instance.master.public_ip} ${local.node_token} ${var.rke2_version} ${var.cluster_type} \"${var.server_flags}\" ${var.username} ${var.password}",
     ]
   }
-
 }
 
 data "local_file" "token" {
@@ -102,25 +97,32 @@ resource "local_file" "master_ips" {
   filename = "/tmp/${var.resource_name}_master_ips"
 }
 
+resource "aws_lb_target_group" "aws_tg_8443" {
+  port             = 8443
+  protocol         = "TCP"
+  vpc_id           = "${var.vpc_id}"
+  name             = "${var.resource_name}-tg-8443"
+}
+
 resource "aws_lb_target_group" "aws_tg_6443" {
   port             = 6443
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-multinode-tg-6334"
+  name             = "${var.resource_name}-tg-6443"
 }
 
 resource "aws_lb_target_group" "aws_tg_9345" {
   port             = 9345
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-multinode-tg-9345"
+  name             = "${var.resource_name}-tg-9345"
 }
 
 resource "aws_lb_target_group" "aws_tg_80" {
   port             = 80
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-multinode-tg-80"
+  name             = "${var.resource_name}-tg-80"
   health_check {
         protocol = "HTTP"
         port = "traffic-port"
@@ -137,7 +139,7 @@ resource "aws_lb_target_group" "aws_tg_443" {
   port             = 443
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-multinode-tg-443"
+  name             = "${var.resource_name}-tg-443"
   health_check {
         protocol = "HTTP"
         port = 80
@@ -148,6 +150,21 @@ resource "aws_lb_target_group" "aws_tg_443" {
         unhealthy_threshold = 3
         matcher = "200-399"
   }
+}
+
+resource "aws_lb_target_group_attachment" "aws_tg_attachment_8443" {
+  target_group_arn = "${aws_lb_target_group.aws_tg_8443.arn}"
+  target_id        = "${aws_instance.master.id}"
+  port             = 8443
+  depends_on       = ["aws_lb_target_group.aws_tg_8443"]
+}
+
+resource "aws_lb_target_group_attachment" "aws_tg_attachment_8443_2" {
+  target_group_arn = "${aws_lb_target_group.aws_tg_8443.arn}"
+  count            = length(aws_instance.master2)
+  target_id        = "${aws_instance.master2[count.index].id}"
+  port             = 8443
+  depends_on       = ["aws_lb_target_group.aws_tg_8443"]
 }
 
 resource "aws_lb_target_group_attachment" "aws_tg_attachment_6443" {
@@ -213,7 +230,17 @@ resource "aws_lb" "aws_nlb" {
   internal           = false
   load_balancer_type = "network"
   subnets            = ["${var.subnets}"]
-  name               = "${var.resource_name}-rke2-nlb"
+  name               = "${var.resource_name}-nlb"
+}
+
+resource "aws_lb_listener" "aws_nlb_listener_8443" {
+  load_balancer_arn = "${aws_lb.aws_nlb.arn}"
+  port              = "8443"
+  protocol          = "TCP"
+  default_action {
+    type             = "forward"
+    target_group_arn = "${aws_lb_target_group.aws_tg_8443.arn}"
+  }
 }
 
 resource "aws_lb_listener" "aws_nlb_listener_6443" {
@@ -258,7 +285,7 @@ resource "aws_lb_listener" "aws_nlb_listener_443" {
 
 resource "aws_route53_record" "aws_route53" {
   zone_id            = "${data.aws_route53_zone.selected.zone_id}"
-  name               = "${var.resource_name}-rke2-route53"
+  name               = "${var.resource_name}-route53"
   type               = "CNAME"
   ttl                = "300"
   records            = ["${aws_lb.aws_nlb.dns_name}"]
