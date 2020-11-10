@@ -881,11 +881,10 @@ steps:
   when:
     event:
       exclude:
-      - pull_request
-      instance:
-        include:
-        - drone-publish.rancher.io
-      status:
+        - pull_request
+    instance:
+      - drone-publish.rancher.io
+    status:
       - failure
 
 volumes:
