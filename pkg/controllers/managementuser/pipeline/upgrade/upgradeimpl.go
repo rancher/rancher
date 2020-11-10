@@ -17,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -81,13 +82,18 @@ func (l *PipelineService) ensureSecrets(namespace *corev1.Namespace) error {
 	projectName := namespace.Annotations["field.cattle.io/projectId"]
 	_, projectID := ref.Parse(projectName)
 	ns := namespace.Name
-	apikey, err := l.systemAccountManager.GetOrCreateProjectSystemToken(projectID)
-	if err != nil {
-		return err
-	}
-	secret := pipelineexecution.GetAPIKeySecret(ns, apikey)
-	if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
+	if _, err := l.secrets.GetNamespaced(ns, utils.PipelineAPIKeySecretName, v12.GetOptions{}); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		apikey, err := l.systemAccountManager.CreateProjectPipelineSystemToken(projectID)
+		if err != nil {
+			return err
+		}
+		secret := pipelineexecution.GetAPIKeySecret(ns, apikey)
+		if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
 	}
 	return nil
 }

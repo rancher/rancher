@@ -52,7 +52,6 @@ func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error)
 }
 
 func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {
-
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
 		return h.Create(token)

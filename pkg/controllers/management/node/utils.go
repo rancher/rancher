@@ -328,16 +328,17 @@ func setEc2ClusterIDTag(data interface{}, clusterID string) {
 	}
 }
 
-func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
+func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, string, error) {
 	user, err := m.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	token, err := m.userManager.EnsureToken("node-removal-drain-"+user.Name, "token for node drain during removal", "agent", user.Name, nil)
+	tokenName := "node-removal-drain-" + user.Name
+	token, err := m.userManager.EnsureToken(tokenName, "token for node drain during removal", "agent", user.Name, nil, false)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return m.clusterManager.KubeConfig(cluster.Name, token), nil
+	return m.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }

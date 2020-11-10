@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,10 +83,17 @@ func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if err != nil {
 		return obj, err
 	}
-	token, err := l.systemTokens.EnsureSystemToken(composeTokenPrefix+user.Name, description, "compose", user.Name, nil)
+	tokenName := composeTokenPrefix + user.Name
+	token, err := l.systemTokens.EnsureSystemToken(tokenName, description, "compose", user.Name, nil, false)
 	if err != nil {
 		return obj, err
 	}
+	defer func() {
+		if err := l.systemTokens.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for compose token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
+
 	config := &compose.Config{}
 	if err := yaml.Unmarshal([]byte(obj.Spec.RancherCompose), config); err != nil {
 		return obj, err

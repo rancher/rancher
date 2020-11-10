@@ -36,7 +36,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 		shellTTL = minutes * 60 * 1000 // convert minutes to milliseconds
 	}
 
-	token, err := userManager.EnsureToken("kubectl-shell-"+userID, "Access to kubectl shell in the browser", "kubectl-shell", userID, &shellTTL)
+	token, err := userManager.EnsureToken("kubectl-shell-"+userID, "Access to kubectl shell in the browser", "kubectl-shell", userID, &shellTTL, true)
 	if err != nil {
 		return err
 	}

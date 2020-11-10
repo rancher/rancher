@@ -146,11 +146,17 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, nodeName string, ca
 
 		stopped := false
 		updatedObj, err := v32.NodeConditionDrained.DoUntilTrue(obj, func() (runtime.Object, error) {
-			kubeConfig, err := d.getKubeConfig()
+			kubeConfig, tokenName, err := d.getKubeConfig()
 			if err != nil {
 				logrus.Errorf("nodeDrain: error getting kubeConfig for node %s", obj.Name)
 				return obj, fmt.Errorf("error getting kubeConfig for node %s", obj.Name)
 			}
+			defer func() {
+				if err := d.systemTokens.DeleteToken(tokenName); err != nil {
+					logrus.Errorf("cleanup for nodesyncer token [%s] failed, will not retry: %v", tokenName, err)
+				}
+			}()
+
 			nodeCopy := obj.DeepCopy()
 			setConditionDraining(nodeCopy, nil, nil)
 			nodeObj, err := d.updateNode(nodeCopy, setConditionDraining, nil, nil)
@@ -215,24 +221,25 @@ func (d *nodeDrain) resetDesiredNodeUnschedulable(obj *v3.Node) error {
 	return nil
 }
 
-func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, error) {
+func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, string, error) {
 	cluster, err := d.clusterLister.Get("", d.clusterName)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	user, err := d.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	token, err := d.systemTokens.EnsureSystemToken(drainTokenPrefix+user.Name, description, "drain-node", user.Name, nil)
+	tokenName := drainTokenPrefix + user.Name
+	token, err := d.systemTokens.EnsureSystemToken(drainTokenPrefix+user.Name, description, "drain-node", user.Name, nil, false)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	kubeConfig := d.kubeConfigGetter.KubeConfig(d.clusterName, token)
 	for k := range kubeConfig.Clusters {
 		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
 	}
-	return kubeConfig, nil
+	return kubeConfig, tokenName, nil
 }
 
 func filterErrorMsg(msg string, nodeName string) string {
