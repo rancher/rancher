@@ -789,10 +789,12 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 	}
 
 	logrus.Infof("node [%s] requires draining before delete", nodeCopy.Spec.RequestedHostname)
-	kubeConfig, err := m.getKubeConfig(cluster)
+	kubeConfig, cleanupToken, err := m.getKubeConfig(cluster)
 	if err != nil {
 		return fmt.Errorf("node [%s] error getting kubeConfig", nodeCopy.Spec.RequestedHostname)
 	}
+
+	defer cleanupToken()
 
 	if nodeCopy.Spec.NodeDrainInput == nil {
 		logrus.Debugf("node [%s] has no NodeDrainInput, creating one with 60s timeout",

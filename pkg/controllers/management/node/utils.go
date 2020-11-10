@@ -328,16 +328,17 @@ func setEc2ClusterIDTag(data interface{}, clusterID string) {
 	}
 }
 
-func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
+func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, func(), error) {
 	user, err := m.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	token, err := m.userManager.EnsureToken("node-removal-drain-"+user.Name, "token for node drain during removal", "agent", user.Name, nil)
+	token, tokenCleanup, err := m.userManager.EnsureToken("node-removal-drain-"+user.Name, "token for node drain during removal", "agent", user.Name, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return m.clusterManager.KubeConfig(cluster.Name, token), nil
+	// TODO: add logic for cleanup of actual kubeconfig
+	return m.clusterManager.KubeConfig(cluster.Name, token), tokenCleanup, nil
 }

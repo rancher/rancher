@@ -122,18 +122,23 @@ func (a ActionHandler) getClusterToken(clusterID string, apiContext *types.APICo
 	if err != nil {
 		return "", err
 	}
-	return a.UserMgr.EnsureClusterToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName, nil)
+
+	token, _, err := a.UserMgr.EnsureClusterToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName, nil)
+	return token, err
 }
 
+// TODO: rename function to accurately reflect what they do, i.e. replace get with ensure
 func (a ActionHandler) getToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
 	name, err := kubeconfigTokenName(userName, "")
 	if err != nil {
 		return "", err
 	}
-	return a.UserMgr.EnsureToken(name, "Kubeconfig token", "kubeconfig", userName, nil)
+	token, _, err := a.UserMgr.EnsureToken(name, "Kubeconfig token", "kubeconfig", userName, nil)
+	return token, err
 }
 
+// TODO: add logic to create a new token each time for kube config
 func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
 	token, err := a.getToken(apiContext)
 	if err != nil {
