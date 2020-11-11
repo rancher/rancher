@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/rancher/apiserver/pkg/handlers"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	"github.com/rancher/apiserver/pkg/types"
 	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
@@ -13,6 +14,7 @@ import (
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
 	schemas3 "github.com/rancher/wrangler/pkg/schemas"
+	"github.com/rancher/wrangler/pkg/schemas/validation"
 )
 
 func Register(ctx context.Context, server *steve.Server,
@@ -84,6 +86,16 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 					Input:  "chartUpgradeAction",
 					Output: "chartActionOutput",
 				},
+			}
+			apiSchema.ByIDHandler = func(request *types.APIRequest) (types.APIObject, error) {
+				if request.Name == "index.yaml" {
+					request.Name = request.Namespace
+					request.Namespace = ""
+					request.Link = "index"
+					index.ServeHTTP(request.Response, request.Request)
+					return types.APIObject{}, validation.ErrComplete
+				}
+				return handlers.ByIDHandler(request)
 			}
 			apiSchema.LinkHandlers = map[string]http.Handler{
 				"index": index,

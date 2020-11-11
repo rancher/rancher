@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -13,12 +14,18 @@ import (
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	name2 "github.com/rancher/wrangler/pkg/name"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	maxSize = 100_000
 )
 
 var (
@@ -29,16 +36,19 @@ type repoHandler struct {
 	secrets      corev1controllers.SecretCache
 	clusterRepos catalogcontrollers.ClusterRepoController
 	configMaps   corev1controllers.ConfigMapClient
+	apply        apply.Apply
 }
 
 func RegisterRepos(ctx context.Context,
+	apply apply.Apply,
 	secrets corev1controllers.SecretCache,
 	clusterRepos catalogcontrollers.ClusterRepoController,
-	configMap corev1controllers.ConfigMapClient) {
+	configMap corev1controllers.ConfigMapController) {
 	h := &repoHandler{
 		secrets:      secrets,
 		clusterRepos: clusterRepos,
 		configMaps:   configMap,
+		apply:        apply.WithCacheTypes(configMap).WithStrictCaching().WithSetOwnerReference(false, false),
 	}
 
 	catalogcontrollers.RegisterClusterRepoStatusHandler(ctx, clusterRepos,
@@ -78,7 +88,24 @@ func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo
 	})
 }
 
+func toOwnerObject(namespace string, owner metav1.OwnerReference) runtime.Object {
+	return &metav1.PartialObjectMetadata{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       owner.Kind,
+			APIVersion: owner.APIVersion,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      owner.Name,
+			Namespace: namespace,
+			UID:       owner.UID,
+		},
+	}
+}
+
 func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.IndexFile, owner metav1.OwnerReference) (*corev1.ConfigMap, error) {
+	// do this before we normalize the namespace
+	ownerObject := toOwnerObject(namespace, owner)
+
 	buf := &bytes.Buffer{}
 	gz := gzip.NewWriter(buf)
 	if err := json.NewEncoder(gz).Encode(index); err != nil {
@@ -92,29 +119,52 @@ func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.Inde
 		namespace = namespaces.System
 	}
 
-	cm, err := r.configMaps.Get(namespace, name, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
+	var (
+		objs  []runtime.Object
+		bytes = buf.Bytes()
+		left  []byte
+		i     = 0
+		size  = len(bytes)
+	)
 
-	if apierrors.IsNotFound(err) || len(cm.OwnerReferences) == 0 || cm.OwnerReferences[0].UID != owner.UID {
+	for {
+		if len(bytes) > maxSize {
+			left = bytes[maxSize:]
+			bytes = bytes[:maxSize]
+		}
+
+		next := ""
+		if len(left) > 0 {
+			next = name2.SafeConcatName(owner.Name, fmt.Sprint(i+1), string(owner.UID))
+		}
+
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName:    name + "-",
+				Name:            name2.SafeConcatName(owner.Name, fmt.Sprint(i), string(owner.UID)),
 				Namespace:       namespace,
 				OwnerReferences: []metav1.OwnerReference{owner},
+				Annotations: map[string]string{
+					"catalog.cattle.io/next": next,
+					// Size ensure the resource version should update even if this is the head of a multipart chunk
+					"catalog.cattle.io/size": fmt.Sprint(size),
+				},
 			},
 			BinaryData: map[string][]byte{
-				"content": buf.Bytes(),
+				"content": bytes,
 			},
 		}
-		return r.configMaps.Create(cm)
+
+		objs = append(objs, cm)
+		if len(left) == 0 {
+			break
+		}
+
+		i++
+		bytes = left
+		left = nil
 	}
 
-	cm.BinaryData = map[string][]byte{
-		"content": buf.Bytes(),
-	}
-	return r.configMaps.Update(cm)
+	return objs[0].(*corev1.ConfigMap), r.apply.WithOwner(ownerObject).ApplyObjects(objs...)
 }
 
 func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta) (catalog.RepoStatus, error) {
