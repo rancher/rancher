@@ -29,6 +29,15 @@ type Server struct {
 	scaledContext *config.ScaledContext
 }
 
+func NewAlwaysAdmin() (*Server, error) {
+	return &Server{
+		Authenticator: steveauth.ToMiddleware(steveauth.AuthenticatorFunc(steveauth.AlwaysAdmin)),
+		Management: func(next http.Handler) http.Handler {
+			return next
+		},
+	}, nil
+}
+
 func NewHeaderAuth() (*Server, error) {
 	return &Server{
 		Authenticator: steveauth.ToMiddleware(steveauth.AuthenticatorFunc(steveauth.Impersonation)),

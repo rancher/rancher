@@ -47,6 +47,12 @@ var (
 		true,
 		false,
 		true)
+	Auth = newFeature(
+		"auth",
+		"Enable authentication",
+		true,
+		false,
+		false)
 )
 
 type Feature struct {
