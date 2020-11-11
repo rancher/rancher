@@ -55,20 +55,12 @@ func getIdentifier() string {
 // than one hour without calling this method again you must pass in an overrideTTL.
 // However, the overrideTTL must not be 0, otherwise the token will never be cleaned up.
 func (t *SystemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64) (string, func(), error) {
-	if overrideTTL != nil && *overrideTTL == 0 {
-		return "", nil, errors.New("TTL for system token must not be zero") // no way to cleanup token
-	}
 	tokenName = fmt.Sprintf("%s-%s", tokenName, t.haIdentifier) // append hashed identifier, see getIdentifier
-	token, err := t.tokenLister.Get("", tokenName)
+	_, err := t.tokenLister.Get("", tokenName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", nil, err
 	}
 
-	if err == nil && !tokens.IsExpired(*token) {
-		if tokenVal := t.getTokenValue(tokenName); tokenVal != "" {
-			return tokenVal, nil, nil
-		}
-	}
 	// needs fresh token because its missing or expired
 	val, err := t.createOrUpdateSystemToken(tokenName, description, kind, username, overrideTTL)
 	if err != nil {
@@ -163,10 +155,7 @@ func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 			return "", err
 		}
 	}
-	// Fresh token needs saving in cache
+
 	fullVal := fmt.Sprintf("%s:%s", token.Name, key)
-	t.tokenCacheMutex.Lock()
-	defer t.tokenCacheMutex.Unlock()
-	t.tokenCache[tokenName] = fullVal
 	return fullVal, nil
 }
