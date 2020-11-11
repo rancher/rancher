@@ -157,10 +157,10 @@ func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), ProjectSystemAccountPrefix+projectName)
 }
 
-func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, error) {
+func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, func(), error) {
 	user, err := s.GetProjectSystemUser(projectName)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	return s.systemTokens.EnsureSystemToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name, nil)
 }

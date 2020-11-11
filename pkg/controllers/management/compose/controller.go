@@ -82,10 +82,12 @@ func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if err != nil {
 		return obj, err
 	}
-	token, err := l.systemTokens.EnsureSystemToken(composeTokenPrefix+user.Name, description, "compose", user.Name, nil)
+	token, cleanup, err := l.systemTokens.EnsureSystemToken(composeTokenPrefix+user.Name, description, "compose", user.Name, nil)
 	if err != nil {
 		return obj, err
 	}
+	defer cleanup()
+
 	config := &compose.Config{}
 	if err := yaml.Unmarshal([]byte(obj.Spec.RancherCompose), config); err != nil {
 		return obj, err

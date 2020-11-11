@@ -154,10 +154,11 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, *common.HelmPath, er
 	var commands []string
 	var cmd *exec.Cmd
 	if common.IsHelm3(obj.Status.HelmVersion) {
-		err = l.writeKubeConfig(obj, tempDir.KubeConfigFull, false)
+		cleanup, err := l.writeKubeConfig(obj, tempDir.KubeConfigFull, false)
 		if err != nil {
 			return "", nil, err
 		}
+		defer cleanup()
 		commands = append([]string{"template", obj.Name, "--include-crds", appDir, "--namespace", obj.Spec.TargetNamespace, "--kubeconfig", tempDir.KubeConfigInJail}, setValues...)
 		cmd = exec.Command(common.HelmV3, commands...)
 	} else {

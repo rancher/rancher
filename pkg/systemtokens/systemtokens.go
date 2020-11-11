@@ -54,27 +54,33 @@ func getIdentifier() string {
 // TTL defaults to 1 hour, after that this method will auto-refresh. If your token will be in use for more
 // than one hour without calling this method again you must pass in an overrideTTL.
 // However, the overrideTTL must not be 0, otherwise the token will never be cleaned up.
-func (t *SystemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64) (string, error) {
+func (t *SystemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64) (string, func(), error) {
 	if overrideTTL != nil && *overrideTTL == 0 {
-		return "", errors.New("TTL for system token must not be zero") // no way to cleanup token
+		return "", nil, errors.New("TTL for system token must not be zero") // no way to cleanup token
 	}
 	tokenName = fmt.Sprintf("%s-%s", tokenName, t.haIdentifier) // append hashed identifier, see getIdentifier
 	token, err := t.tokenLister.Get("", tokenName)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
+		return "", nil, err
 	}
 
 	if err == nil && !tokens.IsExpired(*token) {
 		if tokenVal := t.getTokenValue(tokenName); tokenVal != "" {
-			return tokenVal, nil
+			return tokenVal, nil, nil
 		}
 	}
 	// needs fresh token because its missing or expired
 	val, err := t.createOrUpdateSystemToken(tokenName, description, kind, username, overrideTTL)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return val, nil
+
+	cleanup := func() {
+		if err := t.tokenClient.Delete(tokenName, &v1.DeleteOptions{}); err != nil {
+			logrus.Infof("unable to delete token [%s], will not retry: %v", tokenName, err)
+		}
+	}
+	return val, cleanup, nil
 }
 
 func (t *SystemTokens) getTokenValue(tokenName string) string {

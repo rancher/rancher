@@ -81,7 +81,7 @@ func (l *PipelineService) ensureSecrets(namespace *corev1.Namespace) error {
 	projectName := namespace.Annotations["field.cattle.io/projectId"]
 	_, projectID := ref.Parse(projectName)
 	ns := namespace.Name
-	apikey, err := l.systemAccountManager.GetOrCreateProjectSystemToken(projectID)
+	apikey, _, err := l.systemAccountManager.GetOrCreateProjectSystemToken(projectID)
 	if err != nil {
 		return err
 	}

@@ -78,14 +78,21 @@ func (l *Lifecycle) deploy(projectName string) error {
 		return errors.Wrapf(err, "Error creating a pipeline secret")
 	}
 
-	apikey, err := l.systemAccountManager.GetOrCreateProjectSystemToken(projectID)
+	apikey, tokenCleanup, err := l.systemAccountManager.GetOrCreateProjectSystemToken(projectID)
 	if err != nil {
 		return err
 	}
+	defer tokenCleanup()
+
 	secret = GetAPIKeySecret(nsName, apikey)
 	if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error creating a pipeline secret")
 	}
+	defer func(){
+		if err := l.secrets.Delete(secret.Name, &metav1.DeleteOptions{}); err != nil {
+			logrus.Errorf("failed to delete secret [%s] for pipeline [%s], will not retry: %v", secret.Name, err)
+		}
+	}()
 
 	if err := l.reconcileRegistryCASecret(clusterID); err != nil {
 		return err
