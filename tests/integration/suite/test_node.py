@@ -4,7 +4,7 @@ import pytest
 from rancher import ApiError
 from kubernetes.client import CoreV1Api
 from .common import auth_check, random_str, string_to_encoding
-from .conftest import wait_for
+from .conftest import wait_for, wait_for_condition
 import time
 
 
@@ -139,9 +139,9 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
         digitaloceancredentialConfig={"accessToken": "test"})
     wait_remove_resource(cloud_credential)
 
-    data = {'userdata': 'do cool stuff\n',
+    data = {'userdata': 'do cool stuff' + random_str() + '\n',
             # This validates ssh keys don't drop the ending \n
-            'id_rsa': 'some\nfake\nstuff\n'
+            'id_rsa': 'some\nfake\nstuff\n' + random_str() + '\n'
             }
 
     def _node_template():
@@ -166,6 +166,15 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
         nodeTemplateId=node_template.id,
         hostnamePrefix="test1",
         clusterId="local")
+
+    def node_available():
+        node = client.list_node(nodePoolId=node_pool.id)
+        if len(node.data):
+            return node.data[0]
+        return None
+
+    node = wait_for(node_available)
+    wait_for_condition("Saved", "False", client, node)
     wait_remove_resource(node_pool)
 
     for key, value in data.items():
