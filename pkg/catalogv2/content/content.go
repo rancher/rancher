@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/repo"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 )
@@ -79,6 +80,27 @@ func (c *Manager) getRepo(namespace, name string) (repoDef, error) {
 	panic("namespace should never be empty")
 }
 
+func (c *Manager) readBytes(cm *corev1.ConfigMap) ([]byte, error) {
+	var (
+		bytes = cm.BinaryData["content"]
+		err   error
+	)
+
+	for {
+		next := cm.Annotations["catalog.cattle.io/next"]
+		if next == "" {
+			break
+		}
+		cm, err = c.configMaps.Get(cm.Namespace, next)
+		if err != nil {
+			return nil, err
+		}
+		bytes = append(bytes, cm.BinaryData["content"]...)
+	}
+
+	return bytes, nil
+}
+
 func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	r, err := c.getRepo(namespace, name)
 	if err != nil {
@@ -108,13 +130,18 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 		return nil, validation.Unauthorized
 	}
 
-	gz, err := gzip.NewReader(bytes.NewBuffer(cm.BinaryData["content"]))
+	data, err := c.readBytes(cm)
+	if err != nil {
+		return nil, err
+	}
+
+	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}
 	defer gz.Close()
 
-	data, err := ioutil.ReadAll(gz)
+	data, err = ioutil.ReadAll(gz)
 	if err != nil {
 		return nil, err
 	}
