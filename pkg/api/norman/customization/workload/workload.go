@@ -2,6 +2,7 @@ package workload
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -17,6 +18,10 @@ import (
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	batchv1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
+	batchv1beta1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1beta1"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/rbac"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -32,20 +37,37 @@ const (
 )
 
 var (
-	allowRedeployTypes = map[string]bool{"cronJob": true, "deployment": true, "replicationController": true, "statefulSet": true, "daemonSet": true, "replicaSet": true}
+	allowRedeployTypes     = map[string]bool{"cronJob": true, "deployment": true, "replicationController": true, "statefulSet": true, "daemonSet": true, "replicaSet": true}
+	errInvalidWorkloadType = errors.New("invalid workload type")
 )
 
-type ActionWrapper struct {
+type Config struct {
 	ClusterManager *clustermanager.Manager
+	Schemas        map[string]*types.Schema
 }
 
-func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+func (a *Config) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var deployment projectclient.Workload
 	accessError := access.ByID(apiContext, &projectschema.Version, "workload", apiContext.ID, &deployment)
 	if accessError != nil {
 		return httperror.NewAPIError(httperror.InvalidReference, "Error accessing workload")
 	}
-	namespace, name := splitID(deployment.ID)
+	workloadType, namespace, name := splitID(deployment.ID)
+
+	// Create a RawResource with a minimal config. This will be used for the eventual "CanDo" method, which parses
+	// the name and namespace from a RawResource object.
+	rawResource := &types.RawResource{
+		Values: map[string]interface{}{
+			"id":          name,
+			"namespaceId": namespace,
+		},
+	}
+	if err := a.canUpdateWorkload(apiContext, rawResource, workloadType); err != nil {
+		if err == errInvalidWorkloadType {
+			return httperror.NewAPIError(httperror.InvalidType, errInvalidWorkloadType.Error())
+		}
+		return httperror.NewAPIError(httperror.NotFound, "not found")
+	}
 	switch actionName {
 	case "rollback":
 		clusterName := a.ClusterManager.ClusterName(apiContext)
@@ -133,7 +155,7 @@ func update(apiContext *types.APIContext, data map[string]interface{}, ID string
 	return err
 }
 
-func (a ActionWrapper) rollbackDeployment(apiContext *types.APIContext, clusterContext *config.UserContext,
+func (a *Config) rollbackDeployment(apiContext *types.APIContext, clusterContext *config.UserContext,
 	actionName string, deployment projectclient.Workload, namespace string, name string) error {
 	input, err := handler.ParseAndValidateActionBody(apiContext, apiContext.Schemas.Schema(&projectschema.Version,
 		projectclient.DeploymentRollbackInputType))
@@ -227,7 +249,7 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	if apiContext.Link == workloadRevisions {
 		var deployment projectclient.Workload
 		if err := access.ByID(apiContext, &projectschema.Version, "workload", apiContext.ID, &deployment); err == nil {
-			namespace, deploymentName := splitID(deployment.ID)
+			_, namespace, deploymentName := splitID(deployment.ID)
 			data := getRevisions(apiContext, namespace, deploymentName, "")
 			apiContext.Type = projectclient.ReplicaSetType
 			apiContext.WriteResponse(http.StatusOK, data)
@@ -237,40 +259,81 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	return httperror.NewAPIError(httperror.NotFound, "Link not found")
 }
 
-func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (a *Config) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	workloadID := resource.ID
 	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
 	resource.Links["self"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["remove"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["update"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
-	//add redeploy action to the workload types that support redeploy
-	if _, ok := allowRedeployTypes[resource.Type]; ok {
+	// Add redeploy action to the workload types that support redeploy.
+	_, ok := allowRedeployTypes[resource.Type]
+	workloadType, _, _ := splitID(resource.ID)
+	if ok && a.canUpdateWorkload(apiContext, resource, workloadType) == nil {
 		resource.Actions["redeploy"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "redeploy")
 	}
 
 	delete(resource.Values, "nodeId")
 }
 
-func DeploymentFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (a *Config) DeploymentFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	workloadID := resource.ID
 	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
-	Formatter(apiContext, resource)
+	a.Formatter(apiContext, resource)
 	resource.Links["revisions"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID) + "/" + workloadRevisions
-	resource.Actions["pause"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "pause")
-	resource.Actions["resume"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "resume")
-	resource.Actions["rollback"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "rollback")
+	workloadType, _, _ := splitID(resource.ID)
+	if a.canUpdateWorkload(apiContext, resource, workloadType) == nil {
+		resource.Actions["pause"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "pause")
+		resource.Actions["resume"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "resume")
+		resource.Actions["rollback"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "rollback")
+	}
 }
 
 type Handler struct {
 }
 
-func splitID(id string) (string, string) {
+func splitID(id string) (string, string, string) {
+	workloadType := ""
 	namespace := ""
 	parts := strings.SplitN(id, ":", 3)
 	if len(parts) == 3 {
+		workloadType = parts[0]
 		namespace = parts[1]
 		id = parts[2]
 	}
+	return workloadType, namespace, id
+}
 
-	return namespace, id
+func (a *Config) canUpdateWorkload(apiContext *types.APIContext, resource *types.RawResource, workloadType string) error {
+	var apiGroup string
+	var pluralName string
+
+	switch workloadType {
+	case appsv1.DeploymentResource.SingularName:
+		apiGroup = appsv1.GroupName
+		pluralName = appsv1.DeploymentResource.Name
+	case corev1.ReplicationControllerResource.SingularName:
+		apiGroup = corev1.GroupName
+		pluralName = corev1.ReplicationControllerResource.Name
+	case appsv1.ReplicaSetResource.SingularName:
+		apiGroup = appsv1.GroupName
+		pluralName = appsv1.ReplicaSetResource.Name
+	case appsv1.DaemonSetResource.SingularName:
+		apiGroup = appsv1.GroupName
+		pluralName = appsv1.DaemonSetResource.Name
+	case appsv1.StatefulSetResource.SingularName:
+		apiGroup = appsv1.GroupName
+		pluralName = appsv1.StatefulSetResource.Name
+	case batchv1.JobResource.SingularName:
+		apiGroup = batchv1.GroupName
+		pluralName = batchv1.JobResource.Name
+	case batchv1beta1.CronJobResource.SingularName:
+		apiGroup = batchv1beta1.GroupName
+		pluralName = batchv1beta1.CronJobResource.Name
+	default:
+		logrus.Debugf("Invalid workload type: %s", workloadType)
+		return errInvalidWorkloadType
+	}
+
+	return apiContext.AccessControl.CanDo(apiGroup, pluralName, "update", apiContext,
+		rbac.ObjFromContext(apiContext, resource), a.Schemas[workloadType])
 }
