@@ -17,6 +17,7 @@ import (
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/rbac"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
@@ -39,9 +40,11 @@ var backoff = wait.Backoff{
 }
 
 func (w Wrapper) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "rollback")
-	resource.AddAction(apiContext, addProjectsAction)
-	resource.AddAction(apiContext, removeProjectsAction)
+	if canUpdateMCA(apiContext, resource) == nil {
+		resource.AddAction(apiContext, "rollback")
+		resource.AddAction(apiContext, addProjectsAction)
+		resource.AddAction(apiContext, removeProjectsAction)
+	}
 	resource.Links["revisions"] = apiContext.URLBuilder.Link("revisions", resource)
 }
 
@@ -49,6 +52,9 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	var mcApp client.MultiClusterApp
 	if err := access.ByID(apiContext, &managementschema.Version, client.MultiClusterAppType, apiContext.ID, &mcApp); err != nil {
 		return err
+	}
+	if canUpdateMCA(apiContext, nil) != nil {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 	switch actionName {
 	case "rollback":
@@ -287,4 +293,9 @@ func (w Wrapper) validateRancherVersion(tempVersion string) error {
 	}
 
 	return catUtil.ValidateRancherVersion(template)
+}
+
+func canUpdateMCA(apiContext *types.APIContext, resource *types.RawResource) error {
+	return apiContext.AccessControl.CanDo(v3.MultiClusterAppGroupVersionKind.Group, v3.MultiClusterAppResource.Name,
+		"update", apiContext, rbac.ObjFromContext(apiContext, resource), apiContext.Schema)
 }
