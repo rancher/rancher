@@ -1123,7 +1123,7 @@ def wait_for_node_to_be_deleted(client, node, timeout=300):
     while node_count != 0:
         if time.time() - start > timeout:
             raise AssertionError(
-                "Timed out waiting for state to get to active")
+                "Timed out waiting for node delete")
         time.sleep(.5)
         nodes = client.list_node(uuid=uuid).data
         node_count = len(nodes)
