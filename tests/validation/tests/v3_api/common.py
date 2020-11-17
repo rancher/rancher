@@ -891,10 +891,11 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
                 wget_cmd = "wget -qO- " + cmd
             result = kubectl_pod_exec(client_pod, wget_cmd)
             result = result.decode()
-        result = result.rstrip()
-        assert result in target_name_list
-        if result in target_hit_list:
-            target_hit_list.remove(result)
+        if result is not None:
+            result = result.rstrip()
+            assert result in target_name_list
+            if result in target_hit_list:
+                target_hit_list.remove(result)
     print("After removing all, the rest is: ", target_hit_list)
     assert len(target_hit_list) == 0
 

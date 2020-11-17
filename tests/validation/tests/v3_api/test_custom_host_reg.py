@@ -54,8 +54,8 @@ def test_deploy_rancher_server():
             'sudo docker run -d --name="rancher-server" ' \
             '--restart=unless-stopped -p 80:80 -p 443:443  ' \
             'rancher/rancher'
-    print(RANCHER_SERVER_CMD)
     RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION
+    print(RANCHER_SERVER_CMD)
     aws_nodes = AmazonWebServices().create_multiple_nodes(
         1, random_test_name("testsa" + HOST_NAME))
     aws_nodes[0].execute_command(RANCHER_SERVER_CMD)
