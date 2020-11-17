@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
@@ -219,6 +219,11 @@ func getDesiredImage(cluster *v3.Cluster) string {
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
+	if dialer.HasPublicAPIEndpoint(cluster) {
+		logrus.Debugf("clusterDeploy: deployAgent: cluster [%s] is private so agent cannot be deployed automatically", cluster.Name)
+		return nil
+	}
+
 	if cluster.Spec.Internal {
 		return nil
 	}

@@ -9,9 +9,8 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/types/slice"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -23,6 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+)
+
+const (
+	WaitForAgentError = "waiting for cluster [%s] agent to connect"
 )
 
 func NewFactory(apiContext *config.ScaledContext) (*Factory, error) {
@@ -63,6 +66,21 @@ func IsCloudDriver(cluster *v3.Cluster) bool {
 		cluster.Status.Driver != v32.ClusterDriverK3os &&
 		cluster.Status.Driver != v32.ClusterDriverRke2 &&
 		cluster.Status.Driver != v32.ClusterDriverRancherD
+}
+
+func IsPublicCloudDriver(cluster *v3.Cluster) bool {
+	return IsCloudDriver(cluster) && HasPublicAPIEndpoint(cluster)
+}
+
+func HasPublicAPIEndpoint(cluster *v3.Cluster) bool {
+	switch cluster.Status.Driver {
+	case v32.ClusterDriverEKS:
+		return cluster.Status.EKSStatus.UpstreamSpec == nil ||
+			cluster.Status.EKSStatus.UpstreamSpec.PublicAccess == nil ||
+			*cluster.Status.EKSStatus.UpstreamSpec.PublicAccess
+	default:
+		return true
+	}
 }
 
 func (f *Factory) translateClusterAddress(cluster *v3.Cluster, clusterHostPort, address string) string {
@@ -149,7 +167,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 
 	hostPort := hostPort(cluster)
 	logrus.Tracef("dialerFactory: apiEndpoint hostPort for cluster [%s] is [%s]", clusterName, hostPort)
-	if (address == hostPort || isProxyAddress(address)) && IsCloudDriver(cluster) {
+	if (address == hostPort || isProxyAddress(address)) && IsPublicCloudDriver(cluster) {
 		// For cloud drivers we just connect directly to the k8s API, not through the tunnel.  All other go through tunnel
 		return native()
 	}
@@ -214,7 +232,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 		time.Sleep(wait.Jitter(5*time.Second, 1))
 	}
 
-	return nil, fmt.Errorf("waiting for cluster [%s] agent to connect", cluster.Name)
+	return nil, fmt.Errorf(WaitForAgentError, cluster.Name)
 }
 
 func hostPort(cluster *v3.Cluster) string {
