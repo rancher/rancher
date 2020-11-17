@@ -103,8 +103,11 @@ def test_deploy_airgap_nodes():
     for ag_node in ag_nodes:
         assert ag_node.private_ip_address is not None
         assert ag_node.public_ip_address is None
-
-    results = add_cluster_to_rancher(bastion_node, ag_nodes)
+    results = []
+    for ag_node in ag_nodes:
+        deploy_result = run_command_on_airgap_node(bastion_node, ag_node,
+                                                   AGENT_REG_CMD)
+        results.append(deploy_result)
     for result in results:
         assert "Downloaded newer image for {}/rancher/rancher-agent".format(
             bastion_node.host_name) in result[1]
@@ -137,9 +140,9 @@ def test_deploy_airgap_k3s_private_registry():
     # Optionally add k3s cluster to Rancher server
     if AGENT_REG_CMD:
         print("Adding to rancher server")
-        results = add_cluster_to_rancher(bastion_node, [ag_nodes[0]])
-        for result in results:
-            assert "deployment.apps/cattle-cluster-agent created" in result[0]
+        result = run_command_on_airgap_node(bastion_node, ag_nodes[0],
+                                            AGENT_REG_CMD)
+        assert "deployment.apps/cattle-cluster-agent created" in result
 
 
 def test_deploy_airgap_k3s_tarball():
@@ -173,9 +176,9 @@ def test_deploy_airgap_k3s_tarball():
                 restart_k3s = 'sudo systemctl restart k3s && ' \
                               'sudo chmod 644 /etc/rancher/k3s/k3s.yaml'
             run_command_on_airgap_node(bastion_node, ag_node, restart_k3s)
-        results = add_cluster_to_rancher(bastion_node, [ag_nodes[0]])
-        for result in results:
-            assert "deployment.apps/cattle-cluster-agent created" in result[0]
+        result = run_command_on_airgap_node(bastion_node, ag_nodes[0],
+                                            AGENT_REG_CMD)
+        assert "deployment.apps/cattle-cluster-agent created" in result
 
 
 def test_add_rancher_images_to_private_registry():
@@ -518,15 +521,6 @@ def prepare_airgap_k3s(bastion_node, number_of_nodes, method):
         print("Airgapped K3S Instance Details:\nNAME: {}-{}\nPRIVATE IP: {}\n"
               "".format(node_name, num, ag_node.private_ip_address))
     return ag_nodes
-
-
-def add_cluster_to_rancher(bastion_node, ag_nodes):
-    results = []
-    for ag_node in ag_nodes:
-        deploy_result = run_command_on_airgap_node(bastion_node, ag_node,
-                                                   AGENT_REG_CMD)
-        results.append(deploy_result)
-    return results
 
 
 def deploy_airgap_k3s_cluster(bastion_node, ag_nodes):
