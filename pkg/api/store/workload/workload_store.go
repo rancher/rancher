@@ -34,19 +34,21 @@ func NewWorkloadAggregateStore(schemas *types.Schemas, manager *clustermanager.M
 		schemas.Schema(&schema.Version, "job"),
 		schemas.Schema(&schema.Version, "cronJob"))
 
+	workloadConfig := workload.Config{
+		ClusterManager: manager,
+		Schemas:        store.Schemas,
+	}
+
 	for _, s := range store.Schemas {
 		if s.ID == "deployment" {
-			s.Formatter = workload.DeploymentFormatter
+			s.Formatter = workloadConfig.DeploymentFormatter
 		} else {
-			s.Formatter = workload.Formatter
+			s.Formatter = workloadConfig.Formatter
 		}
 	}
 
 	workloadSchema.Store = store
-	actionWrapper := workload.ActionWrapper{
-		ClusterManager: manager,
-	}
-	workloadSchema.ActionHandler = actionWrapper.ActionHandler
+	workloadSchema.ActionHandler = workloadConfig.ActionHandler
 	workloadSchema.LinkHandler = workload.Handler{}.LinkHandler
 }
 
