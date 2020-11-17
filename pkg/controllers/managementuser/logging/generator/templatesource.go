@@ -41,7 +41,7 @@ var SourceTemplate = `
   @type  tail
   path  {{ .ContainerSourcePath}}
   pos_file  /fluentd/log/{{ .ContainerLogPosFilename}}
-  time_format  %Y-%m-%dT%H:%M:%S
+  time_format  %Y-%m-%dT%H:%M:%S.%N
   tag  {{ .ContainerLogSourceTag }}.*
   format  json
   skip_refresh_on_startup true
