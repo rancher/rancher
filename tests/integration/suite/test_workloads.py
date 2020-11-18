@@ -344,8 +344,9 @@ def test_workload_redeploy(admin_pc, remove_resource):
 def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
                                            user_mc, user_factory):
     """Tests workload actions with a read-only user and a member user.
-       NOTE: if backporting a change to 2.4 and below that this test
-       encounters, ensure that the change works manually."""
+       Note: this test exists only in 2.5+ due to pod scheduling on the
+       local cluster. Manually ensure that any changes in 2.4 and below
+       work."""
     client = admin_pc.client
     project = admin_pc.project
     user = user_mc
