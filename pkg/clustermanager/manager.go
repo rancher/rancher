@@ -126,20 +126,21 @@ func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers, c
 		m.Stop(obj.(*record).clusterRec)
 	}
 
-	controller, err := m.toRecord(ctx, cluster)
+	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
 		m.markUnavailable(cluster.Name)
 		return nil, err
 	}
-	if controller == nil {
+	if clusterRecord == nil {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not found")
 	}
 
-	obj, _ = m.controllers.LoadOrStore(cluster.UID, controller)
+	obj, _ = m.controllers.LoadOrStore(cluster.UID, clusterRecord)
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
 		m.markUnavailable(cluster.Name)
 		return nil, err
 	}
+
 	return obj.(*record), nil
 }
 
@@ -227,6 +228,10 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	done := make(chan error, 1)
 	go func() {
 		defer close(done)
+
+		logrus.Debugf("[clustermanager] creating AccessControl for cluster %v", rec.cluster.ClusterName)
+		rec.accessControl = rbac.NewAccessControl(rec.ctx, rec.cluster.ClusterName, rec.cluster.RBACw)
+
 		err := rec.cluster.Start(rec.ctx)
 		if err == nil {
 			transaction.Commit()
@@ -398,9 +403,8 @@ func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, e
 	}
 
 	s := &record{
-		cluster:       clusterContext,
-		clusterRec:    cluster,
-		accessControl: rbac.NewAccessControl(ctx, cluster.Name, clusterContext.RBACw),
+		cluster:    clusterContext,
+		clusterRec: cluster,
 	}
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
