@@ -62,9 +62,9 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) 
 // which has hostPorts
 func (ph *podHandler) addLabelIfHostPortsPresent(pod *corev1.Pod, systemNamespaces map[string]bool) error {
 	if pod.Labels != nil {
-		if _, ok := pod.Labels[PodNameFieldLabel]; ok {
-			// we don't create network policies in system namespaces, delete label
-			if _, ok := systemNamespaces[pod.Namespace]; ok {
+		if _, ok := systemNamespaces[pod.Namespace]; ok {
+			if _, ok := pod.Labels[PodNameFieldLabel]; ok {
+				// we don't create network policies in system namespaces, delete label
 				logrus.Debugf("podHandler: addLabelIfHostPortsPresent: deleting podNameFieldLabel %+v in %s", pod.Labels, pod.Namespace)
 				podCopy := pod.DeepCopy()
 				delete(podCopy.Labels, PodNameFieldLabel)
@@ -73,6 +73,7 @@ func (ph *podHandler) addLabelIfHostPortsPresent(pod *corev1.Pod, systemNamespac
 					return err
 				}
 			}
+			// don't add hostPort label for pods in system namespaces
 			return nil
 		}
 	}
