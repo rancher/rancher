@@ -100,6 +100,16 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	); err != nil {
 		return err
 	}
+	if err := creator.addCustomDriver(
+		"linodekubernetesengine",
+		"https://github.com/tamalsaha/kontainer-engine-driver-linode/releases/download/v0.0.21/kontainer-engine-driver-lke",
+		"",
+		"http://localhost:3000/component.js",
+		false,
+		"",
+	); err != nil {
+		return err
+	}
 
 	if err := creator.addCustomDriver(
 		"opentelekomcloudcontainerengine",
