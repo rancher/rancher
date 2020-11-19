@@ -69,7 +69,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		"global":       systemGlobalRegistry,
 	}
 
-	gitjobChartValues := map[string]interface{}{}
+	gitjobChartValues :=  make(map[string]interface{})
 
 	if envVal, ok := os.LookupEnv("HTTP_PROXY"); ok {
 		gitjobChartValues["proxy"] = envVal
