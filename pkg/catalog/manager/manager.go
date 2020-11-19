@@ -226,6 +226,10 @@ func (m *Manager) ValidateKubeVersion(template *v3.CatalogTemplateVersion, clust
 		return err
 	}
 
+	if cluster.Status.Version == nil {
+		return fmt.Errorf("cluster [%s] status version is not available yet. Cannot validate kube version for template [%s]", clusterName, template.Name)
+	}
+
 	k8sVersion, err := semver.Parse(strings.TrimPrefix(cluster.Status.Version.String(), "v"))
 	if err != nil {
 		return err
