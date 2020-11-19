@@ -74,6 +74,9 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	if envVal, ok := os.LookupEnv("HTTP_PROXY"); ok {
 		gitjobChartValues["proxy"] = envVal
 	}
+	if envVal, ok := os.LookupEnv("HTTPS_PROXY"); ok {
+		gitjobChartValues["proxy"] = envVal
+	}
 	if envVal, ok := os.LookupEnv("NO_PROXY"); ok {
 		gitjobChartValues["noProxy"] = envVal
 	}
