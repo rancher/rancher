@@ -46,7 +46,7 @@ $hostPrefixPath = $CATTLE_PREFIX_PATH -Replace "c:\\", "c:\host\"
 
 
 # create directories on the host
-# windows docker only can mount the existing path into container
+# windows docker can only mount an existing path into containers
 try
 {
     New-Item -Force -ItemType Directory -Path @(
@@ -82,7 +82,7 @@ try
 } catch { }
 
 # copy cleanup.ps1 & wins.exe to the host
-# wins needs to run as a server on the host to accept the request from container
+# wins needs to run as a service on the host to accept requests from container
 try
 {
     Copy-Item -Force -Destination "$($hostPrefixPath)etc\rancher" -Path @(
@@ -159,26 +159,26 @@ catch
     Log-Warn "Could not detect the DISK resource: `$(`$_.Exception.Message)"
 }
 
-Log-Info "Detecting host Docker name pipe existing ..."
+Log-Info "Detecting host Docker named pipe existing ..."
 `$dockerNPipe = Get-ChildItem //./pipe/ -ErrorAction Ignore | ? Name -eq "docker_engine"
 if (-not `$dockerNPipe)
 {
-    Log-Warn "Default docker named pipe is not available"
+    Log-Warn "Default Docker named pipe is not available"
     Log-Warn "Please create '//./pipe/docker_engine' named pipe to access docker daemon if docker errors occur"
 }
 
-Log-Info "Detecting host Docker release version ..."
+Log-Info "Detecting host Docker platform name..."
 try
 {
     `$dockerPlatform = docker.exe version -f "{{.Server.Platform.Name}}"
-    if (-not (`$dockerPlatform -like '*Enterprise*'))
+    if (-not (`$dockerPlatform -like '*Enterprise*') -AND -not (`$dockerPlatform -eq 'Mirantis Container Runtime'))
     {
-        Log-Fatal "Only support with Docker EE"
+        Log-Fatal "Only Docker EE or Mirantis Container Runtime supported"
     }
 }
 catch
 {
-    Log-Fatal "Could not found Docker service: `$(`$_.Exception.Message)"
+    Log-Fatal "Could not find Docker service: `$(`$_.Exception.Message)"
 }
 
 Log-Info "Detecting host network interface ..."
@@ -187,19 +187,19 @@ Log-Info "Detecting host network interface ..."
 `$networkCount = `$allNetAdapters | Measure-Object | Select-Object -ExpandProperty "Count"
 if (`$networkCount -gt 1)
 {
-    Log-Warn "More than 1 network interfaces are found: `$(`$allNetAdapters -join ", ")"
+    Log-Warn "More than 1 network interface was found: `$(`$allNetAdapters -join ", ")"
     Log-Warn "Please indicate --internal-address when adding failed"
 }
 
-Log-Info "Configuring host Docker startup mode to automatical ..."
+Log-Info "Configuring host Docker Service to start automatically..."
 try
 {
     Get-Service -Name "docker" -ErrorAction Ignore | Where-Object {`$_.StartType -ne "Automatic"} | Set-Service -StartupType Automatic
 }
 catch
 {
-    Log-Warn "Could not configure the docker to start automatically: `$(`$_.Exception.Message)"
-    Log-Warn "Please configure the 'StartupType' to 'Automatic' for the docker service"
+    Log-Warn "Could not configure the Docker service to start automatically: `$(`$_.Exception.Message)"
+    Log-Warn "Please change the Docker service 'StartupType' to 'Automatic'"
 }
 
 Log-Info "Enabling host msiscsi service to support iscsi storage ..."
@@ -235,7 +235,7 @@ Remove-Item -Force -Path "`$PSScriptRoot\bootstrap.ps1" -ErrorAction Ignore
 $verification
 
 # repair Get-GcePdName method
-# this's a stopgap, we could drop this after https://github.com/kubernetes/kubernetes/issues/74674 fixed
+# this is a stopgap, we could drop this after https://github.com/kubernetes/kubernetes/issues/74674 fixed
 # related: rke-tools container
 `$getGcePodNameCommand = Get-Command -Name "Get-GcePdName" -ErrorAction Ignore
 if (-not `$getGcePodNameCommand)
