@@ -9,6 +9,7 @@ const (
 	ShibbolethConfigFieldCreatorID           = "creatorId"
 	ShibbolethConfigFieldDisplayNameField    = "displayNameField"
 	ShibbolethConfigFieldEnabled             = "enabled"
+	ShibbolethConfigFieldEntityID            = "entityID"
 	ShibbolethConfigFieldGroupsField         = "groupsField"
 	ShibbolethConfigFieldIDPMetadataContent  = "idpMetadataContent"
 	ShibbolethConfigFieldLabels              = "labels"
@@ -33,6 +34,7 @@ type ShibbolethConfig struct {
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DisplayNameField    string            `json:"displayNameField,omitempty" yaml:"displayNameField,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	EntityID            string            `json:"entityID,omitempty" yaml:"entityID,omitempty"`
 	GroupsField         string            `json:"groupsField,omitempty" yaml:"groupsField,omitempty"`
 	IDPMetadataContent  string            `json:"idpMetadataContent,omitempty" yaml:"idpMetadataContent,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
