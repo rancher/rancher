@@ -938,6 +938,7 @@ def create_cluster_template_revision(client, clusterTemplateId):
                                         disabled="false",
                                         questions=questions
                                         )
+    wait_for_revision(client, cluster_template_revision.id)
 
     return cluster_template_revision
 
@@ -1022,6 +1023,19 @@ def wait_for_default_revision(client, templateId, revisionId, timeout=60):
         template_reloaded = client.by_id_cluster_template(templateId)
         if template_reloaded.defaultRevisionId is not None:
             updated = True
+        time.sleep(interval)
+        interval *= 2
+
+
+def wait_for_revision(client, revisionId, timeout=60):
+    interval = 0.5
+    start = time.time()
+    while True:
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for clustertemplate to update')
+        revision_reloaded = client.by_id_cluster_template_revision(revisionId)
+        if revision_reloaded is not None:
+            break
         time.sleep(interval)
         interval *= 2
 
