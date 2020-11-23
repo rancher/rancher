@@ -23,12 +23,12 @@ func main() {
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:   "password",
-					Usage:  "Specifying password to login rancher",
+					Usage:  "Password for Rancher login",
 					EnvVar: "PASSWORD",
 				},
 				cli.StringFlag{
 					Name:   "password-file",
-					Usage:  "Specifying password to login rancher from file",
+					Usage:  "Password for Rancher login, from file",
 					EnvVar: "PASSWORD_FILE",
 				},
 			},

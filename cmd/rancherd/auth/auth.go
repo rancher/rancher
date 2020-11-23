@@ -33,36 +33,36 @@ var (
 	defaultAdminLabel      = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 )
 
-func ResetAdmin(ctx *cli.Context) error {
-	if err := validation(ctx); err != nil {
+func ResetAdmin(clx *cli.Context) error {
+	if err := validation(clx); err != nil {
 		return err
 	}
-	if err := resetAdmin(ctx); err != nil {
+	if err := resetAdmin(clx); err != nil {
 		return errors.Wrap(err, "cluster and rancher are not ready. Please try later.")
 	}
 	return nil
 }
 
-func validation(ctx *cli.Context) error {
-	if ctx.String("password") != "" && ctx.String("password-file") != "" {
+func validation(clx *cli.Context) error {
+	if clx.String("password") != "" && clx.String("password-file") != "" {
 		return errors.New("only one option can be set for password and password-file")
 	}
 	return nil
 }
 
-func resetAdmin(c *cli.Context) error {
+func resetAdmin(clx *cli.Context) error {
 	ctx := context.Background()
 	token, err := randomtoken.Generate()
 	if err != nil {
 		return err
 	}
 	mustChangePassword := true
-	if c.String("password") != "" {
-		token = c.String("password")
+	if clx.String("password") != "" {
+		token = clx.String("password")
 		mustChangePassword = false
 	}
-	if c.String("password-file") != "" {
-		passwordFromFile, err := ioutil.ReadFile(c.String("password-file"))
+	if clx.String("password-file") != "" {
+		passwordFromFile, err := ioutil.ReadFile(clx.String("password-file"))
 		if err != nil {
 			return err
 		}
