@@ -70,6 +70,7 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/urfave/cli v1.22.2
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.19.0
 	k8s.io/apimachinery v0.19.0
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
