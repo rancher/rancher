@@ -45,7 +45,6 @@ def test_bkp_restore_s3_recover_validate():
     for etcd_node in etcd_nodes:
         ips_to_remove.append(etcd_node.customConfig['internalAddress'])
         client.delete(etcd_node)
-        wait_for_node_to_be_deleted(client, etcd_node)
     # Also remove the ec2 instances
     for ip_to_remove in ips_to_remove:
         delete_node_from_ec2(ip_to_remove)
@@ -58,7 +57,7 @@ def test_bkp_restore_s3_recover_validate():
     # Add completely new etcd nodes to the cluster
     cluster = add_new_etcd_nodes(client, cluster)
     cluster = client.reload(cluster)
-    wait_for_cluster_node_count(client, cluster, 6)
+    wait_for_cluster_node_count(client, cluster, 6, 500)
     # This message is expected to appear after we add new etcd nodes
     # The cluster will require the user to perform a backup to recover
     # this is appears in the cluster object in cluster.transitioningMessage
