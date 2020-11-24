@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/wrangler/pkg/randomtoken"
@@ -31,18 +33,41 @@ var (
 	defaultAdminLabel      = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 )
 
-func ResetAdmin(ctx *cli.Context) error {
-	if err := resetAdmin(ctx); err != nil {
-		return errors.Wrap(err, "cluster and rancher are not ready. Please try later. ")
+func ResetAdmin(clx *cli.Context) error {
+	if err := validation(clx); err != nil {
+		return err
+	}
+	if err := resetAdmin(clx); err != nil {
+		return errors.Wrap(err, "cluster and rancher are not ready. Please try later.")
 	}
 	return nil
 }
 
-func resetAdmin(_ *cli.Context) error {
+func validation(clx *cli.Context) error {
+	if clx.String("password") != "" && clx.String("password-file") != "" {
+		return errors.New("only one option can be set for password and password-file")
+	}
+	return nil
+}
+
+func resetAdmin(clx *cli.Context) error {
 	ctx := context.Background()
 	token, err := randomtoken.Generate()
 	if err != nil {
 		return err
+	}
+	mustChangePassword := true
+	if clx.String("password") != "" {
+		token = clx.String("password")
+		mustChangePassword = false
+	}
+	if clx.String("password-file") != "" {
+		passwordFromFile, err := ioutil.ReadFile(clx.String("password-file"))
+		if err != nil {
+			return err
+		}
+		token = strings.TrimSuffix(string(passwordFromFile), "\n")
+		mustChangePassword = false
 	}
 
 	kubeconfig := os.Getenv("KUBECONFIG")
@@ -151,7 +176,7 @@ func resetAdmin(_ *cli.Context) error {
 					"displayName":        "Default Admin",
 					"username":           "admin",
 					"password":           string(hash),
-					"mustChangePassword": true,
+					"mustChangePassword": mustChangePassword,
 				},
 			}, v1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
