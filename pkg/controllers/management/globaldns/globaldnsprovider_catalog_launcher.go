@@ -122,6 +122,11 @@ func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDnsProvide
 		"aws.roleArn":         obj.Spec.Route53ProviderConfig.RoleArn,
 		"aws.region":          obj.Spec.Route53ProviderConfig.Region,
 	}
+	for k, v := range obj.Spec.Route53ProviderConfig.AdditionalOptions {
+		if _, ok := answers[k]; !ok {
+			answers[k] = v
+		}
+	}
 
 	if obj.Spec.RootDomain != "" {
 		answers["domainFilters[0]"] = obj.Spec.RootDomain
@@ -157,6 +162,11 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDnsProv
 		"policy":             "sync",
 		"cloudflare.proxied": isProxy,
 	}
+	for k, v := range obj.Spec.CloudflareProviderConfig.AdditionalOptions {
+		if _, ok := answers[k]; !ok {
+			answers[k] = v
+		}
+	}
 
 	if obj.Spec.RootDomain != "" {
 		answers["domainFilters[0]"] = obj.Spec.RootDomain
@@ -187,6 +197,11 @@ func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDnsProvider
 		"txtOwnerId":             rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":            "true",
 		"policy":                 "sync",
+	}
+	for k, v := range obj.Spec.AlidnsProviderConfig.AdditionalOptions {
+		if _, ok := answers[k]; !ok {
+			answers[k] = v
+		}
 	}
 
 	if obj.Spec.RootDomain != "" {
