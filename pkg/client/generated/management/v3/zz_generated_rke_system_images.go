@@ -2,6 +2,14 @@ package client
 
 const (
 	RKESystemImagesType                           = "rkeSystemImages"
+	RKESystemImagesFieldAciCniDeployContainer     = "aciCniDeployContainer"
+	RKESystemImagesFieldAciControllerContainer    = "aciControllerContainer"
+	RKESystemImagesFieldAciGbpServerContainer     = "aciGbpServerContainer"
+	RKESystemImagesFieldAciHostContainer          = "aciHostContainer"
+	RKESystemImagesFieldAciMcastContainer         = "aciMcastContainer"
+	RKESystemImagesFieldAciOpenvSwitchContainer   = "aciOvsContainer"
+	RKESystemImagesFieldAciOpflexContainer        = "aciOpflexContainer"
+	RKESystemImagesFieldAciOpflexServerContainer  = "aciOpflexServerContainer"
 	RKESystemImagesFieldAlpine                    = "alpine"
 	RKESystemImagesFieldCalicoCNI                 = "calicoCni"
 	RKESystemImagesFieldCalicoControllers         = "calicoControllers"
@@ -37,6 +45,14 @@ const (
 )
 
 type RKESystemImages struct {
+	AciCniDeployContainer     string `json:"aciCniDeployContainer,omitempty" yaml:"aciCniDeployContainer,omitempty"`
+	AciControllerContainer    string `json:"aciControllerContainer,omitempty" yaml:"aciControllerContainer,omitempty"`
+	AciGbpServerContainer     string `json:"aciGbpServerContainer,omitempty" yaml:"aciGbpServerContainer,omitempty"`
+	AciHostContainer          string `json:"aciHostContainer,omitempty" yaml:"aciHostContainer,omitempty"`
+	AciMcastContainer         string `json:"aciMcastContainer,omitempty" yaml:"aciMcastContainer,omitempty"`
+	AciOpenvSwitchContainer   string `json:"aciOvsContainer,omitempty" yaml:"aciOvsContainer,omitempty"`
+	AciOpflexContainer        string `json:"aciOpflexContainer,omitempty" yaml:"aciOpflexContainer,omitempty"`
+	AciOpflexServerContainer  string `json:"aciOpflexServerContainer,omitempty" yaml:"aciOpflexServerContainer,omitempty"`
 	Alpine                    string `json:"alpine,omitempty" yaml:"alpine,omitempty"`
 	CalicoCNI                 string `json:"calicoCni,omitempty" yaml:"calicoCni,omitempty"`
 	CalicoControllers         string `json:"calicoControllers,omitempty" yaml:"calicoControllers,omitempty"`
