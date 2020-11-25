@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -72,10 +73,10 @@ func (a ActionHandler) editMonitoring(actionName string, action *types.Action, a
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	cluster = cluster.DeepCopy()
-	cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
-
-	_, err = a.ClusterClient.Update(cluster)
+	err = updateClusterWithRetryOnConflict(a.ClusterClient, cluster, func(cluster *v3.Cluster) *v3.Cluster {
+		cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
+		return cluster
+	})
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to upgrade monitoring")
 	}
@@ -111,11 +112,11 @@ func (a ActionHandler) enableMonitoring(actionName string, action *types.Action,
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	cluster = cluster.DeepCopy()
-	cluster.Spec.EnableClusterMonitoring = true
-	cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
-
-	_, err = a.ClusterClient.Update(cluster)
+	err = updateClusterWithRetryOnConflict(a.ClusterClient, cluster, func(cluster *v3.Cluster) *v3.Cluster {
+		cluster.Spec.EnableClusterMonitoring = true
+		cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
+		return cluster
+	})
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to enable monitoring")
 	}
@@ -138,10 +139,10 @@ func (a ActionHandler) disableMonitoring(actionName string, action *types.Action
 		return nil
 	}
 
-	cluster = cluster.DeepCopy()
-	cluster.Spec.EnableClusterMonitoring = false
-
-	_, err = a.ClusterClient.Update(cluster)
+	err = updateClusterWithRetryOnConflict(a.ClusterClient, cluster, func(cluster *v3.Cluster) *v3.Cluster {
+		cluster.Spec.EnableClusterMonitoring = false
+		return cluster
+	})
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to disable monitoring")
 	}
