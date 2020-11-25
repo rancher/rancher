@@ -115,6 +115,9 @@ certmanager:
 # Rancher custom logos persistence
 customLogos:
   enabled: false
+  volumeSubpaths:
+    emberUi: "ember"
+    vueUi: "vue"
   ## Volume kind to use for persistence: persistentVolumeClaim, configMap
   volumeKind: persistentVolumeClaim
   ## Use an existing volume. Custom logos should be copied to the volume by the user
