@@ -11,6 +11,9 @@ func Add(wrangler *wrangler.Context, management *config.ManagementContext) error
 	if err != nil {
 		return err
 	}
+	if err := addClusterRoleForNamespacedCRDs(management); err != nil {
+		return err
+	}
 
 	if err := data.AuthConfigs(management); err != nil {
 		return err

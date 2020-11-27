@@ -2,9 +2,13 @@ package management
 
 import (
 	"context"
+	"reflect"
+	"sort"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -15,6 +19,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -74,36 +79,15 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	// restricted-admin will get cluster admin access to all downstream clusters but limited access to the local cluster
-	// The validating webhook will ensure GRBs PRTBs and CRTBs are not created by a restricted admin in the local cluster
-	rb.addRole("Restricted Admin", "restricted-admin").
-		addRule().apiGroups("management.cattle.io").resources("*").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("*").verbs("*").
-		addRule().apiGroups("fleet.cattle.io").resources("*").verbs("*").
-		addRule().apiGroups("rancher.cattle.io").resources("*").verbs("*").
-		addRule().apiGroups("catalog.cattle.io").resources("*").verbs("*").
-		addRule().apiGroups("").resources("secrets").verbs("create")
+	restrictedAdminRole := addUserRules(rb.addRole("Restricted Admin", "restricted-admin"))
+	restrictedAdminRole.
+		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("globalroles", "globalrolebindings").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("users", "userattribute", "groups", "groupmembers").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
 
-	rb.addRole("User", "user").
-		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions", "catalogs").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("create").
-		addRule().apiGroups("").resources("secrets").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplaterevisions").verbs("create").
-		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch")
+	userRole := addUserRules(rb.addRole("User", "user"))
+	userRole.addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
@@ -409,6 +393,31 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	return adminName, nil
 }
 
+func addUserRules(role *roleBuilder) *roleBuilder {
+	role.
+		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions", "catalogs").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("create").
+		addRule().apiGroups("").resources("secrets").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplaterevisions").verbs("create").
+		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch")
+
+	return role
+}
+
 // bootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
 // already created the admin user and should not attempt it again. Otherwise attempt to create the admin.
 func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool) (string, error) {
@@ -608,5 +617,79 @@ func bootstrapDefaultRoles(management *config.ManagementContext) error {
 		}
 	}
 
+	return nil
+}
+
+func addClusterRoleForNamespacedCRDs(management *config.ManagementContext) error {
+	var returnErr error
+	// If adding Rules for new CRDs to the below ClusterRole, make sure to add them in a sorted order
+	// ClusterCRDsClusterRole is a CR containing rules for granting restricted-admins access to all CRDs that can be created in a v3.Cluster's namespace
+	cr := rbacv1.ClusterRole{
+		ObjectMeta: v1.ObjectMeta{
+			Name: rbac.ClusterCRDsClusterRole,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"management.cattle.io"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+		},
+	}
+	if err := createOrUpdateClusterRole(management, cr); err != nil {
+		returnErr = multierror.Append(returnErr, err)
+	}
+
+	// ProjectCRDsClusterRole is a CR containing rules for granting restricted-admins access to all CRDs that can be created in a
+	// v3.Cluster and v3.Project's namespace
+	cr = rbacv1.ClusterRole{
+		ObjectMeta: v1.ObjectMeta{
+			Name: rbac.ProjectCRDsClusterRole,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"management.cattle.io"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+			{
+				APIGroups: []string{"project.cattle.io"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+		},
+	}
+	if err := createOrUpdateClusterRole(management, cr); err != nil {
+		returnErr = multierror.Append(returnErr, err)
+	}
+	return returnErr
+}
+
+func createOrUpdateClusterRole(management *config.ManagementContext, cr rbacv1.ClusterRole) error {
+	for _, rule := range cr.Rules {
+		sort.Slice(rule.APIGroups, func(i, j int) bool { return rule.APIGroups[i] < rule.APIGroups[j] })
+	}
+	sort.Slice(cr.Rules, func(i, j int) bool {
+		return cr.Rules[i].APIGroups[0] < cr.Rules[j].APIGroups[0]
+	})
+	_, err := management.RBAC.ClusterRoles("").Create(&cr)
+	if err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			existingCR, err := management.RBAC.ClusterRoles("").Get(cr.Name, v1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if reflect.DeepEqual(cr.Rules, existingCR.Rules) {
+				return nil
+			}
+			existingCR.Rules = cr.Rules
+			_, err = management.RBAC.ClusterRoles("").Update(existingCR)
+			return err
+		})
+		return err
+	}
 	return nil
 }
