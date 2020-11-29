@@ -9,14 +9,18 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rke/templates"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var (
-	t = template.Must(template.New("import").Parse(templateSource))
+	templateFuncMap = sprig.TxtFuncMap()
+	t               = template.Must(template.New("import").Funcs(templateFuncMap).Parse(templateSource))
 )
 
 type context struct {
@@ -32,6 +36,7 @@ type context struct {
 	IsWindowsCluster      bool
 	IsRKE                 bool
 	PrivateRegistryConfig string
+	Tolerations           string
 }
 
 func toFeatureString(features map[string]bool) string {
@@ -51,7 +56,7 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
-	cluster *v3.Cluster, features map[string]bool) error {
+	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint) error {
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -77,6 +82,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		IsWindowsCluster:      isWindowsCluster,
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: privateRegistryConfig,
+		Tolerations:           templates.ToYAML(taints),
 	}
 
 	return t.Execute(resp, context)
