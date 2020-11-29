@@ -45,6 +45,7 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.3.1-0.20191028180845-3492b2aff503
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.1.0
+	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/aws/aws-sdk-go v1.33.5
 	github.com/beevik/etree v1.1.0 // indirect
 	github.com/bep/debounce v1.2.0

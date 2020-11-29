@@ -132,23 +132,51 @@ spec:
                   values:
                     - windows
           preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            preference:
+          - preference:
               matchExpressions:
               - key: node-role.kubernetes.io/controlplane
                 operator: In
                 values:
                 - "true"
-          - weight: 1
-            preference:
+            weight: 100
+          - preference:
               matchExpressions:
-              - key: node-role.kubernetes.io/etcd
+              - key: node-role.kubernetes.io/control-plane
                 operator: In
                 values:
                 - "true"
+            weight: 100
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: In
+                values:
+                - "true"
+            weight: 100
+          - preference:
+              matchExpressions:
+              - key: cattle.io/cluster-agent
+                operator: In
+                values:
+                - "true"
+            weight: 1
       serviceAccountName: cattle
       tolerations:
-      - operator: Exists
+      {{- if ne .Tolerations "null" }}
+      # Tolerations added based on found taints on controlplane nodes
+{{ .Tolerations | indent 6 }}
+      {{- else }}
+      # No taints or no controlplane nodes found, added defaults
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/controlplane
+        value: "true"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+      {{- end }}
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
