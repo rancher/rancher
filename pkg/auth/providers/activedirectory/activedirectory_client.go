@@ -507,7 +507,8 @@ func (p *adProvider) ldapConnection(config *v32.ActiveDirectoryConfig, caPool *x
 	TLS := config.TLS
 	port := config.Port
 	connectionTimeout := config.ConnectionTimeout
-	return ldap.NewLDAPConn(servers, TLS, port, connectionTimeout, caPool)
+	startTLS := config.StartTLS
+	return ldap.NewLDAPConn(servers, TLS, startTLS, port, connectionTimeout, caPool)
 }
 func (p *adProvider) permissionCheck(attributes []*ldapv2.EntryAttribute, config *v32.ActiveDirectoryConfig) bool {
 	userObjectClass := config.UserObjectClass
