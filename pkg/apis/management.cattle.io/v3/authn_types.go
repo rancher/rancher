@@ -269,6 +269,7 @@ type ActiveDirectoryConfig struct {
 	Servers                      []string `json:"servers,omitempty"                     norman:"type=array[string],required"`
 	Port                         int64    `json:"port,omitempty"                        norman:"default=389"`
 	TLS                          bool     `json:"tls,omitempty"                         norman:"default=false"`
+	StartTLS                     bool     `json:"starttls,omitempty"                    norman:"default=false"`
 	Certificate                  string   `json:"certificate,omitempty"`
 	DefaultLoginDomain           string   `json:"defaultLoginDomain,omitempty"`
 	ServiceAccountUsername       string   `json:"serviceAccountUsername,omitempty"      norman:"required"`
@@ -304,6 +305,7 @@ type LdapFields struct {
 	Servers                         []string `json:"servers,omitempty"                         norman:"type=array[string],notnullable,required"`
 	Port                            int64    `json:"port,omitempty"                            norman:"default=389,notnullable,required"`
 	TLS                             bool     `json:"tls,omitempty"                             norman:"default=false,notnullable,required"`
+	StartTLS                        bool     `json:"starttls,omitempty"                        norman:"default=false"`
 	Certificate                     string   `json:"certificate,omitempty"`
 	ServiceAccountDistinguishedName string   `json:"serviceAccountDistinguishedName,omitempty" norman:"required"`
 	ServiceAccountPassword          string   `json:"serviceAccountPassword,omitempty"          norman:"type=password,required"`
