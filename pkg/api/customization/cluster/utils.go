@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	authV1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	clientauthv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 type noopCloser struct {
@@ -150,4 +152,19 @@ func CanCreateRKETemplate(callerID string, subjectAccessReviewClient clientauthv
 	}
 	logrus.Debugf("CanCreateRKETemplate: %v", result)
 	return result.Status.Allowed, nil
+}
+
+// updateClusterWithRetryOnConflict attempts to update the cluster with the changes encoded in the updateFunc. It only retries if a conflict error is returned.
+func updateClusterWithRetryOnConflict(clusterClient v3.ClusterInterface, cluster *v3.Cluster, updateFunc func(*v3.Cluster) *v3.Cluster) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		currentCluster, err := clusterClient.Get(cluster.Name, v12.GetOptions{})
+		if err != nil {
+			return err
+		}
+		cluster = updateFunc(currentCluster)
+		if _, err = clusterClient.Update(cluster); err != nil {
+			return err
+		}
+		return nil
+	})
 }

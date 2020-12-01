@@ -66,10 +66,10 @@ func (a ActionHandler) editMonitoring(actionName string, action *types.Action, a
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}
 
-	cluster = cluster.DeepCopy()
-	cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
-
-	_, err = a.ClusterClient.Update(cluster)
+	err = updateClusterWithRetryOnConflict(a.ClusterClient, cluster, func(cluster *v3.Cluster) *v3.Cluster {
+		cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
+		return cluster
+	})
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to upgrade monitoring")
 	}
@@ -101,11 +101,11 @@ func (a ActionHandler) enableMonitoring(actionName string, action *types.Action,
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}
 
-	cluster = cluster.DeepCopy()
-	cluster.Spec.EnableClusterMonitoring = true
-	cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
-
-	_, err = a.ClusterClient.Update(cluster)
+	err = updateClusterWithRetryOnConflict(a.ClusterClient, cluster, func(cluster *v3.Cluster) *v3.Cluster {
+		cluster.Spec.EnableClusterMonitoring = true
+		cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
+		return cluster
+	})
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to enable monitoring")
 	}
@@ -128,10 +128,10 @@ func (a ActionHandler) disableMonitoring(actionName string, action *types.Action
 		return nil
 	}
 
-	cluster = cluster.DeepCopy()
-	cluster.Spec.EnableClusterMonitoring = false
-
-	_, err = a.ClusterClient.Update(cluster)
+	err = updateClusterWithRetryOnConflict(a.ClusterClient, cluster, func(cluster *v3.Cluster) *v3.Cluster {
+		cluster.Spec.EnableClusterMonitoring = false
+		return cluster
+	})
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to disable monitoring")
 	}
