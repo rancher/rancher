@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func Add(wrangler *wrangler.Context, management *config.ManagementContext, addLocal, removeLocal, embedded bool) error {
+func Add(wrangler *wrangler.Context, management *config.ManagementContext) error {
 	_, err := addRoles(wrangler, management)
 	if err != nil {
 		return err
