@@ -2,6 +2,7 @@ package client
 
 const (
 	NetworkConfigType                        = "networkConfig"
+	NetworkConfigFieldAciNetworkProvider     = "aciNetworkProvider"
 	NetworkConfigFieldCalicoNetworkProvider  = "calicoNetworkProvider"
 	NetworkConfigFieldCanalNetworkProvider   = "canalNetworkProvider"
 	NetworkConfigFieldFlannelNetworkProvider = "flannelNetworkProvider"
@@ -14,6 +15,7 @@ const (
 )
 
 type NetworkConfig struct {
+	AciNetworkProvider     *AciNetworkProvider      `json:"aciNetworkProvider,omitempty" yaml:"aciNetworkProvider,omitempty"`
 	CalicoNetworkProvider  *CalicoNetworkProvider   `json:"calicoNetworkProvider,omitempty" yaml:"calicoNetworkProvider,omitempty"`
 	CanalNetworkProvider   *CanalNetworkProvider    `json:"canalNetworkProvider,omitempty" yaml:"canalNetworkProvider,omitempty"`
 	FlannelNetworkProvider *FlannelNetworkProvider  `json:"flannelNetworkProvider,omitempty" yaml:"flannelNetworkProvider,omitempty"`
