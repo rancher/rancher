@@ -17,6 +17,7 @@ const (
 	LdapFieldsFieldServers                         = "servers"
 	LdapFieldsFieldServiceAccountDistinguishedName = "serviceAccountDistinguishedName"
 	LdapFieldsFieldServiceAccountPassword          = "serviceAccountPassword"
+	LdapFieldsFieldStartTLS                        = "starttls"
 	LdapFieldsFieldTLS                             = "tls"
 	LdapFieldsFieldUserDisabledBitMask             = "userDisabledBitMask"
 	LdapFieldsFieldUserEnabledAttribute            = "userEnabledAttribute"
@@ -45,6 +46,7 @@ type LdapFields struct {
 	Servers                         []string `json:"servers,omitempty" yaml:"servers,omitempty"`
 	ServiceAccountDistinguishedName string   `json:"serviceAccountDistinguishedName,omitempty" yaml:"serviceAccountDistinguishedName,omitempty"`
 	ServiceAccountPassword          string   `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
+	StartTLS                        bool     `json:"starttls,omitempty" yaml:"starttls,omitempty"`
 	TLS                             bool     `json:"tls,omitempty" yaml:"tls,omitempty"`
 	UserDisabledBitMask             int64    `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute            string   `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
