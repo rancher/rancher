@@ -11,10 +11,9 @@ import (
 	"strings"
 	"sync"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
-	factory "github.com/rancher/rancher/pkg/dialer"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	dialer2 "github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -173,7 +172,7 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 			return nil, err
 		}
 		transport.DialContext = d
-		if factory.IsCloudDriver(newCluster) {
+		if dialer2.IsPublicCloudDriver(newCluster) {
 			transport.Proxy = http.ProxyFromEnvironment
 		}
 	}
