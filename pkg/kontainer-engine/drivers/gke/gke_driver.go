@@ -20,7 +20,6 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	raw "google.golang.org/api/container/v1"
-	"google.golang.org/api/option"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -576,7 +575,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, _ *types
 		return info, err
 	}
 
-	svc, err := getServiceClient(ctx, state)
+	svc, err := d.getServiceClient(ctx, state)
 	if err != nil {
 		return info, err
 	}
@@ -629,7 +628,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		return nil, err
 	}
 
-	svc, err := getServiceClient(ctx, state)
+	svc, err := d.getServiceClient(ctx, state)
 	if err != nil {
 		return nil, err
 	}
@@ -787,12 +786,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, err
 	}
 
-	ts, err := getTokenSource(ctx, state)
-	if err != nil {
-		return nil, err
-	}
-
-	svc, err := getServiceClientWithTokenSource(ctx, ts)
+	svc, err := d.getServiceClient(ctx, state)
 	if err != nil {
 		return nil, err
 	}
@@ -802,10 +796,6 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	}
 
 	cluster, err := svc.Projects.Locations.Clusters.Get(clusterRRN(state.ProjectID, state.location(), state.Name)).Context(ctx).Do()
-	if err != nil {
-		return nil, err
-	}
-	token, err := ts.Token()
 	if err != nil {
 		return nil, err
 	}
@@ -819,7 +809,11 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	info.ClientKey = cluster.MasterAuth.ClientKey
 	info.NodeCount = cluster.CurrentNodeCount
 	info.Metadata["nodePool"] = cluster.NodePools[0].Name
-	info.ServiceAccountToken = token.AccessToken
+	serviceAccountToken, err := generateServiceAccountTokenForGke(cluster)
+	if err != nil {
+		return nil, err
+	}
+	info.ServiceAccountToken = serviceAccountToken
 	return info, nil
 }
 
@@ -830,7 +824,7 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 		return err
 	}
 
-	svc, err := getServiceClient(ctx, state)
+	svc, err := d.getServiceClient(ctx, state)
 	if err != nil {
 		return err
 	}
@@ -847,7 +841,7 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 	return nil
 }
 
-func getTokenSource(ctx context.Context, state state) (oauth2.TokenSource, error) {
+func (d *Driver) getServiceClient(ctx context.Context, state state) (*raw.Service, error) {
 	// The google SDK has no sane way to pass in a TokenSource give all the different types (user, service account, etc)
 	// So we actually set an environment variable and then unset it
 	EnvMutex.Lock()
@@ -883,27 +877,19 @@ func getTokenSource(ctx context.Context, state state) (oauth2.TokenSource, error
 	if err != nil {
 		return nil, err
 	}
-	return ts, nil
-}
 
-func getServiceClientWithTokenSource(ctx context.Context, tokenSource oauth2.TokenSource) (*raw.Service, error) {
-	client := oauth2.NewClient(ctx, tokenSource)
-	service, err := raw.NewService(ctx, option.WithHTTPClient(client))
+	// Unlocks
+	cleanup()
+
+	client := oauth2.NewClient(ctx, ts)
+	service, err := raw.New(client)
 	if err != nil {
 		return nil, err
 	}
 	return service, nil
 }
 
-func getServiceClient(ctx context.Context, state state) (*raw.Service, error) {
-	ts, err := getTokenSource(ctx, state)
-	if err != nil {
-		return nil, err
-	}
-	return getServiceClientWithTokenSource(ctx, ts)
-}
-
-func getClientset(cluster *raw.Cluster, accessToken string) (kubernetes.Interface, error) {
+func getClientset(cluster *raw.Cluster) (kubernetes.Interface, error) {
 	capem, err := base64.StdEncoding.DecodeString(cluster.MasterAuth.ClusterCaCertificate)
 	if err != nil {
 		return nil, err
@@ -912,13 +898,14 @@ func getClientset(cluster *raw.Cluster, accessToken string) (kubernetes.Interfac
 	if !strings.HasPrefix(host, "https://") {
 		host = fmt.Sprintf("https://%s", host)
 	}
-
+	// in here we have to use http basic auth otherwise we can't get the permission to create cluster role
 	config := &rest.Config{
 		Host: host,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: capem,
 		},
-		BearerToken: accessToken,
+		Username: cluster.MasterAuth.Username,
+		Password: cluster.MasterAuth.Password,
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -926,6 +913,15 @@ func getClientset(cluster *raw.Cluster, accessToken string) (kubernetes.Interfac
 	}
 
 	return clientset, nil
+}
+
+func generateServiceAccountTokenForGke(cluster *raw.Cluster) (string, error) {
+	clientset, err := getClientset(cluster)
+	if err != nil {
+		return "", err
+	}
+
+	return util.GenerateServiceAccountToken(clientset)
 }
 
 func (d *Driver) waitCluster(ctx context.Context, svc *raw.Service, state *state) error {
@@ -990,7 +986,7 @@ func (d *Driver) getClusterStats(ctx context.Context, info *types.ClusterInfo) (
 		return nil, err
 	}
 
-	svc, err := getServiceClient(ctx, state)
+	svc, err := d.getServiceClient(ctx, state)
 
 	if err != nil {
 		return nil, err
@@ -1042,7 +1038,7 @@ func (d *Driver) SetClusterSize(ctx context.Context, info *types.ClusterInfo, co
 		return err
 	}
 
-	client, err := getServiceClient(ctx, state)
+	client, err := d.getServiceClient(ctx, state)
 
 	if err != nil {
 		return err
@@ -1113,7 +1109,7 @@ func (d *Driver) updateAndWait(ctx context.Context, info *types.ClusterInfo, upd
 		return err
 	}
 
-	client, err := getServiceClient(ctx, state)
+	client, err := d.getServiceClient(ctx, state)
 
 	if err != nil {
 		return err
@@ -1174,12 +1170,8 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 	if err != nil {
 		return err
 	}
-	ts, err := getTokenSource(ctx, state)
-	if err != nil {
-		return err
-	}
 
-	svc, err := getServiceClientWithTokenSource(ctx, ts)
+	svc, err := d.getServiceClient(ctx, state)
 	if err != nil {
 		return err
 	}
@@ -1189,12 +1181,7 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 		return err
 	}
 
-	token, err := ts.Token()
-	if err != nil {
-		return err
-	}
-
-	clientset, err := getClientset(cluster, token.AccessToken)
+	clientset, err := getClientset(cluster)
 	if err != nil {
 		return err
 	}
