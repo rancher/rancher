@@ -19,7 +19,7 @@ replace (
 	k8s.io/apimachinery => github.com/rancher/apimachinery v0.19.0-rancher1
 	k8s.io/apiserver => k8s.io/apiserver v0.19.0
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.19.0
-	k8s.io/client-go => github.com/rancher/client-go v1.19.0-rancher.1
+	k8s.io/client-go => github.com/rancher/client-go v1.19.0-rancher.2
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.19.0
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.19.0
 	k8s.io/code-generator => k8s.io/code-generator v0.19.0
