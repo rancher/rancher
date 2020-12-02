@@ -33,7 +33,10 @@ func Register(ctx context.Context,
 
 func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil || cluster.Status.Provider != "" {
-		return cluster, nil
+		// if cluster has windows enabled and provider is not rke.windows, continue to detect if it has windows nodes
+		if cluster == nil || !cluster.Spec.WindowsPreferedCluster || cluster.Status.Provider == "rke.windows" {
+			return cluster, nil
+		}
 	}
 
 	if !v3.ClusterConditionReady.IsTrue(cluster) {
