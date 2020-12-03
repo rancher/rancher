@@ -1004,8 +1004,8 @@ github.com/rancher/eks-operator v1.0.4 h1:yFEdfutbRoDUV5aHw2cQkQBBO14x4wypmk1VNH
 github.com/rancher/eks-operator v1.0.4/go.mod h1:Bbm03sRUFEfMiP9xA6rCLHB1RiKbifvvs0Egl8+XdOA=
 github.com/rancher/helm/v3 v3.3.0-rancher1 h1:i9uzKgPbt15FTn0rHMt22sA4rdHPq4iJ8gmohSWPR1o=
 github.com/rancher/helm/v3 v3.3.0-rancher1/go.mod h1:qUawjWz9THVCBVsNPJ/Q20VNEyrK7kN6lYf5loyp194=
-github.com/rancher/kubernetes-provider-detector v0.1.1-0.20201022034134-8f971d9f77cf h1:BY7n2YqMwAKODfYgZw0UJZ8XmfwtEImWF1bCscForUI=
-github.com/rancher/kubernetes-provider-detector v0.1.1-0.20201022034134-8f971d9f77cf/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
+github.com/rancher/kubernetes-provider-detector v0.1.2 h1:iFfmmcZiGya6s3cS4Qxksyqqw5hPbbIDHgKJ2Y44XKM=
+github.com/rancher/kubernetes-provider-detector v0.1.2/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
 github.com/rancher/lasso v0.0.0-20200427171700-e0509f89f319/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
 github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB2YjTVagmu4NkhBvbE8nBcGykHRENH6arI=
 github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
@@ -1018,7 +1018,6 @@ github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na
 github.com/rancher/norman v0.0.0-20200517050325-f53cae161640/go.mod h1:92rz/7QN7DOeLQZlJY/8aFBOmF085igIVguR0wpxLas=
 github.com/rancher/norman v0.0.0-20200714195611-b3163ad4ebc4/go.mod h1:W9LfZ96OfjkWSGTy2DUqYPt47Jpzrs7eM0i3AAx6fOI=
 github.com/rancher/norman v0.0.0-20200820172041-261460ee9088/go.mod h1:W9LfZ96OfjkWSGTy2DUqYPt47Jpzrs7eM0i3AAx6fOI=
-github.com/rancher/norman v0.0.0-20200908202416-992a35eef40f h1:9wL0WAIvjf8rq6YJobVt+0MgNovfV4QISIzNQMkTLdI=
 github.com/rancher/norman v0.0.0-20200908202416-992a35eef40f/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
 github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3 h1:e+5LQet2639Fal5VWXjJPIMXMIw8j06CKAqS/0gJ7Zk=
 github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
@@ -1175,7 +1174,6 @@ github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijb
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/urfave/cli v1.22.2 h1:gsqYFH8bb9ekPA12kRo0hfjngWQjkJPlN9R0N78BoUo=
 github.com/urfave/cli v1.22.2/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
-github.com/urfave/cli/v2 v2.1.1 h1:Qt8FeAtxE/vfdrLmR3rxR6JRE0RoVmbXu8+6kZtYU4k=
 github.com/urfave/cli/v2 v2.1.1/go.mod h1:SE9GqnLQmjVa0iPEY0f1w3ygNIYcIJ0OKPMoW2caLfQ=
 github.com/urfave/negroni v1.0.0/go.mod h1:Meg73S6kFm/4PpbYdq35yYWoCZ9mS/YSx+lKnmiohz4=
 github.com/vektah/gqlparser v1.1.2/go.mod h1:1ycwN7Ij5njmMkPPAOaRFY4rET2Enx7IkVv3vaXspKw=
