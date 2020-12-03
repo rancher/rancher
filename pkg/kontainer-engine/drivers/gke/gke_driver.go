@@ -4,11 +4,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
+	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/options"
@@ -20,17 +17,15 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	raw "google.golang.org/api/container/v1"
+	"google.golang.org/api/option"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 const (
-	runningStatus        = "RUNNING"
-	defaultCredentialEnv = "GOOGLE_APPLICATION_CREDENTIALS"
-	none                 = "none"
+	runningStatus = "RUNNING"
+	none          = "none"
 )
-
-var EnvMutex sync.Mutex
 
 // Driver defines the struct of gke driver
 type Driver struct {
@@ -575,7 +570,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, _ *types
 		return info, err
 	}
 
-	svc, err := d.getServiceClient(ctx, state)
+	svc, err := getServiceClient(ctx, state.CredentialContent)
 	if err != nil {
 		return info, err
 	}
@@ -628,7 +623,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		return nil, err
 	}
 
-	svc, err := d.getServiceClient(ctx, state)
+	svc, err := getServiceClient(ctx, state.CredentialContent)
 	if err != nil {
 		return nil, err
 	}
@@ -786,7 +781,12 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, err
 	}
 
-	svc, err := d.getServiceClient(ctx, state)
+	ts, err := GetTokenSource(ctx, state.CredentialContent)
+	if err != nil {
+		return nil, err
+	}
+
+	svc, err := getServiceClientWithTokenSource(ctx, ts)
 	if err != nil {
 		return nil, err
 	}
@@ -796,6 +796,10 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	}
 
 	cluster, err := svc.Projects.Locations.Clusters.Get(clusterRRN(state.ProjectID, state.location(), state.Name)).Context(ctx).Do()
+	if err != nil {
+		return nil, err
+	}
+	token, err := ts.Token()
 	if err != nil {
 		return nil, err
 	}
@@ -809,11 +813,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	info.ClientKey = cluster.MasterAuth.ClientKey
 	info.NodeCount = cluster.CurrentNodeCount
 	info.Metadata["nodePool"] = cluster.NodePools[0].Name
-	serviceAccountToken, err := generateServiceAccountTokenForGke(cluster)
-	if err != nil {
-		return nil, err
-	}
-	info.ServiceAccountToken = serviceAccountToken
+	info.ServiceAccountToken = token.AccessToken
 	return info, nil
 }
 
@@ -824,7 +824,7 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 		return err
 	}
 
-	svc, err := d.getServiceClient(ctx, state)
+	svc, err := getServiceClient(ctx, state.CredentialContent)
 	if err != nil {
 		return err
 	}
@@ -841,55 +841,28 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 	return nil
 }
 
-func (d *Driver) getServiceClient(ctx context.Context, state state) (*raw.Service, error) {
-	// The google SDK has no sane way to pass in a TokenSource give all the different types (user, service account, etc)
-	// So we actually set an environment variable and then unset it
-	EnvMutex.Lock()
-	locked := true
-	setEnv := false
-	cleanup := func() {
-		if setEnv {
-			os.Unsetenv(defaultCredentialEnv)
-		}
-
-		if locked {
-			EnvMutex.Unlock()
-			locked = false
-		}
-	}
-	defer cleanup()
-
-	file, err := ioutil.TempFile("", "credential-file")
+func GetTokenSource(ctx context.Context, credential string) (oauth2.TokenSource, error) {
+	ts, err := google.CredentialsFromJSON(ctx, []byte(credential), raw.CloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(file.Name())
-	defer file.Close()
-
-	if _, err := io.Copy(file, strings.NewReader(state.CredentialContent)); err != nil {
-		return nil, err
-	}
-
-	setEnv = true
-	os.Setenv(defaultCredentialEnv, file.Name())
-
-	ts, err := google.DefaultTokenSource(ctx, raw.CloudPlatformScope)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unlocks
-	cleanup()
-
-	client := oauth2.NewClient(ctx, ts)
-	service, err := raw.New(client)
-	if err != nil {
-		return nil, err
-	}
-	return service, nil
+	return ts.TokenSource, nil
 }
 
-func getClientset(cluster *raw.Cluster) (kubernetes.Interface, error) {
+func getServiceClientWithTokenSource(ctx context.Context, ts oauth2.TokenSource) (*raw.Service, error) {
+	client := oauth2.NewClient(ctx, ts)
+	return raw.NewService(ctx, option.WithHTTPClient(client))
+}
+
+func getServiceClient(ctx context.Context, credential string) (*raw.Service, error) {
+	ts, err := GetTokenSource(ctx, credential)
+	if err != nil {
+		return nil, err
+	}
+	return getServiceClientWithTokenSource(ctx, ts)
+}
+
+func getClientset(cluster *raw.Cluster, ts oauth2.TokenSource) (kubernetes.Interface, error) {
 	capem, err := base64.StdEncoding.DecodeString(cluster.MasterAuth.ClusterCaCertificate)
 	if err != nil {
 		return nil, err
@@ -898,14 +871,18 @@ func getClientset(cluster *raw.Cluster) (kubernetes.Interface, error) {
 	if !strings.HasPrefix(host, "https://") {
 		host = fmt.Sprintf("https://%s", host)
 	}
-	// in here we have to use http basic auth otherwise we can't get the permission to create cluster role
+
 	config := &rest.Config{
 		Host: host,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: capem,
 		},
-		Username: cluster.MasterAuth.Username,
-		Password: cluster.MasterAuth.Password,
+		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
+			return &oauth2.Transport{
+				Source: ts,
+				Base:   rt,
+			}
+		},
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -913,15 +890,6 @@ func getClientset(cluster *raw.Cluster) (kubernetes.Interface, error) {
 	}
 
 	return clientset, nil
-}
-
-func generateServiceAccountTokenForGke(cluster *raw.Cluster) (string, error) {
-	clientset, err := getClientset(cluster)
-	if err != nil {
-		return "", err
-	}
-
-	return util.GenerateServiceAccountToken(clientset)
 }
 
 func (d *Driver) waitCluster(ctx context.Context, svc *raw.Service, state *state) error {
@@ -981,19 +949,16 @@ func (d *Driver) waitNodePool(ctx context.Context, svc *raw.Service, state *stat
 
 func (d *Driver) getClusterStats(ctx context.Context, info *types.ClusterInfo) (*raw.Cluster, error) {
 	state, err := getState(info)
-
 	if err != nil {
 		return nil, err
 	}
 
-	svc, err := d.getServiceClient(ctx, state)
-
+	svc, err := getServiceClient(ctx, state.CredentialContent)
 	if err != nil {
 		return nil, err
 	}
 
 	cluster, err := svc.Projects.Zones.Clusters.Get(state.ProjectID, state.location(), state.Name).Context(ctx).Do()
-
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster info: %v", err)
 	}
@@ -1003,7 +968,6 @@ func (d *Driver) getClusterStats(ctx context.Context, info *types.ClusterInfo) (
 
 func (d *Driver) GetClusterSize(ctx context.Context, info *types.ClusterInfo) (*types.NodeCount, error) {
 	cluster, err := d.getClusterStats(ctx, info)
-
 	if err != nil {
 		return nil, err
 	}
@@ -1015,7 +979,6 @@ func (d *Driver) GetClusterSize(ctx context.Context, info *types.ClusterInfo) (*
 
 func (d *Driver) GetVersion(ctx context.Context, info *types.ClusterInfo) (*types.KubernetesVersion, error) {
 	cluster, err := d.getClusterStats(ctx, info)
-
 	if err != nil {
 		return nil, err
 	}
@@ -1027,19 +990,16 @@ func (d *Driver) GetVersion(ctx context.Context, info *types.ClusterInfo) (*type
 
 func (d *Driver) SetClusterSize(ctx context.Context, info *types.ClusterInfo, count *types.NodeCount) error {
 	cluster, err := d.getClusterStats(ctx, info)
-
 	if err != nil {
 		return err
 	}
 
 	state, err := getState(info)
-
 	if err != nil {
 		return err
 	}
 
-	client, err := d.getServiceClient(ctx, state)
-
+	client, err := getServiceClient(ctx, state.CredentialContent)
 	if err != nil {
 		return err
 	}
@@ -1050,13 +1010,11 @@ func (d *Driver) SetClusterSize(ctx context.Context, info *types.ClusterInfo, co
 		nodePoolRRN(state.ProjectID, state.location(), cluster.Name, cluster.NodePools[0].Name), &raw.SetNodePoolSizeRequest{
 			NodeCount: count.Count,
 		}).Context(ctx).Do()
-
 	if err != nil {
 		return err
 	}
 
 	err = d.waitCluster(ctx, client, &state)
-
 	if err != nil {
 		return err
 	}
@@ -1073,7 +1031,6 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 		Update: &raw.ClusterUpdate{
 			DesiredMasterVersion: version.Version,
 		}})
-
 	if err != nil {
 		return err
 	}
@@ -1086,7 +1043,6 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 			DesiredNodeVersion: version.Version,
 		},
 	})
-
 	if err != nil {
 		return err
 	}
@@ -1098,25 +1054,21 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 
 func (d *Driver) updateAndWait(ctx context.Context, info *types.ClusterInfo, updateRequest *raw.UpdateClusterRequest) error {
 	cluster, err := d.getClusterStats(ctx, info)
-
 	if err != nil {
 		return err
 	}
 
 	state, err := getState(info)
-
 	if err != nil {
 		return err
 	}
 
-	client, err := d.getServiceClient(ctx, state)
-
+	client, err := getServiceClient(ctx, state.CredentialContent)
 	if err != nil {
 		return err
 	}
 
 	_, err = client.Projects.Locations.Clusters.Update(clusterRRN(state.ProjectID, state.location(), cluster.Name), updateRequest).Context(ctx).Do()
-
 	if err != nil {
 		return fmt.Errorf("error while updating cluster: %v", err)
 	}
@@ -1170,8 +1122,12 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 	if err != nil {
 		return err
 	}
+	ts, err := GetTokenSource(ctx, state.CredentialContent)
+	if err != nil {
+		return err
+	}
 
-	svc, err := d.getServiceClient(ctx, state)
+	svc, err := getServiceClientWithTokenSource(ctx, ts)
 	if err != nil {
 		return err
 	}
@@ -1181,7 +1137,7 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 		return err
 	}
 
-	clientset, err := getClientset(cluster)
+	clientset, err := getClientset(cluster, ts)
 	if err != nil {
 		return err
 	}
