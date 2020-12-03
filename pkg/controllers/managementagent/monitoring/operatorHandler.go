@@ -5,21 +5,18 @@ import (
 	"reflect"
 	"strings"
 
-	app2 "github.com/rancher/rancher/pkg/app"
-
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-
-	"k8s.io/apimachinery/pkg/labels"
-
-	"github.com/pkg/errors"
+	app2 "github.com/rancher/rancher/pkg/app"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
-	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -40,32 +37,26 @@ func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.
 		return obj, nil
 	}
 
-	var newCluster *mgmtv3.Cluster
-	var err error
+	cpy := obj.DeepCopy()
+	var returnErr, updateErr error
+	var newObj runtime.Object
 	//should deploy
 	if obj.Spec.EnableClusterAlerting || obj.Spec.EnableClusterMonitoring {
-		newObj, err := v32.ClusterConditionPrometheusOperatorDeployed.Do(obj, func() (runtime.Object, error) {
-			cpy := obj.DeepCopy()
+		newObj, returnErr = v32.ClusterConditionPrometheusOperatorDeployed.Do(cpy, func() (runtime.Object, error) {
 			return cpy, deploySystemMonitor(cpy, h.app, h.catalogManager, h.clusterName)
 		})
-		if err != nil {
-			logrus.Warnf("deploy prometheus operator error, %v", err)
-		}
-		newCluster = newObj.(*mgmtv3.Cluster)
+		cpy = newObj.(*mgmtv3.Cluster)
 	} else { // should withdraw
-		newCluster = obj.DeepCopy()
-		if err = withdrawSystemMonitor(newCluster, h.app); err != nil {
-			logrus.Warnf("withdraw prometheus operator error, %v", err)
+		returnErr = withdrawSystemMonitor(cpy, h.app)
+	}
+
+	if !reflect.DeepEqual(cpy, obj) {
+		if cpy, updateErr = h.clusters.Update(cpy); updateErr != nil {
+			returnErr = multierror.Append(returnErr, updateErr)
 		}
 	}
 
-	if newCluster != nil && !reflect.DeepEqual(newCluster, obj) {
-		if newCluster, err = h.clusters.Update(newCluster); err != nil {
-			return nil, err
-		}
-		return newCluster, nil
-	}
-	return obj, nil
+	return cpy, returnErr
 }
 
 func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runtime.Object, error) {
@@ -83,31 +74,26 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 		return project, nil
 	}
 
-	var newCluster *mgmtv3.Cluster
+	cpyCluster := cluster.DeepCopy()
+	var returnErr error
+	var newObj runtime.Object
 	//should deploy
 	if cluster.Spec.EnableClusterAlerting || project.Spec.EnableProjectMonitoring {
-		newObj, err := v32.ClusterConditionPrometheusOperatorDeployed.Do(cluster, func() (runtime.Object, error) {
-			cpy := cluster.DeepCopy()
-			return cpy, deploySystemMonitor(cpy, h.app, h.catalogManager, cluster.Name)
+		newObj, returnErr = v32.ClusterConditionPrometheusOperatorDeployed.Do(cluster, func() (runtime.Object, error) {
+			return cpyCluster, deploySystemMonitor(cpyCluster, h.app, h.catalogManager, cluster.Name)
 		})
-		if err != nil {
-			logrus.Warnf("deploy prometheus operator error, %v", err)
-		}
-		newCluster = newObj.(*mgmtv3.Cluster)
+		cpyCluster = newObj.(*mgmtv3.Cluster)
 	} else { // should withdraw
-		newCluster = cluster.DeepCopy()
-		if err = withdrawSystemMonitor(newCluster, h.app); err != nil {
-			logrus.Warnf("withdraw prometheus operator error, %v", err)
+		returnErr = withdrawSystemMonitor(cpyCluster, h.app)
+	}
+
+	if !reflect.DeepEqual(cpyCluster, cluster) {
+		if _, updateErr := h.clusters.Update(cpyCluster); updateErr != nil {
+			returnErr = multierror.Append(returnErr, updateErr)
 		}
 	}
 
-	if newCluster != nil && !reflect.DeepEqual(newCluster, cluster) {
-		if _, err = h.clusters.Update(newCluster); err != nil {
-			return nil, err
-		}
-	}
-
-	return project, nil
+	return project, returnErr
 }
 
 func withdrawSystemMonitor(cluster *v32.Cluster, app *appHandler) error {
