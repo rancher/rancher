@@ -107,7 +107,7 @@ steps:
     - allUsers:READER
     cache_control: "public,no-cache,proxy-revalidate"
     source: bin/rancherd
-    target: releases.rancher.com/rancherd/rancherd-master
+    target: releases.rancher.com/rancherd/${DRONE_BRANCH}/rancherd
     token:
       from_secret: google_auth_key
   when:
