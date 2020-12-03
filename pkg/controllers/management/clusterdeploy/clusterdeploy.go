@@ -219,7 +219,7 @@ func getDesiredImage(cluster *v3.Cluster) string {
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
-	if dialer.HasPublicAPIEndpoint(cluster) {
+	if dialer.HasOnlyPrivateAPIEndpoint(cluster) {
 		logrus.Debugf("clusterDeploy: deployAgent: cluster [%s] is private so agent cannot be deployed automatically", cluster.Name)
 		return nil
 	}
