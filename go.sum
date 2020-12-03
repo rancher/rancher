@@ -845,8 +845,6 @@ github.com/rancher/client-go v1.18.8-rancher.4/go.mod h1:HqFqMllQ5NnQJNwjro9k5zM
 github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234 h1:wZ1Zh7fI7B9hfZw9Ouhz7171CZKu6XffM3ysUhhO6i0=
 github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
-github.com/rancher/kontainer-engine v0.0.4-dev.0.20201106160106-4442123b5eaa h1:ezPSQT6x5TIBUSmMg75VibTJJGZs2qEYNRHonaOx4ns=
-github.com/rancher/kontainer-engine v0.0.4-dev.0.20201106160106-4442123b5eaa/go.mod h1:CofnuNGQefXjvq95fwXNVFJzOdrVW3ZUtQZC9ezQzHQ=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20201202223022-33de45824b08 h1:iNnxIjRXUKre4eptdHO2rleUFyG4PSUkgPRjyAWFWio=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20201202223022-33de45824b08/go.mod h1:CofnuNGQefXjvq95fwXNVFJzOdrVW3ZUtQZC9ezQzHQ=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
@@ -879,6 +877,8 @@ github.com/rancher/system-upgrade-controller v0.4.1-0.20200326220202-4655d4a551b
 github.com/rancher/types v0.0.0-20200723224053-ae84b42a4797/go.mod h1:HX+ryuo/4a4OtbjPzaCvXWL7nAk5sQN5dP9XQl6iH78=
 github.com/rancher/types v0.0.0-20201022171446-1df760cc0093 h1:VlEMx5Oj7JFJy0nhqXbN7lStq0O6DhkI0z4MmLa0AXE=
 github.com/rancher/types v0.0.0-20201022171446-1df760cc0093/go.mod h1:HX+ryuo/4a4OtbjPzaCvXWL7nAk5sQN5dP9XQl6iH78=
+github.com/rancher/types v0.0.0-20201203232558-93f99f44a1a1 h1:1kdUVHzhJ3Q4Cy2G7uL5uL60V3epUUBUpvVNmpv09pA=
+github.com/rancher/types v0.0.0-20201203232558-93f99f44a1a1/go.mod h1:HX+ryuo/4a4OtbjPzaCvXWL7nAk5sQN5dP9XQl6iH78=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
 github.com/rancher/wrangler v0.5.4-0.20200520040055-b8d49179cfc8/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
