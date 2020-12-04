@@ -25,9 +25,13 @@ func AddFleetRoles(wrangler *wrangler.Context) error {
 }
 
 func ensureFleetRoles(rbac rbacv1.Interface) error {
+	uiLabels := map[string]string{
+		"management.cattle.io/ui-product": "fleet",
+	}
 	fleetWorkspaceAdminRole := v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "fleetworkspace-admin",
+			Name:   "fleetworkspace-admin",
+			Labels: uiLabels,
 		},
 		Rules: []v1.PolicyRule{
 			{
@@ -63,7 +67,8 @@ func ensureFleetRoles(rbac rbacv1.Interface) error {
 
 	fleetWorkspaceMemberRole := v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "fleetworkspace-member",
+			Name:   "fleetworkspace-member",
+			Labels: uiLabels,
 		},
 		Rules: []v1.PolicyRule{
 			{
@@ -100,7 +105,8 @@ func ensureFleetRoles(rbac rbacv1.Interface) error {
 
 	fleetWorkspaceReadonlyRole := v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "fleetworkspace-readonly",
+			Name:   "fleetworkspace-readonly",
+			Labels: uiLabels,
 		},
 		Rules: []v1.PolicyRule{
 			{
@@ -140,7 +146,7 @@ func ensureFleetRoles(rbac rbacv1.Interface) error {
 				return err
 			}
 		} else {
-			if !reflect.DeepEqual(existing.Rules, role.Rules) {
+			if !reflect.DeepEqual(existing.Rules, role.Rules) || !reflect.DeepEqual(existing.Labels, role.Labels) {
 				if _, err := rbac.ClusterRole().Update(&role); err != nil {
 					return err
 				}
