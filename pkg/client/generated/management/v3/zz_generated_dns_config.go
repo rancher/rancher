@@ -8,6 +8,7 @@ const (
 	DNSConfigFieldProvider               = "provider"
 	DNSConfigFieldReverseCIDRs           = "reversecidrs"
 	DNSConfigFieldStubDomains            = "stubdomains"
+	DNSConfigFieldTolerations            = "tolerations"
 	DNSConfigFieldUpdateStrategy         = "updateStrategy"
 	DNSConfigFieldUpstreamNameservers    = "upstreamnameservers"
 )
@@ -19,6 +20,7 @@ type DNSConfig struct {
 	Provider               string                  `json:"provider,omitempty" yaml:"provider,omitempty"`
 	ReverseCIDRs           []string                `json:"reversecidrs,omitempty" yaml:"reversecidrs,omitempty"`
 	StubDomains            map[string][]string     `json:"stubdomains,omitempty" yaml:"stubdomains,omitempty"`
+	Tolerations            []Toleration            `json:"tolerations,omitempty" yaml:"tolerations,omitempty"`
 	UpdateStrategy         *DeploymentStrategy     `json:"updateStrategy,omitempty" yaml:"updateStrategy,omitempty"`
 	UpstreamNameservers    []string                `json:"upstreamnameservers,omitempty" yaml:"upstreamnameservers,omitempty"`
 }
