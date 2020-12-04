@@ -10,6 +10,7 @@ const (
 	NetworkConfigFieldNodeSelector           = "nodeSelector"
 	NetworkConfigFieldOptions                = "options"
 	NetworkConfigFieldPlugin                 = "plugin"
+	NetworkConfigFieldTolerations            = "tolerations"
 	NetworkConfigFieldUpdateStrategy         = "updateStrategy"
 	NetworkConfigFieldWeaveNetworkProvider   = "weaveNetworkProvider"
 )
@@ -23,6 +24,7 @@ type NetworkConfig struct {
 	NodeSelector           map[string]string        `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 	Options                map[string]string        `json:"options,omitempty" yaml:"options,omitempty"`
 	Plugin                 string                   `json:"plugin,omitempty" yaml:"plugin,omitempty"`
+	Tolerations            []Toleration             `json:"tolerations,omitempty" yaml:"tolerations,omitempty"`
 	UpdateStrategy         *DaemonSetUpdateStrategy `json:"updateStrategy,omitempty" yaml:"updateStrategy,omitempty"`
 	WeaveNetworkProvider   *WeaveNetworkProvider    `json:"weaveNetworkProvider,omitempty" yaml:"weaveNetworkProvider,omitempty"`
 }

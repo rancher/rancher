@@ -3,6 +3,7 @@ package client
 const (
 	IngressConfigType                   = "ingressConfig"
 	IngressConfigFieldDNSPolicy         = "dnsPolicy"
+	IngressConfigFieldDefaultBackend    = "defaultBackend"
 	IngressConfigFieldExtraArgs         = "extraArgs"
 	IngressConfigFieldExtraEnvs         = "extraEnvs"
 	IngressConfigFieldExtraVolumeMounts = "extraVolumeMounts"
@@ -13,11 +14,13 @@ const (
 	IngressConfigFieldNodeSelector      = "nodeSelector"
 	IngressConfigFieldOptions           = "options"
 	IngressConfigFieldProvider          = "provider"
+	IngressConfigFieldTolerations       = "tolerations"
 	IngressConfigFieldUpdateStrategy    = "updateStrategy"
 )
 
 type IngressConfig struct {
 	DNSPolicy         string                   `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
+	DefaultBackend    *bool                    `json:"defaultBackend,omitempty" yaml:"defaultBackend,omitempty"`
 	ExtraArgs         map[string]string        `json:"extraArgs,omitempty" yaml:"extraArgs,omitempty"`
 	ExtraEnvs         []interface{}            `json:"extraEnvs,omitempty" yaml:"extraEnvs,omitempty"`
 	ExtraVolumeMounts []interface{}            `json:"extraVolumeMounts,omitempty" yaml:"extraVolumeMounts,omitempty"`
@@ -28,5 +31,6 @@ type IngressConfig struct {
 	NodeSelector      map[string]string        `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 	Options           map[string]string        `json:"options,omitempty" yaml:"options,omitempty"`
 	Provider          string                   `json:"provider,omitempty" yaml:"provider,omitempty"`
+	Tolerations       []Toleration             `json:"tolerations,omitempty" yaml:"tolerations,omitempty"`
 	UpdateStrategy    *DaemonSetUpdateStrategy `json:"updateStrategy,omitempty" yaml:"updateStrategy,omitempty"`
 }
