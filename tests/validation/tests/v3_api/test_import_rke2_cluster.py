@@ -62,7 +62,10 @@ def test_create_rke2_multiple_control_cluster():
 
 def test_import_rke2_multiple_control_cluster():
     client = get_user_client()
-    rke2_clusterfilepath = create_rke2_multiple_control_cluster()
+    cluster_version = RANCHER_RKE2_VERSION
+    cluster_type = "rke2"
+    rke2_clusterfilepath = create_rke2_multiple_control_cluster(
+        cluster_type, cluster_version)
     cluster = create_rancher_cluster(client, rke2_clusterfilepath)
 
 
