@@ -1,9 +1,8 @@
 package mapper
 
 import (
-	"strings"
-
 	"fmt"
+	"strings"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"

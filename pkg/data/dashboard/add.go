@@ -3,7 +3,7 @@ package dashboard
 import (
 	"context"
 
-	managementdata "github.com/rancher/rancher/pkg/data/management"
+	managementdata "github.com/rancher/rancher/pkg/multiclustermanager/data/management"
 	"github.com/rancher/rancher/pkg/wrangler"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"

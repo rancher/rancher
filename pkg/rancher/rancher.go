@@ -5,8 +5,6 @@ import (
 	"net/http"
 
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
-	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
-	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/auth"
@@ -14,11 +12,14 @@ import (
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
-	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
 	crds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
+	"github.com/rancher/rancher/pkg/multiclustermanager/api/norman/customization/kontainerdriver"
+	"github.com/rancher/rancher/pkg/multiclustermanager/api/norman/customization/podsecuritypolicytemplate"
+	managementauth "github.com/rancher/rancher/pkg/multiclustermanager/controllers/management/auth"
+	"github.com/rancher/rancher/pkg/multiclustermanager/options"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/ui"
 	"github.com/rancher/rancher/pkg/websocket"
@@ -226,7 +227,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 }
 
 func newMCM(wrangler *wrangler.Context, opts *Options) wrangler.MultiClusterManager {
-	return multiclustermanager.NewDeferredServer(wrangler, &multiclustermanager.Options{
+	return multiclustermanager.NewDeferredServer(wrangler, &options.Options{
 		RemoveLocalCluster:  opts.AddLocal == "false",
 		LocalClusterEnabled: localClusterEnabled(opts),
 		Embedded:            opts.Embedded,
