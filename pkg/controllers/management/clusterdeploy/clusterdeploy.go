@@ -21,9 +21,11 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,6 +44,13 @@ var (
 	agentImages      = map[string]map[string]string{
 		nodeImage:    map[string]string{},
 		clusterImage: map[string]string{},
+	}
+	controlPlaneTaintsMutex sync.RWMutex
+	controlPlaneTaints      = make(map[string][]corev1.Taint)
+	controlPlaneLabels      = map[string]string{
+		"node-role.kubernetes.io/master":        "true",
+		"node-role.kubernetes.io/controlplane":  "true",
+		"node-role.kubernetes.io/control-plane": "true",
 	}
 )
 
@@ -135,6 +144,12 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		}
 	}
 
+	if !controlPlaneTaintsCached(cluster.Name) {
+		if err := cd.cacheControlPlaneTaints(cluster.Name); err != nil {
+			return err
+		}
+	}
+
 	err = cd.deployAgent(cluster)
 	if err != nil {
 		return err
@@ -162,7 +177,7 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 	return false
 }
 
-func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool) bool {
+func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
 	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
@@ -186,7 +201,6 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 			}
 		}
 	}
-
 	if forceDeploy || imageChange || repoChange || agentFeaturesChanged {
 		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
 			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
@@ -205,6 +219,22 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 		clearAgentImages(cluster.Name)
 		return true
 	}
+
+	// Taints/tolerations
+	// Current taints are cached for comparison
+	currentTaints := getCachedTaints(cluster.Name)
+	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] currentTaints: [%v]", cluster.Name, currentTaints)
+	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] desiredTaints: [%v]", cluster.Name, desiredTaints)
+	toAdd, toDelete := taints.GetToDiffTaints(currentTaints, desiredTaints)
+	// Any change to current triggers redeploy
+	if len(toAdd) > 0 || len(toDelete) > 0 {
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to toleration mismatch for [%s], was [%v] and will be [%v]", cluster.Name, currentTaints, desiredTaints)
+		// Clear cache to refresh
+		clearControlPlaneTaints(cluster.Name)
+		return true
+	}
+
+	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
 }
@@ -242,7 +272,13 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 
-	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures) {
+	desiredTaints, err := cd.getControlPlaneTaints(cluster.Name)
+	if err != nil {
+		return err
+	}
+	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
+
+	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints) {
 		return nil
 	}
 
@@ -252,10 +288,11 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	if _, err = v32.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
 		if err != nil {
 			return cluster, err
 		}
+		logrus.Tracef("clusterDeploy: deployAgent: agent YAML: %v", string(yaml))
 		var output []byte
 		for i := 0; i < 5; i++ {
 			// This will fail almost always the first time because when we create the namespace in the file it won't have privileges.
@@ -351,10 +388,11 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
+	logrus.Tracef("clusterDeploy: getYAML: Desired taints are [%v] for cluster [%s]", taints, cluster.Name)
 
 	token, err := cd.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
 	if err != nil {
@@ -369,7 +407,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url, cluster.Spec.WindowsPreferedCluster,
-		cluster, features)
+		cluster, features, taints)
 
 	return buf.Bytes(), err
 }
@@ -443,10 +481,28 @@ func agentImagesCached(name string) bool {
 	return na != "" && ca != ""
 }
 
+func controlPlaneTaintsCached(name string) bool {
+	controlPlaneTaintsMutex.RLock()
+	defer controlPlaneTaintsMutex.RUnlock()
+	if _, ok := controlPlaneTaints[name]; ok {
+		return true
+	}
+	return false
+}
+
 func getAgentImages(name string) (string, string) {
 	agentImagesMutex.RLock()
 	defer agentImagesMutex.RUnlock()
 	return agentImages[nodeImage][name], agentImages[clusterImage][name]
+}
+
+func getCachedTaints(name string) []corev1.Taint {
+	controlPlaneTaintsMutex.RLock()
+	defer controlPlaneTaintsMutex.RUnlock()
+	if _, ok := controlPlaneTaints[name]; ok {
+		return controlPlaneTaints[name]
+	}
+	return nil
 }
 
 func clearAgentImages(name string) {
@@ -455,6 +511,64 @@ func clearAgentImages(name string) {
 	defer agentImagesMutex.Unlock()
 	delete(agentImages[nodeImage], name)
 	delete(agentImages[clusterImage], name)
+}
+
+func clearControlPlaneTaints(name string) {
+	logrus.Tracef("clusterDeploy: clearControlPlaneTaints called for [%s]", name)
+	controlPlaneTaintsMutex.Lock()
+	defer controlPlaneTaintsMutex.Unlock()
+	delete(controlPlaneTaints, name)
+}
+
+func (cd *clusterDeploy) cacheControlPlaneTaints(name string) error {
+	taints, err := cd.getControlPlaneTaints(name)
+	if err != nil {
+		return err
+	}
+
+	controlPlaneTaintsMutex.Lock()
+	defer controlPlaneTaintsMutex.Unlock()
+	controlPlaneTaints[name] = taints
+	return nil
+}
+
+func (cd *clusterDeploy) getControlPlaneTaints(name string) ([]corev1.Taint, error) {
+	var allTaints []corev1.Taint
+	var controlPlaneLabelFound bool
+	nodes, err := cd.nodeLister.List(name, labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	logrus.Debugf("clusterDeploy: getControlPlaneTaints: Length of nodes for cluster [%s] is: %d", name, len(nodes))
+
+	for _, node := range nodes {
+		controlPlaneLabelFound = false
+		// Filtering nodes for controlplane nodes based on labels
+		for controlPlaneLabelKey, controlPlaneLabelValue := range controlPlaneLabels {
+			if labelValue, ok := node.Status.NodeLabels[controlPlaneLabelKey]; ok {
+				logrus.Tracef("clusterDeploy: getControlPlaneTaints: node [%s] has label key [%s]", node.Status.NodeName, controlPlaneLabelKey)
+				if labelValue == controlPlaneLabelValue {
+					logrus.Tracef("clusterDeploy: getControlPlaneTaints: node [%s] has label key [%s] and label value [%s]", node.Status.NodeName, controlPlaneLabelKey, controlPlaneLabelValue)
+					controlPlaneLabelFound = true
+					break
+				}
+			}
+		}
+		if controlPlaneLabelFound {
+			toAdd, _ := taints.GetToDiffTaints(allTaints, node.Spec.InternalNodeSpec.Taints)
+			for _, taintStr := range toAdd {
+				if !strings.HasPrefix(taintStr.Key, "node.kubernetes.io") {
+					logrus.Debugf("clusterDeploy: getControlPlaneTaints: toAdd: %v", toAdd)
+					allTaints = append(allTaints, taintStr)
+					continue
+				}
+				logrus.Tracef("clusterDeploy: getControlPlaneTaints: skipping taint [%v] because its k8s internal", taintStr)
+			}
+		}
+	}
+	logrus.Debugf("clusterDeploy: getControlPlaneTaints: allTaints: %v", allTaints)
+
+	return allTaints, nil
 }
 
 func formatKubectlApplyOutput(log string) string {
