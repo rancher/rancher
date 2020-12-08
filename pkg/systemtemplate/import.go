@@ -57,6 +57,7 @@ func toFeatureString(features map[string]bool) string {
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
 	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint) error {
+	var tolerations string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -67,6 +68,10 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster))
 	if err != nil {
 		return err
+	}
+
+	if taints != nil {
+		tolerations = templates.ToYAML(taints)
 	}
 
 	context := &context{
@@ -82,7 +87,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		IsWindowsCluster:      isWindowsCluster,
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: privateRegistryConfig,
-		Tolerations:           templates.ToYAML(taints),
+		Tolerations:           tolerations,
 	}
 
 	return t.Execute(resp, context)
