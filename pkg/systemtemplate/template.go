@@ -162,7 +162,7 @@ spec:
             weight: 1
       serviceAccountName: cattle
       tolerations:
-      {{- if ne .Tolerations "null" }}
+      {{- if .Tolerations }}
       # Tolerations added based on found taints on controlplane nodes
 {{ .Tolerations | indent 6 }}
       {{- else }}
