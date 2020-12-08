@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/api/user"
+	"github.com/rancher/rancher/pkg/data/dashboard"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/urfave/cli"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,7 +104,7 @@ func createNewAdmin(client v3.Interface, length int) error {
 	admin, err := client.Users("").Create(&v3.User{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "user-",
-			Labels:       defaultAdminLabel,
+			Labels:       dashboard.DefaultAdminLabel,
 		},
 		DisplayName:        "Default Admin",
 		Username:           "admin",
@@ -153,14 +154,14 @@ func ensureAdminIsAdmin(client v3.Interface, admin v3.User) error {
 
 func ensureAdminIsLabeled(admin *v3.User) bool {
 	changed := true
-	if current, exists := admin.ObjectMeta.Labels[defaultAdminLabelKey]; exists {
-		changed = current != defaultAdminLabelValue
+	if current, exists := admin.ObjectMeta.Labels[dashboard.DefaultAdminLabelKey]; exists {
+		changed = current != dashboard.DefaultAdminLabelValue
 	}
 
 	if changed {
 		fmt.Fprintf(os.Stdout, "Labeling existing default admin user (%v) as admin\n", admin.Name)
 
-		admin.ObjectMeta.Labels[defaultAdminLabelKey] = defaultAdminLabelValue
+		admin.ObjectMeta.Labels[dashboard.DefaultAdminLabelKey] = dashboard.DefaultAdminLabelValue
 	} else {
 		fmt.Fprintf(os.Stdout, "Existing default admin user (%v) already labeled as admin\n", admin.Name)
 	}
@@ -173,7 +174,7 @@ func addAdminRoleToUser(client v3.Interface, admin v3.User) error {
 		&v3.GlobalRoleBinding{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "globalrolebinding-",
-				Labels:       defaultAdminLabel,
+				Labels:       dashboard.DefaultAdminLabel,
 			},
 			UserName:       admin.Name,
 			GlobalRoleName: "admin",

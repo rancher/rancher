@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/multiclustermanager/clusterrouter"
+	"github.com/rancher/rancher/pkg/clusterlookup"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -48,7 +48,7 @@ func SetRTBStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledC
 
 	s := &Store{
 		Store: t,
-		auth:  requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, mgmt),
+		auth:  requests.NewAuthenticator(ctx, clusterlookup.GetClusterID, mgmt),
 	}
 
 	schema.Store = s

@@ -13,7 +13,7 @@ CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.5"}
 
 cd $(dirname $0)/../package
 
-cp ../bin/rancher.yaml ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
+cp ../bin/rancher.yaml ../bin/rancher ../bin/mcm.so ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 
 IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
@@ -65,7 +65,7 @@ if [ ! -d build/charts ]; then
     rm -f $INDEX_PATH $CHART_REPO_DIR/assets/index.yaml
 fi
 
-TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE
+TAG=$TAG REPO=${REPO} go run ../pkg/multiclustermanager/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE
 
 if [ ${ARCH} == amd64 ]; then
     # rancherd tarball

@@ -27,10 +27,10 @@ import (
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/multiclustermanager/dialer"
 	"github.com/rancher/rancher/pkg/multiclustermanager/kontainer-engine/drivers/util"
-	"github.com/rancher/rancher/pkg/multiclustermanager/namespace"
 	"github.com/rancher/rancher/pkg/multiclustermanager/project"
 	"github.com/rancher/rancher/pkg/multiclustermanager/ref"
 	"github.com/rancher/rancher/pkg/multiclustermanager/systemaccount"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -83,7 +83,7 @@ type eksOperatorController struct {
 	clientDialer         typesDialer.Factory
 }
 
-func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext) {
+func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext, catalogManager manager.CatalogManager) {
 	eksClusterConfigResource := schema.GroupVersionResource{
 		Group:    eksAPIGroup,
 		Version:  "v1",
@@ -100,7 +100,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		appClient:            mgmtCtx.Project.Apps(""),
 		nsClient:             mgmtCtx.Core.Namespaces(""),
 		clusterClient:        wContext.Mgmt.Cluster(),
-		catalogManager:       mgmtCtx.CatalogManager,
+		catalogManager:       catalogManager,
 		systemAccountManager: systemaccount.NewManager(mgmtCtx),
 		dynamicClient:        eksCCDynamicClient,
 		clientDialer:         mgmtCtx.Dialer,

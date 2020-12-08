@@ -3,6 +3,7 @@ package management
 import (
 	"context"
 
+	manager2 "github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/clustermanager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/management/catalog"
@@ -35,6 +36,8 @@ import (
 )
 
 func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {
+	catalogManager := manager2.New(management.Management, management.Project)
+
 	// auth handlers need to run early to create namespaces that back clusters and projects
 	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
 	auth.RegisterEarly(ctx, management, manager)
@@ -60,7 +63,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	podsecuritypolicy.Register(ctx, management)
 	etcdbackup.Register(ctx, management)
 	cis.Register(ctx, management)
-	globaldns.Register(ctx, management)
+	globaldns.Register(ctx, management, catalogManager)
 	multiclusterapp.Register(ctx, management, manager)
 	clustertemplate.Register(ctx, management)
 	nodetemplate.Register(ctx, management)

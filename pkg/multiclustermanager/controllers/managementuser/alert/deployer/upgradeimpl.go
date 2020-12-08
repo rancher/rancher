@@ -17,8 +17,8 @@ import (
 	alertutil "github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/alert/common"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/helm/common"
 	monitorutil "github.com/rancher/rancher/pkg/multiclustermanager/monitoring"
-	"github.com/rancher/rancher/pkg/multiclustermanager/namespace"
 	"github.com/rancher/rancher/pkg/multiclustermanager/ref"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/pkg/errors"
@@ -63,7 +63,7 @@ func NewService() *AlertService {
 	return &AlertService{}
 }
 
-func (l *AlertService) Init(cluster *config.UserContext) {
+func (l *AlertService) Init(cluster *config.UserContext, catalogManager manager.CatalogManager) {
 	l.clusterName = cluster.ClusterName
 	l.clusterLister = cluster.Management.Management.Clusters("").Controller().Lister()
 	l.catalogLister = cluster.Management.Management.Catalogs(metav1.NamespaceAll).Controller().Lister()
@@ -79,7 +79,7 @@ func (l *AlertService) Init(cluster *config.UserContext) {
 	l.appLister = cluster.Management.Project.Apps("").Controller().Lister()
 	l.namespaces = cluster.Core.Namespaces(metav1.NamespaceAll)
 	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
-	l.catalogManager = cluster.Management.CatalogManager
+	l.catalogManager = catalogManager
 }
 
 func (l *AlertService) Version() (string, error) {

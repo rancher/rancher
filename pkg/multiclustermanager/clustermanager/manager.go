@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/rancher/pkg/clusterlookup"
 	"github.com/rancher/wrangler/pkg/ratelimit"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -21,7 +22,6 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/multiclustermanager/clusterrouter"
 	clusterController "github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser"
 	"github.com/rancher/rancher/pkg/multiclustermanager/rbac"
 	"github.com/rancher/rancher/pkg/settings"
@@ -539,7 +539,7 @@ func (m *Manager) GetHTTPSPort() int {
 }
 
 func (m *Manager) SubjectAccessReviewForCluster(req *http.Request) (authv1.SubjectAccessReviewInterface, error) {
-	clusterID := clusterrouter.GetClusterID(req)
+	clusterID := clusterlookup.GetClusterID(req)
 	userContext, err := m.UserContext(clusterID)
 	if err != nil {
 		return nil, err

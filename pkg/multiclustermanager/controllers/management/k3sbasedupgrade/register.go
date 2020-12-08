@@ -36,12 +36,12 @@ const (
 	k3sUpgraderCatalogName = "system-library-rancher-k3s-upgrader"
 )
 
-func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext, manager *clustermanager.Manager) {
+func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext, manager *clustermanager.Manager, catalogManager manager2.CatalogManager) {
 	h := &handler{
 		systemUpgradeNamespace: systemUpgradeNS,
 		clusterCache:           wContext.Mgmt.Cluster().Cache(),
 		clusterClient:          wContext.Mgmt.Cluster(),
-		catalogManager:         mgmtCtx.CatalogManager,
+		catalogManager:         catalogManager,
 		clusterEnqueueAfter:    wContext.Mgmt.Cluster().EnqueueAfter,
 		apps:                   mgmtCtx.Project.Apps(metav1.NamespaceAll),
 		appLister:              mgmtCtx.Project.Apps("").Controller().Lister(),

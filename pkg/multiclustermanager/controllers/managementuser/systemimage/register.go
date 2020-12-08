@@ -3,15 +3,16 @@ package systemimage
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext) {
+func Register(ctx context.Context, cluster *config.UserContext, catalogManager manager.CatalogManager) {
 	projClient := cluster.Management.Management.Projects(cluster.ClusterName)
 	catalogClient := cluster.Management.Management.Catalogs("")
 	systemServices := getSystemService()
 	for _, v := range systemServices {
-		v.Init(cluster)
+		v.Init(cluster, catalogManager)
 	}
 
 	syncer := Syncer{

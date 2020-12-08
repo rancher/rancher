@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/indexers"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
@@ -43,7 +44,7 @@ func (s *store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 	if driver.Spec.BuiltIn {
 		return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "builtin cluster drivers may not be removed")
 	}
-	clustersWithKontainerDriver, err := s.ClusterIndexer.ByIndex(clusterByGenericEngineConfigKey, id)
+	clustersWithKontainerDriver, err := s.ClusterIndexer.ByIndex(indexers.ClusterByGenericEngineConfigKey, id)
 	if err != nil {
 		return nil, errorsutil.WithMessage(err, fmt.Sprintf("error determining if kontainer driver [%s] was in use", driver.Status.DisplayName))
 	}

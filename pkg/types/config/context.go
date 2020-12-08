@@ -25,13 +25,12 @@ import (
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/rancher/pkg/generated/norman/storage.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
-	"github.com/rancher/rancher/pkg/multiclustermanager/peermanager"
-	clusterSchema "github.com/rancher/rancher/pkg/multiclustermanager/schemas/cluster.cattle.io/v3"
-	managementSchema "github.com/rancher/rancher/pkg/multiclustermanager/schemas/management.cattle.io/v3"
-	projectSchema "github.com/rancher/rancher/pkg/multiclustermanager/schemas/project.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/multiclustermanager/user"
+	"github.com/rancher/rancher/pkg/peermanager"
+	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
+	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
@@ -62,7 +61,6 @@ type ScaledContext struct {
 	Dialer            dialer.Factory
 	UserManager       user.Manager
 	PeerManager       peermanager.PeerManager
-	CatalogManager    manager.CatalogManager
 
 	Management managementv3.Interface
 	Project    projectv3.Interface
@@ -84,7 +82,6 @@ func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
 	}
 	mgmt.Dialer = c.Dialer
 	mgmt.UserManager = c.UserManager
-	mgmt.CatalogManager = c.CatalogManager
 	c.managementContext = mgmt
 	return mgmt, nil
 }
@@ -182,7 +179,6 @@ type ManagementContext struct {
 	Scheme            *runtime.Scheme
 	Dialer            dialer.Factory
 	UserManager       user.Manager
-	CatalogManager    manager.CatalogManager
 
 	Management managementv3.Interface
 	Project    projectv3.Interface

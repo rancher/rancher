@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/indexers"
 	pkgrbac "github.com/rancher/rancher/pkg/multiclustermanager/rbac"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,13 +24,13 @@ const (
 	So the older label value, membershipBindingOwnerLegacy (<=2.4.x) will continue to be "memberhsip-binding-owner" (notice the spelling mistake),
 	and the new label, membershipBindingOwner will be "membership-binding-owner" (a different label value with the right spelling)*/
 	membershipBindingOwnerLegacy = "memberhsip-binding-owner"
-	membershipBindingOwner       = "membership-binding-owner"
+	membershipBindingOwner       = indexers.MembershipBindingOwner
 	clusterResource              = "clusters"
-	membershipBindingOwnerIndex  = "auth.management.cattle.io/membership-binding-owner"
+	membershipBindingOwnerIndex  = indexers.MembershipBindingOwnerIndex
 	crtbInProjectBindingOwner    = "crtb-in-project-binding-owner"
 	prtbInClusterBindingOwner    = "prtb-in-cluster-binding-owner"
-	rbByOwnerIndex               = "auth.management.cattle.io/rb-by-owner"
-	rbByRoleAndSubjectIndex      = "auth.management.cattle.io/crb-by-role-and-subject"
+	rbByOwnerIndex               = indexers.RBByOwnerIndex
+	rbByRoleAndSubjectIndex      = indexers.RBByRoleAndSubjectIndex
 	ctrbMGMTController           = "mgmt-auth-crtb-controller"
 	rtbLabelUpdated              = "auth.management.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated        = "auth.management.cattle.io/crb-rb-labels-updated"

@@ -13,16 +13,16 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/clusterlookup"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
-	"github.com/rancher/rancher/pkg/multiclustermanager/clusterrouter"
-	"github.com/rancher/rancher/pkg/multiclustermanager/namespace"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledContext) {
+func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledContext, catalogManager manager.CatalogManager) {
 	providers.Configure(ctx, mgmt)
 	userLister := mgmt.Management.Users("").Controller().Lister()
 
@@ -57,7 +57,7 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 
 	s := &Store{
 		Store:                 t,
-		auth:                  requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, mgmt),
+		auth:                  requests.NewAuthenticator(ctx, clusterlookup.GetClusterID, mgmt),
 		crtbLister:            mgmt.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		prtbLister:            mgmt.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		grbLister:             mgmt.Management.GlobalRoleBindings("").Controller().Lister(),
@@ -65,7 +65,7 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 		templateVersionLister: mgmt.Management.CatalogTemplateVersions("").Controller().Lister(),
 		users:                 mgmt.Management.Users(""),
 		rtLister:              mgmt.Management.RoleTemplates("").Controller().Lister(),
-		catalogManager:        mgmt.CatalogManager,
+		catalogManager:        catalogManager,
 	}
 
 	schema.Store = s

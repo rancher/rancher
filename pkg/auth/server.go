@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/data"
@@ -15,8 +16,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/multiclustermanager/api/norman"
-	"github.com/rancher/rancher/pkg/multiclustermanager/clusterrouter"
+	"github.com/rancher/rancher/pkg/clusterlookup"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
@@ -63,7 +64,7 @@ func NewServer(ctx context.Context, cfg *rest.Config) (*Server, error) {
 		return nil, err
 	}
 
-	authenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
+	authenticator := requests.NewAuthenticator(ctx, clusterlookup.GetClusterID, sc)
 	authManagement, err := newAPIManagement(ctx, sc)
 	if err != nil {
 		return nil, err
@@ -82,7 +83,7 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 		return nil, err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
@@ -102,12 +103,12 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 }
 
 func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext) (*mux.Router, error) {
-	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
 
-	otherAPIs, err := api.NewNormanServer(ctx, clusterrouter.GetClusterID, scaledContext)
+	otherAPIs, err := api.NewNormanServer(ctx, clusterlookup.GetClusterID, scaledContext)
 	if err != nil {
 		return nil, err
 	}
@@ -154,4 +155,32 @@ func (s *Server) Start(ctx context.Context, leader bool) error {
 		return s.OnLeader(ctx)
 	}
 	return nil
+}
+
+func ConfigureAPIUI(server *normanapi.Server) {
+	server.CustomAPIUIResponseWriter(cssURL, jsURL, settings.APIUIVersion.Get)
+}
+
+func cssURL() string {
+	switch settings.UIOfflinePreferred.Get() {
+	case "dynamic":
+		if !settings.IsRelease() {
+			return ""
+		}
+	case "false":
+		return ""
+	}
+	return "/api-ui/ui.min.css"
+}
+
+func jsURL() string {
+	switch settings.UIOfflinePreferred.Get() {
+	case "dynamic":
+		if !settings.IsRelease() {
+			return ""
+		}
+	case "false":
+		return ""
+	}
+	return "/api-ui/ui.min.js"
 }

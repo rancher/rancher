@@ -15,11 +15,11 @@ import (
 	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	cutils "github.com/rancher/rancher/pkg/multiclustermanager/catalog/utils"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/management/rbac"
-	"github.com/rancher/rancher/pkg/multiclustermanager/namespace"
 	"github.com/rancher/rancher/pkg/multiclustermanager/project"
-	"github.com/rancher/rancher/pkg/multiclustermanager/user"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +46,7 @@ type ProviderCatalogLauncher struct {
 	catalogManager    manager.CatalogManager
 }
 
-func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderCatalogLauncher {
+func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.ManagementContext, catalogManager manager.CatalogManager) *ProviderCatalogLauncher {
 	n := &ProviderCatalogLauncher{
 		managementContext: mgmt,
 		Apps:              mgmt.Project.Apps(""),
@@ -55,7 +55,7 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 		userManager:       mgmt.UserManager,
 		secrets:           mgmt.Core.Secrets(""),
 		templateLister:    mgmt.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
-		catalogManager:    mgmt.CatalogManager,
+		catalogManager:    catalogManager,
 	}
 	return n
 }

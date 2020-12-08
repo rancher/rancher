@@ -19,7 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/multiclustermanager/namespace"
+	"github.com/rancher/rancher/pkg/namespace"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,7 +46,7 @@ func NewService() *LoggingService {
 	return &LoggingService{}
 }
 
-func (l *LoggingService) Init(cluster *config.UserContext) {
+func (l *LoggingService) Init(cluster *config.UserContext, catalogManager manager.CatalogManager) {
 	ad := &AppDeployer{
 		AppsGetter: cluster.Management.Project,
 		AppsLister: cluster.Management.Project.Apps("").Controller().Lister(),
@@ -56,7 +56,7 @@ func (l *LoggingService) Init(cluster *config.UserContext) {
 	l.clusterName = cluster.ClusterName
 	l.clusterLister = cluster.Management.Management.Clusters("").Controller().Lister()
 	l.catalogLister = cluster.Management.Management.Catalogs(metav1.NamespaceAll).Controller().Lister()
-	l.catalogManager = cluster.Management.CatalogManager
+	l.catalogManager = catalogManager
 	l.projectLister = cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
 	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
 	l.daemonsets = cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace)

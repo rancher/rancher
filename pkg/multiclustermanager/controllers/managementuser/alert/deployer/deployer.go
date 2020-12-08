@@ -18,10 +18,10 @@ import (
 	alertutil "github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/alert/common"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/alert/manager"
 	monitorutil "github.com/rancher/rancher/pkg/multiclustermanager/monitoring"
-	"github.com/rancher/rancher/pkg/multiclustermanager/namespace"
 	projectutil "github.com/rancher/rancher/pkg/multiclustermanager/project"
 	"github.com/rancher/rancher/pkg/multiclustermanager/ref"
 	"github.com/rancher/rancher/pkg/multiclustermanager/systemaccount"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"golang.org/x/sync/errgroup"
@@ -68,12 +68,12 @@ type appDeployer struct {
 	deployments          appsv1.DeploymentInterface
 }
 
-func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *Deployer {
+func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager, catalogManager manager2.CatalogManager) *Deployer {
 	appsgetter := cluster.Management.Project
 	ad := &appDeployer{
 		appsGetter:           appsgetter,
 		appsLister:           cluster.Management.Project.Apps("").Controller().Lister(),
-		catalogManager:       cluster.Management.CatalogManager,
+		catalogManager:       catalogManager,
 		namespaces:           cluster.Core.Namespaces(metav1.NamespaceAll),
 		secrets:              cluster.Core.Secrets(metav1.NamespaceAll),
 		templateLister:       cluster.Management.Management.CatalogTemplates(namespace.GlobalNamespace).Controller().Lister(),

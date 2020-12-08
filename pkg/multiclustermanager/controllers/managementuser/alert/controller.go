@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	manager2 "github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/ref"
 
 	"github.com/rancher/norman/controller"
@@ -33,7 +34,7 @@ var (
 	}
 )
 
-func Register(ctx context.Context, cluster *config.UserContext) {
+func Register(ctx context.Context, cluster *config.UserContext, catalogManager manager2.CatalogManager) {
 	alertmanager := manager.NewAlertManager(cluster)
 
 	prometheusCRDManager := manager.NewPrometheusCRDManager(ctx, cluster)
@@ -46,7 +47,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 	notifiers := cluster.Management.Management.Notifiers(cluster.ClusterName)
 
-	deploy := deployer.NewDeployer(cluster, alertmanager)
+	deploy := deployer.NewDeployer(cluster, alertmanager, catalogManager)
 	clusterAlertGroups.AddClusterScopedHandler(ctx, "cluster-alert-group-deployer", cluster.ClusterName, deploy.ClusterGroupSync)
 	projectAlertGroups.AddClusterScopedHandler(ctx, "project-alert-group-deployer", cluster.ClusterName, deploy.ProjectGroupSync)
 

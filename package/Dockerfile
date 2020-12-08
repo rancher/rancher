@@ -144,6 +144,7 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY entrypoint.sh rancher /usr/bin/
+COPY mcm.so /usr/lib/rancher/
 COPY kustomize.sh /usr/bin/
 COPY jailer.sh /usr/bin/
 COPY k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/

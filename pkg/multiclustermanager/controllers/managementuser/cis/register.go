@@ -6,15 +6,16 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/multiclustermanager/namespace"
+	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/systemaccount"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Register initializes the controllers and registers
-func Register(ctx context.Context, userContext *config.UserContext) {
+func Register(ctx context.Context, userContext *config.UserContext, catalogManager manager.CatalogManager) {
 	clusterName := userContext.ClusterName
 	clusterClient := userContext.Management.Management.Clusters(metav1.NamespaceAll)
 	var cluster *v3.Cluster
@@ -38,8 +39,6 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 
 	clusterLister := clusterClient.Controller().Lister()
 	projectLister := userContext.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister()
-
-	catalogManager := userContext.Management.CatalogManager
 
 	nsClient := userContext.Core.Namespaces(metav1.NamespaceAll)
 	cmClient := userContext.Core.ConfigMaps(v32.DefaultNamespaceForCis)

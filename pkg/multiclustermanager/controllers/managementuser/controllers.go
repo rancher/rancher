@@ -4,6 +4,7 @@ import (
 	"context"
 
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementagent"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementagent/monitoring"
@@ -36,12 +37,14 @@ import (
 )
 
 func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
+	catalogManager := manager.New(cluster.Management.Management, cluster.Project)
+
 	rbac.Register(ctx, cluster)
 	healthsyncer.Register(ctx, cluster)
 	helm.Register(ctx, cluster, kubeConfigGetter)
-	logging.Register(ctx, cluster)
+	logging.Register(ctx, cluster, catalogManager)
 	networkpolicy.Register(ctx, cluster)
-	cis.Register(ctx, cluster)
+	cis.Register(ctx, cluster, catalogManager)
 	noderemove.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
 	pipeline.Register(ctx, cluster)
@@ -53,13 +56,13 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	podsecuritypolicy.RegisterServiceAccount(ctx, cluster)
 	podsecuritypolicy.RegisterTemplate(ctx, cluster)
 	secret.Register(ctx, cluster)
-	systemimage.Register(ctx, cluster)
+	systemimage.Register(ctx, cluster, catalogManager)
 	endpoints.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
 	globaldns.Register(ctx, cluster)
-	alert.Register(ctx, cluster)
-	monitoring.Register(ctx, cluster)
+	alert.Register(ctx, cluster, catalogManager)
+	monitoring.Register(ctx, cluster, catalogManager)
 	istio.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
 	ingresshostgen.Register(ctx, cluster.UserOnlyContext())

@@ -6,9 +6,9 @@ import (
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	schema "github.com/rancher/rancher/pkg/multiclustermanager/schemas/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/indexers"
+	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
@@ -42,12 +42,7 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 	return s.Store.Delete(apiContext, schema, id)
 }
 
-const clusterByPSPTKey = "clusterByPSPT"
 const projectByPSPTKey = "projectByPSPT"
-
-func RegisterIndexers(config *wrangler.Context) {
-	config.Mgmt.Cluster().Cache().AddIndexer(clusterByPSPTKey, clusterByPSPT)
-}
 
 func NewFormatter(management *config.ScaledContext) types.Formatter {
 	clusterInformer := management.Management.Clusters("").Controller().Informer()
@@ -61,10 +56,6 @@ func NewFormatter(management *config.ScaledContext) types.Formatter {
 		ProjectIndexer: projectInformer.GetIndexer(),
 	}
 	return format.Formatter
-}
-
-func clusterByPSPT(cluster *v3.Cluster) ([]string, error) {
-	return []string{cluster.Spec.DefaultPodSecurityPolicyTemplateName}, nil
 }
 
 func projectByPSPT(obj interface{}) ([]string, error) {
@@ -95,7 +86,7 @@ func (f *Format) Formatter(apiContext *types.APIContext, resource *types.RawReso
 		return
 	}
 
-	clustersWithPSPT, err := f.ClusterIndexer.ByIndex(clusterByPSPTKey, resource.ID)
+	clustersWithPSPT, err := f.ClusterIndexer.ByIndex(indexers.ClusterByPSPTKey, resource.ID)
 	if err != nil {
 		logrus.Warnf("failed to determine if a PSPT was assigned to a cluster: %v", err)
 		return

@@ -15,10 +15,8 @@ import (
 	crds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/indexers"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
-	"github.com/rancher/rancher/pkg/multiclustermanager/api/norman/customization/kontainerdriver"
-	"github.com/rancher/rancher/pkg/multiclustermanager/api/norman/customization/podsecuritypolicytemplate"
-	managementauth "github.com/rancher/rancher/pkg/multiclustermanager/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/multiclustermanager/options"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/ui"
@@ -94,9 +92,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 	wranglerContext.Agent = opts.Agent
 
-	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
-	kontainerdriver.RegisterIndexers(wranglerContext)
-	managementauth.RegisterWranglerIndexers(wranglerContext)
+	indexers.RegisterIndexers(wranglerContext)
 
 	if err := crds.Create(ctx, restConfig); err != nil {
 		return nil, err
@@ -227,7 +223,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 }
 
 func newMCM(wrangler *wrangler.Context, opts *Options) wrangler.MultiClusterManager {
-	return multiclustermanager.NewDeferredServer(wrangler, &options.Options{
+	return multiclustermanager.New(wrangler, &options.Options{
 		RemoveLocalCluster:  opts.AddLocal == "false",
 		LocalClusterEnabled: localClusterEnabled(opts),
 		Embedded:            opts.Embedded,

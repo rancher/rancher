@@ -8,6 +8,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/pipeline/controller/pipelineexecution"
 	images "github.com/rancher/rancher/pkg/multiclustermanager/image"
 	"github.com/rancher/rancher/pkg/multiclustermanager/pipeline/utils"
@@ -37,7 +38,7 @@ func NewService() *PipelineService {
 	return &PipelineService{}
 }
 
-func (l *PipelineService) Init(cluster *config.UserContext) {
+func (l *PipelineService) Init(cluster *config.UserContext, _ manager.CatalogManager) {
 	l.daemonSets = cluster.Apps.DaemonSets("")
 	l.deployments = cluster.Apps.Deployments("")
 	l.deploymentLister = cluster.Apps.Deployments("").Controller().Lister()

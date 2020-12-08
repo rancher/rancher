@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/docker/docker/pkg/locker"
+	"github.com/rancher/rancher/pkg/clusterlookup"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/multiclustermanager/clusterrouter/proxy"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
@@ -13,7 +14,7 @@ import (
 
 type factory struct {
 	dialerFactory dialer.Factory
-	clusterLookup ClusterLookup
+	clusterLookup clusterlookup.ClusterLookup
 	clusterLister v3.ClusterLister
 	clusters      sync.Map
 	serverLock    *locker.Locker
@@ -21,7 +22,7 @@ type factory struct {
 	localConfig   *rest.Config
 }
 
-func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister) *factory {
+func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup clusterlookup.ClusterLookup, clusterLister v3.ClusterLister) *factory {
 	return &factory{
 		dialerFactory: dialer,
 		serverLock:    locker.New(),

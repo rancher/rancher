@@ -14,22 +14,26 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type DeferredServer struct {
+type Factory func(ctx context.Context, wranglerContext *wrangler.Context, cfg *options.Options) (wrangler.MultiClusterManager, error)
+
+type Server struct {
 	sync.RWMutex
 
 	wrangler *wrangler.Context
 	opts     *options.Options
-	mcm      *mcm
+	mcm      wrangler.MultiClusterManager
+	factory  Factory
 }
 
-func NewDeferredServer(wrangler *wrangler.Context, opts *options.Options) *DeferredServer {
-	return &DeferredServer{
+func NewDeferredServer(wrangler *wrangler.Context, factory Factory, opts *options.Options) *Server {
+	return &Server{
 		wrangler: wrangler,
+		factory:  factory,
 		opts:     opts,
 	}
 }
 
-func (s *DeferredServer) Wait(ctx context.Context) {
+func (s *Server) Wait(ctx context.Context) {
 	if !features.MCM.Enabled() {
 		return
 	}
@@ -50,7 +54,7 @@ func (s *DeferredServer) Wait(ctx context.Context) {
 	}
 }
 
-func (s *DeferredServer) Start(ctx context.Context) error {
+func (s *Server) Start(ctx context.Context) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -59,12 +63,12 @@ func (s *DeferredServer) Start(ctx context.Context) error {
 	}
 
 	var (
-		mcm *mcm
+		mcm wrangler.MultiClusterManager
 		err error
 	)
 
 	err = s.wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
-		mcm, err = newMCM(ctx, s.wrangler, s.opts)
+		mcm, err = s.factory(ctx, s.wrangler, s.opts)
 		if err != nil {
 			return err
 		}
@@ -85,13 +89,13 @@ func (s *DeferredServer) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *DeferredServer) getMCM() *mcm {
+func (s *Server) getMCM() wrangler.MultiClusterManager {
 	s.RLock()
 	defer s.RUnlock()
 	return s.mcm
 }
 
-func (s *DeferredServer) Middleware(next http.Handler) http.Handler {
+func (s *Server) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		mcm := s.getMCM()
 		if mcm == nil {
@@ -102,28 +106,20 @@ func (s *DeferredServer) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func (s *DeferredServer) ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error) {
+func (s *Server) ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		mcm := s.getMCM()
 		if mcm == nil {
 			return nil, fmt.Errorf("failed to find cluster %s", clusterID)
 		}
-		dialer, err := mcm.ScaledContext.Dialer.ClusterDialer(clusterID)
-		if err != nil {
-			return nil, err
-		}
-		return dialer(ctx, network, address)
+		return mcm.ClusterDialer(clusterID)(ctx, network, address)
 	}
 }
 
-func (s *DeferredServer) K8sClient(clusterName string) (kubernetes.Interface, error) {
+func (s *Server) K8sClient(clusterName string) (kubernetes.Interface, error) {
 	mcm := s.getMCM()
 	if mcm == nil {
 		return nil, nil
 	}
-	clusterContext, err := mcm.clusterManager.UserContext(clusterName)
-	if err != nil {
-		return nil, err
-	}
-	return clusterContext.K8sClient, nil
+	return mcm.K8sClient(clusterName)
 }

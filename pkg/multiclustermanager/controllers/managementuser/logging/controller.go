@@ -3,6 +3,7 @@ package logging
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/logging/deployer"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/logging/watcher"
@@ -11,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext) {
+func Register(ctx context.Context, cluster *config.UserContext, catalogManager manager.CatalogManager) {
 
 	clusterName := cluster.ClusterName
 	secretManager := configsyncer.NewSecretManager(cluster)
@@ -21,7 +22,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	clusterClient := cluster.Management.Management.Clusters(metav1.NamespaceAll)
 	node := cluster.Core.Nodes(metav1.NamespaceAll)
 
-	deployer := deployer.NewDeployer(cluster, secretManager)
+	deployer := deployer.NewDeployer(cluster, catalogManager)
 	clusterLogging.AddClusterScopedHandler(ctx, "cluster-logging-deployer", cluster.ClusterName, deployer.ClusterLoggingSync)
 	projectLogging.AddClusterScopedHandler(ctx, "project-logging-deployer", cluster.ClusterName, deployer.ProjectLoggingSync)
 	clusterClient.AddHandler(ctx, "cluster-trigger-logging-deployer-updator", deployer.ClusterSync)

@@ -5,23 +5,8 @@ import (
 
 	"github.com/rancher/rancher/pkg/multiclustermanager/clustermanager"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/wrangler"
-	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 )
-
-func RegisterWranglerIndexers(config *wrangler.Context) {
-	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByClusterRoleAndSubject)
-	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *v1.ClusterRoleBinding) ([]string, error) {
-		return indexByMembershipBindingOwner(obj)
-	})
-
-	config.RBAC.RoleBinding().Cache().AddIndexer(rbByOwnerIndex, rbByOwner)
-	config.RBAC.RoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByRoleAndSubject)
-	config.RBAC.RoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *v1.RoleBinding) ([]string, error) {
-		return indexByMembershipBindingOwner(obj)
-	})
-}
 
 func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
 	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()

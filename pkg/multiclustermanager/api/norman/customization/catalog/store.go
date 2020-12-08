@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	catUtil "github.com/rancher/rancher/pkg/multiclustermanager/catalog/utils"
 	hcommon "github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/helm/common"
-	managementschema "github.com/rancher/rancher/pkg/multiclustermanager/schemas/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 )
@@ -24,10 +24,10 @@ type templateStore struct {
 	CatalogManager               manager.CatalogManager
 }
 
-func GetTemplateStore(ctx context.Context, managementContext *config.ScaledContext) types.Store {
+func GetTemplateStore(ctx context.Context, managementContext *config.ScaledContext, catalogManager manager.CatalogManager) types.Store {
 	ts := templateStore{
 		CatalogTemplateVersionLister: managementContext.Management.CatalogTemplateVersions("").Controller().Lister(),
-		CatalogManager:               managementContext.CatalogManager,
+		CatalogManager:               catalogManager,
 	}
 
 	s := &transform.Store{

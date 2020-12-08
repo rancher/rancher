@@ -7,12 +7,11 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	loggingconfig "github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/logging/config"
-	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/multiclustermanager/controllers/managementuser/logging/utils"
-	"github.com/rancher/rancher/pkg/multiclustermanager/namespace"
 	"github.com/rancher/rancher/pkg/multiclustermanager/project"
 	"github.com/rancher/rancher/pkg/multiclustermanager/ref"
 	"github.com/rancher/rancher/pkg/multiclustermanager/systemaccount"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 
@@ -46,7 +45,7 @@ type Deployer struct {
 	systemAccountManager *systemaccount.Manager
 }
 
-func NewDeployer(cluster *config.UserContext, secretSyncer *configsyncer.SecretManager) *Deployer {
+func NewDeployer(cluster *config.UserContext, catalogManager manager.CatalogManager) *Deployer {
 	clusterName := cluster.ClusterName
 	appsgetter := cluster.Management.Project
 
@@ -59,7 +58,7 @@ func NewDeployer(cluster *config.UserContext, secretSyncer *configsyncer.SecretM
 
 	return &Deployer{
 		clusterName:          clusterName,
-		catalogManager:       cluster.Management.CatalogManager,
+		catalogManager:       catalogManager,
 		clusterLister:        cluster.Management.Management.Clusters(metav1.NamespaceAll).Controller().Lister(),
 		clusterLoggingLister: cluster.Management.Management.ClusterLoggings(clusterName).Controller().Lister(),
 		nodeLister:           cluster.Core.Nodes(metav1.NamespaceAll).Controller().Lister(),

@@ -3,6 +3,7 @@ package monitoring
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/multiclustermanager/catalog/manager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/monitoring"
 	"github.com/rancher/rancher/pkg/multiclustermanager/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -19,7 +20,7 @@ func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 }
 
 // Register initializes the controllers and registers
-func Register(ctx context.Context, agentContext *config.UserContext) {
+func Register(ctx context.Context, agentContext *config.UserContext, catalogManager manager.CatalogManager) {
 	clusterName := agentContext.ClusterName
 	logrus.Infof("Registering monitoring for cluster %q", clusterName)
 
@@ -53,7 +54,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		clusterName:    clusterName,
 		clusters:       cattleClustersClient,
 		clusterLister:  mgmtContext.Clusters(metav1.NamespaceAll).Controller().Lister(),
-		catalogManager: cattleContext.CatalogManager,
+		catalogManager: catalogManager,
 		app:            ah,
 	}
 	cattleClustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.syncCluster)
@@ -68,7 +69,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 	ch := &clusterHandler{
 		clusterName:          clusterName,
 		cattleClustersClient: cattleClustersClient,
-		cattleCatalogManager: cattleContext.CatalogManager,
+		cattleCatalogManager: catalogManager,
 		agentEndpointsLister: agentClusterMonitoringEndpointLister,
 		app:                  ah,
 	}
@@ -91,7 +92,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 	ph := &projectHandler{
 		clusterName:         clusterName,
 		clusterLister:       mgmtContext.Clusters(metav1.NamespaceAll).Controller().Lister(),
-		catalogManager:      cattleContext.CatalogManager,
+		catalogManager:      catalogManager,
 		cattleProjectClient: cattleProjectsClient,
 		prtbIndexer:         prtbInformer.GetIndexer(),
 		prtbClient:          mgmtContext.ProjectRoleTemplateBindings(""),

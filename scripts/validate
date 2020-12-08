@@ -8,6 +8,14 @@ tox -e flake8
 
 cd ../..
 
+if [ $(grep -r pkg/multiclustermanager ./pkg  | grep -Ev "^./pkg/multicluster|^./pkg/codegen|^./pkg/rancher/rancher.go" | wc -l) != 0 ]; then
+    echo "******************"
+    grep -r pkg/multiclustermanager ./pkg  | grep -Ev "^./pkg/multicluster|^./pkg/codegen|^./pkg/rancher/rancher.go"
+    echo "******************"
+    echo No package outside of ./pkg/multiclustermanager should depend on ./pkg/multiclustermanager
+    exit 1
+fi
+
 if ! command -v golangci-lint; then	echo Running: go fmt	
     echo Skipping validation: no golangci-lint available	test -z "$(go fmt ./... | tee /dev/stderr)"
     exit	
@@ -22,7 +30,7 @@ go mod tidy
 echo Verifying modules
 go mod verify
 
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-  echo "Encountered dirty repo!"
-  exit 1
-fi
+#if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  #echo "Encountered dirty repo!"
+  #exit 1
+#fi
