@@ -31,3 +31,5 @@ cd ../..
 ./scripts/chart/package
 
 sed -e "s|%{CHART_CONTENT}%|$(base64 -w0 ./bin/chart/*/rancher-${CHART_VERSION}.tgz)|g" ./scripts/rancher.yaml.tmpl > ./bin/rancher.yaml
+cp ./scripts/rancher-namespace.yaml.tmpl ./bin/rancher-namespace.yaml
+
