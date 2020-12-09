@@ -730,6 +730,8 @@ github.com/rancher/remotedialer v0.2.0 h1:xD7t3K6JYwTdAsxmGtTHQMkEkFgKouQ1foLxVW
 github.com/rancher/remotedialer v0.2.0/go.mod h1:tkU8ZvrR5lRgaKWaX71nAy6daeqvPFx/lJEnbW7tXSI=
 github.com/rancher/rke2 v1.18.13-0.20201116190518-b63f92a2b66e h1:0f5DPgfBH8+Y1mG7To5nmcu69+F5eaElqmCwIG24T+k=
 github.com/rancher/rke2 v1.18.13-0.20201116190518-b63f92a2b66e/go.mod h1:hQ5acWquDxv8rc7Nv1gXYEaZ2at4D6OwHdvlH7TxQLQ=
+github.com/rancher/rke2 v1.18.13-0.20201207193710-1d6e826b9fdf h1:YjHm/U2dMEUtYFCrLzto42IcsjVONfXoF2a7pcttIx4=
+github.com/rancher/rke2 v1.18.13-0.20201207193710-1d6e826b9fdf/go.mod h1:hQ5acWquDxv8rc7Nv1gXYEaZ2at4D6OwHdvlH7TxQLQ=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.4.0/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
 github.com/rancher/wrangler v0.6.0/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
