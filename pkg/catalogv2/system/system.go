@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -134,6 +135,21 @@ func (m *Manager) install(namespace, name string, values map[string]interface{})
 	if err != nil {
 		return err
 	}
+
+	// todo: currently a hack to sort by appVersion since in chart we have version like 0.3.100 which will be greater than 0.3.2-rc200
+	// We need to make sure the package version gets added into chart CI so that 0.3.2-rc200 -> 0.3.200-rc2. Once that is added we can remove this custom sorting
+	sort.Slice(index.Entries[name], func(i, j int) bool {
+		// Failed parse pushes to the back.
+		iVer, err := semver.NewVersion(index.Entries[name][i].AppVersion)
+		if err != nil {
+			return true
+		}
+		jVer, err := semver.NewVersion(index.Entries[name][j].AppVersion)
+		if err != nil {
+			return false
+		}
+		return iVer.GreaterThan(jVer)
+	})
 
 	// get latest, the ~0-a is a weird syntax to match everything including prereleases build
 	chart, err := index.Get(name, "~0-a")
