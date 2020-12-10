@@ -110,7 +110,9 @@ func resetAdmin(clx *cli.Context) error {
 		Version:  "v3",
 		Resource: "clusters",
 	})
+
 	var adminName string
+	var adminUser unstructured.Unstructured
 	set := labels.Set(defaultAdminLabel)
 	admins, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
@@ -119,6 +121,7 @@ func resetAdmin(clx *cli.Context) error {
 
 	if len(admins.Items) > 0 {
 		adminName = admins.Items[0].GetName()
+		adminUser = admins.Items[0]
 	}
 
 	if _, err := configmapClient.Get(ctx, bootstrapAdminConfig, v1.GetOptions{}); err != nil {
@@ -127,12 +130,6 @@ func resetAdmin(clx *cli.Context) error {
 		}
 	} else {
 		// if it is already bootstrapped, reset admin password
-		set := labels.Set(map[string]string{defaultAdminLabelKey: defaultAdminLabelValue})
-		admins, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
-		if err != nil {
-			return err
-		}
-
 		count := len(admins.Items)
 		if count != 1 {
 			var users []string
@@ -159,12 +156,8 @@ func resetAdmin(clx *cli.Context) error {
 		return nil
 	}
 
-	users, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
-	if err != nil {
-		panic(err)
-	}
-
-	if len(users.Items) == 0 {
+	// make sure Admin user gets created
+	if len(admins.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
 		hash, _ := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
 		admin, err := userClient.Create(ctx,
@@ -186,76 +179,77 @@ func resetAdmin(clx *cli.Context) error {
 			return err
 		}
 		adminName = admin.GetName()
-		if err := setClusterAnnotation(ctx, clustersClient, adminName); err != nil {
-			return err
-		}
+		adminUser = *admin
+	}
 
-		bindings, err := grbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
-		if err != nil {
-			return err
-		}
-		if len(bindings.Items) == 0 {
-			_, err = grbClient.Create(ctx,
-				&unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"metadata": v1.ObjectMeta{
-							GenerateName: "globalrolebinding-",
-							Labels:       defaultAdminLabel,
-						},
-						"apiVersion":     "management.cattle.io/v3",
-						"kind":           "GlobalRoleBinding",
-						"userName":       adminName,
-						"globalRoleName": "admin",
+	// Make sure the admin user become the admin of system/default project of local cluster
+	if err := setClusterAnnotation(ctx, clustersClient, adminName); err != nil {
+		return err
+	}
+
+	// Make sure globalRolebinding is created with admin user
+	bindings, err := grbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
+	if err != nil {
+		return err
+	}
+	if len(bindings.Items) == 0 {
+		_, err = grbClient.Create(ctx,
+			&unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": v1.ObjectMeta{
+						GenerateName: "globalrolebinding-",
+						Labels:       defaultAdminLabel,
 					},
-				}, v1.CreateOptions{})
-			if err != nil {
-				return err
-			}
-		}
-
-		users, err := userClient.List(ctx, v1.ListOptions{
-			LabelSelector: set.String(),
-		})
-
-		crbBindings, err := crbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
+					"apiVersion":     "management.cattle.io/v3",
+					"kind":           "GlobalRoleBinding",
+					"userName":       adminName,
+					"globalRoleName": "admin",
+				},
+			}, v1.CreateOptions{})
 		if err != nil {
 			return err
 		}
-		if len(crbBindings.Items) == 0 && len(users.Items) > 0 {
-			_, err = crbClient.Create(ctx,
-				&unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"metadata": v1.ObjectMeta{
-							GenerateName: "default-admin-",
-							Labels:       defaultAdminLabel,
+	}
+
+	// Make sure admin user is the cluster-admin of local cluster
+	crbBindings, err := crbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
+	if err != nil {
+		return err
+	}
+	if len(crbBindings.Items) == 0 && adminName != "" {
+		_, err = crbClient.Create(ctx,
+			&unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": v1.ObjectMeta{
+						GenerateName: "default-admin-",
+						Labels:       defaultAdminLabel,
+					},
+					"apiVersion": "rbac.authorization.k8s.io/v1",
+					"kind":       "ClusterRoleBinding",
+					"ownerReferences": []v1.OwnerReference{
+						{
+							APIVersion: "management.cattle.io/v3",
+							Kind:       "user",
+							Name:       adminUser.GetName(),
+							UID:        adminUser.GetUID(),
 						},
-						"apiVersion": "rbac.authorization.k8s.io/v1",
-						"kind":       "ClusterRoleBinding",
-						"ownerReferences": []v1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "user",
-								Name:       users.Items[0].GetName(),
-								UID:        users.Items[0].GetUID(),
-							},
-						},
-						"subjects": []rbacv1.Subject{
-							{
-								Kind:     "User",
-								APIGroup: rbacv1.GroupName,
-								Name:     users.Items[0].GetName(),
-							},
-						},
-						"roleRef": rbacv1.RoleRef{
+					},
+					"subjects": []rbacv1.Subject{
+						{
+							Kind:     "User",
 							APIGroup: rbacv1.GroupName,
-							Kind:     "ClusterRole",
-							Name:     "cluster-admin",
+							Name:     adminUser.GetName(),
 						},
 					},
-				}, v1.CreateOptions{})
-			if err != nil {
-				return err
-			}
+					"roleRef": rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "cluster-admin",
+					},
+				},
+			}, v1.CreateOptions{})
+		if err != nil {
+			return err
 		}
 	}
 
