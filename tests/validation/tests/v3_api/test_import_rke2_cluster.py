@@ -16,6 +16,7 @@ HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
 RANCHER_IAM_ROLE = os.environ.get("RANCHER_IAM_ROLE")
 
 RANCHER_RKE2_VERSION = os.environ.get("RANCHER_RKE2_VERSION", "")
+RANCHER_RKE2_CHANNEL = os.environ.get("RANCHER_RKE2_CHANNEL", "null")
 RANCHER_RANCHERD_VERSION = os.environ.get("RANCHER_RANCHERD_VERSION", "")
 RANCHER_RKE2_NO_OF_SERVER_NODES = \
     os.environ.get("RANCHER_RKE2_NO_OF_SERVER_NODES", 3)
@@ -93,6 +94,7 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                               'username': RANCHER_RKE2_RHEL_USERNAME,
                               'password': RANCHER_RKE2_RHEL_PASSWORD,
                               'rke2_version': cluster_version,
+                              'rke2_channel': RANCHER_RKE2_CHANNEL,
                               'no_of_server_nodes': no_of_servers,
                               'server_flags': RANCHER_RKE2_SERVER_FLAGS,
                               'qa_space': RANCHER_QA_SPACE,
@@ -118,6 +120,7 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                                   'resource_name': RANCHER_HOSTNAME_PREFIX,
                                   'access_key': keyPath,
                                   'rke2_version': cluster_version,
+                                  'rke2_channel': RANCHER_RKE2_CHANNEL,
                                   'username': RANCHER_RKE2_RHEL_USERNAME,
                                   'password': RANCHER_RKE2_RHEL_PASSWORD,
                                   'node_os': RANCHER_RKE2_OPERATING_SYSTEM,
