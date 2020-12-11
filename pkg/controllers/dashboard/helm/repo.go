@@ -178,7 +178,7 @@ func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStat
 		return status, err
 	}
 
-	return status, git.Ensure(secret, metadata.Namespace, metadata.Name, status.URL, status.Commit, repoSpec.InsecureSkipTLSverify)
+	return status, git.Ensure(secret, metadata.Namespace, metadata.Name, status.URL, status.Branch, status.Commit, repoSpec.InsecureSkipTLSverify)
 }
 
 func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta, owner metav1.OwnerReference) (catalog.RepoStatus, error) {

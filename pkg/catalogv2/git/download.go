@@ -61,7 +61,7 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	return commit, err
 }
 
-func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool) error {
+func Ensure(secret *corev1.Secret, namespace, name, gitURL, branch, commit string, insecureSkipTLS bool) error {
 	if commit == "" {
 		return nil
 	}
@@ -70,7 +70,7 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 		return err
 	}
 
-	return git.Ensure(commit)
+	return git.Ensure(branch, commit)
 }
 
 func isBundled(git *git.Git) bool {
