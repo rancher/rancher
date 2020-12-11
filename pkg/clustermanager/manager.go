@@ -420,6 +420,10 @@ func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext typ
 		return m.accessControl, nil
 	}
 
+	if record.accessControl == nil {
+		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cannot determine access, cluster is unavailable")
+	}
+
 	return record.accessControl, nil
 }
 
