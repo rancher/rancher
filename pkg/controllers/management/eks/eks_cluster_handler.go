@@ -3,14 +3,16 @@ package eks
 import (
 	"context"
 	"encoding/base64"
+	stderrors "errors"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/rancher/eks-operator/controller"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
@@ -197,15 +199,13 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		}
 
 		if cluster.Status.EKSStatus.UpstreamSpec == nil {
-			if cluster.Status.EKSStatus.UpstreamSpec == nil {
-				cluster, err = e.setInitialUpstreamSpec(cluster)
-				if err != nil {
-					if !notFound(err) {
-						return cluster, err
-					}
+			cluster, err = e.setInitialUpstreamSpec(cluster)
+			if err != nil {
+				if !notFound(err) {
+					return cluster, err
 				}
-				return cluster, nil
 			}
+			return cluster, nil
 		}
 
 		e.clusterEnqueueAfter(cluster.Name, enqueueTime)
@@ -282,7 +282,26 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			}
 		}
 
-		if cluster.Status.ServiceAccountToken == "" || cluster.Status.APIEndpoint == "" {
+		if cluster.Status.APIEndpoint == "" {
+			return e.recordCAAndAPIEndpoint(cluster)
+		}
+
+		if cluster.Status.EKSStatus.PrivateRequiresTunnel == nil && !*cluster.Status.EKSStatus.UpstreamSpec.PublicAccess {
+			// Check to see if we can still use the public API endpoint even though
+			// the cluster has private-only access
+			serviceToken, mustTunnel, err := e.generateSATokenWithPublicAPI(cluster)
+			if mustTunnel != nil {
+				cluster = cluster.DeepCopy()
+				cluster.Status.EKSStatus.PrivateRequiresTunnel = mustTunnel
+				cluster.Status.ServiceAccountToken = serviceToken
+				return e.clusterClient.Update(cluster)
+			}
+			if err != nil {
+				return cluster, err
+			}
+		}
+
+		if cluster.Status.ServiceAccountToken == "" {
 			cluster, err = e.generateAndSetServiceAccount(cluster)
 			if err != nil {
 				var statusErr error
@@ -404,8 +423,8 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 	}
 }
 
-// getCAAndAPIEndpoint reads the EKSClusterConfig's secret once available. The CA cert and API endpoint are then copied to the cluster status.
-func (e *eksOperatorController) getCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+// recordCAAndAPIEndpoint reads the EKSClusterConfig's secret once available. The CA cert and API endpoint are then copied to the cluster status.
+func (e *eksOperatorController) recordCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	backoff := wait.Backoff{
 		Duration: 2 * time.Second,
 		Factor:   2,
@@ -446,10 +465,7 @@ func (e *eksOperatorController) getCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*m
 		currentCluster.Status.APIEndpoint = apiEndpoint
 		currentCluster.Status.CACert = caCert
 		currentCluster, err = e.clusterClient.Update(currentCluster)
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	})
 
 	return currentCluster, err
@@ -457,20 +473,16 @@ func (e *eksOperatorController) getCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*m
 
 // generateAndSetServiceAccount uses the API endpoint and CA cert to generate a service account token. The token is then copied to the cluster status.
 func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-	var err error
-	cluster, err = e.getCAAndAPIEndpoint(cluster)
+	accessToken, err := e.getAccessToken(cluster)
 	if err != nil {
 		return cluster, err
 	}
+
 	clusterDialer, err := e.clientDialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
-	sess, _, err := controller.StartAWSSessions(e.secretsCache, *cluster.Spec.EKSConfig)
-	if err != nil {
-		return cluster, err
-	}
-	saToken, err := generateSAToken(sess, cluster.Spec.EKSConfig.DisplayName, cluster.Status.APIEndpoint, cluster.Status.CACert, clusterDialer)
+	saToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, accessToken, clusterDialer)
 	if err != nil {
 		return cluster, err
 	}
@@ -608,21 +620,33 @@ func (e *eksOperatorController) deployEKSOperator() error {
 	return nil
 }
 
-func generateSAToken(sess *session.Session, clusterID, endpoint, ca string, dialer typesDialer.Dialer) (string, error) {
+func (e *eksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, *bool, error) {
+	var publicAccess *bool
+	accessToken, err := e.getAccessToken(cluster)
+	if err != nil {
+		return "", nil, err
+	}
+
+	netDialer := net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	serviceToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, accessToken, netDialer.DialContext)
+	if err != nil {
+		var dnsError *net.DNSError
+		if stderrors.As(err, &dnsError) && !dnsError.IsTemporary {
+			return "", aws.Bool(true), nil
+		}
+	} else {
+		publicAccess = aws.Bool(false)
+	}
+
+	return serviceToken, publicAccess, err
+}
+
+func generateSAToken(endpoint, ca, token string, dialer typesDialer.Dialer) (string, error) {
 	decodedCA, err := base64.StdEncoding.DecodeString(ca)
-	if err != nil {
-		return "", err
-	}
-
-	generator, err := token.NewGenerator(false, false)
-	if err != nil {
-		return "", err
-	}
-
-	awsToken, err := generator.GetWithOptions(&token.GetTokenOptions{
-		Session:   sess,
-		ClusterID: clusterID,
-	})
 	if err != nil {
 		return "", err
 	}
@@ -632,7 +656,7 @@ func generateSAToken(sess *session.Session, clusterID, endpoint, ca string, dial
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: decodedCA,
 		},
-		BearerToken: awsToken.Token,
+		BearerToken: token,
 		Dial:        dialer,
 	}
 
@@ -642,6 +666,27 @@ func generateSAToken(sess *session.Session, clusterID, endpoint, ca string, dial
 	}
 
 	return util.GenerateServiceAccountToken(clientset)
+}
+
+func (e *eksOperatorController) getAccessToken(cluster *mgmtv3.Cluster) (string, error) {
+	sess, _, err := controller.StartAWSSessions(e.secretsCache, *cluster.Spec.EKSConfig)
+	if err != nil {
+		return "", err
+	}
+	generator, err := token.NewGenerator(false, false)
+	if err != nil {
+		return "", err
+	}
+
+	awsToken, err := generator.GetWithOptions(&token.GetTokenOptions{
+		Session:   sess,
+		ClusterID: cluster.Spec.EKSConfig.DisplayName,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return awsToken.Token, nil
 }
 
 func (e *eksOperatorController) setUnknown(cluster *mgmtv3.Cluster, condition condition.Cond, message string) (*mgmtv3.Cluster, error) {
