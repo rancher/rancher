@@ -14,6 +14,7 @@ variable "qa_space" {}
 variable "region" {}
 variable "resource_name" {}
 variable "rke2_version" {}
+variable "rke2_channel" {}
 variable "server_flags" {}
 variable "sg_id" {}
 variable "subnets" {}
