@@ -180,6 +180,9 @@ func IsMachineReady(machine *v3.Node) bool {
 }
 
 func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster) bool {
+	if node.Status.NodeConfig == nil {
+		return false
+	}
 	// never drain an etcd node, you will regret it
 	if IsEtcd(node.Status.NodeConfig) {
 		return false
