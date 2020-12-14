@@ -3113,6 +3113,11 @@ func (in *EKSStatus) DeepCopyInto(out *EKSStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.PrivateRequiresTunnel != nil {
+		in, out := &in.PrivateRequiresTunnel, &out.PrivateRequiresTunnel
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
