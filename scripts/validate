@@ -26,3 +26,23 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "Encountered dirty repo!"
   exit 1
 fi
+
+# Check diff between ./go.mod and ./pkg/apis/go.mod
+badmodule="false"
+while read -r module tag; do
+  # Get tag from module in ./go.mod
+  roottag=$(cat go.mod | sed '1,/require/d' | grep "${module} " | awk '{ print $2 }')
+  echo "${module}:"
+  echo "${tag} (./pkg/apis/go.mod)"
+  echo "${roottag} (./go.mod)"
+  # Compare with tag from module in ./pkg/apis/go.mod
+  if [[ "${tag}" != "${roottag}" ]]; then
+    echo "${module} is different ("${tag}" vs "${roottag}")"
+    badmodule="true"
+  fi
+done <<< $(cat pkg/apis/go.mod | sed '1,/require/d' | head -n -1 | grep -v indirect | grep rancher |  awk '{ print $1,$2 }')
+
+if [[ "${badmodule}" == "true" ]]; then
+  echo "Diff found between ./go.mod and ./pkg/apis/go.mod"
+  exit 1
+fi
