@@ -75,9 +75,13 @@ func IsPublicCloudDriver(cluster *v3.Cluster) bool {
 func HasOnlyPrivateAPIEndpoint(cluster *v3.Cluster) bool {
 	switch cluster.Status.Driver {
 	case v32.ClusterDriverEKS:
-		return cluster.Status.EKSStatus.UpstreamSpec != nil &&
+		if cluster.Status.EKSStatus.UpstreamSpec != nil &&
 			cluster.Status.EKSStatus.UpstreamSpec.PublicAccess != nil &&
-			!*cluster.Status.EKSStatus.UpstreamSpec.PublicAccess
+			*cluster.Status.EKSStatus.UpstreamSpec.PublicAccess {
+			return false
+		}
+		return cluster.Status.EKSStatus.PrivateRequiresTunnel != nil &&
+			*cluster.Status.EKSStatus.PrivateRequiresTunnel
 	default:
 		return false
 	}
