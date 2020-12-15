@@ -59,6 +59,7 @@ type ScaledContext struct {
 	Dialer            dialer.Factory
 	UserManager       user.Manager
 	PeerManager       peermanager.PeerManager
+	CatalogManager    CatalogManager
 
 	Management managementv3.Interface
 	Project    projectv3.Interface
@@ -68,6 +69,14 @@ type ScaledContext struct {
 
 	RunContext        context.Context
 	managementContext *ManagementContext
+}
+
+type CatalogManager interface {
+	ValidateChartCompatibility(template *managementv3.CatalogTemplateVersion, clusterName string) error
+	ValidateKubeVersion(template *managementv3.CatalogTemplateVersion, clusterName string) error
+	ValidateRancherVersion(template *managementv3.CatalogTemplateVersion) error
+	LatestAvailableTemplateVersion(template *managementv3.CatalogTemplate, clusterName string) (*managementv3.TemplateVersionSpec, error)
+	GetSystemAppCatalogID(templateVersionID, clusterName string) (string, error)
 }
 
 func (c *ScaledContext) controllers() []controller.Starter {
@@ -89,6 +98,7 @@ func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
 	}
 	mgmt.Dialer = c.Dialer
 	mgmt.UserManager = c.UserManager
+	mgmt.CatalogManager = c.CatalogManager
 	c.managementContext = mgmt
 	return mgmt, nil
 }
@@ -167,6 +177,7 @@ type ManagementContext struct {
 	Scheme            *runtime.Scheme
 	Dialer            dialer.Factory
 	UserManager       user.Manager
+	CatalogManager    CatalogManager
 
 	Management managementv3.Interface
 	Project    projectv3.Interface

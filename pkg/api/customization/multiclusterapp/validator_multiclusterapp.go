@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/values"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -42,6 +43,7 @@ type Wrapper struct {
 	ClusterLister                 v3.ClusterLister
 	Apps                          pv3.AppInterface
 	TemplateVersionLister         v3.CatalogTemplateVersionLister
+	CatalogManager                manager.CatalogManager
 }
 
 const (

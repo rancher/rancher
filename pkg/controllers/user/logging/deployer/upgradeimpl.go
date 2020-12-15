@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/project"
@@ -32,6 +32,7 @@ type LoggingService struct {
 	clusterName    string
 	clusterLister  v3.ClusterLister
 	catalogLister  v3.CatalogLister
+	catalogManager manager.CatalogManager
 	projectLister  v3.ProjectLister
 	templateLister v3.CatalogTemplateLister
 	daemonsets     appsv1.DaemonSetInterface
@@ -53,6 +54,7 @@ func (l *LoggingService) Init(cluster *config.UserContext) {
 	l.clusterName = cluster.ClusterName
 	l.clusterLister = cluster.Management.Management.Clusters("").Controller().Lister()
 	l.catalogLister = cluster.Management.Management.Catalogs(metav1.NamespaceAll).Controller().Lister()
+	l.catalogManager = cluster.Management.CatalogManager
 	l.projectLister = cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
 	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
 	l.daemonsets = cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace)
@@ -72,7 +74,7 @@ func (l *LoggingService) Upgrade(currentVersion string) (string, error) {
 		return "", errors.Wrapf(err, "get template %s failed", templateID)
 	}
 
-	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	templateVersion, err := l.catalogManager.LatestAvailableTemplateVersion(template, l.clusterName)
 	if err != nil {
 		return "", err
 	}

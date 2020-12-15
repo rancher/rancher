@@ -7,7 +7,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/slice"
-	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
+	manager2 "github.com/rancher/rancher/pkg/catalog/manager"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
@@ -56,6 +56,7 @@ type Deployer struct {
 type appDeployer struct {
 	appsGetter           projectv3.AppsGetter
 	appsLister           projectv3.AppLister
+	catalogManager       manager2.CatalogManager
 	namespaces           v1.NamespaceInterface
 	secrets              v1.SecretInterface
 	templateLister       mgmtv3.CatalogTemplateLister
@@ -69,6 +70,7 @@ func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *De
 	ad := &appDeployer{
 		appsGetter:           appsgetter,
 		appsLister:           cluster.Management.Project.Apps("").Controller().Lister(),
+		catalogManager:       cluster.Management.CatalogManager,
 		namespaces:           cluster.Core.Namespaces(metav1.NamespaceAll),
 		secrets:              cluster.Core.Secrets(metav1.NamespaceAll),
 		templateLister:       cluster.Management.Management.CatalogTemplates(namespace.GlobalNamespace).Controller().Lister(),
@@ -148,7 +150,7 @@ func (d *Deployer) sync() error {
 			newCluster = cluster.DeepCopy()
 		}
 
-		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, needWebhookReceiver); err != nil {
+		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, needWebhookReceiver, d.clusterLister, d.clusterName); err != nil {
 			return fmt.Errorf("deploy alertmanager failed, %v", err)
 		}
 
@@ -288,7 +290,7 @@ func (d *appDeployer) getSecret(secretName, secretNamespace string) *corev1.Secr
 	}
 }
 
-func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string, needWebhookReceiver bool) (bool, error) {
+func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string, needWebhookReceiver bool, clusterLister mgmtv3.ClusterLister, clusterName string) (bool, error) {
 	clusterName, systemProjectName := ref.Parse(systemProjectID)
 
 	ns := &corev1.Namespace{
@@ -333,7 +335,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 	if err != nil {
 		return false, fmt.Errorf("get template %s:%s failed, %v", namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName, err)
 	}
-	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	templateVersion, err := d.catalogManager.LatestAvailableTemplateVersion(template, clusterName)
 	if err != nil {
 		return false, err
 	}
