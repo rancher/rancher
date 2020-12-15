@@ -217,6 +217,8 @@ func AuthHandler() http.Handler {
 func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string][]string) (v3.Principal, []v3.Principal, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
+	log.Infof("CUSTOM-SAML: checking if UIDField %v is present in response", config.UIDField)
+
 	uid, ok := samlData[config.UIDField]
 	if !ok {
 		// UID field provided by user is actually not there in SAMLResponse, without this we cannot differentiate between users and create separate principals
@@ -233,12 +235,12 @@ func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string]
 	if ok {
 		userPrincipal.DisplayName = displayName[0]
 	}
-
+	log.Infof("CUSTOM-SAML: DisplayNameField: %v, displayName: %v", config.DisplayNameField, displayName)
 	userName, ok := samlData[config.UserNameField]
 	if ok {
 		userPrincipal.LoginName = userName[0]
 	}
-
+	log.Infof("CUSTOM-SAML: UserNameField: %v, userName: %v", config.UserNameField, userName)
 	groups, ok := samlData[config.GroupsField]
 	if ok {
 		for _, group := range groups {
@@ -260,7 +262,7 @@ func (s *Provider) getSamlPrincipals(config *v3.SamlConfig, samlData map[string]
 func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, assertion *saml.Assertion) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
-
+	log.Infof("CUSTOM-SAML: Received assertion from IdP: %#v", assertion)
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		// delete the cookie
 		s.clientState.DeleteState(w, r, relayState)
@@ -276,7 +278,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 
 	samlData := make(map[string][]string)
-
+	log.Info("CUSTOM-SAML: mapping assertion")
 	for _, attributeStatement := range assertion.AttributeStatements {
 		for _, attr := range attributeStatement.Attributes {
 			attrName := attr.FriendlyName
@@ -288,14 +290,14 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			}
 		}
 	}
-
+	log.Infof("CUSTOM-SAML: mapped SAML data: %#v", samlData)
 	config, err := s.getSamlConfig()
 	if err != nil {
 		log.Errorf("SAML: Error getting saml config %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		return
 	}
-
+	log.Infof("CUSTOM-SAML: Getting SAML principals")
 	userPrincipal, groupPrincipals, err = s.getSamlPrincipals(config, samlData)
 	if err != nil {
 		log.Error(err)
