@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	corev1interface "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -149,6 +151,7 @@ func resetAdmin(clx *cli.Context) error {
 		if err != nil {
 			return err
 		}
+		printServerURL(ctx, nodeClient, settingClient)
 		logrus.Infof("Default admin reset. New username: %v, new Password: %v", admin.Object["username"], token)
 		return nil
 	}
@@ -263,40 +266,67 @@ func resetAdmin(clx *cli.Context) error {
 		}
 	}
 
-	serverURL := "https://%v:8443"
+	printServerURL(ctx, nodeClient, settingClient)
+	logrus.Infof("Default admin and password created. Username: admin, Password: %v", token)
+	return nil
+}
+
+func printServerURL(ctx context.Context, nodeClient corev1interface.NodeInterface, settingClient dynamic.NamespaceableResourceInterface) {
+	serverURL, err := getServerURL(ctx, nodeClient, settingClient)
+	if err != nil {
+		logrus.Warnf("Can't retrieve serverURL to reach rancher server. Error: %v", err)
+	}
+
+	if serverURL != "" {
+		logrus.Infof("Server URL: %v", serverURL)
+	} else {
+		logrus.Info("Rancher is listening on http/8080 and https/8443")
+	}
+}
+
+// getServerURL reads the possible serverUrl in following order
+// 1. First fetch from server-url setting from rancher
+// 2. Fetch From tls-san set in rke2 config
+// 3. Fetch the externalNodeIP then internalNodeIP
+func getServerURL(ctx context.Context, nodeClient corev1interface.NodeInterface, settingClient dynamic.NamespaceableResourceInterface) (string, error) {
+	serverURLSettings, err := settingClient.Get(ctx, "server-url", v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	value := serverURLSettings.Object["value"].(string)
+	defaultValue := serverURLSettings.Object["default"].(string)
+	if value != "" {
+		return value, nil
+	} else if defaultValue != "" {
+		return value, nil
+	}
+
+	tlsSan, err := readTLSSan()
+	if err != nil {
+		return "", err
+	}
+	if tlsSan != "" {
+		return fmt.Sprintf("https://%v:8443", tlsSan), nil
+	}
+
 	nodes, err := nodeClient.List(ctx, v1.ListOptions{})
 	if err != nil {
-		return err
+		return "", err
 	}
 	if len(nodes.Items) > 0 {
 		addresses := nodes.Items[0].Status.Addresses
 		// prefer external IP over internal IP
 		for _, address := range addresses {
 			if address.Type == corev1.NodeExternalIP {
-				serverURL = fmt.Sprintf(serverURL, address.Address)
-				break
+				return fmt.Sprintf("https://%v:8443", address.Address), nil
 			}
 			if address.Type == corev1.NodeInternalIP {
-				serverURL = fmt.Sprintf(serverURL, address.Address)
+				return fmt.Sprintf("https://%v:8443", address.Address), nil
 			}
 		}
 	}
 
-	serverURLSettings, err := settingClient.Get(ctx, "server-url", v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	value := serverURLSettings.Object["value"].(string)
-	defaultValue := serverURLSettings.Object["default"].(string)
-	if value != "" {
-		serverURL = value
-	} else if defaultValue != "" {
-		serverURL = defaultValue
-	}
-
-	logrus.Infof("Server URL: %v", serverURL)
-	logrus.Infof("Default admin and password created. Username: admin, Password: %v", token)
-	return nil
+	return "", nil
 }
 
 func setClusterAnnotation(ctx context.Context, clustersClient dynamic.NamespaceableResourceInterface, adminName string) error {
@@ -342,4 +372,32 @@ func setConditionToFalse(object map[string]interface{}, cond string) {
 		}
 	}
 	return
+}
+
+func readTLSSan() (string, error) {
+	bytes, err := ioutil.ReadFile("/etc/rancher/rke2/config.yaml")
+	if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+
+	if len(bytes) == 0 {
+		return "", nil
+	}
+
+	data := yaml.MapSlice{}
+	if err := yaml.Unmarshal(bytes, &data); err != nil {
+		return "", err
+	}
+
+	for _, item := range data {
+		if item.Key == "tls-san" {
+			if v, ok := item.Value.([]interface{}); ok {
+				if s, ok := v[0].(string); ok {
+					return s, nil
+				}
+			}
+		}
+	}
+
+	return "", nil
 }
