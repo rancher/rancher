@@ -28,6 +28,7 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		assertion, err := serviceProvider.ParseResponse(r, s.getPossibleRequestIDs(r))
 		if err != nil {
 			if parseErr, ok := err.(*saml.InvalidResponseError); ok {
+				log.Infof("CUSTOM-SAML: got following error parsing response: %v", err)
 				log.Debugf("RESPONSE: ===\n%s\n===\nNOW: %s\nERROR: %s",
 					parseErr.Response, parseErr.Now, parseErr.PrivateErr)
 			}
