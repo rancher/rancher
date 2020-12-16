@@ -14,6 +14,7 @@ const (
 	AlertmanagerEndpointsFieldPort            = "port"
 	AlertmanagerEndpointsFieldScheme          = "scheme"
 	AlertmanagerEndpointsFieldTLSConfig       = "tlsConfig"
+	AlertmanagerEndpointsFieldTimeout         = "timeout"
 )
 
 type AlertmanagerEndpoints struct {
@@ -25,4 +26,5 @@ type AlertmanagerEndpoints struct {
 	Port            intstr.IntOrString `json:"port,omitempty" yaml:"port,omitempty"`
 	Scheme          string             `json:"scheme,omitempty" yaml:"scheme,omitempty"`
 	TLSConfig       *TLSConfig         `json:"tlsConfig,omitempty" yaml:"tlsConfig,omitempty"`
+	Timeout         string             `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
