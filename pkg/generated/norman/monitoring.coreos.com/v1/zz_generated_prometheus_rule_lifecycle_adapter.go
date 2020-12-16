@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
