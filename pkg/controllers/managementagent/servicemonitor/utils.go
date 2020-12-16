@@ -9,7 +9,7 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	util "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	rmonitoringv1 "github.com/rancher/rancher/pkg/generated/norman/monitoring.coreos.com/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -87,7 +87,9 @@ func getServiceMonitorFromWorkload(w *util.Workload) (*monitoringv1.ServiceMonit
 			Path:       metric.Path,
 			Scheme:     metric.Schema,
 			TLSConfig: &monitoringv1.TLSConfig{
-				InsecureSkipVerify: true,
+				SafeTLSConfig: monitoringv1.SafeTLSConfig{
+					InsecureSkipVerify: true,
+				},
 			},
 		}
 		if endpoint.Path == "" {
