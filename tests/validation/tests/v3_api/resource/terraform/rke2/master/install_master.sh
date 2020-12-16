@@ -26,6 +26,12 @@ then
    subscription-manager repos --enable=rhel-7-server-extras-rpms
 fi
 
+if [[ ${1} = "centos8" ]] || [[ ${1} = "rhel8" ]]
+then
+  yum install tar -y
+  yum install iptables -y
+fi
+
 if [ ${4} = "rke2" ]
 then
    curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${3} sh -
