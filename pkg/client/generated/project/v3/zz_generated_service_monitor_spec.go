@@ -9,6 +9,7 @@ const (
 	ServiceMonitorSpecFieldSampleLimit       = "sampleLimit"
 	ServiceMonitorSpecFieldSelector          = "selector"
 	ServiceMonitorSpecFieldTargetLabels      = "targetLabels"
+	ServiceMonitorSpecFieldTargetLimit       = "targetLimit"
 )
 
 type ServiceMonitorSpec struct {
@@ -19,4 +20,5 @@ type ServiceMonitorSpec struct {
 	SampleLimit       int64          `json:"sampleLimit,omitempty" yaml:"sampleLimit,omitempty"`
 	Selector          *LabelSelector `json:"selector,omitempty" yaml:"selector,omitempty"`
 	TargetLabels      []string       `json:"targetLabels,omitempty" yaml:"targetLabels,omitempty"`
+	TargetLimit       int64          `json:"targetLimit,omitempty" yaml:"targetLimit,omitempty"`
 }
