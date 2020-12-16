@@ -63,6 +63,7 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 		resource.AddAction(request, v32.ClusterActionExportYaml)
 		resource.AddAction(request, v32.ClusterActionRotateCertificates)
+		resource.AddAction(request, v32.ClusterActionRotateEncryptionKey)
 		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
 			resource.AddAction(request, v32.ClusterActionBackupEtcd)
 			resource.AddAction(request, v32.ClusterActionRestoreFromEtcdBackup)
