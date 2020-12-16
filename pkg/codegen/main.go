@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/coreos/prometheus-operator/pkg/apis/monitoring"
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
+	"github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/codegen/generator"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"

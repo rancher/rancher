@@ -3,8 +3,8 @@ package schema
 import (
 	"net/http"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
