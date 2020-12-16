@@ -43,6 +43,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.9.6
 	github.com/Azure/go-autorest/autorest/adal v0.8.2
 	github.com/Azure/go-autorest/autorest/to v0.3.1-0.20191028180845-3492b2aff503
+	github.com/Azure/go-autorest/autorest/validation v0.2.1-0.20191028180845-3492b2aff503 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.1.0
 	github.com/Masterminds/sprig/v3 v3.1.0
@@ -52,7 +53,6 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/coreos/go-semver v0.3.0
-	github.com/coreos/prometheus-operator v0.36.0
 	github.com/crewjam/saml v0.0.0-00010101000000-000000000000
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -62,6 +62,7 @@ require (
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.4.2
+	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
 	github.com/gorilla/mux v1.7.3
@@ -71,6 +72,7 @@ require (
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
 	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
 	github.com/mattn/go-colorable v0.1.2
+	github.com/mattn/go-runewidth v0.0.6 // indirect
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/mitchellh/mapstructure v1.1.2
@@ -78,6 +80,7 @@ require (
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.44.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.10.0

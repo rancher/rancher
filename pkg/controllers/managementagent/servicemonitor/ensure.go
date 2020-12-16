@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	util "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
