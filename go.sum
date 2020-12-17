@@ -668,6 +668,8 @@ github.com/marstr/guid v1.1.0/go.mod h1:74gB1z2wpxxInTG6yaqA7KrtM0NZ+RbrcqDvYHef
 github.com/marten-seemann/qtls v0.2.3/go.mod h1:xzjG7avBwGGbdZ8dTGxlBnLArsVKLvwmjgmPuiQEcYk=
 github.com/maruel/panicparse v0.0.0-20171209025017-c0182c169410/go.mod h1:nty42YY5QByNC5MM7q/nj938VbgPU7avs45z6NClpxI=
 github.com/maruel/ut v1.0.0/go.mod h1:I68ffiAt5qre9obEVTy7S2/fj2dJku2NYLvzPuY0gqE=
+github.com/mattermost/xml-roundtrip-validator v0.0.0-20201213122252-bcd7e1b9601e h1:qqXczln0qwkVGcpQ+sQuPOVntt2FytYarXXxYSNJkgw=
+github.com/mattermost/xml-roundtrip-validator v0.0.0-20201213122252-bcd7e1b9601e/go.mod h1:qccnGMcpgwcNaBnxqpJpWWUiPNr5H3O8eDgGV9gT5To=
 github.com/mattn/go-colorable v0.0.0-20170210172801-5411d3eea597/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
 github.com/mattn/go-colorable v0.1.2 h1:/bC9yWikZXAL9uJdulbSfyVNIR3n3trXl+v8+1sx8mU=
@@ -916,8 +918,8 @@ github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee h1:hAHJO9u3
 github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
 github.com/rancher/rke v1.2.4-rc8 h1:Q4dEAlO4fmRNRepV/Fc/NCB24MBUkujeoeZ0/cW47JM=
 github.com/rancher/rke v1.2.4-rc8/go.mod h1:cBs0GcHGSDfdHpA3ElCU4B0E4dnQSEAIKBHbYC6Ngew=
-github.com/rancher/saml v0.0.3-rancher1 h1:rX1UIHVGn8v8AXG8GyMHezXU9+l8zs6o+Psk7OmylEs=
-github.com/rancher/saml v0.0.3-rancher1/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
+github.com/rancher/saml v0.2.0 h1:pJ8uG9fiah1RqxDebEPh/XljY8oo5JVtn8py+BgcjPo=
+github.com/rancher/saml v0.2.0/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
 github.com/rancher/steve v0.0.0-20201110183734-21c7add15f64 h1:NYiuBYBEFdzLmsplK65Q2P9EOa68VEH8cRyRCYgIHmw=
