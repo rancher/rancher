@@ -20,6 +20,7 @@ import (
 	"github.com/crewjam/saml/xmlenc"
 	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/russellhaering/goxmldsig/etreeutils"
+	xrv "github.com/mattermost/xml-roundtrip-validator"
 )
 
 // NameIDFormat is the format of the id
@@ -50,6 +51,8 @@ const (
 // See the example directory for an example of a web application using
 // the service provider interface.
 type ServiceProvider struct {
+	// Entity ID is optional - if not specified then MetadataURL will be used
+	EntityID string
 	// Key is the RSA private key we use to sign requests.
 	Key *rsa.PrivateKey
 
@@ -87,7 +90,7 @@ type ServiceProvider struct {
 // issued by the IDP and the time it is received by ParseResponse. This is used
 // to prevent old responses from being replayed (while allowing for some clock
 // drift between the SP and IDP).
-const MaxIssueDelay = time.Second * 90
+const MaxIssueDelay = time.Second * 180
 
 // MaxClockSkew allows for leeway for clock skew between the IDP and SP when
 // validating assertions. It defaults to 180 seconds (matches shibboleth).
@@ -110,7 +113,7 @@ func (sp *ServiceProvider) Metadata() *EntityDescriptor {
 	wantAssertionsSigned := true
 	validUntil := TimeNow().Add(validDuration)
 	return &EntityDescriptor{
-		EntityID:   sp.MetadataURL.String(),
+		EntityID:   firstSet(sp.EntityID, sp.MetadataURL.String()),
 		ValidUntil: validUntil,
 
 		SPSSODescriptors: []SPSSODescriptor{
@@ -272,7 +275,7 @@ func (sp *ServiceProvider) MakeAuthenticationRequest(idpURL string) (*AuthnReque
 		Version:                     "2.0",
 		Issuer: &Issuer{
 			Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:entity",
-			Value:  sp.MetadataURL.String(),
+			Value:  firstSet(sp.EntityID, sp.MetadataURL.String()),
 		},
 		NameIDPolicy: &NameIDPolicy{
 			XMLName: xml.Name{
@@ -399,7 +402,10 @@ func (sp *ServiceProvider) ParseResponse(req *http.Request, possibleRequestIDs [
 		return nil, retErr
 	}
 	retErr.Response = string(rawResponseBuf)
-
+	if err := xrv.Validate(bytes.NewReader(rawResponseBuf)); err != nil {
+		retErr.PrivateErr = fmt.Errorf("invalid xml: %s", err)
+		return nil, retErr
+	}
 	// do some validation first before we decrypt
 	resp := Response{}
 	if err := xml.Unmarshal(rawResponseBuf, &resp); err != nil {
@@ -474,6 +480,11 @@ func (sp *ServiceProvider) ParseResponse(req *http.Request, possibleRequestIDs [
 		}
 		retErr.Response = string(plaintextAssertion)
 
+		if err := xrv.Validate(bytes.NewReader(plaintextAssertion)); err != nil {
+			retErr.PrivateErr = fmt.Errorf("plaintext response contains invalid XML: %s", err)
+			return nil, retErr
+		}
+
 		doc = etree.NewDocument()
 		if err := doc.ReadFromBytes(plaintextAssertion); err != nil {
 			retErr.PrivateErr = fmt.Errorf("cannot parse plaintext response %v", err)
@@ -486,6 +497,8 @@ func (sp *ServiceProvider) ParseResponse(req *http.Request, possibleRequestIDs [
 		}
 
 		assertion = &Assertion{}
+		// Note: plaintextAssertion is known to be safe to parse because
+		// plaintextAssertion is unmodified from when xrv.Validate() was called above.
 		if err := xml.Unmarshal(plaintextAssertion, assertion); err != nil {
 			retErr.PrivateErr = err
 			return nil, retErr
@@ -537,13 +550,14 @@ func (sp *ServiceProvider) validateAssertion(assertion *Assertion, possibleReque
 	}
 
 	audienceRestrictionsValid := false
+	audience := firstSet(sp.EntityID, sp.MetadataURL.String())
 	for _, audienceRestriction := range assertion.Conditions.AudienceRestrictions {
-		if audienceRestriction.Audience.Value == sp.MetadataURL.String() {
+		if audienceRestriction.Audience.Value == audience {
 			audienceRestrictionsValid = true
 		}
 	}
 	if !audienceRestrictionsValid {
-		return fmt.Errorf("Conditions AudienceRestriction does not contain %q", sp.MetadataURL.String())
+		return fmt.Errorf("assertion Conditions AudienceRestriction does not contain %q", audience)
 	}
 	return nil
 }
@@ -667,4 +681,11 @@ func (sp *ServiceProvider) validateSignature(el *etree.Element) error {
 
 	_, err = validationContext.Validate(el)
 	return err
+}
+
+func firstSet(a, b string) string {
+	if a == "" {
+		return b
+	}
+	return a
 }
