@@ -114,7 +114,7 @@ github.com/coreos/prometheus-operator/pkg/apis/monitoring
 github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1
 # github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9 => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
+# github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9 => github.com/rancher/saml v0.2.0
 github.com/crewjam/saml
 github.com/crewjam/saml/logger
 github.com/crewjam/saml/samlsp
@@ -289,6 +289,8 @@ github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/maruel/panicparse v0.0.0-20171209025017-c0182c169410
 github.com/maruel/panicparse/stack
+# github.com/mattermost/xml-roundtrip-validator v0.0.0-20201213122252-bcd7e1b9601e
+github.com/mattermost/xml-roundtrip-validator
 # github.com/mattn/go-colorable v0.1.2
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.9
@@ -625,7 +627,7 @@ github.com/spf13/jwalterweatherman
 github.com/spf13/pflag
 # github.com/spf13/viper v1.4.0
 github.com/spf13/viper
-# github.com/stretchr/testify v1.4.0
+# github.com/stretchr/testify v1.6.1
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 # github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
@@ -839,6 +841,8 @@ gopkg.in/ldap.v2
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/yaml.v2 v2.2.8
 gopkg.in/yaml.v2
+# gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+gopkg.in/yaml.v3
 # k8s.io/api v0.18.8 => k8s.io/api v0.18.8
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
