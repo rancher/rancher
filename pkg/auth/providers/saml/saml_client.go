@@ -1,6 +1,7 @@
 package saml
 
 import (
+	"bytes"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -15,6 +16,7 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/gorilla/mux"
+	xrv "github.com/mattermost/xml-roundtrip-validator"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/server/responsewriter"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -132,6 +134,9 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	idm := &IDPMetadata{}
 	if configToSet.IDPMetadataContent != "" {
 		sp.IDPMetadata = &saml.EntityDescriptor{}
+		if err := xrv.Validate(bytes.NewReader([]byte(configToSet.IDPMetadataContent))); err != nil {
+			return fmt.Errorf("SAML: invalid xml: %v", err)
+		}
 		if err := xml.NewDecoder(strings.NewReader(configToSet.IDPMetadataContent)).Decode(idm); err != nil {
 			return fmt.Errorf("SAML: cannot initialize saml SP, cannot decode IDP Metadata content from the config %v, error %v", configToSet, err)
 		}
