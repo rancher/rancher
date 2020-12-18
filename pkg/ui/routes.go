@@ -25,6 +25,8 @@ func New(prefs v3.PreferenceCache) http.Handler {
 	router.Handle("/index.txt", ember.ServeAsset())
 	router.Handle("/robots.txt", ember.ServeAsset())
 	router.Handle("/VERSION.txt", ember.ServeAsset())
+	router.Handle("/favicon.png", vue.ServeFaviconDashboard())
+	router.Handle("/favicon.ico", vue.ServeFaviconDashboard())
 	router.PathPrefix("/api-ui").Handler(ember.ServeAsset())
 	router.PathPrefix("/assets/rancher-ui-driver-linode").Handler(emberAlwaysOffline.ServeAsset())
 	router.PathPrefix("/assets").Handler(ember.ServeAsset())
