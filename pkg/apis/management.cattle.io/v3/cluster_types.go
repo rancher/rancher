@@ -33,6 +33,7 @@ const (
 	ClusterActionBackupEtcd            = "backupEtcd"
 	ClusterActionRestoreFromEtcdBackup = "restoreFromEtcdBackup"
 	ClusterActionRotateCertificates    = "rotateCertificates"
+	ClusterActionRotateEncryptionKey   = "rotateEncryptionKey"
 	ClusterActionRunSecurityScan       = "runSecurityScan"
 	ClusterActionSaveAsTemplate        = "saveAsTemplate"
 
@@ -320,6 +321,10 @@ type RotateCertificateInput struct {
 }
 
 type RotateCertificateOutput struct {
+	Message string `json:"message,omitempty"`
+}
+
+type RotateEncryptionKeyOutput struct {
 	Message string `json:"message,omitempty"`
 }
 
