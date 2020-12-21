@@ -72,7 +72,7 @@ RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
     chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
     ln -s /usr/bin/rancher-helm /usr/bin/helm && \
     ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-    helm init -c && \
+    helm init -c --stable-repo-url https://charts.helm.sh/stable/ && \
     helm plugin install https://github.com/rancher/helm-unittest
 
 # set up helm 3
