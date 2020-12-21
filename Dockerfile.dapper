@@ -51,7 +51,7 @@ RUN curl -sLf ${!HELM_URL} > /usr/bin/rancher-helm && \
     chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller /usr/bin/k3s && \
     ln -s /usr/bin/rancher-helm /usr/bin/helm && \
     ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-    rancher-helm init -c && \
+    helm init -c --stable-repo-url https://charts.helm.sh/stable/ && \
     rancher-helm plugin install https://github.com/rancher/helm-unittest && \
     mkdir -p /go/src/github.com/rancher/rancher/.kube && \
     ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml
