@@ -10,7 +10,7 @@ from .test_rke_cluster_provisioning import HOST_NAME
 from lib.aws import AmazonWebServices, AWS_DEFAULT_AMI, AWS_DEFAULT_USER
 
 
-def test_windows_provisioning():
+def provision_windows_nodes():
     node_roles_linux = [["controlplane"], ["etcd"], ["worker"]]
     node_roles_windows = [["worker"], ["worker"], ["worker"]]
 
@@ -26,12 +26,33 @@ def test_windows_provisioning():
     nodes = linux_nodes + win_nodes
     node_roles = node_roles_linux + node_roles_windows
 
-    cluster, nodes = create_custom_host_from_nodes(nodes, node_roles,
-                                                   random_cluster_name=True,
-                                                   windows=True)
-
     for node in win_nodes:
         pull_images(node)
+
+    return nodes, node_roles
+
+
+def test_windows_provisioning_vxlan():
+    nodes, node_roles = provision_windows_nodes()
+
+    cluster, nodes = create_custom_host_from_nodes(nodes, node_roles,
+                                                   random_cluster_name=True,
+                                                   windows=True,
+                                                   windows_flannel_backend='vxlan')
+
+    cluster_cleanup(get_user_client(), cluster, nodes)
+
+
+def test_windows_provisioning_gw_host():
+    nodes, node_roles = provision_windows_nodes()
+
+    for node in nodes:
+        AmazonWebServices().disable_source_dest_check(node.provider_node_id)
+
+    cluster, nodes = create_custom_host_from_nodes(nodes, node_roles,
+                                                   random_cluster_name=True,
+                                                   windows=True,
+                                                   windows_flannel_backend='host-gw')
 
     cluster_cleanup(get_user_client(), cluster, nodes)
 

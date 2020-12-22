@@ -91,6 +91,44 @@ rke_config_windows = {
             "type": "kubeAPIService"}},
     "sshAgentAuth": False}
 
+rke_config_windows_host_gw = {
+    "addonJobTimeout": 30,
+    "authentication":
+    {"strategy": "x509",
+     "type": "authnConfig"},
+    "ignoreDockerVersion": True,
+    "ingress":
+        {"provider": "nginx",
+         "type": "ingressConfig"},
+    "monitoring":
+        {"provider": "metrics-server",
+         "type": "monitoringConfig"},
+    "network": {
+        "mtu": 0,
+        "plugin": "flannel",
+        "type": "networkConfig",
+        "options": {
+            "flannel_backend_type": "host-gw"
+        }
+    },
+    "services": {
+        "etcd": {
+            "extraArgs":
+                {"heartbeat-interval": 500,
+                 "election-timeout": 5000},
+            "snapshot": False,
+            "backupConfig":
+                {"intervalHours": 12, "retention": 6, "type": "backupConfig"},
+            "creation": "12h",
+            "retention": "72h",
+            "type": "etcdService"},
+        "kubeApi": {
+            "alwaysPullImages": False,
+            "podSecurityPolicy": False,
+            "serviceNodePortRange": "30000-32767",
+            "type": "kubeAPIService"}},
+    "sshAgentAuth": False}
+
 rke_config_cis_1_4 = {
     "addonJobTimeout": 30,
     "authentication":
@@ -1095,13 +1133,18 @@ def create_and_validate_custom_host(node_roles, random_cluster_name=False,
 
 def create_custom_host_from_nodes(nodes, node_roles,
                                   random_cluster_name=False, windows=False,
+                                  windows_flannel_backend='vxlan',
                                   version=K8S_VERSION):
     client = get_user_client()
     cluster_name = random_name() if random_cluster_name \
         else evaluate_clustername()
 
     if windows:
-        config = rke_config_windows
+        if windows_flannel_backend == "host-gw":
+            config = rke_config_windows_host_gw
+        else:
+            config = rke_config_windows
+
     else:
         config = rke_config
     if version != "":

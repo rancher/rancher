@@ -665,3 +665,9 @@ class AmazonWebServices(CloudProviderBase):
         print ("Waiting for deletion of cluster: {}".format(cluster_name))
         waiter = self._eks_client.get_waiter('cluster_deleted')
         waiter.wait(name=cluster_name)
+
+    def disable_source_dest_check(self, instance_id):
+        response = self._client.modify_instance_attribute(
+                    SourceDestCheck={'Value': False},
+                    InstanceId=instance_id)
+        return response
