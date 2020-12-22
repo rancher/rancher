@@ -126,8 +126,13 @@ func (s *WatchSession) watch(conn *websocket.Conn, resp chan types.APIEvent) err
 
 		if sub.Stop {
 			s.stop(sub.ResourceType, resp)
-		} else if _, ok := s.watchers[sub.ResourceType]; !ok {
-			s.add(sub.ResourceType, sub.ResourceVersion, resp)
+		} else {
+			s.Lock()
+			_, ok := s.watchers[sub.ResourceType]
+			s.Unlock()
+			if !ok {
+				s.add(sub.ResourceType, sub.ResourceVersion, resp)
+			}
 		}
 	}
 }

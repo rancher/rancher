@@ -345,6 +345,9 @@ func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 	useLocalState := ctx.Bool("use-local-state")
 
 	flags := cluster.GetExternalFlags(false, false, false, useLocalState, "", filePath)
+	// Custom certificates and certificate dir flags
+	flags.CertificateDir = ctx.String("cert-dir")
+	flags.CustomCerts = ctx.Bool("custom-certs")
 
 	_, _, _, _, _, err = RestoreEtcdSnapshot(context.Background(), rkeConfig, hosts.DialersOptions{}, flags, map[string]interface{}{}, etcdSnapshotName)
 	return err
