@@ -295,6 +295,11 @@ if K8S_VERSION != "":
     rke_config_cis_1_4["kubernetesVersion"] = K8S_VERSION
     rke_config_cis_1_5["kubernetesVersion"] = K8S_VERSION
 
+rke_config_windows_host_gw_aws_provider = rke_config_windows_host_gw.copy()
+rke_config_windows_host_gw_aws_provider["cloudProvider"] = {"name": "aws",
+                                            "type": "cloudProvider",
+                                            "awsCloudProvider":
+                                            {"type": "awsCloudProvider"}}
 
 rke_config_aws_provider = rke_config.copy()
 rke_config_aws_provider["cloudProvider"] = {"name": "aws",
@@ -1141,7 +1146,7 @@ def create_custom_host_from_nodes(nodes, node_roles,
 
     if windows:
         if windows_flannel_backend == "host-gw":
-            config = rke_config_windows_host_gw
+            config = rke_config_windows_host_gw_aws_provider
         else:
             config = rke_config_windows
 

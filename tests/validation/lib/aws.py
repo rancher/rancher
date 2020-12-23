@@ -143,6 +143,9 @@ class AmazonWebServices(CloudProviderBase):
 
         if len(AWS_IAM_PROFILE) > 0:
             args["IamInstanceProfile"] = {'Name': AWS_IAM_PROFILE}
+            args["TagSpecifications"][0]["Tags"].append(
+                {'Key': 'kubernetes.io/cluster/c-abcde', 'Value': "owned"}
+            )
 
         instance = self._client.run_instances(**args)
         node = Node(
