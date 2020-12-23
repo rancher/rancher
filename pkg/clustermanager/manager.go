@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/kontainer-engine/drivers/gke"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -27,6 +28,7 @@ import (
 	rbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/pkg/ratelimit"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -304,6 +306,17 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 				ht.DialContext = nil
 				ht.DialTLS = tlsDialer
 				ht.Dial = clusterDialer
+			}
+			if cluster.Status.Driver == "googleKubernetesEngine" && cluster.Spec.GenericEngineConfig != nil {
+				cred, _ := (*cluster.Spec.GenericEngineConfig)["credential"].(string)
+				ts, err := gke.GetTokenSource(context.RunContext, cred)
+				if err == nil {
+					return &oauth2.Transport{
+						Source: ts,
+						Base:   rt,
+					}
+				}
+				logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
 			}
 			return rt
 		},
