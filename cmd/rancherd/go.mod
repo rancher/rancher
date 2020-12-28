@@ -64,12 +64,12 @@ replace (
 
 require (
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/k3s v1.19.2-0.20201028222356-523ccaf3f22a
-	github.com/rancher/rke2 v1.18.13-0.20201207193710-1d6e826b9fdf // v1.18.12+rke2r2 ... If you update this, also update rancher/package/Dockerfile.runtime
+	github.com/rancher/k3s v1.19.2-0.20201208230637-989c936993fb
+	github.com/rancher/rke2 v1.19.6-0.20201222203728-22433f03aaf0 // v1.19.5+rke2r1 ... If you update this, also update rancher/package/Dockerfile.runtime
 	github.com/rancher/wrangler v0.6.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/urfave/cli v1.22.2
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.19.0
 	k8s.io/apimachinery v0.19.0
