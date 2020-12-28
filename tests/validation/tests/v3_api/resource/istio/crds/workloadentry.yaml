@@ -1,0 +1,6 @@
+apiVersion: networking.istio.io/v1beta1
+kind: WorkloadEntry
+metadata:
+  name: wle-1
+spec:
+  address: 1.1.1.1

@@ -11,13 +11,15 @@ import (
 	"reflect"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/norman/types/convert"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	provisioner "github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/taints"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/remotedialer"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	client "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -154,7 +156,7 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 
 func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.Node, error) {
 	machineName := machineName(inNode)
-	logrus.Debugf("getMachine: looking up machine [%s] in cluster [%s]", machineName, cluster.Name)
+	logrus.Tracef("getMachine: looking up machine [%s] in cluster [%s]", machineName, cluster.Name)
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
 		if objs, err := t.nodeIndexer.ByIndex(nodeKeyIndex, fmt.Sprintf("%s/%s", cluster.Name, inNode.RequestedHostname)); err == nil {
@@ -163,16 +165,17 @@ func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.N
 			}
 		}
 
-		logrus.Debugf("getMachine: looking up [%s] as node name in cluster [%s]", inNode.RequestedHostname, cluster.Name)
+		logrus.Tracef("getMachine: looking up [%s] as node name in cluster [%s]", inNode.RequestedHostname, cluster.Name)
 		machine, err := t.machineLister.Get(cluster.Name, inNode.RequestedHostname)
 		if err == nil {
+			logrus.Debugf("Found [%s] as node name in cluster [%s], error: %v", inNode.RequestedHostname, cluster.Name, err)
 			return machine, nil
 		}
 
-		logrus.Debugf("getMachine: looking up [%s] as RequestedHostname in cluster [%s]", inNode.RequestedHostname, cluster.Name)
+		logrus.Tracef("getMachine: looking up [%s] as RequestedHostname in cluster [%s]", inNode.RequestedHostname, cluster.Name)
 		machines, _ := t.machineLister.List(cluster.Name, labels.NewSelector())
 		for _, machine := range machines {
-			logrus.Debugf("getMachine: comparing machine.Spec.RequestedHostname [%s] to inNode.RequestedHostname [%s]", machine.Spec.RequestedHostname, inNode.RequestedHostname)
+			logrus.Tracef("getMachine: comparing machine.Spec.RequestedHostname [%s] to inNode.RequestedHostname [%s]", machine.Spec.RequestedHostname, inNode.RequestedHostname)
 			if machine.Spec.RequestedHostname == inNode.RequestedHostname {
 				return machine, nil
 			}
@@ -224,7 +227,7 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 			Name:      name,
 			Namespace: cluster.Name,
 		},
-		Spec: v3.NodeSpec{
+		Spec: v32.NodeSpec{
 			Etcd:              inNode.Etcd,
 			ControlPlane:      inNode.ControlPlane,
 			Worker:            inNode.Worker,
@@ -242,7 +245,7 @@ func (t *Authorizer) updateDockerInfo(machine *v3.Node, inNode *client.Node) (*v
 		return machine, nil
 	}
 
-	dockerInfo := &v3.DockerInfo{}
+	dockerInfo := &v32.DockerInfo{}
 	err := convert.ToObj(inNode.DockerInfo, dockerInfo)
 	if err != nil {
 		return nil, err
@@ -272,7 +275,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		err error
 	)
 
-	if cluster.Status.Driver != v3.ClusterDriverImported && cluster.Status.Driver != "" {
+	if cluster.Status.Driver != v32.ClusterDriverImported && cluster.Status.Driver != "" {
 		return cluster, true, nil
 	}
 
@@ -283,8 +286,8 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		return cluster, true, err
 	}
 	if driver == "" {
-		logrus.Debugf("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
-		cluster.Status.Driver = v3.ClusterDriverImported
+		logrus.Tracef("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
+		cluster.Status.Driver = v32.ClusterDriverImported
 		changed = true
 	}
 
@@ -292,7 +295,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	token := inCluster.Token
 	caCert := inCluster.CACert
 
-	if cluster.Status.Driver == v3.ClusterDriverImported {
+	if cluster.Status.Driver == v32.ClusterDriverImported {
 		if cluster.Status.APIEndpoint != apiEndpoint ||
 			cluster.Status.ServiceAccountToken != token ||
 			cluster.Status.CACert != caCert {
@@ -349,7 +352,7 @@ func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, 
 func machineName(machine *client.Node) string {
 	digest := md5.Sum([]byte(machine.RequestedHostname))
 	machineNameMD5 := fmt.Sprintf("m-%s", hex.EncodeToString(digest[:])[:12])
-	logrus.Debugf("machineName: returning [%s] for node with RequestedHostname [%s]", machineNameMD5, machine.RequestedHostname)
+	logrus.Tracef("machineName: returning [%s] for node with RequestedHostname [%s]", machineNameMD5, machine.RequestedHostname)
 	return machineNameMD5
 }
 
@@ -377,39 +380,14 @@ func (t *Authorizer) nodeIndex(obj interface{}) ([]string, error) {
 	return []string{fmt.Sprintf("%s/%s", node.Namespace, node.Status.NodeName)}, nil
 }
 
-func (t *Authorizer) toCustomConfig(machine *client.Node) *v3.CustomConfig {
+func (t *Authorizer) toCustomConfig(machine *client.Node) *v32.CustomConfig {
 	if machine == nil || machine.CustomConfig == nil {
 		return nil
 	}
 
-	result := &v3.CustomConfig{}
+	result := &v32.CustomConfig{}
 	if err := convert.ToObj(machine.CustomConfig, result); err != nil {
 		return nil
 	}
 	return result
-}
-
-func (t *Authorizer) Authenticate(req *http.Request) (authed bool, user string, groups []string, err error) {
-	token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
-	if token == "" {
-		return false, "", nil, nil
-	}
-
-	cluster, err := t.getClusterByToken(token)
-	if err == ErrClusterNotFound {
-		return false, "", nil, nil
-	}
-	if err != nil || cluster == nil {
-		return false, "", nil, err
-	}
-
-	return true, "system:cluster:" + cluster.Name,
-		[]string{
-			"system:authenticated",
-			"system:clusters",
-		}, nil
-}
-
-func (t *Authorizer) TokenFromRequest(req *http.Request) (*v3.Token, error) {
-	return nil, fmt.Errorf("token not found")
 }

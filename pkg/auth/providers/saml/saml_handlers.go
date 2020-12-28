@@ -35,7 +35,6 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, redirectURL, http.StatusFound)
 			return
 		}
-
 		s.HandleSamlAssertion(w, r, assertion)
 		return
 	}

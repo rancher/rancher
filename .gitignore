@@ -6,7 +6,9 @@
 /.trash-cache
 /trash.lock
 /.idea
+/package/data.json
 /package/rancher
+/package/rancher.yaml
 /package/agent
 /tests/MANIFEST
 /tests/integration/MANIFEST
@@ -29,3 +31,4 @@ __pycache__
 tests/validation/.idea
 all.yaml
 kustomization.yaml
+kontainer-engine

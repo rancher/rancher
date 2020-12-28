@@ -3,12 +3,13 @@ package remote
 import (
 	"errors"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/pipeline/remote/bitbucketcloud"
 	"github.com/rancher/rancher/pkg/pipeline/remote/bitbucketserver"
 	"github.com/rancher/rancher/pkg/pipeline/remote/github"
 	"github.com/rancher/rancher/pkg/pipeline/remote/gitlab"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 )
 
 func New(config interface{}) (model.Remote, error) {
@@ -16,13 +17,13 @@ func New(config interface{}) (model.Remote, error) {
 		return github.New(nil)
 	}
 	switch config := config.(type) {
-	case *v3.GithubPipelineConfig:
+	case *v32.GithubPipelineConfig:
 		return github.New(config)
-	case *v3.GitlabPipelineConfig:
+	case *v32.GitlabPipelineConfig:
 		return gitlab.New(config)
-	case *v3.BitbucketCloudPipelineConfig:
+	case *v32.BitbucketCloudPipelineConfig:
 		return bitbucketcloud.New(config)
-	case *v3.BitbucketServerPipelineConfig:
+	case *v32.BitbucketServerPipelineConfig:
 		return bitbucketserver.New(config)
 	}
 

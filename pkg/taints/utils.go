@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
+
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
@@ -13,7 +14,7 @@ func GetTaintsString(taint v1.Taint) string {
 	return fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
 }
 
-func GetRKETaintsString(taint v3.RKETaint) string {
+func GetRKETaintsString(taint rketypes.RKETaint) string {
 	return fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
 }
 
@@ -75,11 +76,11 @@ func GetToDiffTaints(current, desired []v1.Taint) (toAdd map[int]v1.Taint, toDel
 	return toAdd, toDel
 }
 
-func GetRKETaintsFromStrings(sources []string) []v3.RKETaint {
-	rtn := make([]v3.RKETaint, len(sources))
+func GetRKETaintsFromStrings(sources []string) []rketypes.RKETaint {
+	rtn := make([]rketypes.RKETaint, len(sources))
 	for i, source := range sources {
 		t := GetTaintFromString(source)
-		rtn[i] = v3.RKETaint{
+		rtn[i] = rketypes.RKETaint{
 			Key:       t.Key,
 			Value:     t.Value,
 			Effect:    t.Effect,
@@ -89,7 +90,7 @@ func GetRKETaintsFromStrings(sources []string) []v3.RKETaint {
 	return rtn
 }
 
-func GetStringsFromRKETaint(taints []v3.RKETaint) []string {
+func GetStringsFromRKETaint(taints []rketypes.RKETaint) []string {
 	var rtn []string
 	for _, taint := range taints {
 		rtn = append(rtn, GetRKETaintsString(taint))
@@ -97,10 +98,10 @@ func GetStringsFromRKETaint(taints []v3.RKETaint) []string {
 	return rtn
 }
 
-func GetRKETaintsFromTaints(sources []v1.Taint) []v3.RKETaint {
-	rtn := make([]v3.RKETaint, len(sources))
+func GetRKETaintsFromTaints(sources []v1.Taint) []rketypes.RKETaint {
+	rtn := make([]rketypes.RKETaint, len(sources))
 	for i, source := range sources {
-		rtn[i] = v3.RKETaint{
+		rtn[i] = rketypes.RKETaint{
 			Key:       source.Key,
 			Effect:    source.Effect,
 			Value:     source.Value,

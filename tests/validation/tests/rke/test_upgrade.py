@@ -5,43 +5,9 @@ from .common import *  # NOQA
 import pytest
 
 K8S_PREUPGRADE_IMAGE = os.environ.get(
-    'RANCHER_K8S_PREUPGRADE_IMAGE', 'v1.16.4-rancher1-1')
+    'RANCHER_K8S_PREUPGRADE_IMAGE', 'v1.16.8-rancher1-3')
 K8S_UPGRADE_IMAGE = os.environ.get(
-    'RANCHER_K8S_UPGRADE_IMAGE', 'v1.17.0-rancher1-2')
-
-K8S_POSTUPGRADE_HYPERKUBE_IMAGE = os.environ.get(
-    'RANCHER_K8S_POSTUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.17.0-rancher1')
-K8S_POSTUPGRADE_ETCD_IMAGE = os.environ.get(
-    'RANCHER_K8S_POSTUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.4.3-rancher1')
-K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE = os.environ.get(
-    'RANCHER_K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.52')
-
-K8S_PREUPGRADE_HYPERKUBE_IMAGE = os.environ.get(
-    'RANCHER_K8S_PREUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.16.4-rancher1')
-K8S_PREUPGRADE_ETCD_IMAGE = os.environ.get(
-    'RANCHER_K8S_PREUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.3.15-rancher1')
-K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE = os.environ.get(
-    'RANCHER_K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.52')
-
-pre_config = {
-        "etcd": K8S_PREUPGRADE_ETCD_IMAGE,
-        "service-sidekick": K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE,
-        "kube-proxy": K8S_PREUPGRADE_HYPERKUBE_IMAGE,
-        "kube-scheduler": K8S_PREUPGRADE_HYPERKUBE_IMAGE,
-        "kube-controller-manager": K8S_PREUPGRADE_HYPERKUBE_IMAGE,
-        "kube-apiserver": K8S_PREUPGRADE_HYPERKUBE_IMAGE,
-        "kubelet": K8S_PREUPGRADE_HYPERKUBE_IMAGE
-}
-
-post_config = {
-        "etcd": K8S_POSTUPGRADE_ETCD_IMAGE,
-        "service-sidekick": K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE,
-        "kube-proxy": K8S_POSTUPGRADE_HYPERKUBE_IMAGE,
-        "kube-scheduler": K8S_POSTUPGRADE_HYPERKUBE_IMAGE,
-        "kube-controller-manager": K8S_POSTUPGRADE_HYPERKUBE_IMAGE,
-        "kube-apiserver": K8S_POSTUPGRADE_HYPERKUBE_IMAGE,
-        "kubelet": K8S_POSTUPGRADE_HYPERKUBE_IMAGE
-}
+    'RANCHER_K8S_UPGRADE_IMAGE', 'v1.17.4-rancher1-3')
 
 
 def test_upgrade_1(test_name, cloud_provider, rke_client, kubectl):
@@ -64,15 +30,16 @@ def test_upgrade_1(test_name, cloud_provider, rke_client, kubectl):
     network, dns_discovery = validate_rke_cluster(
         rke_client, kubectl, all_nodes, 'beforeupgrade')
 
-    validate_k8s_service_images(all_nodes, pre_config)
+    validate_k8s_service_images(all_nodes, K8S_PREUPGRADE_IMAGE,
+                                rke_client, kubectl)
 
     # New cluster needs to keep controlplane and etcd nodes the same
     rke_config = create_rke_cluster(
         rke_client, kubectl, all_nodes, rke_template,
         k8_rancher_image=K8S_UPGRADE_IMAGE)
     # The updated images versions need to be validated
-    validate_k8s_service_images(all_nodes, post_config)
-
+    validate_k8s_service_images(all_nodes, K8S_UPGRADE_IMAGE,
+                                rke_client, kubectl)
     # Rerun validation on existing and new resources
     validate_rke_cluster(
         rke_client, kubectl, all_nodes, 'beforeupgrade',
@@ -102,14 +69,16 @@ def test_upgrade_2(test_name, cloud_provider, rke_client, kubectl):
         k8_rancher_image=K8S_PREUPGRADE_IMAGE)
     network, dns_discovery = validate_rke_cluster(
         rke_client, kubectl, before_upgrade_nodes, 'beforeupgrade')
-    validate_k8s_service_images(before_upgrade_nodes, pre_config)
+    validate_k8s_service_images(before_upgrade_nodes, K8S_PREUPGRADE_IMAGE,
+                                rke_client, kubectl)
 
     # New cluster needs to keep controlplane and etcd nodes the same
     rke_template = 'cluster_upgrade_2_2.yml.j2'
     rke_config = create_rke_cluster(
         rke_client, kubectl, all_nodes, rke_template,
         k8_rancher_image=K8S_UPGRADE_IMAGE)
-    validate_k8s_service_images(all_nodes, post_config)
+    validate_k8s_service_images(all_nodes, K8S_UPGRADE_IMAGE,
+                                rke_client, kubectl)
 
     # Rerun validation on existing and new resources
     validate_rke_cluster(
@@ -137,7 +106,8 @@ def test_upgrade_3(test_name, cloud_provider, rke_client, kubectl):
         k8_rancher_image=K8S_PREUPGRADE_IMAGE)
     network, dns_discovery = validate_rke_cluster(
         rke_client, kubectl, all_nodes, 'beforeupgrade')
-    validate_k8s_service_images(all_nodes, pre_config)
+    validate_k8s_service_images(all_nodes, K8S_PREUPGRADE_IMAGE,
+                                rke_client, kubectl)
 
     # New cluster needs to keep controlplane and etcd nodes the same
     rke_template = 'cluster_upgrade_3_2.yml.j2'
@@ -145,7 +115,8 @@ def test_upgrade_3(test_name, cloud_provider, rke_client, kubectl):
     rke_config = create_rke_cluster(
         rke_client, kubectl, after_upgrade_nodes, rke_template,
         k8_rancher_image=K8S_UPGRADE_IMAGE)
-    validate_k8s_service_images(after_upgrade_nodes, post_config)
+    validate_k8s_service_images(after_upgrade_nodes, K8S_UPGRADE_IMAGE,
+                                rke_client, kubectl)
 
     # Rerun validation on existing and new resources
     validate_rke_cluster(
@@ -172,7 +143,8 @@ def test_upgrade_4(test_name, cloud_provider, rke_client, kubectl):
         k8_rancher_image=K8S_PREUPGRADE_IMAGE)
     network, dns_discovery = validate_rke_cluster(
         rke_client, kubectl, all_nodes, 'beforeupgrade')
-    validate_k8s_service_images(all_nodes, pre_config)
+    validate_k8s_service_images(all_nodes, K8S_PREUPGRADE_IMAGE,
+                                rke_client, kubectl)
 
     # Upgrade only the scheduler, yaml will replace `upgrade_k8_rancher_image`
     # for scheduler image only, the rest will keep pre-upgrade image
@@ -180,8 +152,8 @@ def test_upgrade_4(test_name, cloud_provider, rke_client, kubectl):
         rke_client, kubectl, all_nodes, rke_template,
         k8_rancher_image=K8S_PREUPGRADE_IMAGE,
         upgrade_k8_rancher_image=K8S_UPGRADE_IMAGE)
-    validate_k8s_service_images(all_nodes, post_config)
-
+    validate_k8s_service_images(all_nodes, K8S_UPGRADE_IMAGE,
+                                rke_client, kubectl)
     # Rerun validation on existing and new resources
     validate_rke_cluster(
         rke_client, kubectl, all_nodes, 'beforeupgrade',

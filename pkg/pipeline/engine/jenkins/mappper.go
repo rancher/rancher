@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"strings"
 
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/pkg/errors"
+	apiv1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	apiv1 "github.com/rancher/types/apis/core/v1"
-	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -250,7 +253,7 @@ func (c *jenkinsPipelineConverter) injectGitCaCert(pod *v1.Pod) {
 	pod.Spec.InitContainers = []v1.Container{
 		{
 			Name:    "config-crt",
-			Image:   images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.AlpineGit),
+			Image:   images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.AlpineGit),
 			Command: []string{"sh", "-c", "CERT_PATH=/home/jenkins/certs/ca.crt;printf \"%s\" \"$CA_CERT\" > $CERT_PATH;chown 10000:10000 $CERT_PATH;"},
 			Env: []v1.EnvVar{
 				{
@@ -295,7 +298,7 @@ func (c *jenkinsPipelineConverter) injectAgentResources(container *v1.Container)
 	return injectResources(container, c.opts.executorCPULimit, c.opts.executorCPURequest, c.opts.executorMemoryLimit, c.opts.executorMemoryRequest)
 }
 
-func injectSetpContainerResources(container *v1.Container, step *v3.Step) error {
+func injectSetpContainerResources(container *v1.Container, step *v32.Step) error {
 	return injectResources(container, step.CPULimit, step.CPURequest, step.MemoryLimit, step.MemoryRequest)
 }
 

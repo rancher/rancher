@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"net/http"
 
 	"fmt"
@@ -15,8 +17,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 type principalsHandler struct {
@@ -27,12 +29,12 @@ type principalsHandler struct {
 	ac               types.AccessControl
 }
 
-func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext) *principalsHandler {
+func newPrincipalsHandler(ctx context.Context, clusterRouter requests.ClusterRouter, mgmt *config.ScaledContext) *principalsHandler {
 	providers.Configure(ctx, mgmt)
 	return &principalsHandler{
 		principalsClient: mgmt.Management.Principals(""),
 		tokensClient:     mgmt.Management.Tokens(""),
-		auth:             requests.NewAuthenticator(ctx, mgmt),
+		auth:             requests.NewAuthenticator(ctx, clusterRouter, mgmt),
 		tokenMGR:         tokens.NewManager(ctx, mgmt),
 		ac:               mgmt.AccessControl,
 	}
@@ -43,7 +45,7 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
 
-	input := &v3.SearchPrincipalsInput{}
+	input := &v32.SearchPrincipalsInput{}
 	if err := json.NewDecoder(apiContext.Request.Body).Decode(input); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Failed to parse body: %v", err))
 	}
@@ -134,5 +136,5 @@ func convertPrincipal(schema *types.Schema, principal v3.Principal) (map[string]
 
 func (h *principalsHandler) getToken(request *http.Request) (*v3.Token, error) {
 	token, err := h.auth.TokenFromRequest(request)
-	return token, errors.Wrap(err, "must authenticate")
+	return token, errors.Wrap(err, requests.ErrMustAuthenticate.Error())
 }

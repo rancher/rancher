@@ -12,12 +12,14 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/util"
-	"github.com/rancher/rancher/pkg/randomtoken"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	clientv3 "github.com/rancher/types/client/management/v3"
-	"github.com/rancher/types/config"
+	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	apicorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,24 +32,31 @@ import (
 // TODO Cleanup error logging. If error is being returned, use errors.wrap to return and dont log here
 
 const (
-	userPrincipalIndex = "authn.management.cattle.io/user-principal-index"
-	UserIDLabel        = "authn.management.cattle.io/token-userId"
-	TokenKindLabel     = "authn.management.cattle.io/kind"
-	tokenKeyIndex      = "authn.management.cattle.io/token-key-index"
-	secretNameEnding   = "-secret"
-	secretNamespace    = "cattle-system"
+	userPrincipalIndex     = "authn.management.cattle.io/user-principal-index"
+	UserIDLabel            = "authn.management.cattle.io/token-userId"
+	TokenKindLabel         = "authn.management.cattle.io/kind"
+	tokenKeyIndex          = "authn.management.cattle.io/token-key-index"
+	secretNameEnding       = "-secret"
+	secretNamespace        = "cattle-system"
+	KubeconfigResponseType = "kubeconfig"
 )
 
 var (
 	toDeleteCookies = []string{CookieName, CSRFCookie}
 )
 
+func RegisterIndexer(ctx context.Context, apiContext *config.ScaledContext) error {
+	informer := apiContext.Management.Users("").Controller().Informer()
+	if err := informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager {
 	informer := apiContext.Management.Users("").Controller().Informer()
-	informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
-
 	tokenInformer := apiContext.Management.Tokens("").Controller().Informer()
-	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 
 	return &Manager{
 		ctx:                 ctx,
@@ -83,15 +92,6 @@ func userPrincipalIndexer(obj interface{}) ([]string, error) {
 	return user.PrincipalIDs, nil
 }
 
-func tokenKeyIndexer(obj interface{}) ([]string, error) {
-	token, ok := obj.(*v3.Token)
-	if !ok {
-		return []string{}, nil
-	}
-
-	return []string{token.Token}, nil
-}
-
 // createDerivedToken will create a jwt token for the authenticated user
 func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue string) (v3.Token, int, error) {
 	logrus.Debug("Create Derived Token Invoked")
@@ -101,10 +101,15 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return v3.Token{}, 401, err
 	}
 
+	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
+	if err != nil {
+		return v3.Token{}, 500, fmt.Errorf("error validating max-ttl %v", err)
+	}
+
 	derivedToken := v3.Token{
 		UserPrincipal: token.UserPrincipal,
 		IsDerived:     true,
-		TTLMillis:     jsonInput.TTLMillis,
+		TTLMillis:     tokenTTL.Milliseconds(),
 		UserID:        token.UserID,
 		AuthProvider:  token.AuthProvider,
 		ProviderInfo:  token.ProviderInfo,
@@ -559,7 +564,7 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 				},
 			},
 		},
-		GroupPrincipals: map[string]v3.Principals{},
+		GroupPrincipals: map[string]v32.Principals{},
 		LastRefresh:     "",
 		NeedsRefresh:    false,
 	}
@@ -574,7 +579,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	}
 
 	if needCreate {
-		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
 		_, err := m.userAttributes.Create(attribs)
 		if err != nil {
 			return err
@@ -584,7 +589,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 
 	// Exists, just update if necessary
 	if m.UserAttributeChanged(attribs, provider, groupPrincipals) {
-		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
 		_, err := m.userAttributes.Update(attribs)
 		if err != nil {
 			return err
@@ -594,7 +599,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	return nil
 }
 
-func (m *Manager) UserAttributeChanged(attribs *v3.UserAttribute, provider string, groupPrincipals []v3.Principal) bool {
+func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider string, groupPrincipals []v32.Principal) bool {
 	oldSet := []string{}
 	newSet := []string{}
 	for _, principal := range attribs.GroupPrincipals[provider].Items {
@@ -626,7 +631,7 @@ var uaBackoff = wait.Backoff{
 	Steps:    5,
 }
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v32.Principal, groupPrincipals []v32.Principal, providerToken string, ttl int64, description string) (v3.Token, error) {
 	provider := userPrincipal.Provider
 	if (provider == "github" || provider == "azuread" || provider == "googleoauth") && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
@@ -779,4 +784,31 @@ func (m *Manager) TokenStreamTransformer(
 		}
 		return data
 	}), nil
+}
+
+func ParseTokenTTL(ttl string) (time.Duration, error) {
+	durString := fmt.Sprintf("%vm", ttl)
+	dur, err := time.ParseDuration(durString)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing token ttl: %v", err)
+	}
+	return dur, nil
+}
+
+func ValidateMaxTTL(ttl time.Duration) (time.Duration, error) {
+	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
+	if err != nil {
+		return 0, fmt.Errorf("error getting auth-token-max-ttl %v", err)
+	}
+	if maxTTL == 0 {
+		return ttl, nil
+	}
+	if ttl == 0 {
+		return maxTTL, nil
+	}
+	// return min(ttl, maxTTL)
+	if ttl <= maxTTL {
+		return ttl, nil
+	}
+	return maxTTL, nil
 }

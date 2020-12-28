@@ -4,12 +4,10 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"os/user"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -23,6 +21,10 @@ var lock = sync.Mutex{}
 
 // CreateJail sets up the named directory for use with chroot
 func CreateJail(name string) error {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return os.MkdirAll(path.Join(BaseJailPath, name), 0700)
+	}
+
 	logrus.Debugf("CreateJail: called for [%s]", name)
 	lock.Lock()
 	defer lock.Unlock()
@@ -73,32 +75,6 @@ func CreateJail(name string) error {
 		logrus.Debugf("CreateJail: no output from jail script for [%s]", name)
 	}
 	return nil
-}
-
-// GetUserCred looks up the user and provides it in syscall.Credential
-func GetUserCred() (*syscall.Credential, error) {
-	u, err := user.Current()
-	if err != nil {
-		uID := os.Getuid()
-		u, err = user.LookupId(strconv.Itoa(uID))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	i, err := strconv.ParseUint(u.Uid, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	uid := uint32(i)
-
-	i, err = strconv.ParseUint(u.Gid, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	gid := uint32(i)
-
-	return &syscall.Credential{Uid: uid, Gid: gid}, nil
 }
 
 func WhitelistEnvvars(envvars []string) []string {

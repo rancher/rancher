@@ -2,14 +2,16 @@ package steve
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"sync"
+	"time"
 
-	server2 "github.com/rancher/dynamiclistener/server"
-	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/steve/pkg/auth"
-	"github.com/rancher/steve/pkg/server"
+	"github.com/rancher/rancher/pkg/rancher"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 var (
@@ -17,11 +19,7 @@ var (
 	runLock sync.Mutex
 )
 
-func Run(ctx context.Context, namespace string) error {
-	if !features.Steve.Enabled() {
-		return nil
-	}
-
+func Run(ctx context.Context) error {
 	runLock.Lock()
 	defer runLock.Unlock()
 
@@ -35,18 +33,68 @@ func Run(ctx context.Context, namespace string) error {
 		return err
 	}
 
-	s := server.Server{
-		RestConfig:     c,
-		AuthMiddleware: auth.ToMiddleware(auth.AuthenticatorFunc(auth.Impersonation)),
-	}
+	go func() {
+		err = http.ListenAndServe(":8080", http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			resp, err := http.Get("http://localhost:6080/healthz")
+			if err != nil {
+				http.Error(rw, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer resp.Body.Close()
+			rw.WriteHeader(resp.StatusCode)
+			_, _ = io.Copy(rw, resp.Body)
+		}))
+		panic("health check server failed: " + err.Error())
+	}()
 
 	go func() {
-		err := s.ListenAndServe(ctx, 6443, 6080, &server2.ListenOpts{
-			BindHost: "127.0.0.1",
-		})
-		logrus.Fatalf("steve exited: %v", err)
+		for {
+			ctx, cancel := context.WithCancel(ctx)
+			r, err := rancher.New(ctx, reverseClientConfig{cfg: c}, &rancher.Options{
+				BindHost:        "127.0.0.1",
+				HTTPListenPort:  6080,
+				HTTPSListenPort: 0,
+				AddLocal:        "true",
+				Agent:           true,
+			})
+			if err != nil {
+				cancel()
+				logrus.Errorf("failed to initialize Rancher: %v", err)
+				time.Sleep(10 * time.Second)
+				continue
+			}
+
+			if err := r.ListenAndServe(ctx); err != nil {
+				cancel()
+				logrus.Errorf("failed to start Rancher: %v", err)
+				time.Sleep(10 * time.Second)
+				continue
+			}
+
+			cancel()
+		}
 	}()
 
 	running = true
 	return nil
+}
+
+type reverseClientConfig struct {
+	cfg *rest.Config
+}
+
+func (r reverseClientConfig) RawConfig() (clientcmdapi.Config, error) {
+	panic("not implemented")
+}
+
+func (r reverseClientConfig) ClientConfig() (*rest.Config, error) {
+	return r.cfg, nil
+}
+
+func (r reverseClientConfig) Namespace() (string, bool, error) {
+	return "", false, nil
+}
+
+func (r reverseClientConfig) ConfigAccess() clientcmd.ConfigAccess {
+	panic("not implemented ")
 }

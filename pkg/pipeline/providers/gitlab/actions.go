@@ -12,10 +12,10 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	client "github.com/rancher/types/client/project/v3"
 )
 
 const (
@@ -56,7 +56,7 @@ func (g *GlProvider) providerActionHandler(actionName string, action *types.Acti
 }
 
 func (g *GlProvider) testAndApply(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	applyInput := &v3.GitlabApplyInput{}
+	applyInput := &v32.GitlabApplyInput{}
 
 	if err := json.NewDecoder(apiContext.Request.Body).Decode(applyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -68,7 +68,7 @@ func (g *GlProvider) testAndApply(actionName string, action *types.Action, apiCo
 	if err != nil {
 		return err
 	}
-	storedGitlabPipelineConfig, ok := pConfig.(*v3.GitlabPipelineConfig)
+	storedGitlabPipelineConfig, ok := pConfig.(*v32.GitlabPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get gitlab provider config")
 	}
@@ -104,7 +104,7 @@ func (g *GlProvider) testAndApply(actionName string, action *types.Action, apiCo
 }
 
 func (g *GlProvider) authuser(apiContext *types.APIContext) error {
-	authUserInput := v3.AuthUserInput{}
+	authUserInput := v32.AuthUserInput{}
 	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func (g *GlProvider) authuser(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	config, ok := pConfig.(*v3.GitlabPipelineConfig)
+	config, ok := pConfig.(*v32.GitlabPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get gitlab provider config")
 	}

@@ -1,0 +1,12 @@
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: Output
+metadata:
+  name: do-output
+  namespace: default
+spec:
+  splunkHec:
+    hec_host: 192.168.0.1
+    hec_port: 8088
+    protocol: http
+    hec_token:
+      value: dummy-token

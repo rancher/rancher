@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/clustermanager"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -64,31 +66,15 @@ func newUserLifecycle(management *config.ManagementContext, clusterManager *clus
 	}
 
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
-	prtbInformer.AddIndexers(map[string]cache.IndexFunc{
-		prtbByUserRefKey: prtbByUserRefFunc,
-	})
-
 	lfc.prtbIndexer = prtbInformer.GetIndexer()
 
 	crtbInformer := management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
-	crtbInformer.AddIndexers(map[string]cache.IndexFunc{
-		crtbByUserRefKey: crtbByUserRefFunc,
-	})
-
 	lfc.crtbIndexer = crtbInformer.GetIndexer()
 
 	grbInformer := management.Management.GlobalRoleBindings("").Controller().Informer()
-	grbInformer.AddIndexers(map[string]cache.IndexFunc{
-		grbByUserRefKey: grbByUserRefFunc,
-	})
-
 	lfc.grbIndexer = grbInformer.GetIndexer()
 
 	tokenInformer := management.Management.Tokens("").Controller().Informer()
-	tokenInformer.AddIndexers(map[string]cache.IndexFunc{
-		tokenByUserRefKey: tokenByUserRefFunc,
-	})
-
 	lfc.tokenIndexer = tokenInformer.GetIndexer()
 
 	return lfc
@@ -146,7 +132,7 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 	// creatorIDAnn indicates it was created through the API, create the new
 	// user bindings and add the annotation UserConditionInitialRolesPopulated
 	if user.ObjectMeta.Annotations[creatorIDAnn] != "" {
-		u, err := v3.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
+		u, err := v32.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
 			err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 			if err != nil {
 				return nil, err

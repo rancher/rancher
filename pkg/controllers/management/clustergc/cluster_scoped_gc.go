@@ -6,8 +6,8 @@ import (
 
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -55,7 +55,7 @@ func cleanFinalizers(clusterName string, object *unstructured.Unstructured, dyna
 
 	if modified {
 		md.SetFinalizers(finalizers)
-		obj, e := dynamicClient.Update(object, metav1.UpdateOptions{})
+		obj, e := dynamicClient.Update(context.TODO(), object, metav1.UpdateOptions{})
 		return obj, e
 	}
 	return object, nil
@@ -81,7 +81,7 @@ func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	for key := range decodedMap {
 		actualKey := key // https://golang.org/doc/faq#closures_and_goroutines
 		g.Go(func() error {
-			objList, err := dynamicClient.Resource(actualKey).List(metav1.ListOptions{})
+			objList, err := dynamicClient.Resource(actualKey).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil

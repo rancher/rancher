@@ -6,11 +6,12 @@ import (
 	"reflect"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3public"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	ldapv2 "gopkg.in/ldap.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +19,7 @@ import (
 
 var operationalAttrList = []string{"1.1", "+", "*"}
 
-func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.LdapConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
+func (p *ldapProvider) loginUser(credential *v32.BasicLogin, config *v3.LdapConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := credential.Username
@@ -68,7 +69,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 	}
 
 	searchOpRequest := ldapv2.NewSearchRequest(userDN,
-		ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
+		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
 		operationalAttrList, nil)
 	opResult, err := lConn.Search(searchOpRequest)
@@ -121,14 +122,8 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 
 	logrus.Debugf("SearchResult memberOf attribute {%s}", userMemberAttribute)
 
-	isType := false
-	objectClass := entry.GetAttributeValues(ObjectClass)
-	for _, obj := range objectClass {
-		if strings.EqualFold(string(obj), config.UserObjectClass) {
-			isType = true
-		}
-	}
-	if !isType {
+	if !ldap.IsType(userAttributes, config.UserObjectClass) {
+		logrus.Debugf("The objectClass %s was not found in the user attributes", config.UserObjectClass)
 		return v3.Principal{}, nil, nil
 	}
 

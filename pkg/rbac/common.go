@@ -6,8 +6,19 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/types"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/ref"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	NamespaceID           = "namespaceId"
+	ProjectID             = "projectId"
+	ClusterID             = "clusterId"
+	GlobalAdmin           = "admin"
+	GlobalRestrictedAdmin = "restricted-admin"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -71,7 +82,13 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 }
 
 func GrbCRBName(grb *v3.GlobalRoleBinding) string {
-	return "globaladmin-" + GetGRBTargetKey(grb)
+	var prefix string
+	if grb.GlobalRoleName == GlobalAdmin {
+		prefix = "globaladmin-"
+	} else {
+		prefix = "globalrestrictedadmin-"
+	}
+	return prefix + GetGRBTargetKey(grb)
 }
 
 // GetGRBSubject creates and returns a subject that is
@@ -105,4 +122,36 @@ func GetGRBTargetKey(grb *v3.GlobalRoleBinding) string {
 		name = "u-" + strings.ToLower(sha)
 	}
 	return name
+}
+
+// Returns object with available information to check against users permissions, used in combination with CanDo
+func ObjFromContext(apiContext *types.APIContext, resource *types.RawResource) map[string]interface{} {
+	var obj map[string]interface{}
+	if resource != nil && resource.Values["id"] != nil {
+		obj = resource.Values
+	}
+	if obj == nil {
+		obj = map[string]interface{}{
+			"id": apiContext.ID,
+		}
+		// collection endpoint without id needs to know which cluster-namespace for rbac check
+		if apiContext.Query.Get(ClusterID) != "" {
+			obj[NamespaceID] = apiContext.Query.Get(ClusterID)
+		}
+		if apiContext.Query.Get(ProjectID) != "" {
+			_, obj[NamespaceID] = ref.Parse(apiContext.Query.Get(ProjectID))
+		}
+	}
+	return obj
+}
+
+func TypeFromContext(apiContext *types.APIContext, resource *types.RawResource) string {
+	if resource == nil {
+		return apiContext.Type
+	}
+	return resource.Type
+}
+
+func GetRTBLabel(objMeta metav1.ObjectMeta) string {
+	return objMeta.Namespace + "_" + objMeta.Name
 }

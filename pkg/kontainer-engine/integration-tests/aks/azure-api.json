@@ -1,0 +1,110 @@
+{
+  "data": {
+    "pairs": [
+      {
+        "request": {
+          "path": {
+            "globMatch": "/subscriptions/*/resourceGroups/*/providers/Microsoft.ContainerService/managedClusters/*"
+          },
+          "method": {
+            "exactMatch": "PUT"
+          },
+          "scheme": {
+            "exactMatch": "http"
+          }
+        },
+        "response": {
+          "status": 200,
+          "body": "{\"message\": \"doesn't matter what this returns, we don't check it\"}",
+          "encodedBody": false,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "templated": false
+        }
+      },
+      {
+        "request": {
+          "path": {
+            "globMatch": "/subscriptions/*/resourceGroups/*/providers/Microsoft.ContainerService/managedClusters/*"
+          },
+          "method": {
+            "exactMatch": "GET"
+          },
+          "scheme": {
+            "exactMatch": "http"
+          }
+        },
+        "response": {
+          "status": 200,
+          "body": "{\"properties\": {\"provisioningState\":\"Succeeded\", \"kubernetesVersion\":\"1.8.2\", \"agentPoolProfiles\": [{\"count\":3}]}}",
+          "encodedBody": false,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "templated": false
+        }
+      },
+      {
+        "request": {
+          "path": {
+            "globMatch": "/subscriptions/*/resourceGroups/*/providers/Microsoft.ContainerService/managedClusters/*"
+          },
+          "method": {
+            "exactMatch": "DELETE"
+          },
+          "scheme": {
+            "exactMatch": "http"
+          }
+        },
+        "response": {
+          "status": 200,
+          "body": "{\"message\": \"doesn't matter what this returns, we don't check it\"}",
+          "encodedBody": false,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "templated": false
+        }
+      },
+      {
+        "request": {
+          "path": {
+            "globMatch": "/subscriptions/*/resourceGroups/*/providers/Microsoft.ContainerService/managedClusters/*/accessProfiles/*"
+          },
+          "method": {
+            "exactMatch": "GET"
+          },
+          "scheme": {
+            "exactMatch": "http"
+          }
+        },
+        "response": {
+          "status": 200,
+          "body": "{\n\"id\":\"/subscriptions/fake-subscription-id/resourcegroups/kube/providers/Microsoft.ContainerService/managedClusters/aks-cluster-4/accessProfiles/clusterUser\",\n\"name\":\"clusterUser\",\n\"type\":\"Microsoft.ContainerService/ManagedClusters/AccessProfiles\",\n\"location\":\"eastus\",\n\"properties\":{\n\"kubeConfig\":\"YXBpVmVyc2lvbjogdjENCmNsdXN0ZXJzOg0KLSBjbHVzdGVyOg0KICAgIGNlcnRpZmljYXRlLWF1dGhvcml0eS1kYXRhOiBMUzB0TFMxQ1JVZEpUaUJEUlZKVVNVWkpRMEZVUlMwdExTMHREUXBTYTBaTVVsTkNSRkpXU2xWSlJWSkNWa1ZGUFEwS0xTMHRMUzFGVGtRZ1EwVlNWRWxHU1VOQlZFVXRMUzB0TFE9PQ0KICAgIHNlcnZlcjogaHR0cHM6Ly9zb21lZmFrZXByZWZpeC5oY3AuZWFzdHVzLmF6bWs4cy5pbzo0NDMNCiAgbmFtZTogYWtzLWNsdXN0ZXItNA0KY29udGV4dHM6DQotIGNvbnRleHQ6DQogICAgY2x1c3RlcjogYWtzLWNsdXN0ZXItNA0KICAgIHVzZXI6IGNsdXN0ZXJVc2VyX2t1YmVfYWtzLWNsdXN0ZXItNA0KICBuYW1lOiBha3MtY2x1c3Rlci00DQpjdXJyZW50LWNvbnRleHQ6IGFrcy1jbHVzdGVyLTQNCmtpbmQ6IENvbmZpZw0KcHJlZmVyZW5jZXM6IHt9DQp1c2VyczoNCi0gbmFtZTogY2x1c3RlclVzZXJfa3ViZV9ha3MtY2x1c3Rlci00DQogIHVzZXI6DQogICAgY2xpZW50LWNlcnRpZmljYXRlLWRhdGE6IExTMHRMUzFDUlVkSlRpQkRSVkpVU1VaSlEwRlVSUzB0TFMwdERRcFNhMFpNVWxOQ1JGSldTbFZKUlZKQ1ZrVkZQUTBLTFMwdExTMUZUa1FnUTBWU1ZFbEdTVU5CVkVVdExTMHRMUT09DQogICAgY2xpZW50LWtleS1kYXRhOiBMUzB0TFMxQ1JVZEpUaUJEUlZKVVNVWkpRMEZVUlMwdExTMHREUXBTYTBaTVVsTkNSRkpXU2xWSlJWSkNWa1ZGUFEwS0xTMHRMUzFGVGtRZ1EwVlNWRWxHU1VOQlZFVXRMUzB0TFE9PQ0KICAgIHRva2VuOiBGQUtFX1RPS0VO\"\n}\n}",
+          "encodedBody": false,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "templated": false
+        }
+      }
+    ],
+    "globalActions": {
+      "delays": []
+    }
+  },
+  "meta": {
+    "schemaVersion": "v4",
+    "hoverflyVersion": "v0.15.0",
+    "timeExported": "2018-01-05T13:41:55-07:00"
+  }
+}

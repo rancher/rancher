@@ -132,29 +132,59 @@ spec:
                   values:
                     - windows
           preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            preference:
+          - preference:
               matchExpressions:
               - key: node-role.kubernetes.io/controlplane
                 operator: In
                 values:
                 - "true"
-          - weight: 1
-            preference:
+            weight: 100
+          - preference:
               matchExpressions:
-              - key: node-role.kubernetes.io/etcd
+              - key: node-role.kubernetes.io/control-plane
                 operator: In
                 values:
                 - "true"
+            weight: 100
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: In
+                values:
+                - "true"
+            weight: 100
+          - preference:
+              matchExpressions:
+              - key: cattle.io/cluster-agent
+                operator: In
+                values:
+                - "true"
+            weight: 1
       serviceAccountName: cattle
       tolerations:
-      - operator: Exists
+      {{- if .Tolerations }}
+      # Tolerations added based on found taints on controlplane nodes
+{{ .Tolerations | indent 6 }}
+      {{- else }}
+      # No taints or no controlplane nodes found, added defaults
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/controlplane
+        value: "true"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+      {{- end }}
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
           env:
           - name: CATTLE_FEATURES
             value: "{{.Features}}"
+          - name: CATTLE_IS_RKE
+            value: "{{.IsRKE}}"
           - name: CATTLE_SERVER
             value: "{{.URLPlain}}"
           - name: CATTLE_CA_CHECKSUM
@@ -168,6 +198,12 @@ spec:
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
+          readinessProbe:
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            httpGet:
+              path: /health
+              port: 8080
       {{- if .PrivateRegistryConfig}}
       imagePullSecrets:
       - name: cattle-private-registry
@@ -179,6 +215,8 @@ spec:
           defaultMode: 320
 
 ---
+
+{{ if .IsRKE }}
 
 apiVersion: apps/v1
 kind: DaemonSet
@@ -234,8 +272,10 @@ spec:
           mountPath: /etc/kubernetes
         - name: var-run
           mountPath: /var/run
+          mountPropagation: HostToContainer
         - name: run
           mountPath: /run
+          mountPropagation: HostToContainer
         - name: docker-certs
           mountPath: /etc/docker/certs.d
         securityContext:
@@ -269,6 +309,8 @@ spec:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 25%
+
+{{- end }}
 
 {{- if .IsWindowsCluster}}
 
@@ -427,10 +469,19 @@ spec:
 {{- end }}
 `
 
-var AuthDaemonSet = `
+var (
+	AuthDaemonSet = `
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: kube-api-auth
     namespace: cattle-system
 `
+	NodeAgentDaemonSet = `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+    name: cattle-node-agent
+    namespace: cattle-system
+`
+)

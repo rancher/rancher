@@ -4,22 +4,12 @@ from invoke import run
 
 
 class CloudProviderBase(object, metaclass=abc.ABCMeta):
-    OS_VERSION = os.environ.get("OS_VERSION", 'ubuntu-18.04')
     DOCKER_VERSION = os.environ.get("DOCKER_VERSION", '19.03')
-    DOCKER_INSTALLED = os.environ.get("DOCKER_INSTALLED", "true")
-    OS_DOCKER_VERSION = os.environ.get("RANCHER_OS_DOCKER_VERSION", "")
-    if len(OS_DOCKER_VERSION) > 0:
-        versions = OS_DOCKER_VERSION.split(":")
-        OS_VERSION = versions[0]
-        DOCKER_VERSION = versions[1]
+    DOCKER_INSTALLED = os.environ.get("DOCKER_INSTALLED", "false")
 
     @abc.abstractmethod
     def create_node(self, node_name, wait_for_ready=False):
         raise NotImplementedError
-
-    # @abc.abstractmethod
-    # def get_node(self):
-    #     raise NotImplementedError
 
     @abc.abstractmethod
     def stop_node(self, node, wait_for_stop=False):

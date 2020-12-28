@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 )
 
 func (g *ghProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -41,7 +41,7 @@ func (g *ghProvider) actionHandler(actionName string, action *types.Action, requ
 }
 
 func (g *ghProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
-	githubConfig := &v3.GithubConfig{}
+	githubConfig := &v32.GithubConfig{}
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
@@ -57,7 +57,7 @@ func (g *ghProvider) configureTest(actionName string, action *types.Action, requ
 	return nil
 }
 
-func formGithubRedirectURL(githubConfig *v3.GithubConfig) string {
+func formGithubRedirectURL(githubConfig *v32.GithubConfig) string {
 	return githubRedirectURL(githubConfig.Hostname, githubConfig.ClientID, githubConfig.TLS)
 }
 
@@ -90,15 +90,15 @@ func githubRedirectURL(hostname, clientID string, tls bool) string {
 }
 
 func (g *ghProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
-	var githubConfig v3.GithubConfig
-	githubConfigApplyInput := &v3.GithubConfigApplyInput{}
+	var githubConfig v32.GithubConfig
+	githubConfigApplyInput := &v32.GithubConfigApplyInput{}
 
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
 	githubConfig = githubConfigApplyInput.GithubConfig
-	githubLogin := &v3public.GithubLogin{
+	githubLogin := &v32.GithubLogin{
 		Code: githubConfigApplyInput.Code,
 	}
 

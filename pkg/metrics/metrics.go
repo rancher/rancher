@@ -8,9 +8,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/ticker"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/ticker"
 	authV1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -59,7 +60,7 @@ func (h *metricsHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		},
 	}
 
-	result, err := h.k8sClient.AuthorizationV1().SubjectAccessReviews().Create(&review)
+	result, err := h.k8sClient.AuthorizationV1().SubjectAccessReviews().Create(req.Context(), &review, metav1.CreateOptions{})
 	if err != nil {
 		util.ReturnHTTPError(rw, req, 500, err.Error())
 		return

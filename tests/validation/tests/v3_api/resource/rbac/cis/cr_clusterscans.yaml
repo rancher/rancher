@@ -1,0 +1,6 @@
+apiVersion: cis.cattle.io/v1
+kind: ClusterScan
+metadata:
+  name: scan-sample
+spec:
+  scanProfileName: ''

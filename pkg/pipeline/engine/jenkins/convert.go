@@ -5,12 +5,12 @@ import (
 	"regexp"
 	"strings"
 
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
-	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 )
@@ -106,7 +106,7 @@ func (c *jenkinsPipelineConverter) getJenkinsStepCommand(stageOrdinal int, stepO
 func (c *jenkinsPipelineConverter) getAgentContainer() (v1.Container, error) {
 	container := v1.Container{
 		Name:  utils.JenkinsAgentContainerName,
-		Image: images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp),
+		Image: images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp),
 		Args:  []string{"$(JENKINS_SECRET)", "$(JENKINS_NAME)"},
 	}
 	cloneContainer, err := c.getStepContainer(0, 0)
@@ -119,16 +119,16 @@ func (c *jenkinsPipelineConverter) getAgentContainer() (v1.Container, error) {
 	return container, err
 }
 
-func (c *jenkinsPipelineConverter) configCloneStepContainer(container *v1.Container, step *v3.Step) error {
-	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.AlpineGit)
+func (c *jenkinsPipelineConverter) configCloneStepContainer(container *v1.Container, step *v32.Step) error {
+	container.Image = images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.AlpineGit)
 	return injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
-func (c *jenkinsPipelineConverter) configRunScriptStepContainer(container *v1.Container, step *v3.Step) {
+func (c *jenkinsPipelineConverter) configRunScriptStepContainer(container *v1.Container, step *v32.Step) {
 	container.Image = step.RunScriptConfig.Image
 }
 
-func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Container, step *v3.Step) {
+func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Container, step *v32.Step) {
 	ns := utils.GetPipelineCommonName(c.execution.Spec.ProjectName)
 	config := step.PublishImageConfig
 	m := utils.GetEnvVarMap(c.execution)
@@ -160,7 +160,7 @@ func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Cont
 		registry = ""
 	}
 
-	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.PluginsDocker)
+	container.Image = images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.PluginsDocker)
 	publishEnv := map[string]string{
 		"DOCKER_REGISTRY":   registry,
 		"PLUGIN_REPO":       pluginRepo,
@@ -198,9 +198,9 @@ func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Cont
 	}
 }
 
-func (c *jenkinsPipelineConverter) configApplyYamlStepContainer(container *v1.Container, step *v3.Step, stageOrdinal int) error {
+func (c *jenkinsPipelineConverter) configApplyYamlStepContainer(container *v1.Container, step *v32.Step, stageOrdinal int) error {
 	config := step.ApplyYamlConfig
-	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
+	container.Image = images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.KubeApply)
 
 	applyEnv := map[string]string{
 		"YAML_PATH":    config.Path,
@@ -235,12 +235,12 @@ StageLoop:
 	return injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
-func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.Container, step *v3.Step) error {
+func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.Container, step *v32.Step) error {
 	if c.opts.gitCaCerts != "" {
 		c.injectGitCaCertToContainer(container)
 	}
 	config := step.PublishCatalogConfig
-	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
+	container.Image = images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.KubeApply)
 	envs := map[string]string{
 		"CATALOG_PATH":          config.Path,
 		"CATALOG_TEMPLATE_NAME": config.CatalogTemplate,
@@ -261,9 +261,9 @@ func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.C
 	return injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
-func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Container, step *v3.Step) error {
+func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Container, step *v32.Step) error {
 	config := step.ApplyAppConfig
-	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
+	container.Image = images.Resolve(v33.ToolsSystemImages.PipelineSystemImages.KubeApply)
 	answerBytes, _ := yaml.Marshal(config.Answers)
 	envs := map[string]string{
 		"APP_NAME":              config.Name,

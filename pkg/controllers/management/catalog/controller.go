@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/catalog/manager"
-	"github.com/rancher/rancher/pkg/ticker"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -80,7 +80,7 @@ func doUntilSucceeds(ctx context.Context, retryPeriod time.Duration, f func() bo
 
 func Run(ctx context.Context, refreshInterval int, management *config.ManagementContext) error {
 	logrus.Infof("Starting catalog controller")
-	m := manager.New(management)
+	m := manager.New(management.Management, management.Project)
 
 	controller := management.Management.Catalogs("").Controller()
 	controller.AddHandler(ctx, "catalog", m.Sync)

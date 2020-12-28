@@ -1,20 +1,18 @@
-// +build !windows
-
 package cluster
 
 import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/agent/steve"
-	clusterController "github.com/rancher/rancher/pkg/controllers/user"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/controllers/managementagent"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
 
 var running bool
 
-func RunControllers(namespace, token, url string) error {
+func RunControllers(ctx context.Context) error {
 	if running {
 		return nil
 	}
@@ -30,26 +28,17 @@ func RunControllers(namespace, token, url string) error {
 		return err
 	}
 
-	err = clusterController.RegisterUserOnly(context.Background(), userOnly)
-	if err != nil {
+	if err := managementagent.Register(ctx, userOnly); err != nil {
 		return err
 	}
 
-	// ctx, _ := context.WithCancel(context.Background())
-	err = userOnly.Start(context.Background())
-	if err != nil {
+	if err := userOnly.Start(ctx); err != nil {
 		return err
 	}
 
-	if err := steve.Run(context.Background(), namespace); err != nil {
+	if err := steve.Run(ctx); err != nil {
 		return err
 	}
-
-	// logrus.Infof("Starting agent controllers for namespace [%s], url [%s]", namespace, url)
-	// if err := controllers.StartControllers(ctx, token, url, namespace); err != nil {
-	// 	cancel()
-	// 	return err
-	// }
 
 	running = true
 	return nil

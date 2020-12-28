@@ -1,0 +1,74 @@
+# Audit Logs https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing/
+# The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
+# https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing/
+# destination stream to sidecar container console or hostPath volume
+# level: Verbosity of logs, 0 to 3. 0 is off 3 is a lot.
+auditLog:
+  destination: sidecar
+  hostPath: /var/log/rancher/audit/
+  level: 0
+  maxAge: 1
+  maxBackup: 1
+  maxSize: 100
+
+# Have Rancher detect and import the "local" Rancher server cluster
+# Adding the "local" cluster available in the GUI can be convenient, but any user with access to this cluster has "root" on any of the clusters that Rancher manages.
+# options; "true", "false". (auto pretty much means true)
+addLocal: "true"
+
+# Image for collecting rancher audit logs.
+# Important: update pkg/image/export/main.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
+busyboxImage: busybox
+
+# Add debug flag to Rancher server
+debug: false
+
+# Extra environment variables passed to the rancher pods.
+# extraEnv:
+# - name: CATTLE_TLS_MIN_VERSION
+#   value: "1.0"
+
+## Optional array of imagePullSecrets containing private registry credentials
+## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+# - name: secretName
+
+# If you are using certs signed by a public CA set to 'true' and set the 'tls-ca'
+# in the 'cattle-system' namespace. See the README.md for details
+publicCA: false
+
+# http[s] proxy server passed into rancher server.
+# proxy: http://<username>@<password>:<url>:<port>
+
+# comma separated list of domains or ip addresses that will not use the proxy
+noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+
+# Override rancher image location for Air Gap installs
+rancherImage: rancher/rancher
+# rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
+# Defaults to .Chart.appVersion
+# rancherImageTag: v2.4.7
+
+# Override imagePullPolicy for rancher server images
+# options: Always, Never, IfNotPresent
+# Defaults to IfNotPresent
+# rancherImagePullPolicy: <pullPolicy>
+
+# Set pod resource requests/limits for Rancher.
+resources: {}
+
+systemDefaultRegistry: ""
+
+# Set to use the packaged system charts
+useBundledSystemChart: false
+
+# Do not use hostport to expose rancher
+disableHostport: false
+
+# Hostport to expose on http
+httpPort: 8080
+
+# Hostport to expose on https
+httpsPort: 8443
+
+

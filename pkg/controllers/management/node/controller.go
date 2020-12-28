@@ -16,18 +16,24 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/encryptedstore"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
+	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/namespace"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
-	corev1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
@@ -35,12 +41,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
-	defaultEngineInstallURL = "https://releases.rancher.com/install-docker/17.03.2.sh"
-	amazonec2               = "amazonec2"
+	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2                       = "amazonec2"
+	userNodeRemoveCleanupAnnotation = "nodes.management.cattle.io/user-node-remove-cleanup"
 )
 
 // aliases maps Schema field => driver field
@@ -57,7 +65,7 @@ var aliases = map[string]map[string]string{
 	"vmwarevsphere": map[string]string{"cloudConfig": "cloud-config"},
 }
 
-func Register(ctx context.Context, management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
 	if err != nil {
 		logrus.Fatal(err)
@@ -66,6 +74,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	nodeClient := management.Management.Nodes("")
 
 	nodeLifecycle := &Lifecycle{
+		ctx:                       ctx,
 		systemAccountManager:      systemaccount.NewManager(management),
 		secretStore:               secretStore,
 		nodeClient:                nodeClient,
@@ -76,6 +85,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
 		credLister:                management.Core.Secrets("").Controller().Lister(),
+		userManager:               management.UserManager,
+		clusterManager:            clusterManager,
 		devMode:                   os.Getenv("CATTLE_DEV_MODE") != "",
 	}
 
@@ -83,6 +94,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 type Lifecycle struct {
+	ctx                       context.Context
 	systemAccountManager      *systemaccount.Manager
 	secretStore               *encryptedstore.GenericEncryptedStore
 	nodeTemplateGenericClient objectclient.GenericClient
@@ -93,11 +105,13 @@ type Lifecycle struct {
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
 	credLister                corev1.SecretLister
+	userManager               user.Manager
+	clusterManager            *clustermanager.Manager
 	devMode                   bool
 }
 
 func (m *Lifecycle) setupCustom(obj *v3.Node) {
-	obj.Status.NodeConfig = &v3.RKEConfigNode{
+	obj.Status.NodeConfig = &rketypes.RKEConfigNode{
 		NodeName:         obj.Namespace + ":" + obj.Name,
 		HostnameOverride: obj.Spec.RequestedHostname,
 		Address:          obj.Spec.CustomConfig.Address,
@@ -128,14 +142,14 @@ func isCustom(obj *v3.Node) bool {
 }
 
 func (m *Lifecycle) setWaiting(node *v3.Node) {
-	v3.NodeConditionRegistered.IsUnknown(node)
-	v3.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
+	v32.NodeConditionRegistered.IsUnknown(node)
+	v32.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
 }
 
 func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
-		newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
+		newObj, err := v32.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
 			if err := validateCustomHost(obj); err != nil {
 				return obj, err
 			}
@@ -149,7 +163,7 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
+	newObj, err := v32.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
 		logrus.Debugf("Called v3.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
 		// Ensure jail is created first, else the function `NewNodeConfig` will create the full jail path (including parent jail directory) and CreateJail will remove the directory as it does not contain a done file
 		if !m.devMode {
@@ -206,7 +220,7 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	newObj, err := v3.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
+	newObj, err := v32.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
 		found, err := m.isNodeInAppliedSpec(obj)
 		if err != nil {
 			return obj, err
@@ -245,6 +259,9 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 
 		if mExists {
 			logrus.Infof("Removing node %s", obj.Spec.RequestedHostname)
+			if err := m.drainNode(obj); err != nil {
+				return obj, err
+			}
 			if err := deleteNode(config.Dir(), obj); err != nil {
 				return obj, err
 			}
@@ -254,7 +271,11 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 		return obj, nil
 	})
 
-	return newObj.(*v3.Node), err
+	if err != nil {
+		return newObj.(*v3.Node), err
+	}
+
+	return m.deleteV1Node(newObj.(*v3.Node))
 }
 
 func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
@@ -429,7 +450,7 @@ outer:
 		}
 	}
 
-	newObj, saveError := v3.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
+	newObj, saveError := v32.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
 		return m.saveConfig(config, config.FullDir(), obj)
 	})
 	obj = newObj.(*v3.Node)
@@ -440,7 +461,12 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
-	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
+	if cleanupAnnotation, ok := obj.Annotations[userNodeRemoveCleanupAnnotation]; !ok || cleanupAnnotation != "true" {
+		// finalizer from user-node-remove has to be checked/cleaned
+		return m.userNodeRemoveCleanup(obj)
+	}
+
+	newObj, err := v32.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
 			return obj, nil
@@ -508,7 +534,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
-	obj.Status.NodeConfig = &v3.RKEConfigNode{
+	obj.Status.NodeConfig = &rketypes.RKEConfigNode{
 		NodeName:         obj.Namespace + ":" + obj.Name,
 		Address:          ip,
 		InternalAddress:  interalAddress,
@@ -680,7 +706,7 @@ func roles(node *v3.Node) []string {
 	return roles
 }
 
-func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v3.Field, credID string) error {
+func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v32.Field, credID string) error {
 	splitID := strings.Split(credID, ":")
 	if len(splitID) != 2 {
 		return fmt.Errorf("invalid credential id %s", credID)
@@ -716,4 +742,129 @@ func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, r
 		}
 	}
 	return nil
+}
+
+func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
+	logrus.Debugf("Deleting v1.node for [%v] node", node.Status.NodeName)
+	if nodehelper.IgnoreNode(node.Status.NodeName, node.Status.NodeLabels) {
+		logrus.Debugf("Skipping v1.node removal for [%v] node", node.Status.NodeName)
+		return node, nil
+	}
+
+	if node.Status.NodeName == "" {
+		return node, nil
+	}
+
+	userClient, err := m.clusterManager.UserContext(node.Namespace)
+	if err != nil {
+		if kerror.IsNotFound(err) {
+			return node, nil
+		}
+		return node, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 45*time.Second)
+	defer cancel()
+	err = userClient.K8sClient.CoreV1().Nodes().Delete(
+		ctx, node.Status.NodeName, metav1.DeleteOptions{})
+	if !kerror.IsNotFound(err) && ctx.Err() != context.DeadlineExceeded {
+		return node, err
+	}
+
+	return node, nil
+}
+
+func (m *Lifecycle) drainNode(node *v3.Node) error {
+	nodeCopy := node.DeepCopy() // copy for cache protection as we do no updating but need things set for the drain
+	cluster, err := m.clusterLister.Get("", nodeCopy.Namespace)
+	if err != nil {
+		if kerror.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster) {
+		return nil
+	}
+
+	logrus.Infof("node [%s] requires draining before delete", nodeCopy.Spec.RequestedHostname)
+	kubeConfig, err := m.getKubeConfig(cluster)
+	if err != nil {
+		return fmt.Errorf("node [%s] error getting kubeConfig", nodeCopy.Spec.RequestedHostname)
+	}
+
+	if nodeCopy.Spec.NodeDrainInput == nil {
+		logrus.Debugf("node [%s] has no NodeDrainInput, creating one with 60s timeout",
+			nodeCopy.Spec.RequestedHostname)
+		nodeCopy.Spec.NodeDrainInput = &rketypes.NodeDrainInput{
+			Force:           false,
+			DeleteLocalData: false,
+			GracePeriod:     60,
+			Timeout:         60,
+		}
+	}
+
+	backoff := wait.Backoff{
+		Duration: 2 * time.Second,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    3,
+	}
+
+	logrus.Infof("node [%s] attempting to drain, retrying up to 3 times", nodeCopy.Spec.RequestedHostname)
+	// purposefully ignoring error, if the drain fails this falls back to deleting the node as usual
+	wait.ExponentialBackoff(backoff, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, time.Duration(nodeCopy.Spec.NodeDrainInput.Timeout)*time.Second)
+		defer cancel()
+
+		_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeCopy.Status.NodeName, nodehelper.GetDrainFlags(nodeCopy))
+		if ctx.Err() != nil {
+			logrus.Errorf("node [%s] kubectl drain failed, retrying: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
+			return false, nil
+		}
+		if err != nil {
+			// kubectl failed continue on with delete any way
+			logrus.Errorf("node [%s] kubectl drain error, retrying: %s", nodeCopy.Spec.RequestedHostname, err)
+			return false, nil
+		}
+
+		logrus.Infof("node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
+		return true, nil
+	})
+
+	return nil
+}
+
+func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
+	copy := obj.DeepCopy()
+	copy.Annotations[userNodeRemoveCleanupAnnotation] = "true"
+	if hasFinalizerWithPrefix(copy, "clusterscoped.controller.cattle.io/user-node-remove_") {
+		// user-node-remove controller functionality is now merged into this controller
+		logrus.Infof("node [%s] has a finalizer for user-node-remove controller and it will be removed",
+			copy.Spec.RequestedHostname)
+		copy = removeFinalizerWithPrefix(copy, "clusterscoped.controller.cattle.io/user-node-remove_")
+	}
+	return m.nodeClient.Update(copy)
+}
+
+func hasFinalizerWithPrefix(node *v3.Node, prefix string) bool {
+	for _, finalizer := range node.Finalizers {
+		if strings.HasPrefix(finalizer, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func removeFinalizerWithPrefix(node *v3.Node, prefix string) *v3.Node {
+	var newFinalizers []string
+	for _, finalizer := range node.Finalizers {
+		if strings.HasPrefix(finalizer, prefix) {
+			continue
+		}
+		newFinalizers = append(newFinalizers, finalizer)
+	}
+	node.SetFinalizers(newFinalizers)
+	return node
 }

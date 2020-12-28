@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/rancher/rancher/pkg/catalog/helm"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
 const invalidURLErrMsg string = "a valid url must consist of an http, https, or git scheme"

@@ -76,12 +76,16 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 			if nc.AgentCheckInterval != 0 {
 				interval = nc.AgentCheckInterval
 			}
-			if nc.NodeVersion != 0 {
-				err := rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
-				if err != nil {
-					return interval, err
-				}
 
+			err := rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
+			if err != nil {
+				return interval, err
+			}
+
+			/* server sends non-zero nodeVersion when node is upgrading (node.Status.AppliedVersion != cluster.Status.NodeVersion)
+			ExecutePlan doesn't update processes if writeCertOnly, shouldn't consider this an upgrade */
+			if nc.NodeVersion != 0 && !writeCertOnly {
+				// reply back with nodeVersion
 				params := node.Params()
 				params["nodeVersion"] = nc.NodeVersion
 
@@ -100,7 +104,7 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 				continue
 			}
 
-			return interval, rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
+			return interval, err
 		}
 
 		logrus.Infof("Waiting for node to register. Either cluster is not ready for registering or etcd and controlplane node have to be registered first")

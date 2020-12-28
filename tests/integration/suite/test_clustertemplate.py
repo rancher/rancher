@@ -88,6 +88,7 @@ def test_default_pod_sec(admin_mc, list_remove_resource):
                                                   clusterTemplateId=tId,
                                                   enabled="true")
 
+    time.sleep(2)
     cluster = wait_for_cluster_create(client, name=random_str(),
                                       clusterTemplateRevisionId=rev.id)
     remove_list.insert(0, cluster)
@@ -366,7 +367,7 @@ def test_updated_members_revision_access(admin_mc, remove_resource,
     rb_name = name + "-ctr-r"
     wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
                                          user_member.user.id, rb_name),
-             timeout=60,
+             timeout=120,
              fail_handler=fail_handler(rb_resource))
     revision = user_member.client.by_id_cluster_template_revision(rev.id)
     assert revision is not None
@@ -754,6 +755,106 @@ def test_save_as_template_action(admin_mc, list_remove_resource):
         assert e is not None
 
 
+def test_cluster_desc_update(admin_mc, list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc,
+                                               [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+    templateId = cluster_template.id
+
+    rev = \
+        create_cluster_template_revision(admin_mc.client, templateId)
+
+    # create a cluster with this template
+    client = admin_mc.client
+
+    cname = random_str()
+    cluster = wait_for_cluster_create(admin_mc.client, name=cname,
+                                      clusterTemplateRevisionId=rev.id,
+                                      description="template from cluster")
+    remove_list.insert(0, cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+    assert cluster.description == 'template from cluster'
+
+    # edit cluster description
+    updatedC = client.update(cluster, name=cname,
+                             clusterTemplateRevisionId=rev.id,
+                             description="updated desc")
+    assert updatedC.description == 'updated desc'
+
+    client.delete(cluster)
+    wait_for_cluster_to_be_deleted(client, cluster.id)
+
+
+def test_update_cluster_monitoring(admin_mc, list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+
+    tId = cluster_template.id
+    client = admin_mc.client
+    cconfig = {
+        "rancherKubernetesEngineConfig": {
+            "services": {
+                "type": "rkeConfigServices",
+                "kubeApi": {
+                    "alwaysPullImages": "false",
+                    "podSecurityPolicy": "false",
+                    "serviceNodePortRange": "30000-32767",
+                    "type": "kubeAPIService"
+                }
+            }
+        },
+        "enableClusterMonitoring": "true",
+        "defaultPodSecurityPolicyTemplateId": "restricted",
+    }
+    rev1 = client.create_cluster_template_revision(clusterConfig=cconfig,
+                                                   name="v1",
+                                                   clusterTemplateId=tId,
+                                                   enabled="true")
+    cconfig2 = {
+        "rancherKubernetesEngineConfig": {
+            "services": {
+                "type": "rkeConfigServices",
+                "kubeApi": {
+                    "alwaysPullImages": "false",
+                    "podSecurityPolicy": "false",
+                    "serviceNodePortRange": "30000-32767",
+                    "type": "kubeAPIService"
+                }
+            }
+        },
+        "enableClusterMonitoring": "false",
+        "defaultPodSecurityPolicyTemplateId": "restricted",
+    }
+    rev2 = client.create_cluster_template_revision(clusterConfig=cconfig2,
+                                                   name="v2",
+                                                   clusterTemplateId=tId,
+                                                   enabled="true")
+
+    cluster_name = random_str()
+    cluster = wait_for_cluster_create(client, name=cluster_name,
+                                      clusterTemplateRevisionId=rev1.id,
+                                      description="template from cluster")
+    remove_list.insert(0, cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+
+    # update cluster to use rev2 that turns off monitoring
+    # expect no change to monitoring
+
+    client.update(cluster,
+                  name=cluster_name, clusterTemplateRevisionId=rev2.id)
+
+    reloaded_cluster = client.by_id_cluster(cluster.id)
+    assert reloaded_cluster.enableClusterMonitoring is True
+
+    client.delete(cluster)
+    wait_for_cluster_to_be_deleted(client, cluster.id)
+
+
 def rtb_cb(client, rtb):
     """Wait for the prtb to have the userId populated"""
     def cb():
@@ -824,7 +925,7 @@ def create_cluster_template_revision(client, clusterTemplateId):
                   "rancherKubernetesEngineConfig.kubernetesVersion",
                   "required": "false",
                   "type": "string",
-                  "default": "1.15.x"
+                  "default": "1.18.x"
                  }]
 
     revision_name = random_str()

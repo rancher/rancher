@@ -3,8 +3,8 @@ package utils
 import (
 	"fmt"
 
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 )
 
 const (

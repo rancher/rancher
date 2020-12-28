@@ -9,7 +9,7 @@ cd $(dirname $0)/..
 
 mkdir -p ../bin/chart/${CHART_REPO}
 
-helm package -d ../bin/chart/${CHART_REPO} /tmp/chart/rancher
+helm package -d ../bin/chart/${CHART_REPO} ../build/chart/rancher
 
 if [[ "${CHART_REPO}" == "dev" ]]; then
     echo "dev repo - skipping index"

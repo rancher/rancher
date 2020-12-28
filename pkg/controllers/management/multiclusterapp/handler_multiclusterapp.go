@@ -7,11 +7,11 @@ import (
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -19,7 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 )
+
+const ownerRefUpdated = "auth.management.cattle.io/owner-ref-updated"
 
 type MCAppController struct {
 	multiClusterApps              v3.MultiClusterAppInterface
@@ -35,8 +38,9 @@ type MCAppController struct {
 }
 
 type MCAppRevisionController struct {
-	managementContext     *config.ManagementContext
-	multiClusterAppLister v3.MultiClusterAppLister
+	managementContext        *config.ManagementContext
+	multiClusterAppLister    v3.MultiClusterAppLister
+	multiClusterAppRevisions v3.MultiClusterAppRevisionInterface
 }
 
 type ProjectController struct {
@@ -66,8 +70,9 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		users:                         management.Management.Users(""),
 	}
 	r := MCAppRevisionController{
-		managementContext:     management,
-		multiClusterAppLister: management.Management.MultiClusterApps("").Controller().Lister(),
+		managementContext:        management,
+		multiClusterAppLister:    management.Management.MultiClusterApps("").Controller().Lister(),
+		multiClusterAppRevisions: management.Management.MultiClusterAppRevisions(""),
 	}
 	projects := management.Management.Projects("")
 	p := ProjectController{
@@ -157,8 +162,8 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 		}
 	}
 
-	if err := rbac.CreateRoleAndRoleBinding(rbac.MultiClusterAppResource, mcapp.Name, namespace.GlobalNamespace,
-		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIVersion},
+	if err := rbac.CreateRoleAndRoleBinding(rbac.MultiClusterAppResource, v3.MultiClusterAppGroupVersionKind.Kind, mcapp.Name, namespace.GlobalNamespace,
+		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIGroup},
 		mcapp.UID,
 		mcapp.Spec.Members, mc.managementContext); err != nil {
 		return nil, err
@@ -172,8 +177,8 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 	}
 	for _, rev := range revisions {
 		if err := rbac.CreateRoleAndRoleBinding(
-			rbac.MultiClusterAppRevisionResource, rev.Name, namespace.GlobalNamespace, rbac.RancherManagementAPIVersion,
-			creatorID, []string{rbac.RancherManagementAPIVersion}, rev.UID, mcapp.Spec.Members,
+			rbac.MultiClusterAppRevisionResource, v3.MultiClusterAppRevisionGroupVersionKind.Kind, rev.Name, namespace.GlobalNamespace, rbac.RancherManagementAPIVersion,
+			creatorID, []string{rbac.RancherManagementAPIGroup}, rev.UID, mcapp.Spec.Members,
 			mc.managementContext); err != nil {
 			return nil, err
 		}
@@ -186,6 +191,11 @@ func (r *MCAppRevisionController) sync(key string, mcappRevision *v3.MultiCluste
 	if mcappRevision == nil || mcappRevision.DeletionTimestamp != nil {
 		return mcappRevision, nil
 	}
+
+	if err := r.updateOwnerRef(mcappRevision); err != nil {
+		return mcappRevision, err
+	}
+
 	metaAccessor, err := meta.Accessor(mcappRevision)
 	if err != nil {
 		return mcappRevision, err
@@ -205,13 +215,55 @@ func (r *MCAppRevisionController) sync(key string, mcappRevision *v3.MultiCluste
 	}
 
 	if err := rbac.CreateRoleAndRoleBinding(
-		rbac.MultiClusterAppRevisionResource, mcappRevision.Name, namespace.GlobalNamespace, rbac.RancherManagementAPIVersion,
-		creatorID, []string{rbac.RancherManagementAPIVersion}, mcappRevision.UID, mcapp.Spec.Members,
+		rbac.MultiClusterAppRevisionResource, v3.MultiClusterAppRevisionGroupVersionKind.Kind, mcappRevision.Name, namespace.GlobalNamespace, rbac.RancherManagementAPIVersion,
+		creatorID, []string{rbac.RancherManagementAPIGroup}, mcappRevision.UID, mcapp.Spec.Members,
 		r.managementContext); err != nil {
 		return nil, err
 	}
 
 	return mcappRevision, nil
+}
+
+func (r *MCAppRevisionController) updateOwnerRef(mcappRevision *v3.MultiClusterAppRevision) error {
+	/* MCAppRevision has had wrong OwnerReference format till 2.5, the ownerReference kind should be "MultiClusterApp" and not "multiclusterapps"
+	    ownerReferences:
+	    - apiVersion: management.cattle.io/v3
+	      kind: multiclusterapps
+	      name: datadogmcapp
+	      uid: 32cdd51f-b152-44fa-93bb-1054a3203541
+	The revisions created before 2.5 need to be updated to use the right format
+	*/
+	if mcappRevision.Labels != nil && mcappRevision.Labels[ownerRefUpdated] == "true" {
+		return nil
+	}
+	var needsUpdate bool
+	for ind, ownerRef := range mcappRevision.OwnerReferences {
+		if ownerRef.Kind == "multiclusterapps" {
+			ownerRef.Kind = v3.MultiClusterAppGroupVersionKind.Kind
+			mcappRevision.OwnerReferences[ind] = ownerRef
+			needsUpdate = true
+		}
+	}
+
+	if !needsUpdate {
+		return nil
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		mcappRevisionToUpdate, updateErr := r.multiClusterAppRevisions.GetNamespaced(mcappRevision.Namespace, mcappRevision.Name, v1.GetOptions{})
+		if updateErr != nil {
+			return updateErr
+		}
+		mcappRevisionToUpdate.OwnerReferences = mcappRevision.OwnerReferences
+		if mcappRevisionToUpdate.Labels == nil {
+			mcappRevisionToUpdate.Labels = make(map[string]string)
+		}
+		mcappRevisionToUpdate.Labels[ownerRefUpdated] = "true"
+		_, err := r.multiClusterAppRevisions.Update(mcappRevisionToUpdate)
+		return err
+	})
+
+	return retryErr
 }
 
 func (p *ProjectController) sync(key string, project *v3.Project) (runtime.Object, error) {

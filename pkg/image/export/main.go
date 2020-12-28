@@ -4,14 +4,18 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/controllers/management/k3supgrade"
+	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
-	"github.com/rancher/types/image"
-	"github.com/rancher/types/kdm"
+	"github.com/rancher/rke/types/image"
+	"github.com/rancher/rke/types/kdm"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -38,16 +42,16 @@ var (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("system charts path is required, please set it as the first parameter")
+	if len(os.Args) < 3 {
+		log.Fatal("\"main.go\" requires 2 arguments. Usage: go run main.go [SYSTEM_CHART_PATH] [CHART_PATH] [OPTIONAL]...")
 	}
 
-	if err := run(os.Args[1], os.Args[2:]); err != nil {
+	if err := run(os.Args[1], os.Args[2], os.Args[3:]); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(systemChartPath string, imagesFromArgs []string) error {
+func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 	tag, ok := os.LookupEnv("TAG")
 	if !ok {
 		return fmt.Errorf("no tag %s", tag)
@@ -61,7 +65,10 @@ func run(systemChartPath string, imagesFromArgs []string) error {
 	}
 
 	// already downloaded in dapper
-	b, err := ioutil.ReadFile("/root/data.json")
+	b, err := ioutil.ReadFile(filepath.Join("data.json"))
+	if os.IsNotExist(err) {
+		b, err = ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
+	}
 	if err != nil {
 		return err
 	}
@@ -80,12 +87,12 @@ func run(systemChartPath string, imagesFromArgs []string) error {
 
 	k3sUpgradeImages := getK3sUpgradeImages(rancherVersion, data.K3S)
 
-	targetImages, err := img.GetImages(systemChartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
+	targetImages, err := img.GetImages(systemChartPath, chartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
 	if err != nil {
 		return err
 	}
 
-	targetWindowsImages, err := img.GetImages(systemChartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
+	targetWindowsImages, err := img.GetImages(systemChartPath, chartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
 	if err != nil {
 		return err
 	}
@@ -145,6 +152,25 @@ func saveImages(targetImages []string) []string {
 	return saveImages
 }
 
+func checkImage(image string) error {
+	// ignore non prefixed images, also in types (image/mirror.go)
+	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") || strings.HasPrefix(image, "registry:") || strings.EqualFold(image, "busybox") {
+		return nil
+	}
+
+	imageNameTag := strings.Split(image, ":")
+	if len(imageNameTag) != 2 {
+		return fmt.Errorf("Can't extract tag from image [%s]", image)
+	}
+	if !strings.HasPrefix(imageNameTag[0], "rancher/") {
+		return fmt.Errorf("Image [%s] does not start with rancher/", image)
+	}
+	if strings.HasSuffix(imageNameTag[0], "-") {
+		return fmt.Errorf("Image [%s] has trailing '-', probably an error in image substitution", image)
+	}
+	return nil
+}
+
 func saveScript(arch string, targetImages []string) error {
 	filename := getScriptFilename(arch, "save")
 	log.Printf("Creating %s\n", filename)
@@ -171,6 +197,11 @@ func imagesText(arch string, targetImages []string) error {
 	save.Chmod(0755)
 
 	for _, image := range saveImages(targetImages) {
+		err := checkImage(image)
+		if err != nil {
+			return err
+		}
+
 		log.Println("Image:", image)
 		fmt.Fprintln(save, image)
 	}
@@ -224,11 +255,13 @@ func getWindowsAgentImage() string {
 // getK3sUpgradeImages returns k3s-upgrade images for every k3s release that supports
 // current rancher version
 func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) []string {
-	k3sImages := make([]string, 0)
-	imageFormat := "rancher/k3s-upgrade:%s"
+	logrus.Infof("generating k3s image list...")
+	k3sImagesMap := make(map[string]bool)
 	releases, _ := k3sData["releases"].([]interface{})
-	for _, channel := range releases {
-		releaseMap, _ := channel.(map[string]interface{})
+	var compatibleReleases []string
+
+	for _, release := range releases {
+		releaseMap, _ := release.(map[string]interface{})
 		version, _ := releaseMap["version"].(string)
 		if version == "" {
 			continue
@@ -246,7 +279,7 @@ func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) 
 				continue
 			}
 
-			versionGTMin, err := k3supgrade.IsNewerVersion(minVersion, rancherVersion)
+			versionGTMin, err := k3sbasedupgrade.IsNewerVersion(minVersion, rancherVersion)
 			if err != nil {
 				continue
 			}
@@ -255,7 +288,7 @@ func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) 
 				continue
 			}
 
-			versionLTMax, err := k3supgrade.IsNewerVersion(rancherVersion, maxVersion)
+			versionLTMax, err := k3sbasedupgrade.IsNewerVersion(rancherVersion, maxVersion)
 			if err != nil {
 				continue
 			}
@@ -265,11 +298,62 @@ func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) 
 			}
 		}
 
-		version = strings.Replace(version, "+", "-", -1)
-		k3sImages = append(k3sImages, fmt.Sprintf(imageFormat, version))
-
+		compatibleReleases = append(compatibleReleases, version)
 	}
+
+	for _, release := range compatibleReleases {
+		// registries don't allow +, so image names will have these substituted
+		upgradeImage := fmt.Sprintf("rancher/k3s-upgrade:%s", strings.Replace(release, "+", "-", -1))
+		k3sImagesMap[upgradeImage] = true
+
+		images, err := downloadK3sSupportingImages(release)
+		if err != nil {
+			logrus.Infof("could not find supporting images for k3s release [%s]: %v", release, err)
+			continue
+		}
+
+		supportingImages := strings.Split(images, "\n")
+		if supportingImages[len(supportingImages)-1] == "" {
+			supportingImages = supportingImages[:len(supportingImages)-1]
+		}
+
+		for _, imageName := range supportingImages {
+			imageName = strings.TrimPrefix(imageName, "docker.io/")
+			k3sImagesMap[imageName] = true
+		}
+	}
+
+	var k3sImages []string
+	for imageName := range k3sImagesMap {
+		k3sImages = append(k3sImages, imageName)
+	}
+
+	sort.Strings(k3sImages)
+	logrus.Infof("finished generating k3s image list...")
 	return k3sImages
+}
+
+// DownloadK3s supporting images attempt to download k3s-images.txt files that contains a list
+// of its dependencies.
+func downloadK3sSupportingImages(release string) (string, error) {
+	url := fmt.Sprintf("https://github.com/rancher/k3s/releases/download/%s/k3s-images.txt", release)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("failed to get url: %v", string(body))
+	}
+	defer resp.Body.Close()
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }
 
 func getScript(arch, fileType string) string {

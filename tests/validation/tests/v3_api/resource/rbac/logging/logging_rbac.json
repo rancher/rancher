@@ -1,0 +1,153 @@
+{
+  "logging-admin": {
+    "should_pass": [
+
+      "create -f {resource_root}/rbac/logging/cr_output.yaml",
+      "get output do-output",
+      "apply -f {resource_root}/rbac/logging/cr_output.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_output.yaml",
+
+      "create -f {resource_root}/rbac/logging/cr_flow.yaml",
+      "get flow do-flow",
+      "apply -f {resource_root}/rbac/logging/cr_flow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_flow.yaml"
+    ],
+    "should_fail": [
+      "get loggings",
+      "create -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_logging.yaml",
+
+      "get clusteroutputs",
+      "create -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+
+      "get clusterflows",
+      "create -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusterflow.yaml"
+    ]
+  },
+  "logging-edit": {
+    "should_pass": [
+      "get output",
+      "create -f {resource_root}/rbac/logging/cr_output.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_output.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_output.yaml",
+
+      "get flow",
+      "create -f {resource_root}/rbac/logging/cr_flow.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_flow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_flow.yaml"
+
+    ],
+    "should_fail": [
+      "get loggings",
+      "create -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_logging.yaml",
+
+      "get clusteroutputs",
+      "create -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+
+      "get clusterflows",
+      "create -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusterflow.yaml"
+    ]
+  },
+  "logging-view": {
+    "should_pass": [
+      "get flows",
+      "get outputs"
+    ],
+    "should_fail": [
+      "get loggings",
+      "create -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_logging.yaml",
+
+      "get clusteroutputs",
+      "create -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+
+      "get clusterflows",
+      "create -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+
+      "create -f {resource_root}/rbac/logging/cr_output.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_output.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_output.yaml",
+
+      "create -f {resource_root}/rbac/logging/cr_flow.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_flow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_flow.yaml"
+    ]
+  },
+  "rancher-logging-fluentbit": {
+    "should_pass": [
+      "get pods",
+      "get namespaces"
+    ],
+    "should_fail": [
+      "get pv",
+      "get secrets",
+      "get configmaps",
+
+      "get loggings",
+      "create -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_logging.yaml",
+
+      "get clusteroutputs",
+      "create -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+
+      "get clusterflows",
+      "create -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+
+      "get outputs",
+      "create -f {resource_root}/rbac/logging/cr_output.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_output.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_output.yaml",
+
+      "get flows",
+      "create -f {resource_root}/rbac/logging/cr_flow.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_flow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_flow.yaml"
+    ]
+  },
+  "rancher-logging": {
+    "should_pass": [
+      "get crd",
+      "get loggings",
+      "create -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_logging.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_logging.yaml",
+
+      "get clusteroutputs",
+      "create -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusteroutput.yaml",
+
+      "get clusterflows",
+      "create -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_clusterflow.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_clusterflow.yaml"
+
+    ],
+    "should_fail": [
+      "create -f {resource_root}/rbac/logging/cr_resourcedefinition.yaml",
+      "apply -f {resource_root}/rbac/logging/cr_resourcedefinition.yaml",
+      "delete -f {resource_root}/rbac/logging/cr_resourcedefinition.yaml"
+    ]
+  }
+}

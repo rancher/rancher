@@ -152,6 +152,9 @@ def test_project_create_role_locked(admin_mc, cleanup_roles, remove_resource):
 
     # Lock the role
     client.update(client.by_id_role_template(locked_role), locked=True)
+    # Wait for role to get updated
+    wait_for(lambda: client.by_id_role_template(locked_role)['locked'] is True,
+             fail_handler=lambda: "Failed to lock role"+locked_role)
 
     project = client.create_project(name=random_str(), clusterId='local')
     remove_resource(project)

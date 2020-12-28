@@ -1,0 +1,17 @@
+---
+mirrors:
+  docker.io:
+    endpoint:
+      - "https://$PRIVATE_REG"
+  k8s.gcr.io:
+    endpoint:
+      - "https://$PRIVATE_REG"
+configs:
+  "$PRIVATE_REG":
+    auth:
+      username: $USERNAME
+      password: $PASSWORD
+    tls:
+      cert_file: /home/ubuntu/cert.pem
+      key_file:  /home/ubuntu/key.pem
+      ca_file: /home/ubuntu/ca.pem

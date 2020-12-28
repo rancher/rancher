@@ -1,0 +1,7 @@
+apiVersion: cis.cattle.io/v1
+kind: ClusterScanBenchmark
+metadata:
+  name: benchmark-sample
+spec:
+  clusterProvider: rke
+  minKubernetesVersion: 1.15.0

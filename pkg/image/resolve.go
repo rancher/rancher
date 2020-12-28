@@ -11,10 +11,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
 	util "github.com/rancher/rancher/pkg/cluster"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	img "github.com/rancher/types/image"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
+	rketypes "github.com/rancher/rke/types"
+	img "github.com/rancher/rke/types/image"
 	"gopkg.in/yaml.v2"
 )
 
@@ -129,12 +132,21 @@ func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[inte
 	}
 }
 
-func GetImages(systemChartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]v3.RKESystemImages, osType OSType) ([]string, error) {
+func GetImages(systemChartPath, chartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, error) {
 	var images []string
 
-	// fetch images from charts
+	// fetch images from system charts
 	if systemChartPath != "" {
-		imagesInCharts, err := fetchImagesFromCharts(systemChartPath, osType)
+		imagesInSystemCharts, err := fetchImagesFromCharts(systemChartPath, osType)
+		if err != nil {
+			return []string{}, errors.Wrap(err, "failed to fetch images from system charts")
+		}
+		images = append(images, imagesInSystemCharts...)
+	}
+
+	// fetch images from charts
+	if chartPath != "" {
+		imagesInCharts, err := fetchImagesFromCharts(chartPath, osType)
 		if err != nil {
 			return []string{}, errors.Wrap(err, "failed to fetch images from charts")
 		}
@@ -192,13 +204,13 @@ func fetchImagesFromCharts(path string, osType OSType) ([]string, error) {
 	return images, nil
 }
 
-func fetchImagesFromSystem(rkeSystemImages map[string]v3.RKESystemImages, osType OSType) ([]string, error) {
+func fetchImagesFromSystem(rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, error) {
 	collectionImagesList := []interface{}{
 		rkeSystemImages,
 	}
 	switch osType {
 	case Linux:
-		collectionImagesList = append(collectionImagesList, v3.ToolsSystemImages)
+		collectionImagesList = append(collectionImagesList, v32.ToolsSystemImages)
 	}
 
 	return flatImagesFromCollections(collectionImagesList...)
@@ -233,6 +245,7 @@ func getRequirementImages(osType OSType) []string {
 	case Linux:
 		return []string{
 			"busybox",
+			settings.ShellImage.Get(),
 		}
 	}
 	return []string{}

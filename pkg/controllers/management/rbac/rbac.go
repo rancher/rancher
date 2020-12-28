@@ -5,9 +5,10 @@ import (
 	"reflect"
 	"sort"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/types/config"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/types/config"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +28,8 @@ const (
 	ClusterTemplateRevisionResource = "clustertemplaterevisions"
 	CloudCredentialResource         = "secrets"
 	CreatorIDAnn                    = "field.cattle.io/creatorId"
-	RancherManagementAPIVersion     = "management.cattle.io"
+	RancherManagementAPIVersion     = "management.cattle.io/v3"
+	RancherManagementAPIGroup       = "management.cattle.io"
 	NodeTemplateResource            = "nodetemplates"
 )
 
@@ -37,7 +39,7 @@ var subjectWithAllUsers = k8srbacv1.Subject{
 	APIGroup: rbacv1.GroupName,
 }
 
-func CreateRoleAndRoleBinding(resource, name, namespace, apiVersion, creatorID string, apiGroup []string, UID types.UID, members []v3.Member,
+func CreateRoleAndRoleBinding(resource, kind, name, namespace, apiVersion, creatorID string, apiGroup []string, UID types.UID, members []v32.Member,
 	mgmt *config.ManagementContext) error {
 	/* Create 3 Roles containing the CRD, and the current CR in resourceNames list
 	1. Role with owner verbs (Owner access, includes creator); name multiclusterapp.Name + "-ma" / (globalDNS.Name + "-ga")
@@ -45,7 +47,7 @@ func CreateRoleAndRoleBinding(resource, name, namespace, apiVersion, creatorID s
 	3. Role with "update" verb (Member access); name multiclusterapp.Name + "-mu" / (globalDNS.Name + "-gu")
 	*/
 
-	if _, err := createRole(resource, name, namespace, OwnerAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
+	if _, err := createRole(resource, kind, name, namespace, OwnerAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
 		return err
 	}
 
@@ -77,16 +79,16 @@ func CreateRoleAndRoleBinding(resource, name, namespace, apiVersion, creatorID s
 	}
 
 	// There will always be a role and rolebinding for owner access (admin)
-	if err := createRoleBindingForMembers(resource, name, namespace, OwnerAccess, apiVersion, UID, ownerAccessSubjects, mgmt); err != nil {
+	if err := createRoleBindingForMembers(resource, kind, name, namespace, OwnerAccess, apiVersion, UID, ownerAccessSubjects, mgmt); err != nil {
 		return err
 	}
 
 	// Check if there are members with readonly or member(update) access; if found then create rolebindings for those
 	if len(readOnlyAccessSubjects) > 0 {
-		if _, err := createRole(resource, name, namespace, ReadOnlyAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
+		if _, err := createRole(resource, kind, name, namespace, ReadOnlyAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
 			return err
 		}
-		if err := createRoleBindingForMembers(resource, name, namespace, ReadOnlyAccess, apiVersion, UID, readOnlyAccessSubjects, mgmt); err != nil {
+		if err := createRoleBindingForMembers(resource, kind, name, namespace, ReadOnlyAccess, apiVersion, UID, readOnlyAccessSubjects, mgmt); err != nil {
 			return err
 		}
 	} else {
@@ -99,10 +101,10 @@ func CreateRoleAndRoleBinding(resource, name, namespace, apiVersion, creatorID s
 	}
 
 	if len(memberAccessSubjects) > 0 {
-		if _, err := createRole(resource, name, namespace, MemberAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
+		if _, err := createRole(resource, kind, name, namespace, MemberAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
 			return err
 		}
-		if err := createRoleBindingForMembers(resource, name, namespace, MemberAccess, apiVersion, UID, memberAccessSubjects, mgmt); err != nil {
+		if err := createRoleBindingForMembers(resource, kind, name, namespace, MemberAccess, apiVersion, UID, memberAccessSubjects, mgmt); err != nil {
 			return err
 		}
 	} else {
@@ -114,12 +116,12 @@ func CreateRoleAndRoleBinding(resource, name, namespace, apiVersion, creatorID s
 	return nil
 }
 
-func createRole(resourceType, resourceName, namespace, roleAccess, apiVersion string, apiGroups []string, resourceUID types.UID,
+func createRole(resourceType, resourceKind, resourceName, namespace, roleAccess, apiVersion string, apiGroups []string, resourceUID types.UID,
 	mgmt *config.ManagementContext) (*k8srbacv1.Role, error) {
 	roleName, verbs := GetRoleNameAndVerbs(roleAccess, resourceName, resourceType)
 	ownerReference := metav1.OwnerReference{
 		APIVersion: apiVersion,
-		Kind:       resourceType,
+		Kind:       resourceKind,
 		Name:       resourceName,
 		UID:        resourceUID,
 	}
@@ -160,20 +162,20 @@ func createRole(resourceType, resourceName, namespace, roleAccess, apiVersion st
 	return role, nil
 }
 
-func createRoleBindingForMembers(resourceType, resourceName, namespace, roleAccess, apiVersion string, UID types.UID,
+func createRoleBindingForMembers(resourceType, resourceKind, resourceName, namespace, roleAccess, apiVersion string, UID types.UID,
 	subjects []k8srbacv1.Subject, mgmt *config.ManagementContext) error {
 	roleName, _ := GetRoleNameAndVerbs(roleAccess, resourceName, resourceType)
 	// we can define the rolebinding first, since if it's not already present we can call create. And if it's present then we'll
 	// still need to compare the current members' list
 	sort.Slice(subjects, func(i, j int) bool { return subjects[i].Name < subjects[j].Name })
-	return createRoleBinding(resourceType, resourceName, namespace, roleName, apiVersion, mgmt, UID, subjects)
+	return createRoleBinding(resourceKind, resourceName, namespace, roleName, apiVersion, mgmt, UID, subjects)
 }
 
-func createRoleBinding(resourceType, resourceName, namespace, roleName, apiVersion string, mgmt *config.ManagementContext,
+func createRoleBinding(resourceKind, resourceName, namespace, roleName, apiVersion string, mgmt *config.ManagementContext,
 	resourceUID types.UID, subjects []k8srbacv1.Subject) error {
 	ownerReference := metav1.OwnerReference{
 		APIVersion: apiVersion,
-		Kind:       resourceType,
+		Kind:       resourceKind,
 		Name:       resourceName,
 		UID:        resourceUID,
 	}
@@ -261,7 +263,7 @@ func deleteRoleAndRoleBinding(roleName, namespace string, mgmt *config.Managemen
 	return nil
 }
 
-func buildSubjectForMember(member v3.Member, managementContext *config.ManagementContext) (k8srbacv1.Subject, error) {
+func buildSubjectForMember(member v32.Member, managementContext *config.ManagementContext) (k8srbacv1.Subject, error) {
 	var name, kind string
 	member, err := checkAndSetUserFields(member, managementContext)
 	if err != nil {
@@ -297,7 +299,7 @@ func buildSubjectForMember(member v3.Member, managementContext *config.Managemen
 	}, nil
 }
 
-func checkAndSetUserFields(m v3.Member, managementContext *config.ManagementContext) (v3.Member, error) {
+func checkAndSetUserFields(m v32.Member, managementContext *config.ManagementContext) (v32.Member, error) {
 	if m.GroupPrincipalName != "" || (m.UserPrincipalName != "" && m.UserName != "") {
 		return m, nil
 	}

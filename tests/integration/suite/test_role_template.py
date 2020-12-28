@@ -266,6 +266,100 @@ def test_role_template_update_inherited_role(admin_mc, remove_resource,
     assert 'edit' not in rb_dict
 
 
+def test_kubernetes_admin_permissions(admin_mc, remove_resource, user_factory,
+                                      admin_pc):
+    client = admin_mc.client
+    name = random_str()
+    # clone Kubernetes-admin role
+    cloned_admin = client.create_role_template(name=name, context="project",
+                                               roleTemplateIds=["admin"])
+    remove_resource(cloned_admin)
+    wait_for_role_template_creation(admin_mc, name)
+
+    # add user with cloned kubernetes-admin role to a project
+    cloned_user = user_factory()
+    remove_resource(cloned_user)
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=cloned_user.user.id,
+        projectId=admin_pc.project.id,
+        roleTemplateId=cloned_admin.id
+    )
+    remove_resource(prtb)
+    wait_until_available(cloned_user.client, admin_pc.project)
+
+    # cloned kubernetes-admin role should not give user project-owner
+    # privileges, for instance, user should not be able to create enable
+    # monitoring
+
+    project = cloned_user.client.by_id_project(admin_pc.project.id)
+    assert 'enableMonitoring' not in project.actions
+
+
+def test_role_template_changes_revoke_permissions(admin_mc, remove_resource,
+                                                  user_factory, admin_pc):
+    client = admin_mc.client
+    name = random_str()
+    # clone project-owner role
+    po = client.by_id_role_template("project-owner")
+    cloned_po = client.create_role_template(name=name, context="project",
+                                            rules=po.rules,
+                                            roleTemplateIds=["admin"])
+    remove_resource(cloned_po)
+    wait_for_role_template_creation(admin_mc, name)
+    role_template_id = cloned_po['id']
+
+    user = user_factory()
+    # add a user with this cloned project-owner role to a project
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user.user.id,
+        projectId=admin_pc.project.id,
+        roleTemplateId=role_template_id
+    )
+    remove_resource(prtb)
+    wait_until_available(user.client, admin_pc.project)
+
+    # this user should be able to list PRTBs
+    def _list_prtbs():
+        prtbs = user.client.list_project_role_template_binding()
+        return len(prtbs.data) > 0
+
+    wait_for(_list_prtbs, fail_handler=lambda: "user was unable to list PRTBs")
+
+    # now edit the cloned roletemplate to remove permission
+    # to list projectroletemplatebindings
+    rules = cloned_po['rules']
+    for ind, rule in enumerate(rules):
+        if 'projectroletemplatebindings' in rule['resources']:
+            del rules[ind]
+
+    client.update(cloned_po, rules=rules)
+
+    def role_template_update_check():
+        rt = client.by_id_role_template(role_template_id)
+        for rule in rt['rules']:
+            if 'projectroletemplatebindings' in rule['resources']:
+                return False
+        return True
+
+    def fail_handler():
+        return "failed waiting for cloned roletemplate to be updated"
+
+    # Validate the rule was dropped
+    wait_for(role_template_update_check, fail_handler=fail_handler(),
+             timeout=120)
+
+    # this user should NOT be able to list PRTBs
+    def _list_prtbs_empty():
+        prtbs = user.client.list_project_role_template_binding()
+        return len(prtbs.data) == 0
+
+    wait_for(_list_prtbs_empty,
+             fail_handler=lambda: "user was able to list PRTBs")
+
+
 def wait_for_role_template_creation(admin_mc, rt_name, timeout=60):
     start = time.time()
     interval = 0.5

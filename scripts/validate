@@ -1,7 +1,12 @@
 #!/bin/bash
 set -e
 
-cd $(dirname $0)/..
+echo Running: flake8 python linting
+
+cd $(dirname $0)/../tests/integration
+tox -e flake8
+
+cd ../..
 
 if ! command -v golangci-lint; then	echo Running: go fmt	
     echo Skipping validation: no golangci-lint available	test -z "$(go fmt ./... | tee /dev/stderr)"
@@ -10,3 +15,14 @@ fi
 
 echo Running: golangci-lint
 golangci-lint run
+
+echo Tidying up modules
+go mod tidy
+
+echo Verifying modules
+go mod verify
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "Encountered dirty repo!"
+  exit 1
+fi

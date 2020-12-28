@@ -10,10 +10,12 @@ import (
 	"sync"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,12 +24,7 @@ import (
 )
 
 var (
-	nameRegexp       = regexp.MustCompile("^(.*?)([0-9]+)$")
-	unReachableTaint = v1.Taint{
-		Key:    "node.kubernetes.io/unreachable",
-		Effect: "NoExecute",
-	}
-	falseValue = false
+	nameRegexp = regexp.MustCompile("^(.*?)([0-9]+)$")
 )
 
 type Controller struct {
@@ -60,7 +57,7 @@ func (c *Controller) Create(nodePool *v3.NodePool) (runtime.Object, error) {
 }
 
 func (c *Controller) Updated(nodePool *v3.NodePool) (runtime.Object, error) {
-	obj, err := v3.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
+	obj, err := v32.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
 		return nodePool, c.reconcile(nodePool)
 	})
 	return obj.(*v3.NodePool), err
@@ -114,7 +111,7 @@ func (c *Controller) createNode(name string, nodePool *v3.NodePool, simulate boo
 			Labels:       nodePool.Labels,
 			Annotations:  nodePool.Annotations,
 		},
-		Spec: v3.NodeSpec{
+		Spec: v32.NodeSpec{
 			Etcd:              nodePool.Spec.Etcd,
 			ControlPlane:      nodePool.Spec.ControlPlane,
 			Worker:            nodePool.Spec.Worker,
@@ -212,14 +209,14 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 			continue
 		}
 
-		if v3.NodeConditionProvisioned.IsFalse(node) || v3.NodeConditionInitialized.IsFalse(node) || v3.NodeConditionConfigSaved.IsFalse(node) {
+		if v32.NodeConditionProvisioned.IsFalse(node) || v32.NodeConditionInitialized.IsFalse(node) || v32.NodeConditionConfigSaved.IsFalse(node) {
 			changed = true
 			if !simulate {
 				_ = c.deleteNode(node, 2*time.Minute)
 			}
 		}
 		// remove unreachable node with the unreachable taint & status of Ready being Unknown
-		q := getTaint(node.Spec.InternalNodeSpec.Taints, &unReachableTaint)
+		q := getUnreachableTaint(node.Spec.InternalNodeSpec.Taints)
 		if q != nil && deleteNotReadyAfter > 0 {
 			changed = true
 			if isNodeReadyUnknown(node) && !simulate {
@@ -347,6 +344,10 @@ func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, s
 		newRoles = append(newRoles, "worker")
 	}
 
+	if len(newRoles) == 0 {
+		newRoles = []string{"worker"}
+	}
+
 	toUpdate.Status.NodeConfig.Role = newRoles
 	if simulate {
 		return toUpdate, nil
@@ -357,14 +358,14 @@ func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, s
 // requeue checks every 5 seconds if the node is still unreachable with one goroutine per node
 func (c *Controller) requeue(timeout time.Duration, np *v3.NodePool, node *v3.Node) {
 
-	t := getTaint(node.Spec.InternalNodeSpec.Taints, &unReachableTaint)
+	t := getUnreachableTaint(node.Spec.InternalNodeSpec.Taints)
 	for t != nil {
 		time.Sleep(5 * time.Second)
 		exist, err := c.NodeLister.Get(node.Namespace, node.Name)
 		if err != nil {
 			break
 		}
-		t = getTaint(exist.Spec.InternalNodeSpec.Taints, &unReachableTaint)
+		t = getUnreachableTaint(exist.Spec.InternalNodeSpec.Taints)
 		if t != nil && time.Since(t.TimeAdded.Time) > timeout {
 			logrus.Debugf("Enqueue nodepool controller: %s %s", np.Namespace, np.Name)
 			c.NodePoolController.Enqueue(np.Namespace, np.Name)
@@ -376,10 +377,9 @@ func (c *Controller) requeue(timeout time.Duration, np *v3.NodePool, node *v3.No
 	c.mutex.Unlock()
 }
 
-// getTaint returns the taint that matches the given request
-func getTaint(taints []v1.Taint, taintToFind *v1.Taint) *v1.Taint {
+func getUnreachableTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
+		if taint.Key == v1.TaintNodeUnreachable {
 			return &taint
 		}
 	}

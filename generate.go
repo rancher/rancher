@@ -1,4 +1,4 @@
-//go:generate go run pkg/wrangler/codegen/cleanup/main.go
-//go:generate go run pkg/wrangler/codegen/main.go
+//go:generate go run pkg/codegen/generator/cleanup/main.go
+//go:generate go run pkg/codegen/main.go
 
 package main

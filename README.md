@@ -10,15 +10,15 @@ Rancher is an open source project that provides a container management platform 
 
 ## Latest Release
 
-* Latest - v2.3.5 - `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.3.5).
+* Latest - v2.5.3 - `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.3).
 
-* Stable - v2.3.5 - `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.3.5).
+* Stable - v2.5.3 - `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.3).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
 ## Quick Start
 
-    sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher
+    sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --privileged rancher/rancher
 
 Open your browser to https://localhost
 
@@ -68,7 +68,7 @@ For security issues, please email security@rancher.com instead of posting a publ
 
 # License
 
-Copyright (c) 2014-2019 [Rancher Labs, Inc.](http://rancher.com)
+Copyright (c) 2014-2020 [Rancher Labs, Inc.](http://rancher.com)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

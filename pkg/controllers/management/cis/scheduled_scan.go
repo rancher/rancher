@@ -7,9 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/controllers/user/cis"
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	"github.com/rancher/rancher/pkg/controllers/managementuser/cis"
+	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -164,11 +166,11 @@ func checkAndLaunchScan(cluster *v3.Cluster,
 	clusterScanClient v3.ClusterScanInterface,
 	clusterInfo *scheduleInfo,
 ) (*v3.ClusterScan, error) {
-	var cisScanConfig *v3.CisScanConfig
+	var cisScanConfig *v32.CisScanConfig
 	if cluster.Spec.ScheduledClusterScan.ScanConfig == nil ||
 		cluster.Spec.ScheduledClusterScan.ScanConfig.CisScanConfig == nil {
-		cisScanConfig = &v3.CisScanConfig{
-			Profile: v3.CisScanProfileTypePermissive,
+		cisScanConfig = &v32.CisScanConfig{
+			Profile: v32.CisScanProfileTypePermissive,
 		}
 	} else {
 		cisScanConfig = cluster.Spec.ScheduledClusterScan.ScanConfig.CisScanConfig

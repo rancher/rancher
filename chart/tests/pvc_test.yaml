@@ -1,0 +1,36 @@
+suite: Test persistentVolumeClaim
+templates:
+- pvc.yaml
+tests:
+- it: should create custom-logos pvc if customLogos.enabled and customLogos.volumeKind persistentVolumeClaim
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: persistentVolumeClaim
+  asserts:
+  - equal:
+      path: metadata.name
+      value: RELEASE-NAME-rancher-custom-logos
+- it: should not create custom-logos pvc if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeName 
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: persistentVolumeClaim
+    customLogos.volumeName: existing-pvc
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: pvc.yaml
+- it: should not create custom-logos pvc if not customLogos.enabled and customLogos.volumeKind=configMap
+  set:
+    customLogos.enabled: true
+    customLogos.volumeKind: configMap
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: pvc.yaml
+- it: should not create custom-logos pvc if not customLogos.enabled
+  set:
+    customLogos.enabled: false
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: pvc.yaml

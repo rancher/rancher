@@ -415,5 +415,5 @@ def validate_edit_global_role(token, global_role, permission=False):
     gr = client.reload(global_role)
     assert gr.newUserDefault is False
     # check that there is no rule left
-    assert gr.rules is None
+    assert (gr.rules is None or gr.rules == [])
     return gr

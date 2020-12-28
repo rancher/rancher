@@ -9,21 +9,27 @@ import (
 	"strings"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/randomtoken"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -35,6 +41,31 @@ const (
 	grbByUserIndex               = "auth.management.cattle.io/grbByUser"
 	roleTemplatesRequired        = "authz.management.cattle.io/creator-role-bindings"
 )
+
+func NewUserManagerNoBindings(scaledContext *config.ScaledContext) (user.Manager, error) {
+	userInformer := scaledContext.Management.Users("").Controller().Informer()
+	userIndexers := map[string]cache.IndexFunc{
+		userByPrincipalIndex: userByPrincipal,
+	}
+	if err := userInformer.AddIndexers(userIndexers); err != nil {
+		return nil, err
+	}
+
+	return &userManager{
+		users:       scaledContext.Management.Users(""),
+		userIndexer: userInformer.GetIndexer(),
+		tokens:      scaledContext.Management.Tokens(""),
+		tokenLister: scaledContext.Management.Tokens("").Controller().Lister(),
+		rbacClient:  scaledContext.RBAC,
+	}, nil
+}
+
+var backoff = wait.Backoff{
+	Duration: 100 * time.Millisecond,
+	Factor:   1,
+	Jitter:   0,
+	Steps:    7,
+}
 
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	userInformer := scaledContext.Management.Users("").Controller().Informer()
@@ -70,6 +101,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	}
 
 	return &userManager{
+		manageBindings:           true,
 		users:                    scaledContext.Management.Users(""),
 		userIndexer:              userInformer.GetIndexer(),
 		crtbIndexer:              crtbInformer.GetIndexer(),
@@ -86,6 +118,8 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 }
 
 type userManager struct {
+	// manageBinding means whether or not we gr, grb, crtb, and prtb exist in the cluster
+	manageBindings           bool
 	users                    v3.UserInterface
 	globalRoleBindings       v3.GlobalRoleBindingInterface
 	globalRoleLister         v3.GlobalRoleLister
@@ -188,6 +222,7 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 	return false, errors.Errorf("Unsupported accessMode: %v", accessMode)
 }
 
+// creates tokens with 0 ttl and returns token in 'token.Name:token.Token' format
 func (m *userManager) EnsureToken(tokenName, description, kind, userName string) (string, error) {
 	return m.EnsureClusterToken("", tokenName, description, kind, userName)
 }
@@ -243,6 +278,143 @@ func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, ki
 	return token.Name + ":" + token.Token, nil
 }
 
+func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, ttl time.Duration, useExisting bool) (*v3.Token, error) {
+	key, err := randomtoken.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token key %v", err)
+	}
+
+	tokenTTL, err := tokens.ValidateMaxTTL(ttl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate token ttl %v", err)
+	}
+
+	token := &v3.Token{
+		ObjectMeta: v1.ObjectMeta{
+			Name: tokenName,
+			Labels: map[string]string{
+				tokens.UserIDLabel:    userName,
+				tokens.TokenKindLabel: kind,
+			},
+		},
+		Description:  description,
+		UserID:       userName,
+		AuthProvider: "local",
+		IsDerived:    true,
+		Token:        key,
+		ClusterName:  clusterName,
+	}
+
+	if tokenTTL.Minutes() > 0 {
+		token.TTLMillis = tokenTTL.Milliseconds()
+	}
+
+	logrus.Infof("Creating token for user %v", userName)
+	createdToken, err := m.tokens.Create(token)
+	if err == nil {
+		return createdToken, nil
+	}
+	if !apierrors.IsAlreadyExists(err) {
+		return nil, err
+	}
+	if useExisting {
+		return m.tokens.Get(tokenName, v1.GetOptions{})
+	}
+	// retry if can't use existing token
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		createdToken, err = m.tokens.Create(token)
+		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		token = createdToken
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+// creates kubeconfig tokens with KubeconfigTokenTTL and regenerates if existing token expired
+func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string) (*v3.Token, error) {
+	token, err := m.tokenLister.Get("", tokenName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	tokenTTL, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse setting [%s]: %v", settings.KubeconfigTokenTTLMinutes.Name, err)
+	}
+
+	if token == nil {
+		createdToken, err := m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, tokenTTL, true)
+		if err != nil {
+			return nil, err
+		}
+		token = createdToken
+	}
+
+	if token != nil && tokenUtil.IsExpired(*token) {
+		logrus.Debugf("getToken: deleting expired token %s", tokenName)
+		err := m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		token, err = m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, tokenTTL, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if token.ExpiresAt != "" {
+		return token, nil
+	}
+
+	// SetTokenExpiresAt requires creationTS, so can only be set post create
+	tokenCopy := token.DeepCopy()
+	tokenUtil.SetTokenExpiresAt(tokenCopy)
+
+	token, err = m.tokens.Update(tokenCopy)
+	if err != nil {
+		if !apierrors.IsConflict(err) {
+			return nil, fmt.Errorf("getToken: updating token [%s] failed [%v]", tokenName, err)
+		}
+
+		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+			token, err = m.tokens.Get(tokenName, v1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			if token.ExpiresAt == "" {
+				tokenCopy := token.DeepCopy()
+				tokenUtil.SetTokenExpiresAt(tokenCopy)
+
+				token, err = m.tokens.Update(tokenCopy)
+				if err != nil {
+					logrus.Debugf("getToken: updating token [%s] failed [%v]", tokenName, err)
+					if apierrors.IsConflict(err) {
+						return false, nil
+					}
+					return false, err
+				}
+			}
+			return true, nil
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("getToken: retry updating token [%s] failed [%v]", tokenName, err)
+		}
+	}
+
+	logrus.Debugf("getToken: token %s expiresAt %s", token.Name, token.ExpiresAt)
+	return token, nil
+}
+
 func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, error) {
 	var user *v3.User
 	var err error
@@ -270,7 +442,7 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 			return user, nil
 		}
 
-		if v3.UserConditionInitialRolesPopulated.IsTrue(user) {
+		if v32.UserConditionInitialRolesPopulated.IsTrue(user) {
 			// The users global role bindings were already created. They can differ
 			// from what is in the annotation if they were updated manually.
 			return user, nil
@@ -322,6 +494,10 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 }
 
 func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error {
+	if !m.manageBindings {
+		return nil
+	}
+
 	roleName := userName + "-view"
 	bindingName := "grb-" + roleName
 
@@ -394,6 +570,10 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 }
 
 func (m *userManager) createUsersBindings(user *v3.User) error {
+	if !m.manageBindings {
+		return nil
+	}
+
 	roleMap := make(map[string][]string)
 	err := json.Unmarshal([]byte(user.Annotations[roleTemplatesRequired]), &roleMap)
 	if err != nil {
@@ -452,7 +632,7 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 		user.Annotations[roleTemplatesRequired] = rtr
 
 		if reflect.DeepEqual(roleMap["required"], createdRoles) {
-			v3.UserConditionInitialRolesPopulated.True(user)
+			v32.UserConditionInitialRolesPopulated.True(user)
 		}
 
 		_, err = m.users.Update(user)
@@ -472,6 +652,10 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 }
 
 func (m *userManager) createUsersRoleAnnotation() (map[string]string, error) {
+	if !m.manageBindings {
+		return nil, nil
+	}
+
 	roleMap := make(map[string][]string)
 
 	roles, err := m.globalRoleLister.List("", labels.NewSelector())
@@ -527,6 +711,10 @@ func (m *userManager) checkCache(principalName string) (*v3.User, error) {
 }
 
 func (m *userManager) userExistsInClusterOrProject(userNameAndPrincipals []string) (bool, error) {
+	if !m.manageBindings {
+		return false, nil
+	}
+
 	for _, principal := range userNameAndPrincipals {
 		crtbs, err := m.crtbIndexer.ByIndex(crtbsByPrincipalAndUserIndex, principal)
 		if err != nil {
@@ -582,7 +770,18 @@ func userByPrincipal(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 
-	return u.PrincipalIDs, nil
+	match := false
+	for _, id := range u.PrincipalIDs {
+		if strings.HasPrefix(id, "local://") {
+			match = true
+			break
+		}
+	}
+
+	if match {
+		return u.PrincipalIDs, nil
+	}
+	return append(u.PrincipalIDs, "local://"+u.Name), nil
 }
 
 func crtbsByPrincipalAndUser(obj interface{}) ([]string, error) {

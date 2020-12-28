@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/minio/minio-go"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +61,7 @@ func (j *Engine) getMinioClient(ns string) (*minio.Client, error) {
 
 		j.HTTPClient = &http.Client{
 			Transport: &http.Transport{
-				Dial: dial,
+				DialContext: dial,
 			},
 			Timeout: 15 * time.Second,
 		}

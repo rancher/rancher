@@ -7,15 +7,16 @@ import (
 	"strconv"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/machine/libmachine/drivers/plugin/localbinary"
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	cli "github.com/rancher/machine/libmachine/mcnflag"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
-func FlagToField(flag cli.Flag) (string, v3.Field, error) {
-	field := v3.Field{
+func FlagToField(flag cli.Flag) (string, v32.Field, error) {
+	field := v32.Field{
 		Create: true,
 		Update: true,
 		Type:   "string",

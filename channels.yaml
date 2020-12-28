@@ -1,0 +1,10 @@
+channels:
+- name: latest
+  latestRegexp: .*
+  excludeRegexp: ^[^+]+-
+- name: testing
+  latestRegexp: .*
+github:
+  owner: rancher
+  repo: rancher
+redirectBase: https://github.com/rancher/rancher/releases/tag/
