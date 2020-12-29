@@ -548,6 +548,10 @@ def deploy_airgap_k3s_cluster(bastion_node, ag_nodes):
 
 def deploy_airgap_rancher(bastion_node):
     ag_node = prepare_airgap_node(bastion_node, 1)[0]
+    if "v2.5" in RANCHER_SERVER_VERSION or "master" in RANCHER_SERVER_VERSION:
+        privileged = "--privileged"
+    else:
+        privileged = ""
     if RANCHER_HA_CERT_OPTION == 'byo-valid':
         write_cert_command = "cat <<EOT >> fullchain.pem\n{}\nEOT".format(
             base64.b64decode(RANCHER_VALID_TLS_CERT).decode("utf-8"))
@@ -558,22 +562,22 @@ def deploy_airgap_rancher(bastion_node):
         run_command_on_airgap_node(bastion_node, ag_node,
                                    write_key_command)
         deploy_rancher_command = \
-            'sudo docker run -d --restart=unless-stopped ' \
+            'sudo docker run -d {} --restart=unless-stopped ' \
             '-p 80:80 -p 443:443 ' \
             '-v ${{PWD}}/fullchain.pem:/etc/rancher/ssl/cert.pem ' \
             '-v ${{PWD}}/privkey.pem:/etc/rancher/ssl/key.pem ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
             '-e CATTLE_SYSTEM_CATALOG=bundled ' \
             '{}/rancher/rancher:{} --no-cacerts'.format(
-                bastion_node.host_name, bastion_node.host_name,
+                privileged, bastion_node.host_name, bastion_node.host_name,
                 RANCHER_SERVER_VERSION)
     else:
         deploy_rancher_command = \
-            'sudo docker run -d --restart=unless-stopped ' \
+            'sudo docker run -d {} --restart=unless-stopped ' \
             '-p 80:80 -p 443:443 ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
             '-e CATTLE_SYSTEM_CATALOG=bundled {}/rancher/rancher:{}'.format(
-                bastion_node.host_name, bastion_node.host_name,
+                privileged, bastion_node.host_name, bastion_node.host_name,
                 RANCHER_SERVER_VERSION)
     deploy_result = run_command_on_airgap_node(bastion_node, ag_node,
                                                deploy_rancher_command,
