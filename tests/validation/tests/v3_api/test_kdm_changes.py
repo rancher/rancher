@@ -54,7 +54,7 @@ def test_clusters_for_kdm():
             default_k8s_versions = k8s_v.split(",")
 
     else:
-        default_k8s_versions = [K8S_VERSION]
+        default_k8s_versions = K8S_VERSION.split(",")
     list_process = []
     network_plugins = NETWORK_PLUGINS
     dns_providers = DNS_PROVIDERS
