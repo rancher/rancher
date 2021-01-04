@@ -76,11 +76,6 @@ This step is only required to use certificates issued by Rancher’s generated C
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
   --set hostname=rancher.my.org
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 - [Let’s Encrypt](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
@@ -91,11 +86,6 @@ helm install rancher rancher-latest/rancher \
   --set hostname=rancher.my.org \
   --set ingress.tls.source=letsEncrypt \
   --set letsEncrypt.email=me@example.org
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 - [Certificates from Files](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
@@ -115,11 +105,6 @@ helm install rancher rancher-latest/rancher \
   --set hostname=rancher.my.org \
   --set ingress.tls.source=secret \
   --set privateCA=true
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 #### Verify that the Rancher Server is Successfully Deployed
