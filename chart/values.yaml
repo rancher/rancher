@@ -25,6 +25,11 @@ addLocal: "true"
 # Important: update pkg/image/export/main.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
 busyboxImage: busybox
 
+# Override imagePullPolicy for busybox images
+# options: Always, Never, IfNotPresent
+# Defaults to IfNotPresent
+# busyboxImagePullPolicy: <pullPolicy>
+
 # Add debug flag to Rancher server
 debug: false
 
