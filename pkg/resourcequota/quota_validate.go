@@ -1,6 +1,7 @@
 package resourcequota
 
 import (
+	"errors"
 	"sort"
 	"strings"
 	"sync"
@@ -12,6 +13,8 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/cache"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/quota/v1"
 )
 
@@ -27,6 +30,21 @@ func GetProjectLock(projectID string) *sync.Mutex {
 	}
 	mu := val.(*sync.Mutex)
 	return mu
+}
+
+func ValidateLimits(nsLimit *v32.ResourceQuotaLimit) error {
+	nsResourceList, err := ConvertLimitToResourceList(nsLimit)
+	if err != nil {
+		return err
+	}
+	allErrs := field.ErrorList{}
+	for _, v := range nsResourceList {
+		allErrs = append(allErrs, validation.ValidateNonnegativeQuantity(v, field.NewPath("limitsCpu", "limitsMemory"))...)
+	}
+	if len(allErrs) > 0 {
+		return errors.New(allErrs[0].Type.String())
+	}
+	return nil
 }
 
 func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, string, error) {
