@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	steveauth "github.com/rancher/steve/pkg/auth"
+
 	gmux "github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -53,6 +55,7 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 		SubjectAccessReviewClient: sar,
 		AllowCacheTTL:             time.Second * time.Duration(settings.AuthorizationCacheTTLSeconds.GetInt()),
 		DenyCacheTTL:              time.Second * time.Duration(settings.AuthorizationDenyCacheTTLSeconds.GetInt()),
+		WebhookRetryBackoff:       &steveauth.WebhookBackoff,
 	}
 
 	authorizer, err := cfg.New()

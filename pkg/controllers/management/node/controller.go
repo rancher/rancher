@@ -798,10 +798,10 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		logrus.Debugf("node [%s] has no NodeDrainInput, creating one with 60s timeout",
 			nodeCopy.Spec.RequestedHostname)
 		nodeCopy.Spec.NodeDrainInput = &rketypes.NodeDrainInput{
-			Force:           false,
-			DeleteLocalData: false,
-			GracePeriod:     60,
-			Timeout:         60,
+			Force:              false,
+			DeleteEmptyDirData: false,
+			GracePeriod:        60,
+			Timeout:            60,
 		}
 	}
 

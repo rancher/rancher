@@ -6,13 +6,12 @@ import (
 	"sync"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/cache"
-	"k8s.io/kubernetes/pkg/quota/v1"
+	quota "k8s.io/apiserver/pkg/quota/v1"
 )
 
 var (
