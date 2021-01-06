@@ -1,18 +1,16 @@
 package resourcequota
 
 import (
-	"reflect"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"fmt"
+	"reflect"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	quota "k8s.io/apiserver/pkg/quota/v1"
 	clientcache "k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/quota/v1"
 )
 
 /*
