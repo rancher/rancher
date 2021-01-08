@@ -29,8 +29,8 @@ RANCHER_PRIVATE_CA_CERT = os.environ.get("RANCHER_PRIVATE_CA_CERT")
 RANCHER_LOCAL_CLUSTER_TYPE = os.environ.get("RANCHER_LOCAL_CLUSTER_TYPE")
 RANCHER_ADD_CUSTOM_CLUSTER = os.environ.get("RANCHER_ADD_CUSTOM_CLUSTER",
                                             "True")
-KUBERNETES_VERSION = os.environ.get("RANCHER_LOCAL_KUBERNETES_VERSION",
-                                            "")
+KUBERNETES_VERSION = os.environ.get("RANCHER_LOCAL_KUBERNETES_VERSION","")
+RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
 
 kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
 export_cmd = "export KUBECONFIG=" + kubeconfig_path
