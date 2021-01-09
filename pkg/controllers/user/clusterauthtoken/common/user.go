@@ -9,8 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewClusterAuthToken(token *managementv3.Token) (*clusterv3.ClusterAuthToken, error) {
-	hash, err := CreateHash(token.Token)
+func NewClusterAuthToken(token *managementv3.Token, rawTokenValue string) (*clusterv3.ClusterAuthToken, error) {
+	hash, err := CreateHash(rawTokenValue)
 	if err != nil {
 		return nil, err
 	}

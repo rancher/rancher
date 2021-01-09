@@ -21,34 +21,34 @@ func getToken() managementv3.Token {
 
 func TestValidUser(t *testing.T) {
 	token := getToken()
-	clusterAuthToken, err := NewClusterAuthToken(&token)
+	clusterAuthToken, err := NewClusterAuthToken(&token, token.Token)
 	assert.Nil(t, err)
 	assert.Nil(t, VerifyClusterAuthToken(token.Token, clusterAuthToken))
 }
 
 func TestInvalidPassword(t *testing.T) {
 	token := getToken()
-	clusterAuthToken, _ := NewClusterAuthToken(&token)
+	clusterAuthToken, _ := NewClusterAuthToken(&token, token.Token)
 	assert.NotNil(t, VerifyClusterAuthToken(token.Token+":wrong!", clusterAuthToken))
 }
 
 func TestExpired(t *testing.T) {
 	token := getToken()
 	token.ExpiresAt = time.Now().Add(-time.Minute).Format(time.RFC3339)
-	clusterAuthToken, _ := NewClusterAuthToken(&token)
+	clusterAuthToken, _ := NewClusterAuthToken(&token, token.Token)
 	assert.NotNil(t, VerifyClusterAuthToken(token.Token, clusterAuthToken))
 }
 
 func TestNotExpired(t *testing.T) {
 	token := getToken()
 	token.ExpiresAt = time.Now().Add(time.Minute).Format(time.RFC3339)
-	clusterAuthToken, _ := NewClusterAuthToken(&token)
+	clusterAuthToken, _ := NewClusterAuthToken(&token, token.Token)
 	assert.Nil(t, VerifyClusterAuthToken(token.Token, clusterAuthToken))
 }
 
 func TestInvalidExpiresAt(t *testing.T) {
 	token := getToken()
 	token.ExpiresAt = "some invalid time stamp"
-	clusterAuthToken, _ := NewClusterAuthToken(&token)
+	clusterAuthToken, _ := NewClusterAuthToken(&token, token.Token)
 	assert.NotNil(t, VerifyClusterAuthToken(token.Token, clusterAuthToken))
 }
