@@ -33,6 +33,7 @@ steps:
 - name: docker-publish-head
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -56,6 +57,7 @@ steps:
 - name: docker-publish-head-agent
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -80,6 +82,7 @@ steps:
 - name: docker-publish-head-runtime
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -122,6 +125,7 @@ steps:
 - name: docker-publish
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
@@ -141,6 +145,7 @@ steps:
 - name: docker-publish-agent
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
@@ -161,6 +166,7 @@ steps:
 - name: docker-publish-runtime
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
@@ -276,6 +282,7 @@ steps:
 - name: docker-publish-head
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -299,6 +306,7 @@ steps:
 - name: docker-publish-head-agent
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -323,6 +331,7 @@ steps:
 - name: docker-publish
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"
@@ -342,6 +351,7 @@ steps:
 - name: docker-publish-agent
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"
@@ -420,6 +430,7 @@ steps:
   - name: docker-publish-head-agent
     image: plugins/docker:windows-1809-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1809
         - ARCH=amd64
@@ -447,6 +458,7 @@ steps:
   - name: docker-publish-agent
     image: plugins/docker:windows-1809-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1809
         - ARCH=amd64
@@ -528,6 +540,7 @@ steps:
   - name: docker-publish-head-agent
     image: plugins/docker:windows-1903-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1903
         - ARCH=amd64
@@ -555,6 +568,7 @@ steps:
   - name: docker-publish-agent
     image: plugins/docker:windows-1903-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1903
         - ARCH=amd64
@@ -637,6 +651,7 @@ steps:
   - name: docker-publish-head-agent
     image: plugins/docker:windows-1909-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1909
         - ARCH=amd64
@@ -664,6 +679,7 @@ steps:
   - name: docker-publish-agent
     image: plugins/docker:windows-1909-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1909
         - ARCH=amd64
@@ -754,6 +770,7 @@ steps:
   - name: docker-publish-head-agent
     image: luthermonson/drone-docker:2004
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=2004
         - ARCH=amd64
@@ -781,6 +798,7 @@ steps:
   - name: docker-publish-agent
     image: luthermonson/drone-docker:2004
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=2004
         - ARCH=amd64
@@ -870,6 +888,7 @@ steps:
   - name: docker-publish-head-agent
     image: luthermonson/drone-docker:20H2
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=20H2
         - ARCH=amd64
@@ -897,6 +916,7 @@ steps:
   - name: docker-publish-agent
     image: luthermonson/drone-docker:20H2
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=20H2
         - ARCH=amd64
