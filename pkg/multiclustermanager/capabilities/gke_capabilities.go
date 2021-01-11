@@ -4,13 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
-	"os"
-	"strings"
 
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -44,46 +39,12 @@ func validateCapabilitiesRequestBody(writer http.ResponseWriter, body *capabilit
 }
 
 func getOAuthClient(ctx context.Context, credentialContent string) (*http.Client, error) {
-	// The google SDK has no sane way to pass in a TokenSource give all the different types (user, service account, etc)
-	// So we actually set an environment variable and then unset it
-	gke.EnvMutex.Lock()
-	locked := true
-	setEnv := false
-	cleanup := func() {
-		if setEnv {
-			os.Unsetenv(defaultCredentialEnv)
-		}
-
-		if locked {
-			gke.EnvMutex.Unlock()
-			locked = false
-		}
-	}
-	defer cleanup()
-
-	file, err := ioutil.TempFile("", "credential-file")
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove(file.Name())
-	defer file.Close()
-
-	if _, err := io.Copy(file, strings.NewReader(credentialContent)); err != nil {
-		return nil, err
-	}
-
-	setEnv = true
-	os.Setenv(defaultCredentialEnv, file.Name())
-
-	ts, err := google.DefaultTokenSource(ctx, container.CloudPlatformScope)
+	ts, err := google.CredentialsFromJSON(ctx, []byte(credentialContent), container.CloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}
 
-	// Unlocks
-	cleanup()
-
-	return oauth2.NewClient(ctx, ts), nil
+	return oauth2.NewClient(ctx, ts.TokenSource), nil
 }
 
 func handleErr(writer http.ResponseWriter, originalErr error) {
