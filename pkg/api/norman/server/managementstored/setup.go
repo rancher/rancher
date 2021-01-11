@@ -257,8 +257,10 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	handler := ccluster.ActionHandler{
 		NodepoolGetter:                managementContext.Management,
 		ClusterClient:                 managementContext.Management.Clusters(""),
+		CatalogManager:                managementContext.CatalogManager,
 		UserMgr:                       managementContext.UserManager,
 		ClusterManager:                clusterManager,
+		CatalogTemplateVersionLister:  managementContext.Management.CatalogTemplateVersions("").Controller().Lister(),
 		NodeTemplateGetter:            managementContext.Management,
 		BackupClient:                  managementContext.Management.EtcdBackups(""),
 		ClusterScanClient:             managementContext.Management.ClusterScans(""),
@@ -518,10 +520,13 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 		Store:                 schema.Store,
 		Apps:                  management.Project.Apps("").Controller().Lister(),
 		TemplateVersionLister: management.Management.CatalogTemplateVersions("").Controller().Lister(),
+		CatalogManager:        management.CatalogManager,
+		ClusterLister:         management.Management.Clusters("").Controller().Lister(),
 	}
 	schema.Store = store
 	wrapper := app.Wrapper{
 		Clusters:              management.Management.Clusters(""),
+		CatalogManager:        management.CatalogManager,
 		TemplateVersionClient: management.Management.CatalogTemplateVersions(""),
 		TemplateVersionLister: management.Management.CatalogTemplateVersions("").Controller().Lister(),
 		KubeConfigGetter:      kubeConfigGetter,
@@ -782,6 +787,7 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		ClusterLister:                 management.Management.Clusters("").Controller().Lister(),
 		Apps:                          management.Project.Apps(""),
 		TemplateVersionLister:         management.Management.CatalogTemplateVersions("").Controller().Lister(),
+		CatalogManager:                management.CatalogManager,
 	}
 	schema.Formatter = wrapper.Formatter
 	schema.ActionHandler = wrapper.ActionHandler

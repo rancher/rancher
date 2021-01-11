@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	hcommon "github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
@@ -20,11 +21,13 @@ import (
 type templateStore struct {
 	types.Store
 	CatalogTemplateVersionLister v3.CatalogTemplateVersionLister
+	CatalogManager               manager.CatalogManager
 }
 
 func GetTemplateStore(ctx context.Context, managementContext *config.ScaledContext) types.Store {
 	ts := templateStore{
 		CatalogTemplateVersionLister: managementContext.Management.CatalogTemplateVersions("").Controller().Lister(),
+		CatalogManager:               managementContext.CatalogManager,
 	}
 
 	s := &transform.Store{
@@ -89,7 +92,7 @@ func (t *templateStore) templateVersionForRancherVersion(apiContext *types.APICo
 		return true
 	}
 
-	err = catUtil.ValidateRancherVersion(template)
+	err = t.CatalogManager.ValidateRancherVersion(template)
 	if err != nil {
 		return false
 	}

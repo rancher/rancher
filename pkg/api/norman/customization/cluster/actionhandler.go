@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -19,9 +20,11 @@ import (
 type ActionHandler struct {
 	NodepoolGetter                v3.NodePoolsGetter
 	ClusterClient                 v3.ClusterInterface
+	CatalogManager                manager.CatalogManager
 	NodeTemplateGetter            v3.NodeTemplatesGetter
 	UserMgr                       user.Manager
 	ClusterManager                *clustermanager.Manager
+	CatalogTemplateVersionLister  v3.CatalogTemplateVersionLister
 	BackupClient                  v3.EtcdBackupInterface
 	ClusterScanClient             v3.ClusterScanInterface
 	ClusterTemplateClient         v3.ClusterTemplateInterface

@@ -715,24 +715,9 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node,
 	for name, quantity := range limits {
 		machine.Status.Limits[name] = quantity
 	}
-
-	if node.Labels != nil {
-		_, etcd := node.Labels["node-role.kubernetes.io/etcd"]
-		machine.Spec.Etcd = etcd
-		_, control := node.Labels["node-role.kubernetes.io/controlplane"]
-		_, master := node.Labels["node-role.kubernetes.io/master"]
-		if control || master {
-			machine.Spec.ControlPlane = true
-		}
-		_, worker := node.Labels["node-role.kubernetes.io/worker"]
-		machine.Spec.Worker = worker
-		if !machine.Spec.Worker && !machine.Spec.ControlPlane && !machine.Spec.Etcd {
-			machine.Spec.Worker = true
-		}
-	}
-
-	machine.Status.NodeAnnotations = node.Annotations
 	machine.Status.NodeLabels = node.Labels
+	determineNodeRoles(machine)
+	machine.Status.NodeAnnotations = node.Annotations
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Node"
@@ -850,4 +835,19 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func determineNodeRoles(machine *v3.Node) {
+	if machine.Status.NodeLabels != nil {
+		_, etcd := machine.Status.NodeLabels["node-role.kubernetes.io/etcd"]
+		_, control := machine.Status.NodeLabels["node-role.kubernetes.io/controlplane"]
+		_, master := machine.Status.NodeLabels["node-role.kubernetes.io/master"]
+		_, worker := machine.Status.NodeLabels["node-role.kubernetes.io/worker"]
+		machine.Spec.Etcd = etcd
+		machine.Spec.Worker = worker
+		machine.Spec.ControlPlane = control || master
+		if !machine.Spec.Worker && !machine.Spec.ControlPlane && !machine.Spec.Etcd {
+			machine.Spec.Worker = true
+		}
+	}
 }

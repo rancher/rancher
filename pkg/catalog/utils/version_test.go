@@ -3,12 +3,7 @@ package utils
 import (
 	"testing"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/stretchr/testify/assert"
-
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/settings"
 )
 
 func TestVersionBetween(t *testing.T) {
@@ -133,74 +128,4 @@ func TestVersionSatifiesRange(t *testing.T) {
 	testInvalidVersion(t, "versionInvalid-1.0", "<v1.0.0-validVersion")
 	testInvalidVersion(t, "versionInvalid-1.0", "<=v1.0.0-validVersion")
 
-}
-
-func TestLatestAvailableTemplateVersion(t *testing.T) {
-	template := &v3.CatalogTemplate{
-		Template: v3.Template{
-			Spec: v32.TemplateSpec{
-				Versions: []v32.TemplateVersionSpec{
-					{
-						ExternalID:        "catalog://?catalog=library&template=artifactory-ha&version=0.12.16",
-						Version:           "0.12.16",
-						RancherMinVersion: "v2.2.0",
-						RancherMaxVersion: "v2.3.0",
-					},
-					{
-						ExternalID:        "catalog://?catalog=library&template=artifactory-ha&version=0.12.15",
-						Version:           "0.12.15",
-						RancherMinVersion: "v2.1.0",
-						RancherMaxVersion: "v2.2.0",
-					},
-					{
-						ExternalID:        "catalog://?catalog=library&template=artifactory-ha&version=0.12.14",
-						Version:           "0.12.14",
-						RancherMinVersion: "v2.0.0",
-						RancherMaxVersion: "v2.1.0",
-					},
-				},
-			},
-		},
-	}
-
-	templateWithoutRancherVersion := &v3.CatalogTemplate{
-		Template: v3.Template{
-			Spec: v32.TemplateSpec{
-				Versions: []v32.TemplateVersionSpec{
-					{
-						ExternalID: "catalog://?catalog=library&template=artifactory-ha&version=0.12.16",
-						Version:    "0.12.16",
-					},
-					{
-						ExternalID: "catalog://?catalog=library&template=artifactory-ha&version=0.12.15",
-						Version:    "0.12.15",
-					},
-					{
-						ExternalID: "catalog://?catalog=library&template=artifactory-ha&version=0.12.14",
-						Version:    "0.12.14",
-					},
-				},
-			},
-		},
-	}
-
-	testLatestAvailableTemplateVersion(t, "v2.1.0", "0.12.15", template)
-	testLatestAvailableTemplateVersion(t, "dev", "0.12.16", template)
-	testLatestAvailableTemplateVersion(t, "master", "0.12.16", template)
-	testLatestAvailableTemplateVersion(t, "master-head", "0.12.16", template)
-	testLatestAvailableTemplateVersion(t, "", "0.12.16", template)
-
-	testLatestAvailableTemplateVersion(t, "v2.1.0", "0.12.16", templateWithoutRancherVersion)
-	testLatestAvailableTemplateVersion(t, "dev", "0.12.16", templateWithoutRancherVersion)
-	testLatestAvailableTemplateVersion(t, "master", "0.12.16", templateWithoutRancherVersion)
-	testLatestAvailableTemplateVersion(t, "master-head", "0.12.16", templateWithoutRancherVersion)
-	testLatestAvailableTemplateVersion(t, "", "0.12.16", templateWithoutRancherVersion)
-}
-
-func testLatestAvailableTemplateVersion(t *testing.T, serverVersion, expectedCatalogVersion string, template *v3.CatalogTemplate) {
-	err := settings.ServerVersion.Set(serverVersion)
-	assert.Nil(t, err)
-	templateVertion, err := LatestAvailableTemplateVersion(template)
-	assert.Nil(t, err)
-	assert.Equal(t, expectedCatalogVersion, templateVertion.Version)
 }

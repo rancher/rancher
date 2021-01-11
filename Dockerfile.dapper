@@ -4,7 +4,7 @@ FROM ubuntu:20.04
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher45
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher46
 ENV CATTLE_K3S_VERSION v1.18.8+k3s1
 ENV CATTLE_ETCD_VERSION v3.4.3
 ENV CATTLE_CHANNELSERVER_VERSION v0.5.0
@@ -90,6 +90,9 @@ RUN curl -sLf ${!CHANNELSERVER_URL} > /usr/bin/channelserver && \
 RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt
 
 RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
+
+ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_${ARCH}
+RUN wget -O - ${YQ_URL} > /usr/bin/yq && chmod +x /usr/bin/yq
 
 ENV KUBECTL_URL=https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/${ARCH}/kubectl
 RUN wget -O - ${KUBECTL_URL} > /usr/bin/kubectl && chmod +x /usr/bin/kubectl

@@ -1,6 +1,6 @@
 from .common import random_str
 from rancher import ApiError
-from .conftest import wait_for
+from .conftest import wait_for, wait_until_available, user_project_client
 
 import time
 import pytest
@@ -341,6 +341,74 @@ def test_workload_redeploy(admin_pc, remove_resource):
              fail_handler=lambda: 'Timed out waiting for timestamp reset')
 
 
+def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
+                                           user_mc, user_factory):
+    """Tests workload actions with a read-only user and a member user."""
+    client = admin_pc.client
+    project = admin_pc.project
+    user = user_mc
+    user_member = user_factory()
+
+    ns = admin_pc.cluster.client.create_namespace(
+        name=random_str(),
+        projectId=project.id)
+    remove_resource(ns)
+
+    # Create a read-only user binding.
+    prtb1 = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user.user.id,
+        projectId=project.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb1)
+    wait_until_available(user.client, project)
+
+    # Then, create a member user binding.
+    prtb2 = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_member.user.id,
+        projectId=project.id,
+        roleTemplateId="project-member")
+    remove_resource(prtb2)
+    wait_until_available(user_member.client, project)
+    user_pc = user_project_client(user, project)
+    user_member_pc = user_project_client(user_member, project)
+
+    # Admin user creates the workload.
+    workload_name = random_str()
+    workload = client.create_workload(
+        name=workload_name,
+        namespaceId=ns.id,
+        scale=1,
+        containers=[{
+            'name': 'foo',
+            'image': 'nginx:1.18',
+        }])
+    remove_resource(workload)
+    wait_for_workload(client, workload.id)
+
+    # Admin user updates the workload to yield a rollback option. We change the
+    # name below.
+    workload.containers = [{
+        'name': 'foo',
+        'image': 'nginx:1.19',
+    }]
+    workload = client.update_by_id_workload(workload.id, workload)
+    wait_for_workload(client, workload.id)
+    workload = client.reload(workload)
+    original_rev_id = workload.revisions().data[0].id
+
+    # Read-only users should receive a 404 error.
+    with pytest.raises(ApiError) as e:
+        user_pc.action(obj=workload, action_name="rollback",
+                       replicaSetId=original_rev_id)
+    assert e.value.error.status == 404
+
+    # Member users will be able to perform the rollback.
+    user_member_pc.action(obj=workload, action_name="rollback",
+                          replicaSetId=original_rev_id)
+
+
 def wait_for_service_create(client, name, timeout=30):
     start = time.time()
     services = client.list_service(name=name, kind="ClusterIP")
@@ -372,3 +440,17 @@ def wait_for_service_cluserip_reset(client, name, timeout=30):
         if time.time() - start > timeout:
             raise Exception('Timeout waiting for workload service')
     return services.data[0]
+
+
+def wait_for_workload(client, workload_id, timeout=30):
+    """Wait for a given workload to be active."""
+    def _get_result():
+        try:
+            return client.by_id_workload(workload_id)["state"]
+        except KeyError:
+            return ""
+    start = time.time()
+    while _get_result() != "active":
+        time.sleep(.5)
+        if time.time() - start > timeout:
+            raise Exception("Timeout waiting for workload")

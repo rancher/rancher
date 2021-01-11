@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 
@@ -35,7 +36,7 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 		return nil, "", err
 	}
 	if !u.IsAbs() {
-		base, err := url.Parse(repoURL)
+		base, err := url.Parse(strings.TrimSuffix(repoURL, "/") + "/")
 		if err != nil {
 			return nil, "", err
 		}
@@ -75,7 +76,7 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 		return nil, err
 	}
 	if !u.IsAbs() {
-		base, err := url.Parse(repoURL)
+		base, err := url.Parse(strings.TrimSuffix(repoURL, "/") + "/")
 		if err != nil {
 			return nil, err
 		}

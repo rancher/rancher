@@ -4,8 +4,6 @@ import (
 	"regexp"
 
 	"github.com/pkg/errors"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -90,17 +88,4 @@ func ValidateURL(pathURL string) error {
 		return errors.New("Invalid characters in url")
 	}
 	return nil
-}
-
-func GetSystemAppCatalogID(templateVersionID string, templateLister v3.CatalogTemplateLister) (string, error) {
-	template, err := templateLister.Get(namespace.GlobalNamespace, templateVersionID)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to find template by ID %s", templateVersionID)
-	}
-
-	templateVersion, err := LatestAvailableTemplateVersion(template)
-	if err != nil {
-		return "", err
-	}
-	return templateVersion.ExternalID, nil
 }

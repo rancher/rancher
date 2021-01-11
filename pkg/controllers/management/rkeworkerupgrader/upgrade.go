@@ -6,17 +6,16 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/docker/docker/pkg/locker"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	rkedefaults "github.com/rancher/rke/cluster"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -224,7 +223,7 @@ func (uh *upgradeHandler) getNodePlan(node *v3.Node, cluster *v3.Cluster) (*rket
 		nodePlan *rketypes.RKEConfigNodePlan
 		err      error
 	)
-	if nodeserver.IsNonWorker(node.Status.NodeConfig.Role) {
+	if nodehelper.IsNonWorker(node.Status.NodeConfig) {
 		nodePlan, err = uh.nonWorkerPlan(node, cluster)
 	} else {
 		nodePlan, err = uh.workerPlan(node, cluster)
@@ -257,7 +256,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 		clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy = &rketypes.NodeUpgradeStrategy{
 			MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
 			MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
-			Drain:                      false,
+			Drain:                      func() *bool { b := false; return &b }(),
 		}
 	}
 	if clusterCopy != nil {
@@ -276,7 +275,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	}
 
 	upgradeStrategy := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.UpgradeStrategy
-	toDrain := upgradeStrategy.Drain
+	toDrain := upgradeStrategy.Drain != nil && *upgradeStrategy.Drain
 
 	// get current upgrade status of nodes
 	status := uh.filterNodes(nodes, cluster.Status.NodeVersion, toDrain)
@@ -398,6 +397,10 @@ func (uh *upgradeHandler) toUpgradeCluster(cluster *v3.Cluster) (bool, bool, err
 		}
 
 		if node.Status.NodePlan == nil || v32.NodeConditionRegistered.IsUnknown(node) {
+			// enqueue if node plan isn't initialized yet
+			if node.Status.NodePlan == nil {
+				uh.nodes.Controller().Enqueue(node.Namespace, node.Name)
+			}
 			// node's not yet registered, change in its node plan should do nothing for cluster upgrade
 			continue
 		}

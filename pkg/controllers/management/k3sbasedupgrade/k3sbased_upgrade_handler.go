@@ -10,7 +10,6 @@ import (
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/rancher/rancher/pkg/catalog/utils"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
@@ -32,6 +31,11 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	if !isK3s && !isRke2 {
 		return cluster, nil
 	}
+	// Don't allow nil configs to continue for given cluster type
+	if (isK3s && cluster.Spec.K3sConfig == nil) || (isRke2 && cluster.Spec.Rke2Config == nil) {
+		return cluster, nil
+	}
+
 	var (
 		updateVersion string
 		strategy      v32.ClusterUpgradeStrategy
@@ -46,10 +50,6 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 
 	}
 	if updateVersion == "" {
-		return cluster, nil
-	}
-
-	if (isK3s && cluster.Spec.K3sConfig == nil) || (isRke2 && cluster.Spec.Rke2Config == nil) {
 		return cluster, nil
 	}
 
@@ -112,7 +112,7 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 		return err
 	}
 
-	latestTemplateVersion, err := utils.LatestAvailableTemplateVersion(template)
+	latestTemplateVersion, err := h.catalogManager.LatestAvailableTemplateVersion(template, clusterName)
 	if err != nil {
 		return err
 	}

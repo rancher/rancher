@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/managementagent"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/monitoring"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/agentupgrade"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/alert"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/approuter"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/certsexpiration"
@@ -78,6 +79,10 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 
 	if clusterRec.Spec.Internal {
 		err := managementagent.Register(ctx, cluster.UserOnlyContext())
+		if err != nil {
+			return err
+		}
+		err = agentupgrade.Register(ctx, cluster.UserOnlyContext())
 		if err != nil {
 			return err
 		}

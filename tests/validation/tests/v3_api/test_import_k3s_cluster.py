@@ -4,7 +4,7 @@ from .common import *  # NOQA
 RANCHER_REGION = os.environ.get("AWS_REGION")
 RANCHER_VPC_ID = os.environ.get("AWS_VPC")
 RANCHER_SUBNETS = os.environ.get("AWS_SUBNET")
-RANCHER_AWS_SG = os.environ.get("AWS_SG")
+RANCHER_AWS_SG = os.environ.get("AWS_SECURITY_GROUPS")
 RANCHER_AVAILABILITY_ZONE = os.environ.get("AWS_AVAILABILITY_ZONE")
 RANCHER_AWS_AMI = os.environ.get("AWS_AMI", "")
 RANCHER_AWS_USER = os.environ.get("AWS_USER", "ubuntu")

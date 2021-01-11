@@ -399,18 +399,13 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	}
 
 	if !createFromImport {
-		// validate either all networking fields are provided or no networking fields are provided
+		// If security groups are provided, then subnets must also be provided
 		securityGroups, _ := eksConfig["securityGroups"].([]interface{})
 		subnets, _ := eksConfig["subnets"].([]interface{})
 
-		allNetworkingFieldsProvided := len(subnets) != 0 && len(securityGroups) != 0
-		noNetworkingFieldsProvided := len(subnets) == 0 && len(securityGroups) == 0
-
-		if !(allNetworkingFieldsProvided || noNetworkingFieldsProvided) {
-			if !createFromImport {
-				return httperror.NewAPIError(httperror.InvalidBodyContent,
-					"must provide both networking fields (subnets, securityGroups) or neither")
-			}
+		if len(securityGroups) != 0 && len(subnets) == 0 {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				"subnets must be provided if security groups are provided")
 		}
 	}
 

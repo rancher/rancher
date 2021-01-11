@@ -17,9 +17,10 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/rbac"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -40,9 +41,11 @@ var backoff = wait.Backoff{
 }
 
 func (w Wrapper) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "rollback")
-	resource.AddAction(apiContext, addProjectsAction)
-	resource.AddAction(apiContext, removeProjectsAction)
+	if canUpdateMCA(apiContext, resource) == nil {
+		resource.AddAction(apiContext, "rollback")
+		resource.AddAction(apiContext, addProjectsAction)
+		resource.AddAction(apiContext, removeProjectsAction)
+	}
 	resource.Links["revisions"] = apiContext.URLBuilder.Link("revisions", resource)
 }
 
@@ -50,6 +53,9 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	var mcApp client.MultiClusterApp
 	if err := access.ByID(apiContext, &managementschema.Version, client.MultiClusterAppType, apiContext.ID, &mcApp); err != nil {
 		return err
+	}
+	if canUpdateMCA(apiContext, nil) != nil {
+		return httperror.NewAPIError(httperror.NotFound, "not found")
 	}
 	switch actionName {
 	case "rollback":
@@ -77,10 +83,11 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if obj.Status.RevisionName == revision.Name {
 			return nil
 		}
-		err = w.validateRancherVersion(revision.TemplateVersionName)
-		if err != nil {
+
+		if err := w.validateChartCompatibility(revision.TemplateVersionName, obj.Spec.Targets); err != nil {
 			return err
 		}
+
 		toUpdate := obj.DeepCopy()
 		toUpdate.Spec.TemplateVersionName = revision.TemplateVersionName
 		toUpdate.Spec.Answers = revision.Answers
@@ -276,7 +283,7 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) ([
 	return inputProjects, inputAnswers, nil
 }
 
-func (w Wrapper) validateRancherVersion(tempVersion string) error {
+func (w Wrapper) validateChartCompatibility(tempVersion string, targets []v32.Target) error {
 	parts := strings.Split(tempVersion, ":")
 	if len(parts) != 2 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid templateVersionId")
@@ -287,5 +294,19 @@ func (w Wrapper) validateRancherVersion(tempVersion string) error {
 		return err
 	}
 
-	return catUtil.ValidateRancherVersion(template)
+	if err := w.CatalogManager.ValidateRancherVersion(template); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
+	for _, target := range targets {
+		if err := w.CatalogManager.ValidateKubeVersion(template, target.ObjClusterName()); err != nil {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+		}
+	}
+	return nil
+}
+
+func canUpdateMCA(apiContext *types.APIContext, resource *types.RawResource) error {
+	return apiContext.AccessControl.CanDo(v3.MultiClusterAppGroupVersionKind.Group, v3.MultiClusterAppResource.Name,
+		"update", apiContext, rbac.ObjFromContext(apiContext, resource), apiContext.Schema)
 }

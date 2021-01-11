@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apiprojv3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	utils2 "github.com/rancher/rancher/pkg/app"
-	"github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/controllers/management/eksupstreamrefresh"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/aws-iam-authenticator/pkg/token"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -57,6 +59,12 @@ const (
 	importedAnno        = "eks.cattle.io/imported"
 )
 
+type eksOperatorValues struct {
+	HTTPProxy  string `json:"httpProxy,omitempty"`
+	HTTPSProxy string `json:"httpsProxy,omitempty"`
+	NoProxy    string `json:"noProxy,omitempty"`
+}
+
 type eksOperatorController struct {
 	clusterEnqueueAfter  func(name string, duration time.Duration)
 	secretsCache         wranglerv1.SecretCache
@@ -66,6 +74,7 @@ type eksOperatorController struct {
 	appClient            projectv3.AppInterface
 	nsClient             corev1.NamespaceInterface
 	clusterClient        v3.ClusterClient
+	catalogManager       manager.CatalogManager
 	systemAccountManager *systemaccount.Manager
 	dynamicClient        dynamic.NamespaceableResourceInterface
 }
@@ -87,6 +96,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		appClient:            mgmtCtx.Project.Apps(""),
 		nsClient:             mgmtCtx.Core.Namespaces(""),
 		clusterClient:        wContext.Mgmt.Cluster(),
+		catalogManager:       mgmtCtx.CatalogManager,
 		systemAccountManager: systemaccount.NewManager(mgmtCtx),
 		dynamicClient:        eksCCDynamicClient,
 	}
@@ -108,12 +118,12 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		var conditionErr error
 		if cluster.Spec.EKSConfig.Imported {
 			cluster, conditionErr = e.setFalse(cluster, apimgmtv3.ClusterConditionPending, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
-			if err != nil {
+			if conditionErr != nil {
 				return cluster, conditionErr
 			}
 		} else {
 			cluster, conditionErr = e.setFalse(cluster, apimgmtv3.ClusterConditionProvisioned, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
-			if err != nil {
+			if conditionErr != nil {
 				return cluster, conditionErr
 			}
 		}
@@ -481,7 +491,7 @@ func (e *eksOperatorController) deployEKSOperator() error {
 		return err
 	}
 
-	latestTemplateVersion, err := utils.LatestAvailableTemplateVersion(template)
+	latestTemplateVersion, err := e.catalogManager.LatestAvailableTemplateVersion(template, "local")
 	if err != nil {
 		return err
 	}
@@ -495,6 +505,11 @@ func (e *eksOperatorController) deployEKSOperator() error {
 
 	systemProjectID := ref.Ref(systemProject)
 	_, systemProjectName := ref.Parse(systemProjectID)
+
+	valuesYaml, err := generateValuesYaml()
+	if err != nil {
+		return err
+	}
 
 	app, err := e.appLister.Get(systemProjectName, eksOperator)
 	if err != nil {
@@ -528,18 +543,21 @@ func (e *eksOperatorController) deployEKSOperator() error {
 			},
 		}
 
+		desiredApp.Spec.ValuesYaml = valuesYaml
+
 		// k3s upgrader doesn't exist yet, so it will need to be created
 		if _, err = e.appClient.Create(desiredApp); err != nil {
 			return err
 		}
 	} else {
-		if app.Spec.ExternalID == latestVersionID {
+		if app.Spec.ExternalID == latestVersionID && app.Spec.ValuesYaml == valuesYaml {
 			// app is up to date, no action needed
 			return nil
 		}
 		logrus.Info("updating EKS operator in local cluster's system project")
 		desiredApp := app.DeepCopy()
 		desiredApp.Spec.ExternalID = latestVersionID
+		desiredApp.Spec.ValuesYaml = valuesYaml
 		// new version of k3s upgrade available, update app
 		if _, err = e.appClient.Update(desiredApp); err != nil {
 			return err
@@ -634,4 +652,23 @@ func notFound(err error) bool {
 		return awsErr.Code() == eks.ErrCodeResourceNotFoundException
 	}
 	return false
+}
+
+// generateValuesYaml generates a YAML string containing any
+// necessary values to override defaults in values.yaml. If
+// no defaults need to be overwritten, an empty string will
+// be returned.
+func generateValuesYaml() (string, error) {
+	values := eksOperatorValues{
+		HTTPProxy:  os.Getenv("HTTP_PROXY"),
+		HTTPSProxy: os.Getenv("HTTPS_PROXY"),
+		NoProxy:    os.Getenv("NO_PROXY"),
+	}
+
+	valuesYaml, err := yaml.Marshal(values)
+	if err != nil {
+		return "", err
+	}
+
+	return string(valuesYaml), nil
 }

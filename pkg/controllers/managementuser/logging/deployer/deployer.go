@@ -3,7 +3,7 @@ package deployer
 import (
 	"github.com/rancher/norman/controller"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/managementuser/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/logging/utils"
@@ -37,6 +37,7 @@ type Deployer struct {
 	clusterName          string
 	clusterLister        mgmtv3.ClusterLister
 	clusterLoggingLister mgmtv3.ClusterLoggingLister
+	catalogManager       manager.CatalogManager
 	nodeLister           v1.NodeLister
 	projectLoggingLister mgmtv3.ProjectLoggingLister
 	projectLister        mgmtv3.ProjectLister
@@ -58,6 +59,7 @@ func NewDeployer(cluster *config.UserContext, secretSyncer *configsyncer.SecretM
 
 	return &Deployer{
 		clusterName:          clusterName,
+		catalogManager:       cluster.Management.CatalogManager,
 		clusterLister:        cluster.Management.Management.Clusters(metav1.NamespaceAll).Controller().Lister(),
 		clusterLoggingLister: cluster.Management.Management.ClusterLoggings(clusterName).Controller().Lister(),
 		nodeLister:           cluster.Core.Nodes(metav1.NamespaceAll).Controller().Lister(),
@@ -147,7 +149,7 @@ func (d *Deployer) deployRancherLogging(systemProjectID, appCreator string) erro
 		return errors.Wrapf(err, "failed to find template by ID %s", templateVersionID)
 	}
 
-	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	templateVersion, err := d.catalogManager.LatestAvailableTemplateVersion(template, d.clusterName)
 	if err != nil {
 		return err
 	}

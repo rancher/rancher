@@ -4,11 +4,14 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/controllers/management/eksupstreamrefresh"
@@ -18,11 +21,13 @@ import (
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Options struct {
@@ -43,6 +48,9 @@ type mcm struct {
 	removeLocalCluster  bool
 	embedded            bool
 	httpsListenPort     int
+
+	startedChan chan struct{}
+	startLock   sync.Mutex
 }
 
 func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*config.ScaledContext, *clustermanager.Manager, error) {
@@ -52,6 +60,8 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	if err != nil {
 		return nil, nil, err
 	}
+
+	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
 
 	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
 		return nil, nil, err
@@ -77,6 +87,7 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	scaledContext.RunContext = ctx
 
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
+
 	scaledContext.AccessControl = manager
 	scaledContext.ClientGetter = manager
 
@@ -107,9 +118,39 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 		removeLocalCluster:  cfg.RemoveLocalCluster,
 		embedded:            cfg.Embedded,
 		httpsListenPort:     cfg.HTTPSListenPort,
+		startedChan:         make(chan struct{}),
 	}
 
+	go func() {
+		<-ctx.Done()
+		mcm.started()
+	}()
+
 	return mcm, nil
+}
+
+func (m *mcm) started() {
+	m.startLock.Lock()
+	defer m.startLock.Unlock()
+	select {
+	case <-m.startedChan:
+	default:
+		close(m.startedChan)
+	}
+}
+
+func (m *mcm) Wait(ctx context.Context) {
+	select {
+	case <-m.startedChan:
+		for {
+			if _, err := m.wranglerContext.Core.Namespace().Get(namespace.GlobalNamespace, metav1.GetOptions{}); err == nil {
+				return
+			}
+			logrus.Infof("Waiting for initial data to be populated")
+			time.Sleep(2 * time.Second)
+		}
+	case <-ctx.Done():
+	}
 }
 
 func (m *mcm) Middleware(next http.Handler) http.Handler {
@@ -120,6 +161,8 @@ func (m *mcm) Start(ctx context.Context) error {
 	var (
 		management *config.ManagementContext
 	)
+
+	defer m.started()
 
 	if dm := os.Getenv("CATTLE_DEV_MODE"); dm == "" {
 		if err := jailer.CreateJail("driver-jail"); err != nil {

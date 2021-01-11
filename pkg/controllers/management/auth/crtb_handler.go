@@ -227,6 +227,9 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			if updateErr != nil {
 				return updateErr
 			}
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
 			crbToUpdate.Labels[bindingKey] = membershipBindingOwner
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := c.mgr.crbClient.Update(crbToUpdate)
@@ -249,6 +252,9 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			if updateErr != nil {
 				return updateErr
 			}
+			if rbToUpdate.Labels == nil {
+				rbToUpdate.Labels = make(map[string]string)
+			}
 			rbToUpdate.Labels[bindingKey] = crtbInProjectBindingOwner
 			rbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := c.mgr.rbClient.Update(rbToUpdate)
@@ -267,7 +273,10 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 		if updateErr != nil {
 			return updateErr
 		}
-		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		if crtbToUpdate.Labels == nil {
+			crtbToUpdate.Labels = make(map[string]string)
+		}
+		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
 		_, err := c.mgr.crtbs.Update(crtbToUpdate)
 		return err
 	})

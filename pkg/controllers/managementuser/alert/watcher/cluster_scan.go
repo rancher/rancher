@@ -53,6 +53,12 @@ func (csw *ClusterScanWatcher) Sync(_ string, cs *v3.ClusterScan) (runtime.Objec
 	if cs.DeletionTimestamp != nil {
 		return cs, nil
 	}
+	// Cis sends alerts when the cluster scan has completed, and when it has completed with failures.
+	// In both scenarios, the "CisScanStatus" needs to be set in order to send an alert, so we skip
+	// sending alerts until then.
+	if cs.Status.CisScanStatus == nil {
+		return cs, nil
+	}
 	// Start with Unknown, True if there is/are a matching alert rule(s), else False
 	if !(v32.ClusterScanConditionAlerted.IsUnknown(cs) &&
 		v32.ClusterScanConditionCompleted.IsTrue(cs)) {

@@ -41,10 +41,11 @@ def test_bkp_restore_s3_recover_validate():
     [stop_node_from_ec2(etcd_node.externalIpAddress)
      for etcd_node in etcd_nodes]
     # wait for cluster to get into unavailable state
-    cluster = wait_for_cluster_unavailable(client, cluster)
+    cluster = wait_for_cluster_unavailable_or_error(client, cluster)
     for etcd_node in etcd_nodes:
         ips_to_remove.append(etcd_node.customConfig['internalAddress'])
         client.delete(etcd_node)
+        wait_for_node_to_be_deleted(client, etcd_node)
     # Also remove the ec2 instances
     for ip_to_remove in ips_to_remove:
         delete_node_from_ec2(ip_to_remove)
@@ -118,11 +119,14 @@ def create_project_client_and_cluster_s3_three_etcd(request):
     request.addfinalizer(fin)
 
 
-def wait_for_cluster_unavailable(client, cluster):
-    return wait_for_condition(client, cluster,
-                              lambda x: x.state == "unavailable",
-                              lambda x: 'State is: ' + x.state,
-                              timeout=DEFAULT_CLUSTER_STATE_TIMEOUT)
+def wait_for_cluster_unavailable_or_error(client, cluster):
+    return wait_for_condition(
+        client,
+        cluster,
+        lambda x: x.state == "unavailable" or x.state == "error",
+        lambda x: "State is: " + x.state,
+        timeout=DEFAULT_CLUSTER_STATE_TIMEOUT,
+    )
 
 
 def wait_for_cluster_transitioning_message(client, cluster, message):

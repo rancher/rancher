@@ -11,6 +11,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	app2 "github.com/rancher/rancher/pkg/app"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -45,6 +46,7 @@ type etcdTLSConfig struct {
 type clusterHandler struct {
 	clusterName          string
 	cattleClustersClient mgmtv3.ClusterInterface
+	cattleCatalogManager manager.CatalogManager
 	agentEndpointsLister corev1.EndpointsLister
 	app                  *appHandler
 }
@@ -346,7 +348,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.ruleSelector.matchExpressions[0].values[1]":                             monitoring.CattleMonitoringPrometheusRuleLabelValue,
 	}
 
-	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, cluster.Annotations, ch.app.catalogTemplateLister)
+	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, cluster.Annotations, ch.app.catalogTemplateLister, ch.cattleCatalogManager, ch.clusterName)
 	if err != nil {
 		return nil, err
 	}

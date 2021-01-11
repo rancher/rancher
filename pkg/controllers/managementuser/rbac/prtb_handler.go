@@ -356,6 +356,9 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			if updateErr != nil {
 				return updateErr
 			}
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
 			crbToUpdate.Labels[bindingLabel] = owner
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := p.m.clusterRoleBindings.Update(crbToUpdate)
@@ -381,6 +384,9 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			if updateErr != nil {
 				return updateErr
 			}
+			if rbToUpdate.Labels == nil {
+				rbToUpdate.Labels = make(map[string]string)
+			}
 			rbToUpdate.Labels[rtbOwnerLabel] = bindingLabel
 			rbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := p.m.roleBindings.Update(rbToUpdate)
@@ -400,7 +406,10 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 		if updateErr != nil {
 			return updateErr
 		}
-		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		if crtbToUpdate.Labels == nil {
+			crtbToUpdate.Labels = make(map[string]string)
+		}
+		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
 		_, err := p.m.prtbs.Update(crtbToUpdate)
 		return err
 	})

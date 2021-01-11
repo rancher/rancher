@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	defaultAWSRegion = "us-east-1"
+	defaultAWSRegion      = "us-east-1"
+	defaultUSGovAWSRegion = "us-gov-west-1"
 )
 
 var requiredHeadersForAws = map[string]bool{"host": true,
@@ -115,8 +116,12 @@ func (a awsv4) getServiceAndRegion(host string) (string, string) {
 		}
 	}
 
-	// if no region is found, global endpoint is assumed. In this case us-east-1 should be used for signing:
+	// if no region is found, global endpoint is assumed.
 	// https://docs.aws.amazon.com/general/latest/gr/sigv4_elements.html
+	if strings.Contains(host, "us-gov") {
+		return service, defaultUSGovAWSRegion
+	}
+
 	return service, defaultAWSRegion
 }
 

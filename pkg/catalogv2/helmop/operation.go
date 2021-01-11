@@ -92,6 +92,11 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
+	user, err = s.getUser(user, namespace, name, true)
+	if err != nil {
+		return nil, err
+	}
+
 	return s.createOperation(ctx, user, status, cmds)
 }
 
@@ -101,7 +106,7 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	user, err = s.getUser(user, namespace, name)
+	user, err = s.getUser(user, namespace, name, false)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +120,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	user, err = s.getUser(user, namespace, name)
+	user, err = s.getUser(user, namespace, name, false)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +192,28 @@ func (s *Operations) Log(rw http.ResponseWriter, req *http.Request, namespace, n
 	return s.proxyLogRequest(rw, req, pod, client)
 }
 
-func (s *Operations) getSpec(namespace, name string) (*catalog.RepoSpec, error) {
+func (s *Operations) getSpec(namespace, name string, isApp bool) (*catalog.RepoSpec, error) {
+	if isApp {
+		rel, err := s.apps.Get(namespace, name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		if rel.Spec.Chart != nil && rel.Spec.Chart.Metadata != nil {
+			isClusterRepo := rel.Spec.Chart.Metadata.Annotations["catalog.cattle.io/ui-source-repo-type"]
+			if isClusterRepo != "cluster" {
+				return &catalog.RepoSpec{}, nil
+			}
+			clusterRepoName := rel.Spec.Chart.Metadata.Annotations["catalog.cattle.io/ui-source-repo"]
+			clusterRepo, err := s.clusterRepos.Get(clusterRepoName, metav1.GetOptions{})
+			if err != nil {
+				// don't report error if annotation doesn't exist
+				return &catalog.RepoSpec{}, nil
+			}
+			return &clusterRepo.Spec, nil
+		}
+		return &catalog.RepoSpec{}, nil
+	}
 	if namespace == "" {
 		clusterRepo, err := s.clusterRepos.Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -199,8 +225,8 @@ func (s *Operations) getSpec(namespace, name string) (*catalog.RepoSpec, error) 
 	panic("namespace should not be empty")
 }
 
-func (s *Operations) getUser(userInfo user.Info, namespace, name string) (user.Info, error) {
-	repoSpec, err := s.getSpec(namespace, name)
+func (s *Operations) getUser(userInfo user.Info, namespace, name string, isApp bool) (user.Info, error) {
+	repoSpec, err := s.getSpec(namespace, name, isApp)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +242,7 @@ func (s *Operations) getUser(userInfo user.Info, namespace, name string) (user.I
 		return userInfo, nil
 	}
 	return &user.DefaultInfo{
-		Name: fmt.Sprintf("system:serviceaccount:%s:%s", repoSpec.ServiceAccount, serviceAccountNS),
+		Name: fmt.Sprintf("system:serviceaccount:%s:%s", serviceAccountNS, repoSpec.ServiceAccount),
 		Groups: []string{
 			"system:serviceaccounts",
 			"system:serviceaccounts:" + serviceAccountNS,

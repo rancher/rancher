@@ -240,6 +240,9 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 			if updateErr != nil {
 				return updateErr
 			}
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
 			crbToUpdate.Labels[bindingKey] = membershipBindingOwner
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := p.mgr.crbClient.Update(crbToUpdate)
@@ -262,6 +265,9 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 				if updateErr != nil {
 					return updateErr
 				}
+				if rbToUpdate.Labels == nil {
+					rbToUpdate.Labels = make(map[string]string)
+				}
 				rbToUpdate.Labels[bindingKey] = prtbLabel
 				rbToUpdate.Labels[rtbLabelUpdated] = "true"
 				_, err := p.mgr.rbClient.Update(rbToUpdate)
@@ -281,7 +287,10 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 		if updateErr != nil {
 			return updateErr
 		}
-		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		if prtbToUpdate.Labels == nil {
+			prtbToUpdate.Labels = make(map[string]string)
+		}
+		prtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
 		_, err := p.mgr.prtbs.Update(prtbToUpdate)
 		return err
 	})

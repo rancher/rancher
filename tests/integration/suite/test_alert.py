@@ -1,7 +1,7 @@
 import pytest
 from rancher import ApiError
 from .common import random_str
-from .conftest import wait_until
+from .conftest import wait_for
 from .alert_common import MockReceiveAlert
 
 dingtalk_config = {
@@ -29,7 +29,9 @@ def test_alert_access(admin_mc, admin_pc, admin_cc, user_mc, remove_resource):
     remove_resource(prtb)
 
     # we get some project defaults, wait for them to come up
-    wait_until(projectAlertRules(user_mc.client), timeout=20)
+    wait_for(projectAlertRules(user_mc.client),
+             fail_handler=lambda: "failed waiting for project alerts",
+             timeout=120)
     # list with admin_mc to get action not available to user
     alerts = admin_mc.client.list_projectAlertRule(
         projectId=admin_pc.project.id
