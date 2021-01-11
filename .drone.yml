@@ -8,7 +8,7 @@ platform:
 
 steps:
 - name: build
-  image: rancher/dapper:v0.5.3
+  image: rancher/dapper:v0.5.4
   commands:
   - dapper ci
   privileged: true
@@ -22,7 +22,7 @@ steps:
     - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.5.3
+  image: rancher/dapper:v0.5.4
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -257,7 +257,7 @@ platform:
 
 steps:
 - name: build
-  image: rancher/dapper:v0.5.3
+  image: rancher/dapper:v0.5.4
   commands:
   - dapper ci
   privileged: true
@@ -271,7 +271,7 @@ steps:
     - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.5.3
+  image: rancher/dapper:v0.5.4
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -406,7 +406,7 @@ platform:
 steps:
   - name: build
     pull: always
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -419,7 +419,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -516,7 +516,7 @@ platform:
 steps:
   - name: build
     pull: always
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -529,7 +529,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -627,7 +627,7 @@ platform:
 steps:
   - name: build
     pull: always
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -640,7 +640,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -746,7 +746,7 @@ steps:
       depth: 1
   - name: build
     pull: always
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -759,7 +759,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -864,7 +864,7 @@ steps:
       depth: 1
   - name: build
     pull: always
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -877,7 +877,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.3
+    image: rancher/dapper:v0.5.4
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -1034,7 +1034,7 @@ steps:
     - tag
 
 - name: build-chart
-  image: rancher/dapper:v0.5.3
+  image: rancher/dapper:v0.5.4
   commands:
   - dapper chart/ci
   privileged: true
@@ -1105,7 +1105,7 @@ platform:
 
 steps:
 - name: chart-promote
-  image: rancher/dapper:v0.5.3
+  image: rancher/dapper:v0.5.4
   commands:
   - dapper chart/copy
   volumes:
