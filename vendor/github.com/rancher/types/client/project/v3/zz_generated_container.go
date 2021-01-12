@@ -48,7 +48,7 @@ type Container struct {
 	CapDrop                  []string                       `json:"capDrop,omitempty" yaml:"capDrop,omitempty"`
 	Command                  []string                       `json:"command,omitempty" yaml:"command,omitempty"`
 	Entrypoint               []string                       `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
-	Environment              map[string]string              `json:"environment,omitempty" yaml:"environment,omitempty"`
+	Environment              []EnvironmentVar               `json:"environment,omitempty" yaml:"environment,omitempty"`
 	EnvironmentFrom          []EnvironmentFrom              `json:"environmentFrom,omitempty" yaml:"environmentFrom,omitempty"`
 	ExitCode                 *int64                         `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
 	Image                    string                         `json:"image,omitempty" yaml:"image,omitempty"`
