@@ -104,6 +104,12 @@ func (u *handler) ServeAsset() http.Handler {
 	}))
 }
 
+func (u *handler) ServeFaviconDashboard() http.Handler {
+	return u.middleware(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		http.FileServer(http.Dir(filepath.Join(u.pathSetting(), "dashboard"))).ServeHTTP(rw, req)
+	}))
+}
+
 func (u *handler) IndexFileOnNotFound() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if _, err := os.Stat(filepath.Join(u.pathSetting(), req.URL.Path)); err == nil {
