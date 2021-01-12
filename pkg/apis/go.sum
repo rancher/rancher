@@ -445,8 +445,8 @@ github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b/go.mod h1:OhBBBO1pBw
 github.com/rancher/norman v0.0.0-20200517050325-f53cae161640/go.mod h1:92rz/7QN7DOeLQZlJY/8aFBOmF085igIVguR0wpxLas=
 github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3 h1:e+5LQet2639Fal5VWXjJPIMXMIw8j06CKAqS/0gJ7Zk=
 github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
-github.com/rancher/rke v1.2.4-rc8 h1:Q4dEAlO4fmRNRepV/Fc/NCB24MBUkujeoeZ0/cW47JM=
-github.com/rancher/rke v1.2.4-rc8/go.mod h1:cBs0GcHGSDfdHpA3ElCU4B0E4dnQSEAIKBHbYC6Ngew=
+github.com/rancher/rke v1.2.4 h1:rapvX1WBD0z1pu/78kxhxG6Cl9cvXeb7xkUrYdGjTO8=
+github.com/rancher/rke v1.2.4/go.mod h1:cBs0GcHGSDfdHpA3ElCU4B0E4dnQSEAIKBHbYC6Ngew=
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061 h1:oash8kayb/AlGop5KPn/cjUZv2m7oKMU3mwTNqd126c=
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
 github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f h1:QPOlhiY3YCPLsEtOmPam+ghtqip/f/zsfz4F4PF70D8=
@@ -455,6 +455,8 @@ github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106 h1:ed0NTDvIwule
 github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106/go.mod h1:iKqQcYs4YSDjsme52OZtQU4jHPmLlIiM93aj2c8c/W8=
 github.com/rancher/wrangler v0.7.3-0.20201020003736-e86bc912dfac h1:1mpYb+EPqZ8S95UxMPsQ4tNOPSLrVurAqW5B651chrM=
 github.com/rancher/wrangler v0.7.3-0.20201020003736-e86bc912dfac/go.mod h1:goezjesEKwMxHLfltdjg9DW0xWV7txQee6vOuSDqXAI=
+github.com/rancher/wrangler v0.7.3-0.20201023210123-9b7d265b90ec h1:FSHitOD9wDscz28bH5b9UPmFA9ZMe50Mu4GFWZqUfHg=
+github.com/rancher/wrangler v0.7.3-0.20201023210123-9b7d265b90ec/go.mod h1:goezjesEKwMxHLfltdjg9DW0xWV7txQee6vOuSDqXAI=
 github.com/rancher/wrangler-api v0.6.1-0.20200427172631-a7c2f09b783e h1:UJpGtw6IKs0dHPTF+6Wd12lskeCZZAejl8/ie/fc1+0=
 github.com/rancher/wrangler-api v0.6.1-0.20200427172631-a7c2f09b783e/go.mod h1:2lcWR98q8HU3U4mVETnXc8quNG0uXxrt8vKd6cAa/30=
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=

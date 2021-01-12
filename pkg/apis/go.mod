@@ -11,8 +11,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/eks-operator v1.0.4
 	github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3
-	github.com/rancher/rke v1.2.4-rc8
-	github.com/rancher/wrangler v0.7.3-0.20201020003736-e86bc912dfac
+	github.com/rancher/rke v1.2.4
+	github.com/rancher/wrangler v0.7.3-0.20201023210123-9b7d265b90ec
 	github.com/sirupsen/logrus v1.6.0
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
 	k8s.io/api v0.18.8
