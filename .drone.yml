@@ -895,7 +895,7 @@ steps:
         - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
       context: package/windows
       custom_dns: 1.1.1.1
-      dockerfile: package/windows/Dockerfile.agent
+      dockerfile: package/windows/Dockerfile.agent.20H2
       password:
         from_secret: docker_password
       repo: rancher/rancher-agent
