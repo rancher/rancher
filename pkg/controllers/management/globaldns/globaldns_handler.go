@@ -35,14 +35,14 @@ const (
 type GDController struct {
 	ingresses               clientv1beta1.IngressInterface //need to use client-go IngressInterface to update Ingress.Status field
 	managementContext       *config.ManagementContext
-	globalDNSProviderLister v3.GlobalDnsProviderLister
+	globalDNSProviderLister v3.GlobalDNSProviderLister
 }
 
 func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext) *GDController {
 	n := &GDController{
 		ingresses:               mgmt.K8sClient.ExtensionsV1beta1().Ingresses(namespace.GlobalNamespace),
 		managementContext:       mgmt,
-		globalDNSProviderLister: mgmt.Management.GlobalDnsProviders(namespace.GlobalNamespace).Controller().Lister(),
+		globalDNSProviderLister: mgmt.Management.GlobalDNSProviders(namespace.GlobalNamespace).Controller().Lister(),
 	}
 	return n
 }
@@ -235,7 +235,7 @@ func (n *GDController) getGlobalDNSProviderName(globalDNSProviderName string) (s
 	return provider, nil
 }
 
-func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.GlobalDns) error {
+func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.GlobalDNS) error {
 	var err error
 
 	if n.ifEndpointsDiffer(ingress.Status.LoadBalancer.Ingress, obj.Status.Endpoints) {
