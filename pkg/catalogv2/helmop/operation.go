@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	v1internal "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -57,6 +58,15 @@ var (
 		"Chart.yml":  true,
 	}
 )
+
+var (
+	podOptionsScheme = runtime.NewScheme()
+	podOptionsCodec  = runtime.NewParameterCodec(podOptionsScheme)
+)
+
+func init() {
+	v1internal.AddToScheme(podOptionsScheme)
+}
 
 type Operations struct {
 	namespace      string
@@ -129,7 +139,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 }
 
 func decodeParams(req *http.Request, target runtime.Object) error {
-	return scheme.ParameterCodec.DecodeParameters(req.URL.Query(), corev1.SchemeGroupVersion, target)
+	return podOptionsCodec.DecodeParameters(req.URL.Query(), corev1.SchemeGroupVersion, target)
 }
 
 func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, pod *v1.Pod, client kubernetes.Interface) error {
