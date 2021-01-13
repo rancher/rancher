@@ -41,8 +41,11 @@ kube_fname = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "k8s_kube_config")
 MACHINE_TIMEOUT = float(os.environ.get('RANCHER_MACHINE_TIMEOUT', "1200"))
 
+HARDENED_CLUSTER = ast.literal_eval(
+    os.environ.get('RANCHER_HARDENED_CLUSTER', "False"))
 TEST_OS = os.environ.get('RANCHER_TEST_OS', "linux")
 TEST_IMAGE = os.environ.get('RANCHER_TEST_IMAGE', "sangeetha/mytestcontainer")
+TEST_IMAGE_PORT = os.environ.get('RANCHER_TEST_IMAGE_PORT', "80")
 TEST_IMAGE_NGINX = os.environ.get('RANCHER_TEST_IMAGE_NGINX', "nginx")
 TEST_IMAGE_OS_BASE = os.environ.get('RANCHER_TEST_IMAGE_OS_BASE', "ubuntu")
 if TEST_OS == "windows":
@@ -950,7 +953,8 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
         path = "/name.html"
         rule = {"host": host,
                 "paths":
-                    [{"workloadIds": [workload.id], "targetPort": "80"}]}
+                    [{"workloadIds": [workload.id],
+                      "targetPort": TEST_IMAGE_PORT}]}
         ingress = p_client.create_ingress(name=name,
                                           namespaceId=ns.id,
                                           rules=[rule])
@@ -990,30 +994,36 @@ def check_cluster_state(etcd_count):
     assert len(components) == 0
 
 
-def validate_dns_record(pod, record, expected):
+def validate_dns_record(pod, record, expected, port=TEST_IMAGE_PORT):
     # requires pod with `dig` available - TEST_IMAGE
     host = '{0}.{1}.svc.cluster.local'.format(
         record["name"], record["namespaceId"])
-    validate_dns_entry(pod, host, expected)
+    validate_dns_entry(pod, host, expected, port=port)
 
 
-def validate_dns_entry(pod, host, expected):
+def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
     if is_windows():
         validate_dns_entry_windows(pod, host, expected)
         return
 
     # requires pod with `dig` available - TEST_IMAGE
-    cmd = 'ping -c 1 -W 1 {0}'.format(host)
-    ping_output = kubectl_pod_exec(pod, cmd)
+    if HARDENED_CLUSTER:
+        cmd = 'curl -vs {}:{} 2>&1'.format(host, port)
+    else:
+        cmd = 'ping -c 1 -W 1 {0}'.format(host)
+    cmd_output = kubectl_pod_exec(pod, cmd)
 
-    ping_validation_pass = False
+    connectivity_validation_pass = False
     for expected_value in expected:
-        if expected_value in str(ping_output):
-            ping_validation_pass = True
+        if expected_value in str(cmd_output):
+            connectivity_validation_pass = True
             break
 
-    assert ping_validation_pass is True
-    assert " 0% packet loss" in str(ping_output)
+    assert connectivity_validation_pass is True
+    if HARDENED_CLUSTER:
+        assert " 200 OK" in str(cmd_output)
+    else:
+        assert " 0% packet loss" in str(cmd_output)
 
     dig_cmd = 'dig {0} +short'.format(host)
     dig_output = kubectl_pod_exec(pod, dig_cmd)
@@ -1256,20 +1266,28 @@ def check_connectivity_between_workload_pods(p_client, workload):
 def check_connectivity_between_pods(pod1, pod2, allow_connectivity=True):
     pod_ip = pod2.status.podIp
 
-    cmd = "ping -c 1 -W 1 " + pod_ip
     if is_windows():
         cmd = 'ping -w 1 -n 1 {0}'.format(pod_ip)
+    elif HARDENED_CLUSTER:
+        cmd = 'curl -I {}:{}'.format(pod_ip, TEST_IMAGE_PORT)
+    else:
+        cmd = "ping -c 1 -W 1 " + pod_ip
 
     response = kubectl_pod_exec(pod1, cmd)
-    assert pod_ip in str(response)
+    if not HARDENED_CLUSTER:
+        assert pod_ip in str(response)
     if allow_connectivity:
         if is_windows():
             assert " (0% loss)" in str(response)
+        elif HARDENED_CLUSTER:
+            assert " 200 OK" in str(response)
         else:
             assert " 0% packet loss" in str(response)
     else:
         if is_windows():
             assert " (100% loss)" in str(response)
+        elif HARDENED_CLUSTER:
+            assert " 200 OK" not in str(response)
         else:
             assert " 100% packet loss" in str(response)
 
@@ -2209,7 +2227,7 @@ def validate_backup_create(namespace, backup_info, backup_mode=None):
     path = "/name.html"
     rule = {"host": host,
             "paths": [{"workloadIds": [backup_info["workload"].id],
-                       "targetPort": "80"}]}
+                       "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule])
