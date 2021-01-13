@@ -82,6 +82,9 @@ func (l *Lifecycle) deploy(projectName string) error {
 		apiKey           string
 	)
 	apiKeyName := fmt.Sprintf("%s-pipeline", projectID)
+
+	// only create pipeline tokens if it does not exist or is expired. Pipeline secrets are passed as environment variables
+	// and shared throughout a project, so they should stay the same when possible.
 	apiToken, err := l.tokenLister.Get("", apiKeyName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -102,7 +105,7 @@ func (l *Lifecycle) deploy(projectName string) error {
 
 		secret = GetAPIKeySecret(nsName, apiKey)
 		if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "Error creating a pipeline secret")
+			return errors.Wrap(err, "Error creating a pipeline secret")
 		}
 	}
 

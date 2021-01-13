@@ -12,7 +12,7 @@ import (
 )
 
 const hashFormat = "$%d:%s:%s" // $version:salt:hash -> $1:abc:def
-const Version = 1
+const Version = 2
 
 // CreateSHA256Hash can be used for basic key hashing, includes a random salt
 func CreateSHA256Hash(secretKey string) (string, error) {

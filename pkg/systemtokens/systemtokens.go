@@ -8,20 +8,21 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewSystemTokensFromScale(mgmt *config.ScaledContext) *SystemTokens {
-	return &SystemTokens{
+func NewSystemTokensFromScale(mgmt *config.ScaledContext) systemtokens.Interface {
+	return &systemTokens{
 		tokenLister: mgmt.Management.Tokens("").Controller().Lister(),
 		tokenClient: mgmt.Management.Tokens(""),
 	}
 }
 
-type SystemTokens struct {
+type systemTokens struct {
 	tokenClient v3.TokenInterface
 	tokenLister v3.TokenLister
 }
@@ -30,7 +31,7 @@ type SystemTokens struct {
 // TTL defaults to 1 hour, after that this method will auto-refresh. If your token will be in use for more
 // than one hour without calling this method again you must pass in an overrideTTL.
 // However, the overrideTTL must not be 0, otherwise the token will never be cleaned up.
-func (t *SystemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64, randomize bool) (string, error) {
+func (t *systemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64, randomize bool) (string, error) {
 	var err error
 	if !randomize {
 		_, err = t.tokenLister.Get("", tokenName)
@@ -48,12 +49,12 @@ func (t *SystemTokens) EnsureSystemToken(tokenName, description, kind, username 
 	return val, nil
 }
 
-func (t *SystemTokens) DeleteToken(tokenName string) error {
+func (t *systemTokens) DeleteToken(tokenName string) error {
 	return t.tokenClient.Delete(tokenName, &v1.DeleteOptions{})
 }
 
 // Creates token obj with hashed token, returns token. Overwrites if pre-existing.
-func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, userName string, overrideTTL *int64, randomize bool) (string, error) {
+func (t *systemTokens) createOrUpdateSystemToken(tokenName, description, kind, userName string, overrideTTL *int64, randomize bool) (string, error) {
 	if strings.HasPrefix(tokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
 	}
@@ -76,7 +77,7 @@ func (t *SystemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 					tokens.TokenKindLabel: kind,
 				},
 			},
-			TTLMillis:    3600000, // 1 hour, token purge daemon will cleanup
+			TTLMillis:    86400000, // 24 hours, token purge daemon will cleanup
 			Description:  description,
 			UserID:       userName,
 			AuthProvider: "local",

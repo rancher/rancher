@@ -2,13 +2,13 @@ package tokens
 
 import (
 	"fmt"
-	"github.com/rancher/wrangler/pkg/randomtoken"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -26,7 +26,7 @@ type TestCase struct {
 }
 
 var (
-	token string
+	token       string
 	tokenHashed string
 )
 
@@ -44,7 +44,6 @@ func TestTokenStreamTransformer(t *testing.T) {
 		Request: &http.Request{},
 	}
 
-
 	var err error
 	token, err = randomtoken.Generate()
 	if err != nil {
@@ -57,7 +56,7 @@ func TestTokenStreamTransformer(t *testing.T) {
 
 	testCases := []TestCase{
 		{
-			token:   "testname:"+token,
+			token:   "testname:" + token,
 			userID:  "testuser",
 			receive: true,
 			err:     "",
@@ -81,7 +80,7 @@ func TestTokenStreamTransformer(t *testing.T) {
 			err:     "422: [TokenStreamTransformer] failed: Invalid auth token value",
 		},
 		{
-			token:   "testname:"+token,
+			token:   "testname:" + token,
 			userID:  "diffname",
 			receive: false,
 			err:     "",

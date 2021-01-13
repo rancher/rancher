@@ -177,7 +177,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 	}
 
 	if _, err := tokens.VerifyToken(storedToken, tokenName, tokenKey); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
 	}
 
 	return storedToken, nil
