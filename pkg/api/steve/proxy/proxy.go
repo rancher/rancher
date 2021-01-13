@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/proxy"
 	authzv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -53,6 +54,7 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 		SubjectAccessReviewClient: sar,
 		AllowCacheTTL:             time.Second * time.Duration(settings.AuthorizationCacheTTLSeconds.GetInt()),
 		DenyCacheTTL:              time.Second * time.Duration(settings.AuthorizationDenyCacheTTLSeconds.GetInt()),
+		WebhookRetryBackoff:       &auth.WebhookBackoff,
 	}
 
 	authorizer, err := cfg.New()
