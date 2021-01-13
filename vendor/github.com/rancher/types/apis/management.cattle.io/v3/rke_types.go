@@ -394,6 +394,8 @@ type NetworkConfig struct {
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 	// Network plugin daemonset upgrade strategy
 	UpdateStrategy *DaemonSetUpdateStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
+	// Tolerations for Deployments
+	Tolerations []v1.Toleration `yaml:"tolerations" json:"tolerations,omitempty"`
 }
 
 type AuthWebhookConfig struct {
@@ -444,6 +446,8 @@ type IngressConfig struct {
 	HTTPSPort int `yaml:"https_port" json:"httpsPort,omitempty"`
 	// NetworkMode selector for ingress controller pods. Default is HostNetwork
 	NetworkMode string `yaml:"network_mode" json:"networkMode,omitempty"`
+	// Tolerations for Deployments
+	Tolerations []v1.Toleration `yaml:"tolerations" json:"tolerations,omitempty"`
 }
 
 type ExtraEnv struct {
@@ -834,6 +838,8 @@ type MonitoringConfig struct {
 	UpdateStrategy *DeploymentStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
 	// Number of monitoring addon pods
 	Replicas *int32 `yaml:"replicas" json:"replicas,omitempty" norman:"default=1"`
+	// Tolerations for Deployments
+	Tolerations []v1.Toleration `yaml:"tolerations" json:"tolerations,omitempty"`
 }
 
 type RestoreConfig struct {
@@ -864,6 +870,8 @@ type DNSConfig struct {
 	UpdateStrategy *DeploymentStrategy `yaml:"update_strategy" json:"updateStrategy,omitempty"`
 	// Autoscaler fields to determine number of dns replicas
 	LinearAutoscalerParams *LinearAutoscalerParams `yaml:"linear_autoscaler_params" json:"linearAutoscalerParams,omitempty"`
+	// Tolerations for Deployments
+	Tolerations []v1.Toleration `yaml:"tolerations" json:"tolerations,omitempty"`
 }
 
 type Nodelocal struct {

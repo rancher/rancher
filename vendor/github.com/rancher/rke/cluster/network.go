@@ -115,6 +115,7 @@ const (
 
 	NodeSelector   = "NodeSelector"
 	UpdateStrategy = "UpdateStrategy"
+	Tolerations    = "Tolerations"
 )
 
 var EtcdPortList = []string{
@@ -210,6 +211,7 @@ func (c *Cluster) doCalicoDeploy(ctx context.Context, data map[string]interface{
 			RollingUpdate: c.Network.UpdateStrategy.RollingUpdate,
 		},
 		FlexVolPluginDir: c.Network.Options[CalicoFlexVolPluginDirectory],
+		Tolerations:      c.Network.Tolerations,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(calicoConfig, data)
 	if err != nil {
@@ -254,6 +256,7 @@ func (c *Cluster) doCanalDeploy(ctx context.Context, data map[string]interface{}
 			RollingUpdate: c.Network.UpdateStrategy.RollingUpdate,
 		},
 		FlexVolPluginDir: c.Network.Options[CanalFlexVolPluginDirectory],
+		Tolerations:      c.Network.Tolerations,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(canalConfig, data)
 	if err != nil {

@@ -13,6 +13,7 @@ const (
 	IngressConfigFieldNodeSelector      = "nodeSelector"
 	IngressConfigFieldOptions           = "options"
 	IngressConfigFieldProvider          = "provider"
+	IngressConfigFieldTolerations       = "tolerations"
 	IngressConfigFieldUpdateStrategy    = "updateStrategy"
 )
 
@@ -28,5 +29,6 @@ type IngressConfig struct {
 	NodeSelector      map[string]string        `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 	Options           map[string]string        `json:"options,omitempty" yaml:"options,omitempty"`
 	Provider          string                   `json:"provider,omitempty" yaml:"provider,omitempty"`
+	Tolerations       []Toleration             `json:"tolerations,omitempty" yaml:"tolerations,omitempty"`
 	UpdateStrategy    *DaemonSetUpdateStrategy `json:"updateStrategy,omitempty" yaml:"updateStrategy,omitempty"`
 }

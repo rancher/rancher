@@ -3005,6 +3005,13 @@ func (in *DNSConfig) DeepCopyInto(out *DNSConfig) {
 		*out = new(LinearAutoscalerParams)
 		**out = **in
 	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
@@ -4612,6 +4619,13 @@ func (in *IngressConfig) DeepCopyInto(out *IngressConfig) {
 		*out = new(DaemonSetUpdateStrategy)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
@@ -5569,6 +5583,13 @@ func (in *MonitoringConfig) DeepCopyInto(out *MonitoringConfig) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
@@ -5912,6 +5933,13 @@ func (in *NetworkConfig) DeepCopyInto(out *NetworkConfig) {
 		in, out := &in.UpdateStrategy, &out.UpdateStrategy
 		*out = new(DaemonSetUpdateStrategy)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	return
 }
