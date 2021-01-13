@@ -23,7 +23,7 @@ from .common import (ApiError, CLUSTER_MEMBER, CLUSTER_OWNER, create_kubeconfig,
                      random_test_name, rbac_get_namespace, rbac_get_project,
                      rbac_get_user_token_by_role, TEST_IMAGE, USER_TOKEN,
                      validate_ingress_using_endpoint, validate_workload,
-                     wait_for_ingress_to_active, base64)
+                     wait_for_ingress_to_active, base64, TEST_IMAGE_PORT)
 from lib.aws import AmazonWebServices
 from pathlib import Path
 import pytest
@@ -122,7 +122,7 @@ class TestCertificate:
         path = "/name.html"
         rule = {"host": host,
                 "paths": [{"path": path, "workloadIds": [self.workload.id],
-                           "targetPort": "80"}]}
+                           "targetPort": TEST_IMAGE_PORT}]}
         tls = {"certificateId": self.certificate_valid.id, "hosts": [host]}
         validate_workload(self.p_client, self.workload, "deployment",
                           self.ns.name)
@@ -146,7 +146,7 @@ class TestCertificate:
         path = "/name.html"
         rule = {"host": host,
                 "paths": [{"path": path, "workloadIds": [self.workload.id],
-                           "targetPort": "80"}]
+                           "targetPort": TEST_IMAGE_PORT}]
                 }
         tls = {"certificateId": self.certificate_all_ns_valid.id,
                "hosts": [host]
@@ -186,7 +186,7 @@ class TestCertificate:
         path = "/name.html"
         rule = {"host": host,
                 "paths": [{"path": path, "workloadIds": [self.workload_2.id],
-                           "targetPort": "80"}]
+                           "targetPort": TEST_IMAGE_PORT}]
                 }
         tls = {"certificateId": self.certificate_all_ns_valid.id,
                "hosts": [host]
@@ -214,7 +214,7 @@ class TestCertificate:
         path = "/name.html"
         rule = {"host": host,
                 "paths": [{"path": path, "workloadIds": [self.workload.id],
-                           "targetPort": "80"}]}
+                           "targetPort": TEST_IMAGE_PORT}]}
         tls = {"certificateId": self.certificate_ssc.id, "hosts": [host]}
         self.ingress = self.p_client.create_ingress(
             name=ingress_name, namespaceId=self.ns.id, rules=[rule], tls=[tls]
@@ -239,7 +239,7 @@ class TestCertificate:
         path = "/name.html"
         rule = {"host": host,
                 "paths": [{"path": path, "workloadIds": [self.workload.id],
-                           "targetPort": "80"}]
+                           "targetPort": TEST_IMAGE_PORT}]
                 }
         tls = {"certificateId": self.certificate_all_ns_ssc.id, "hosts": [host]}
         self.ingress = self.p_client.create_ingress(
@@ -277,7 +277,7 @@ class TestCertificate:
         path = "/name.html"
         rule = {"host": host,
                 "paths": [{"path": path, "workloadIds": [self.workload_2.id],
-                           "targetPort": "80"}]
+                           "targetPort": TEST_IMAGE_PORT}]
                 }
         tls = {"certificateId": self.certificate_all_ns_ssc.id, "hosts": [host]}
         self.ingress = self.p_client.create_ingress(
@@ -305,10 +305,10 @@ class TestCertificate:
         path = "/name.html"
         rule_1 = {"host": host_1,
                   "paths": [{"path": path, "workloadIds": [self.workload.id],
-                             "targetPort": "80"}]}
+                             "targetPort": TEST_IMAGE_PORT}]}
         rule_2 = {"host": host_2,
                   "paths": [{"path": path, "workloadIds": [self.workload.id],
-                             "targetPort": "80"}]}
+                             "targetPort": TEST_IMAGE_PORT}]}
         tls = {"certificateId": self.certificate_ssc.id, "hosts": [host_1]}
         tls_2 = {"certificateId": self.certificate_ssc.id, "hosts": [host_2]}
         self.ingress = self.p_client.create_ingress(
@@ -342,11 +342,11 @@ class TestCertificate:
         path = "/name.html"
         rule_1 = {"host": host_1,
                   "paths": [{"path": path, "workloadIds": [self.workload.id],
-                             "targetPort": "80"}]
+                             "targetPort": TEST_IMAGE_PORT}]
                   }
         rule_2 = {"host": host_2,
                   "paths": [{"path": path, "workloadIds": [self.workload.id],
-                             "targetPort": "80"}]
+                             "targetPort": TEST_IMAGE_PORT}]
                   }
         tls = {"certificateId": self.certificate_all_ns_ssc.id,
                "hosts": [host_1]}

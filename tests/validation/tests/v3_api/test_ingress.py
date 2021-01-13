@@ -16,6 +16,7 @@ from .common import PROJECT_READ_ONLY
 from .common import PROJECT_OWNER
 from .common import PROJECT_MEMBER
 from .common import TEST_IMAGE
+from .common import TEST_IMAGE_PORT
 from .common import random_test_name
 from .common import validate_workload
 from .common import get_schedulable_nodes
@@ -66,7 +67,8 @@ def test_ingress():
     host = "test1.com"
     path = "/name.html"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule])
@@ -97,9 +99,11 @@ def test_ingress_with_same_rules_having_multiple_targets():
     host = "testm1.com"
     path = "/name.html"
     rule1 = {"host": host,
-             "paths": [{"workloadIds": [workload1.id], "targetPort": "80"}]}
+             "paths": [{"workloadIds": [workload1.id],
+                        "targetPort": TEST_IMAGE_PORT}]}
     rule2 = {"host": host,
-             "paths": [{"workloadIds": [workload2.id], "targetPort": "80"}]}
+             "paths": [{"workloadIds": [workload2.id],
+                        "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule1, rule2])
@@ -128,7 +132,8 @@ def test_ingress_edit_target():
     host = "test2.com"
     path = "/name.html"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload1.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload1.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.create_ingress(name=name,
                                       namespaceId=ns.id,
                                       rules=[rule])
@@ -136,7 +141,8 @@ def test_ingress_edit_target():
                      [workload1], host, path)
 
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload2.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload2.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.update(ingress, rules=[rule])
     validate_ingress(namespace["p_client"], namespace["cluster"],
                      [workload2], host, path)
@@ -158,7 +164,8 @@ def test_ingress_edit_host():
     host = "test3.com"
     path = "/name.html"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.create_ingress(name=name,
                                       namespaceId=ns.id,
                                       rules=[rule])
@@ -166,7 +173,8 @@ def test_ingress_edit_host():
                      [workload], host, path)
     host = "test4.com"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.update(ingress, rules=[rule])
     validate_ingress(namespace["p_client"], namespace["cluster"],
                      [workload], host, path)
@@ -188,7 +196,8 @@ def test_ingress_edit_path():
     host = "test5.com"
     path = "/name.html"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.create_ingress(name=name,
                                       namespaceId=ns.id,
                                       rules=[rule])
@@ -196,7 +205,8 @@ def test_ingress_edit_path():
                      [workload], host, path)
     path = "/service1.html"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.update(ingress, rules=[rule])
     validate_ingress(namespace["p_client"], namespace["cluster"],
                      [workload], host, path)
@@ -223,7 +233,8 @@ def test_ingress_edit_add_more_rules():
     host1 = "test6.com"
     path = "/name.html"
     rule1 = {"host": host1,
-             "paths": [{"workloadIds": [workload1.id], "targetPort": "80"}]}
+             "paths": [{"workloadIds": [workload1.id],
+                        "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.create_ingress(name=name,
                                       namespaceId=ns.id,
                                       rules=[rule1])
@@ -232,7 +243,8 @@ def test_ingress_edit_add_more_rules():
 
     host2 = "test7.com"
     rule2 = {"host": host2,
-             "paths": [{"workloadIds": [workload2.id], "targetPort": "80"}]}
+             "paths": [{"workloadIds": [workload2.id],
+                        "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.update(ingress, rules=[rule1, rule2])
     validate_ingress(namespace["p_client"], namespace["cluster"],
                      [workload2], host2, path)
@@ -255,7 +267,8 @@ def test_ingress_scale_up_target():
     host = "test8.com"
     path = "/name.html"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule])
@@ -282,7 +295,8 @@ def test_ingress_upgrade_target():
     host = "test9.com"
     path = "/name.html"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule])
@@ -311,7 +325,8 @@ def test_ingress_rule_with_only_path():
     host = ""
     path = "/service2.html"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule])
@@ -333,7 +348,8 @@ def test_ingress_rule_with_only_host():
 
     host = "test10.com"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule])
@@ -359,7 +375,8 @@ def test_ingress_xip_io():
     path = "/name.html"
     rule = {"host": "xip.io",
             "paths": [{"path": path,
-                       "workloadIds": [workload.id], "targetPort": "80"}]}
+                       "workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.create_ingress(name=name,
                                       namespaceId=ns.id,
                                       rules=[rule])
@@ -383,7 +400,8 @@ def test_rbac_ingress_create(role):
 
     host = "xip.io"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
     if role in (CLUSTER_MEMBER, PROJECT_READ_ONLY):
         with pytest.raises(ApiError) as e:
             p_client.create_ingress(name=name,
@@ -418,10 +436,11 @@ def test_rbac_ingress_edit(role):
     host = "xip.io"
     path = "/name.html"
     rule_1 = {"host": host,
-              "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+              "paths": [{"workloadIds": [workload.id],
+                         "targetPort": TEST_IMAGE_PORT}]}
     rule_2 = {"host": host,
               "paths": [{"path": path, "workloadIds": [workload.id],
-                         "targetPort": "80"}]}
+                         "targetPort": TEST_IMAGE_PORT}]}
     name = random_test_name("default")
     ingress = p_client_for_c_owner.create_ingress(name=name, namespaceId=ns.id,
                                                   rules=[rule_1])
@@ -457,7 +476,8 @@ def test_rbac_ingress_delete(role):
 
     host = "xip.io"
     rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+            "paths": [{"workloadIds": [workload.id],
+                       "targetPort": TEST_IMAGE_PORT}]}
 
     ingress = p_client_for_c_owner.create_ingress(name=name, namespaceId=ns.id,
                                                   rules=[rule])

@@ -271,7 +271,7 @@ def create_and_validate_ingress_xip_io_daemon():
     path = "/name.html"
     rule = {"host": "xip.io",
             "paths":
-                [{"workloadIds": [workload.id], "targetPort": "80",
+                [{"workloadIds": [workload.id], "targetPort": TEST_IMAGE_PORT,
                   "path": path}]}
     p_client.create_ingress(name=ingress_name1_create,
                             namespaceId=ns.id,
@@ -293,7 +293,7 @@ def create_and_validate_ingress_xip_io_wl():
     path = "/name.html"
     rule = {"host": "xip.io",
             "paths":
-                [{"workloadIds": [workload.id], "targetPort": "80",
+                [{"workloadIds": [workload.id], "targetPort": TEST_IMAGE_PORT,
                   "path": path}]}
     p_client.create_ingress(name=ingress_name2_create,
                             namespaceId=ns.id,
