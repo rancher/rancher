@@ -774,14 +774,14 @@ steps:
       build_args:
         - SERVERCORE_VERSION=2004
         - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
       repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-head-windows-2004
+      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-2004
       username:
         from_secret: docker_username
     volumes:
@@ -892,14 +892,14 @@ steps:
       build_args:
         - SERVERCORE_VERSION=20H2
         - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_BUILD_NUMBER}-head
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent.20H2
       password:
         from_secret: docker_password
       repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-head-windows-20H2
+      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-20H2
       username:
         from_secret: docker_username
     volumes:
