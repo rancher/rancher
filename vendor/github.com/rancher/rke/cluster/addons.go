@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -66,6 +67,7 @@ type ingressOptions struct {
 	HTTPSPort         int
 	NetworkMode       string
 	UpdateStrategy    *appsv1.DaemonSetUpdateStrategy
+	Tolerations       []v1.Toleration
 }
 
 type MetricsServerOptions struct {
@@ -76,6 +78,7 @@ type MetricsServerOptions struct {
 	Version            string
 	UpdateStrategy     *appsv1.DeploymentStrategy
 	Replicas           *int32
+	Tolerations        []v1.Toleration
 }
 
 type CoreDNSOptions struct {
@@ -89,6 +92,7 @@ type CoreDNSOptions struct {
 	NodeSelector           map[string]string
 	UpdateStrategy         *appsv1.DeploymentStrategy
 	LinearAutoscalerParams string
+	Tolerations            []v1.Toleration
 }
 
 type KubeDNSOptions struct {
@@ -105,6 +109,7 @@ type KubeDNSOptions struct {
 	NodeSelector           map[string]string
 	UpdateStrategy         *appsv1.DeploymentStrategy
 	LinearAutoscalerParams string
+	Tolerations            []v1.Toleration
 }
 
 type NodelocalOptions struct {
@@ -322,6 +327,7 @@ func (c *Cluster) deployKubeDNS(ctx context.Context, data map[string]interface{}
 			Type:          c.DNS.UpdateStrategy.Strategy,
 			RollingUpdate: c.DNS.UpdateStrategy.RollingUpdate,
 		},
+		Tolerations: c.DNS.Tolerations,
 	}
 	linearModeBytes, err := json.Marshal(c.DNS.LinearAutoscalerParams)
 	if err != nil {
@@ -358,6 +364,7 @@ func (c *Cluster) deployCoreDNS(ctx context.Context, data map[string]interface{}
 			Type:          c.DNS.UpdateStrategy.Strategy,
 			RollingUpdate: c.DNS.UpdateStrategy.RollingUpdate,
 		},
+		Tolerations: c.DNS.Tolerations,
 	}
 	linearModeBytes, err := json.Marshal(c.DNS.LinearAutoscalerParams)
 	if err != nil {
@@ -411,7 +418,8 @@ func (c *Cluster) deployMetricServer(ctx context.Context, data map[string]interf
 			Type:          c.Monitoring.UpdateStrategy.Strategy,
 			RollingUpdate: c.Monitoring.UpdateStrategy.RollingUpdate,
 		},
-		Replicas: c.Monitoring.Replicas,
+		Replicas:    c.Monitoring.Replicas,
+		Tolerations: c.Monitoring.Tolerations,
 	}
 	tmplt, err := templates.GetVersionedTemplates(kdm.MetricsServer, data, c.Version)
 	if err != nil {
@@ -575,6 +583,7 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 			Type:          c.Ingress.UpdateStrategy.Strategy,
 			RollingUpdate: c.Ingress.UpdateStrategy.RollingUpdate,
 		},
+		Tolerations: c.Ingress.Tolerations,
 	}
 	// since nginx ingress controller 0.16.0, it can be run as non-root and doesn't require privileged anymore.
 	// So we can use securityContext instead of setting privileges via initContainer.
