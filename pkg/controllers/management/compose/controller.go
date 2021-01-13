@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	clusterClient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	managementClient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	projectClient "github.com/rancher/rancher/pkg/client/generated/project/v3"
@@ -83,11 +84,12 @@ func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if err != nil {
 		return obj, err
 	}
-	tokenName := composeTokenPrefix + user.Name
-	token, err := l.systemTokens.EnsureSystemToken(tokenName, description, "compose", user.Name, nil, false)
+	tokenPrefix := composeTokenPrefix + user.Name
+	token, err := l.systemTokens.EnsureSystemToken(tokenPrefix, description, "compose", user.Name, nil, true)
 	if err != nil {
 		return obj, err
 	}
+	tokenName, _ := tokens.SplitTokenParts(token)
 	defer func() {
 		if err := l.systemTokens.DeleteToken(tokenName); err != nil {
 			logrus.Errorf("cleanup for compose token [%s] failed, will not retry: %v", tokenName, err)

@@ -271,6 +271,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		CisConfigLister:               managementContext.Management.CisConfigs("").Controller().Lister(),
 		CisBenchmarkVersionClient:     managementContext.Management.CisBenchmarkVersions(""),
 		CisBenchmarkVersionLister:     managementContext.Management.CisBenchmarkVersions("").Controller().Lister(),
+		TokenClient:                   managementContext.Management.Tokens(""),
 	}
 
 	schema.ActionHandler = handler.ClusterActionHandler

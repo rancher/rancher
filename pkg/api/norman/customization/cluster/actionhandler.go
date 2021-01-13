@@ -33,6 +33,7 @@ type ActionHandler struct {
 	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
 	CisConfigClient               v3.CisConfigInterface
 	CisConfigLister               v3.CisConfigLister
+	TokenClient                   v3.TokenInterface
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

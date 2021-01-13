@@ -10,6 +10,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubectl"
 	nodehelper "github.com/rancher/rancher/pkg/node"
@@ -230,8 +231,8 @@ func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	tokenName := drainTokenPrefix + user.Name
-	token, err := d.systemTokens.EnsureSystemToken(drainTokenPrefix+user.Name, description, "drain-node", user.Name, nil, false)
+	tokenPrefix := drainTokenPrefix + user.Name
+	token, err := d.systemTokens.EnsureSystemToken(tokenPrefix, description, "drain-node", user.Name, nil, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -239,6 +240,7 @@ func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, string, error) {
 	for k := range kubeConfig.Clusters {
 		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
 	}
+	tokenName, _ := tokens.SplitTokenParts(token)
 	return kubeConfig, tokenName, nil
 }
 

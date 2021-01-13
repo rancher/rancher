@@ -171,7 +171,8 @@ func (s *Manager) CreateProjectPipelineSystemToken(projectName string) (string, 
 	if err != nil {
 		return "", err
 	}
-	return s.systemTokens.EnsureSystemToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name, nil, false)
+	var ttl int64
+	return s.systemTokens.EnsureSystemToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name, &ttl, false)
 }
 
 func (s *Manager) CreateProjectHelmSystemToken(projectName string) (string, error) {

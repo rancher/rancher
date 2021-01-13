@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -387,12 +388,13 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 		return nil, "", err
 	}
 
-	tokenName := fmt.Sprintf("%s-%s", "agent", systemUser.Name)
-	token, err := cd.mgmt.SystemTokens.EnsureSystemToken(tokenName, "token for agent deployment", "agent", systemUser.Name, nil, false)
+	tokenPrefix := fmt.Sprintf("%s-%s", "agent", systemUser.Name)
+	token, err := cd.mgmt.SystemTokens.EnsureSystemToken(tokenPrefix, "token for agent deployment", "agent", systemUser.Name, nil, true)
 	if err != nil {
 		return nil, "", err
 	}
 
+	tokenName, _ := tokens.SplitTokenParts(token)
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
