@@ -85,6 +85,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
 		credLister:                management.Core.Secrets("").Controller().Lister(),
 		userManager:               management.UserManager,
+		systemTokens:              management.SystemTokens,
 		clusterManager:            clusterManager,
 		devMode:                   os.Getenv("CATTLE_DEV_MODE") != "",
 	}
@@ -105,9 +106,9 @@ type Lifecycle struct {
 	schemaLister              v3.DynamicSchemaLister
 	credLister                corev1.SecretLister
 	userManager               user.Manager
+	systemTokens              systemtokens.Interface
 	clusterManager            *clustermanager.Manager
 	devMode                   bool
-	systemTokens              systemtokens.Interface
 }
 
 func (m *Lifecycle) setupCustom(obj *v3.Node) {
