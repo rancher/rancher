@@ -582,7 +582,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v1.Handler{}, handlerOverride{}).
 		MustImport(&Version, v1.Probe{}, handlerOverride{}).
 		MustImport(&Version, v1.Container{}, struct {
-			Environment          []EnvironmentVar
+			Environment          map[string]string
 			EnvironmentFrom      []EnvironmentFrom
 			InitContainer        bool
 			State                string
