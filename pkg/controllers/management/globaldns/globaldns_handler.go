@@ -27,7 +27,7 @@ import (
 const (
 	GlobaldnsController    = "mgmt-global-dns-controller"
 	annotationIngressClass = "kubernetes.io/ingress.class"
-	annotationFilter       = "annotation-filter"
+	annotationFilter       = "annotationFilter"
 	annotationDNSTTL       = "external-dns.alpha.kubernetes.io/ttl"
 	defaultIngressClass    = "rancher-external-dns"
 )
