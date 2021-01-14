@@ -7,8 +7,8 @@ const (
 	ContainerFieldCapDrop                  = "capDrop"
 	ContainerFieldCommand                  = "command"
 	ContainerFieldEntrypoint               = "entrypoint"
-	ContainerFieldEnvironment              = "environment"
-	ContainerFieldEnvironmentFrom          = "environmentFrom"
+	ContainerFieldEnv                      = "env"
+	ContainerFieldEnvFrom                  = "envFrom"
 	ContainerFieldExitCode                 = "exitCode"
 	ContainerFieldImage                    = "image"
 	ContainerFieldImagePullPolicy          = "imagePullPolicy"
@@ -48,8 +48,8 @@ type Container struct {
 	CapDrop                  []string                       `json:"capDrop,omitempty" yaml:"capDrop,omitempty"`
 	Command                  []string                       `json:"command,omitempty" yaml:"command,omitempty"`
 	Entrypoint               []string                       `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
-	Environment              []EnvironmentVar               `json:"environment,omitempty" yaml:"environment,omitempty"`
-	EnvironmentFrom          []EnvironmentFrom              `json:"environmentFrom,omitempty" yaml:"environmentFrom,omitempty"`
+	Env                      []EnvVar                       `json:"env,omitempty" yaml:"env,omitempty"`
+	EnvFrom                  []EnvFromSource                `json:"envFrom,omitempty" yaml:"envFrom,omitempty"`
 	ExitCode                 *int64                         `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
 	Image                    string                         `json:"image,omitempty" yaml:"image,omitempty"`
 	ImagePullPolicy          string                         `json:"imagePullPolicy,omitempty" yaml:"imagePullPolicy,omitempty"`

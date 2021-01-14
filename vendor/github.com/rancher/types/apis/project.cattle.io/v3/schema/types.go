@@ -37,21 +37,6 @@ type handlerOverride struct {
 	TCP bool
 }
 
-type EnvironmentVar struct {
-	Name      string
-	Value     string
-	ValueFrom *EnvironmentFrom
-}
-
-type EnvironmentFrom struct {
-	Source     string `norman:"type=enum,options=field|resource|configMap|secret"`
-	SourceName string
-	SourceKey  string
-	Prefix     string
-	Optional   bool
-	TargetKey  string
-}
-
 type Scheduling struct {
 	Node              *NodeScheduling
 	Tolerate          []v1.Toleration
