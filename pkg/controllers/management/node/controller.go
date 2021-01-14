@@ -31,6 +31,7 @@ import (
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/config/systemtokens"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -106,6 +107,7 @@ type Lifecycle struct {
 	userManager               user.Manager
 	clusterManager            *clustermanager.Manager
 	devMode                   bool
+	systemTokens              systemtokens.Interface
 }
 
 func (m *Lifecycle) setupCustom(obj *v3.Node) {
