@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,28 +30,16 @@ type tokenHandler struct {
 }
 
 func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
-
-	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
-	if !errors.IsNotFound(err) {
-		return h.Updated(token)
+	if _, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name); err != nil {
+		if !errors.IsNotFound(err) {
+			return h.Updated(token)
+		}
+		return token, err
 	}
-
-	err = h.updateClusterUserAttribute(token)
-	if err != nil {
-		return nil, err
-	}
-
-	clusterAuthToken, err := common.NewClusterAuthToken(token)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = h.clusterAuthToken.Create(clusterAuthToken)
-	return nil, err
+	return token, nil
 }
 
 func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {
-
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
 		return h.Create(token)
