@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/crewjam/saml"
-	"github.com/crewjam/saml/samlsp"
 	"github.com/gorilla/mux"
 	xrv "github.com/mattermost/xml-roundtrip-validator"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -161,11 +160,12 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 
 	provider.serviceProvider = &sp
 
-	cookieStore := samlsp.ClientCookies{
+	cookieStore := ClientCookies{
 		ServiceProvider: &sp,
 		Name:            "token",
 		Domain:          actURL.Host,
 	}
+
 	provider.clientState = &cookieStore
 
 	root.Use(responsewriter.ContentTypeOptions)

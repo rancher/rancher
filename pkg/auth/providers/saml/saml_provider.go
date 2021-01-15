@@ -9,7 +9,6 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/crewjam/saml"
-	"github.com/crewjam/saml/samlsp"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
@@ -49,7 +48,7 @@ type Provider struct {
 	name            string
 	userType        string
 	groupType       string
-	clientState     samlsp.ClientState
+	clientState     ClientState
 	ldapProvider    common.AuthProvider
 }
 
