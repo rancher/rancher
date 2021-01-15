@@ -31,6 +31,7 @@ import (
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
+	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
@@ -60,6 +61,7 @@ type ScaledContext struct {
 	Schemas           *types.Schemas
 	AccessControl     types.AccessControl
 	Dialer            dialer.Factory
+	SystemTokens      systemtokens.Interface
 	UserManager       user.Manager
 	PeerManager       peermanager.PeerManager
 	CatalogManager    manager.CatalogManager
@@ -84,6 +86,7 @@ func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
 	}
 	mgmt.Dialer = c.Dialer
 	mgmt.UserManager = c.UserManager
+	mgmt.SystemTokens = c.SystemTokens
 	mgmt.CatalogManager = c.CatalogManager
 	c.managementContext = mgmt
 	return mgmt, nil
@@ -182,6 +185,7 @@ type ManagementContext struct {
 	Scheme            *runtime.Scheme
 	Dialer            dialer.Factory
 	UserManager       user.Manager
+	SystemTokens      systemtokens.Interface
 	CatalogManager    manager.CatalogManager
 
 	Management managementv3.Interface

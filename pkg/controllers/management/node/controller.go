@@ -32,6 +32,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
@@ -86,6 +87,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
 		credLister:                management.Core.Secrets("").Controller().Lister(),
 		userManager:               management.UserManager,
+		systemTokens:              management.SystemTokens,
 		clusterManager:            clusterManager,
 		devMode:                   os.Getenv("CATTLE_DEV_MODE") != "",
 	}
@@ -106,6 +108,7 @@ type Lifecycle struct {
 	schemaLister              v3.DynamicSchemaLister
 	credLister                corev1.SecretLister
 	userManager               user.Manager
+	systemTokens              systemtokens.Interface
 	clusterManager            *clustermanager.Manager
 	devMode                   bool
 }
@@ -789,10 +792,16 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 	}
 
 	logrus.Infof("node [%s] requires draining before delete", nodeCopy.Spec.RequestedHostname)
-	kubeConfig, err := m.getKubeConfig(cluster)
+	kubeConfig, tokenName, err := m.getKubeConfig(cluster)
 	if err != nil {
 		return fmt.Errorf("node [%s] error getting kubeConfig", nodeCopy.Spec.RequestedHostname)
 	}
+
+	defer func() {
+		if err := m.userManager.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for node token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
 
 	if nodeCopy.Spec.NodeDrainInput == nil {
 		logrus.Debugf("node [%s] has no NodeDrainInput, creating one with 60s timeout",
