@@ -29,6 +29,7 @@ import (
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/types/apis/storage.k8s.io/v1"
 	"github.com/rancher/types/config/dialer"
+	"github.com/rancher/types/config/systemtokens"
 	"github.com/rancher/types/peermanager"
 	"github.com/rancher/types/user"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/rbac"
@@ -57,6 +58,7 @@ type ScaledContext struct {
 	Schemas           *types.Schemas
 	AccessControl     types.AccessControl
 	Dialer            dialer.Factory
+	SystemTokens      systemtokens.Interface
 	UserManager       user.Manager
 	PeerManager       peermanager.PeerManager
 	CatalogManager    CatalogManager
@@ -98,6 +100,7 @@ func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
 	}
 	mgmt.Dialer = c.Dialer
 	mgmt.UserManager = c.UserManager
+	mgmt.SystemTokens = c.SystemTokens
 	mgmt.CatalogManager = c.CatalogManager
 	c.managementContext = mgmt
 	return mgmt, nil
@@ -177,6 +180,7 @@ type ManagementContext struct {
 	Scheme            *runtime.Scheme
 	Dialer            dialer.Factory
 	UserManager       user.Manager
+	SystemTokens      systemtokens.Interface
 	CatalogManager    CatalogManager
 
 	Management managementv3.Interface

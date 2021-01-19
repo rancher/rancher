@@ -343,7 +343,7 @@ github.com/pborman/uuid
 github.com/pelletier/go-toml
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 github.com/peterbourgon/diskv
-# github.com/pkg/errors v0.8.1
+# github.com/pkg/errors v0.9.1
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
@@ -445,7 +445,7 @@ github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.6-0.20200401224317-04cc22157b83
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
-# github.com/rancher/rke v1.1.14
+# github.com/rancher/rke v1.1.14 => github.com/rawmind0/rke v0.1.6-rc3.0.20210118144808-0472fae650ae
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -512,7 +512,7 @@ github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1
 github.com/rancher/system-upgrade-controller/pkg/condition
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/scheme
 github.com/rancher/system-upgrade-controller/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1
-# github.com/rancher/types v0.0.0-20210123000350-7cb436b3f0b0
+# github.com/rancher/types v0.0.0-20210123000350-7cb436b3f0b0 => github.com/rawmind0/types v0.0.0-20210118143454-bb3b606b1c64
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
@@ -544,6 +544,7 @@ github.com/rancher/types/compose
 github.com/rancher/types/condition
 github.com/rancher/types/config
 github.com/rancher/types/config/dialer
+github.com/rancher/types/config/systemtokens
 github.com/rancher/types/factory
 github.com/rancher/types/image
 github.com/rancher/types/kdm
