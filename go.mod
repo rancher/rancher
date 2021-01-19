@@ -8,6 +8,7 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
+	github.com/rancher/machine => github.com/pennyscissors/machine v0.15.0-rancher9.0.20210119180325-1ab1fc257938
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190921190940-14da1ac737cc // This is because docker/docker/pkg/archive has a dependency on an old x/sys
@@ -108,7 +109,7 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
-	github.com/vmware/govmomi v0.21.1-0.20191006164024-1d61d1ba0200
+	github.com/vmware/govmomi v0.23.2-0.20201015235820-81318771d0e0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
