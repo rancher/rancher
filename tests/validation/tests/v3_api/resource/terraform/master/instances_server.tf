@@ -1,5 +1,5 @@
 resource "aws_db_instance" "db" {
-  identifier = "${var.resource_name}-multinode-db"
+  identifier = "${var.resource_name}-db"
   allocated_storage    = 20
   storage_type         = "gp2"
   engine               = var.external_db
@@ -29,7 +29,7 @@ resource "aws_instance" "master" {
   vpc_security_group_ids = ["${var.sg_id}"]
   key_name = "jenkins-rke-validation"
   tags = {
-    Name = "${var.resource_name}-multinode-server"
+    Name = "${var.resource_name}-server"
   }
   provisioner "remote-exec" {
     inline = [
@@ -64,7 +64,7 @@ resource "aws_instance" "master2-ha" {
   vpc_security_group_ids = ["${var.sg_id}"]
   key_name = "jenkins-rke-validation"
   tags = {
-    Name = "${var.resource_name}-multinode-servers"
+    Name = "${var.resource_name}-servers"
   }
   provisioner "remote-exec" {
     inline = [
@@ -82,7 +82,7 @@ resource "aws_lb_target_group" "aws_tg_80" {
   port             = 80
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-multinode-tg-80"
+  name             = "${var.resource_name}-tg-80"
   health_check {
         protocol = "HTTP"
         port = "traffic-port"
@@ -115,7 +115,7 @@ resource "aws_lb_target_group" "aws_tg_443" {
   port             = 443
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-multinode-tg-443"
+  name             = "${var.resource_name}-tg-443"
   health_check {
         protocol = "HTTP"
         port = 80
@@ -148,7 +148,7 @@ resource "aws_lb_target_group" "aws_tg_6443" {
   port             = 6443
   protocol         = "TCP"
   vpc_id           = "${var.vpc_id}"
-  name             = "${var.resource_name}-multinode-tg-6443"
+  name             = "${var.resource_name}-tg-6443"
 }
 
 resource "aws_lb_target_group_attachment" "aws_tg_attachment_6443" {
@@ -171,7 +171,7 @@ resource "aws_lb" "aws_nlb" {
   internal           = false
   load_balancer_type = "network"
   subnets            = ["${var.subnets}"] 
-  name               = "${var.resource_name}-multinode-nlb"
+  name               = "${var.resource_name}-nlb"
 }
 
 resource "aws_lb_listener" "aws_nlb_listener_80" {

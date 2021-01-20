@@ -54,6 +54,8 @@ skip_test_windows_os = pytest.mark.skipif(
     TEST_OS == "windows",
     reason='Tests Skipped for including Windows nodes cluster')
 
+UPDATE_KDM = ast.literal_eval(os.environ.get('RANCHER_UPDATE_KDM', "False"))
+KDM_URL = os.environ.get("RANCHER_KDM_URL", "")
 CLUSTER_NAME = os.environ.get("RANCHER_CLUSTER_NAME", "")
 RANCHER_CLEANUP_CLUSTER = \
     ast.literal_eval(os.environ.get('RANCHER_CLEANUP_CLUSTER', "True"))
@@ -2671,7 +2673,6 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
     tg_list = []
     lb_list = []
     lb_names = [resource_prefix + '-nlb',
-                resource_prefix + '-multinode-nlb',
                 resource_prefix + '-k3s-nlb',
                 resource_prefix + '-internal-nlb']
     for name in lb_names:
@@ -2689,7 +2690,7 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
         AmazonWebServices().delete_target_group(tg)
 
     # delete rds
-    db_name = resource_prefix + "-multinode-db"
+    db_name = resource_prefix + "-db"
     print("deleting the database (if it exists): {}".format(db_name))
     AmazonWebServices().delete_db(db_name)
 
@@ -2950,3 +2951,28 @@ def check_v2_app_and_uninstall(client, chart_name):
             app_list = wait_until_app_v2_uninstall(client, chart_name)
             assert chart_name not in app_list, \
                 "App has not uninstalled"
+
+
+def update_and_validate_kdm(kdm_url, admin_token=ADMIN_TOKEN,
+                            rancher_api_url=CATTLE_API_URL):
+    print("Updating KDM to use {}".format(kdm_url))
+    header = {'Authorization': 'Bearer ' + admin_token}
+    api_url = rancher_api_url + "/settings/rke-metadata-config"
+    kdm_json = {
+        "name": "rke-metadata-config",
+        "value": json.dumps({
+            "refresh-interval-minutes": "1440",
+            "url": kdm_url
+        })
+    }
+    r = requests.put(api_url, verify=False, headers=header, json=kdm_json)
+    r_content = json.loads(r.content)
+    assert r.ok
+    assert r_content['name'] == kdm_json['name']
+    assert r_content['value'] == kdm_json['value']
+    time.sleep(2)
+
+    # Refresh Kubernetes Metadata
+    kdm_refresh_url = rancher_api_url + "/kontainerdrivers?action=refresh"
+    response = requests.post(kdm_refresh_url, verify=False, headers=header)
+    assert response.ok

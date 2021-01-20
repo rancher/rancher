@@ -11,6 +11,7 @@ RANCHER_AWS_USER = os.environ.get("AWS_USER", "ubuntu")
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
 
 RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
+RANCHER_K3S_VERSIONS = os.environ.get('RANCHER_K3S_VERSIONS', "").split(",")
 RANCHER_K3S_NO_OF_SERVER_NODES = \
     os.environ.get("RANCHER_K3S_NO_OF_SERVER_NODES", 2)
 RANCHER_K3S_NO_OF_WORKER_NODES = \
@@ -137,10 +138,8 @@ def create_multiple_control_cluster():
                               'db': RANCHER_DB_TYPE})
     print("Creating cluster")
     tf.init()
-    print(tf.plan(out="plan_server.out"))
-    print("\n\n")
-    print(tf.apply("--auto-approve"))
-    print("\n\n")
+    tf.plan(out="plan_server.out")
+    tf.apply("--auto-approve")
     if int(RANCHER_K3S_NO_OF_WORKER_NODES) > 0:
         tf_dir = DATA_SUBDIR + "/" + "terraform/worker"
         tf = Terraform(working_dir=tf_dir,
@@ -160,10 +159,8 @@ def create_multiple_control_cluster():
 
         print("Joining worker nodes")
         tf.init()
-        print(tf.plan(out="plan_worker.out"))
-        print("\n\n")
-        print(tf.apply("--auto-approve"))
-        print("\n\n")
+        tf.plan(out="plan_worker.out")
+        tf.apply("--auto-approve")
 
     cmd = "cp /tmp/multinode_kubeconfig1 " + k3s_clusterfilepath
     os.system(cmd)
@@ -176,13 +173,15 @@ def create_multiple_control_cluster():
     return k3s_clusterfilepath
 
 
-def create_rancher_cluster(client, k3s_clusterfilepath):
-    clustername = random_test_name("testcustom-k3s")
+def create_rancher_cluster(client, k3s_clusterfilepath, validate=True):
+    if CLUSTER_NAME:
+        clustername = CLUSTER_NAME
+    else:
+        clustername = random_test_name("testcustom-k3s")
     cluster = client.create_cluster(name=clustername)
     cluster_token = create_custom_host_registration_token(client, cluster)
     command = cluster_token.insecureCommand
     finalimportcommand = command + " --kubeconfig " + k3s_clusterfilepath
-    print(finalimportcommand)
 
     result = run_command(finalimportcommand)
 
