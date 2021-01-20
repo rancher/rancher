@@ -47,6 +47,12 @@ func buildAgentCommand(node *v3.Node, dockerRun string) []string {
 	return cmd
 }
 
+func buildLoginCommand(node *v3.Node, login string) []string {
+	cmd := []string{"--native-ssh", "ssh", node.Spec.RequestedHostname}
+	cmd = append(cmd, strings.Fields(login)...)
+	return cmd
+}
+
 func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []string {
 	sDriver := strings.ToLower(node.Status.NodeTemplateSpec.Driver)
 	cmd := []string{"create", "-d", sDriver}
