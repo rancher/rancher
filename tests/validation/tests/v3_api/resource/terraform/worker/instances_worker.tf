@@ -13,7 +13,7 @@ resource "aws_instance" "mysql-worker" {
   vpc_security_group_ids = ["${var.sg_id}"]
   key_name = "jenkins-rke-validation"
   tags          = {
-    Name = "${var.resource_name}-multinode-worker"
+    Name = "${var.resource_name}-worker"
   }
   provisioner "remote-exec" {
     inline      = [

@@ -115,6 +115,10 @@ def test_deploy_rancher_server():
     env_details += "env.ADMIN_TOKEN='" + token + "'\n"
     env_details += "env.USER_TOKEN='" + user_token + "'\n"
 
+    if UPDATE_KDM:
+        update_and_validate_kdm(KDM_URL, admin_token=token,
+                                rancher_api_url=RANCHER_SERVER_URL + "/v3")
+
     if AUTO_DEPLOY_CUSTOM_CLUSTER:
         aws_nodes = \
             AmazonWebServices().create_multiple_nodes(
@@ -141,6 +145,7 @@ def test_deploy_rancher_server():
             i += 1
         validate_cluster_state(client, cluster)
         env_details += "env.CLUSTER_NAME='" + cluster.name + "'\n"
+
     create_config_file(env_details)
 
 

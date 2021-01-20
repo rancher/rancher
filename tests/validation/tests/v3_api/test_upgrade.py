@@ -23,6 +23,7 @@ sshUser = os.environ.get('RANCHER_SSH_USER', "ubuntu")
 rancherVersion = os.environ.get('RANCHER_SERVER_VERSION', "master")
 upgradeVersion = os.environ.get('RANCHER_SERVER_VERSION_UPGRADE', "master")
 upgradeImage = os.environ.get('RANCHER_UPGRADE_IMAGE', "rancher/rancher")
+CLUSTER_VERSION = os.environ.get('RANCHER_CLUSTER_UPGRADE_VERSION', "")
 
 value = base64.b64encode(b"valueall")
 keyvaluepair = {"testall": value.decode('utf-8')}
@@ -89,6 +90,9 @@ if_validate_ingress = pytest.mark.skipif(
 if_upgrade_rancher = pytest.mark.skipif(
     upgrade_check_stage != "upgrade_rancher",
     reason='This test is only for testing upgrading Rancher')
+if_upgrade_cluster = pytest.mark.skipif(
+    upgrade_check_stage != "upgrade_cluster",
+    reason='This test is only for testing upgrading clusters')
 
 
 @if_post_upgrade
@@ -230,6 +234,15 @@ def test_rancher_upgrade():
     client = get_user_client()
     version = client.list_setting(name="server-version").data[0].value
     assert version == upgradeVersion
+
+
+# the flag if_upgrade_cluster is false all the time
+# because we do not have this option for the variable RANCHER_UPGRADE_CHECK
+# instead, we will have a new pipeline that calls this function directly
+@if_upgrade_cluster
+def test_cluster_upgrade():
+    upgrade_cluster()
+    wait_for_ready_nodes()
 
 
 def create_and_validate_wl():
@@ -625,6 +638,38 @@ def upgrade_rancher_server(serverIp,
           sshUser, sshKeyPath))
 
     wait_until_active(CATTLE_TEST_URL)
+
+
+def upgrade_cluster():
+    print("Upgrading cluster {} to version {}".format(
+        CLUSTER_NAME, CLUSTER_VERSION))
+    client, cluster = get_user_client_and_cluster()
+    if cluster.k3sConfig:
+        k3s_config = cluster.k3sConfig
+        k3s_updated_config = k3s_config.copy()
+        k3s_updated_config["kubernetesVersion"] = CLUSTER_VERSION
+        client.update(cluster, name=cluster.name, k3sConfig=k3s_updated_config)
+        cluster = get_cluster_by_name(client, CLUSTER_NAME)
+        assert cluster.k3sConfig["kubernetesVersion"] == CLUSTER_VERSION
+
+
+def wait_for_ready_nodes():
+    client, cluster = get_user_client_and_cluster()
+    start = time.time()
+    nodes = client.list_node(clusterId=cluster.id).data
+    unready_nodes = []
+    for node in nodes:
+        unready_nodes.append(node.id)
+    while unready_nodes and time.time() - start < MACHINE_TIMEOUT:
+        nodes = client.list_node(clusterId=cluster.id).data
+        for node in nodes:
+            if node.info.kubernetes.kubeletVersion == CLUSTER_VERSION:
+                time.sleep(5)
+                wait_for_node_status(client, node, "active")
+                if node.id in unready_nodes:
+                    unready_nodes.remove(node.id)
+    assert not unready_nodes, "Nodes did not successfully upgrade " \
+                              "within the timeout"
 
 
 def create_and_validate_catalog_app():
