@@ -25,7 +25,8 @@ func Register(ctx context.Context, server *steve.Server) error {
 	}
 
 	apply := &Apply{
-		cg: server.ClientFactory,
+		cg:            server.ClientFactory,
+		schemaFactory: server.SchemaFactory,
 	}
 
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)

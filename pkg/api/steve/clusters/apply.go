@@ -3,19 +3,25 @@ package clusters
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/pborman/uuid"
 	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/steve/pkg/attributes"
+	steveschema "github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/yaml"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )
 
 type Apply struct {
-	cg proxy.ClientGetter
+	cg            proxy.ClientGetter
+	schemaFactory steveschema.Factory
 }
 
 func (a *Apply) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -46,13 +52,47 @@ func (a *Apply) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	rw.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(rw).Encode(&ApplyOutput{
-		Resources: objs,
-	})
-	if err != nil {
-		apiContext.WriteError(err)
+	var result types.APIObjectList
+
+	for _, obj := range objs {
+		result.Objects = append(result.Objects, a.toAPIObject(apiContext, obj, input.DefaultNamespace))
 	}
+
+	apiContext.WriteResponseList(http.StatusOK, result)
+}
+
+func (a *Apply) toAPIObject(apiContext *types.APIRequest, obj runtime.Object, defaultNamespace string) types.APIObject {
+	if defaultNamespace == "" {
+		defaultNamespace = "default"
+	}
+
+	result := types.APIObject{
+		Object: obj,
+	}
+
+	m, err := meta.Accessor(obj)
+	if err != nil {
+		return result
+	}
+
+	schemaID := a.schemaFactory.ByGVK(obj.GetObjectKind().GroupVersionKind())
+	apiSchema := apiContext.Schemas.LookupSchema(schemaID)
+	if apiSchema != nil {
+		id := m.GetName()
+		ns := m.GetNamespace()
+
+		if ns == "" && attributes.Namespaced(apiSchema) {
+			ns = defaultNamespace
+		}
+
+		if ns != "" {
+			id = fmt.Sprintf("%s/%s", ns, id)
+		}
+		result.ID = id
+		result.Type = apiSchema.ID
+	}
+
+	return result
 }
 
 func (a *Apply) createApply(apiContext *types.APIRequest) (apply.Apply, error) {
