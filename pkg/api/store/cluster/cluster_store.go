@@ -534,6 +534,25 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := r.validateUnavailableNodes(data, existingCluster, id); err != nil {
 		return nil, err
 	}
+
+	// Replace rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter value to properly update virtualCenter removal
+	if newVCenter, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter"); ok && newVCenter != nil {
+		oldVCenter, ok := values.GetValue(existingCluster, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+		if ok && oldVCenter != nil && !reflect.DeepEqual(newVCenter, oldVCenter) {
+			newData := map[string]interface{}{}
+			for k,v := range data {
+	  			newData[k] = v
+			}
+			// Update virtualCenter value to nil
+			values.PutValue(newData, nil, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+			if _, err := r.Store.Update(apiContext, schema, newData, id); err != nil {
+				return nil, err
+			}
+			// Set virtualCenter value to newVCenter
+			values.PutValue(data, newVCenter, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+		}
+	}
+
 	return r.Store.Update(apiContext, schema, data, id)
 }
 
