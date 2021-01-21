@@ -2950,3 +2950,11 @@ def check_v2_app_and_uninstall(client, chart_name):
             app_list = wait_until_app_v2_uninstall(client, chart_name)
             assert chart_name not in app_list, \
                 "App has not uninstalled"
+
+
+def check_v2_app_installed(client, chart_name):
+    app = client.list_catalog_cattle_io_app()
+    for app in app["data"]:
+        if app["metadata"]["name"] == chart_name:
+            return True
+    return False
