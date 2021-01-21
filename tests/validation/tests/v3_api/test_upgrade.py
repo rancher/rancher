@@ -620,7 +620,8 @@ def upgrade_rancher_server(serverIp,
 
     runCommand = "docker run -d --volumes-from rancher-data " \
                  "--restart=unless-stopped " \
-                 "-p 80:80 -p 443:443 " + upgradeImage + ":" + upgradeVersion
+                 "-p 80:80 -p 443:443 " + upgradeImage + ":" + upgradeVersion + \
+                 " --trace"
     print(exec_shell_command(serverIp, 22, runCommand, "",
           sshUser, sshKeyPath))
 
