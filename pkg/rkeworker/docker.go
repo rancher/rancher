@@ -372,7 +372,7 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 				// symbolic link source: docker container logs location
 				"c:\\ProgramData:c:\\ProgramData",
 				// symbolic link target
-				fmt.Sprintf("%s\\var\\lib:c:\\var\\lib", getWindowsPrefixPath()),
+				fmt.Sprintf("%svar\\lib:c:\\var\\lib", getWindowsPrefixPath()),
 			},
 			NetworkMode: "none",
 		}
@@ -460,9 +460,6 @@ func getWindowsPrefixPath() string {
 		}
 	}
 
-	// drive letter only, add a trailing slash
-	if len(new) == 1 {
-		new = append(new, "")
-	}
+	new = append(new, "") // always add trailing slash
 	return strings.Join(new, "\\")
 }
