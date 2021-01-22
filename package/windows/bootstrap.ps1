@@ -74,6 +74,8 @@ try
         "$($hostPrefixPath)var\lib"
         "$($hostPrefixPath)var\lib\cni"
         "$($hostPrefixPath)var\lib\rancher"
+        "$($hostPrefixPath)var\lib\rancher\rke"
+        "$($hostPrefixPath)var\lib\rancher\rke\log"
         "$($hostPrefixPath)var\lib\kubelet"
         "$($hostPrefixPath)var\lib\kubelet\volumeplugins"
         "$($hostPrefixPath)run"
