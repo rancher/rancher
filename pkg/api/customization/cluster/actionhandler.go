@@ -11,6 +11,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/user"
+	"github.com/rancher/rancher/pkg/randomtoken"
 	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -32,7 +33,6 @@ type ActionHandler struct {
 	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
 	CisConfigClient               v3.CisConfigInterface
 	CisConfigLister               v3.CisConfigLister
-	TokenClient                   v3.TokenInterface
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -113,26 +113,41 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
 
-func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
+func (a ActionHandler) getClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-
-	token, err := a.UserMgr.EnsureClusterToken(clusterID, tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
-	return token, err
+	name, err := kubeconfigTokenName(userName, clusterID)
+	if err != nil {
+		return "", err
+	}
+	return a.UserMgr.EnsureClusterToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName, nil)
 }
 
-func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error) {
+func (a ActionHandler) getToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-	token, err := a.UserMgr.EnsureToken(tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
-	return token, err
+	name, err := kubeconfigTokenName(userName, "")
+	if err != nil {
+		return "", err
+	}
+	return a.UserMgr.EnsureToken(name, "Kubeconfig token", "kubeconfig", userName, nil)
 }
 
-func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
-	token, err := a.ensureToken(apiContext)
+func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
+	token, err := a.getToken(apiContext)
 	if err != nil {
 		return nil, err
 	}
 
 	return a.ClusterManager.KubeConfig(cluster.ID, token), nil
+}
+
+func kubeconfigTokenName(userName, clusterID string) (string, error) {
+	randString, err := randomtoken.Generate()
+	if err != nil {
+		return "", err
+	}
+	randString = randString[0:5]
+	if clusterID != "" {
+		return fmt.Sprintf("kubeconfig-%s-%s.%s", userName, randString, clusterID), nil
+	}
+	return fmt.Sprintf("kubeconfig-%s-%s", userName, randString), nil
 }

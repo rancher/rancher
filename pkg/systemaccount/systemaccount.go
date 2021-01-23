@@ -42,7 +42,6 @@ func NewManagerFromScale(management *config.ScaledContext) *Manager {
 		prtbs:        management.Management.ProjectRoleTemplateBindings(""),
 		prtbLister:   management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		tokens:       management.Management.Tokens(""),
-		tokenLister:  management.Management.Tokens("").Controller().Lister(),
 		users:        management.Management.Users(""),
 	}
 }
@@ -55,7 +54,6 @@ type Manager struct {
 	prtbs        v3.ProjectRoleTemplateBindingInterface
 	prtbLister   v3.ProjectRoleTemplateBindingLister
 	tokens       v3.TokenInterface
-	tokenLister  v3.TokenLister
 	users        v3.UserInterface
 }
 
@@ -157,28 +155,12 @@ func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), ProjectSystemAccountPrefix+projectName)
 }
 
-func (s *Manager) GetProjectPipelineSystemToken(projectName string) (*v3.Token, error) {
-	return s.tokenLister.Get("", projectName+"-pipeline")
-}
-
-// CreateProjectPipelineSystemToken will create a new pipeline token for the given project
-// if one does not exist. If a token already exists, it's value will be overwritten with a
-// new token.
-func (s *Manager) CreateProjectPipelineSystemToken(projectName string) (string, error) {
+func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, error) {
 	user, err := s.GetProjectSystemUser(projectName)
 	if err != nil {
 		return "", err
 	}
-	var ttl int64
-	return s.systemTokens.EnsureSystemToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name, &ttl, false)
-}
-
-func (s *Manager) CreateProjectHelmSystemToken(projectName string) (string, error) {
-	user, err := s.GetProjectSystemUser(projectName)
-	if err != nil {
-		return "", err
-	}
-	return s.systemTokens.EnsureSystemToken(projectName+"-helm", "Helm token for project "+projectName, "helm", user.Name, nil, true)
+	return s.systemTokens.EnsureSystemToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name, nil)
 }
 
 func (s *Manager) RemoveSystemAccount(userID string) error {
