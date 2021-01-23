@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/httperror"
@@ -30,13 +29,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 	userManager := context.Management.UserManager
 
 	userID := userManager.GetUser(apiContext)
-
-	var shellTTL int64
-	if minutes, err := strconv.ParseInt(settings.AuthUserSessionTTLMinutes.Get(), 10, 64); err == nil {
-		shellTTL = minutes * 60 * 1000 // convert minutes to milliseconds
-	}
-
-	token, err := userManager.EnsureToken("kubectl-shell-"+userID, "Access to kubectl shell in the browser", "kubectl-shell", userID, &shellTTL)
+	token, err := userManager.EnsureToken("kubectl-shell-"+userID, "Access to kubectl shell in the browser", "kubectl-shell", userID)
 	if err != nil {
 		return err
 	}

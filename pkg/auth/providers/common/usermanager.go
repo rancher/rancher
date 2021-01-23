@@ -200,74 +200,59 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 }
 
 // creates tokens with 0 ttl and returns token in 'token.Name:token.Token' format
-func (m *userManager) EnsureToken(tokenName, description, kind, userName string, ttl *int64) (string, error) {
-	return m.EnsureClusterToken("", tokenName, description, kind, userName, ttl)
+func (m *userManager) EnsureToken(tokenName, description, kind, userName string) (string, error) {
+	return m.EnsureClusterToken("", tokenName, description, kind, userName)
 }
 
-func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string, ttl *int64) (string, error) {
+func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string) (string, error) {
 	if strings.HasPrefix(tokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
 	}
-	key, err := randomtoken.Generate()
-	if err != nil {
-		return "", errors.New("failed to generate token key")
-	}
+
 	token, err := m.tokenLister.Get("", tokenName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
 
-	if token != nil {
-		token.Token = key
-		err = tokens.ConvertTokenKeyToHash(token)
+	if token == nil {
+		key, err := randomtoken.Generate()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to generate token key")
 		}
-		logrus.Infof("Updating token for user %v", userName)
-		token, err = m.tokens.Update(token)
-		if err != nil {
-			return "", err
-		}
-	} else {
-		if token == nil {
-			key, err := randomtoken.Generate()
-			if err != nil {
-				return "", fmt.Errorf("failed to generate token key")
-			}
 
-			token = &v3.Token{
-				ObjectMeta: v1.ObjectMeta{
-					Name: tokenName,
-					Labels: map[string]string{
-						tokens.UserIDLabel:    userName,
-						tokens.TokenKindLabel: kind,
-					},
+		token = &v3.Token{
+			ObjectMeta: v1.ObjectMeta{
+				Name: tokenName,
+				Labels: map[string]string{
+					tokens.UserIDLabel:    userName,
+					tokens.TokenKindLabel: kind,
 				},
-				TTLMillis:    0,
-				Description:  description,
-				UserID:       userName,
-				AuthProvider: "local",
-				IsDerived:    true,
-				Token:        key,
-				ClusterName:  clusterName,
-			}
-			if ttl != nil {
-				token.TTLMillis = *ttl
-			}
+			},
+			TTLMillis:    0,
+			Description:  description,
+			UserID:       userName,
+			AuthProvider: "local",
+			IsDerived:    true,
+			Token:        key,
+			ClusterName:  clusterName,
+		}
 
-			err = tokens.ConvertTokenKeyToHash(token)
+		logrus.Infof("Creating token for user %v", userName)
+		createdToken, err := m.tokens.Create(token)
+		if err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return "", err
+			}
+			token, err = m.tokens.Get(tokenName, v1.GetOptions{})
 			if err != nil {
 				return "", err
 			}
-			logrus.Infof("Creating token for user %v", userName)
-			token, err = m.tokens.Create(token)
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				return "", err
-			}
+		} else {
+			token = createdToken
 		}
 	}
 
-	return token.Name + ":" + key, nil
+	return token.Name + ":" + token.Token, nil
 }
 
 func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, ttl time.Duration, useExisting bool) (*v3.Token, error) {

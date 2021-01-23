@@ -47,7 +47,6 @@ var (
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	c := &clusterDeploy{
-		mgmt:                 management,
 		systemAccountManager: systemaccount.NewManager(management),
 		userManager:          management.UserManager,
 		clusters:             management.Management.Clusters(""),
@@ -63,7 +62,6 @@ type clusterDeploy struct {
 	userManager          user.Manager
 	clusters             v3.ClusterInterface
 	clusterManager       *clustermanager.Manager
-	mgmt                 *config.ManagementContext
 	nodeLister           v3.NodeLister
 }
 
@@ -325,13 +323,12 @@ func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 
 func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
 	logrus.Tracef("clusterDeploy: getKubeConfig called for cluster [%s]", cluster.Name)
-	systemUser, err := cd.systemAccountManager.GetSystemUser(cluster.Name)
+	user, err := cd.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	key := fmt.Sprintf("%s-%s", "agent", systemUser.Name)
-	token, err := cd.mgmt.SystemTokens.EnsureSystemToken(key, "token for agent deployment", "agent", systemUser.Name, nil)
+	token, err := cd.userManager.EnsureToken("agent-"+user.Name, "token for agent deployment", "agent", user.Name)
 	if err != nil {
 		return nil, err
 	}

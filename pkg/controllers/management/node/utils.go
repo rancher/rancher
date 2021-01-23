@@ -350,7 +350,7 @@ func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, er
 		return nil, err
 	}
 
-	token, err := m.userManager.EnsureToken("node-removal-drain-"+user.Name, "token for node drain during removal", "agent", user.Name, nil)
+	token, err := m.userManager.EnsureToken("node-removal-drain-"+user.Name, "token for node drain during removal", "agent", user.Name)
 	if err != nil {
 		return nil, err
 	}

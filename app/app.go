@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"github.com/rancher/rancher/pkg/systemtokens"
 	"net/http"
 	"os"
 	"time"
@@ -160,9 +159,6 @@ func buildScaledContext(ctx context.Context, clientConfig clientcmd.ClientConfig
 	scaledContext.UserManager = userManager
 	scaledContext.RunContext = ctx
 	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
-
-	systemTokens := systemtokens.NewSystemTokensFromScale(scaledContext)
-	scaledContext.SystemTokens = systemTokens
 
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
 	scaledContext.AccessControl = manager
