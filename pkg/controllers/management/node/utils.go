@@ -16,7 +16,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/jailer"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -345,18 +344,16 @@ func setEc2ClusterIDTag(data interface{}, clusterID string) {
 	}
 }
 
-func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, string, error) {
+func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
 	user, err := m.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	tokenPrefix := "node-removal-drain-" + user.Name
-	token, err := m.systemTokens.EnsureSystemToken(tokenPrefix, "token for node drain during removal", "agent", user.Name, nil, true)
+	token, err := m.userManager.EnsureToken("node-removal-drain-"+user.Name, "token for node drain during removal", "agent", user.Name)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	tokenName, _ := tokens.SplitTokenParts(token)
-	return m.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
+	return m.clusterManager.KubeConfig(cluster.Name, token), nil
 }

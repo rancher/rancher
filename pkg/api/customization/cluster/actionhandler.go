@@ -32,7 +32,6 @@ type ActionHandler struct {
 	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
 	CisConfigClient               v3.CisConfigInterface
 	CisConfigLister               v3.CisConfigLister
-	TokenClient                   v3.TokenInterface
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -113,23 +112,18 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
 
-func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
+func (a ActionHandler) getClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-
-	token, err := a.UserMgr.EnsureClusterToken(clusterID, tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
-	return token, err
+	return a.UserMgr.EnsureClusterToken(clusterID, fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID), "Kubeconfig token", "kubeconfig", userName)
 }
 
-func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error) {
+func (a ActionHandler) getToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-	token, err := a.UserMgr.EnsureToken(tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
-	return token, err
+	return a.UserMgr.EnsureToken("kubeconfig-"+userName, "Kubeconfig token", "kubeconfig", userName)
 }
 
-func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
-	token, err := a.ensureToken(apiContext)
+func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
+	token, err := a.getToken(apiContext)
 	if err != nil {
 		return nil, err
 	}

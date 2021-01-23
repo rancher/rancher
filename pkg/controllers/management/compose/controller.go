@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	clusterClient "github.com/rancher/types/client/cluster/v3"
@@ -19,9 +18,7 @@ import (
 	projectClient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/compose"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/config/systemtokens"
 	"github.com/rancher/types/user"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +34,6 @@ const (
 type Lifecycle struct {
 	TokenClient     v3.TokenInterface
 	UserClient      v3.UserInterface
-	systemTokens    systemtokens.Interface
 	UserManager     user.Manager
 	HTTPSPortGetter common.KubeConfigGetter
 	ComposeClient   v3.ComposeConfigInterface
@@ -48,7 +44,6 @@ func Register(ctx context.Context, managementContext *config.ManagementContext, 
 	tokenClient := managementContext.Management.Tokens("")
 	userClient := managementContext.Management.Users("")
 	l := Lifecycle{
-		systemTokens:    managementContext.SystemTokens,
 		HTTPSPortGetter: portGetter,
 		UserManager:     managementContext.UserManager,
 		TokenClient:     tokenClient,
@@ -82,18 +77,10 @@ func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if err != nil {
 		return obj, err
 	}
-	tokenPrefix := composeTokenPrefix + user.Name
-	token, err := l.systemTokens.EnsureSystemToken(tokenPrefix, description, "compose", user.Name, nil, true)
+	token, err := l.UserManager.EnsureToken(composeTokenPrefix+user.Name, description, "compose", user.Name)
 	if err != nil {
 		return obj, err
 	}
-	tokenName, _ := tokens.SplitTokenParts(token)
-	defer func() {
-		if err := l.systemTokens.DeleteToken(tokenName); err != nil {
-			logrus.Errorf("cleanup for compose token [%s] failed, will not retry: %v", tokenName, err)
-		}
-	}()
-
 	config := &compose.Config{}
 	if err := yaml.Unmarshal([]byte(obj.Spec.RancherCompose), config); err != nil {
 		return obj, err

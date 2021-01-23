@@ -12,7 +12,6 @@ import (
 	"time"
 
 	errorsutil "github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hCommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
@@ -21,7 +20,6 @@ import (
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/config/systemtokens"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -48,6 +46,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		SystemAccountManager:  systemaccount.NewManager(user.Management),
 		TokenClient:           user.Management.Management.Tokens(""),
 		UserClient:            user.Management.Management.Users(""),
+		UserManager:           user.Management.UserManager,
 		K8sClient:             user.K8sClient,
 		TemplateVersionClient: user.Management.Management.CatalogTemplateVersions(""),
 		TemplateClient:        user.Management.Management.CatalogTemplates(""),
@@ -56,7 +55,6 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		ProjectCatalogLister:  user.Management.Management.ProjectCatalogs("").Controller().Lister(),
 		TemplateVersionLister: user.Management.Management.CatalogTemplateVersions("").Controller().Lister(),
 		ClusterName:           user.ClusterName,
-		systemTokens:          user.Management.SystemTokens,
 		AppRevisionGetter:     user.Management.Project,
 		AppGetter:             user.Management.Project,
 		AppsLister:            user.Management.Project.Apps("").Controller().Lister(),
@@ -69,7 +67,6 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 }
 
 type Lifecycle struct {
-	systemTokens          systemtokens.Interface
 	KubeConfigGetter      common.KubeConfigGetter
 	SystemAccountManager  *systemaccount.Manager
 	UserManager           user.Manager
@@ -272,15 +269,10 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 		return obj, err
 	}
 	defer os.RemoveAll(tempDirs.FullPath)
-	tokenName, err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, true)
+	err = l.writeKubeConfig(obj, tempDirs.KubeConfigFull, true)
 	if err != nil {
 		return obj, err
 	}
-	defer func() {
-		if err := l.systemTokens.DeleteToken(tokenName); err != nil {
-			logrus.Errorf("cleanup for helm token [%s] failed, will not retry: %v", tokenName, err)
-		}
-	}()
 	// try three times and succeed
 	start := time.Second * 1
 	for i := 0; i < 3; i++ {
@@ -325,15 +317,10 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 }
 
 func (l *Lifecycle) Run(obj *v3.App, template string, tempDirs *hCommon.HelmPath) error {
-	tokenName, err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, false)
+	err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, false)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := l.systemTokens.DeleteToken(tokenName); err != nil {
-			logrus.Errorf("cleanup for helm token [%s] failed, will not retry: %v", tokenName, err)
-		}
-	}()
 	notes, err := helmInstall(tempDirs, obj)
 	if err != nil {
 		// create an app revision so that user can decide to continue
@@ -381,20 +368,20 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	return err
 }
 
-func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) (string, error) {
+func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) error {
 	var token string
 
 	userID := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		return "", err
+		return err
 	} else if errors.IsNotFound(err) && remove {
-		token, err = l.SystemAccountManager.CreateProjectHelmSystemToken(obj.Namespace)
+		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
 	} else if err == nil {
-		token, err = l.systemTokens.EnsureSystemToken(helmTokenPrefix+user.Name, description, "helm", user.Name, nil, true)
+		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, "helm", user.Name)
 	}
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	kubeConfig := l.KubeConfigGetter.KubeConfig(l.ClusterName, token)
@@ -402,11 +389,7 @@ func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) (
 		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
 	}
 
-	if err := clientcmd.WriteToFile(*kubeConfig, kubePath); err != nil {
-		return "", err
-	}
-	tokenID, _ := tokens.SplitTokenParts(token)
-	return tokenID, nil
+	return clientcmd.WriteToFile(*kubeConfig, kubePath)
 }
 
 func isSame(obj *v3.App, revision *v3.AppRevision) bool {

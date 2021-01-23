@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	images "github.com/rancher/rancher/pkg/image"
@@ -39,6 +38,7 @@ const projectIDFieldLabel = "field.cattle.io/projectId"
 const defaultPortRange = "34000-35000"
 
 func (l *Lifecycle) deploy(projectName string) error {
+
 	clusterID, projectID := ref.Parse(projectName)
 	ns := getPipelineNamespace(clusterID, projectID)
 	if _, err := l.namespaceLister.Get("", ns.Name); err == nil {
@@ -77,36 +77,13 @@ func (l *Lifecycle) deploy(projectName string) error {
 		return errors.Wrapf(err, "Error creating a pipeline secret")
 	}
 
-	var (
-		generateNewToken bool
-		apiKey           string
-	)
-	apiKeyName := fmt.Sprintf("%s-pipeline", projectID)
-
-	// only create pipeline tokens if it does not exist or is expired. Pipeline secrets are passed as environment variables
-	// and shared throughout a project, so they should stay the same when possible.
-	apiToken, err := l.tokenLister.Get("", apiKeyName)
+	apikey, err := l.systemAccountManager.GetOrCreateProjectSystemToken(projectID)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		generateNewToken = true
-	} else {
-		if tokens.IsExpired(*apiToken) {
-			generateNewToken = true
-		}
+		return err
 	}
-
-	if generateNewToken {
-		apiKey, err = l.systemAccountManager.CreateProjectPipelineSystemToken(projectID)
-		if err != nil {
-			return err
-		}
-
-		secret = GetAPIKeySecret(nsName, apiKey)
-		if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "Error creating a pipeline secret")
-		}
+	secret = GetAPIKeySecret(nsName, apikey)
+	if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "Error creating a pipeline secret")
 	}
 
 	if err := l.reconcileRegistryCASecret(clusterID); err != nil {
