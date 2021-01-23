@@ -32,7 +32,6 @@ import (
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/config/systemtokens"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -86,7 +85,6 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
 		credLister:                management.Core.Secrets("").Controller().Lister(),
 		userManager:               management.UserManager,
-		systemTokens:              management.SystemTokens,
 		clusterManager:            clusterManager,
 		devMode:                   os.Getenv("CATTLE_DEV_MODE") != "",
 	}
@@ -107,7 +105,6 @@ type Lifecycle struct {
 	schemaLister              v3.DynamicSchemaLister
 	credLister                corev1.SecretLister
 	userManager               user.Manager
-	systemTokens              systemtokens.Interface
 	clusterManager            *clustermanager.Manager
 	devMode                   bool
 }
