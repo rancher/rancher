@@ -145,7 +145,7 @@ spec:
           subPath: cacerts.pem
           readOnly: true
 {{- end }}
-{{- if eq .Values.tls.offload "internal" }}
+{{- if .Values.tls.enabled }}
         - mountPath: /etc/rancher/ssl/cert.pem
           name: tls-certificate-volume
           subPath: cert.pem
