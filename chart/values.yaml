@@ -107,16 +107,19 @@ resources: {}
 
 #
 # tls
-#   Where to offload the TLS/SSL encryption
-# - ingress (default)
-# - external
-# - internal
+#   enabled - Use secret cert/key for rancher certificate
+#    - false (default)
+#    - true 
+#   offload - Where to offload the TLS/SSL encryption
+#    - ingress (default)
+#    - external
+#    - internal
 tls:
   enabled: false
   offload: ingress
 
 #
-# tls-secret
+# tlsSecrets
 #   tls secret locations
 tlsSecrets:
   ca:                 tls-ca-volume
