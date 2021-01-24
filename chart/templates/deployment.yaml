@@ -58,13 +58,15 @@ spec:
         ports:
         - containerPort: 80
           protocol: TCP
+        - containerPort: 443
+          protocol: TCP
         args:
 {{- if .Values.debug }}
         - "--debug"
 {{- end }}
 {{- if .Values.privateCA }}
         # Private CA - don't clear ca certs
-{{- else if and (eq .Values.tls "ingress") (eq .Values.ingress.tls.source "rancher") }}
+{{- else if and (eq .Values.tls.offload "ingress") (eq .Values.ingress.tls.source "rancher") }}
         # Rancher self-signed - don't clear ca certs
 {{- else }}
         # Public trusted CA - clear ca certs
@@ -143,6 +145,16 @@ spec:
           subPath: cacerts.pem
           readOnly: true
 {{- end }}
+{{- if eq .Values.tls.offload "internal" }}
+        - mountPath: /etc/rancher/ssl/cert.pem
+          name: tls-certificate-volume
+          subPath: cert.pem
+          readOnly: true
+        - mountPath: /etc/rancher/ssl/key.pem
+          name: tls-certificate-volume
+          subPath: key.pem
+          readOnly: true
+{{- end }}
 {{- if and .Values.customLogos.enabled (or (eq .Values.customLogos.volumeKind "persistentVolumeClaim") (and (eq .Values.customLogos.volumeKind "configMap") (.Values.customLogos.volumeName))) }}
         # Mount rancher custom-logos volume
         - mountPath: /usr/share/rancher/ui/assets/images/logos
@@ -173,13 +185,21 @@ spec:
         secret:
           defaultMode: 0400
           secretName: tls-ca-additional
+          secretName: {{ .Values.tlsSecrets.caAdditional }}
 {{- end }}
 {{- if .Values.privateCA }}
       - name: tls-ca-volume
         secret:
           defaultMode: 0400
-          secretName: tls-ca
+          secretName: {{ .Values.tlsSecrets.ca }}
 {{- end }}
+{{- if .Values.tls.enabled }}
+      - name: tls-certificate
+        secret:
+          defaultMode: 0400
+          secretName: {{ .Values.tlsSecrets.certificate }}
+{{- end }}
+
 {{- if gt (int .Values.auditLog.level) 0 }}
   {{- if eq .Values.auditLog.destination "hostPath" }}
       - name: audit-log

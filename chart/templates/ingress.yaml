@@ -17,7 +17,7 @@ metadata:
     nginx.ingress.kubernetes.io/configuration-snippet: |
       {{- template "configurationSnippet" . }}
 {{- end }}
-{{- if eq .Values.tls "external" }}
+{{- if eq .Values.tls.offload "external" }}
     nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
 {{- else }}
   {{- if ne .Values.ingress.tls.source "secret" }}
@@ -43,18 +43,18 @@ spec:
           service:
             name: {{ template "rancher.fullname" . }}
             port:
-              number: 80
+              number: {{ ternary 8443 80 .Values.tls.enabled }}
           {{- else }}
           serviceName: {{ template "rancher.fullname" . }}
-          servicePort: 80
+          servicePort: {{ ternary 8443 80 .Values.tls.enabled }}
           {{- end }}
         {{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
         pathType: ImplementationSpecific
         {{- end }}
-{{- if eq .Values.tls "ingress" }}
+{{- if eq .Values.tls.offload "ingress" }}
   tls:
   - hosts:
     - {{ .Values.hostname }}
-    secretName: tls-rancher-ingress
+    secretName: {{ .Values.tlsSecrets.certificateIngress }}
 {{- end }}
 {{- end }}
