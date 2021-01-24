@@ -20,6 +20,6 @@ metadata:
     release: {{ .Release.Name }}
 spec:
   ca:
-    secretName: {{ .Values.tls.autogen }}
+    secretName: {{ .Values.tlsSecrets.autogen }}
   {{- end -}}
 {{- end -}}

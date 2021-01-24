@@ -121,7 +121,7 @@ tls:
 tlsSecrets:
   ca:                 tls-ca-volume
   caAdditional:       tls-ca-additional-volume
-  certificate:        tls-rancher-certificate
+  certificate:        tls-rancher-certificate-volume
   certificateIngress: tls-rancher-ingress
   autogen:            tls-rancher
 
