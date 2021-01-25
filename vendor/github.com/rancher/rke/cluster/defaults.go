@@ -54,6 +54,7 @@ const (
 	DefaultMonitoringProvider            = "metrics-server"
 	DefaultEtcdBackupConfigIntervalHours = 12
 	DefaultEtcdBackupConfigRetention     = 6
+	DefaultEtcdBackupConfigTimeout       = docker.WaitTimeout
 
 	DefaultDNSProvider = "kube-dns"
 	K8sVersionCoreDNS  = "1.14.0"
@@ -304,6 +305,9 @@ func (c *Cluster) setClusterServicesDefaults() {
 		}
 		if c.Services.Etcd.BackupConfig.Retention == 0 {
 			c.Services.Etcd.BackupConfig.Retention = DefaultEtcdBackupConfigRetention
+		}
+		if c.Services.Etcd.BackupConfig.Timeout == 0 {
+			c.Services.Etcd.BackupConfig.Timeout = DefaultEtcdBackupConfigTimeout
 		}
 	}
 
