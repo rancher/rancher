@@ -8,7 +8,6 @@ import (
 
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -25,11 +24,6 @@ type TestCase struct {
 	err     string
 }
 
-var (
-	token       string
-	tokenHashed string
-)
-
 // TestTokenStreamTransformer validates that the function properly filters data in websocket
 func TestTokenStreamTransformer(t *testing.T) {
 	assert := assert.New(t)
@@ -44,28 +38,12 @@ func TestTokenStreamTransformer(t *testing.T) {
 		Request: &http.Request{},
 	}
 
-	var err error
-	token, err = randomtoken.Generate()
-	if err != nil {
-		assert.FailNow(fmt.Sprintf("unable to generate token for token stream transformer test: %v", err))
-	}
-	tokenHashed, err = CreateSHA256Hash(token)
-	if err != nil {
-		assert.FailNow(fmt.Sprintf("unable to hash token for token stream transformer test: %v", err))
-	}
-
 	testCases := []TestCase{
 		{
-			token:   "testname:" + token,
+			token:   "testname:testkey",
 			userID:  "testuser",
 			receive: true,
 			err:     "",
-		},
-		{
-			token:   "testname:testtoken",
-			userID:  "testuser",
-			receive: false,
-			err:     "Invalid auth token value",
 		},
 		{
 			token:   "wrongname:testkey",
@@ -80,7 +58,7 @@ func TestTokenStreamTransformer(t *testing.T) {
 			err:     "422: [TokenStreamTransformer] failed: Invalid auth token value",
 		},
 		{
-			token:   "testname:" + token,
+			token:   "testname:testkey",
 			userID:  "diffname",
 			receive: false,
 			err:     "",
@@ -93,9 +71,7 @@ func TestTokenStreamTransformer(t *testing.T) {
 		},
 	}
 
-	for index, testCase := range testCases {
-		failureMessage := fmt.Sprintf("test case #%d failed", index)
-
+	for _, testCase := range testCases {
 		dataStream := make(chan map[string]interface{}, 1)
 		dataReceived := make(chan bool, 1)
 
@@ -103,10 +79,10 @@ func TestTokenStreamTransformer(t *testing.T) {
 
 		df, err := tokenManager.TokenStreamTransformer(apiCtx, nil, dataStream, nil)
 		if testCase.err == "" {
-			assert.Nil(err, failureMessage)
+			assert.Nil(err)
 		} else {
-			assert.NotNil(err, failureMessage)
-			assert.Contains(err.Error(), testCase.err, failureMessage)
+			assert.NotNil(err)
+			assert.Contains(err.Error(), testCase.err)
 		}
 
 		ticker := time.NewTicker(1 * time.Second)
@@ -145,7 +121,7 @@ func (d *DummyIndexer) ListIndexFuncValues(indexName string) []string {
 func (d *DummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
 	return []interface{}{
 		&v3.Token{
-			Token: tokenHashed,
+			Token: "testkey",
 			ObjectMeta: v1.ObjectMeta{
 				Name: "testname",
 			},
