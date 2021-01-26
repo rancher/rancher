@@ -349,9 +349,11 @@ type SaveAsTemplateOutput struct {
 }
 
 type EKSStatus struct {
-	UpstreamSpec          *eksv1.EKSClusterConfigSpec `json:"upstreamSpec"`
-	VirtualNetwork        string                      `json:"virtualNetwork"`
-	Subnets               []string                    `json:"subnets"`
-	SecurityGroups        []string                    `json:"securityGroups"`
-	PrivateRequiresTunnel *bool                       `json:"privateRequiresTunnel"`
+	UpstreamSpec                  *eksv1.EKSClusterConfigSpec `json:"upstreamSpec"`
+	VirtualNetwork                string                      `json:"virtualNetwork"`
+	Subnets                       []string                    `json:"subnets"`
+	SecurityGroups                []string                    `json:"securityGroups"`
+	PrivateRequiresTunnel         *bool                       `json:"privateRequiresTunnel"`
+	ManagedLaunchTemplateID       string                      `json:"managedLaunchTemplateID"`
+	ManagedLaunchTemplateVersions map[string]string           `json:"managedLaunchTemplateVersions"`
 }
