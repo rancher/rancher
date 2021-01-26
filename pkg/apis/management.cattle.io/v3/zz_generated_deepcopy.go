@@ -3118,6 +3118,13 @@ func (in *EKSStatus) DeepCopyInto(out *EKSStatus) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ManagedLaunchTemplateVersions != nil {
+		in, out := &in.ManagedLaunchTemplateVersions, &out.ManagedLaunchTemplateVersions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
