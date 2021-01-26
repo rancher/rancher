@@ -139,9 +139,9 @@ github.com/aws/aws-sdk-go v1.15.11/go.mod h1:mFuSZ37Z9YOHbQEwBWztmVzqXrEkub65tZo
 github.com/aws/aws-sdk-go v1.20.20/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.27.0/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.30.0/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
-github.com/aws/aws-sdk-go v1.30.22/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
-github.com/aws/aws-sdk-go v1.35.24 h1:U3GNTg8+7xSM6OAJ8zksiSM4bRqxBWmVwwehvOSNG3A=
 github.com/aws/aws-sdk-go v1.35.24/go.mod h1:tlPOdRjfxPBpNIwqDj61rmsnA85v9jc0Ps9+muhnW+k=
+github.com/aws/aws-sdk-go v1.36.7 h1:XoJPAjKoqvdL531XGWxKYn5eGX/xMoXzMN5fBtoyfSY=
+github.com/aws/aws-sdk-go v1.36.7/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
 github.com/aws/aws-sdk-go-v2 v0.18.0/go.mod h1:JWVYvqSMppoMJC0x5wdwiImzgXTI9FuZwxzkQq9wy+g=
 github.com/beevik/etree v1.1.0 h1:T0xke/WvNtMoCqgzPhkX2r4rjY3GDZFi+FjpRZY2Jbs=
 github.com/beevik/etree v1.1.0/go.mod h1:r8Aw8JqVegEf0w2fDnATrX9VpkMcyFeM0FhwO62wh+A=
@@ -892,8 +892,8 @@ github.com/rancher/client-go v1.20.0-rancher.1/go.mod h1:UTdyXFcu9VZV4qQRKGXCa0K
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
 github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09 h1:Rh+7vXWJF/bA5ZLtUEBbOQX/wBQ9cFvtUoMOJXrJqVY=
 github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
-github.com/rancher/eks-operator v1.0.4 h1:yFEdfutbRoDUV5aHw2cQkQBBO14x4wypmk1VNHhKCTU=
-github.com/rancher/eks-operator v1.0.4/go.mod h1:Bbm03sRUFEfMiP9xA6rCLHB1RiKbifvvs0Egl8+XdOA=
+github.com/rancher/eks-operator v1.0.6-rc1 h1:VY2lLcaHtBMByd7pq7px4fB+GW0cd0cfessODbmH+Tc=
+github.com/rancher/eks-operator v1.0.6-rc1/go.mod h1:GB2kyPtIN0r+DGlUcDgEUMsB4qRwZH7OKsraemZT+GA=
 github.com/rancher/helm/v3 v3.3.0-rancher1 h1:i9uzKgPbt15FTn0rHMt22sA4rdHPq4iJ8gmohSWPR1o=
 github.com/rancher/helm/v3 v3.3.0-rancher1/go.mod h1:qUawjWz9THVCBVsNPJ/Q20VNEyrK7kN6lYf5loyp194=
 github.com/rancher/kubernetes-provider-detector v0.1.2 h1:iFfmmcZiGya6s3cS4Qxksyqqw5hPbbIDHgKJ2Y44XKM=
