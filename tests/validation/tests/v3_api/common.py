@@ -2494,18 +2494,15 @@ def auth_resource_cleanup():
         for crtb in user_crtbs:
             client.delete(crtb)
 
-
 class WebsocketLogParse:
     """
     the class is used for receiving and parsing the message
     received from the websocket
     """
-
     def __init__(self):
         self.lock = Lock()
         self._last_message = ''
-
-    def receiver(self, socket, skip):
+    def receiver(self, socket, skip, b64=True):
         """
         run a thread to receive and save the message from the web socket
         :param socket: the socket connection
@@ -2519,7 +2516,8 @@ class WebsocketLogParse:
                     data = data[1:]
                 if len(data) < 5:
                     pass
-                data = base64.b64decode(data).decode()
+                if b64:
+                    data = base64.b64decode(data).decode()
                 self.lock.acquire()
                 self._last_message += data
                 self.lock.release()
