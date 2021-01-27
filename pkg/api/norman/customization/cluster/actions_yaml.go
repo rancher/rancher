@@ -43,7 +43,7 @@ func (a ActionHandler) ImportYamlHandler(actionName string, action *types.Action
 		return err
 	}
 
-	cfg, err := a.generateKubeConfig(apiContext, &cluster)
+	cfg, err := a.getKubeConfig(apiContext, &cluster)
 	if err != nil {
 		return err
 	}

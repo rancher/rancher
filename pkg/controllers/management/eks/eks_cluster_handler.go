@@ -232,6 +232,10 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			}
 		}
 
+		if apimgmtv3.ClusterConditionUpdated.IsFalse(cluster) && strings.HasPrefix(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), "[Syncing error") {
+			return cluster, fmt.Errorf(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster))
+		}
+
 		// cluster must have at least one managed nodegroup. It is possible for a cluster
 		// agent to be deployed without one, but having a managed nodegroup makes it easy
 		// for rancher to validate its ability to do so.
@@ -321,6 +325,30 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 				if statusErr != nil {
 					return cluster, statusErr
 				}
+				return cluster, err
+			}
+		}
+
+		clusterLaunchTemplateID, _ := status["managedLaunchTemplateID"].(string)
+		if clusterLaunchTemplateID != "" && cluster.Status.EKSStatus.ManagedLaunchTemplateID != clusterLaunchTemplateID {
+			cluster = cluster.DeepCopy()
+			cluster.Status.EKSStatus.ManagedLaunchTemplateID = clusterLaunchTemplateID
+			cluster, err = e.clusterClient.Update(cluster)
+			if err != nil {
+				return cluster, err
+			}
+		}
+
+		managedLaunchTemplateVersions, _ := status["managedLaunchTemplateVersions"].(map[string]interface{})
+		if !reflect.DeepEqual(cluster.Status.EKSStatus.ManagedLaunchTemplateVersions, managedLaunchTemplateVersions) {
+			managedLaunchTemplateVersionsToString := make(map[string]string, len(managedLaunchTemplateVersions))
+			for key, value := range managedLaunchTemplateVersions {
+				managedLaunchTemplateVersionsToString[key] = value.(string)
+			}
+			cluster.DeepCopy()
+			cluster.Status.EKSStatus.ManagedLaunchTemplateVersions = managedLaunchTemplateVersionsToString
+			cluster, err = e.clusterClient.Update(cluster)
+			if err != nil {
 				return cluster, err
 			}
 		}
@@ -715,9 +743,10 @@ func (e *eksOperatorController) setTrue(cluster *mgmtv3.Cluster, condition condi
 	condition.True(cluster)
 	condition.Message(cluster, message)
 	var err error
+	clusterName := cluster.Name
 	cluster, err = e.clusterClient.Update(cluster)
 	if err != nil {
-		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s true with message: %s", cluster.Name, condition, message)
+		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s true with message: %s", clusterName, condition, message)
 	}
 	return cluster, nil
 }

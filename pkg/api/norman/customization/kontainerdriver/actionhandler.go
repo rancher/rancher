@@ -125,6 +125,15 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 			// removing weave images since it's not supported
 			rkeSysImgCopy.WeaveNode = ""
 			rkeSysImgCopy.WeaveCNI = ""
+			// removing noiro (Cisco ACI) since it's not supported
+			rkeSysImgCopy.AciCniDeployContainer = ""
+			rkeSysImgCopy.AciHostContainer = ""
+			rkeSysImgCopy.AciOpflexContainer = ""
+			rkeSysImgCopy.AciMcastContainer = ""
+			rkeSysImgCopy.AciOpenvSwitchContainer = ""
+			rkeSysImgCopy.AciControllerContainer = ""
+			rkeSysImgCopy.AciOpflexServerContainer = ""
+			rkeSysImgCopy.AciGbpServerContainer = ""
 		case windowsImages:
 			majorVersion := util.GetTagMajorVersion(k8sVersion)
 			if mVersion.Compare(majorVersion, "v1.13", "<=") {
