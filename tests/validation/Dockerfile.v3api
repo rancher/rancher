@@ -40,4 +40,4 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     unzip awscli-exe-linux-x86_64.zip && \
     ./aws/install && \
     cd $WORKSPACE && \
-    pip install -r requirements_v3api.txt
+    pip install --no-cache-dir -r requirements_v3api.txt
