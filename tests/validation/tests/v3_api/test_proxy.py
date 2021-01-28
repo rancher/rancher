@@ -145,7 +145,7 @@ def deploy_proxy_rancher(bastion_node):
         '-e HTTPS_PROXY={} ' \
         '-e NO_PROXY="localhost,127.0.0.1,0.0.0.0,10.0.0.0/8,' \
         'cattle-system.svc" ' \
-        'rancher/rancher:{}'.format(
+        'rancher/rancher:{} --trace'.format(
             proxy_url, proxy_url,
             RANCHER_SERVER_VERSION)
 

@@ -568,7 +568,7 @@ def deploy_airgap_rancher(bastion_node):
             '-v ${{PWD}}/privkey.pem:/etc/rancher/ssl/key.pem ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
             '-e CATTLE_SYSTEM_CATALOG=bundled ' \
-            '{}/rancher/rancher:{} --no-cacerts'.format(
+            '{}/rancher/rancher:{} --no-cacerts --trace'.format(
                 privileged, bastion_node.host_name, bastion_node.host_name,
                 RANCHER_SERVER_VERSION)
     else:
@@ -576,7 +576,7 @@ def deploy_airgap_rancher(bastion_node):
             'sudo docker run -d {} --restart=unless-stopped ' \
             '-p 80:80 -p 443:443 ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
-            '-e CATTLE_SYSTEM_CATALOG=bundled {}/rancher/rancher:{}'.format(
+            '-e CATTLE_SYSTEM_CATALOG=bundled {}/rancher/rancher:{} --trace'.format(
                 privileged, bastion_node.host_name, bastion_node.host_name,
                 RANCHER_SERVER_VERSION)
     deploy_result = run_command_on_airgap_node(bastion_node, ag_node,

@@ -305,6 +305,13 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
     run_command_with_stderr(helm_rancher_cmd)
     time.sleep(120)
 
+    # set trace logging
+    set_trace_cmd = "kubectl -n cattle-system get pods -l app=rancher " + \
+        "--no-headers -o custom-columns=name:.metadata.name | " + \
+        "while read rancherpod; do kubectl -n cattle-system " + \
+        "exec $rancherpod -c rancher -- loglevel --set trace; done"
+    run_command_with_stderr(set_trace_cmd)
+
 
 def create_tls_secrets(valid_cert):
     cert_path = DATA_SUBDIR + "/tls.crt"
