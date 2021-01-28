@@ -72,6 +72,7 @@ RUN $URL = 'https://dl.k8s.io/v1.14.3/kubernetes-client-windows-amd64.tar.gz'; \
 RUN Copy-Item -Path /wins.exe -Destination /Windows/
 RUN Copy-Item -Path /docker.exe -Destination /Windows/
 RUN Copy-Item -Path /kubernetes/client/bin/kubectl.exe -Destination /Windows/
+RUN New-Alias -Name pwsh -Value powershell
 
 ARG VERSION=dev
 LABEL io.cattle.agent true
