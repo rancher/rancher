@@ -27,6 +27,7 @@ type context struct {
 	Features              string
 	CAChecksum            string
 	AgentImage            string
+	AgentEnvVars          string
 	AuthImage             string
 	TokenKey              string
 	Token                 string
@@ -57,7 +58,7 @@ func toFeatureString(features map[string]bool) string {
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
 	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint) error {
-	var tolerations string
+	var tolerations, agentEnvVars string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -74,10 +75,15 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		tolerations = templates.ToYAML(taints)
 	}
 
+	if cluster != nil && cluster.Spec.AgentEnvVars != nil {
+		agentEnvVars = templates.ToYAML(cluster.Spec.AgentEnvVars)
+	}
+
 	context := &context{
 		Features:              toFeatureString(features),
 		CAChecksum:            CAChecksum(),
 		AgentImage:            agentImage,
+		AgentEnvVars:          agentEnvVars,
 		AuthImage:             authImage,
 		TokenKey:              tokenKey,
 		Token:                 base64.StdEncoding.EncodeToString([]byte(token)),
