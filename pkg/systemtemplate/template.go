@@ -194,6 +194,9 @@ spec:
             value: "true"
           - name: CATTLE_K8S_MANAGED
             value: "true"
+      {{- if .AgentEnvVar}}
+{{ .AgentEnvVar | indent 10 }}
+      {{- end }}
           image: {{.AgentImage}}
           volumeMounts:
           - name: cattle-credentials
