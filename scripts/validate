@@ -23,7 +23,7 @@ echo Verifying modules
 go mod verify
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-  echo "Encountered dirty repo!"
+  echo "Encountered dirty repo! Did you run go mod tidy?"
   exit 1
 fi
 
