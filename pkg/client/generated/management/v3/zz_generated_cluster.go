@@ -7,6 +7,7 @@ import (
 const (
 	ClusterType                                      = "cluster"
 	ClusterFieldAPIEndpoint                          = "apiEndpoint"
+	ClusterFieldAgentEnvVars                         = "agentEnvVars"
 	ClusterFieldAgentFeatures                        = "agentFeatures"
 	ClusterFieldAgentImage                           = "agentImage"
 	ClusterFieldAgentImageOverride                   = "agentImageOverride"
@@ -73,6 +74,7 @@ const (
 type Cluster struct {
 	types.Resource
 	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
+	AgentEnvVars                         []EnvVar                       `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
 	AgentFeatures                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	AgentImageOverride                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
