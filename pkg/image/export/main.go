@@ -264,35 +264,46 @@ func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) 
 			continue
 		}
 
-		if rancherVersion != "dev" {
-			maxVersion, _ := releaseMap["maxChannelServerVersion"].(string)
-			maxVersion = strings.TrimPrefix(maxVersion, "v")
-			if maxVersion == "" {
-				continue
-			}
-			minVersion, _ := releaseMap["minChannelServerVersion"].(string)
-			minVersion = strings.Trim(minVersion, "v")
-			if minVersion == "" {
-				continue
-			}
+		maxVersion, _ := releaseMap["maxChannelServerVersion"].(string)
+		maxVersion = strings.TrimPrefix(maxVersion, "v")
+		if maxVersion == "" {
+			continue
+		}
+		minVersion, _ := releaseMap["minChannelServerVersion"].(string)
+		minVersion = strings.Trim(minVersion, "v")
+		if minVersion == "" {
+			continue
+		}
 
-			versionGTMin, err := k3supgrade.IsNewerVersion(minVersion, rancherVersion)
-			if err != nil {
-				continue
-			}
-			if rancherVersion != minVersion && !versionGTMin {
-				// rancher version not equal to or greater than minimum supported rancher version
-				continue
-			}
+		var versionGTMin bool
+		var err error
+		if rancherVersion == kd.RancherVersionDev {
+			versionGTMin, err = k3supgrade.IsNewerVersion(minVersion, rancherVersion+".999")
+		} else {
+			versionGTMin, err = k3supgrade.IsNewerVersion(minVersion, rancherVersion)
+		}
+		if err != nil {
+			logrus.Errorf("%v", err)
+			continue
+		}
+		if rancherVersion != minVersion && !versionGTMin {
+			// rancher version not equal to or greater than minimum supported rancher version
+			continue
+		}
 
-			versionLTMax, err := k3supgrade.IsNewerVersion(rancherVersion, maxVersion)
-			if err != nil {
-				continue
-			}
-			if rancherVersion != maxVersion && !versionLTMax {
-				// rancher version not equal to or greater than maximum supported rancher version
-				continue
-			}
+		var versionLTMax bool
+		if rancherVersion == kd.RancherVersionDev {
+			versionLTMax, err = k3supgrade.IsNewerVersion(rancherVersion+".0", maxVersion)
+		} else {
+			versionLTMax, err = k3supgrade.IsNewerVersion(rancherVersion, maxVersion)
+		}
+		if err != nil {
+			logrus.Errorf("%v", err)
+			continue
+		}
+		if rancherVersion != maxVersion && !versionLTMax {
+			// rancher version not equal to or greater than maximum supported rancher version
+			continue
 		}
 
 		compatibleReleases = append(compatibleReleases, version)
