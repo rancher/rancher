@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/steve/pkg/podimpersonation"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
+	"github.com/rancher/wrangler/pkg/schemas"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -21,10 +22,17 @@ func Register(ctx context.Context, server *steve.Server) error {
 		impersonator: podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
 	}
 
+	apply := &Apply{
+		cg:            server.ClientFactory,
+		schemaFactory: server.SchemaFactory,
+	}
+
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
 	server.ClusterCache.OnChange(ctx, func(gvr schema.GroupVersionResource, key string, obj, oldObj runtime.Object) error {
 		return shell.impersonator.PurgeOldRoles(gvr, key, obj)
 	})
+	server.BaseSchemas.MustImportAndCustomize(&ApplyInput{}, nil)
+	server.BaseSchemas.MustImportAndCustomize(&ApplyOutput{}, nil)
 
 	server.SchemaFactory.AddTemplate(schema2.Template{
 		Group: "management.cattle.io",
@@ -32,6 +40,15 @@ func Register(ctx context.Context, server *steve.Server) error {
 		Customize: func(schema *types.APISchema) {
 			schema.LinkHandlers = map[string]http.Handler{
 				"shell": shell,
+			}
+			schema.ActionHandlers = map[string]http.Handler{
+				"apply": apply,
+			}
+			schema.ResourceActions = map[string]schemas.Action{
+				"apply": {
+					Input:  "applyInput",
+					Output: "applyOutput",
+				},
 			}
 			// Everybody can list even if they have no list or get privileges. The users
 			// authorization will still be used to determine what can be seen but just
