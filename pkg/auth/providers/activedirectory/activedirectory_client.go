@@ -264,7 +264,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 	search := ldapv2.NewSearchRequest(searchBase,
 		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 		filter,
-		ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+		ldap.GetGroupSearchAttributes(config, ObjectClass), nil)
 
 	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
 	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
@@ -380,7 +380,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		search = ldapv2.NewSearchRequest(distinguishedName,
 			ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
 			filter,
-			ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+			ldap.GetGroupSearchAttributes(config, MemberOfAttribute, ObjectClass), nil)
 	}
 
 	result, err := lConn.Search(search)
@@ -471,7 +471,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v32.ActiveDi
 		search = ldapv2.NewSearchRequest(searchDomain,
 			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 			query,
-			ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+			ldap.GetGroupSearchAttributes(config, MemberOfAttribute, ObjectClass), nil)
 	}
 
 	// Bind before query

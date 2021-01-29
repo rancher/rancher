@@ -139,13 +139,13 @@ func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.
 	return userSearchAttributes
 }
 
-func GetGroupSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.ActiveDirectoryConfig) []string {
-	groupSeachAttributes := []string{memberOfAttribute,
-		ObjectClass,
+func GetGroupSearchAttributes(config *v32.ActiveDirectoryConfig, searchAttributes ...string) []string {
+	groupSeachAttributes := []string{
 		config.GroupObjectClass,
 		config.UserLoginAttribute,
 		config.GroupNameAttribute,
 		config.GroupSearchAttribute}
+	groupSeachAttributes = append(groupSeachAttributes, searchAttributes...)
 	return groupSeachAttributes
 }
 
