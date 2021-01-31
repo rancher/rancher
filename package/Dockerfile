@@ -37,6 +37,11 @@ ENV RANCHER_METADATA_BRANCH ${RANCHER_METADATA_BRANCH}
 ENV HELM_VERSION v3.3.1
 ENV KUSTOMIZE_VERSION v3.5.4
 
+# System charts minimal version
+ENV CATTLE_FLEET_MIN_VERSION=0.3.400
+ENV CATTLE_RANCHER_OPERATOR_MIN_VERSION=0.1.300
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.1.0-beta900
+
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/helm3-library && \
