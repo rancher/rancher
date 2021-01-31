@@ -38,8 +38,9 @@ var (
 )
 
 type desiredKey struct {
-	namespace string
-	name      string
+	namespace  string
+	name       string
+	minVersion string
 }
 
 type desired struct {
@@ -104,7 +105,7 @@ func (m *Manager) runSync() {
 func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}) {
 	for key, values := range charts {
 		for {
-			if err := m.install(key.namespace, key.name, values); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+			if err := m.install(key.namespace, key.name, key.minVersion, values); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
 				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.name, err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -116,12 +117,13 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}) {
 	}
 }
 
-func (m *Manager) Ensure(namespace, name string, values map[string]interface{}) error {
+func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]interface{}) error {
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
-				namespace: namespace,
-				name:      name,
+				namespace:  namespace,
+				name:       name,
+				minVersion: minVersion,
 			},
 			values: values,
 		}
@@ -129,7 +131,7 @@ func (m *Manager) Ensure(namespace, name string, values map[string]interface{}) 
 	return nil
 }
 
-func (m *Manager) install(namespace, name string, values map[string]interface{}) error {
+func (m *Manager) install(namespace, name, minVersion string, values map[string]interface{}) error {
 	index, err := m.content.Index("", "rancher-charts")
 	if err != nil {
 		return err
@@ -141,7 +143,7 @@ func (m *Manager) install(namespace, name string, values map[string]interface{})
 		return err
 	}
 
-	if ok, err := m.isInstalled(namespace, name, chart.Version, values); err != nil {
+	if ok, err := m.isInstalled(namespace, name, chart.Version, minVersion, values); err != nil {
 		return err
 	} else if ok {
 		return nil
@@ -255,7 +257,7 @@ func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 	return false, nil
 }
 
-func (m *Manager) isInstalled(namespace, name, version string, values map[string]interface{}) (bool, error) {
+func (m *Manager) isInstalled(namespace, name, version, minVersion string, values map[string]interface{}) (bool, error) {
 	helmcfg := &action.Configuration{}
 	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
 		return false, err
@@ -282,6 +284,17 @@ func (m *Manager) isInstalled(namespace, name, version string, values map[string
 		ver, err := semver.NewVersion(release.Chart.Metadata.Version)
 		if err != nil {
 			return false, err
+		}
+
+		if minVersion != "" {
+			min, err := semver.NewVersion(minVersion)
+			if err != nil {
+				return false, err
+			}
+			if min.LessThan(ver) || min.Equal(ver) {
+				logrus.Infof("Skipping installing/upgrading desired version %v for release %v, current version %v is greater or equal to minimal required version %v", desired.String(), name, ver.String(), minVersion)
+				return true, nil
+			}
 		}
 
 		if (desired.LessThan(ver) || desired.Equal(ver)) && equality.Semantic.DeepEqual(values, release.Config) {

@@ -14,24 +14,28 @@ import (
 var (
 	toInstall = []chartDef{
 		{
-			ReleaseNamespace: namespaces.System,
-			ChartName:        "rancher-webhook",
+			ReleaseNamespace:  namespaces.System,
+			ChartName:         "rancher-webhook",
+			MinVersionSetting: settings.RancherWebhookMinVersion,
 		},
 		{
-			ReleaseNamespace: "rancher-operator-system",
-			ChartName:        "rancher-operator-crd",
+			ReleaseNamespace:  "rancher-operator-system",
+			ChartName:         "rancher-operator-crd",
+			MinVersionSetting: settings.RancherOperatorMinVersion,
 		},
 		{
-			ReleaseNamespace: "rancher-operator-system",
-			ChartName:        "rancher-operator",
+			ReleaseNamespace:  "rancher-operator-system",
+			ChartName:         "rancher-operator",
+			MinVersionSetting: settings.RancherOperatorMinVersion,
 		},
 	}
 	repoName = "rancher-charts"
 )
 
 type chartDef struct {
-	ReleaseNamespace string
-	ChartName        string
+	ReleaseNamespace  string
+	ChartName         string
+	MinVersionSetting settings.Setting
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
@@ -59,7 +63,7 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		},
 	}
 	for _, chartDef := range toInstall {
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, map[string]interface{}{
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.MinVersionSetting.Get(), map[string]interface{}{
 			"global": systemGlobalRegistry,
 		}); err != nil {
 			return repo, err
