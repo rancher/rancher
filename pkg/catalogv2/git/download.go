@@ -20,7 +20,7 @@ const (
 )
 
 func gitDir(namespace, name, gitURL string) string {
-	staticDir := filepath.Join(staticDir, namespace, name)
+	staticDir := filepath.Join(staticDir, namespace, name, hash(gitURL))
 	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
 		return staticDir
 	}
