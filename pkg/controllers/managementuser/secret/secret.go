@@ -63,14 +63,22 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 	cluster.Management.Core.Secrets("").AddHandler(ctx, "secretsController", func(key string, obj *corev1.Secret) (runtime.Object, error) {
 		if obj == nil {
+			logrus.Tracef("secretsController: AddHandler: obj is nil, calling sync")
 			return sync(key, nil)
 		}
 		if !controller.ObjectInCluster(cluster.ClusterName, obj) {
+			logrus.Tracef("secretsController: AddHandler: obj [%s] is not in cluster [%s], returning nil", obj.Name, cluster.ClusterName)
+			return nil, nil
+		}
+
+		if obj.Type == corev1.SecretTypeServiceAccountToken {
+			logrus.Tracef("secretsController: AddHandler: obj [%s] is Service Account token, skipping", obj.Name)
 			return nil, nil
 		}
 
 		if obj.Labels != nil {
 			if obj.Labels["cattle.io/creator"] == "norman" {
+				logrus.Tracef("secretsController: AddHandler: obj [%s] labels in [%s] contain cattle.io/creator=norman, calling sync", obj.Name, cluster.ClusterName)
 				return sync(key, obj)
 			}
 		}
@@ -88,7 +96,9 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
+	logrus.Tracef("secretsController: sync called for key [%s] in namespace [%s]", key, obj.Name)
 	// field.cattle.io/projectId value is <cluster name>:<project name>
+	logrus.Tracef("secretsController: sync: key [%s], obj.Annotations[projectIDLabel]: [%s]", key, obj.Annotations[projectIDLabel])
 	if obj.Annotations[projectIDLabel] != "" {
 		parts := strings.Split(obj.Annotations[projectIDLabel], ":")
 		if len(parts) == 2 {
@@ -97,8 +107,15 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 			if err != nil {
 				return nil, err
 			}
+			logrus.Tracef("secretsController: sync: length of secrets for [%s] in namespace [%s] is %d", parts[1], obj.Name, len(secrets))
 			for _, secret := range secrets {
+				// skip service account token secrets
+				if secret.Type == corev1.SecretTypeServiceAccountToken {
+					logrus.Tracef("secretsController: AddHandler: secret [%s] is Service Account token, skipping", secret.Name)
+					continue
+				}
 				namespacedSecret := getNamespacedSecret(secret, obj.Name)
+				logrus.Infof("Creating secret [%s] into namespace [%s]", namespacedSecret.Name, obj.Name)
 				_, err := n.clusterSecretsClient.Create(namespacedSecret)
 				if err != nil && !errors.IsAlreadyExists(err) {
 					return nil, err
@@ -110,14 +127,17 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 }
 
 func (s *Controller) Create(obj *corev1.Secret) (runtime.Object, error) {
+	logrus.Tracef("secretsController: Create called for [%s]", obj.Name)
 	return nil, s.createOrUpdate(obj, create)
 }
 
 func (s *Controller) Updated(obj *corev1.Secret) (runtime.Object, error) {
+	logrus.Tracef("secretsController: Updated called for [%s]", obj.Name)
 	return nil, s.createOrUpdate(obj, update)
 }
 
 func (s *Controller) Remove(obj *corev1.Secret) (runtime.Object, error) {
+	logrus.Tracef("secretsController: Remove called for [%s]", obj.Name)
 	clusterNamespaces, err := s.getClusterNamespaces(obj)
 	if err != nil {
 		return nil, err
@@ -133,6 +153,7 @@ func (s *Controller) Remove(obj *corev1.Secret) (runtime.Object, error) {
 }
 
 func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespace, error) {
+	logrus.Tracef("secretsController: getClusterNamespaces called for [%s]", obj.Name)
 	var toReturn []*corev1.Namespace
 	projectNamespace, err := s.managementNamespaceLister.Get("", obj.Namespace)
 	if err != nil {
@@ -175,6 +196,7 @@ func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespa
 }
 
 func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
+	logrus.Tracef("secretsController: createOrUpdate called for [%s]", obj.Name)
 	if obj.Annotations[projectIDLabel] != "" {
 		parts := strings.Split(obj.Annotations[projectIDLabel], ":")
 		if len(parts) == 2 {
@@ -198,10 +220,12 @@ func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 				return err
 			}
 		case update:
+			logrus.Infof("Updating secret [%s] into namespace [%s]", namespacedSecret.Name, namespace.Name)
 			_, err := s.secrets.Update(namespacedSecret)
 			if err != nil && !errors.IsNotFound(err) {
 				return err
 			} else if errors.IsNotFound(err) {
+				logrus.Infof("Updating secret [%s] returned NotFound, creating secret [%s] into namespace [%s]", namespacedSecret.Name, namespacedSecret.Name, namespace.Name)
 				_, err := s.secrets.Create(namespacedSecret)
 				if err != nil {
 					return err
