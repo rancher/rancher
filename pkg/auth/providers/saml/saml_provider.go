@@ -114,6 +114,15 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 	finalRedirectURL := login.FinalRedirectURL
 
 	if provider, ok := SamlProviders[name]; ok {
+		if provider == nil {
+			logrus.Errorf("SAML: Provider %v not initialized", name)
+			return fmt.Errorf("SAML: Provider %v not initialized", name)
+		}
+		if provider.clientState == nil {
+			logrus.Errorf("SAML: Provider %v clientState not set", name)
+			return fmt.Errorf("SAML: Provider %v clientState not set", name)
+		}
+		logrus.Debugf("SAML [PerformSamlLogin]: Setting clientState for SAML service provider %v", name)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_Action", loginAction)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_PublicKey", login.PublicKey)
@@ -124,6 +133,7 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 		if err != nil {
 			return err
 		}
+		logrus.Debugf("SAML [PerformSamlLogin]: Redirecting to the identity provider login page at %v", idpRedirectURL)
 		data := map[string]interface{}{
 			"idpRedirectUrl": idpRedirectURL,
 			"type":           "samlLoginOutput",
