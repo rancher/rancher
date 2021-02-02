@@ -20,7 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/istio"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/logging"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/networkpolicy"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/noderemove"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/pipeline"
@@ -42,7 +41,6 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	logging.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	cis.Register(ctx, cluster)
-	noderemove.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
 	pipeline.Register(ctx, cluster)
 	podsecuritypolicy.RegisterCluster(ctx, cluster)
