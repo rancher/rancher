@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
@@ -143,9 +144,10 @@ func (m *Manager) install(namespace, name, minVersion string, values map[string]
 		return err
 	}
 
-	if ok, err := m.isInstalled(namespace, name, chart.Version, minVersion, values); err != nil {
+	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, name, chart.Version, minVersion, values)
+	if err != nil {
 		return err
-	} else if ok {
+	} else if installed {
 		return nil
 	}
 
@@ -178,9 +180,9 @@ func (m *Manager) install(namespace, name, minVersion string, values map[string]
 		Charts: []types.ChartUpgrade{
 			{
 				ChartName:   name,
-				Version:     chart.Version,
+				Version:     desiredVersion,
 				ReleaseName: name,
-				Values:      values,
+				Values:      desiredValue,
 				ResetValues: true,
 			},
 		},
@@ -257,10 +259,11 @@ func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 	return false, nil
 }
 
-func (m *Manager) isInstalled(namespace, name, version, minVersion string, values map[string]interface{}) (bool, error) {
+// isInstalled returns whether the release is installed, if false, it will return the version and values.yaml it should install/upgrade
+func (m *Manager) isInstalled(namespace, name, version, minVersion string, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
 	helmcfg := &action.Configuration{}
 	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
-		return false, err
+		return false, "", nil, err
 	}
 
 	l := action.NewList(helmcfg)
@@ -268,12 +271,12 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, value
 
 	releases, err := l.Run()
 	if err != nil {
-		return false, err
+		return false, "", nil, err
 	}
 
 	desired, err := semver.NewVersion(version)
 	if err != nil {
-		return false, err
+		return false, "", nil, err
 	}
 
 	for _, release := range releases {
@@ -281,28 +284,52 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, value
 			continue
 		}
 
+		desiredValuesJSON, err := json.Marshal(desiredValue)
+		if err != nil {
+			return false, "", nil, err
+		}
+
+		actualValueJSON, err := json.Marshal(release.Config)
+		if err != nil {
+			return false, "", nil, err
+		}
+
+		patchedJSON, err := jsonpatch.MergePatch(actualValueJSON, desiredValuesJSON)
+		if err != nil {
+			return false, "", nil, err
+		}
+
+		desiredValue = map[string]interface{}{}
+		if err := json.Unmarshal(patchedJSON, &desiredValue); err != nil {
+			return false, "", nil, err
+		}
+
 		ver, err := semver.NewVersion(release.Chart.Metadata.Version)
 		if err != nil {
-			return false, err
+			return false, "", nil, err
 		}
 
 		if minVersion != "" {
 			min, err := semver.NewVersion(minVersion)
 			if err != nil {
-				return false, err
+				return false, "", nil, err
 			}
 			if min.LessThan(ver) || min.Equal(ver) {
-				logrus.Infof("Skipping installing/upgrading desired version %v for release %v, current version %v is greater or equal to minimal required version %v", desired.String(), name, ver.String(), minVersion)
-				return true, nil
+				// If the current deployed version is greater or equal than the min version but configuration has changed, return false and upgrade with the current version
+				if !bytes.Equal(patchedJSON, actualValueJSON) {
+					return false, release.Chart.Metadata.Version, desiredValue, nil
+				}
+				logrus.Debugf("Skipping installing/upgrading desired version %v for release %v, current version %v is greater or equal to minimal required version %v", desired.String(), name, ver.String(), minVersion)
+				return true, "", nil, nil
 			}
 		}
 
-		if (desired.LessThan(ver) || desired.Equal(ver)) && equality.Semantic.DeepEqual(values, release.Config) {
-			return true, nil
+		if (desired.LessThan(ver) || desired.Equal(ver)) && bytes.Equal(patchedJSON, actualValueJSON) {
+			return true, "", nil, nil
 		}
 	}
 
-	return false, nil
+	return false, version, desiredValue, nil
 }
 
 func (m *Manager) isPendingUninstall(namespace, name string) (bool, error) {
