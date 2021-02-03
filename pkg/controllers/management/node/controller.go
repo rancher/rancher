@@ -218,7 +218,7 @@ func (m *Lifecycle) getNodePool(nodePoolName string) (*v3.NodePool, error) {
 
 func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 	if obj.Status.NodeTemplateSpec == nil {
-		return obj, nil
+		return m.deleteV1Node(obj)
 	}
 
 	newObj, err := v32.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
