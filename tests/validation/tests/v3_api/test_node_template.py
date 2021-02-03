@@ -7,7 +7,7 @@ from .test_rke_cluster_provisioning import random_node_name
 from .test_rke_cluster_provisioning import create_and_validate_cluster
 
 DO_ACCESSKEY = os.environ.get('DO_ACCESSKEY', "None")
-engine_install_url = "https://releases.rancher.com/install-docker/19.03.sh"
+engine_install_url = "https://releases.rancher.com/install-docker/20.10.sh"
 user_clients = {"admin": None, "standard_user_1": None,
                 "standard_user_2": None}
 
