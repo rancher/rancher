@@ -3,6 +3,7 @@ module github.com/rancher/rancher/pkg/apis
 go 1.14
 
 replace (
+	github.com/rancher/rke => github.com/pennyscissors/rke v1.2.0-rc2.0.20210204015639-b7ed21d6bf04
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/ibuildthecloud/system-upgrade-controller/pkg/apis v0.0.0-20200823050544-4b08ab2b5a02
 	k8s.io/client-go => k8s.io/client-go v0.20.0
 )
