@@ -144,14 +144,14 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY package/entrypoint.sh  /usr/bin/
-COPY package/rancher  /usr/bin/
+##COPY package/rancher  /usr/bin/
 COPY package/kustomize.sh /usr/bin/
 COPY package/jailer.sh /usr/bin/
-COPY package/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+##COPY package/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
 
-COPY package/data.json /var/lib/rancher-data/driver-metadata/
+##COPY package/data.json /var/lib/rancher-data/driver-metadata/
 
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
