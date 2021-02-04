@@ -6,6 +6,7 @@
 /.trash-cache
 /trash.lock
 /.idea
+/cmd/agent/agent
 /package/data.json
 /package/rancher
 /package/rancher.yaml
