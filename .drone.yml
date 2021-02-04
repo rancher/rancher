@@ -43,7 +43,7 @@ steps:
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
       from_secret: docker_password
-    repo: rancher/rancher
+    repo: opcache/rancher
     username:
       from_secret: docker_username
   when:
@@ -68,7 +68,7 @@ steps:
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
       from_secret: docker_password
-    repo: rancher/rancher-agent
+    repo: opcache/rancher-agent
     username:
       from_secret: docker_username
   when:
@@ -92,7 +92,7 @@ steps:
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
       from_secret: docker_password
-    repo: rancher/rancher-runtime
+    repo: opcache/rancher-runtime
     username:
       from_secret: docker_username
   when:
@@ -134,7 +134,7 @@ steps:
     dockerfile: package/Dockerfile
     password:
       from_secret: docker_password
-    repo: rancher/rancher
+    repo: opcache/rancher
     tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
@@ -155,7 +155,7 @@ steps:
     dockerfile: package/Dockerfile.agent
     password:
       from_secret: docker_password
-    repo: rancher/rancher-agent
+    repo: opcache/rancher-agent
     tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
@@ -175,7 +175,7 @@ steps:
     dockerfile: package/Dockerfile.runtime
     password:
       from_secret: docker_password
-    repo: rancher/rancher-runtime
+    repo: opcache/rancher-runtime
     tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
@@ -292,7 +292,7 @@ steps:
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
     password:
       from_secret: docker_password
-    repo: rancher/rancher
+    repo: opcache/rancher
     username:
       from_secret: docker_username
   when:
@@ -317,7 +317,7 @@ steps:
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
     password:
       from_secret: docker_password
-    repo: rancher/rancher-agent
+    repo: opcache/rancher-agent
     username:
       from_secret: docker_username
   when:
@@ -340,7 +340,7 @@ steps:
     dockerfile: package/Dockerfile
     password:
       from_secret: docker_password
-    repo: rancher/rancher
+    repo: opcache/rancher
     tag: "${DRONE_TAG}-linux-arm64"
     username:
       from_secret: docker_username
@@ -361,7 +361,7 @@ steps:
     dockerfile: package/Dockerfile.agent
     password:
       from_secret: docker_password
-    repo: rancher/rancher-agent
+    repo: opcache/rancher-agent
     tag: "${DRONE_TAG}-linux-arm64"
     username:
       from_secret: docker_username
@@ -440,7 +440,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1809
       username:
         from_secret: docker_username
@@ -468,7 +468,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: "${DRONE_TAG}-windows-1809"
       username:
         from_secret: docker_username
@@ -550,7 +550,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1903
       username:
         from_secret: docker_username
@@ -578,7 +578,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: "${DRONE_TAG}-windows-1903"
       username:
         from_secret: docker_username
@@ -661,7 +661,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1909
       username:
         from_secret: docker_username
@@ -689,7 +689,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: "${DRONE_TAG}-windows-1909"
       username:
         from_secret: docker_username
@@ -780,7 +780,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-2004
       username:
         from_secret: docker_username
@@ -808,7 +808,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: "${DRONE_TAG}-windows-2004"
       username:
         from_secret: docker_username
@@ -898,7 +898,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent.20H2
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-20H2
       username:
         from_secret: docker_username
@@ -926,7 +926,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
-      repo: rancher/rancher-agent
+      repo: opcache/rancher-agent
       tag: "${DRONE_TAG}-windows-20H2"
       username:
         from_secret: docker_username
