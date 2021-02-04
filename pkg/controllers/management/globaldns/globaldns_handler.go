@@ -189,7 +189,6 @@ func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDNS) *v1beta1.
 	}
 }
 
-
 func (n *GDController) getIngressClass(globalDNSProviderName string) (string, error) {
 	providerName, err := n.getGlobalDNSProviderName(globalDNSProviderName)
 	if err != nil {
