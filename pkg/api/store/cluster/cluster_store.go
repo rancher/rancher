@@ -540,8 +540,8 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		oldVCenter, ok := values.GetValue(existingCluster, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
 		if ok && oldVCenter != nil && !reflect.DeepEqual(newVCenter, oldVCenter) {
 			newData := map[string]interface{}{}
-			for k,v := range data {
-	  			newData[k] = v
+			for k, v := range data {
+				newData[k] = v
 			}
 			// Update virtualCenter value to nil
 			values.PutValue(newData, nil, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
