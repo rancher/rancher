@@ -95,6 +95,10 @@ var (
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
 	EKSUpstreamRefreshCron            = NewSetting("eks-refresh-cron", "*/5 * * * *")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
+
+	FleetMinVersion           = NewSetting("fleet-min-version", "")
+	RancherOperatorMinVersion = NewSetting("rancher-operator-min-version", "")
+	RancherWebhookMinVersion  = NewSetting("rancher-webhook-min-version", "")
 )
 
 func FullShellImage() string {
