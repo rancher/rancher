@@ -34,12 +34,6 @@ type ClusterDialerFactory interface {
 
 func RewriteLocalCluster(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if strings.HasPrefix(req.URL.Path, "/k8s/clusters/local") {
-			req.URL.Path = strings.TrimPrefix(req.URL.Path, "/k8s/clusters/local")
-			if req.URL.Path == "" {
-				req.URL.Path = "/"
-			}
-		}
 		next.ServeHTTP(rw, req)
 	})
 }
