@@ -56,6 +56,7 @@ node {
                         string(credentialsId: 'RANCHER_AD_SPECIAL_CHAR_PASSWORD', variable: 'RANCHER_AD_SPECIAL_CHAR_PASSWORD'),
                         string(credentialsId: 'RANCHER_USER_SEARCH_BASE', variable: 'RANCHER_USER_SEARCH_BASE'),
                         string(credentialsId: 'RANCHER_DB_PASSWORD', variable: 'RANCHER_DB_PASSWORD'),
+                        string(credentialsId: 'RANCHER_RHEL_PASSWORD', variable: 'RANCHER_RHEL_PASSWORD'),
                         string(credentialsId: 'RANCHER_DEFAULT_LOGIN_DOMAIN', variable: 'RANCHER_DEFAULT_LOGIN_DOMAIN'),
                         string(credentialsId: 'RANCHER_OPENLDAP_SERVICE_ACCOUNT_NAME', variable: 'RANCHER_OPENLDAP_SERVICE_ACCOUNT_NAME'),
                         string(credentialsId: 'RANCHER_OPENLDAP_SERVICE_ACCOUNT_PASSWORD', variable: 'RANCHER_OPENLDAP_SERVICE_ACCOUNT_PASSWORD'),
