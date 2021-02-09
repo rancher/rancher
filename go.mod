@@ -97,7 +97,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee
-	github.com/rancher/rke v1.2.6-rc4.0.20210205231142-0e2db503c5a2
+	github.com/rancher/rke v1.2.6-rc4.0.20210209012359-ef99aae7bb89
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20210106185822-0badd210b19e
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
