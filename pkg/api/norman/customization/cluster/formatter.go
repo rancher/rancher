@@ -3,11 +3,10 @@ package cluster
 import (
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -20,6 +19,7 @@ import (
 type Formatter struct {
 	KontainerDriverLister     v3.KontainerDriverLister
 	nodeLister                v3.NodeLister
+	clusterLister             v3.ClusterLister
 	clusterSpecPwdFields      map[string]interface{}
 	SubjectAccessReviewClient v1.SubjectAccessReviewInterface
 }
@@ -28,6 +28,7 @@ func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContex
 	clusterFormatter := Formatter{
 		KontainerDriverLister:     managementContext.Management.KontainerDrivers("").Controller().Lister(),
 		nodeLister:                managementContext.Management.Nodes("").Controller().Lister(),
+		clusterLister:             managementContext.Management.Clusters("").Controller().Lister(),
 		clusterSpecPwdFields:      gatherClusterSpecPwdFields(schemas, schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType)),
 		SubjectAccessReviewClient: managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
 	}
@@ -63,7 +64,9 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 		resource.AddAction(request, v32.ClusterActionExportYaml)
 		resource.AddAction(request, v32.ClusterActionRotateCertificates)
-		resource.AddAction(request, v32.ClusterActionRotateEncryptionKey)
+		if rotateEncryptionKeyEnabled(f.clusterLister, resource.ID) {
+			resource.AddAction(request, v32.ClusterActionRotateEncryptionKey)
+		}
 		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
 			resource.AddAction(request, v32.ClusterActionBackupEtcd)
 			resource.AddAction(request, v32.ClusterActionRestoreFromEtcdBackup)
@@ -155,6 +158,24 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	} else {
 		resource.Values["nodeCount"] = len(nodes)
 	}
+}
+
+// rotateEncryptionKeyEnabled returns true if the rotateEncryptionKey action should be enabled in the API view, otherwise, it returns false.
+func rotateEncryptionKeyEnabled(clusterLister v3.ClusterLister, clusterName string) bool {
+	cluster, err := clusterLister.Get("", clusterName)
+	if err != nil {
+		return false
+	}
+
+	// check that encryption is enabled on cluster
+	if cluster.Spec.RancherKubernetesEngineConfig == nil ||
+		cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig == nil ||
+		!cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.Enabled {
+		return false
+	}
+
+	// Cluster should not be in updating
+	return v32.ClusterConditionUpdated.IsTrue(cluster)
 }
 
 func setTrueIfNil(configMap map[string]interface{}, fieldName string) {
