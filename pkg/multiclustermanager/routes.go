@@ -61,6 +61,11 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 
 	metricsHandler := metrics.NewMetricsHandler(scaledContext, clusterManager, promhttp.Handler())
 
+	metaProxy, err := httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext)
+	if err != nil {
+		return nil, err
+	}
+
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()
@@ -97,7 +102,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	authed.Path("/metrics").Handler(metricsHandler)
 	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
-	authed.PathPrefix("/meta/proxy").Handler(httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext))
+	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
