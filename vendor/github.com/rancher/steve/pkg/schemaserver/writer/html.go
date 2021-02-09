@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/rancher/steve/pkg/schemaserver/types"
@@ -22,7 +23,7 @@ var (
 <script>
 var user = "admin";
 var curlUser='${CATTLE_ACCESS_KEY}:${CATTLE_SECRET_KEY}';
-var schemas="%SCHEMAS%";
+var schemas=%SCHEMAS%;
 var data =
 `
 	end = []byte(`</script>
@@ -57,7 +58,7 @@ func (h *HTMLResponseWriter) write(apiOp *types.APIRequest, code int, obj interf
 	schemaSchema := apiOp.Schemas.Schemas["schema"]
 	headerString := start
 	if schemaSchema != nil {
-		headerString = strings.Replace(headerString, "%SCHEMAS%", apiOp.URLBuilder.Collection(schemaSchema), 1)
+		headerString = strings.Replace(headerString, "%SCHEMAS%", jsonEncodeURL(apiOp.URLBuilder.Collection(schemaSchema)), 1)
 	}
 	var jsurl, cssurl string
 	if h.CSSURL != nil && h.JSURL != nil && h.CSSURL() != "" && h.JSURL() != "" {
@@ -82,4 +83,9 @@ func (h *HTMLResponseWriter) write(apiOp *types.APIRequest, code int, obj interf
 	if schemaSchema != nil {
 		apiOp.Response.Write(end)
 	}
+}
+
+func jsonEncodeURL(str string) string {
+	data, _ := json.Marshal(str)
+	return string(data)
 }
