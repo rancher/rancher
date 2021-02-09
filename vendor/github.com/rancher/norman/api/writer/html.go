@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/rancher/norman/api/builtin"
@@ -23,7 +24,7 @@ var (
 <script>
 var user = "admin";
 var curlUser='${CATTLE_ACCESS_KEY}:${CATTLE_SECRET_KEY}';
-var schemas="%SCHEMAS%";
+var schemas=%SCHEMAS%;
 var data =
 `
 	end = []byte(`</script>
@@ -51,7 +52,7 @@ func (h *HTMLResponseWriter) Write(apiContext *types.APIContext, code int, obj i
 	schemaSchema := apiContext.Schemas.Schema(&builtin.Version, "schema")
 	headerString := start
 	if schemaSchema != nil {
-		headerString = strings.Replace(headerString, "%SCHEMAS%", apiContext.URLBuilder.Collection(schemaSchema, apiContext.Version), 1)
+		headerString = strings.Replace(headerString, "%SCHEMAS%", jsonEncodeURL(apiContext.URLBuilder.Collection(schemaSchema, apiContext.Version)), 1)
 	}
 	var jsurl, cssurl string
 	if h.CSSURL != nil && h.JSURL != nil && h.CSSURL() != "" && h.JSURL() != "" {
@@ -72,4 +73,9 @@ func (h *HTMLResponseWriter) Write(apiContext *types.APIContext, code int, obj i
 	if schemaSchema != nil {
 		apiContext.Response.Write(end)
 	}
+}
+
+func jsonEncodeURL(str string) string {
+	data, _ := json.Marshal(str)
+	return string(data)
 }
