@@ -10,7 +10,7 @@ replace (
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/eks-operator v1.0.6-rc1
-	github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3
+	github.com/rancher/norman v0.0.0-20210209001710-63e1cb58f072
 	github.com/rancher/rke v1.3.0-rc1.0.20210209015327-646f3fe89f29
 	github.com/rancher/wrangler v0.7.3-0.20201028210318-d73835950c29
 	github.com/sirupsen/logrus v1.6.0
