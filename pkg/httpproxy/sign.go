@@ -17,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/rancher/norman/httperror"
-	v1 "github.com/rancher/types/apis/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -29,8 +29,10 @@ var requiredHeadersForAws = map[string]bool{"host": true,
 	"x-amz-date":           true,
 	"x-amz-user-agent":     true}
 
+type SecretGetter func(namespace, name string) (*v1.Secret, error)
+
 type Signer interface {
-	sign(*http.Request, v1.SecretInterface, string) error
+	sign(*http.Request, SecretGetter, string) error
 }
 
 func newSigner(auth string) Signer {
@@ -50,7 +52,7 @@ func newSigner(auth string) Signer {
 	return nil
 }
 
-func (br bearer) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (br bearer) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	data, secret, err := getAuthData(auth, secrets, []string{"passwordField", "credID"})
 	if err != nil {
 		return err
@@ -59,7 +61,7 @@ func (br bearer) sign(req *http.Request, secrets v1.SecretInterface, auth string
 	return nil
 }
 
-func (b basic) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (b basic) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	data, secret, err := getAuthData(auth, secrets, []string{"usernameField", "passwordField", "credID"})
 	if err != nil {
 		return err
@@ -70,7 +72,7 @@ func (b basic) sign(req *http.Request, secrets v1.SecretInterface, auth string) 
 	return nil
 }
 
-func (a awsv4) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	_, secret, err := getAuthData(auth, secrets, []string{"credID"})
 	if err != nil {
 		return err
@@ -144,7 +146,7 @@ func partitionServiceAndRegion(partition endpoints.Partition, host string) (stri
 	return service, ""
 }
 
-func (d digest) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (d digest) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	data, secret, err := getAuthData(auth, secrets, []string{"usernameField", "passwordField", "credID"})
 	if err != nil {
 		return err
@@ -257,7 +259,7 @@ func getCnonce() string {
 	return fmt.Sprintf("%x", b)[:16]
 }
 
-func (a arbitrary) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (a arbitrary) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	data, _, err := getAuthData(auth, secrets, []string{})
 	if err != nil {
 		return err
