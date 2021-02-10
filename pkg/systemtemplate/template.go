@@ -214,10 +214,9 @@ spec:
         secret:
           secretName: cattle-credentials-{{.TokenKey}}
           defaultMode: 320
+{{ if .IsRKE }}
 
 ---
-
-{{ if .IsRKE }}
 
 apiVersion: apps/v1
 kind: DaemonSet
