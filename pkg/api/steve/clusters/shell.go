@@ -103,6 +103,7 @@ func (s *shell) createPod() *v1.Pod {
 			Namespace:    s.namespace,
 		},
 		Spec: v1.PodSpec{
+			DNSPolicy:                     "Default",
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,
 			NodeSelector: map[string]string{
@@ -114,6 +115,18 @@ func (s *shell) createPod() *v1.Pod {
 					Operator: "Equal",
 					Value:    "linux",
 					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/controlplane",
+					Operator: "Equal",
+					Value:    "true",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/etcd",
+					Operator: "Equal",
+					Value:    "true",
+					Effect:   "NoExecute",
 				},
 			},
 			Containers: []v1.Container{

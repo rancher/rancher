@@ -161,6 +161,7 @@ spec:
                 - "true"
             weight: 1
       serviceAccountName: cattle
+      dnsPolicy: Default
       tolerations:
       {{- if .Tolerations }}
       # Tolerations added based on found taints on controlplane nodes

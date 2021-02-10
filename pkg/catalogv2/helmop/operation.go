@@ -732,6 +732,7 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 			Namespace:    s.namespace,
 		},
 		Spec: v1.PodSpec{
+			DNSPolicy: "Default",
 			Volumes: []v1.Volume{
 				{
 					Name: "data",
@@ -753,6 +754,18 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 					Operator: "Equal",
 					Value:    "linux",
 					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/controlplane",
+					Operator: "Equal",
+					Value:    "true",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/etcd",
+					Operator: "Equal",
+					Value:    "true",
+					Effect:   "NoExecute",
 				},
 			},
 			Containers: []v1.Container{
