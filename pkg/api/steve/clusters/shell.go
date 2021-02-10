@@ -103,7 +103,6 @@ func (s *shell) createPod() *v1.Pod {
 			Namespace:    s.namespace,
 		},
 		Spec: v1.PodSpec{
-			DNSPolicy:                     "Default",
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,
 			NodeSelector: map[string]string{
