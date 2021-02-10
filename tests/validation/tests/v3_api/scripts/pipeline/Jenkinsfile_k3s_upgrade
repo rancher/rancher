@@ -130,6 +130,7 @@ node {
                       string(name: 'RANCHER_K3S_NO_OF_SERVER_NODES', value: "${RANCHER_K3S_NO_OF_SERVER_NODES}"),
                       string(name: 'RANCHER_K3S_NO_OF_WORKER_NODES', value: "${RANCHER_K3S_NO_OF_WORKER_NODES}"),
                       string(name: 'RANCHER_K3S_VERSION', value: "${k3s_versions[i]}"),
+                      string(name: 'RANCHER_NODE_OS', value: "${RANCHER_NODE_OS}"),
                       string(name: 'AWS_AMI', value: "${K3S_AWS_AMI}"),
                       string(name: 'RANCHER_K3S_SERVER_FLAGS', value: "${RANCHER_K3S_SERVER_FLAGS}"),
                       string(name: 'RANCHER_K3S_WORKER_FLAGS', value: "${RANCHER_K3S_WORKER_FLAGS}"),
