@@ -67,7 +67,6 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 	mux.UseEncodedPath()
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy(localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy(localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(proxyHandler)
 
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -111,19 +110,6 @@ func NewProxyHandler(authorizer authorizer.Authorizer,
 		authorizer:    authorizer,
 		dialerFactory: dialerFactory,
 		clusters:      clusters,
-	}
-}
-
-func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
-	return func(req *http.Request, match *gmux.RouteMatch) bool {
-		clusterID := strings.TrimPrefix(req.URL.Path, prefix)
-		clusterID = strings.SplitN(clusterID, "/", 2)[0]
-		if match.Vars == nil {
-			match.Vars = map[string]string{}
-		}
-		match.Vars["clusterID"] = clusterID
-
-		return true
 	}
 }
 
