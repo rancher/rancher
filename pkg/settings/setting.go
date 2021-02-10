@@ -19,6 +19,7 @@ var (
 	provider       Provider
 	InjectDefaults string
 
+	AgentInstallScript                = NewSetting("agent-install-script", "./install.sh")
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
