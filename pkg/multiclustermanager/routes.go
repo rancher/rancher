@@ -57,6 +57,11 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		return nil, err
 	}
 
+	metaProxy, err := httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext)
+	if err != nil {
+		return nil, err
+	}
+
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()
@@ -96,7 +101,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
-	authed.PathPrefix("/meta/proxy").Handler(httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext))
+	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/metrics").Handler(metrics.NewMetricsHandler(scaledContext, promhttp.Handler()))
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
