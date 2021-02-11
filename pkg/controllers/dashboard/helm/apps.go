@@ -84,8 +84,8 @@ func (a *appHandler) appStatus(app *v1.App, status v1.ReleaseStatus) (v1.Release
 	return status, nil
 }
 
-func (a *appHandler) isLatestSecret(spec *v1.ReleaseSpec) (bool, error) {
-	others, err := a.secretCache.List(spec.Namespace, labels.SelectorFromSet(labels.Set{
+func (a *appHandler) isLatestSecret(ns string, spec *v1.ReleaseSpec) (bool, error) {
+	others, err := a.secretCache.List(ns, labels.SelectorFromSet(labels.Set{
 		"owner": "helm",
 	}))
 	if err != nil {
@@ -100,8 +100,8 @@ func (a *appHandler) isLatestSecret(spec *v1.ReleaseSpec) (bool, error) {
 	return helm.IsLatest(spec, othersRuntime), nil
 }
 
-func (a *appHandler) isLatestConfigMap(spec *v1.ReleaseSpec) (bool, error) {
-	others, err := a.configMapCache.List(spec.Namespace, labels.SelectorFromSet(labels.Set{
+func (a *appHandler) isLatestConfigMap(ns string, spec *v1.ReleaseSpec) (bool, error) {
+	others, err := a.configMapCache.List(ns, labels.SelectorFromSet(labels.Set{
 		"OWNER": "TILLER",
 	}))
 	if err != nil {
@@ -129,7 +129,7 @@ func (a *appHandler) OnConfigMapChange(key string, configMap *corev1.ConfigMap) 
 	a.locker.Lock(spec.Name)
 	defer a.locker.Unlock(spec.Name)
 
-	if latest, err := a.isLatestConfigMap(spec); err != nil {
+	if latest, err := a.isLatestConfigMap(configMap.Namespace, spec); err != nil {
 		return nil, err
 	} else if !latest {
 		// Don't delete if we create an App before as it's probably owned by something else now
@@ -158,7 +158,7 @@ func (a *appHandler) OnSecretChange(key string, secret *corev1.Secret) (*corev1.
 	a.locker.Lock(spec.Name)
 	defer a.locker.Unlock(spec.Name)
 
-	if latest, err := a.isLatestSecret(spec); err != nil {
+	if latest, err := a.isLatestSecret(secret.Namespace, spec); err != nil {
 		return nil, err
 	} else if !latest {
 		// Don't delete if we create an App before as it's probably owned by something else now
