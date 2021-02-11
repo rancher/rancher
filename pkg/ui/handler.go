@@ -112,7 +112,8 @@ func (u *handler) ServeFaviconDashboard() http.Handler {
 
 func (u *handler) IndexFileOnNotFound() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if _, err := os.Stat(filepath.Join(u.pathSetting(), req.URL.Path)); err == nil {
+		// we ignore directories here because we want those to come from the CDN when running in that mode
+		if stat, err := os.Stat(filepath.Join(u.pathSetting(), req.URL.Path)); err == nil && !stat.IsDir() {
 			u.ServeAsset().ServeHTTP(rw, req)
 		} else {
 			u.IndexFile().ServeHTTP(rw, req)
