@@ -732,7 +732,6 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 			Namespace:    s.namespace,
 		},
 		Spec: v1.PodSpec{
-			DNSPolicy: "Default",
 			Volumes: []v1.Volume{
 				{
 					Name: "data",
