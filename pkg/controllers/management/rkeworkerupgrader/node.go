@@ -24,6 +24,8 @@ type upgradeStatus struct {
 	toProcess []*v3.Node
 	// upgrading => upgraded => uncordon
 	upgraded []*v3.Node
+	// notReady => stuck in cordoned (unavailable nodes get new plan without NodeConditionUpgraded)
+	toUncordon []*v3.Node
 	// unavailable nodes
 	notReady []*v3.Node
 	// upgraded active nodes
@@ -161,6 +163,10 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int, dra
 			} else {
 				// node hasn't un-cordoned, so consider it upgrading in terms of maxUnavailable count
 				status.upgrading++
+				// node has already upgraded, but condition is not unknown, so uncordon it
+				if !v32.NodeConditionUpgraded.IsUnknown(node) && node.Spec.DesiredNodeUnschedulable != "false" {
+					status.toUncordon = append(status.toUncordon, node)
+				}
 			}
 			continue
 		}
