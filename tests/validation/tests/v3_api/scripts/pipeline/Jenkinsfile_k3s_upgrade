@@ -135,7 +135,6 @@ node {
                       string(name: 'RANCHER_K3S_SERVER_FLAGS', value: "${RANCHER_K3S_SERVER_FLAGS}"),
                       string(name: 'RANCHER_K3S_WORKER_FLAGS', value: "${RANCHER_K3S_WORKER_FLAGS}"),
                       string(name: 'RANCHER_DB_USERNAME', value: "${RANCHER_DB_USERNAME}"),
-                      string(name: 'RANCHER_DB_PASSWORD', value: "${RANCHER_DB_PASSWORD}"),
                       string(name: 'AWS_USER', value: "${AWS_USER}"),
                       string(name: 'RANCHER_EXTERNAL_DB', value: "${RANCHER_EXTERNAL_DB}"),
                       string(name: 'RANCHER_EXTERNAL_DB_VERSION', value: "${RANCHER_EXTERNAL_DB_VERSION}"),
