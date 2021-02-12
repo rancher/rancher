@@ -53,6 +53,9 @@ if TEST_OS == "windows":
 skip_test_windows_os = pytest.mark.skipif(
     TEST_OS == "windows",
     reason='Tests Skipped for including Windows nodes cluster')
+skip_test_hardened = pytest.mark.skipif(
+    HARDENED_CLUSTER,
+    reason='Tests Skipped due to being a hardened cluster')
 
 UPDATE_KDM = ast.literal_eval(os.environ.get('RANCHER_UPDATE_KDM', "False"))
 KDM_URL = os.environ.get("RANCHER_KDM_URL", "")
