@@ -823,7 +823,12 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		return err
 	}
 
-	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster) {
+	nodePool, err := m.getNodePool(node.Spec.NodePoolName)
+	if err != nil {
+		return err
+	}
+
+	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster, nodePool) {
 		return nil
 	}
 
