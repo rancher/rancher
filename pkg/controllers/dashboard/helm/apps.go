@@ -92,6 +92,14 @@ func (a *appHandler) isLatestSecret(ns string, spec *v1.ReleaseSpec) (bool, erro
 		return false, err
 	}
 
+	// TODO: If we find nothing here we didn't even find the original. That's bad and can
+	// indicate that this is a helm v2 release using secrets which we currently
+	// aren't expecting.
+	// https://github.com/rancher/rancher/issues/31297
+	if len(others) == 0 {
+		return false, nil
+	}
+
 	othersRuntime := make([]runtime.Object, 0, len(others))
 	for _, other := range others {
 		othersRuntime = append(othersRuntime, other)
@@ -106,6 +114,14 @@ func (a *appHandler) isLatestConfigMap(ns string, spec *v1.ReleaseSpec) (bool, e
 	}))
 	if err != nil {
 		return false, err
+	}
+
+	// TODO: If we find nothing here we didn't even find the original. That's bad and can
+	// indicate that this is a helm v2 release using configMaps which we currently
+	// aren't expecting.
+	// https://github.com/rancher/rancher/issues/31297
+	if len(others) == 0 {
+		return false, nil
 	}
 
 	othersRuntime := make([]runtime.Object, 0, len(others))
