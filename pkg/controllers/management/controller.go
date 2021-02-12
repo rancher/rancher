@@ -29,12 +29,14 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
 	"github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	"github.com/rancher/rancher/pkg/controllers/management/restrictedadminrbac"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {
+func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager, wrangler *wrangler.Context) {
 	// auth handlers need to run early to create namespaces that back clusters and projects
 	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
 	auth.RegisterEarly(ctx, management, manager)
@@ -66,6 +68,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	nodetemplate.Register(ctx, management)
 	rkeworkerupgrader.Register(ctx, management, manager.ScaledContext)
 	rbac.Register(ctx, management)
+	restrictedadminrbac.Register(ctx, management, wrangler)
 
 	// Register last
 	auth.RegisterLate(ctx, management)
