@@ -69,6 +69,11 @@ ingress:
     # options: rancher, letsEncrypt, secret
     source: rancher
 
+### service ###
+service:
+  # Set to NodePort or LoadBalancer to expose Rancher Server outside the cluster
+  type: ClusterIP
+
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
 #         Use staging until you have your config right.

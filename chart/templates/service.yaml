@@ -1,3 +1,4 @@
+{{- $service := default dict .Values.service -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -19,3 +20,4 @@ spec:
     name: https-internal
   selector:
     app: {{ template "rancher.fullname" . }}
+  type: {{ default "ClusterIP" $service.type }}
