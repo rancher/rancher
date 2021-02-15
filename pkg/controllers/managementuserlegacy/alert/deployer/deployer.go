@@ -326,6 +326,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 		if app.Spec.Answers[WebhookReceiverEnable] != enableWebhookReceiver {
 			copy := app.DeepCopy()
 			copy.Spec.Answers[WebhookReceiverEnable] = enableWebhookReceiver
+			delete(copy.Spec.AnswersForceString, WebhookReceiverEnable)
 			_, err := d.appsGetter.Apps(systemProjectName).Update(copy)
 			if err != nil {
 				return false, fmt.Errorf("failed to update %q App, %v", appName, err)

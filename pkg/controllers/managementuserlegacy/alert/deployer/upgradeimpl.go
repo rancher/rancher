@@ -150,6 +150,7 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 	newApp := app.DeepCopy()
 	newApp.Spec.ExternalID = newExternalID
 	newApp.Spec.Answers["operator.enabled"] = "false"
+	delete(newApp.Spec.AnswersForceString, "operator.enabled")
 
 	if !reflect.DeepEqual(newApp, app) {
 		// check cluster ready before upgrade, because helm will not retry if got cluster not ready error
