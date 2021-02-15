@@ -17,8 +17,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
-	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -157,14 +156,14 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 	commands = append(commands, setValues...)
 	commands = append(commands, tempDirs.AppDirInJail)
 
-	if v32.AppConditionForceUpgrade.IsUnknown(obj) {
+	if v3.AppConditionForceUpgrade.IsUnknown(obj) {
 		commands = append(commands, forceUpgradeStr)
 		// don't leave force recreate on the object
-		v32.AppConditionForceUpgrade.True(obj)
+		v3.AppConditionForceUpgrade.True(obj)
 	}
 	var cmd *exec.Cmd
 	// switch userTriggeredAction back
-	v32.AppConditionUserTriggeredAction.Unknown(obj)
+	v3.AppConditionUserTriggeredAction.Unknown(obj)
 	if IsHelm3(obj.Status.HelmVersion) {
 		cmd = exec.Command(HelmV3, commands...)
 	} else {
@@ -185,10 +184,10 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 		// if the first install failed, the second install would have error message like `has no deployed releases`, then the
 		// original error is masked. We need to filter out the message and always return the last one if error matches this pattern
 		if strings.Contains(stderrBuf.String(), "has no deployed releases") {
-			if !v32.AppConditionForceUpgrade.IsUnknown(obj) {
-				v32.AppConditionForceUpgrade.Unknown(obj)
+			if !v3.AppConditionForceUpgrade.IsUnknown(obj) {
+				v3.AppConditionForceUpgrade.Unknown(obj)
 			}
-			return errors.New(v32.AppConditionInstalled.GetMessage(obj))
+			return errors.New(v3.AppConditionInstalled.GetMessage(obj))
 		}
 		return errors.Errorf("failed to install app %s. %s", obj.Name, stderrBuf.String())
 	}
