@@ -295,6 +295,13 @@ func (in *Answer) DeepCopyInto(out *Answer) {
 			(*out)[key] = val
 		}
 	}
+	if in.ValuesForceString != nil {
+		in, out := &in.ValuesForceString, &out.ValuesForceString
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
@@ -5337,6 +5344,13 @@ func (in *MonitoringInput) DeepCopyInto(out *MonitoringInput) {
 			(*out)[key] = val
 		}
 	}
+	if in.AnswersForceString != nil {
+		in, out := &in.AnswersForceString, &out.AnswersForceString
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
@@ -5356,6 +5370,13 @@ func (in *MonitoringOutput) DeepCopyInto(out *MonitoringOutput) {
 	if in.Answers != nil {
 		in, out := &in.Answers, &out.Answers
 		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.AnswersForceString != nil {
+		in, out := &in.AnswersForceString, &out.AnswersForceString
+		*out = make(map[string]bool, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
