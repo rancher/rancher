@@ -94,7 +94,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 	}
 	systemUserName := systemUser.Name
 
-	answerMap, err := m.createAnswerMap(mcapp.Spec.Answers)
+	answerMap, answerForceStringMap, err := m.createAnswerMap(mcapp.Spec.Answers)
 	if err != nil {
 		return mcapp, err
 	}
@@ -129,7 +129,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		}
 	}
 
-	resp, err := m.createApps(mcapp, externalID, answerMap, systemUserName, batchSize, toUpdate)
+	resp, err := m.createApps(mcapp, externalID, answerMap, answerForceStringMap, systemUserName, batchSize, toUpdate)
 	if err != nil {
 		return resp.object, err
 	}
@@ -152,7 +152,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 	}
 
 	for i, app := range resp.updateApps {
-		if _, err := m.updateApp(app, answerMap, externalID, resp.projects[i]); err != nil {
+		if _, err := m.updateApp(app, answerMap, answerForceStringMap, externalID, resp.projects[i]); err != nil {
 			return mcapp, err
 		}
 		resp.remaining--
@@ -178,8 +178,15 @@ type Response struct {
 	count      int
 }
 
-func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, answerMap map[string]map[string]string,
-	creatorID string, batchSize int, toUpdate bool) (*Response, error) {
+func (m *MCAppManager) createApps(
+	mcapp *v3.MultiClusterApp,
+	externalID string,
+	answerMap map[string]map[string]string,
+	answerForceStringMap map[string]map[string]bool,
+	creatorID string,
+	batchSize int,
+	toUpdate bool,
+) (*Response, error) {
 
 	var mcappToUpdate *v3.MultiClusterApp
 	var updateApps []*pv3.App
@@ -214,7 +221,8 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 			}
 			appUpdated := false
 			if app.Spec.ExternalID == externalID {
-				if reflect.DeepEqual(app.Spec.Answers, getAnswerMap(answerMap, t.ProjectName)) {
+				if reflect.DeepEqual(app.Spec.Answers, getAnswerMap(answerMap, t.ProjectName)) &&
+					reflect.DeepEqual(app.Spec.AnswersForceString, getAnswerForceStringMap(answerForceStringMap, t.ProjectName)) {
 					appUpdated = true
 				}
 			}
@@ -234,7 +242,7 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 			continue
 		}
 		if batchSize > 0 {
-			appName, mcapp, err := m.createApp(mcapp, answerMap, ann, set, projectNS, creatorID, externalID, t.ProjectName)
+			appName, mcapp, err := m.createApp(mcapp, answerMap, answerForceStringMap, ann, set, projectNS, creatorID, externalID, t.ProjectName)
 			if err != nil {
 				return resp, fmt.Errorf("error %v in creating multiclusterapp: %v", err, mcapp)
 			}
@@ -266,9 +274,16 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 	return resp, nil
 }
 
-func (m *MCAppManager) updateApp(app *pv3.App, answerMap map[string]map[string]string, externalID string, projectName string) (*pv3.App, error) {
+func (m *MCAppManager) updateApp(
+	app *pv3.App,
+	answerMap map[string]map[string]string,
+	answerForceStringMap map[string]map[string]bool,
+	externalID string,
+	projectName string,
+) (*pv3.App, error) {
 	app = app.DeepCopy()
 	app.Spec.Answers = getAnswerMap(answerMap, projectName)
+	app.Spec.AnswersForceString = getAnswerForceStringMap(answerForceStringMap, projectName)
 	app.Spec.ExternalID = externalID
 	updatedObj, err := m.apps.Update(app)
 	if err != nil && apierrors.IsConflict(err) {
@@ -280,6 +295,7 @@ func (m *MCAppManager) updateApp(app *pv3.App, answerMap map[string]map[string]s
 			}
 			latestToUpdate := latestObj.DeepCopy()
 			latestToUpdate.Spec.Answers = getAnswerMap(answerMap, projectName)
+			latestToUpdate.Spec.AnswersForceString = getAnswerForceStringMap(answerForceStringMap, projectName)
 			latestToUpdate.Spec.ExternalID = externalID
 			updated, err := m.apps.Update(latestToUpdate)
 			if err != nil && apierrors.IsConflict(err) {
@@ -313,6 +329,7 @@ func (m *MCAppManager) createRevision(mcapp *v3.MultiClusterApp, creatorID strin
 		mcAppLabel: mcapp.Name,
 	}
 	revision.Answers = mcapp.Spec.Answers
+	logrus.Infof("nikkelma: createRevision revision.Answers: %v", revision.Answers)
 	revision.TemplateVersionName = mcapp.Spec.TemplateVersionName
 	revision.Namespace = namespace.GlobalNamespace
 	return m.multiClusterAppRevisions.Create(revision)
@@ -377,8 +394,17 @@ func (m *MCAppManager) toUpdate(mcapp *v3.MultiClusterApp) (bool, error) {
 	return true, nil
 }
 
-func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string]map[string]string, ann map[string]string,
-	set map[string]string, projectNS string, creatorID string, externalID string, projectName string) (string, *v3.MultiClusterApp, error) {
+func (m *MCAppManager) createApp(
+	mcapp *v3.MultiClusterApp,
+	answerMap map[string]map[string]string,
+	answerForceStringMap map[string]map[string]bool,
+	ann map[string]string,
+	set map[string]string,
+	projectNS string,
+	creatorID string,
+	externalID string,
+	projectName string,
+) (string, *v3.MultiClusterApp, error) {
 	nsName := getAppNamespaceName(mcapp.Name, projectNS)
 	app, err := m.appLister.Get(projectNS, nsName)
 	if err != nil {
@@ -398,6 +424,7 @@ func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string
 				ExternalID:          externalID,
 				MultiClusterAppName: mcapp.Name,
 				Answers:             getAnswerMap(answerMap, projectName),
+				AnswersForceString:  getAnswerForceStringMap(answerForceStringMap, projectName),
 				Wait:                mcapp.Spec.Wait,
 				Timeout:             mcapp.Spec.Timeout,
 			},
@@ -429,6 +456,26 @@ func getAnswerMap(answerMap map[string]map[string]string, projectName string) ma
 		}
 	}
 	return answers
+}
+
+func getAnswerForceStringMap(answerForceStringMap map[string]map[string]bool, projectName string) map[string]bool {
+	// find answerForceStrings for this project, if not found then try finding for the cluster this project belongs to, else finally use the global scoped answer
+	answersForceString := make(map[string]bool)
+	if len(answerForceStringMap) > 0 {
+		if ans, ok := answerForceStringMap[projectName]; ok {
+			return ans
+		}
+		// find the answerForceStrings for the cluster of this project
+		split := strings.SplitN(projectName, ":", 2)
+		clusterName := split[0]
+		if ans, ok := answerForceStringMap[clusterName]; ok {
+			return ans
+		}
+		if ans, ok := answerForceStringMap[globalScopeAnswersKey]; ok {
+			return ans
+		}
+	}
+	return answersForceString
 }
 
 // deleteApps finds all apps created by this multiclusterapp and deletes them
@@ -577,17 +624,24 @@ func setInstalledDone(mcapp *v3.MultiClusterApp) {
 	v32.MultiClusterAppConditionInstalled.Message(mcapp, "")
 }
 
-func (m *MCAppManager) createAnswerMap(answers []v32.Answer) (map[string]map[string]string, error) {
-	// create a map, where key is the projectID or clusterID, or "global" if neither is provided, and value is the actual answer values
+func (m *MCAppManager) createAnswerMap(answers []v32.Answer) (map[string]map[string]string, map[string]map[string]bool, error) {
+	// create two maps, where key is the projectID or clusterID, or "global" if neither is provided, and value is the actual answer values or forceString values
 	// Global scoped answers will have all questions. Project/cluster scoped will only have override keys. So we'll first create a global map,
 	// and then merge with project/cluster map
 	answerMap := make(map[string]map[string]string)
+	answerForceStringMap := make(map[string]map[string]bool)
 	globalAnswersMap := make(map[string]string)
+	globalAnswersForceStringMap := make(map[string]bool)
 	for _, a := range answers {
 		if a.ProjectName == "" && a.ClusterName == "" {
 			globalAnswersMap = a.Values
+			globalAnswersForceStringMap = a.ValuesForceString
+
 			answerMap[globalScopeAnswersKey] = make(map[string]string)
 			answerMap[globalScopeAnswersKey] = a.Values
+
+			answerForceStringMap[globalScopeAnswersKey] = make(map[string]bool)
+			answerForceStringMap[globalScopeAnswersKey] = a.ValuesForceString
 		}
 	}
 
@@ -599,6 +653,10 @@ func (m *MCAppManager) createAnswerMap(answers []v32.Answer) (map[string]map[str
 			clusterLabels := labels.Merge(globalAnswersMap, a.Values)
 			answerMap[a.ClusterName] = make(map[string]string)
 			answerMap[a.ClusterName] = clusterLabels
+
+			clusterMergedForceString := mergeBool(globalAnswersForceStringMap, a.ValuesForceString)
+			answerForceStringMap[a.ClusterName] = make(map[string]bool)
+			answerForceStringMap[a.ClusterName] = clusterMergedForceString
 		}
 	}
 
@@ -607,7 +665,7 @@ func (m *MCAppManager) createAnswerMap(answers []v32.Answer) (map[string]map[str
 			// check if answers for the cluster of this project are provided
 			split := strings.SplitN(a.ProjectName, ":", 2)
 			if len(split) != 2 {
-				return answerMap, fmt.Errorf("error in splitting project name: %v", a.ProjectName)
+				return answerMap, answerForceStringMap, fmt.Errorf("error in splitting project name: %v", a.ProjectName)
 			}
 			clusterName := split[0]
 			// Using k8s labels.Merge, since by definition:
@@ -621,10 +679,19 @@ func (m *MCAppManager) createAnswerMap(answers []v32.Answer) (map[string]map[str
 			}
 			answerMap[a.ProjectName] = make(map[string]string)
 			answerMap[a.ProjectName] = projectLabels
+
+			projectMergedForceString := make(map[string]bool)
+			if val, ok := answerForceStringMap[clusterName]; ok {
+				projectMergedForceString = mergeBool(val, a.ValuesForceString)
+			} else {
+				projectMergedForceString = mergeBool(globalAnswersForceStringMap, a.ValuesForceString)
+			}
+			answerForceStringMap[a.ProjectName] = make(map[string]bool)
+			answerForceStringMap[a.ProjectName] = projectMergedForceString
 		}
 	}
 
-	return answerMap, nil
+	return answerMap, answerForceStringMap, nil
 }
 
 // getExternalID gets the TemplateVersion.Spec.ExternalID field
@@ -647,4 +714,19 @@ func (m *MCAppManager) getExternalID(mcapp *v3.MultiClusterApp) (string, *v3.Mul
 
 func getAppNamespaceName(mcappName, projectNS string) string {
 	return fmt.Sprintf("%s-%s", mcappName, projectNS)
+}
+
+// mergeBool combines given maps, and does not check for any conflicts
+// between the maps. In case of conflicts, second map (labels2) wins.
+// Reimplements k8s.io/apimachinery/pkg/labels.Set.Merge for bool value type.
+func mergeBool(labels1, labels2 map[string]bool) map[string]bool {
+	mergedMap := make(map[string]bool)
+
+	for k, v := range labels1 {
+		mergedMap[k] = v
+	}
+	for k, v := range labels2 {
+		mergedMap[k] = v
+	}
+	return mergedMap
 }
