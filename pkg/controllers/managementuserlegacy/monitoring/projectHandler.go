@@ -199,9 +199,33 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.cluster.alertManagerNamespace": clusterAlertManagerSvcNamespaces,
 	}
 
-	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, project.Annotations, ph.app.catalogTemplateLister, ph.catalogManager, ph.clusterName)
+	// build list of known keys that should NOT be forced to a string
+	// e.g. "true", "false", "123", "2379"
+	var knownUnforcedStringKeys []string
+
+	detectNotForcedStringKeys := func(answers map[string]string) []string {
+		var notForcedStringKeys []string
+		for k := range answers {
+			// all boolean keys must NOT be forced to be a string
+			if k == "true" || k == "false" {
+				notForcedStringKeys = append(notForcedStringKeys, k)
+			}
+			// if any default values are numbers, add a check here to ensure those number values are NOT forced as a string
+		}
+		return notForcedStringKeys
+	}
+
+	knownUnforcedStringKeys = append(knownUnforcedStringKeys, detectNotForcedStringKeys(optionalAppAnswers)...)
+	knownUnforcedStringKeys = append(knownUnforcedStringKeys, detectNotForcedStringKeys(mustAppAnswers)...)
+
+	appAnswers, appAnswersForceString, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, project.Annotations, ph.app.catalogTemplateLister, ph.catalogManager, ph.clusterName)
 	if err != nil {
 		return err
+	}
+
+	// prevent forcing string for known keys that should NOT be forced to a string
+	for _, key := range knownUnforcedStringKeys {
+		delete(appAnswersForceString, key)
 	}
 
 	// cannot overwrite mustAppAnswers
@@ -231,11 +255,12 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 			Namespace:   appDeployProjectID,
 		},
 		Spec: v33.AppSpec{
-			Answers:         appAnswers,
-			Description:     "Rancher Project Monitoring",
-			ExternalID:      appCatalogID,
-			ProjectName:     appProjectName,
-			TargetNamespace: appTargetNamespace,
+			Answers:            appAnswers,
+			AnswersForceString: appAnswersForceString,
+			Description:        "Rancher Project Monitoring",
+			ExternalID:         appCatalogID,
+			ProjectName:        appProjectName,
+			TargetNamespace:    appTargetNamespace,
 		},
 	}
 

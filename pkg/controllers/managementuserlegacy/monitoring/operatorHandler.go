@@ -165,6 +165,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler, catalogManage
 		"apiGroup":     monitoring.APIVersion.Group,
 		"nameOverride": "prometheus-operator",
 	}
+	appAnswersForceString := map[string]bool{}
 
 	mustAppAnswers := map[string]string{
 		"operator.apiGroup":     monitoring.APIVersion.Group,
@@ -172,12 +173,41 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler, catalogManage
 		"operator-init.enabled": "true",
 	}
 
+	// build list of known keys that should NOT be forced to a string
+	// e.g. "true", "false", "123", "2379"
+	var knownUnforcedStringKeys []string
+
+	detectNotForcedStringKeys := func(answers map[string]string) []string {
+		var notForcedStringKeys []string
+		for k := range answers {
+			// all boolean keys must NOT be forced to be a string
+			if k == "true" || k == "false" {
+				notForcedStringKeys = append(notForcedStringKeys, k)
+			}
+			// if any default values are numbers, add a check here to ensure those number values are NOT forced as a string
+		}
+		return notForcedStringKeys
+	}
+
+	knownUnforcedStringKeys = append(knownUnforcedStringKeys, detectNotForcedStringKeys(appAnswers)...)
+	knownUnforcedStringKeys = append(knownUnforcedStringKeys, detectNotForcedStringKeys(mustAppAnswers)...)
+
 	// take operator answers from overwrite answers
-	answers, version := monitoring.GetOverwroteAppAnswersAndVersion(cluster.Annotations)
+	answers, answersForceString, version := monitoring.GetOverwroteAppAnswersAndVersion(cluster.Annotations)
 	for ansKey, ansVal := range answers {
 		if strings.HasPrefix(ansKey, "operator.") || strings.HasPrefix(ansKey, "operator-init.") {
 			appAnswers[ansKey] = ansVal
+			if answersForceString[ansKey] {
+				appAnswersForceString[ansKey] = true
+			} else {
+				delete(appAnswersForceString, ansKey)
+			}
 		}
+	}
+
+	// prevent forcing string for known unforced keys
+	for _, key := range knownUnforcedStringKeys {
+		delete(appAnswersForceString, key)
 	}
 
 	// cannot overwrite mustAppAnswers
@@ -203,11 +233,12 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler, catalogManage
 			Namespace:   appDeployProjectID,
 		},
 		Spec: v33.AppSpec{
-			Answers:         appAnswers,
-			Description:     "Prometheus Operator for Rancher Monitoring",
-			ExternalID:      appCatalogID,
-			ProjectName:     appProjectName,
-			TargetNamespace: appTargetNamespace,
+			Answers:            appAnswers,
+			AnswersForceString: appAnswersForceString,
+			Description:        "Prometheus Operator for Rancher Monitoring",
+			ExternalID:         appCatalogID,
+			ProjectName:        appProjectName,
+			TargetNamespace:    appTargetNamespace,
 		},
 	}
 

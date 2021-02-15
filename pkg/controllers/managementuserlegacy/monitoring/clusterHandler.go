@@ -103,7 +103,7 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			}
 		}
 
-		_, err = ch.deployApp(appName, appTargetNamespace, appProjectName, cluster, etcdTLSConfigs, systemComponentMap)
+		_, _, err = ch.deployApp(appName, appTargetNamespace, appProjectName, cluster, etcdTLSConfigs, systemComponentMap)
 		if err != nil {
 			v32.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			v32.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
@@ -278,7 +278,14 @@ func (ch *clusterHandler) getExporterEndpoint() (map[string][]string, error) {
 	return endpointMap, nil
 }
 
-func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProjectName string, cluster *mgmtv3.Cluster, etcdTLSConfig []*etcdTLSConfig, systemComponentMap map[string][]string) (map[string]string, error) {
+func (ch *clusterHandler) deployApp(
+	appName string,
+	appTargetNamespace string,
+	appProjectName string,
+	cluster *mgmtv3.Cluster,
+	etcdTLSConfig []*etcdTLSConfig,
+	systemComponentMap map[string][]string,
+) (map[string]string, map[string]bool, error) {
 	_, appDeployProjectID := ref.Parse(appProjectName)
 	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
 
@@ -348,9 +355,33 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.ruleSelector.matchExpressions[0].values[1]":                             monitoring.CattleMonitoringPrometheusRuleLabelValue,
 	}
 
-	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, cluster.Annotations, ch.app.catalogTemplateLister, ch.cattleCatalogManager, ch.clusterName)
+	// build list of known keys that should NOT be forced to a string
+	// e.g. "true", "false", "123", "2379"
+	var knownUnforcedStringKeys []string
+
+	detectNotForcedStringKeys := func(answers map[string]string) []string {
+		var notForcedStringKeys []string
+		for k := range answers {
+			// all boolean keys must NOT be forced to be a string
+			if k == "true" || k == "false" {
+				notForcedStringKeys = append(notForcedStringKeys, k)
+			}
+			// if any default values are numbers, add a check here to ensure those number values are NOT forced as a string
+		}
+		return notForcedStringKeys
+	}
+
+	knownUnforcedStringKeys = append(knownUnforcedStringKeys, detectNotForcedStringKeys(optionalAppAnswers)...)
+	knownUnforcedStringKeys = append(knownUnforcedStringKeys, detectNotForcedStringKeys(mustAppAnswers)...)
+
+	appAnswers, appAnswersForceString, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, cluster.Annotations, ch.app.catalogTemplateLister, ch.cattleCatalogManager, ch.clusterName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	// prevent forcing string for known unforced keys
+	for _, key := range knownUnforcedStringKeys {
+		delete(appAnswersForceString, key)
 	}
 
 	// cannot overwrite mustAppAnswers
@@ -361,8 +392,14 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	if systemComponentMap != nil {
 		if etcdEndpoints, ok := systemComponentMap[etcd]; ok {
 			appAnswers["prometheus.secrets[0]"] = exporterEtcdCertName
+
 			appAnswers["exporter-kube-etcd.enabled"] = "true"
+			delete(appAnswersForceString, "exporter-kube-etcd.enabled")
+
 			appAnswers["exporter-kube-etcd.ports.metrics.port"] = "2379"
+			appAnswersForceString["exporter-kube-etcd.ports.metrics.port"] = false
+			delete(appAnswersForceString, "exporter-kube-etcd.ports.metrics.port")
+
 			sort.Strings(etcdEndpoints)
 			for k, v := range etcdEndpoints {
 				key := fmt.Sprintf("exporter-kube-etcd.endpoints[%d]", k)
@@ -380,7 +417,11 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 
 		if controlplaneEndpoints, ok := systemComponentMap[controlplane]; ok {
 			appAnswers["exporter-kube-scheduler.enabled"] = "true"
+			delete(appAnswersForceString, "exporter-kube-scheduler.enabled")
+
 			appAnswers["exporter-kube-controller-manager.enabled"] = "true"
+			delete(appAnswersForceString, "exporter-kube-controller-manager.enabled")
+
 			sort.Strings(controlplaneEndpoints)
 			for k, v := range controlplaneEndpoints {
 				key1 := fmt.Sprintf("exporter-kube-scheduler.endpoints[%d]", k)
@@ -392,8 +433,11 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 
 		if windowsNodeEndpoints, ok := systemComponentMap[windowsNode]; ok {
 			appAnswers["exporter-node-windows.enabled"] = "true"
+			delete(appAnswersForceString, "exporter-node-windows.enabled")
+
 			if port, ok := appAnswers["exporter-node.ports.metrics.port"]; ok {
 				appAnswers["exporter-node-windows.ports.metrics.port"] = port
+				delete(appAnswersForceString, "exporter-node-windows.ports.metrics.port")
 			}
 			sort.Strings(windowsNodeEndpoints)
 			for k, v := range windowsNodeEndpoints {
@@ -405,7 +449,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 
 	creator, err := ch.app.systemAccountManager.GetSystemUser(ch.clusterName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	app := &v3.App{
@@ -416,11 +460,12 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 			Namespace:   appDeployProjectID,
 		},
 		Spec: v33.AppSpec{
-			Answers:         appAnswers,
-			Description:     "Rancher Cluster Monitoring",
-			ExternalID:      appCatalogID,
-			ProjectName:     appProjectName,
-			TargetNamespace: appTargetNamespace,
+			Answers:            appAnswers,
+			AnswersForceString: appAnswersForceString,
+			Description:        "Rancher Cluster Monitoring",
+			ExternalID:         appCatalogID,
+			ProjectName:        appProjectName,
+			TargetNamespace:    appTargetNamespace,
 		},
 	}
 
@@ -428,7 +473,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	var forceRedeploy bool
 	appWorkload, err := ch.app.agentStatefulSetLister.Get(appTargetNamespace, fmt.Sprintf("prometheus-%s", appName))
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, errors.Wrapf(err, "failed to get statefulset %s/prometheus-%s", appTargetNamespace, appName)
+		return nil, nil, errors.Wrapf(err, "failed to get statefulset %s/prometheus-%s", appTargetNamespace, appName)
 	}
 	if appWorkload == nil || appWorkload.Name == "" || appWorkload.DeletionTimestamp != nil {
 		forceRedeploy = true
@@ -436,10 +481,10 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 
 	_, err = app2.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app, forceRedeploy)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return appAnswers, nil
+	return appAnswers, appAnswersForceString, nil
 }
 
 func getClusterTag(cluster *mgmtv3.Cluster) string {
