@@ -130,21 +130,29 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		}
 
 		answers := actionInput["answers"]
+		answersForceString := actionInput["answersForceString"]
 		forceUpgrade := actionInput["forceUpgrade"]
 		files := actionInput["files"]
 		valuesYaml := actionInput["valuesYaml"]
 
+		obj.Spec.Answers = make(map[string]string)
 		if answers != nil {
-			m, ok := answers.(map[string]interface{})
-			if ok {
-				obj.Spec.Answers = make(map[string]string)
+			if m, ok := answers.(map[string]interface{}); ok {
 				for k, v := range m {
 					obj.Spec.Answers[k] = convert.ToString(v)
 				}
 			}
-		} else {
-			obj.Spec.Answers = make(map[string]string)
 		}
+
+		obj.Spec.AnswersForceString = make(map[string]bool)
+		if answersForceString != nil {
+			if m, ok := answersForceString.(map[string]interface{}); ok {
+				for k, v := range m {
+					obj.Spec.AnswersForceString[k] = convert.ToBool(v)
+				}
+			}
+		}
+
 		obj.Spec.ExternalID = externalID
 		if convert.ToBool(forceUpgrade) {
 			v32.AppConditionForceUpgrade.Unknown(obj)

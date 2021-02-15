@@ -224,20 +224,29 @@ func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[strin
 	// `--set` values will overridden the user-supplied values.yaml file
 	if app.Spec.Answers != nil || extraArgs != nil {
 		answers := app.Spec.Answers
-		var values = []string{}
+		var values, valuesForceString []string
 		for k, v := range answers {
 			if _, ok := extraArgs[k]; ok {
 				continue
 			}
 			// helm will only accept escaped commas in values
 			escapedValue := fmt.Sprintf("%s=%s", k, escapeCommas(v))
-			values = append(values, escapedValue)
+			if app.Spec.AnswersForceString[k] {
+				valuesForceString = append(valuesForceString, escapedValue)
+			} else {
+				values = append(values, escapedValue)
+			}
 		}
 		for k, v := range extraArgs {
 			escapedValue := fmt.Sprintf("%s=%s", k, escapeCommas(v))
 			values = append(values, escapedValue)
 		}
-		setValues = append(setValues, "--set", strings.Join(values, ","))
+		if len(values) != 0 {
+			setValues = append(setValues, "--set", strings.Join(values, ","))
+		}
+		if len(valuesForceString) != 0 {
+			setValues = append(setValues, "--set-string", strings.Join(valuesForceString, ","))
+		}
 	}
 	return setValues, nil
 }
