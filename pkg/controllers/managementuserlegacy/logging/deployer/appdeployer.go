@@ -93,19 +93,19 @@ func (d *AppDeployer) deploy(app *projectv3.App, systemWriteKeys []string) error
 		return errors.New("stale app " + app.Namespace + ":" + app.Name + " still on terminating")
 	}
 
-	new := current.DeepCopy()
+	newApp := current.DeepCopy()
 	if len(systemWriteKeys) != 0 {
-		if new.Spec.Answers == nil {
-			new.Spec.Answers = make(map[string]string)
+		if newApp.Spec.Answers == nil {
+			newApp.Spec.Answers = make(map[string]string)
 		}
 
 		for _, v := range systemWriteKeys {
-			new.Spec.Answers[v] = app.Spec.Answers[v]
+			newApp.Spec.Answers[v] = app.Spec.Answers[v]
 		}
 	}
 
-	if !reflect.DeepEqual(current.Spec, new.Spec) {
-		_, err = d.AppsGetter.Apps(app.Namespace).Update(new)
+	if !reflect.DeepEqual(current.Spec, newApp.Spec) {
+		_, err = d.AppsGetter.Apps(app.Namespace).Update(newApp)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update app %s", app.Name)
 		}
