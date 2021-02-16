@@ -139,6 +139,14 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		np.Spec.Ingress[0].From = append(np.Spec.Ingress[0].From, knetworkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
 	}
 
+	// An empty ingress rule allows all traffic to the namespace
+	// so we need to skip creating the network policy here.
+	// This is expected for CNI plugins other than Canal/Flannel.
+	if len(np.Spec.Ingress[0].From) == 0 {
+		logrus.Debugf("netpolMgr: handleHostNetwork: no host addresses found, skipping programming the hn policy")
+		return nil
+	}
+
 	// sort ipblocks so it always appears in a certain order
 	sort.Slice(np.Spec.Ingress[0].From, func(i, j int) bool {
 		return np.Spec.Ingress[0].From[i].IPBlock.CIDR < np.Spec.Ingress[0].From[j].IPBlock.CIDR

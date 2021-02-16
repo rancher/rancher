@@ -54,6 +54,14 @@ const (
 	s3TransportTimeout         = 10
 )
 
+// RKE network providers with default support of Kubernetes network policies
+var rkeNetworkPolicyControllerPlugins = map[string]bool{
+	"canal":  true,
+	"calico": true,
+	"weave":  true,
+	"aci":    true,
+}
+
 type Store struct {
 	types.Store
 	ShellHandler                  types.RequestHandler
@@ -698,6 +706,14 @@ func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	enableNetworkPolicy := values.GetValueN(data, "enableNetworkPolicy")
 	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
 	plugin := convert.ToString(values.GetValueN(convert.ToMapInterface(rkeConfig), "network", "plugin"))
+	var ingressProvider, ingressNetworkMode string
+	ingressMap := convert.ToMapInterface(values.GetValueN(convert.ToMapInterface(rkeConfig), "ingress"))
+	if value := ingressMap["provider"]; value != nil {
+		ingressProvider = convert.ToString(value)
+	}
+	if value := ingressMap["networkMode"]; value != nil {
+		ingressNetworkMode = convert.ToString(value)
+	}
 
 	if enableNetworkPolicy == nil && create {
 		// setting default values for new clusters if value not passed
@@ -710,8 +726,16 @@ func validateNetworkFlag(data map[string]interface{}, create bool) error {
 			}
 			return fmt.Errorf("enableNetworkPolicy should be false for non-RKE clusters")
 		}
-		if plugin != "canal" {
-			return fmt.Errorf("plugin %s should have enableNetworkPolicy %v", plugin, !value)
+		if !rkeNetworkPolicyControllerPlugins[plugin] {
+			return fmt.Errorf("enableNetworkPolicy not supported for plugin %s", plugin)
+		}
+		// If the nginx ingress controller is configured with hostNetwork mode (the default)
+		// then implementing network policies requires a CNI provider-specific workaround.
+		// This is currently only implemented for Canal and so for other plugins the
+		// ingress.networkMode must be set to 'hostPort' or 'none'.
+		if ingressProvider == "nginx" && plugin != "canal" &&
+			ingressNetworkMode != "hostPort" && ingressNetworkMode != "none" {
+			return fmt.Errorf("enableNetworkPolicy with plugin %s requires ingress.networkMode=none|hostPort", plugin)
 		}
 	}
 
