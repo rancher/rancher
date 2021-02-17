@@ -14,17 +14,11 @@ import (
 )
 
 const (
-	NamespaceID                       = "namespaceId"
-	ProjectID                         = "projectId"
-	ClusterID                         = "clusterId"
-	GlobalAdmin                       = "admin"
-	GlobalRestrictedAdmin             = "restricted-admin"
-	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
-	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
-	ProjectCRDsClusterRole            = "project-crd-clusterRole"
-	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
-	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
-	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
+	NamespaceID           = "namespaceId"
+	ProjectID             = "projectId"
+	ClusterID             = "clusterId"
+	GlobalAdmin           = "admin"
+	GlobalRestrictedAdmin = "restricted-admin"
 )
 
 // BuildSubjectFromRTB This function will generate
