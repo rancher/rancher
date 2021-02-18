@@ -195,15 +195,15 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 // isNewerVersion returns true if updated versions semver is newer and false if its
 // semver is older. If semver is equal then metadata is alphanumerically compared.
 func IsNewerVersion(prevVersion, updatedVersion string) (bool, error) {
-	parseErrMsg := "failed to parse version [%s]: %v"
+	parseErrMsg := "failed to parse version: %v"
 	prevVer, err := semver.NewVersion(strings.TrimPrefix(prevVersion, "v"))
 	if err != nil {
-		return false, fmt.Errorf(parseErrMsg, prevVersion, err)
+		return false, fmt.Errorf(parseErrMsg, err)
 	}
 
 	updatedVer, err := semver.NewVersion(strings.TrimPrefix(updatedVersion, "v"))
 	if err != nil {
-		return false, fmt.Errorf(parseErrMsg, updatedVersion, err)
+		return false, fmt.Errorf(parseErrMsg, err)
 	}
 
 	switch updatedVer.Compare(*prevVer) {
