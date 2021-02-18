@@ -8,7 +8,7 @@ const (
 	AciNetworkProviderFieldApicUserCrt              = "apicUserCrt"
 	AciNetworkProviderFieldApicUserKey              = "apicUserKey"
 	AciNetworkProviderFieldApicUserName             = "apicUserName"
-	AciNetworkProviderFieldCApic                    = "cApic"
+	AciNetworkProviderFieldCApic                    = "capic"
 	AciNetworkProviderFieldControllerLogLevel       = "controllerLogLevel"
 	AciNetworkProviderFieldDropLogEnable            = "dropLogEnable"
 	AciNetworkProviderFieldDynamicExternalSubnet    = "externDynamic"
@@ -25,9 +25,9 @@ const (
 	AciNetworkProviderFieldKafkaBrokers             = "kafkaBrokers"
 	AciNetworkProviderFieldKafkaClientCrt           = "kafkaClientCrt"
 	AciNetworkProviderFieldKafkaClientKey           = "kafkaClientKey"
-	AciNetworkProviderFieldKubeAPIVlan              = "kubeAPIVlan"
-	AciNetworkProviderFieldL3Out                    = "l3Out"
-	AciNetworkProviderFieldL3OutExternalNetworks    = "l3OutExternalNetworks"
+	AciNetworkProviderFieldKubeAPIVlan              = "kubeApiVlan"
+	AciNetworkProviderFieldL3Out                    = "l3out"
+	AciNetworkProviderFieldL3OutExternalNetworks    = "l3outExternalNetworks"
 	AciNetworkProviderFieldMaxNodesSvcGraph         = "maxNodesSvcGraph"
 	AciNetworkProviderFieldMcastRangeEnd            = "mcastRangeEnd"
 	AciNetworkProviderFieldMcastRangeStart          = "mcastRangeStart"
@@ -35,10 +35,10 @@ const (
 	AciNetworkProviderFieldNodeSubnet               = "nodeSubnet"
 	AciNetworkProviderFieldOVSMemoryLimit           = "ovsMemoryLimit"
 	AciNetworkProviderFieldOpflexAgentLogLevel      = "opflexLogLevel"
-	AciNetworkProviderFieldOpflexClientSSL          = "opflexClientSSL"
+	AciNetworkProviderFieldOpflexClientSSL          = "opflexClientSsl"
 	AciNetworkProviderFieldOpflexMode               = "opflexMode"
 	AciNetworkProviderFieldOpflexServerPort         = "opflexServerPort"
-	AciNetworkProviderFieldOverlayVRFName           = "overlayVRFName"
+	AciNetworkProviderFieldOverlayVRFName           = "overlayVrfName"
 	AciNetworkProviderFieldPBRTrackingNonSnat       = "pbrTrackingNonSnat"
 	AciNetworkProviderFieldPodSubnetChunkSize       = "podSubnetChunkSize"
 	AciNetworkProviderFieldRunGbpContainer          = "runGbpContainer"
@@ -56,7 +56,7 @@ const (
 	AciNetworkProviderFieldSystemIdentifier         = "systemId"
 	AciNetworkProviderFieldTenant                   = "tenant"
 	AciNetworkProviderFieldToken                    = "token"
-	AciNetworkProviderFieldUseAciAnywhereCRD        = "useAciAnywhereCRD"
+	AciNetworkProviderFieldUseAciAnywhereCRD        = "useAciAnywhereCrd"
 	AciNetworkProviderFieldUseAciCniPriorityClass   = "useAciCniPriorityClass"
 	AciNetworkProviderFieldUseHostNetnsVolume       = "useHostNetnsVolume"
 	AciNetworkProviderFieldUseOpflexServerVolume    = "useOpflexServerVolume"
@@ -74,7 +74,7 @@ type AciNetworkProvider struct {
 	ApicUserCrt              string   `json:"apicUserCrt,omitempty" yaml:"apicUserCrt,omitempty"`
 	ApicUserKey              string   `json:"apicUserKey,omitempty" yaml:"apicUserKey,omitempty"`
 	ApicUserName             string   `json:"apicUserName,omitempty" yaml:"apicUserName,omitempty"`
-	CApic                    string   `json:"cApic,omitempty" yaml:"cApic,omitempty"`
+	CApic                    string   `json:"capic,omitempty" yaml:"capic,omitempty"`
 	ControllerLogLevel       string   `json:"controllerLogLevel,omitempty" yaml:"controllerLogLevel,omitempty"`
 	DropLogEnable            string   `json:"dropLogEnable,omitempty" yaml:"dropLogEnable,omitempty"`
 	DynamicExternalSubnet    string   `json:"externDynamic,omitempty" yaml:"externDynamic,omitempty"`
@@ -91,9 +91,9 @@ type AciNetworkProvider struct {
 	KafkaBrokers             []string `json:"kafkaBrokers,omitempty" yaml:"kafkaBrokers,omitempty"`
 	KafkaClientCrt           string   `json:"kafkaClientCrt,omitempty" yaml:"kafkaClientCrt,omitempty"`
 	KafkaClientKey           string   `json:"kafkaClientKey,omitempty" yaml:"kafkaClientKey,omitempty"`
-	KubeAPIVlan              string   `json:"kubeAPIVlan,omitempty" yaml:"kubeAPIVlan,omitempty"`
-	L3Out                    string   `json:"l3Out,omitempty" yaml:"l3Out,omitempty"`
-	L3OutExternalNetworks    []string `json:"l3OutExternalNetworks,omitempty" yaml:"l3OutExternalNetworks,omitempty"`
+	KubeAPIVlan              string   `json:"kubeApiVlan,omitempty" yaml:"kubeApiVlan,omitempty"`
+	L3Out                    string   `json:"l3out,omitempty" yaml:"l3out,omitempty"`
+	L3OutExternalNetworks    []string `json:"l3outExternalNetworks,omitempty" yaml:"l3outExternalNetworks,omitempty"`
 	MaxNodesSvcGraph         string   `json:"maxNodesSvcGraph,omitempty" yaml:"maxNodesSvcGraph,omitempty"`
 	McastRangeEnd            string   `json:"mcastRangeEnd,omitempty" yaml:"mcastRangeEnd,omitempty"`
 	McastRangeStart          string   `json:"mcastRangeStart,omitempty" yaml:"mcastRangeStart,omitempty"`
@@ -101,10 +101,10 @@ type AciNetworkProvider struct {
 	NodeSubnet               string   `json:"nodeSubnet,omitempty" yaml:"nodeSubnet,omitempty"`
 	OVSMemoryLimit           string   `json:"ovsMemoryLimit,omitempty" yaml:"ovsMemoryLimit,omitempty"`
 	OpflexAgentLogLevel      string   `json:"opflexLogLevel,omitempty" yaml:"opflexLogLevel,omitempty"`
-	OpflexClientSSL          string   `json:"opflexClientSSL,omitempty" yaml:"opflexClientSSL,omitempty"`
+	OpflexClientSSL          string   `json:"opflexClientSsl,omitempty" yaml:"opflexClientSsl,omitempty"`
 	OpflexMode               string   `json:"opflexMode,omitempty" yaml:"opflexMode,omitempty"`
 	OpflexServerPort         string   `json:"opflexServerPort,omitempty" yaml:"opflexServerPort,omitempty"`
-	OverlayVRFName           string   `json:"overlayVRFName,omitempty" yaml:"overlayVRFName,omitempty"`
+	OverlayVRFName           string   `json:"overlayVrfName,omitempty" yaml:"overlayVrfName,omitempty"`
 	PBRTrackingNonSnat       string   `json:"pbrTrackingNonSnat,omitempty" yaml:"pbrTrackingNonSnat,omitempty"`
 	PodSubnetChunkSize       string   `json:"podSubnetChunkSize,omitempty" yaml:"podSubnetChunkSize,omitempty"`
 	RunGbpContainer          string   `json:"runGbpContainer,omitempty" yaml:"runGbpContainer,omitempty"`
@@ -122,7 +122,7 @@ type AciNetworkProvider struct {
 	SystemIdentifier         string   `json:"systemId,omitempty" yaml:"systemId,omitempty"`
 	Tenant                   string   `json:"tenant,omitempty" yaml:"tenant,omitempty"`
 	Token                    string   `json:"token,omitempty" yaml:"token,omitempty"`
-	UseAciAnywhereCRD        string   `json:"useAciAnywhereCRD,omitempty" yaml:"useAciAnywhereCRD,omitempty"`
+	UseAciAnywhereCRD        string   `json:"useAciAnywhereCrd,omitempty" yaml:"useAciAnywhereCrd,omitempty"`
 	UseAciCniPriorityClass   string   `json:"useAciCniPriorityClass,omitempty" yaml:"useAciCniPriorityClass,omitempty"`
 	UseHostNetnsVolume       string   `json:"useHostNetnsVolume,omitempty" yaml:"useHostNetnsVolume,omitempty"`
 	UseOpflexServerVolume    string   `json:"useOpflexServerVolume,omitempty" yaml:"useOpflexServerVolume,omitempty"`
