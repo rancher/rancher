@@ -101,7 +101,7 @@ type ClusterSpecBase struct {
 	DesiredAgentImage                    string                                  `json:"desiredAgentImage"`
 	DesiredAuthImage                     string                                  `json:"desiredAuthImage"`
 	AgentImageOverride                   string                                  `json:"agentImageOverride"`
-	AgentEnvVars                         []v1.EnvVar                             `json:"agentEnvVars"`
+	AgentEnvVars                         []v1.EnvVar                             `json:"agentEnvVars,omitempty"`
 	RancherKubernetesEngineConfig        *rketypes.RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 	DefaultPodSecurityPolicyTemplateName string                                  `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string                                  `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
@@ -147,6 +147,7 @@ type ClusterStatus struct {
 	Driver                               string                      `json:"driver"`
 	Provider                             string                      `json:"provider"`
 	AgentImage                           string                      `json:"agentImage"`
+	AppliedAgentEnvVars                  []v1.EnvVar                 `json:"appliedAgentEnvVars,omitempty"`
 	AgentFeatures                        map[string]bool             `json:"agentFeatures,omitempty"`
 	AuthImage                            string                      `json:"authImage"`
 	ComponentStatuses                    []ClusterComponentStatus    `json:"componentStatuses,omitempty"`

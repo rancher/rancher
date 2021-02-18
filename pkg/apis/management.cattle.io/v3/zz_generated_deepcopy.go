@@ -2312,6 +2312,13 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]ClusterCondition, len(*in))
 		copy(*out, *in)
 	}
+	if in.AppliedAgentEnvVars != nil {
+		in, out := &in.AppliedAgentEnvVars, &out.AppliedAgentEnvVars
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.AgentFeatures != nil {
 		in, out := &in.AgentFeatures, &out.AgentFeatures
 		*out = make(map[string]bool, len(*in))
