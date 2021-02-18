@@ -283,13 +283,20 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, desir
 		if release.Info.Status != release2.StatusDeployed {
 			continue
 		}
+		if desiredValue == nil {
+			desiredValue = map[string]interface{}{}
+		}
+		releaseConfig := release.Config
+		if releaseConfig == nil {
+			releaseConfig = map[string]interface{}{}
+		}
 
 		desiredValuesJSON, err := json.Marshal(desiredValue)
 		if err != nil {
 			return false, "", nil, err
 		}
 
-		actualValueJSON, err := json.Marshal(release.Config)
+		actualValueJSON, err := json.Marshal(releaseConfig)
 		if err != nil {
 			return false, "", nil, err
 		}
