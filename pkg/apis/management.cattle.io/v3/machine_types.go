@@ -239,6 +239,7 @@ type NodeSpec struct {
 	DesiredNodeUnschedulable string          `json:"desiredNodeUnschedulable,omitempty"`
 	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
 	MetadataUpdate           MetadataUpdate  `json:"metadataUpdate,omitempty"`
+	ScaledownTime            string          `json:"scaledownTime,omitempty"`
 }
 
 type NodePlan struct {

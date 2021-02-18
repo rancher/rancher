@@ -415,6 +415,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions["cordon"] = types.Action{}
 			schema.ResourceActions["uncordon"] = types.Action{}
 			schema.ResourceActions["stopDrain"] = types.Action{}
+			schema.ResourceActions["scaledown"] = types.Action{}
 			schema.ResourceActions["drain"] = types.Action{
 				Input: "nodeDrainInput",
 			}
