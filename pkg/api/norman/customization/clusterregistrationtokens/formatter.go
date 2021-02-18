@@ -3,6 +3,7 @@ package clusterregistrationtokens
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
@@ -18,7 +19,7 @@ import (
 const (
 	commandFormat            = "kubectl apply -f %s"
 	insecureCommandFormat    = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
+	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
 	loginCommandFormat       = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
@@ -54,6 +55,7 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 		// for linux
 		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
+			AgentEnvVars(cluster),
 			agentImage,
 			rootURL,
 			token,
@@ -93,6 +95,16 @@ func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) 
 	return ""
 }
 
+func AgentEnvVars(cluster *v3.Cluster) string {
+	var agentEnvVars []string
+	if cluster != nil {
+		for _, envVar := range cluster.Spec.AgentEnvVars {
+			agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e %s=%s", envVar.Name, envVar.Value))
+		}
+	}
+	return strings.Join(agentEnvVars, " ")
+}
+
 func NodeCommand(token string, cluster *v3.Cluster) string {
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
@@ -100,6 +112,7 @@ func NodeCommand(token string, cluster *v3.Cluster) string {
 	}
 
 	return fmt.Sprintf(nodeCommandFormat,
+		AgentEnvVars(cluster),
 		image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
 		getRootURL(nil),
 		token,
