@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
@@ -42,15 +43,16 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	}
 
 	token, _ := resource.Values["token"].(string)
+	clusterID := convert.ToString(resource.Values["clusterId"])
 	if token != "" {
-		url := getURL(request, token)
+		url := getURL(request, token, clusterID)
 		resource.Values["insecureCommand"] = fmt.Sprintf(insecureCommandFormat, url)
 		resource.Values["command"] = fmt.Sprintf(commandFormat, url)
 		resource.Values["token"] = token
 		resource.Values["manifestUrl"] = url
 		rootURL := getRootURL(request)
 
-		cluster, _ := f.Clusters.Get(fmt.Sprintf("%v", resource.Values["clusterId"]), metav1.GetOptions{})
+		cluster, _ := f.Clusters.Get(clusterID, metav1.GetOptions{})
 
 		agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 		// for linux
@@ -164,8 +166,8 @@ func getRootURL(request *types.APIContext) string {
 	return serverURL
 }
 
-func getURL(request *types.APIContext, token string) string {
-	path := "/v3/import/" + token + ".yaml"
+func getURL(request *types.APIContext, token, clusterID string) string {
+	path := "/v3/import/" + token + "_" + clusterID + ".yaml"
 	serverURL := settings.ServerURL.Get()
 	if serverURL == "" {
 		serverURL = request.URLBuilder.RelativeToRoot(path)
