@@ -237,6 +237,21 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 		return true
 	}
 
+	agentEnvVarsChanged := false
+	desiredAgentEnvVars := cluster.Spec.AgentEnvVars
+	currentAgentEnvVars := cluster.Status.AppliedAgentEnvVars
+
+	if (desiredAgentEnvVars == nil && currentAgentEnvVars != nil) || (desiredAgentEnvVars != nil && currentAgentEnvVars == nil) {
+		agentEnvVarsChanged = true
+	}
+	if desiredAgentEnvVars != nil && currentAgentEnvVars != nil && !reflect.DeepEqual(desiredAgentEnvVars, currentAgentEnvVars) {
+		agentEnvVarsChanged = true
+	}
+	if agentEnvVarsChanged {
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent env vars mismatched for [%s], was [%v] and will be [%v]", cluster.Name, currentAgentEnvVars, desiredAgentEnvVars)
+		return true
+	}
+
 	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
@@ -363,6 +378,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	if cluster.Annotations[AgentForceDeployAnn] == "true" {
 		cluster.Annotations[AgentForceDeployAnn] = "false"
 	}
+	cluster.Status.AppliedAgentEnvVars = cluster.Spec.AgentEnvVars
 
 	return nil
 }
