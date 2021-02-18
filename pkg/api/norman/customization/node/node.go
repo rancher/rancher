@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
@@ -49,6 +50,8 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	customConfig := resource.Values["customConfig"]
 	if nodeTemplateID == nil {
 		delete(resource.Links, "nodeConfig")
+	} else {
+		resource.AddAction(apiContext, "scaledown")
 	}
 
 	if nodeTemplateID == nil && customConfig == nil {
@@ -99,7 +102,24 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		return drainNode(actionName, apiContext, false)
 	case "stopDrain":
 		return drainNode(actionName, apiContext, true)
+	case "scaledown":
+		return scaledownNode(actionName, apiContext)
 	}
+	return nil
+}
+
+func scaledownNode(actionName string, apiContext *types.APIContext) error {
+	node, schema, err := getNodeAndSchema(apiContext)
+	if err != nil {
+		return err
+	}
+
+	values.PutValue(node, time.Now().Format(time.RFC3339), "scaledownTime")
+	err = updateNode(apiContext, node, schema, actionName)
+	if err != nil {
+		return err
+	}
+	apiContext.WriteResponse(http.StatusOK, map[string]interface{}{})
 	return nil
 }
 
@@ -127,7 +147,7 @@ func drainNode(actionName string, apiContext *types.APIContext, stop bool) error
 		return err
 	}
 	if !stop {
-		drainInput, err := validate(apiContext)
+		drainInput, err := validateDrainInput(apiContext)
 		if err != nil {
 			return err
 		}
@@ -146,7 +166,7 @@ func drainNode(actionName string, apiContext *types.APIContext, stop bool) error
 	return nil
 }
 
-func validate(apiContext *types.APIContext) (*v32.NodeDrainInput, error) {
+func validateDrainInput(apiContext *types.APIContext) (*v32.NodeDrainInput, error) {
 	input, err := handler.ParseAndValidateActionBody(apiContext, apiContext.Schemas.Schema(&managementschema.Version,
 		client.NodeDrainInputType))
 	if err != nil {
