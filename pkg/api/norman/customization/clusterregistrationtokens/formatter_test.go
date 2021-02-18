@@ -24,6 +24,7 @@ xxx
 func TestFormatter(t *testing.T) {
 	testCases := []struct {
 		caseName                    string
+		clusterID                   string
 		presetAgentImage            string
 		presetCertCAs               string
 		presetServerURL             string
@@ -34,17 +35,19 @@ func TestFormatter(t *testing.T) {
 	}{
 		{
 			caseName:         "default",
+			clusterID:        "c-xxxx",
 			presetAgentImage: testAgentImage,
 			presetCertCAs:    testCertCAs,
 			presetServerURL:  "https://fake-server.rancher.io",
 			requestURL:       "https://fake-test.rancher.io/v3/clusterregistrationtokens",
 			requestToken:     "fake-token",
 			outputShouldEqual: map[string]interface{}{
-				"insecureCommand": fmt.Sprintf(insecureCommandFormat, "https://fake-server.rancher.io/v3/import/fake-token.yaml"),
-				"command":         fmt.Sprintf(commandFormat, "https://fake-server.rancher.io/v3/import/fake-token.yaml"),
+				"insecureCommand": fmt.Sprintf(insecureCommandFormat, "https://fake-server.rancher.io/v3/import/fake-token_c-xxxx.yaml"),
+				"command":         fmt.Sprintf(commandFormat, "https://fake-server.rancher.io/v3/import/fake-token_c-xxxx.yaml"),
 				"token":           "fake-token",
-				"manifestUrl":     "https://fake-server.rancher.io/v3/import/fake-token.yaml",
-				"nodeCommand": fmt.Sprintf(nodeCommandFormat,
+				"clusterId":       "c-xxxx",
+				"manifestUrl":     "https://fake-server.rancher.io/v3/import/fake-token_c-xxxx.yaml",
+				"nodeCommand": fmt.Sprintf(nodeCommandFormat, "",
 					"rancher/rancher-agent:test",
 					"https://fake-server.rancher.io",
 					"fake-token",
@@ -60,6 +63,7 @@ func TestFormatter(t *testing.T) {
 		},
 		{
 			caseName:                    "with private registry setting",
+			clusterID:                   "c-xxxx",
 			presetAgentImage:            testAgentImage,
 			presetCertCAs:               testCertCAs,
 			presetServerURL:             "https://fake-server.rancher.io",
@@ -67,11 +71,12 @@ func TestFormatter(t *testing.T) {
 			requestURL:                  "https://fake-test.rancher.io/v3/clusterregistrationtokens",
 			requestToken:                "fake-token",
 			outputShouldEqual: map[string]interface{}{
-				"insecureCommand": fmt.Sprintf(insecureCommandFormat, "https://fake-server.rancher.io/v3/import/fake-token.yaml"),
-				"command":         fmt.Sprintf(commandFormat, "https://fake-server.rancher.io/v3/import/fake-token.yaml"),
+				"insecureCommand": fmt.Sprintf(insecureCommandFormat, "https://fake-server.rancher.io/v3/import/fake-token_c-xxxx.yaml"),
+				"command":         fmt.Sprintf(commandFormat, "https://fake-server.rancher.io/v3/import/fake-token_c-xxxx.yaml"),
 				"token":           "fake-token",
-				"manifestUrl":     "https://fake-server.rancher.io/v3/import/fake-token.yaml",
-				"nodeCommand": fmt.Sprintf(nodeCommandFormat,
+				"clusterId":       "c-xxxx",
+				"manifestUrl":     "https://fake-server.rancher.io/v3/import/fake-token_c-xxxx.yaml",
+				"nodeCommand": fmt.Sprintf(nodeCommandFormat, "",
 					"fake-registry.rancher.io:443/rancher/rancher-agent:test",
 					"https://fake-server.rancher.io",
 					"fake-token",
@@ -87,17 +92,19 @@ func TestFormatter(t *testing.T) {
 		},
 		{
 			caseName:         "without server URL setting",
+			clusterID:        "c-xxxx",
 			presetAgentImage: testAgentImage,
 			presetCertCAs:    testCertCAs,
 			presetServerURL:  "",
 			requestURL:       "https://fake-test.rancher.io/v3/clusterregistrationtokens",
 			requestToken:     "fake-token",
 			outputShouldEqual: map[string]interface{}{
-				"insecureCommand": fmt.Sprintf(insecureCommandFormat, "https://fake-test.rancher.io/v3/import/fake-token.yaml"),
-				"command":         fmt.Sprintf(commandFormat, "https://fake-test.rancher.io/v3/import/fake-token.yaml"),
+				"insecureCommand": fmt.Sprintf(insecureCommandFormat, "https://fake-test.rancher.io/v3/import/fake-token_c-xxxx.yaml"),
+				"command":         fmt.Sprintf(commandFormat, "https://fake-test.rancher.io/v3/import/fake-token_c-xxxx.yaml"),
 				"token":           "fake-token",
-				"manifestUrl":     "https://fake-test.rancher.io/v3/import/fake-token.yaml",
-				"nodeCommand": fmt.Sprintf(nodeCommandFormat,
+				"clusterId":       "c-xxxx",
+				"manifestUrl":     "https://fake-test.rancher.io/v3/import/fake-token_c-xxxx.yaml",
+				"nodeCommand": fmt.Sprintf(nodeCommandFormat, "",
 					"rancher/rancher-agent:test",
 					"https://fake-test.rancher.io",
 					"fake-token",
@@ -128,7 +135,7 @@ func TestFormatter(t *testing.T) {
 		// prepare
 		fakeAPIContext, err := newFakeAPIContext(cs.requestURL)
 		assert.Nilf(err, "%s could not new fake APIContext", cs.caseName)
-		fakeRawResource, err := newFakeRawResource(cs.requestToken)
+		fakeRawResource, err := newFakeRawResource(cs.requestToken, cs.clusterID)
 		assert.Nilf(err, "%s could not new fake RawResource", cs.caseName)
 
 		// verify
@@ -156,9 +163,10 @@ func newFakeAPIContext(url string) (*types.APIContext, error) {
 	return apiContext, nil
 }
 
-func newFakeRawResource(token string) (*types.RawResource, error) {
+func newFakeRawResource(token, clusterID string) (*types.RawResource, error) {
 	values := map[string]interface{}{
-		"token": token,
+		"token":     token,
+		"clusterId": clusterID,
 	}
 
 	rawResource := &types.RawResource{
