@@ -13,6 +13,7 @@ const (
 	ClusterFieldAgentImageOverride                   = "agentImageOverride"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
+	ClusterFieldAppliedAgentEnvVars                  = "appliedAgentEnvVars"
 	ClusterFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                          = "appliedSpec"
@@ -80,6 +81,7 @@ type Cluster struct {
 	AgentImageOverride                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedAgentEnvVars                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedEnableNetworkPolicy           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
