@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -17,7 +16,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -63,8 +61,6 @@ func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle
 		projects:             management.Management.Projects(""),
 		roleTemplateLister:   management.Management.RoleTemplates("").Controller().Lister(),
 		systemAccountManager: systemaccount.NewManager(management),
-		rbLister:             management.RBAC.RoleBindings("").Controller().Lister(),
-		roleBindings:         management.RBAC.RoleBindings(""),
 	}
 	p := &projectLifecycle{
 		mgr: m,
@@ -150,23 +146,8 @@ func (l *projectLifecycle) Updated(obj *v3.Project) (runtime.Object, error) {
 }
 
 func (l *projectLifecycle) Remove(obj *v3.Project) (runtime.Object, error) {
-	var returnErr error
-	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
-	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	if err != nil {
-		returnErr = multierror.Append(returnErr, err)
-	}
-	for _, rb := range rbs {
-		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
-		if err != nil {
-			returnErr = multierror.Append(returnErr, err)
-		}
-	}
-	err = l.mgr.deleteNamespace(obj, projectRemoveController)
-	if err != nil {
-		returnErr = multierror.Append(returnErr, err)
-	}
-	return obj, returnErr
+	err := l.mgr.deleteNamespace(obj, projectRemoveController)
+	return obj, err
 }
 
 type clusterLifecycle struct {
@@ -235,23 +216,8 @@ func (l *clusterLifecycle) Updated(obj *v3.Cluster) (runtime.Object, error) {
 }
 
 func (l *clusterLifecycle) Remove(obj *v3.Cluster) (runtime.Object, error) {
-	var returnErr error
-	set := labels.Set{rbac.RestrictedAdminClusterRoleBinding: "true"}
-	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	if err != nil {
-		returnErr = multierror.Append(returnErr, err)
-	}
-	for _, rb := range rbs {
-		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
-		if err != nil {
-			returnErr = multierror.Append(returnErr, err)
-		}
-	}
-	err = l.mgr.deleteNamespace(obj, clusterRemoveController)
-	if err != nil {
-		returnErr = multierror.Append(returnErr, err)
-	}
-	return obj, returnErr
+	err := l.mgr.deleteNamespace(obj, clusterRemoveController)
+	return obj, err
 }
 
 type mgr struct {
@@ -266,8 +232,6 @@ type mgr struct {
 	roleTemplateLister   v3.RoleTemplateLister
 	clusterRoleClient    rrbacv1.ClusterRoleInterface
 	systemAccountManager *systemaccount.Manager
-	rbLister             rrbacv1.RoleBindingLister
-	roleBindings         rrbacv1.RoleBindingInterface
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
