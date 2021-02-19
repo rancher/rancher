@@ -47,6 +47,18 @@ var (
 		true,
 		false,
 		false)
+	EmbeddedClusterAPI = newFeature(
+		"embedded-cluster-api",
+		"Enable an embedded instance of cluster-api core controller",
+		true,
+		true,
+		true)
+	RKE2 = newFeature(
+		"rke2",
+		"Enable provisioning of RKE2",
+		true,
+		true,
+		true)
 )
 
 type Feature struct {
