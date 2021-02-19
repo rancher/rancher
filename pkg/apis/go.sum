@@ -548,15 +548,14 @@ github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4do
 github.com/rancher/eks-operator v1.0.6-rc1 h1:VY2lLcaHtBMByd7pq7px4fB+GW0cd0cfessODbmH+Tc=
 github.com/rancher/eks-operator v1.0.6-rc1/go.mod h1:GB2kyPtIN0r+DGlUcDgEUMsB4qRwZH7OKsraemZT+GA=
 github.com/rancher/lasso v0.0.0-20200427171700-e0509f89f319/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
-github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91 h1:p4VVl0tr6YAeUILFMCn+0DKzbUOS0ah9biSsL7Sy6S4=
 github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB2YjTVagmu4NkhBvbE8nBcGykHRENH6arI=
 github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0 h1:ng7i8n0kzTGnXyvVK+nkb+sLm06BBNdsbd2aqJAP3lM=
 github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b h1:DQLpu44dsR+2qYvg1wyYadk108MWMHUOqvb2z4274Vs=
 github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/norman v0.0.0-20200517050325-f53cae161640/go.mod h1:92rz/7QN7DOeLQZlJY/8aFBOmF085igIVguR0wpxLas=
-github.com/rancher/norman v0.0.0-20210209001710-63e1cb58f072 h1:GStfIcmZ20mQ9ZsBagNgs36UDa7TLI23jsYXHSoVhNg=
-github.com/rancher/norman v0.0.0-20210209001710-63e1cb58f072/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
+github.com/rancher/norman v0.0.0-20210219183327-731b8482505c h1:1HKsD6uKTmVcQVuwP8PsZBeNwmVI7V+Zr0pSyxzjLTE=
+github.com/rancher/norman v0.0.0-20210219183327-731b8482505c/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
 github.com/rancher/rke v1.2.6-rc5 h1:Qf65nzIs2hRLoHsPnAG+h9ObmN5d5vQKlViriM1MF6g=
 github.com/rancher/rke v1.2.6-rc5/go.mod h1:osU/R8vPjgV3AwNnPamC0eOZ6aI0UfpHTyZ5K/b/vZE=
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
