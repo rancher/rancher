@@ -39,6 +39,10 @@ var (
 		"linux":   "rancher-images.txt",
 		"windows": "rancher-windows-images.txt",
 	}
+	sourcesFilenameMap = map[string]string{
+		"linux":   "rancher-images-sources.txt",
+		"windows": "rancher-windows-images-sources.txt",
+	}
 )
 
 func main() {
@@ -87,36 +91,43 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 
 	k3sUpgradeImages := getK3sUpgradeImages(rancherVersion, data.K3S)
 
-	targetImages, err := img.GetImages(systemChartPath, chartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
+	targetImages, targetImagesAndSources, err := img.GetImages(systemChartPath, chartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
 	if err != nil {
 		return err
 	}
 
-	targetWindowsImages, err := img.GetImages(systemChartPath, chartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(systemChartPath, chartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
 	if err != nil {
 		return err
 	}
 
-	for arch, images := range map[string][]string{
-		"linux":   targetImages,
-		"windows": targetWindowsImages,
+	type imageTextLists struct {
+		images           []string
+		imagesAndSources []string
+	}
+	for arch, imageLists := range map[string]imageTextLists{
+		"linux":   {images: targetImages, imagesAndSources: targetImagesAndSources},
+		"windows": {images: targetWindowsImages, imagesAndSources: targetWindowsImagesAndSources},
 	} {
-		err = imagesText(arch, images)
+		err = imagesText(arch, imageLists.images)
 		if err != nil {
 			return err
 		}
 
-		err = mirrorScript(arch, images)
+		if err := imagesAndSourcesText(arch, imageLists.imagesAndSources); err != nil {
+			return err
+		}
+		err = mirrorScript(arch, imageLists.images)
 		if err != nil {
 			return err
 		}
 
-		err = saveScript(arch, images)
+		err = saveScript(arch, imageLists.images)
 		if err != nil {
 			return err
 		}
 
-		err = loadScript(arch, images)
+		err = loadScript(arch, imageLists.images)
 		if err != nil {
 			return err
 		}
@@ -150,6 +161,20 @@ func saveImages(targetImages []string) []string {
 		saveImages = append(saveImages, targetImage)
 	}
 	return saveImages
+}
+
+func saveImagesAndSources(imagesAndSources []string) []string {
+	var saveImagesAndSources []string
+	for _, imageAndSources := range imagesAndSources {
+		targetImage := strings.Split(imageAndSources, " ")[0]
+		_, ok := image.Mirrors[targetImage]
+		if !ok {
+			continue
+		}
+
+		saveImagesAndSources = append(saveImagesAndSources, imageAndSources)
+	}
+	return saveImagesAndSources
 }
 
 func checkImage(image string) error {
@@ -204,6 +229,28 @@ func imagesText(arch string, targetImages []string) error {
 
 		log.Println("Image:", image)
 		fmt.Fprintln(save, image)
+	}
+
+	return nil
+}
+
+// imagesAndSourcesText writes data of the format "image source1,..." to the filename
+// designated for the given arch
+func imagesAndSourcesText(arch string, targetImagesAndSources []string) error {
+	filename := sourcesFilenameMap[arch]
+	log.Printf("Creating %s\n", filename)
+	save, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer save.Close()
+	save.Chmod(0755)
+
+	for _, imageAndSources := range saveImagesAndSources(targetImagesAndSources) {
+		if err := checkImage(strings.Split(imageAndSources, " ")[0]); err != nil {
+			return err
+		}
+		fmt.Fprintln(save, imageAndSources)
 	}
 
 	return nil
