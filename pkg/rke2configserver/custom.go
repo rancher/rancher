@@ -15,7 +15,7 @@ import (
 
 const (
 	machineRequestType = "rke.cattle.io/machine-request"
-	nameHeader         = "X-Cattle-Name"
+	nameHeader         = "X-Cattle-Id"
 	headerPrefix       = "X-Cattle-"
 )
 
