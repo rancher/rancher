@@ -267,6 +267,9 @@ spec:
           value: "true"
         - name: CATTLE_AGENT_CONNECT
           value: "true"
+      {{- if .AgentEnvVars}}
+{{ .AgentEnvVars | indent 8 }}
+      {{- end }}
         volumeMounts:
         - name: cattle-credentials
           mountPath: /cattle-credentials
