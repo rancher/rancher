@@ -3,8 +3,10 @@ package clusterregistrationtokens
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
@@ -18,7 +20,7 @@ import (
 const (
 	commandFormat            = "kubectl apply -f %s"
 	insecureCommandFormat    = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
+	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
 	loginCommandFormat       = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
@@ -41,19 +43,21 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	}
 
 	token, _ := resource.Values["token"].(string)
+	clusterID := convert.ToString(resource.Values["clusterId"])
 	if token != "" {
-		url := getURL(request, token)
+		url := getURL(request, token, clusterID)
 		resource.Values["insecureCommand"] = fmt.Sprintf(insecureCommandFormat, url)
 		resource.Values["command"] = fmt.Sprintf(commandFormat, url)
 		resource.Values["token"] = token
 		resource.Values["manifestUrl"] = url
 		rootURL := getRootURL(request)
 
-		cluster, _ := f.Clusters.Get(fmt.Sprintf("%v", resource.Values["clusterId"]), metav1.GetOptions{})
+		cluster, _ := f.Clusters.Get(clusterID, metav1.GetOptions{})
 
 		agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 		// for linux
 		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
+			AgentEnvVars(cluster),
 			agentImage,
 			rootURL,
 			token,
@@ -93,6 +97,16 @@ func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) 
 	return ""
 }
 
+func AgentEnvVars(cluster *v3.Cluster) string {
+	var agentEnvVars []string
+	if cluster != nil {
+		for _, envVar := range cluster.Spec.AgentEnvVars {
+			agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e %s=%s", envVar.Name, envVar.Value))
+		}
+	}
+	return strings.Join(agentEnvVars, " ")
+}
+
 func NodeCommand(token string, cluster *v3.Cluster) string {
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
@@ -100,6 +114,7 @@ func NodeCommand(token string, cluster *v3.Cluster) string {
 	}
 
 	return fmt.Sprintf(nodeCommandFormat,
+		AgentEnvVars(cluster),
 		image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
 		getRootURL(nil),
 		token,
@@ -151,8 +166,8 @@ func getRootURL(request *types.APIContext) string {
 	return serverURL
 }
 
-func getURL(request *types.APIContext, token string) string {
-	path := "/v3/import/" + token + ".yaml"
+func getURL(request *types.APIContext, token, clusterID string) string {
+	path := "/v3/import/" + token + "_" + clusterID + ".yaml"
 	serverURL := settings.ServerURL.Get()
 	if serverURL == "" {
 		serverURL = request.URLBuilder.RelativeToRoot(path)
