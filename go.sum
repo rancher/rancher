@@ -740,6 +740,7 @@ github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f/go.mod h1:OkQIRizQ
 github.com/mitchellh/reflectwalk v1.0.0 h1:9D+8oIskB4VJBN5SFlmc27fSlIBZaov1Wpk/IfikLNY=
 github.com/mitchellh/reflectwalk v1.0.0/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
 github.com/moby/ipvs v1.0.1/go.mod h1:2pngiyseZbIKXNv7hsKj3O9UEz30c53MT9005gt2hxQ=
+github.com/moby/locker v1.0.1/go.mod h1:S7SDdo5zpBK84bzzVlKr2V0hz+7x9hWbYC/kq7oQppc=
 github.com/moby/term v0.0.0-20200312100748-672ec06f55cd h1:aY7OQNf2XqY/JQ6qREWamhI/81os/agb2BAGpcx5yWI=
 github.com/moby/term v0.0.0-20200312100748-672ec06f55cd/go.mod h1:DdlQx2hp0Ss5/fLikoLlEeIYiATotOjgB//nb973jeo=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
@@ -918,6 +919,9 @@ github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB
 github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b h1:DQLpu44dsR+2qYvg1wyYadk108MWMHUOqvb2z4274Vs=
 github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
+github.com/rancher/lasso v0.0.0-20210218221607-54c79222a9ad/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
+github.com/rancher/lasso v0.0.0-20210219160604-9baf1c12751b h1:CqS7xql6zJ7AKc1IFeKSy+3JZqVuEoEvKRE3bSj78JU=
+github.com/rancher/lasso v0.0.0-20210219160604-9baf1c12751b/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
 github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
@@ -937,8 +941,8 @@ github.com/rancher/rke v1.3.0-rc1.0.20210218215557-dc70017c5941 h1:jwiZhN8A3HZIz
 github.com/rancher/rke v1.3.0-rc1.0.20210218215557-dc70017c5941/go.mod h1:osU/R8vPjgV3AwNnPamC0eOZ6aI0UfpHTyZ5K/b/vZE=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20210126001943-00da04b7d566 h1:OnB+XzBDM6GzZ/KycroFV0alLetgE+Bv0aBOGl5gDuc=
-github.com/rancher/steve v0.0.0-20210126001943-00da04b7d566/go.mod h1:i0zwVjesOJEC2OrZTzd0IAdFo708PlVp27Be7vujPt4=
+github.com/rancher/steve v0.0.0-20210218173627-e8086b4525ca h1:i7z3aKkN8O00tIio3dwEO5QznmHHMCJdLHiu9umI93o=
+github.com/rancher/steve v0.0.0-20210218173627-e8086b4525ca/go.mod h1:i0zwVjesOJEC2OrZTzd0IAdFo708PlVp27Be7vujPt4=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24 h1:d98aZFpLw1txbsPgCC6z1Kjl+gqCnmB+1bqE8t1W9tk=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24/go.mod h1:f8UA6yw5xPtSspqXUQZNfs7bTyG0UOfzJz7zOkegir4=
 github.com/rancher/wrangler v0.5.4-0.20200326191509-4054411d9736/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
@@ -949,8 +953,8 @@ github.com/rancher/wrangler v0.6.2-0.20200714200521-c61fae623942/go.mod h1:8LdIq
 github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106/go.mod h1:iKqQcYs4YSDjsme52OZtQU4jHPmLlIiM93aj2c8c/W8=
 github.com/rancher/wrangler v0.7.1/go.mod h1:goezjesEKwMxHLfltdjg9DW0xWV7txQee6vOuSDqXAI=
 github.com/rancher/wrangler v0.7.3-0.20201020003736-e86bc912dfac/go.mod h1:goezjesEKwMxHLfltdjg9DW0xWV7txQee6vOuSDqXAI=
-github.com/rancher/wrangler v0.7.3-0.20201028210318-d73835950c29 h1:2qlV8DWTta4kNRnwYbOZ4yAJ7DAlZoDgPfvbq/JLfxk=
-github.com/rancher/wrangler v0.7.3-0.20201028210318-d73835950c29/go.mod h1:goezjesEKwMxHLfltdjg9DW0xWV7txQee6vOuSDqXAI=
+github.com/rancher/wrangler v0.7.3-0.20210219161540-ef7fe9ce2443 h1:M6GVpZFsc8GmjGwmIM45WXVGVu4FyGdIkCrAl2llQjk=
+github.com/rancher/wrangler v0.7.3-0.20210219161540-ef7fe9ce2443/go.mod h1:MXpKvxE/LGgLIY+ycpXD/l9zq14FOwMjfxwrf3iRIJM=
 github.com/rancher/wrangler-api v0.6.1-0.20200427172631-a7c2f09b783e/go.mod h1:2lcWR98q8HU3U4mVETnXc8quNG0uXxrt8vKd6cAa/30=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=
@@ -1067,7 +1071,6 @@ github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijb
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/urfave/cli v1.22.2 h1:gsqYFH8bb9ekPA12kRo0hfjngWQjkJPlN9R0N78BoUo=
 github.com/urfave/cli v1.22.2/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
-github.com/urfave/cli/v2 v2.1.1 h1:Qt8FeAtxE/vfdrLmR3rxR6JRE0RoVmbXu8+6kZtYU4k=
 github.com/urfave/cli/v2 v2.1.1/go.mod h1:SE9GqnLQmjVa0iPEY0f1w3ygNIYcIJ0OKPMoW2caLfQ=
 github.com/urfave/negroni v1.0.0/go.mod h1:Meg73S6kFm/4PpbYdq35yYWoCZ9mS/YSx+lKnmiohz4=
 github.com/vektah/gqlparser v1.1.2/go.mod h1:1ycwN7Ij5njmMkPPAOaRFY4rET2Enx7IkVv3vaXspKw=

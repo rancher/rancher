@@ -104,7 +104,7 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 		return nil, err
 	}
 
-	router, err := router(ctx, cfg.LocalClusterEnabled, scaledContext, clusterManager)
+	router, err := router(ctx, cfg.LocalClusterEnabled, scaledContext, clusterManager, wranglerContext)
 	if err != nil {
 		return nil, err
 	}
