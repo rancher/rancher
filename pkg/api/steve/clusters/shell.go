@@ -115,6 +115,18 @@ func (s *shell) createPod() *v1.Pod {
 					Value:    "linux",
 					Effect:   "NoSchedule",
 				},
+				{
+					Key:      "node-role.kubernetes.io/controlplane",
+					Operator: "Equal",
+					Value:    "true",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/etcd",
+					Operator: "Equal",
+					Value:    "true",
+					Effect:   "NoExecute",
+				},
 			},
 			Containers: []v1.Container{
 				{

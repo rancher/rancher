@@ -25,6 +25,11 @@ addLocal: "true"
 # Important: update pkg/image/export/main.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
 busyboxImage: busybox
 
+# Override imagePullPolicy for busybox images
+# options: Always, Never, IfNotPresent
+# Defaults to IfNotPresent
+# busyboxImagePullPolicy: <pullPolicy>
+
 # Add debug flag to Rancher server
 debug: false
 
@@ -47,6 +52,10 @@ imagePullSecrets: []
 ### ingress ###
 # Readme for details and instruction on adding tls secrets.
 ingress:
+  # If set to false, ingress will not be created
+  # Defaults to true
+  # options: true, false
+  enabled: true
   extraAnnotations:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"

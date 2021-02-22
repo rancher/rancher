@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"sync"
 
-	prommonitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	istiov1alpha3api "github.com/knative/pkg/apis/istio/v1alpha3"
+	prommonitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/lasso/pkg/controller"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"

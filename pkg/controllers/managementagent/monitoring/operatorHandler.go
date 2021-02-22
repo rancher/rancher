@@ -33,7 +33,7 @@ func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.
 		return obj, nil
 	}
 
-	if !v32.ClusterConditionAgentDeployed.IsTrue(obj) {
+	if !obj.Spec.Internal && !v32.ClusterConditionAgentDeployed.IsTrue(obj) {
 		return obj, nil
 	}
 
@@ -70,7 +70,7 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 		return nil, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
 	}
 
-	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if !cluster.Spec.Internal && !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return project, nil
 	}
 

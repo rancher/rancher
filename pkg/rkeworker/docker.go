@@ -371,10 +371,11 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 		hostConfig = &container.HostConfig{
 			Binds: []string{
 				// symbolic link source: docker container logs location
-				"c:/ProgramData:c:/ProgramData",
+				"c:\\ProgramData:c:\\ProgramData",
 				// symbolic link target
-				fmt.Sprintf("%s/var/lib:c:/var/lib", getWindowsPrefixPath()),
+				fmt.Sprintf("%svar\\lib:c:\\var\\lib", getWindowsPrefixPath()),
 			},
+
 			NetworkMode: "none",
 		}
 	}
@@ -445,10 +446,22 @@ func (s containerWaitingStatus) error() error {
 }
 
 func getWindowsPrefixPath() string {
-	prefixPath := os.Getenv("CATTLE_PREFIX_PATH")
-	if prefixPath == "" {
-		prefixPath = "c:\\"
+	p := os.Getenv("CATTLE_PREFIX_PATH")
+	if p == "" {
+		return "c:\\"
 	}
 
-	return prefixPath
+	// clean backslashes added from encoding
+	var new []string
+
+	// squash multi backslashes
+	sp := strings.Split(p, "\\")
+	for _, v := range sp {
+		if v != "" {
+			new = append(new, v)
+		}
+	}
+
+	new = append(new, "") // always add trailing slash
+	return strings.Join(new, "\\")
 }

@@ -36,11 +36,13 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 		return nil, "", err
 	}
 	if !u.IsAbs() {
-		base, err := url.Parse(strings.TrimSuffix(repoURL, "/") + "/")
+		base, err := url.Parse(repoURL)
 		if err != nil {
 			return nil, "", err
 		}
+		base.Path = strings.TrimSuffix(base.Path, "/") + "/"
 		u = base.ResolveReference(u)
+		u.RawQuery = base.RawQuery
 	}
 
 	resp, err := client.Get(u.String())
@@ -76,11 +78,17 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 		return nil, err
 	}
 	if !u.IsAbs() {
-		base, err := url.Parse(strings.TrimSuffix(repoURL, "/") + "/")
+		base, err := url.Parse(repoURL)
 		if err != nil {
 			return nil, err
 		}
+		// Prevent ResolveReference from stripping the last element
+		// of the path by ensuring it has a trailing slash
+		base.Path = strings.TrimSuffix(base.Path, "/") + "/"
 		u = base.ResolveReference(u)
+		// Retain the query string of the repository URL as it might
+		// contain an access credential.
+		u.RawQuery = base.RawQuery
 	}
 
 	resp, err := client.Get(u.String())

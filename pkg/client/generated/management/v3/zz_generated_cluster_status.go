@@ -6,6 +6,7 @@ const (
 	ClusterStatusFieldAgentFeatures                        = "agentFeatures"
 	ClusterStatusFieldAgentImage                           = "agentImage"
 	ClusterStatusFieldAllocatable                          = "allocatable"
+	ClusterStatusFieldAppliedAgentEnvVars                  = "appliedAgentEnvVars"
 	ClusterStatusFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterStatusFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterStatusFieldAppliedSpec                          = "appliedSpec"
@@ -36,6 +37,7 @@ type ClusterStatus struct {
 	AgentFeatures                        map[string]bool             `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                      `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                          map[string]string           `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
+	AppliedAgentEnvVars                  []EnvVar                    `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedEnableNetworkPolicy           bool                        `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                      `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`

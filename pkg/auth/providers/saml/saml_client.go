@@ -1,6 +1,7 @@
 package saml
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -17,8 +18,8 @@ import (
 	"time"
 
 	"github.com/crewjam/saml"
-	"github.com/crewjam/saml/samlsp"
 	"github.com/gorilla/mux"
+	xrv "github.com/mattermost/xml-roundtrip-validator"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -56,6 +57,8 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 	var cert *x509.Certificate
 	var err error
 	var ok bool
+
+	log.Debugf("SAML [InitializeSamlServiceProvider]: Validating input for provider %v", name)
 
 	if configToSet.IDPMetadataContent == "" {
 		return fmt.Errorf("SAML: Cannot initialize saml SP properly, missing IDP URL/metadata in the config %v", configToSet)
@@ -113,7 +116,12 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 		}
 	}
 
-	provider := SamlProviders[name]
+	provider, ok := SamlProviders[name]
+	if !ok {
+		return fmt.Errorf("SAML [InitializeSamlServiceProvider]: Provider %v not configured", name)
+	}
+
+	log.Debugf("SAML [InitializeSamlServiceProvider]: Initializing provider %v", name)
 
 	rancherAPIHost := strings.TrimRight(configToSet.RancherAPIHost, "/")
 	samlURL := rancherAPIHost + "/v1-saml/"
@@ -140,6 +148,9 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 	idm := &IDPMetadata{}
 	if configToSet.IDPMetadataContent != "" {
 		sp.IDPMetadata = &saml.EntityDescriptor{}
+		if err := xrv.Validate(bytes.NewReader([]byte(configToSet.IDPMetadataContent))); err != nil {
+			return fmt.Errorf("SAML: invalid xml: %v", err)
+		}
 		if err := xml.NewDecoder(strings.NewReader(configToSet.IDPMetadataContent)).Decode(idm); err != nil {
 			return fmt.Errorf("SAML: cannot initialize saml SP, cannot decode IDP Metadata content from the config %v, error %v", configToSet, err)
 		}
@@ -156,11 +167,12 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 
 	provider.serviceProvider = &sp
 
-	cookieStore := samlsp.ClientCookies{
+	cookieStore := ClientCookies{
 		ServiceProvider: &sp,
 		Name:            "token",
 		Domain:          actURL.Host,
 	}
+
 	provider.clientState = &cookieStore
 
 	root.Use(responsewriter.ContentTypeOptions)

@@ -76,11 +76,6 @@ This step is only required to use certificates issued by Rancher’s generated C
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
   --set hostname=rancher.my.org
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 - [Let’s Encrypt](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
@@ -91,11 +86,6 @@ helm install rancher rancher-latest/rancher \
   --set hostname=rancher.my.org \
   --set ingress.tls.source=letsEncrypt \
   --set letsEncrypt.email=me@example.org
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 - [Certificates from Files](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
@@ -115,11 +105,6 @@ helm install rancher rancher-latest/rancher \
   --set hostname=rancher.my.org \
   --set ingress.tls.source=secret \
   --set privateCA=true
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 #### Verify that the Rancher Server is Successfully Deployed
@@ -187,10 +172,12 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `auditLog.maxBackups`          | 1                                                     | int - maximum number of audit log files to retain (only applies when **auditLog.destination** is set to **hostPath**)                                                                                        |
 | `auditLog.maxSize`             | 100                                                   | ***int*** - maximum size in megabytes of the audit log file before it gets rotated (only applies when **auditLog.destination** is set to **hostPath**)                                                       |
 | `busyboxImage`                 | "busybox"                                             | ***string*** - Image location for busybox image used to collect audit logs *Note: Available as of v2.2.0*                                                                                                    |
+| `busyboxImagePullPolicy`       | "IfNotPresent"                                        | ***string*** - Override imagePullPolicy for busybox images - *"Always", "Never", "IfNotPresent"*                                                                                                      |
 | `debug`                        | false                                                 | ***bool*** - set debug flag on rancher server                                                                                                                                                                |
 | `certmanager.version`          | " "                                                   | ***string*** - set cert-manager compatibility                                                                                                                                                                |
 | `extraEnv`                     | []                                                    | ***list*** - set additional environment variables for Rancher Note: *Available as of v2.2.0*                                                                                                                 |
 | `imagePullSecrets`             | []                                                    | ***list*** - list of names of Secret resource containing private registry credentials                                                                                                                        |
+| `ingress.enabled`              | true                                                  | ***bool*** - install ingress resource
 | `ingress.extraAnnotations`     | {}                                                    | ***map*** - additional annotations to customize the ingress                                                                                                                                                  |
 | `ingress.configurationSnippet` | " "                                                   | ***string*** - Add additional Nginx configuration. Can be used for proxy configuration. Note: *Available as of v2.0.15, v2.1.10 and v2.2.4*                                                                  |
 | `letsEncrypt.ingress.class`    | " "                                                   | ***string*** - optional ingress class for the cert-manager acmesolver ingress that responds to the Let’s *Encrypt ACME challenges*                                                                           |

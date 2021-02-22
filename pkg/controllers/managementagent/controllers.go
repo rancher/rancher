@@ -3,7 +3,7 @@ package managementagent
 import (
 	"context"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/types"
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"

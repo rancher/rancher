@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/encryptedstore"
@@ -49,6 +50,7 @@ const (
 	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
 	amazonec2                       = "amazonec2"
 	userNodeRemoveCleanupAnnotation = "nodes.management.cattle.io/user-node-remove-cleanup"
+	userScaledownAnnotation         = "nodes.management.cattle.io/scaledown"
 )
 
 // aliases maps Schema field => driver field
@@ -80,6 +82,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		nodeClient:                nodeClient,
 		nodeTemplateClient:        management.Management.NodeTemplates(""),
 		nodePoolLister:            management.Management.NodePools("").Controller().Lister(),
+		nodePoolController:        management.Management.NodePools("").Controller(),
 		nodeTemplateGenericClient: management.Management.NodeTemplates("").ObjectClient().UnstructuredClient(),
 		configMapGetter:           management.K8sClient.CoreV1(),
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
@@ -101,6 +104,7 @@ type Lifecycle struct {
 	nodeClient                v3.NodeInterface
 	nodeTemplateClient        v3.NodeTemplateInterface
 	nodePoolLister            v3.NodePoolLister
+	nodePoolController        v3.NodePoolController
 	configMapGetter           typedv1.ConfigMapsGetter
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
@@ -217,7 +221,7 @@ func (m *Lifecycle) getNodePool(nodePoolName string) (*v3.NodePool, error) {
 
 func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 	if obj.Status.NodeTemplateSpec == nil {
-		return obj, nil
+		return m.deleteV1Node(obj)
 	}
 
 	newObj, err := v32.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
@@ -276,6 +280,16 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 	}
 
 	return m.deleteV1Node(newObj.(*v3.Node))
+}
+
+func (m *Lifecycle) enqueueNodePool(obj *v3.Node) {
+	logrus.Errorf("[node] enqueing node pool %s", obj.Spec.NodePoolName)
+	pool, err := m.getNodePool(obj.Spec.NodePoolName)
+	if err != nil {
+		logrus.Errorf("[node] error finding pool %s", obj.Spec.NodePoolName)
+		return
+	}
+	m.nodePoolController.Enqueue(pool.Namespace, pool.Name)
 }
 
 func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
@@ -396,12 +410,50 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 		return err
 	}
 
-	drun := clusterregistrationtokens.NodeCommand(token, nil)
+	cluster, err := m.clusterLister.Get("", obj.Namespace)
+	if err != nil {
+		return err
+	}
+
+	err = m.authenticateRegistry(nodeDir, obj, cluster)
+	if err != nil {
+		return err
+	}
+
+	drun := clusterregistrationtokens.NodeCommand(token, cluster)
 	args := buildAgentCommand(obj, drun)
 	cmd, err := buildCommand(nodeDir, obj, args)
 	if err != nil {
 		return err
 	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, string(output))
+	}
+
+	return nil
+}
+
+// authenticateRegistry authenticates the machine to a private registry if one is defined on the cluster
+// this enables the agent image to be pulled from the private registry
+func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster *v3.Cluster) error {
+	reg := util.GetPrivateRepo(cluster)
+	if reg == nil {
+		return nil // if there is no private registry defined, return since auth is not needed
+	}
+
+	logrus.Infof("[node-controller-rancher-machine] private registry detected, authenticating %s to %s", node.Spec.RequestedHostname, reg.URL)
+
+	login := clusterregistrationtokens.LoginCommand(*reg)
+	args := buildLoginCommand(node, login)
+	cmd, err := buildCommand(nodeDir, node, args)
+	if err != nil {
+		return err
+	}
+
+	logrus.Tracef("[node-controller-rancher-machine] login command: %s", cmd.String())
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrap(err, string(output))
@@ -430,6 +482,9 @@ func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// if the node provision failed let the pool schedule it for delete
+	defer m.enqueueNodePool(obj)
 
 	// Provision in the background so we can poll and save the config
 	done := make(chan error)
@@ -460,10 +515,42 @@ outer:
 	return obj, err
 }
 
+func (m *Lifecycle) scaledown(obj *v3.Node) (runtime.Object, error) {
+	logrus.Debugf("[node] checking when to scaledown node %s", obj.Name)
+	scaledown, err := time.Parse(time.RFC3339, obj.Spec.ScaledownTime)
+	if err != nil {
+		return obj, fmt.Errorf("[node] failed to parse scaledown time, is it in RFC3339? %s", obj.Spec.ScaledownTime)
+	}
+
+	// time to scaledown, send to nodepool to delete the node
+	pool, err := m.getNodePool(obj.Spec.NodePoolName)
+	if err != nil {
+		return obj, err
+	}
+
+	if scaledown.Before(time.Now()) {
+		logrus.Debugf("[node] enqueing nodepool %s for scaledown immediately", pool.Name)
+		m.nodePoolController.Enqueue(pool.Namespace, pool.Name)
+	} else if after := scaledown.Sub(time.Now()); after > 0 {
+		logrus.Debugf("[node] enqueing nodepool %s for scaledown in %s", pool.Name, after)
+		m.nodePoolController.EnqueueAfter(pool.Namespace, pool.Name, after+(5*time.Second))
+	}
+
+	copy := obj.DeepCopy()
+	copy.Annotations[userScaledownAnnotation] = "true"
+	return m.nodeClient.Update(copy)
+}
+
 func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
 	if cleanupAnnotation, ok := obj.Annotations[userNodeRemoveCleanupAnnotation]; !ok || cleanupAnnotation != "true" {
 		// finalizer from user-node-remove has to be checked/cleaned
 		return m.userNodeRemoveCleanup(obj)
+	}
+
+	if obj.Spec.ScaledownTime != "" {
+		if scaledownAnnotation, ok := obj.Annotations[userScaledownAnnotation]; !ok || scaledownAnnotation != "true" {
+			return m.scaledown(obj)
+		}
 	}
 
 	newObj, err := v32.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
@@ -784,7 +871,12 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		return err
 	}
 
-	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster) {
+	nodePool, err := m.getNodePool(node.Spec.NodePoolName)
+	if err != nil {
+		return err
+	}
+
+	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster, nodePool) {
 		return nil
 	}
 

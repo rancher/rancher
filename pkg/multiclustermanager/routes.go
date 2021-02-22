@@ -40,6 +40,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(scaledContext.Dialer.(*rancherdialer.Factory).TunnelAuthorizer, scaledContext)
+		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
 	)
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
@@ -65,7 +66,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	unauthed.Handle("/v3/connect/config", connectConfigHandler)
 	unauthed.Handle("/v3/connect", connectHandler)
 	unauthed.Handle("/v3/connect/register", connectHandler)
-	unauthed.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusterregistrationtokens.ClusterImportHandler))
+	unauthed.Handle("/v3/import/{token}_{clusterId}.yaml", http.HandlerFunc(clusterImport.ClusterImportHandler))
 	unauthed.Handle("/v3/settings/cacerts", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/first-login", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-banners", managementAPI).MatcherFunc(onlyGet)

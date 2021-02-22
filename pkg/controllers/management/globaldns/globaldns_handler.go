@@ -27,18 +27,22 @@ import (
 const (
 	GlobaldnsController    = "mgmt-global-dns-controller"
 	annotationIngressClass = "kubernetes.io/ingress.class"
+	annotationFilter       = "annotationFilter"
 	annotationDNSTTL       = "external-dns.alpha.kubernetes.io/ttl"
+	defaultIngressClass    = "rancher-external-dns"
 )
 
 type GDController struct {
-	ingresses         clientv1beta1.IngressInterface //need to use client-go IngressInterface to update Ingress.Status field
-	managementContext *config.ManagementContext
+	ingresses               clientv1beta1.IngressInterface //need to use client-go IngressInterface to update Ingress.Status field
+	managementContext       *config.ManagementContext
+	globalDNSProviderLister v3.GlobalDnsProviderLister
 }
 
 func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext) *GDController {
 	n := &GDController{
-		ingresses:         mgmt.K8sClient.ExtensionsV1beta1().Ingresses(namespace.GlobalNamespace),
-		managementContext: mgmt,
+		ingresses:               mgmt.K8sClient.ExtensionsV1beta1().Ingresses(namespace.GlobalNamespace),
+		managementContext:       mgmt,
+		globalDNSProviderLister: mgmt.Management.GlobalDnsProviders(namespace.GlobalNamespace).Controller().Lister(),
 	}
 	return n
 }
@@ -124,11 +128,20 @@ func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDns) (*v1be
 	if globaldns.Spec.TTL != 0 {
 		ingressSpec.ObjectMeta.Annotations[annotationDNSTTL] = strconv.FormatInt(globaldns.Spec.TTL, 10)
 	}
+	if globaldns.Spec.ProviderName != "" {
+		ingressClass, err := n.getIngressClass(globaldns.Spec.ProviderName)
+		if err != nil {
+			return nil, err
+		}
+		if ingressClass != "" {
+			ingressSpec.ObjectMeta.Annotations[annotationIngressClass] = ingressClass
+		}
+	}
 	ingressObj, err := n.ingresses.Create(context.TODO(), ingressSpec, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
-	logrus.Debugf("Created ingress %v for globalDNS %s", ingressObj.Name, globaldns.Name)
+	logrus.Infof("Created ingress %v for globalDNS %s", ingressObj.Name, globaldns.Name)
 	return ingressObj, nil
 }
 
@@ -176,6 +189,51 @@ func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDns) *v1beta1.
 	}
 }
 
+func (n *GDController) getIngressClass(globalDNSProviderName string) (string, error) {
+	providerName, err := n.getGlobalDNSProviderName(globalDNSProviderName)
+	if err != nil {
+		return defaultIngressClass, err
+	}
+
+	provider, err := n.globalDNSProviderLister.Get(namespace.GlobalNamespace, providerName)
+	if err != nil && k8serrors.IsNotFound(err) {
+		logrus.Errorf("GlobalDNSController: Object Not found Error %v, while listing GlobalDNSProvider by name %v", err, providerName)
+		return defaultIngressClass, nil
+	}
+	if err != nil {
+		return defaultIngressClass, fmt.Errorf("GlobalDNSController: Error %v Listing GlobalDNSProvider by name %v", err, providerName)
+	}
+
+	var options map[string]string
+	if provider.Spec.Route53ProviderConfig != nil {
+		options = provider.Spec.Route53ProviderConfig.AdditionalOptions
+	} else if provider.Spec.CloudflareProviderConfig != nil {
+		options = provider.Spec.CloudflareProviderConfig.AdditionalOptions
+	} else if provider.Spec.AlidnsProviderConfig != nil {
+		options = provider.Spec.AlidnsProviderConfig.AdditionalOptions
+	}
+
+	if options != nil {
+		ingressClassAnnotation, ok := options[annotationFilter]
+		if ok {
+			prefix := annotationIngressClass + "="
+			if strings.HasPrefix(ingressClassAnnotation, prefix) {
+				return strings.TrimPrefix(ingressClassAnnotation, prefix), nil
+			}
+		}
+	}
+	return defaultIngressClass, nil
+}
+
+func (n *GDController) getGlobalDNSProviderName(globalDNSProviderName string) (string, error) {
+	split := strings.SplitN(globalDNSProviderName, ":", 2)
+	if len(split) != 2 {
+		return "", fmt.Errorf("error in splitting globalDNSProviderName %v", globalDNSProviderName)
+	}
+	provider := split[1]
+	return provider, nil
+}
+
 func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.GlobalDns) error {
 	var err error
 
@@ -200,6 +258,17 @@ func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.Glo
 	if !strings.EqualFold(ingress.ObjectMeta.Annotations[annotationDNSTTL], ttlvalue) {
 		ingress.ObjectMeta.Annotations[annotationDNSTTL] = ttlvalue
 		updateIngress = true
+	}
+
+	if obj.Spec.ProviderName != "" {
+		ingressClass, err := n.getIngressClass(obj.Spec.ProviderName)
+		if err != nil {
+			return err
+		}
+		if !strings.EqualFold(ingress.ObjectMeta.Annotations[annotationIngressClass], ingressClass) {
+			ingress.ObjectMeta.Annotations[annotationIngressClass] = ingressClass
+			updateIngress = true
+		}
 	}
 
 	if updateIngress {

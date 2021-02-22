@@ -56,7 +56,7 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 		return cluster, nil
 	}
 
-	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if !cluster.Spec.Internal && !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return cluster, nil
 	}
 

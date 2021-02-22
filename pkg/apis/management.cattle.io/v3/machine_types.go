@@ -181,11 +181,12 @@ type NodePoolSpec struct {
 	Worker           bool   `json:"worker"`
 	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],required,notnullable"`
 
-	HostnamePrefix  string            `json:"hostnamePrefix" norman:"required,notnullable"`
-	Quantity        int               `json:"quantity" norman:"required,default=1"`
-	NodeLabels      map[string]string `json:"nodeLabels"`
-	NodeAnnotations map[string]string `json:"nodeAnnotations"`
-	NodeTaints      []v1.Taint        `json:"nodeTaints,omitempty"`
+	HostnamePrefix    string            `json:"hostnamePrefix" norman:"required,notnullable"`
+	Quantity          int               `json:"quantity" norman:"required,default=1"`
+	DrainBeforeDelete bool              `json:"drainBeforeDelete" norman:"default=false"`
+	NodeLabels        map[string]string `json:"nodeLabels"`
+	NodeAnnotations   map[string]string `json:"nodeAnnotations"`
+	NodeTaints        []v1.Taint        `json:"nodeTaints,omitempty"`
 
 	DisplayName string `json:"displayName"`
 	ClusterName string `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
@@ -238,6 +239,7 @@ type NodeSpec struct {
 	DesiredNodeUnschedulable string          `json:"desiredNodeUnschedulable,omitempty"`
 	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
 	MetadataUpdate           MetadataUpdate  `json:"metadataUpdate,omitempty"`
+	ScaledownTime            string          `json:"scaledownTime,omitempty"`
 }
 
 type NodePlan struct {

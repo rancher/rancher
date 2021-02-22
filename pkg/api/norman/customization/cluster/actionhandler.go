@@ -3,11 +3,10 @@ package cluster
 import (
 	"fmt"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -41,7 +40,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		cluster := map[string]interface{}{
 			"id": apiContext.ID,
 		}
-
 		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, cluster, apiContext.Schema) == nil
 	}
 
@@ -55,7 +53,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	}
 
 	canCreateClusterTemplate := func() bool {
-
 		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
 		canCreateTemplates, _ := CanCreateRKETemplate(callerID, a.SubjectAccessReviewClient)
 		return canCreateTemplates
@@ -100,6 +97,11 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate certificates")
 		}
 		return a.RotateCertificates(actionName, action, apiContext)
+	case v32.ClusterActionRotateEncryptionKey:
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate encryption key")
+		}
+		return a.RotateEncryptionKey(actionName, action, apiContext)
 	case v32.ClusterActionRunSecurityScan:
 		return a.runCisScan(actionName, action, apiContext)
 	case v32.ClusterActionSaveAsTemplate:
@@ -129,6 +131,5 @@ func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmt
 	if err != nil {
 		return nil, err
 	}
-
 	return a.ClusterManager.KubeConfig(cluster.ID, token), nil
 }

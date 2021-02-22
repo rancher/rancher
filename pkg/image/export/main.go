@@ -281,6 +281,7 @@ func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) 
 
 			versionGTMin, err := k3sbasedupgrade.IsNewerVersion(minVersion, rancherVersion)
 			if err != nil {
+				logrus.Errorf("%v", err)
 				continue
 			}
 			if rancherVersion != minVersion && !versionGTMin {
@@ -290,6 +291,7 @@ func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) 
 
 			versionLTMax, err := k3sbasedupgrade.IsNewerVersion(rancherVersion, maxVersion)
 			if err != nil {
+				logrus.Errorf("%v", err)
 				continue
 			}
 			if rancherVersion != maxVersion && !versionLTMax {

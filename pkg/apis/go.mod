@@ -4,17 +4,16 @@ go 1.14
 
 replace (
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/ibuildthecloud/system-upgrade-controller/pkg/apis v0.0.0-20200823050544-4b08ab2b5a02
-	k8s.io/client-go => k8s.io/client-go v0.18.8
+	k8s.io/client-go => k8s.io/client-go v0.20.0
 )
 
 require (
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/eks-operator v1.0.4
-	github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3
-	github.com/rancher/rke v1.2.4-rc5
-	github.com/rancher/wrangler v0.7.3-0.20201020003736-e86bc912dfac
+	github.com/rancher/eks-operator v1.0.6-rc1
+	github.com/rancher/norman v0.0.0-20210219183327-731b8482505c
+	github.com/rancher/rke v1.2.6-rc5
+	github.com/rancher/wrangler v0.7.3-0.20201028210318-d73835950c29
 	github.com/sirupsen/logrus v1.6.0
-	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
-	k8s.io/api v0.18.8
-	k8s.io/apimachinery v0.18.8
+	k8s.io/api v0.20.0
+	k8s.io/apimachinery v0.20.0
 )

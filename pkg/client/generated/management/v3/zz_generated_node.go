@@ -41,6 +41,7 @@ const (
 	NodeFieldRemoved              = "removed"
 	NodeFieldRequested            = "requested"
 	NodeFieldRequestedHostname    = "requestedHostname"
+	NodeFieldScaledownTime        = "scaledownTime"
 	NodeFieldSshUser              = "sshUser"
 	NodeFieldState                = "state"
 	NodeFieldTaints               = "taints"
@@ -90,6 +91,7 @@ type Node struct {
 	Removed              string                    `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested            map[string]string         `json:"requested,omitempty" yaml:"requested,omitempty"`
 	RequestedHostname    string                    `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`
+	ScaledownTime        string                    `json:"scaledownTime,omitempty" yaml:"scaledownTime,omitempty"`
 	SshUser              string                    `json:"sshUser,omitempty" yaml:"sshUser,omitempty"`
 	State                string                    `json:"state,omitempty" yaml:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty" yaml:"taints,omitempty"`
@@ -124,6 +126,8 @@ type NodeOperations interface {
 	ActionCordon(resource *Node) error
 
 	ActionDrain(resource *Node, input *NodeDrainInput) error
+
+	ActionScaledown(resource *Node) error
 
 	ActionStopDrain(resource *Node) error
 
@@ -206,6 +210,11 @@ func (c *NodeClient) ActionCordon(resource *Node) error {
 
 func (c *NodeClient) ActionDrain(resource *Node, input *NodeDrainInput) error {
 	err := c.apiClient.Ops.DoAction(NodeType, "drain", &resource.Resource, input, nil)
+	return err
+}
+
+func (c *NodeClient) ActionScaledown(resource *Node) error {
+	err := c.apiClient.Ops.DoAction(NodeType, "scaledown", &resource.Resource, nil, nil)
 	return err
 }
 

@@ -239,6 +239,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ImportClusterYamlInput{}).
 		MustImport(&Version, v3.RotateCertificateInput{}).
 		MustImport(&Version, v3.RotateCertificateOutput{}).
+		MustImport(&Version, v3.RotateEncryptionKeyOutput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
 		MustImport(&Version, v3.MonitoringInput{}).
@@ -246,6 +247,11 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
 		MustImport(&Version, v3.SaveAsTemplateInput{}).
 		MustImport(&Version, v3.SaveAsTemplateOutput{}).
+		AddMapperForType(&Version, v1.EnvVar{},
+			&m.Move{
+				From: "envVar",
+				To:   "agentEnvVar",
+			}).
 		MustImportAndCustomize(&Version, rketypes.ETCDService{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
 				field.Default = map[string]interface{}{
@@ -288,6 +294,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions[v3.ClusterActionRotateCertificates] = types.Action{
 				Input:  "rotateCertificateInput",
 				Output: "rotateCertificateOutput",
+			}
+			schema.ResourceActions[v3.ClusterActionRotateEncryptionKey] = types.Action{
+				Output: "rotateEncryptionKeyOutput",
 			}
 			schema.ResourceActions[v3.ClusterActionRunSecurityScan] = types.Action{
 				Input: "cisScanConfig",
@@ -406,6 +415,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions["cordon"] = types.Action{}
 			schema.ResourceActions["uncordon"] = types.Action{}
 			schema.ResourceActions["stopDrain"] = types.Action{}
+			schema.ResourceActions["scaledown"] = types.Action{}
 			schema.ResourceActions["drain"] = types.Action{
 				Input: "nodeDrainInput",
 			}

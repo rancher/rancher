@@ -2,7 +2,6 @@ package healthsyncer
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sort"
 	"time"
@@ -12,11 +11,9 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,13 +99,9 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return nil
 	}
 
-	wasReady := v32.ClusterConditionReady.IsTrue(cluster)
 	newObj, err := v32.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
 		for i := 0; ; i++ {
 			err := h.getComponentStatus(cluster)
-			if err == nil && !wasReady {
-				err = h.checkClusterAgent()
-			}
 			if err == nil || i > 1 {
 				return cluster, errors.Wrap(err, "cluster health check failed")
 			}
@@ -134,21 +127,6 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	// Purposefully not return error.  This is so when the cluster goes unavailable we don't just keep failing
 	// which will essentially keep the controller alive forever, instead of shutting down.
 	return nil
-}
-
-func (h *HealthSyncer) checkClusterAgent() error {
-	if c, err := h.clusterLister.Get("", h.clusterName); err == nil && c.Spec.Internal {
-		return nil
-	}
-
-	deployment, err := h.k8s.AppsV1().Deployments(namespace.System).Get(h.ctx, "cattle-cluster-agent", metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if condition.Cond(appsv1.DeploymentAvailable).IsTrue(deployment) {
-		return nil
-	}
-	return fmt.Errorf("cluster agent is not ready")
 }
 
 func (h *HealthSyncer) getCluster() (*v3.Cluster, error) {

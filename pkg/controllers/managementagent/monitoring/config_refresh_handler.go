@@ -9,7 +9,7 @@ import (
 	apiv1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	rmonitoringv1 "github.com/rancher/rancher/pkg/generated/norman/monitoring.coreos.com/v1"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"

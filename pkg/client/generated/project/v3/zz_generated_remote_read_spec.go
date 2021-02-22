@@ -5,6 +5,7 @@ const (
 	RemoteReadSpecFieldBasicAuth        = "basicAuth"
 	RemoteReadSpecFieldBearerToken      = "bearerToken"
 	RemoteReadSpecFieldBearerTokenFile  = "bearerTokenFile"
+	RemoteReadSpecFieldName             = "name"
 	RemoteReadSpecFieldProxyURL         = "proxyUrl"
 	RemoteReadSpecFieldReadRecent       = "readRecent"
 	RemoteReadSpecFieldRemoteTimeout    = "remoteTimeout"
@@ -17,6 +18,7 @@ type RemoteReadSpec struct {
 	BasicAuth        *BasicAuth        `json:"basicAuth,omitempty" yaml:"basicAuth,omitempty"`
 	BearerToken      string            `json:"bearerToken,omitempty" yaml:"bearerToken,omitempty"`
 	BearerTokenFile  string            `json:"bearerTokenFile,omitempty" yaml:"bearerTokenFile,omitempty"`
+	Name             string            `json:"name,omitempty" yaml:"name,omitempty"`
 	ProxyURL         string            `json:"proxyUrl,omitempty" yaml:"proxyUrl,omitempty"`
 	ReadRecent       bool              `json:"readRecent,omitempty" yaml:"readRecent,omitempty"`
 	RemoteTimeout    string            `json:"remoteTimeout,omitempty" yaml:"remoteTimeout,omitempty"`

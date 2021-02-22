@@ -8,7 +8,7 @@ platform:
 
 steps:
 - name: build
-  image: rancher/dapper:v0.5.2
+  image: rancher/dapper:v0.5.4
   commands:
   - dapper ci
   privileged: true
@@ -22,7 +22,7 @@ steps:
     - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.5.2
+  image: rancher/dapper:v0.5.4
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -33,6 +33,7 @@ steps:
 - name: docker-publish-head
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -56,6 +57,7 @@ steps:
 - name: docker-publish-head-agent
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -80,6 +82,7 @@ steps:
 - name: docker-publish-head-runtime
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -122,6 +125,7 @@ steps:
 - name: docker-publish
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
@@ -141,6 +145,7 @@ steps:
 - name: docker-publish-agent
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
@@ -161,6 +166,7 @@ steps:
 - name: docker-publish-runtime
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
@@ -251,7 +257,7 @@ platform:
 
 steps:
 - name: build
-  image: rancher/dapper:v0.5.2
+  image: rancher/dapper:v0.5.4
   commands:
   - dapper ci
   privileged: true
@@ -265,7 +271,7 @@ steps:
     - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.5.2
+  image: rancher/dapper:v0.5.4
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -276,6 +282,7 @@ steps:
 - name: docker-publish-head
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -299,6 +306,7 @@ steps:
 - name: docker-publish-head-agent
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -323,6 +331,7 @@ steps:
 - name: docker-publish
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"
@@ -342,6 +351,7 @@ steps:
 - name: docker-publish-agent
   image: plugins/docker
   settings:
+    purge: false
     build_args:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"
@@ -396,7 +406,7 @@ platform:
 steps:
   - name: build
     pull: always
-    image: rancher/dapper:v0.5.2
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -409,7 +419,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.2
+    image: rancher/dapper:v0.5.4
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -420,6 +430,7 @@ steps:
   - name: docker-publish-head-agent
     image: plugins/docker:windows-1809-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1809
         - ARCH=amd64
@@ -447,6 +458,7 @@ steps:
   - name: docker-publish-agent
     image: plugins/docker:windows-1809-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1809
         - ARCH=amd64
@@ -504,7 +516,7 @@ platform:
 steps:
   - name: build
     pull: always
-    image: rancher/dapper:v0.5.2
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -517,7 +529,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.2
+    image: rancher/dapper:v0.5.4
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -528,6 +540,7 @@ steps:
   - name: docker-publish-head-agent
     image: plugins/docker:windows-1903-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1903
         - ARCH=amd64
@@ -555,6 +568,7 @@ steps:
   - name: docker-publish-agent
     image: plugins/docker:windows-1903-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1903
         - ARCH=amd64
@@ -613,7 +627,7 @@ platform:
 steps:
   - name: build
     pull: always
-    image: rancher/dapper:v0.5.2
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -626,7 +640,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.2
+    image: rancher/dapper:v0.5.4
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -637,6 +651,7 @@ steps:
   - name: docker-publish-head-agent
     image: plugins/docker:windows-1909-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1909
         - ARCH=amd64
@@ -664,6 +679,7 @@ steps:
   - name: docker-publish-agent
     image: plugins/docker:windows-1909-amd64
     settings:
+      purge: false
       build_args:
         - SERVERCORE_VERSION=1909
         - ARCH=amd64
@@ -675,6 +691,243 @@ steps:
         from_secret: docker_password
       repo: rancher/rancher-agent
       tag: "${DRONE_TAG}-windows-1909"
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - tag
+
+  - name: slack_notify
+    image: plugins/slack
+    settings:
+      template: "Build {{build.link}} failed to publish an image/artifact.\n"
+      username: Drone_Publish
+      webhook:
+        from_secret: slack_webhook
+    when:
+      event:
+        exclude:
+          - pull_request
+      instance:
+        - drone-publish.rancher.io
+      status:
+        - failure
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+      - promote
+
+---
+kind: pipeline
+name: default-windows-2004
+
+platform:
+  os: windows
+  arch: amd64
+  version: 2004
+
+# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
+clone:
+  disable: true
+
+steps:
+  - name: clone
+    image: luthermonson/drone-git:windows-2004-amd64
+    settings:
+      depth: 1
+  - name: build
+    pull: always
+    image: rancher/dapper:v0.5.4
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - push
+        - pull_request
+        - tag
+
+  - name: stage-binaries
+    image: rancher/dapper:v0.5.4
+    commands:
+      - "cp -r ./bin/* ./package/windows/"
+    when:
+      event:
+        - push
+        - tag
+
+  - name: docker-publish-head-agent
+    image: luthermonson/drone-docker:2004
+    settings:
+      purge: false
+      build_args:
+        - SERVERCORE_VERSION=2004
+        - ARCH=amd64
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-2004
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+      event:
+        - push
+
+  - name: docker-publish-agent
+    image: luthermonson/drone-docker:2004
+    settings:
+      purge: false
+      build_args:
+        - SERVERCORE_VERSION=2004
+        - ARCH=amd64
+        - "VERSION=${DRONE_TAG}"
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: "${DRONE_TAG}-windows-2004"
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - tag
+
+  - name: slack_notify
+    image: plugins/slack
+    settings:
+      template: "Build {{build.link}} failed to publish an image/artifact.\n"
+      username: Drone_Publish
+      webhook:
+        from_secret: slack_webhook
+    when:
+      event:
+        exclude:
+          - pull_request
+      instance:
+        - drone-publish.rancher.io
+      status:
+        - failure
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+      - promote
+---
+kind: pipeline
+name: default-windows-20H2
+
+platform:
+  os: windows
+  arch: amd64
+  version: 20H2
+
+# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
+clone:
+  disable: true
+
+steps:
+  - name: clone
+    image: luthermonson/drone-git:windows-20H2-amd64
+    settings:
+      depth: 1
+  - name: build
+    pull: always
+    image: rancher/dapper:v0.5.4
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - push
+        - pull_request
+        - tag
+
+  - name: stage-binaries
+    image: rancher/dapper:v0.5.4
+    commands:
+      - "cp -r ./bin/* ./package/windows/"
+    when:
+      event:
+        - push
+        - tag
+
+  - name: docker-publish-head-agent
+    image: luthermonson/drone-docker:20H2
+    settings:
+      purge: false
+      build_args:
+        - SERVERCORE_VERSION=20H2
+        - ARCH=amd64
+        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent.20H2
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-20H2
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+      event:
+        - push
+
+  - name: docker-publish-agent
+    image: luthermonson/drone-docker:20H2
+    settings:
+      purge: false
+      build_args:
+        - SERVERCORE_VERSION=20H2
+        - ARCH=amd64
+        - "VERSION=${DRONE_TAG}"
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent.20H2
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: "${DRONE_TAG}-windows-20H2"
       username:
         from_secret: docker_username
     volumes:
@@ -779,7 +1032,7 @@ steps:
     - tag
 
 - name: build-chart
-  image: rancher/dapper:v0.5.2
+  image: rancher/dapper:v0.5.4
   commands:
   - dapper chart/ci
   privileged: true
@@ -838,6 +1091,8 @@ depends_on:
 - default-windows-1809
 - default-windows-1903
 - default-windows-1909
+- default-windows-2004
+- default-windows-20H2
 ---
 kind: pipeline
 name: publish
@@ -848,7 +1103,7 @@ platform:
 
 steps:
 - name: chart-promote
-  image: rancher/dapper:v0.5.2
+  image: rancher/dapper:v0.5.4
   commands:
   - dapper chart/copy
   volumes:
