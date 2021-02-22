@@ -393,8 +393,7 @@ class TestCertificate:
                 name=cert_name, key=rancher_private_key,
                 certs=rancher_cert
             )
-            assert certificate_allns_valid.issuer == 'Let\'s Encrypt ' \
-                                                     'Authority X3'
+            assert certificate_allns_valid.issuer == 'R3'
             # Delete the certificate
             p_client.delete(certificate_allns_valid)
 
