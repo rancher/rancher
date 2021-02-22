@@ -49,7 +49,7 @@ func indexByMembershipBindingOwner(obj interface{}) ([]string, error) {
 	ns := meta.GetNamespace()
 	var keys []string
 	for k, v := range meta.GetLabels() {
-		if v == membershipBindingOwner {
+		if v == MembershipBindingOwner {
 			keys = append(keys, strings.Join([]string{ns, k}, "/"))
 		}
 	}

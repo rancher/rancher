@@ -144,7 +144,7 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "clusterrolebinding-",
 				Labels: map[string]string{
-					rtbNsAndName: membershipBindingOwner,
+					rtbNsAndName: MembershipBindingOwner,
 				},
 			},
 			Subjects: []v1.Subject{subject},
@@ -167,7 +167,7 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 	if crb.Labels == nil {
 		crb.Labels = map[string]string{}
 	}
-	crb.Labels[rtbNsAndName] = membershipBindingOwner
+	crb.Labels[rtbNsAndName] = MembershipBindingOwner
 	logrus.Infof("[%v] Updating clusterRoleBinding %v for cluster membership in cluster %v for subject %v", m.controller, crb.Name, cluster.Name, subject.Name)
 	_, err = m.mgmt.RBAC.ClusterRoleBindings("").Update(crb)
 	return err
@@ -217,7 +217,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "rolebinding-",
 				Labels: map[string]string{
-					rtbNsAndName: membershipBindingOwner,
+					rtbNsAndName: MembershipBindingOwner,
 				},
 			},
 			Subjects: []v1.Subject{subject},
@@ -240,7 +240,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 	if rb.Labels == nil {
 		rb.Labels = map[string]string{}
 	}
-	rb.Labels[rtbNsAndName] = membershipBindingOwner
+	rb.Labels[rtbNsAndName] = MembershipBindingOwner
 	logrus.Infof("[%v] Updating roleBinding %v for project membership in project %v for subject %v", m.controller, rb.Name, project.Name, subject.Name)
 	_, err = m.mgmt.RBAC.RoleBindings(namespace).Update(rb)
 	return err
@@ -365,9 +365,9 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 		}
 		var otherOwners bool
 		for k, v := range objMeta.GetLabels() {
-			if k == rtbNsAndName && v == membershipBindingOwner {
+			if k == rtbNsAndName && v == MembershipBindingOwner {
 				delete(objMeta.GetLabels(), k)
-			} else if v == membershipBindingOwner {
+			} else if v == MembershipBindingOwner {
 				// Another rtb is also linked to this roleBinding so don't delete
 				otherOwners = true
 			}
@@ -500,7 +500,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 						ObjectMeta: metav1.ObjectMeta{
 							Name: bindingName,
 							Labels: map[string]string{
-								bindingKey: crtbInProjectBindingOwner,
+								bindingKey: CrtbInProjectBindingOwner,
 							},
 						},
 						Subjects: []v1.Subject{subject},
@@ -520,7 +520,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	}
 
 	currentRBs := map[string]*v1.RoleBinding{}
-	set := labels.Set(map[string]string{bindingKey: crtbInProjectBindingOwner})
+	set := labels.Set(map[string]string{bindingKey: CrtbInProjectBindingOwner})
 	current, err := m.rbLister.List(projectNamespace, set.AsSelector())
 	if err != nil {
 		return err
@@ -561,7 +561,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 						ObjectMeta: metav1.ObjectMeta{
 							Name: bindingName,
 							Labels: map[string]string{
-								bindingKey: prtbInClusterBindingOwner,
+								bindingKey: PrtbInClusterBindingOwner,
 							},
 						},
 						Subjects: []v1.Subject{subject},
@@ -581,7 +581,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	}
 
 	currentRBs := map[string]*v1.RoleBinding{}
-	set := labels.Set(map[string]string{bindingKey: prtbInClusterBindingOwner})
+	set := labels.Set(map[string]string{bindingKey: PrtbInClusterBindingOwner})
 	current, err := m.rbLister.List(clusterNamespace, set.AsSelector())
 	if err != nil {
 		return err
