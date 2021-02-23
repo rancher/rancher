@@ -51,6 +51,7 @@ const (
 	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
 	amazonec2                       = "amazonec2"
 	userNodeRemoveCleanupAnnotation = "nodes.management.cattle.io/user-node-remove-cleanup"
+	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
 	userScaledownAnnotation         = "nodes.management.cattle.io/scaledown"
 )
 
@@ -939,33 +940,19 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 
 func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
 	copy := obj.DeepCopy()
+	copy.SetFinalizers(removeFinalizerWithPrefix(copy.GetFinalizers(), userNodeRemoveFinalizerPrefix))
 	copy.Annotations[userNodeRemoveCleanupAnnotation] = "true"
-	if hasFinalizerWithPrefix(copy, "clusterscoped.controller.cattle.io/user-node-remove_") {
-		// user-node-remove controller functionality is now merged into this controller
-		logrus.Infof("node [%s] has a finalizer for user-node-remove controller and it will be removed",
-			copy.Spec.RequestedHostname)
-		copy = removeFinalizerWithPrefix(copy, "clusterscoped.controller.cattle.io/user-node-remove_")
-	}
 	return m.nodeClient.Update(copy)
 }
 
-func hasFinalizerWithPrefix(node *v3.Node, prefix string) bool {
-	for _, finalizer := range node.Finalizers {
+func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
+	var nf []string
+	for _, finalizer := range finalizers {
 		if strings.HasPrefix(finalizer, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
-func removeFinalizerWithPrefix(node *v3.Node, prefix string) *v3.Node {
-	var newFinalizers []string
-	for _, finalizer := range node.Finalizers {
-		if strings.HasPrefix(finalizer, prefix) {
+			logrus.Debugf("a finalizer with prefix %s will be removed", prefix)
 			continue
 		}
-		newFinalizers = append(newFinalizers, finalizer)
+		nf = append(nf, finalizer)
 	}
-	node.SetFinalizers(newFinalizers)
-	return node
+	return nf
 }
