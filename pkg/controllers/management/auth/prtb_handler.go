@@ -160,7 +160,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 
 	roleName := strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
 	// if roletemplate is not builtin, check if it's inherited/cloned
-	isOwnerRole, err := p.mgr.checkReferencedRoles(binding.RoleTemplateName)
+	isOwnerRole, err := p.mgr.checkReferencedRoles(binding.RoleTemplateName, projectContext)
 	if err != nil {
 		return err
 	}
