@@ -880,8 +880,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]rketypes.RKEConfi
 		return nil, err
 	}
 
-	etcd := false
-	controlplane := false
+	var etcd, controlplane, worker bool
 	var nodes []rketypes.RKEConfigNode
 	for _, machine := range machines {
 		if machine.DeletionTimestamp != nil {
@@ -913,6 +912,9 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]rketypes.RKEConfi
 		if slice.ContainsString(machine.Status.NodeConfig.Role, services.ControlRole) {
 			controlplane = true
 		}
+		if slice.ContainsString(machine.Status.NodeConfig.Role, services.WorkerRole) {
+			worker = true
+		}
 
 		node := *machine.Status.NodeConfig
 		if node.User == "" {
@@ -927,9 +929,9 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]rketypes.RKEConfi
 		nodes = append(nodes, node)
 	}
 
-	if !etcd || !controlplane {
+	if !etcd || !controlplane || !worker {
 		return nil, &controller.ForgetError{
-			Err:    fmt.Errorf("waiting for etcd and controlplane nodes to be registered"),
+			Err:    fmt.Errorf("waiting for etcd, controlplane and worker nodes to be registered"),
 			Reason: "Provisioning",
 		}
 	}
