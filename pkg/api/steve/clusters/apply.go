@@ -90,6 +90,14 @@ func (a *Apply) toAPIObject(apiContext *types.APIRequest, obj runtime.Object, de
 		}
 		result.ID = id
 		result.Type = apiSchema.ID
+
+		if apiSchema.Store != nil {
+			apiContext := apiContext.Clone()
+			apiContext.Namespace = ns
+			if obj, err := apiSchema.Store.ByID(apiContext.Clone(), apiSchema, m.GetName()); err == nil {
+				return obj
+			}
+		}
 	}
 
 	return result
