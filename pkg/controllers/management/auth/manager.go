@@ -22,6 +22,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const (
+	clusterContext = "cluster"
+	projectContext = "project"
+)
+
 var commonClusterAndProjectMgmtPlaneResources = map[string]bool{
 	"catalogtemplates":        true,
 	"catalogtemplateversions": true,
@@ -757,18 +762,24 @@ func buildRule(resource string, verbs map[string]bool) v1.PolicyRule {
 	}
 }
 
-func (m *manager) checkReferencedRoles(roleTemplateName string) (bool, error) {
+func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext string) (bool, error) {
 	roleTemplate, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
 		return false, err
 	}
 
+	// Only check if we are in the same context, if the roleTemplate is from a different context then
+	// it can't possibly be a owner in the callers context.
+	if roleTemplate.Context != roleTemplateContext {
+		return false, nil
+	}
+
 	// upon upgrades, crtb/prtbs are reconciled before roletemplates.
 	// So these roles won't have the "own" verb at the time of this check added 2.4.6 onwards
-	if roleTemplate.Builtin && roleTemplate.Context == "project" && roleTemplateName == "project-owner" {
+	if roleTemplate.Builtin && roleTemplate.Context == projectContext && roleTemplateName == "project-owner" {
 		return true, nil
 	}
-	if roleTemplate.Builtin && roleTemplate.Context == "cluster" && roleTemplateName == "cluster-owner" {
+	if roleTemplate.Builtin && roleTemplate.Context == clusterContext && roleTemplateName == "cluster-owner" {
 		return true, nil
 	}
 
@@ -783,7 +794,7 @@ func (m *manager) checkReferencedRoles(roleTemplateName string) (bool, error) {
 	if len(roleTemplate.RoleTemplateNames) > 0 {
 		// get referenced roletemplate
 		for _, rtName := range roleTemplate.RoleTemplateNames {
-			isOwnerRole, err = m.checkReferencedRoles(rtName)
+			isOwnerRole, err = m.checkReferencedRoles(rtName, roleTemplateContext)
 			if err != nil {
 				return false, err
 			}
