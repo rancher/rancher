@@ -48,11 +48,13 @@ import (
 )
 
 const (
-	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
-	amazonec2                       = "amazonec2"
-	userNodeRemoveCleanupAnnotation = "nodes.management.cattle.io/user-node-remove-cleanup"
-	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
-	userScaledownAnnotation         = "nodes.management.cattle.io/scaledown"
+	defaultEngineInstallURL            = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2                          = "amazonec2"
+	userNodeRemoveCleanupAnnotation    = "cleanup.cattle.io/user-node-remove"
+	userNodeRemoveCleanupAnnotationOld = "nodes.management.cattle.io/user-node-remove-cleanup"
+	userNodeRemoveFinalizerPrefix      = "clusterscoped.controller.cattle.io/user-node-remove_"
+	userNodeRemoveAnnotationPrefix     = "lifecycle.cattle.io/create.user-node-remove_"
+	userScaledownAnnotation            = "nodes.management.cattle.io/scaledown"
 )
 
 // aliases maps Schema field => driver field
@@ -97,6 +99,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	}
 
 	nodeClient.AddLifecycle(ctx, "node-controller", nodeLifecycle)
+	nodeClient.AddHandler(ctx, "node-controller-sync", nodeLifecycle.sync)
 }
 
 type Lifecycle struct {
@@ -545,12 +548,20 @@ func (m *Lifecycle) scaledown(obj *v3.Node) (runtime.Object, error) {
 	return m.nodeClient.Update(copy)
 }
 
-func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
+func (m *Lifecycle) sync(key string, obj *v3.Node) (runtime.Object, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
 	if cleanupAnnotation, ok := obj.Annotations[userNodeRemoveCleanupAnnotation]; !ok || cleanupAnnotation != "true" {
 		// finalizer from user-node-remove has to be checked/cleaned
 		return m.userNodeRemoveCleanup(obj)
 	}
 
+	return obj, nil
+}
+
+func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
 	if obj.Spec.ScaledownTime != "" {
 		if scaledownAnnotation, ok := obj.Annotations[userScaledownAnnotation]; !ok || scaledownAnnotation != "true" {
 			return m.scaledown(obj)
@@ -939,10 +950,20 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 }
 
 func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
-	copy := obj.DeepCopy()
-	copy.SetFinalizers(removeFinalizerWithPrefix(copy.GetFinalizers(), userNodeRemoveFinalizerPrefix))
-	copy.Annotations[userNodeRemoveCleanupAnnotation] = "true"
-	return m.nodeClient.Update(copy)
+	newObj := obj.DeepCopy()
+	newObj.SetFinalizers(removeFinalizerWithPrefix(newObj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
+
+	annos := newObj.GetAnnotations()
+	if annos == nil {
+		annos = make(map[string]string)
+	} else {
+		annos = removeAnnotationWithPrefix(annos, userNodeRemoveAnnotationPrefix)
+		delete(annos, userNodeRemoveCleanupAnnotationOld)
+	}
+
+	annos[userNodeRemoveCleanupAnnotation] = "true"
+	newObj.SetAnnotations(annos)
+	return m.nodeClient.Update(newObj)
 }
 
 func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
@@ -955,4 +976,14 @@ func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 		nf = append(nf, finalizer)
 	}
 	return nf
+}
+
+func removeAnnotationWithPrefix(annotations map[string]string, prefix string) map[string]string {
+	for k := range annotations {
+		if strings.HasPrefix(k, prefix) {
+			logrus.Debugf("annotation with prefix %s will be removed", prefix)
+			delete(annotations, k)
+		}
+	}
+	return annotations
 }
