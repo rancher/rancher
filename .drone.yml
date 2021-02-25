@@ -743,7 +743,7 @@ steps:
   - name: clone
     image: luthermonson/drone-git:windows-2004-amd64
     settings:
-      depth: 1
+      depth: 20
   - name: build
     pull: always
     image: rancher/dapper:v0.5.4
@@ -861,7 +861,7 @@ steps:
   - name: clone
     image: luthermonson/drone-git:windows-20H2-amd64
     settings:
-      depth: 1
+      depth: 20
   - name: build
     pull: always
     image: rancher/dapper:v0.5.4
