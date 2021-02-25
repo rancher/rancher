@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -15,6 +16,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	dialer2 "github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -220,7 +222,20 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	req.URL.Host = req.Host
-	if r.auth == nil {
+	transport, err := r.getTransport()
+	if err != nil {
+		er.Error(rw, req, err)
+		return
+	}
+
+	if r.cluster.Status.Driver == "googleKubernetesEngine" && r.cluster.Spec.GenericEngineConfig != nil {
+		cred, _ := (*r.cluster.Spec.GenericEngineConfig)["credential"].(string)
+		transport, err = gke.Oauth2Transport(context.Background(), transport, cred)
+		if err != nil {
+			er.Error(rw, req, fmt.Errorf("unable to retrieve token source for GKE oauth2: %v", err))
+			return
+		}
+	} else if r.auth == nil {
 		req.Header.Del("Authorization")
 	} else {
 		token, err := r.auth()
@@ -229,11 +244,6 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 		req.Header.Set("Authorization", token)
-	}
-	transport, err := r.getTransport()
-	if err != nil {
-		er.Error(rw, req, err)
-		return
 	}
 
 	if httpstream.IsUpgradeRequest(req) {

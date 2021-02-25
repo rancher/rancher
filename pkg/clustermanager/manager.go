@@ -13,13 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/pkg/ratelimit"
-
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -31,8 +28,8 @@ import (
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/ratelimit"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -319,14 +316,10 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 			}
 			if cluster.Status.Driver == "googleKubernetesEngine" && cluster.Spec.GenericEngineConfig != nil {
 				cred, _ := (*cluster.Spec.GenericEngineConfig)["credential"].(string)
-				ts, err := gke.GetTokenSource(context.RunContext, cred)
-				if err == nil {
-					return &oauth2.Transport{
-						Source: ts,
-						Base:   rt,
-					}
+				rt, err = gke.Oauth2Transport(context.RunContext, rt, cred)
+				if err != nil {
+					logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
 				}
-				logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
 			}
 			return rt
 		},
