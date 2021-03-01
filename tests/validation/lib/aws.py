@@ -491,7 +491,6 @@ class AmazonWebServices(CloudProviderBase):
             res = self._route53_client.list_resource_record_sets(
                 HostedZoneId=AWS_HOSTED_ZONE_ID,
                 StartRecordName=record_name,
-                StartRecordType='CNAME',
                 MaxItems='1')
             if len(res["ResourceRecordSets"]) > 0:
                 record = res["ResourceRecordSets"][0]
