@@ -103,7 +103,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.4.46
+ENV CATTLE_UI_VERSION 2.4.47
 
 ENV CATTLE_CLI_VERSION v2.4.11-rc2
 
