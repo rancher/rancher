@@ -39,6 +39,7 @@ var (
 		"otc":           map[string]string{"privateKeyFile": "privateKeyFile"},
 		"packet":        map[string]string{"userdata": "userdata"},
 		"vmwarevsphere": map[string]string{"cloud-config": "cloudConfig"},
+		"google":        map[string]string{"authEncodedJson": "authEncodedJson"},
 	}
 	SSHKeyFields = map[string]bool{
 		"sshKeyContents": true,
