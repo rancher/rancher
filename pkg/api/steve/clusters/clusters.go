@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/steve/pkg/podimpersonation"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
-	"github.com/rancher/wrangler/pkg/schemas"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -24,34 +23,20 @@ func Register(ctx context.Context, server *steve.Server) error {
 		impersonator: podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
 	}
 
-	apply := &Apply{
-		cg:            server.ClientFactory,
-		schemaFactory: server.SchemaFactory,
-	}
-
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
 	server.ClusterCache.OnChange(ctx, func(gvk schema.GroupVersionKind, key string, obj, oldObj runtime.Object) error {
 		return shell.impersonator.PurgeOldRoles(gvk, key, obj)
 	})
-	server.BaseSchemas.MustImportAndCustomize(&ApplyInput{}, nil)
-	server.BaseSchemas.MustImportAndCustomize(&ApplyOutput{}, nil)
 
 	server.SchemaFactory.AddTemplate(schema2.Template{
 		Group: "management.cattle.io",
 		Kind:  "Cluster",
 		Customize: func(schema *types.APISchema) {
-			schema.LinkHandlers = map[string]http.Handler{
-				"shell": shell,
+			if schema.LinkHandlers == nil {
+				schema.LinkHandlers = map[string]http.Handler{}
 			}
-			schema.ActionHandlers = map[string]http.Handler{
-				"apply": apply,
-			}
-			schema.ResourceActions = map[string]schemas.Action{
-				"apply": {
-					Input:  "applyInput",
-					Output: "applyOutput",
-				},
-			}
+			schema.LinkHandlers["shell"] = shell
+
 			schema.ByIDHandler = func(request *types.APIRequest) (types.APIObject, error) {
 				// By pass authorization for local shell because the user might not have
 				// GET granted for local cluster
