@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -66,19 +67,23 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	mgmt := management.Management
 
 	m := &MetadataController{
-		SystemImagesLister:        mgmt.RkeK8sSystemImages("").Controller().Lister(),
-		SystemImages:              mgmt.RkeK8sSystemImages(""),
-		ServiceOptionsLister:      mgmt.RkeK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:            mgmt.RkeK8sServiceOptions(""),
-		NamespacesLister:          management.Core.Namespaces("").Controller().Lister(),
-		AddonsLister:              mgmt.RkeAddons("").Controller().Lister(),
-		Addons:                    mgmt.RkeAddons(""),
-		SettingLister:             mgmt.Settings("").Controller().Lister(),
-		Settings:                  mgmt.Settings(""),
-		CisConfigLister:           mgmt.CisConfigs("").Controller().Lister(),
-		CisConfig:                 mgmt.CisConfigs(""),
-		CisBenchmarkVersionLister: mgmt.CisBenchmarkVersions("").Controller().Lister(),
-		CisBenchmarkVersion:       mgmt.CisBenchmarkVersions(""),
+		SystemImagesLister:   mgmt.RkeK8sSystemImages("").Controller().Lister(),
+		SystemImages:         mgmt.RkeK8sSystemImages(""),
+		ServiceOptionsLister: mgmt.RkeK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:       mgmt.RkeK8sServiceOptions(""),
+		NamespacesLister:     management.Core.Namespaces("").Controller().Lister(),
+		AddonsLister:         mgmt.RkeAddons("").Controller().Lister(),
+		Addons:               mgmt.RkeAddons(""),
+		SettingLister:        mgmt.Settings("").Controller().Lister(),
+		Settings:             mgmt.Settings(""),
+	}
+
+	if features.Legacy.Enabled() {
+		m.CisConfigLister = mgmt.CisConfigs("").Controller().Lister()
+		m.CisConfig = mgmt.CisConfigs("")
+		m.CisBenchmarkVersionLister = mgmt.CisBenchmarkVersions("").Controller().Lister()
+		m.CisBenchmarkVersion = mgmt.CisBenchmarkVersions("")
+
 	}
 
 	mgmt.Settings("").AddHandler(ctx, "rke-metadata-handler", m.sync)

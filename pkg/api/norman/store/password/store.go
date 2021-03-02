@@ -71,7 +71,7 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 		} else {
 			schema = schemas.Schema(&managementschema.Version, storeType)
 		}
-		if schema != nil {
+		if schema != nil && schema.Store != nil {
 			data := getFields(schema, schemas, map[string]bool{})
 			id := schema.ID
 			pwdStore.Stores[id] = schema.Store

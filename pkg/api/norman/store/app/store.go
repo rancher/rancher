@@ -10,7 +10,7 @@ import (
 	pv3app "github.com/rancher/rancher/pkg/api/norman/customization/app"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	hcommon "github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
+	hcommon "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"

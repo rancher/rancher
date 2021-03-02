@@ -4,10 +4,9 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/agentupgrade"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
-	"github.com/rancher/rancher/pkg/controllers/management/catalog"
 	"github.com/rancher/rancher/pkg/controllers/management/certsexpiration"
-	"github.com/rancher/rancher/pkg/controllers/management/cis"
 	"github.com/rancher/rancher/pkg/controllers/management/cloudcredential"
 	"github.com/rancher/rancher/pkg/controllers/management/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
@@ -17,13 +16,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/clustertemplate"
-	"github.com/rancher/rancher/pkg/controllers/management/compose"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/kontainerdriver"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
-	"github.com/rancher/rancher/pkg/controllers/management/globaldns"
 	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/controllers/management/multiclusterapp"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
@@ -32,6 +28,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/restrictedadminrbac"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
+	"github.com/rancher/rancher/pkg/controllers/managementlegacy"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -42,7 +40,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	usercontrollers.RegisterEarly(ctx, management, manager)
 
 	// a-z
-	catalog.Register(ctx, management)
+	agentupgrade.Register(ctx, management)
 	certsexpiration.Register(ctx, management)
 	cluster.Register(ctx, management)
 	clusterdeploy.Register(ctx, management, manager)
@@ -51,7 +49,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clusterstats.Register(ctx, management, manager)
 	clusterstatus.Register(ctx, management)
 	clusterregistrationtoken.Register(ctx, management)
-	compose.Register(ctx, management, manager)
 	kontainerdriver.Register(ctx, management)
 	kontainerdrivermetadata.Register(ctx, management)
 	nodedriver.Register(ctx, management)
@@ -60,21 +57,24 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	node.Register(ctx, management, manager)
 	podsecuritypolicy.Register(ctx, management)
 	etcdbackup.Register(ctx, management)
-	cis.Register(ctx, management)
-	globaldns.Register(ctx, management)
-	multiclusterapp.Register(ctx, management, manager)
 	clustertemplate.Register(ctx, management)
 	nodetemplate.Register(ctx, management)
 	rkeworkerupgrader.Register(ctx, management, manager.ScaledContext)
 	rbac.Register(ctx, management)
 	restrictedadminrbac.Register(ctx, management)
 
+	if features.Legacy.Enabled() {
+		managementlegacy.Register(ctx, management, manager)
+	}
+
 	// Register last
 	auth.RegisterLate(ctx, management)
 
-	// Ensure caches are available for user controllers, these are used as part of
-	// registration
-	management.Management.ClusterAlertGroups("").Controller()
-	management.Management.ClusterAlertRules("").Controller()
+	if features.Legacy.Enabled() {
+		// Ensure caches are available for user controllers, these are used as part of
+		// registration
+		management.Management.ClusterAlertGroups("").Controller()
+		management.Management.ClusterAlertRules("").Controller()
+	}
 
 }

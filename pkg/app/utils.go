@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"

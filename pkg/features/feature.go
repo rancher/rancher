@@ -59,6 +59,12 @@ var (
 		true,
 		true,
 		true)
+	Legacy = newFeature(
+		"legacy",
+		"Enable legacy features",
+		true,
+		false,
+		false)
 )
 
 type Feature struct {
