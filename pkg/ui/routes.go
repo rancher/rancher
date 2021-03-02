@@ -2,7 +2,6 @@ package ui
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -30,8 +29,8 @@ func New(prefs v3.PreferenceCache) http.Handler {
 	router.Handle("/VERSION.txt", ember.ServeAsset())
 	router.Handle("/favicon.png", vue.ServeFaviconDashboard())
 	router.Handle("/favicon.ico", vue.ServeFaviconDashboard())
-	router.Handle("/verify-auth-azure/{suffix:.*}", http.HandlerFunc(redirectAuth))
-	router.Handle("/verify-auth/{suffix:.*}", http.HandlerFunc(redirectAuth))
+	router.Path("/verify-auth-azure").Queries("state", "{state}").HandlerFunc(redirectAuth)
+	router.Path("/verify-auth").Queries("state", "{state}").HandlerFunc(redirectAuth)
 	router.PathPrefix("/api-ui").Handler(ember.ServeAsset())
 	router.PathPrefix("/assets/rancher-ui-driver-linode").Handler(emberAlwaysOffline.ServeAsset())
 	router.PathPrefix("/assets").Handler(ember.ServeAsset())
@@ -43,15 +42,6 @@ func New(prefs v3.PreferenceCache) http.Handler {
 	router.NotFoundHandler = emberIndexUnlessAPI()
 
 	return router
-}
-
-func redirectAuth(rw http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	u := url.URL{
-		Path:     "/" + vars["suffix"],
-		RawQuery: req.URL.RawQuery,
-	}
-	http.Redirect(rw, req, u.String(), http.StatusFound)
 }
 
 func emberIndexUnlessAPI() http.Handler {
