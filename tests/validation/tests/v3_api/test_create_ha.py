@@ -451,7 +451,9 @@ def create_aks_cluster():
                    variables={'kubernetes_version': aks_k8_s_version,
                               'location': aks_location,
                               'client_id': client_id,
-                              'client_secret': client_secret})
+                              'client_secret': client_secret,
+                              'cluster_name': resource_prefix})
+
     print("Creating cluster")
     tf.init()
     print(tf.plan(out="aks_plan_server.out"))
