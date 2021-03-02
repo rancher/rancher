@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/rancher/apiserver/pkg/parse"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rke2configserver"
 	"github.com/rancher/rancher/pkg/wrangler"
 
@@ -85,7 +86,9 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
-	unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
+	if features.Legacy.Enabled() {
+		unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
+	}
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver.NewProxy(ctx))
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)

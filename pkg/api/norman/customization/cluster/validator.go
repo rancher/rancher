@@ -16,7 +16,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/cis"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/cis"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/namespace"

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/helm"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/sirupsen/logrus"
