@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/sambabox"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -127,6 +128,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.ActiveDirectoryProviderType:
 		input = &v32.BasicLogin{}
 		providerName = activedirectory.Name
+	case client.SambaBoxProviderType:
+		input = &v32.BasicLogin{}
+		providerName = sambabox.Name
 	case client.AzureADProviderType:
 		input = &v32.AzureADLogin{}
 		providerName = azure.Name

@@ -84,6 +84,18 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
 		}).
+		// SambaBox provider
+		MustImportAndCustomize(&PublicVersion, v3.SambaBoxProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "authProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "basicLogin",
+					Output: "token",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
 		// Azure AD provider
 		MustImportAndCustomize(&PublicVersion, v3.AzureADProvider{}, func(schema *types.Schema) {
 			schema.BaseType = "authProvider"

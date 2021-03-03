@@ -539,6 +539,19 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
 		MustImport(&Version, v3.ActiveDirectoryTestAndApplyInput{}).
+		// SambaBox Config
+		MustImportAndCustomize(&Version, v3.SambaBoxConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"testAndApply": {
+					Input: "sambaBoxTestAndApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.SambaBoxTestAndApplyInput{}).
 		// OpenLdap Config
 		MustImportAndCustomize(&Version, v3.OpenLdapConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
