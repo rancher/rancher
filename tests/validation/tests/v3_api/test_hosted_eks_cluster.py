@@ -10,12 +10,12 @@ import pytest
 EKS_ACCESS_KEY = os.environ.get('RANCHER_EKS_ACCESS_KEY', "")
 EKS_SECRET_KEY = os.environ.get('RANCHER_EKS_SECRET_KEY', "")
 EKS_REGION = os.environ.get('RANCHER_EKS_REGION', "us-east-2")
-EKS_K8S_VERSION = os.environ.get('RANCHER_EKS_K8S_VERSION', "1.17")
+EKS_K8S_VERSION = os.environ.get('RANCHER_EKS_K8S_VERSION', "1.18")
 EKS_NODESIZE = os.environ.get('RANCHER_EKS_NODESIZE', 2)
 KMS_KEY = os.environ.get('RANCHER_KMS_KEY', None)
 SECRET_ENCRYPTION = os.environ.get('RANCHER_SECRET_ENCRYPTION', False)
 LOGGING_TYPES = os.environ.get('RANCHER_LOGGING_TYPES', None)
-EKS_SERVICE_ROLE = os.environ.get('RANCHER_EKS_SERVICE_ROLE', None)
+EKS_SERVICE_ROLE = os.environ.get('RANCHER_EKS_SERVICE_ROLE', "")
 EKS_SUBNETS = os.environ.get('RANCHER_EKS_SUBNETS', None)
 EKS_SECURITYGROUP = os.environ.get('RANCHER_EKS_SECURITYGROUP', None)
 AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME")
@@ -24,7 +24,8 @@ EKS_PUBLIC_ACCESS_SOURCES = \
 ekscredential = pytest.mark.skipif(not (EKS_ACCESS_KEY and EKS_SECRET_KEY),
                                    reason='EKS Credentials not provided, '
                                           'cannot create cluster')
-DEFAULT_TIMEOUT_EKS = 1200
+CLEANUP_CLUSTER = os.environ.get('RANCHER_CLEANUP_CLUSTER', True)
+DEFAULT_TIMEOUT_EKS = 1400
 IMPORTED_EKS_CLUSTERS = []
 
 cluster_details = {}
@@ -174,13 +175,13 @@ def test_eks_v2_create_import_cluster():
     Create an imported EKS cluster with some default values in EKS config
     """
     display_name = create_resources_eks()
-    cluster_name = random_test_name("test-auto-eks")
-    eks_config_temp = get_eks_config_basic(cluster_name)
+    # cluster_name = random_test_name("test-auto-eks")
+    eks_config_temp = get_eks_config_basic(display_name)
     eks_config_temp["imported"] = True
 
     cluster_config = {
         "eksConfig": eks_config_temp,
-        "name": cluster_name,
+        "name": display_name,
         "type": "cluster",
         "dockerRootDir": "/var/lib/docker",
         "enableNetworkPolicy": False,
@@ -207,11 +208,13 @@ def create_project_client(request):
 
     def fin():
         client = get_user_client()
-        for name, cluster in cluster_details.items():
-            if len(client.list_cluster(name=name).data) > 0:
-                client.delete(cluster)
-        for display_name in IMPORTED_EKS_CLUSTERS:
-            AmazonWebServices().delete_eks_cluster(cluster_name=display_name)
+        if CLEANUP_CLUSTER:
+            for name, cluster in cluster_details.items():
+                if len(client.list_cluster(name=name).data) > 0:
+                    client.delete(cluster)
+            for display_name in IMPORTED_EKS_CLUSTERS:
+                AmazonWebServices().delete_eks_cluster(
+                                cluster_name=display_name)
 
     request.addfinalizer(fin)
 
@@ -312,6 +315,8 @@ def get_eks_config_all(cluster_name):
     eks_config_temp["loggingTypes"] = get_logging_types()
     eks_config_temp["serviceRole"] = EKS_SERVICE_ROLE
     eks_config_temp["ec2SshKey"] = AWS_SSH_KEY_NAME
+    eks_config_temp["nodeGroups"][0]["version"] = EKS_K8S_VERSION
+    eks_config_temp["nodeGroups"][0]["subnets"] = []
     return eks_config_temp
 
 
@@ -456,7 +461,7 @@ def validate_nodegroup(nodegroup_list, cluster_name):
             "diskSize is incorrect on the nodes"
         # check ec2SshKey
         if "ec2SshKey" in nodegroup.keys() and \
-                nodegroup["ec2SshKey"] is not "":
+                nodegroup["ec2SshKey"] != "":
             assert nodegroup["ec2SshKey"] \
                 == eks_nodegroup["nodegroup"]["remoteAccess"]["ec2SshKey"], \
                 "Ssh key is incorrect on the nodes"
