@@ -124,6 +124,7 @@ def test_validate_existing_wl_with_secret():
 # It's hard to find an App to support Windows case for now.
 # Could we make an App to support both Windows and Linux?
 @skip_test_windows_os
+@skip_test_hardened
 @if_post_upgrade
 @pytest.mark.run(order=2)
 def test_validate_existing_catalog_app():
@@ -167,6 +168,7 @@ def test_modify_workload_validate_secret():
 # It's hard to find an App to support Windows case for now.
 # Could we make an App to support both Windows and Linux?
 @skip_test_windows_os
+@skip_test_hardened
 @if_post_upgrade
 @pytest.mark.run(order=3)
 def test_modify_catalog_app():
@@ -214,7 +216,7 @@ def test_create_and_validate_ingress_xip_io_wl():
 
 # It's hard to find an App to support Windows case for now.
 # Could we make an App to support both Windows and Linux?
-@skip_test_windows_os
+@skip_test_hardened
 @pytest.mark.run(order=5)
 def test_create_and_validate_catalog_app():
     create_and_validate_catalog_app()
