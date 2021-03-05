@@ -9,7 +9,7 @@ from subprocess import CalledProcessError
 
 from rancher import ApiError
 
-from .test_auth import enable_ad, load_setup_data
+from .test_auth import enable_ad, enable_sbx, load_setup_data
 from .common import add_role_to_user
 from .common import auth_get_user_token
 from .common import auth_resource_cleanup
@@ -955,6 +955,11 @@ def create_project_client(request):
     ad_enabled = admin_client.by_id_auth_config("activedirectory").enabled
     if AUTH_PROVIDER == "activeDirectory" and not ad_enabled:
         enable_ad(load_setup_data()["admin_user"], ADMIN_TOKEN, 
+                  password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
+
+    sbx_enabled = admin_client.by_id_auth_config("sambabox").enabled
+    if AUTH_PROVIDER == "sambaBox" and not sbx_enabled:
+        enable_sbx(load_setup_data()["admin_user"], ADMIN_TOKEN, 
                   password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
 
     projects = client.list_project(name='System', clusterId=cluster.id)

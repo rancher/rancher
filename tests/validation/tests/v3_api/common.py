@@ -167,9 +167,9 @@ TEMPLATE_LIST_CLUSTER = {
 
 # this is used when testing users from a auth provider
 AUTH_PROVIDER = os.environ.get('RANCHER_AUTH_PROVIDER', "")
-if AUTH_PROVIDER not in ["activeDirectory", "freeIpa", "openLdap", ""]:
+if AUTH_PROVIDER not in ["activeDirectory", "sambaBox", "freeIpa", "openLdap", ""]:
     pytest.fail("Invalid RANCHER_AUTH_PROVIDER. Please provide one of: "
-                "activeDirectory, freeIpa, or openLdap (case sensitive).")
+                "activeDirectory, sambaBox, freeIpa, or openLdap (case sensitive).")
 NESTED_GROUP_ENABLED = ast.literal_eval(
     os.environ.get('RANCHER_NESTED_GROUP_ENABLED', "False"))
 # Admin Auth username and the shared password for all auth users
