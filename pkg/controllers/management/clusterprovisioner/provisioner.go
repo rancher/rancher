@@ -103,9 +103,22 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		mgmt.RkeK8sSystemImages(""))
 }
 
+func skipOperatorCluster(action string, cluster *v3.Cluster) bool {
+	msgFmt := "%s cluster [%s] will be managed by %s-operator-controller, skipping %s"
+	switch {
+	case cluster.Spec.EKSConfig != nil:
+		logrus.Debugf(msgFmt, "EKS", cluster.Name, "eks", action)
+		return true
+	case cluster.Spec.GKEConfig != nil:
+		logrus.Debugf(msgFmt, "GKE", cluster.Name, "gke", action)
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
-	if cluster.Spec.EKSConfig != nil {
-		logrus.Debugf("EKS cluster [%s] will be managed by eks-operator-controller, skipping remove", cluster.Name)
+	if skipOperatorCluster("remove", cluster) {
 		return cluster, nil
 	}
 
@@ -133,8 +146,7 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
-	if cluster.Spec.EKSConfig != nil {
-		logrus.Debugf("EKS cluster [%s] will be managed by eks-operator-controller, skipping update", cluster.Name)
+	if skipOperatorCluster("update", cluster) {
 		return cluster, nil
 	}
 
@@ -343,8 +355,7 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) (runtime.Obje
 }
 
 func (p *Provisioner) Create(cluster *v3.Cluster) (runtime.Object, error) {
-	if cluster.Spec.EKSConfig != nil {
-		logrus.Debugf("EKS cluster [%s] will be managed by eks-operator-controller, skipping create", cluster.Name)
+	if skipOperatorCluster("create", cluster) {
 		return cluster, nil
 	}
 
