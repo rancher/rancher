@@ -75,6 +75,10 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
+	if err := v.validateGKEConfig(request, data, &clusterSpec); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -531,6 +535,171 @@ func validateEKS(prevCluster, newCluster map[string]interface{}) error {
 	}
 	if !reflect.DeepEqual(prev, new) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "cannot modify EKS subnets after creation")
+	}
+	return nil
+}
+
+func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {
+	gkeConfig, ok := cluster["gkeConfig"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	var prevCluster *v3.Cluster
+
+	if request.Method == http.MethodPut {
+		var err error
+		prevCluster, err = v.ClusterLister.Get("", request.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// check user's access to cloud credential
+	if googleCredential, ok := gkeConfig["googleCredentialSecret"].(string); ok {
+		if err := validateGKECredentialAuth(request, googleCredential, prevCluster); err != nil {
+			return err
+		}
+	}
+
+	createFromImport := request.Method == http.MethodPost && gkeConfig["imported"] == true
+
+	if !createFromImport {
+		if err := validateGKEKubernetesVersion(clusterSpec, prevCluster); err != nil {
+			return err
+		}
+		if err := validateGKENodePools(clusterSpec); err != nil {
+			return err
+		}
+	}
+
+	if request.Method != http.MethodPost {
+		return nil
+	}
+
+	// validation for creates only
+
+	if err := validateGKEClusterName(v.ClusterClient, clusterSpec); err != nil {
+		return err
+	}
+
+	region, regionOk := gkeConfig["region"]
+	zone, zoneOk := gkeConfig["zone"]
+	if (!regionOk || region == "") && (!zoneOk || zone == "") {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide region or zone")
+	}
+
+	return nil
+}
+
+// validateGKECredentialAuth validates that a user has access to the credential they are setting and the credential
+// they are overwriting. If there is no previous credential such as during a create or the old credential cannot
+// be found, the auth check will succeed as long as the user can access the new credential.
+func validateGKECredentialAuth(request *types.APIContext, credential string, prevCluster *v3.Cluster) error {
+	var accessCred mgmtclient.CloudCredential
+	credentialErr := "error accessing cloud credential"
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
+		return httperror.NewAPIError(httperror.NotFound, credentialErr)
+	}
+
+	if prevCluster == nil {
+		return nil
+	}
+
+	if prevCluster.Spec.GKEConfig == nil {
+		return nil
+	}
+
+	// validate the user has access to the old cloud credential before allowing them to change it
+	credential = prevCluster.Spec.GKEConfig.GoogleCredentialSecret
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.NotFound.Status {
+				// old cloud credential doesn't exist anymore, anyone can change it
+				return nil
+			}
+		}
+		return httperror.NewAPIError(httperror.NotFound, credentialErr)
+	}
+
+	return nil
+}
+
+// validateGKEKubernetesVersion checks whether a kubernetes version is provided and if it is supported
+func validateGKEKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	clusterVersion := spec.GKEConfig.KubernetesVersion
+	if clusterVersion == nil {
+		return nil
+	}
+
+	if *clusterVersion == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
+	}
+
+	return nil
+}
+
+// validateGKENodePools checks whether a given node pool version is empty or not supported.
+func validateGKENodePools(spec *v32.ClusterSpec) error {
+	nodepools := spec.GKEConfig.NodePools
+	if nodepools == nil {
+		return nil
+	}
+	if len(nodepools) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node pool"))
+	}
+
+	var errors []string
+
+	for _, np := range nodepools {
+		name := *np.Name
+		if name == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("node pool name cannot be an empty string"))
+		}
+
+		version := np.Version
+		if version == nil || *version == "" {
+			errors = append(errors, fmt.Sprintf("node pool [%s] version cannot be empty", name))
+			continue
+		}
+	}
+
+	if len(errors) != 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf(strings.Join(errors, ";")))
+	}
+	return nil
+}
+
+func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+	// validate cluster does not reference an GKE cluster that is already backed by a Rancher cluster
+	name := spec.GKEConfig.ClusterName
+	region := spec.GKEConfig.Region
+	zone := spec.GKEConfig.Zone
+	msgSuffix := fmt.Sprintf("in region [%s]", region)
+	if region == "" {
+		msgSuffix = fmt.Sprintf("in zone [%s]", spec.GKEConfig.Zone)
+	}
+
+	// cluster client is being used instead of lister to avoid the use of an outdated cache
+	clusters, err := client.List(metav1.ListOptions{})
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher GKE clusters "+msgSuffix)
+	}
+
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.GKEConfig == nil {
+			continue
+		}
+		if name != cluster.Spec.GKEConfig.ClusterName {
+			continue
+		}
+		if region != "" && region != cluster.Spec.GKEConfig.Region {
+			continue
+		}
+		if zone != "" && zone != cluster.Spec.GKEConfig.Zone {
+			continue
+		}
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
 	}
 	return nil
 }
