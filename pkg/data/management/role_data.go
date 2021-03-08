@@ -370,6 +370,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
 		setRoleTemplateNames("view")
 
+	rb.addRoleTemplate("View Monitoring", "monitoring-ui-view", "project", true, false, false)
+
 	// Not specific to project or cluster
 	// TODO When clusterevents has value, consider adding this back in
 	//rb.addRoleTemplate("View Events", "events-view", "", true, false, false).
