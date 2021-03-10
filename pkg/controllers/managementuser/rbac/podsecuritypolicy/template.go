@@ -85,6 +85,13 @@ func (p *psptHandler) sync(key string, obj *v3.PodSecurityPolicyTemplate) (runti
 			newPolicy.Spec = obj.Spec
 			newPolicy.Annotations[podSecurityPolicyTemplateVersionAnnotation] = obj.ResourceVersion
 
+			// Setting annotations that doesn't contains podSecurityPolicyTemplateFilterAnnotation
+			for k, v := range obj.Annotations {
+				if !strings.Contains(k, podSecurityPolicyTemplateFilterAnnotation) {
+					newPolicy.Annotations[k] = v
+				}
+			}
+
 			_, err = p.policies.Update(newPolicy)
 			if err != nil {
 				return nil, fmt.Errorf("error updating psp: %v", err)
