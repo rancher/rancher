@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook
+spec:
+  type: ClusterIP
+  selector:
+    app: webhook-serv
+  ports:
+  - protocol: TCP
+    port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-serv-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-serv
+  template:
+    metadata:
+      labels:
+        app: webhook-serv
+    spec:
+      containers:
+      - name: webhook-serv
+        image: python:3.7.0
+        imagePullPolicy: "IfNotPresent"
+        command: ['sh', '-c', 'pip3 install pyserv && serv 8080']
+        ports:
+        - name: http
+          containerPort: 8080
