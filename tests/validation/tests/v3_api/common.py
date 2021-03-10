@@ -427,16 +427,18 @@ def validate_all_workload_image_from_rancher(project_client, ns, pod_count=1,
                                              ignore_pod_count=False,
                                              deployment_list=None,
                                              daemonset_list=None,
-                                             cronjob_list=None):
+                                             cronjob_list=None, job_list=None):
     if cronjob_list is None:
         cronjob_list = []
     if daemonset_list is None:
         daemonset_list = []
     if deployment_list is None:
         deployment_list = []
-    workload_list = deployment_list + daemonset_list + cronjob_list
+    if job_list is None:
+        job_list = []
+    workload_list = deployment_list + daemonset_list + cronjob_list + job_list
 
-    wls = project_client.list_workload(namespaceId=ns.id).data
+    wls = [dep.name for dep in project_client.list_workload(namespaceId=ns.id).data]
     assert len(workload_list) == len(wls), \
         "Expected {} workload(s) to be present in {} namespace " \
         "but there were {}".format(len(workload_list), ns.name, len(wls))
@@ -466,6 +468,11 @@ def validate_all_workload_image_from_rancher(project_client, ns, pod_count=1,
                                   ns.name, pod_count=pod_count,
                                   ignore_pod_count=ignore_pod_count)
                 cronjob_list.remove(workload_name)
+            if workload_name in job_list:
+                validate_workload(project_client, workload, "job",
+                                  ns.name, pod_count=pod_count,
+                                  ignore_pod_count=ignore_pod_count)
+                job_list.remove(workload_name)
     # Final assertion to ensure all expected workloads have been validated
     assert not deployment_list + daemonset_list + cronjob_list
 
@@ -486,8 +493,15 @@ def validate_workload(p_client, workload, type, ns_name, pod_count=1,
         pods = p_client.list_pod(workloadId=workload.id).data
         assert len(pods) == pod_count
     for pod in pods:
-        p = wait_for_pod_to_running(p_client, pod)
-        assert p["status"]["phase"] == "Running"
+        if type == "job":
+            job_type = True
+            expected_status = "Succeeded"
+        else:
+            job_type = False
+            expected_status = "Running"
+        p = wait_for_pod_to_running(p_client, pod, job_type=job_type)
+        assert p["status"]["phase"] == expected_status
+
 
     wl_result = execute_kubectl_cmd(
         "get " + type + " " + workload.name + " -n " + ns_name)
@@ -497,6 +511,8 @@ def validate_workload(p_client, workload, type, ns_name, pod_count=1,
         assert wl_result["status"]["currentNumberScheduled"] == len(pods)
     if type == "cronJob":
         assert len(wl_result["status"]["active"]) >= len(pods)
+    if type == "job":
+        assert wl_result["status"]["succeeded"] == len(pods)
 
 
 def validate_workload_with_sidekicks(p_client, workload, type, ns_name,
@@ -656,12 +672,16 @@ def wait_for_wl_transitioning(client, workload, timeout=DEFAULT_TIMEOUT,
     return wl
 
 
-def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT):
+def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT, job_type=False):
     start = time.time()
     pods = client.list_pod(uuid=pod.uuid).data
     assert len(pods) == 1
     p = pods[0]
-    while p.state != "running":
+    if job_type:
+        expected_state = "succeeded"
+    else:
+        expected_state = "running"
+    while p.state != expected_state :
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for state to get to active")

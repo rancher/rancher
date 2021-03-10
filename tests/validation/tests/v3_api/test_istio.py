@@ -174,6 +174,7 @@ def test_istio_deployment_options():
 # Enables all possible istio custom answers with the exception of certmanager
 def test_istio_custom_answers(skipif_unsupported_istio_version,
                               enable_all_options_except_certmanager):
+
     expected_deployments = [
         "grafana", "istio-citadel", "istio-egressgateway", "istio-galley",
         "istio-ilbgateway", "istio-ingressgateway", "istio-pilot",
@@ -181,10 +182,12 @@ def test_istio_custom_answers(skipif_unsupported_istio_version,
         "istio-tracing", "istiocoredns", "kiali", "prometheus"
     ]
     expected_daemonsets = ["istio-nodeagent"]
+    expected_job_list = ["istio-onefive-migration" if int(namespace["istio_version"].split(".")[1]) >= 5 else None]
+
     validate_all_workload_image_from_rancher(
         get_system_client(USER_TOKEN), namespace["system_ns"],
         ignore_pod_count=True, deployment_list=expected_deployments,
-        daemonset_list=expected_daemonsets)
+        daemonset_list=expected_daemonsets, job_list=expected_job_list)
 
 
 # This is split out separately from test_istio_custom_answers because
