@@ -285,6 +285,7 @@ catch
             "$($CATTLE_PREFIX_PATH)etc\kubernetes\bin\kubelet.exe"
             "$($CATTLE_PREFIX_PATH)etc\nginx\nginx.exe"
             "$($CATTLE_PREFIX_PATH)opt\bin\flanneld.exe"
+            "$($CATTLE_PREFIX_PATH)etc\rancher\wins\wins-upgrade.exe"
         )
     }
 } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "$($CATTLE_PREFIX_PATH)etc\rancher\wins\config"
