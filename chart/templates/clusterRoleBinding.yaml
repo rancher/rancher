@@ -3,10 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ template "rancher.fullname" . }}
   labels:
-    app: {{ template "rancher.fullname" . }}
-    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
+{{ include "rancher.labels" . | indent 4 }}
 subjects:
 - kind: ServiceAccount
   name: {{ template "rancher.fullname" . }}
