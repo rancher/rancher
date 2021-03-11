@@ -1,0 +1,28 @@
+files: ^tests/validation/
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v3.4.0
+      hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-aws-credentials
+      - id: detect-private-key
+      - id: end-of-file-fixer
+    - repo: https://github.com/ambv/black
+      rev: 20.8b1
+      hooks:
+      - id: black
+        args: [--config, tests/validation/.black]
+    - repo: https://gitlab.com/pycqa/flake8
+      rev: 3.8.4
+      hooks:
+      - id: flake8
+        alias: flake8-validation
+        args: [--config, tests/validation/.flake8]
+    - repo: https://github.com/pre-commit/mirrors-autopep8
+      rev: v1.5.4
+      hooks:
+      - id: autopep8
+        args: [--global-config, tests/validation/.black, --ignore-local-config]
