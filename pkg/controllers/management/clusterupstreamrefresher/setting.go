@@ -1,4 +1,4 @@
-package eksupstreamrefresh
+package clusterupstreamrefresher
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	eksUpstreamRefreshSettingController = "eks-upstream-refresh-cron-settings-controller"
+	clusterUpstreamRefreshSettingController = "cluster-upstream-refresh-cron-settings-controller"
 )
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
-	wContext.Mgmt.Setting().OnChange(ctx, eksUpstreamRefreshSettingController, sync)
+	wContext.Mgmt.Setting().OnChange(ctx, clusterUpstreamRefreshSettingController, sync)
 }
 
 func sync(key string, obj *v3.Setting) (*v3.Setting, error) {
@@ -22,7 +22,7 @@ func sync(key string, obj *v3.Setting) (*v3.Setting, error) {
 		return nil, nil
 	}
 
-	if obj.Name != settings.EKSUpstreamRefreshCron.Name {
+	if obj.Name != settings.ClusterUpstreamRefreshCron.Name {
 		return obj, nil
 	}
 
@@ -34,9 +34,9 @@ func sync(key string, obj *v3.Setting) (*v3.Setting, error) {
 		return obj, err
 	}
 
-	eksUpstreamRefresher.refreshCronJob.Stop()
-	eksUpstreamRefresher.refreshCronJob = cron.New()
-	eksUpstreamRefresher.refreshCronJob.Schedule(schedule, cron.FuncJob(eksUpstreamRefresher.refreshAllUpstreamStates))
-	eksUpstreamRefresher.refreshCronJob.Start()
+	clusterUpstreamRefresher.refreshCronJob.Stop()
+	clusterUpstreamRefresher.refreshCronJob = cron.New()
+	clusterUpstreamRefresher.refreshCronJob.Schedule(schedule, cron.FuncJob(clusterUpstreamRefresher.refreshAllUpstreamStates))
+	clusterUpstreamRefresher.refreshCronJob.Start()
 	return nil, nil
 }
