@@ -3,10 +3,7 @@ kind: Service
 metadata:
   name: {{ template "rancher.fullname" . }}
   labels:
-    app: {{ template "rancher.fullname" . }}
-    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
+{{ include "rancher.labels" . | indent 4 }}
 spec:
   ports:
   - port: 80
