@@ -21,7 +21,7 @@ import (
 	apiprojv3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	utils2 "github.com/rancher/rancher/pkg/app"
 	"github.com/rancher/rancher/pkg/catalog/manager"
-	"github.com/rancher/rancher/pkg/controllers/management/eksupstreamrefresh"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -404,7 +404,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 func (e *eksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
 	cluster = cluster.DeepCopy()
-	upstreamSpec, err := eksupstreamrefresh.GetComparableUpstreamSpec(e.secretsCache, cluster)
+	upstreamSpec, err := clusterupstreamrefresher.BuildEKSUpstreamSpec(e.secretsCache, cluster)
 	if err != nil {
 		return cluster, err
 	}
