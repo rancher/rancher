@@ -424,8 +424,9 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 // this enables the agent image to be pulled from the private registry
 func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster *v3.Cluster) error {
 	reg := util.GetPrivateRepo(cluster)
-	if reg == nil {
-		return nil // if there is no private registry defined, return since auth is not needed
+	// if there is no private registry defined or there is a registry without credentials, return since auth is not needed
+	if reg == nil || reg.User == "" || reg.Password == "" {
+		return nil
 	}
 
 	logrus.Infof("[node-controller-rancher-machine] private registry detected, authenticating %s to %s", node.Spec.RequestedHostname, reg.URL)
