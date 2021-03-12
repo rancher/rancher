@@ -69,6 +69,7 @@ var aliases = map[string]map[string]string{
 	"otc":           map[string]string{"privateKeyFile": "privateKeyFile"},
 	"packet":        map[string]string{"userdata": "userdata"},
 	"vmwarevsphere": map[string]string{"cloudConfig": "cloud-config"},
+	"google":        map[string]string{"authEncodedJson": "authEncodedJson"},
 }
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {

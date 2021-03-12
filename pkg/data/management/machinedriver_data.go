@@ -28,6 +28,7 @@ const (
 	RackspaceDriver    = "rackspace"
 	SoftLayerDriver    = "softlayer"
 	Vmwaredriver       = "vmwarevsphere"
+	GoogleDriver       = "google"
 )
 
 var driverData = map[string]map[string][]string{
@@ -44,6 +45,7 @@ var driverData = map[string]map[string][]string{
 	RackspaceDriver:    {"privateCredentialFields": []string{"apiKey"}},
 	SoftLayerDriver:    {"privateCredentialFields": []string{"apiKey"}},
 	Vmwaredriver:       {"publicCredentialFields": []string{"username", "vcenter", "vcenterPort"}, "privateCredentialFields": []string{"password"}},
+	GoogleDriver:       {"privateCredentialFields": []string{"authEncodedJson"}},
 }
 
 var driverDefaults = map[string]map[string]string{
@@ -92,6 +94,9 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 	if err := addMachineDriver(ExoscaleDriver, "local://", "", "", []string{"api.exoscale.ch"}, false, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver(GoogleDriver, "local://", "", "", nil, true, true, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
