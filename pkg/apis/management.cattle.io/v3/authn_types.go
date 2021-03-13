@@ -300,6 +300,43 @@ type ActiveDirectoryTestAndApplyInput struct {
 	Password              string                `json:"password"`
 	Enabled               bool                  `json:"enabled,omitempty"`
 }
+type SambaBoxConfig struct {
+	AuthConfig `json:",inline" mapstructure:",squash"`
+
+	Servers                      []string `json:"servers,omitempty"                     norman:"type=array[string],required"`
+	Port                         int64    `json:"port,omitempty"                        norman:"default=389"`
+	TLS                          bool     `json:"tls,omitempty"                         norman:"default=false"`
+	StartTLS                     bool     `json:"starttls,omitempty"                    norman:"default=false"`
+	Certificate                  string   `json:"certificate,omitempty"`
+	DefaultLoginDomain           string   `json:"defaultLoginDomain,omitempty"`
+	ServiceAccountUsername       string   `json:"serviceAccountUsername,omitempty"      norman:"required"`
+	ServiceAccountPassword       string   `json:"serviceAccountPassword,omitempty"      norman:"type=password,required"`
+	UserDisabledBitMask          int64    `json:"userDisabledBitMask,omitempty"         norman:"default=2"`
+	UserSearchBase               string   `json:"userSearchBase,omitempty"              norman:"required"`
+	UserSearchAttribute          string   `json:"userSearchAttribute,omitempty"         norman:"default=sAMAccountName|sn|givenName,required"`
+	UserSearchFilter             string   `json:"userSearchFilter,omitempty"`
+	UserLoginAttribute           string   `json:"userLoginAttribute,omitempty"          norman:"default=sAMAccountName,required"`
+	UserObjectClass              string   `json:"userObjectClass,omitempty"             norman:"default=person,required"`
+	UserNameAttribute            string   `json:"userNameAttribute,omitempty"           norman:"default=name,required"`
+	UserEnabledAttribute         string   `json:"userEnabledAttribute,omitempty"        norman:"default=userAccountControl,required"`
+	GroupSearchBase              string   `json:"groupSearchBase,omitempty"`
+	GroupSearchAttribute         string   `json:"groupSearchAttribute,omitempty"        norman:"default=sAMAccountName,required"`
+	GroupSearchFilter            string   `json:"groupSearchFilter,omitempty"`
+	GroupObjectClass             string   `json:"groupObjectClass,omitempty"            norman:"default=group,required"`
+	GroupNameAttribute           string   `json:"groupNameAttribute,omitempty"          norman:"default=name,required"`
+	GroupDNAttribute             string   `json:"groupDNAttribute,omitempty"            norman:"default=distinguishedName,required"`
+	GroupMemberUserAttribute     string   `json:"groupMemberUserAttribute,omitempty"    norman:"default=distinguishedName,required"`
+	GroupMemberMappingAttribute  string   `json:"groupMemberMappingAttribute,omitempty" norman:"default=member,required"`
+	ConnectionTimeout            int64    `json:"connectionTimeout,omitempty"           norman:"default=5000,notnullable,required"`
+	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=false"`
+}
+
+type SambaBoxTestAndApplyInput struct {
+	SambaBoxConfig SambaBoxConfig `json:"sambaBoxConfig,omitempty"`
+	Username       string         `json:"username"`
+	Password       string         `json:"password"`
+	Enabled        bool           `json:"enabled,omitempty"`
+}
 
 type LdapFields struct {
 	Servers                         []string `json:"servers,omitempty"                         norman:"type=array[string],notnullable,required"`

@@ -17,6 +17,7 @@ var (
 	TypeToFields = map[string][]string{
 		client.GithubConfigType:          {client.GithubConfigFieldClientSecret},
 		client.ActiveDirectoryConfigType: {client.ActiveDirectoryConfigFieldServiceAccountPassword},
+		client.SambaBoxConfigType:        {client.SambaBoxConfigFieldServiceAccountPassword},
 		client.AzureADConfigType:         {client.AzureADConfigFieldApplicationSecret},
 		client.OpenLdapConfigType:        {client.LdapConfigFieldServiceAccountPassword},
 		client.FreeIpaConfigType:         {client.LdapConfigFieldServiceAccountPassword},

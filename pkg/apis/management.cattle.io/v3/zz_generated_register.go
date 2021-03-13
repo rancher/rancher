@@ -29,6 +29,7 @@ import (
 
 var (
 	ActiveDirectoryProviderResourceName                 = "activedirectoryproviders"
+	SambaBoxProviderResourceName                        = "sambaboxproviders"
 	AuthConfigResourceName                              = "authconfigs"
 	AuthProviderResourceName                            = "authproviders"
 	AuthTokenResourceName                               = "authtokens"
@@ -127,6 +128,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ActiveDirectoryProvider{},
 		&ActiveDirectoryProviderList{},
+		&SambaBoxProvider{},
+		&SambaBoxProviderList{},
 		&AuthConfig{},
 		&AuthConfigList{},
 		&AuthProvider{},

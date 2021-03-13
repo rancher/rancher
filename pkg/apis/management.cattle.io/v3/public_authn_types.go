@@ -94,6 +94,13 @@ type ActiveDirectoryProvider struct {
 
 	DefaultLoginDomain string `json:"defaultLoginDomain,omitempty"`
 }
+type SambaBoxProvider struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthProvider      `json:",inline"`
+
+	DefaultLoginDomain string `json:"defaultLoginDomain,omitempty"`
+}
 
 // +genclient
 // +genclient:nonNamespaced

@@ -43,6 +43,23 @@ func NewActiveDirectoryProvider(namespace, name string, obj ActiveDirectoryProvi
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// SambaBoxProviderList is a list of SambaBoxProvider resources
+type SambaBoxProviderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []SambaBoxProvider `json:"items"`
+}
+
+func NewSambaBoxProvider(namespace, name string, obj SambaBoxProvider) *SambaBoxProvider {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SambaBoxProvider").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // AuthConfigList is a list of AuthConfig resources
 type AuthConfigList struct {
 	metav1.TypeMeta `json:",inline"`

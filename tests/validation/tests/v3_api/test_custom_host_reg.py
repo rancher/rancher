@@ -1,4 +1,4 @@
-from .test_auth import enable_ad, load_setup_data, enable_openldap, \
+from .test_auth import enable_ad, enable_sbx, load_setup_data, enable_openldap, \
     OPENLDAP_AUTH_USER_PASSWORD, enable_freeipa, FREEIPA_AUTH_USER_PASSWORD
 from .common import *  # NOQA
 import ast
@@ -83,6 +83,14 @@ def test_deploy_rancher_server():
         if AUTH_PROVIDER == "activeDirectory":
 
             enable_ad(auth_admin_user, token, enable_url=enable_url,
+                      password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
+            user_token = login_as_auth_user(
+                load_setup_data()["standard_user"],
+                AUTH_USER_PASSWORD,
+                login_url=auth_user_login_url)["token"]
+        elif AUTH_PROVIDER == "sambaBox":
+
+            enable_sbx(auth_admin_user, token, enable_url=enable_url,
                       password=AUTH_USER_PASSWORD, nested=NESTED_GROUP_ENABLED)
             user_token = login_as_auth_user(
                 load_setup_data()["standard_user"],

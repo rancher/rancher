@@ -149,6 +149,25 @@ func GetGroupSearchAttributes(config *v32.ActiveDirectoryConfig, searchAttribute
 	return groupSeachAttributes
 }
 
+func GetUserSearchAttributesForSBX(memberOfAttribute, ObjectClass string, config *v32.SambaBoxConfig) []string {
+	userSearchAttributes := []string{memberOfAttribute,
+		ObjectClass,
+		config.UserObjectClass,
+		config.UserLoginAttribute,
+		config.UserNameAttribute,
+		config.UserEnabledAttribute}
+	return userSearchAttributes
+}
+
+func GetGroupSearchAttributesForSBX(memberOfAttribute, ObjectClass string, config *v32.SambaBoxConfig) []string {
+	groupSeachAttributes := []string{memberOfAttribute,
+		ObjectClass,
+		config.GroupObjectClass,
+		config.UserLoginAttribute,
+		config.GroupNameAttribute,
+		config.GroupSearchAttribute}
+	return groupSeachAttributes
+}
 func GetUserSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) []string {
 	userSearchAttributes := []string{"dn", config.UserMemberAttribute,
 		ObjectClass,

@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/sambabox"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -75,6 +76,12 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[activedirectory.Name] = p
 	providersByType[client.ActiveDirectoryConfigType] = p
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
+
+	p = sambabox.Configure(ctx, mgmt, userMGR, tokenMGR)
+	ProviderNames[sambabox.Name] = true
+	providers[sambabox.Name] = p
+	providersByType[client.SambaBoxConfigType] = p
+	providersByType[publicclient.SambaBoxProviderType] = p
 
 	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.OpenLdapName)
 	ProviderNames[ldap.OpenLdapName] = true
