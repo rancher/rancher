@@ -234,6 +234,10 @@ def random_test_name(name="test"):
     return name + "-" + str(random_int(10000, 99999))
 
 
+def random_cluster_name(name="test"):
+    return name + "-" + str(random_int(10000, 99999))
+
+
 def get_cluster_client_for_token_v1(cluster_id, token):
     url = CATTLE_TEST_URL + "/k8s/clusters/" + cluster_id + "/v1/schemas"
     return rancher.Client(url=url, token=token, verify=False)

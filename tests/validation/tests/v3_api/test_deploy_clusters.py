@@ -5,10 +5,13 @@ from .test_gke_cluster import get_gke_config, \
     create_and_validate_gke_cluster, get_gke_version_credentials
 from .test_rke_cluster_provisioning import create_and_validate_custom_host
 from .test_import_cluster import create_and_validate_import_cluster
+from .test_windows_cluster import provision_windows_nodes
+from .test_rke_cluster_provisioning import create_custom_host_from_nodes
 
 env_details = "env.RANCHER_CLUSTER_NAMES='"
-cluster_details = {"rke": {}, "rke_import": {},
+cluster_details = {"rke": {}, "windows": {},"rke_import": {},
                    "eks": {}, "aks": {}, "gke": {}}
+K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 
 if_not_auto_deploy_rke = pytest.mark.skipif(
     ast.literal_eval(
@@ -35,6 +38,11 @@ if_not_auto_deploy_rke_import = pytest.mark.skipif(
         os.environ.get(
             'RANCHER_TEST_DEPLOY_RKE_IMPORT', "False")) is False,
     reason='auto deploy RKE import tests are skipped')
+if_not_auto_deploy_windows = pytest.mark.skipif(
+    ast.literal_eval(
+        os.environ.get(
+            'RANCHER_TEST_DEPLOY_WINDOWS', "False")) is False,
+    reason='auto deploy Windows tests are skipped')
 
 
 @if_not_auto_deploy_rke
@@ -65,6 +73,50 @@ def test_deploy_rke():
         print("Successfully deployed {} with kubernetes version {}".format(
             cluster.name, k8s_version))
         cluster_details["rke"][cluster.name] = k8s_version
+
+
+@if_not_auto_deploy_windows 
+def test_deploy_windows():
+    print("Deploying Windows Clusters")
+    global env_details
+    global cluster_details
+
+    default_k8s_versions = K8S_VERSION.split(",")
+    # Create clusters
+    for k8s_version in default_k8s_versions:
+        if env_details != "env.RANCHER_CLUSTER_NAMES='":
+            env_details += ","
+        print("Deploying Windows Cluster using kubernetes version {}".format(
+            k8s_version))
+        nodes, node_roles = provision_windows_nodes()
+
+        cluster, nodes = create_custom_host_from_nodes(
+            nodes, node_roles,
+            random_cluster_name=True,
+            version=k8s_version,
+            windows=True,
+            windows_flannel_backend='vxlan')
+
+        env_details += cluster.name
+        print("Successfully deployed {} with kubernetes version {}".format(
+            cluster.name, k8s_version))
+        cluster_details["windows"][cluster.name] = k8s_version
+
+        nodes, node_roles = provision_windows_nodes()
+
+        for node in nodes:
+            AmazonWebServices().disable_source_dest_check(node.provider_node_id)
+
+        cluster, nodes = create_custom_host_from_nodes(
+            nodes, node_roles,
+            random_cluster_name=True,
+            windows=True,
+            windows_flannel_backend='host-gw')
+        
+        env_details += cluster.name
+        print("Successfully deployed {} with kubernetes version {}".format(
+            cluster.name, k8s_version))
+        cluster_details["windows"][cluster.name] = k8s_version
 
 
 @if_not_auto_deploy_rke_import
