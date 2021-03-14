@@ -288,7 +288,7 @@ catch
             "$($CATTLE_PREFIX_PATH)etc\rancher\wins\wins-upgrade.exe"
         )
         proxyPorts = @(
-            "9796"
+            9796
         )
     }
 } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "$($CATTLE_PREFIX_PATH)etc\rancher\wins\config"
