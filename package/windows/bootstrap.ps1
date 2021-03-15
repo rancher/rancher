@@ -286,6 +286,7 @@ catch
             "$($CATTLE_PREFIX_PATH)etc\nginx\nginx.exe"
             "$($CATTLE_PREFIX_PATH)opt\bin\flanneld.exe"
             "$($CATTLE_PREFIX_PATH)etc\rancher\wins\wins-upgrade.exe"
+            "$($CATTLE_PREFIX_PATH)etc\windows-exporter\windows-exporter.exe"
         )
         proxyPorts = @(
             9796
