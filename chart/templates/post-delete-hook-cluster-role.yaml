@@ -1,0 +1,27 @@
+{{- if .Values.postDelete.enabled }}
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ template "rancher.fullname" . }}-post-delete
+  labels: {{ include "rancher.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+rules:
+  - apiGroups: [ "extensions","apps" ]
+    resources: [ "deployments" ]
+    verbs: [ "get", "list", "delete" ]
+  - apiGroups: [ "rbac.authorization.k8s.io" ]
+    resources: [ "clusterroles", "clusterrolebindings", "roles", "rolebindings" ]
+    verbs: [ "get", "list", "delete" ]
+  - apiGroups: [ "" ]
+    resources: [ "serviceaccounts", "pods", "secrets", "services", "configmaps" ]
+    verbs: [ "get", "list", "delete" ]
+  - apiGroups: [ "networking.k8s.io" ]
+    resources: [ "networkpolicies" ]
+    verbs: [ "get", "list", "delete" ]
+  - apiGroups: [ "admissionregistration.k8s.io" ]
+    resources: [ "validatingwebhookconfigurations" ]
+    verbs: [ "get", "list", "delete" ]
+{{- end }}
