@@ -329,6 +329,12 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		dataFromTemplate[managementv3.MetadataUpdateFieldLabels] = convert.ToMapInterface(labels)
 	}
 
+	// make sure fleetworkspace is copied over
+	fleetworkspace, ok := data[managementv3.ClusterFieldFleetWorkspaceName]
+	if ok {
+		dataFromTemplate[managementv3.ClusterFieldFleetWorkspaceName] = fleetworkspace
+	}
+
 	//validate that the data loaded is valid clusterSpec
 	var spec v32.ClusterSpec
 	if err := convert.ToObj(dataFromTemplate, &spec); err != nil {
