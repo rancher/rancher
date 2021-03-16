@@ -19,6 +19,7 @@ import (
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/ui"
 	"github.com/rancher/rancher/pkg/websocket"
@@ -124,10 +125,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
-		Controllers:     wranglerContext.Controllers,
-		AccessSetLookup: wranglerContext.ASL,
-		AuthMiddleware:  steveauth.ExistingContext,
-		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache()),
+		Controllers:                wranglerContext.Controllers,
+		AccessSetLookup:            wranglerContext.ASL,
+		AuthMiddleware:             steveauth.ExistingContext,
+		AggregationSecretNamespace: namespace.System,
+		AggregationSecretName:      "steve-aggregation",
+		Next:                       ui.New(wranglerContext.Mgmt.Preference().Cache()),
 	})
 	if err != nil {
 		return nil, err
