@@ -2,6 +2,7 @@ resource "aws_db_parameter_group" "db-parameters" {
   name   = "${var.resource_name}-dbparameter"
   family = var.db_group_name
   parameter {
+    apply_method = "pending-reboot"
     name  = "max_connections"
     value = var.max_connections
   }
