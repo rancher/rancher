@@ -1,4 +1,4 @@
-package tunnelserver
+package mcmauthorizer
 
 import (
 	"crypto/md5"
@@ -12,14 +12,13 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainerdriver"
 
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	provisioner "github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,10 +55,6 @@ type input struct {
 	Node        *client.Node `json:"node"`
 	Cluster     *cluster     `json:"cluster"`
 	NodeVersion int          `json:"nodeVersion"`
-}
-
-func NewTunnelServer(authorizer *Authorizer) *remotedialer.Server {
-	return remotedialer.New(authorizer.authorizeTunnel, remotedialer.DefaultErrorWriter)
 }
 
 func NewAuthorizer(context *config.ScaledContext) *Authorizer {
@@ -99,7 +94,7 @@ type Client struct {
 	NodeVersion int
 }
 
-func (t *Authorizer) authorizeTunnel(req *http.Request) (string, bool, error) {
+func (t *Authorizer) AuthorizeTunnel(req *http.Request) (string, bool, error) {
 	client, ok, err := t.Authorize(req)
 	if client != nil && client.Node != nil {
 		return client.Cluster.Name + ":" + client.Node.Name, ok, err
@@ -289,7 +284,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	changed := false
 
 	if cluster.Status.Driver == "" {
-		driver, err := provisioner.GetDriver(cluster, t.KontainerDriverLister)
+		driver, err := kontainerdriver.GetDriver(cluster, t.KontainerDriverLister)
 		if err != nil {
 			return cluster, true, err
 		}

@@ -23,6 +23,9 @@ import (
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io"
 	projectv3 "github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/peermanager"
+	"github.com/rancher/rancher/pkg/tunnelserver"
+	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/server"
@@ -78,6 +81,9 @@ type Context struct {
 	Catalog             catalogcontrollers.Interface
 	ControllerFactory   controller.SharedControllerFactory
 	MultiClusterManager MultiClusterManager
+	TunnelServer        *remotedialer.Server
+	TunnelAuthorizer    *tunnelserver.Authorizers
+	PeerManager         peermanager.PeerManager
 
 	ASL             accesscontrol.AccessSetLookup
 	ClientConfig    clientcmd.ClientConfig
@@ -208,6 +214,21 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 		return nil, err
 	}
 
+	tunnelAuth := &tunnelserver.Authorizers{}
+	tunnelServer := remotedialer.New(tunnelAuth.Authorize, remotedialer.DefaultErrorWriter)
+	peerManager, err := tunnelserver.NewPeerManager(ctx, steveControllers.Core.Endpoints(), tunnelServer)
+	if err != nil {
+		return nil, err
+	}
+
+	leadership := leader.NewManager("", lockID, steveControllers.K8s)
+	leadership.OnLeader(func(ctx context.Context) error {
+		if peerManager != nil {
+			peerManager.Leader()
+		}
+		return nil
+	})
+
 	return &Context{
 		Controllers:           steveControllers,
 		Apply:                 apply,
@@ -221,11 +242,13 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 		MultiClusterManager:   noopMCM{},
 		CachedDiscovery:       cache,
 		RESTMapper:            restMapper,
-		leadership:            leader.NewManager("", lockID, steveControllers.K8s),
+		leadership:            leadership,
 		RESTClientGetter:      restClientGetter,
 		CatalogContentManager: content,
 		HelmOperations:        helmop,
 		SystemChartsManager:   systemCharts,
+		TunnelAuthorizer:      tunnelAuth,
+		TunnelServer:          tunnelServer,
 	}, nil
 }
 
