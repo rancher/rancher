@@ -1,10 +1,12 @@
 package client
 
 const (
-	GKEStatusType              = "gkeStatus"
-	GKEStatusFieldUpstreamSpec = "upstreamSpec"
+	GKEStatusType                       = "gkeStatus"
+	GKEStatusFieldPrivateRequiresTunnel = "privateRequiresTunnel"
+	GKEStatusFieldUpstreamSpec          = "upstreamSpec"
 )
 
 type GKEStatus struct {
-	UpstreamSpec *GKEClusterConfigSpec `json:"upstreamSpec,omitempty" yaml:"upstreamSpec,omitempty"`
+	PrivateRequiresTunnel *bool                 `json:"privateRequiresTunnel,omitempty" yaml:"privateRequiresTunnel,omitempty"`
+	UpstreamSpec          *GKEClusterConfigSpec `json:"upstreamSpec,omitempty" yaml:"upstreamSpec,omitempty"`
 }

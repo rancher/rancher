@@ -365,5 +365,6 @@ type EKSStatus struct {
 }
 
 type GKEStatus struct {
-	UpstreamSpec *gkev1.GKEClusterConfigSpec `json:"upstreamSpec"`
+	UpstreamSpec          *gkev1.GKEClusterConfigSpec `json:"upstreamSpec"`
+	PrivateRequiresTunnel *bool                       `json:"privateRequiresTunnel"`
 }
