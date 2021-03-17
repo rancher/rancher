@@ -1,3 +1,4 @@
+from ..common import *  # NOQA
 import inspect
 import json
 import os
@@ -19,7 +20,6 @@ from threading import Thread
 import websocket
 import base64
 
-DEFAULT_TIMEOUT = 120
 DEFAULT_CATALOG_TIMEOUT = 15
 DEFAULT_MONITORING_TIMEOUT = 180
 DEFAULT_CLUSTER_STATE_TIMEOUT = 320
@@ -27,13 +27,10 @@ DEFAULT_MULTI_CLUSTER_APP_TIMEOUT = 300
 DEFAULT_APP_DELETION_TIMEOUT = 360
 DEFAULT_APP_V2_TIMEOUT = 60
 
-CATTLE_TEST_URL = os.environ.get('CATTLE_TEST_URL', "")
 CATTLE_API_URL = CATTLE_TEST_URL + "/v3"
 CATTLE_AUTH_URL = \
     CATTLE_TEST_URL + "/v3-public/localproviders/local?action=login"
 
-ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', "None")
-USER_TOKEN = os.environ.get('USER_TOKEN', "None")
 USER_PASSWORD = os.environ.get('USER_PASSWORD', "None")
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', "None")
 
@@ -218,22 +215,6 @@ def is_windows(os_type=TEST_OS):
     return os_type == "windows"
 
 
-def random_str():
-    return 'random-{0}-{1}'.format(random_num(), int(time.time()))
-
-
-def random_num():
-    return random.randint(0, 1000000)
-
-
-def random_int(start, end):
-    return random.randint(start, end)
-
-
-def random_test_name(name="test"):
-    return name + "-" + str(random_int(10000, 99999))
-
-
 def get_cluster_client_for_token_v1(cluster_id, token):
     url = CATTLE_TEST_URL + "/k8s/clusters/" + cluster_id + "/v1/schemas"
     return rancher.Client(url=url, token=token, verify=False)
@@ -289,24 +270,6 @@ def wait_for_condition(client, resource, check_function, fail_handler=None,
         time.sleep(.5)
         resource = client.reload(resource)
     return resource
-
-
-def wait_for(callback, timeout=DEFAULT_TIMEOUT, timeout_message=None):
-    start = time.time()
-    ret = callback()
-    while ret is None or ret is False:
-        time.sleep(.5)
-        if time.time() - start > timeout:
-            if timeout_message:
-                raise Exception(timeout_message)
-            else:
-                raise Exception('Timeout waiting for condition')
-        ret = callback()
-    return ret
-
-
-def random_name():
-    return "test" + "-" + str(random_int(10000, 99999))
 
 
 def get_setting_value_by_name(name):
@@ -707,8 +670,9 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
                         break
         # Including master in list of nodes as master is also schedulable
         if ('k3s' in cluster.version["gitVersion"] or 'rke2' in cluster.version["gitVersion"]) and node.controlPlane:
-                schedulable_nodes.append(node)
+            schedulable_nodes.append(node)
     return schedulable_nodes
+
 
 def get_etcd_nodes(cluster, client=None):
     if not client:

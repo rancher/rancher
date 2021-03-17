@@ -20,3 +20,4 @@ PyYAML==5.2
 requests==2.22.0
 rsa==4.0
 websocket-client==0.57.0
+semver==2.13.0
