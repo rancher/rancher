@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	"github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -231,9 +232,40 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return e.recordCAAndAPIEndpoint(cluster)
 		}
 
+		if cluster.Status.GKEStatus.PrivateRequiresTunnel == nil &&
+			cluster.Status.GKEStatus.UpstreamSpec.PrivateClusterConfig != nil &&
+			cluster.Status.GKEStatus.UpstreamSpec.PrivateClusterConfig.EnablePrivateEndpoint {
+			// Check to see if we can still use the control plane endpoint even though
+			// the cluster has private-only access
+			serviceToken, mustTunnel, err := e.generateSATokenWithPublicAPI(cluster)
+			if err != nil {
+				return cluster, err
+			}
+			if mustTunnel {
+				cluster = cluster.DeepCopy()
+				cluster.Status.GKEStatus.PrivateRequiresTunnel = &mustTunnel
+				cluster.Status.ServiceAccountToken = serviceToken
+				return e.clusterClient.Update(cluster)
+			}
+		}
+
 		if cluster.Status.ServiceAccountToken == "" {
 			cluster, err = e.generateAndSetServiceAccount(cluster)
 			if err != nil {
+				var statusErr error
+				if strings.Contains(err.Error(), fmt.Sprintf(dialer.WaitForAgentError, cluster.Name)) {
+					// In this case, the API endpoint is private and rancher is waiting for the import cluster command to be run.
+					cluster, statusErr = e.setUnknown(cluster, apimgmtv3.ClusterConditionWaiting, "waiting for cluster agent to be deployed")
+					if statusErr == nil {
+						e.clusterEnqueueAfter(cluster.Name, enqueueTime)
+					}
+					return cluster, statusErr
+				}
+				cluster, statusErr = e.setFalse(cluster, apimgmtv3.ClusterConditionWaiting,
+					fmt.Sprintf("failed to communicate with cluster: %v", err))
+				if statusErr != nil {
+					return cluster, statusErr
+				}
 				return cluster, err
 			}
 		}
@@ -398,11 +430,11 @@ func (e *gkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 	if err != nil {
 		return nil, fmt.Errorf("error getting google credential from credentialContent: %w", err)
 	}
-	netDialer := net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
+	clusterDialer, err := e.clientDialer.ClusterDialer(cluster.Name)
+	if err != nil {
+		return cluster, err
 	}
-	saToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, ts, netDialer.DialContext)
+	saToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, ts, clusterDialer)
 	if err != nil {
 		return cluster, fmt.Errorf("error generating service account token: %w", err)
 	}
@@ -537,6 +569,28 @@ func (e *gkeOperatorController) deployGKEOperator() error {
 	}
 
 	return nil
+}
+
+func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, bool, error) {
+	var publicAccess bool
+
+	ctx := context.Background()
+	ts, err := controller.GetTokenSource(ctx, e.secretsCache, cluster.Spec.GKEConfig)
+
+	netDialer := net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+	serviceToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, ts, netDialer.DialContext)
+	if err != nil {
+		if strings.Contains(err.Error(), "dial tcp") {
+			return "", true, nil
+		}
+	} else {
+		publicAccess = false
+	}
+
+	return serviceToken, publicAccess, err
 }
 
 func generateSAToken(endpoint, ca string, ts oauth2.TokenSource, dialer typesDialer.Dialer) (string, error) {
