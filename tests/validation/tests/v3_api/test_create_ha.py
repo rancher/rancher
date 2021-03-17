@@ -1,3 +1,5 @@
+from python_terraform import * # NOQA
+
 from .common import *  # NOQA
 from .test_boto_create_eks import get_eks_kubeconfig
 from .test_import_k3s_cluster import create_multiple_control_cluster
@@ -91,6 +93,13 @@ def test_install_rancher_ha(precheck_certificate_options):
                 "--set ingress."
                 "extraAnnotations.\"kubernetes\\.io/ingress\\.class\"=nginx"
             )
+        elif RANCHER_LOCAL_CLUSTER_TYPE == "AKS":
+            create_aks_cluster()
+            install_aks_ingress()
+            extra_settings.append(
+                "--set ingress."
+                "extraAnnotations.\"kubernetes\\.io/ingress\\.class\"=nginx"
+            )
     else:
         write_kubeconfig()
 
@@ -115,6 +124,8 @@ def test_install_rancher_ha(precheck_certificate_options):
         # For EKS we need to wait for EKS to generate the nlb and then configure
         # a Route53 record with the ingress address value
         set_route53_with_eks_ingress()
+    if RANCHER_LOCAL_CLUSTER_TYPE == "AKS":
+        set_route53_with_aks_ingress()
     wait_for_status_code(url=RANCHER_SERVER_URL + "/v3", expected_code=401)
     auth_url = \
         RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
@@ -244,6 +255,24 @@ def set_route53_with_eks_ingress():
     time.sleep(60)
 
 
+def set_route53_with_aks_ingress():
+    kubectl_ingress = "kubectl get svc -n ingress-nginx " \
+                      "ingress-nginx-controller -o " \
+                      "jsonpath=\"" \
+                      "{.status.loadBalancer.ingress[0].ip}\""
+    time.sleep(10)
+    ingress_address = run_command_with_stderr(export_cmd
+                                              + " && " +
+                                              kubectl_ingress).decode()
+
+    print("AKS INGRESS ADDRESS:")
+    print(ingress_address)
+    AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
+                                                     ingress_address,
+                                                     record_type='A')
+    time.sleep(60)
+
+
 def add_repo_create_namespace(repo=RANCHER_HELM_REPO):
     repo_name = "rancher-" + repo
     repo_url = "https://releases.rancher.com/server-charts/" + repo
@@ -304,6 +333,13 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
 
     run_command_with_stderr(helm_rancher_cmd)
     time.sleep(120)
+
+    # set trace logging
+    set_trace_cmd = "kubectl -n cattle-system get pods -l app=rancher " + \
+        "--no-headers -o custom-columns=name:.metadata.name | " + \
+        "while read rancherpod; do kubectl -n cattle-system " + \
+        "exec $rancherpod -c rancher -- loglevel --set trace; done"
+    run_command_with_stderr(set_trace_cmd)
 
 
 def create_tls_secrets(valid_cert):
@@ -402,6 +438,36 @@ def create_rke_cluster_config(aws_nodes):
     f.write(rkeconfig)
     f.close()
     return clusterfilepath
+
+
+def create_aks_cluster():
+    tf_dir = DATA_SUBDIR + "/" + "terraform/aks"
+    aks_k8_s_version = os.environ.get('RANCHER_AKS_K8S_VERSION', '')
+    aks_location = os.environ.get('RANCHER_AKS_LOCATION', '')
+    client_id = os.environ.get('ARM_CLIENT_ID', '')
+    client_secret = os.environ.get('ARM_CLIENT_SECRET', '')
+
+    tf = Terraform(working_dir=tf_dir,
+                   variables={'kubernetes_version': aks_k8_s_version,
+                              'location': aks_location,
+                              'client_id': client_id,
+                              'client_secret': client_secret,
+                              'cluster_name': resource_prefix})
+
+    print("Creating cluster")
+    tf.init()
+    print(tf.plan(out="aks_plan_server.out"))
+    print("\n\n")
+    print(tf.apply("--auto-approve"))
+    print("\n\n")
+    out_string = tf.output("kube_config", full_value=True)
+    with open(kubeconfig_path, "w") as kubefile:
+        kubefile.write(out_string)
+
+
+def install_aks_ingress():
+    run_command_with_stderr(export_cmd + " && kubectl apply -f " +
+                            DATA_SUBDIR + "/aks_nlb.yml")
 
 
 @pytest.fixture(scope='module')

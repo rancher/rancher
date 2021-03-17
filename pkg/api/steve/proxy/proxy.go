@@ -8,7 +8,6 @@ import (
 	"time"
 
 	gmux "github.com/gorilla/mux"
-	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -68,8 +67,7 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 	mux.UseEncodedPath()
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy(localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy(localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/", true)).Handler(proxyHandler)
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/", false)).Handler(proxyHandler)
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(proxyHandler)
 
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -116,12 +114,8 @@ func NewProxyHandler(authorizer authorizer.Authorizer,
 	}
 }
 
-func (h *Handler) MatchNonLegacy(prefix string, force bool) gmux.MatcherFunc {
+func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
 	return func(req *http.Request, match *gmux.RouteMatch) bool {
-		if !features.SteveProxy.Enabled() && !force {
-			return false
-		}
-
 		clusterID := strings.TrimPrefix(req.URL.Path, prefix)
 		clusterID = strings.SplitN(clusterID, "/", 2)[0]
 		if match.Vars == nil {

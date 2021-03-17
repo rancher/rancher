@@ -750,8 +750,26 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 			Tolerations: []v1.Toleration{
 				{
 					Key:      "cattle.io/os",
-					Operator: "Equal",
+					Operator: corev1.TolerationOpEqual,
 					Value:    "linux",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/controlplane",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/etcd",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   "NoExecute",
+				},
+				{
+					Key:      "node.cloudprovider.kubernetes.io/uninitialized",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
 					Effect:   "NoSchedule",
 				},
 			},

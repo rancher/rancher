@@ -1150,6 +1150,15 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 	return nil
 }
 
+func Oauth2Transport(ctx context.Context, rt http.RoundTripper, credentials string) (http.RoundTripper, error) {
+	ts, err := GetTokenSource(ctx, credentials)
+	if err != nil {
+		return rt, fmt.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
+	}
+
+	return &oauth2.Transport{Source: ts, Base: rt}, nil
+}
+
 // locationRRN returns a Relative Resource Name representing a location. This
 // RRN can either represent a Region or a Zone. It can be used as the parent
 // attribute during cluster creation to create a zonal or regional cluster, or

@@ -53,7 +53,12 @@ if TEST_OS == "windows":
 skip_test_windows_os = pytest.mark.skipif(
     TEST_OS == "windows",
     reason='Tests Skipped for including Windows nodes cluster')
+skip_test_hardened = pytest.mark.skipif(
+    HARDENED_CLUSTER,
+    reason='Tests Skipped due to being a hardened cluster')
 
+UPDATE_KDM = ast.literal_eval(os.environ.get('RANCHER_UPDATE_KDM', "False"))
+KDM_URL = os.environ.get("RANCHER_KDM_URL", "")
 CLUSTER_NAME = os.environ.get("RANCHER_CLUSTER_NAME", "")
 RANCHER_CLEANUP_CLUSTER = \
     ast.literal_eval(os.environ.get('RANCHER_CLEANUP_CLUSTER', "True"))
@@ -422,16 +427,18 @@ def validate_all_workload_image_from_rancher(project_client, ns, pod_count=1,
                                              ignore_pod_count=False,
                                              deployment_list=None,
                                              daemonset_list=None,
-                                             cronjob_list=None):
+                                             cronjob_list=None, job_list=None):
     if cronjob_list is None:
         cronjob_list = []
     if daemonset_list is None:
         daemonset_list = []
     if deployment_list is None:
         deployment_list = []
-    workload_list = deployment_list + daemonset_list + cronjob_list
+    if job_list is None:
+        job_list = []
+    workload_list = deployment_list + daemonset_list + cronjob_list + job_list
 
-    wls = project_client.list_workload(namespaceId=ns.id).data
+    wls = [dep.name for dep in project_client.list_workload(namespaceId=ns.id).data]
     assert len(workload_list) == len(wls), \
         "Expected {} workload(s) to be present in {} namespace " \
         "but there were {}".format(len(workload_list), ns.name, len(wls))
@@ -461,6 +468,11 @@ def validate_all_workload_image_from_rancher(project_client, ns, pod_count=1,
                                   ns.name, pod_count=pod_count,
                                   ignore_pod_count=ignore_pod_count)
                 cronjob_list.remove(workload_name)
+            if workload_name in job_list:
+                validate_workload(project_client, workload, "job",
+                                  ns.name, pod_count=pod_count,
+                                  ignore_pod_count=ignore_pod_count)
+                job_list.remove(workload_name)
     # Final assertion to ensure all expected workloads have been validated
     assert not deployment_list + daemonset_list + cronjob_list
 
@@ -481,8 +493,15 @@ def validate_workload(p_client, workload, type, ns_name, pod_count=1,
         pods = p_client.list_pod(workloadId=workload.id).data
         assert len(pods) == pod_count
     for pod in pods:
-        p = wait_for_pod_to_running(p_client, pod)
-        assert p["status"]["phase"] == "Running"
+        if type == "job":
+            job_type = True
+            expected_status = "Succeeded"
+        else:
+            job_type = False
+            expected_status = "Running"
+        p = wait_for_pod_to_running(p_client, pod, job_type=job_type)
+        assert p["status"]["phase"] == expected_status
+
 
     wl_result = execute_kubectl_cmd(
         "get " + type + " " + workload.name + " -n " + ns_name)
@@ -492,6 +511,8 @@ def validate_workload(p_client, workload, type, ns_name, pod_count=1,
         assert wl_result["status"]["currentNumberScheduled"] == len(pods)
     if type == "cronJob":
         assert len(wl_result["status"]["active"]) >= len(pods)
+    if type == "job":
+        assert wl_result["status"]["succeeded"] == len(pods)
 
 
 def validate_workload_with_sidekicks(p_client, workload, type, ns_name,
@@ -651,12 +672,16 @@ def wait_for_wl_transitioning(client, workload, timeout=DEFAULT_TIMEOUT,
     return wl
 
 
-def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT):
+def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT, job_type=False):
     start = time.time()
     pods = client.list_pod(uuid=pod.uuid).data
     assert len(pods) == 1
     p = pods[0]
-    while p.state != "running":
+    if job_type:
+        expected_state = "succeeded"
+    else:
+        expected_state = "running"
+    while p.state != expected_state :
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for state to get to active")
@@ -2518,12 +2543,10 @@ class WebsocketLogParse:
     the class is used for receiving and parsing the message
     received from the websocket
     """
-
     def __init__(self):
         self.lock = Lock()
         self._last_message = ''
-
-    def receiver(self, socket, skip):
+    def receiver(self, socket, skip, b64=True):
         """
         run a thread to receive and save the message from the web socket
         :param socket: the socket connection
@@ -2537,7 +2560,8 @@ class WebsocketLogParse:
                     data = data[1:]
                 if len(data) < 5:
                     pass
-                data = base64.b64decode(data).decode()
+                if b64:
+                    data = base64.b64decode(data).decode()
                 self.lock.acquire()
                 self._last_message += data
                 self.lock.release()
@@ -2671,7 +2695,6 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
     tg_list = []
     lb_list = []
     lb_names = [resource_prefix + '-nlb',
-                resource_prefix + '-multinode-nlb',
                 resource_prefix + '-k3s-nlb',
                 resource_prefix + '-internal-nlb']
     for name in lb_names:
@@ -2689,7 +2712,7 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
         AmazonWebServices().delete_target_group(tg)
 
     # delete rds
-    db_name = resource_prefix + "-multinode-db"
+    db_name = resource_prefix + "-db"
     print("deleting the database (if it exists): {}".format(db_name))
     AmazonWebServices().delete_db(db_name)
 
@@ -2950,3 +2973,28 @@ def check_v2_app_and_uninstall(client, chart_name):
             app_list = wait_until_app_v2_uninstall(client, chart_name)
             assert chart_name not in app_list, \
                 "App has not uninstalled"
+
+
+def update_and_validate_kdm(kdm_url, admin_token=ADMIN_TOKEN,
+                            rancher_api_url=CATTLE_API_URL):
+    print("Updating KDM to use {}".format(kdm_url))
+    header = {'Authorization': 'Bearer ' + admin_token}
+    api_url = rancher_api_url + "/settings/rke-metadata-config"
+    kdm_json = {
+        "name": "rke-metadata-config",
+        "value": json.dumps({
+            "refresh-interval-minutes": "1440",
+            "url": kdm_url
+        })
+    }
+    r = requests.put(api_url, verify=False, headers=header, json=kdm_json)
+    r_content = json.loads(r.content)
+    assert r.ok
+    assert r_content['name'] == kdm_json['name']
+    assert r_content['value'] == kdm_json['value']
+    time.sleep(2)
+
+    # Refresh Kubernetes Metadata
+    kdm_refresh_url = rancher_api_url + "/kontainerdrivers?action=refresh"
+    response = requests.post(kdm_refresh_url, verify=False, headers=header)
+    assert response.ok

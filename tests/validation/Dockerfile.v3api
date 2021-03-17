@@ -8,6 +8,7 @@ ARG RKE_VERSION=v1.0.2
 ARG CLI_VERSION=v2.3.2
 ARG RANCHER_HELM_VERSION=v3.3.4
 ARG SONOBUOY_VERSION=0.18.2
+ARG TERRAFORM_VERSION=0.12.10
 
 
 COPY [".", "$WORKSPACE"]
@@ -26,10 +27,10 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     tar -x -f helm-$RANCHER_HELM_VERSION-linux-amd64.tar.gz && \
     mv linux-amd64/helm /bin/helm_v3 && \
     chmod +x /bin/helm_v3 && \
-    wget https://releases.hashicorp.com/terraform/0.12.10/terraform_0.12.10_linux_amd64.zip && \
+    wget https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
     apt-get update && \
     apt-get install unzip && \
-    unzip terraform_0.12.10_linux_amd64.zip && \
+    unzip terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
     chmod u+x terraform && \
     mv terraform /usr/local/bin && \
     wget "https://github.com/vmware-tanzu/sonobuoy/releases/download/v$SONOBUOY_VERSION/sonobuoy_$SONOBUOY_VERSION"_linux_amd64.tar.gz && \
@@ -39,5 +40,6 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     wget https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip && \
     unzip awscli-exe-linux-x86_64.zip && \
     ./aws/install && \
+    curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
     cd $WORKSPACE && \
     pip install -r requirements_v3api.txt

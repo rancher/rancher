@@ -19,6 +19,7 @@ var (
 	provider       Provider
 	InjectDefaults string
 
+	AgentInstallScript                = NewSetting("agent-install-script", "./install.sh")
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
@@ -30,10 +31,10 @@ var (
 	CLIURLLinux                       = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                     = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	ClusterControllerStartCount       = NewSetting("cluster-controller-start-count", "50")
-	EngineInstallURL                  = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/19.03.sh")
+	EngineInstallURL                  = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/20.10.sh")
 	EngineISOURL                      = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
 	EngineNewestVersion               = NewSetting("engine-newest-version", "v17.12.0")
-	EngineSupportedRange              = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 ")
+	EngineSupportedRange              = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 ")
 	FirstLogin                        = NewSetting("first-login", "true")
 	GlobalRegistryEnabled             = NewSetting("global-registry-enabled", "false")
 	GithubProxyAPIURL                 = NewSetting("github-proxy-api-url", "https://api.github.com")
@@ -61,6 +62,7 @@ var (
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
 	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,fleet-system")
 	TelemetryOpt                      = NewSetting("telemetry-opt", "")
+	TokenHashing                      = NewSetting("token-hashing", "true")
 	TLSMinVersion                     = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                        = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
 	UIBanners                         = NewSetting("ui-banners", "{}")
@@ -89,12 +91,16 @@ var (
 	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.5")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
 	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
-	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.5")
+	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.6")
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
 	EKSUpstreamRefreshCron            = NewSetting("eks-refresh-cron", "*/5 * * * *")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
+
+	FleetMinVersion           = NewSetting("fleet-min-version", "")
+	RancherOperatorMinVersion = NewSetting("rancher-operator-min-version", "")
+	RancherWebhookMinVersion  = NewSetting("rancher-webhook-min-version", "")
 )
 
 func FullShellImage() string {

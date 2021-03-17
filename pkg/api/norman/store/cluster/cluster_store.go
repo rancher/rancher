@@ -28,11 +28,11 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
 	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/management/cis"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
+	"github.com/rancher/rancher/pkg/controllers/managementlegacy/cis"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
@@ -329,6 +329,12 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		dataFromTemplate[managementv3.MetadataUpdateFieldLabels] = convert.ToMapInterface(labels)
 	}
 
+	// make sure fleetworkspace is copied over
+	fleetworkspace, ok := data[managementv3.ClusterFieldFleetWorkspaceName]
+	if ok {
+		dataFromTemplate[managementv3.ClusterFieldFleetWorkspaceName] = fleetworkspace
+	}
+
 	//validate that the data loaded is valid clusterSpec
 	var spec v32.ClusterSpec
 	if err := convert.ToObj(dataFromTemplate, &spec); err != nil {
@@ -538,6 +544,25 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := r.validateUnavailableNodes(data, existingCluster, id); err != nil {
 		return nil, err
 	}
+
+	// Replace rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter value to properly update virtualCenter removal
+	if newVCenter, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter"); ok && newVCenter != nil {
+		oldVCenter, ok := values.GetValue(existingCluster, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+		if ok && oldVCenter != nil && !reflect.DeepEqual(newVCenter, oldVCenter) {
+			newData := map[string]interface{}{}
+			for k, v := range data {
+				newData[k] = v
+			}
+			// Update virtualCenter value to nil
+			values.PutValue(newData, nil, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+			if _, err := r.Store.Update(apiContext, schema, newData, id); err != nil {
+				return nil, err
+			}
+			// Set virtualCenter value to newVCenter
+			values.PutValue(data, newVCenter, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+		}
+	}
+
 	return r.Store.Update(apiContext, schema, data, id)
 }
 

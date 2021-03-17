@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -62,7 +63,9 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 		return nil, nil, err
 	}
 
-	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
+	if features.Legacy.Enabled() {
+		scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
+	}
 
 	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
 		return nil, nil, err
@@ -104,7 +107,7 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 		return nil, err
 	}
 
-	router, err := router(ctx, cfg.LocalClusterEnabled, scaledContext, clusterManager)
+	router, err := router(ctx, cfg.LocalClusterEnabled, scaledContext, clusterManager, wranglerContext)
 	if err != nil {
 		return nil, err
 	}

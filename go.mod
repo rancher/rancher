@@ -1,10 +1,9 @@
 module github.com/rancher/rancher
 
-go 1.14
+go 1.16
 
 replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
-	github.com/crewjam/saml => github.com/rancher/saml v0.0.3-rancher1
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
@@ -48,19 +47,19 @@ require (
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.1.0
 	github.com/Masterminds/sprig/v3 v3.1.0
-	github.com/aws/aws-sdk-go v1.35.24
-	github.com/beevik/etree v1.1.0 // indirect
+	github.com/aws/aws-sdk-go v1.36.7
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/coreos/go-semver v0.3.0
-	github.com/crewjam/saml v0.0.0-00010101000000-000000000000
+	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
+	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-github v17.0.0+incompatible
@@ -83,24 +82,23 @@ require (
 	github.com/prometheus/client_golang v1.8.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.14.0
-	github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197
+	github.com/rancher/apiserver v0.0.0-20210209001659-a17289640582
 	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
-	github.com/rancher/eks-operator v1.0.4
+	github.com/rancher/eks-operator v1.0.6-rc1
 	github.com/rancher/kubernetes-provider-detector v0.1.2
-	github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b
+	github.com/rancher/lasso v0.0.0-20210219160604-9baf1c12751b
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200930000340-693d65aaffe3
+	github.com/rancher/norman v0.0.0-20210225010917-c7fd1e24145b
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20200820180140-e5448aaba7ee
-	github.com/rancher/rke v1.2.0-rc9.0.20210106190313-91aed199f04c
+	github.com/rancher/rke v1.3.0-rc1.0.20210218215557-dc70017c5941
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20210106185822-0badd210b19e
+	github.com/rancher/steve v0.0.0-20210302143000-362617a677a9
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
-	github.com/rancher/wrangler v0.7.3-0.20201028210318-d73835950c29
+	github.com/rancher/wrangler v0.7.3-0.20210219161540-ef7fe9ce2443
 	github.com/robfig/cron v1.1.0
-	github.com/russellhaering/goxmldsig v0.0.0-20180430223755-7acd5e4a6ef7 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.6.0

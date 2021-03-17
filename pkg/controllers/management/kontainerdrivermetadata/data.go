@@ -13,6 +13,7 @@ import (
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/types/convert"
 	setting2 "github.com/rancher/rancher/pkg/api/norman/store/setting"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -33,7 +34,7 @@ const (
 
 const (
 	APIVersion           = "management.cattle.io/v3"
-	RancherVersionDev    = "2.5"
+	RancherVersionDev    = "2.6.99"
 	DataJSONLocation     = "/var/lib/rancher-data/driver-metadata/data.json"
 	sendRKELabel         = "io.cattle.rke_store"
 	svcOptionLinuxKey    = "service-option-linux-key"
@@ -90,11 +91,13 @@ func (md *MetadataController) createOrUpdateMetadata(data kdm.Data) error {
 	if err := md.saveAddons(data, localData.K8sVersionedTemplates); err != nil {
 		return err
 	}
-	if err := md.saveCisConfigParams(data.CisConfigParams); err != nil {
-		return fmt.Errorf("error saving cisDefaultConfigs: %v", err)
-	}
-	if err := md.saveCisBenchmarkVersions(data.CisBenchmarkVersionInfo); err != nil {
-		return fmt.Errorf("error saving cisBechmarkVersions: %v", err)
+	if features.Legacy.Enabled() {
+		if err := md.saveCisConfigParams(data.CisConfigParams); err != nil {
+			return fmt.Errorf("error saving cisDefaultConfigs: %v", err)
+		}
+		if err := md.saveCisBenchmarkVersions(data.CisBenchmarkVersionInfo); err != nil {
+			return fmt.Errorf("error saving cisBechmarkVersions: %v", err)
+		}
 	}
 	return nil
 }

@@ -217,23 +217,7 @@ def deploy_bastion_server():
     node_name = AG_HOST_NAME + "-bastion"
     # Create Bastion Server in AWS
     bastion_node = AmazonWebServices().create_node(node_name)
-
-    # Copy SSH Key to Bastion and local dir and give it proper permissions
-    write_key_command = "cat <<EOT >> {}.pem\n{}\nEOT".format(
-        bastion_node.ssh_key_name, bastion_node.ssh_key)
-    bastion_node.execute_command(write_key_command)
-    local_write_key_command = \
-        "mkdir -p {} && cat <<EOT >> {}/{}.pem\n{}\nEOT".format(
-            SSH_KEY_DIR, SSH_KEY_DIR,
-            bastion_node.ssh_key_name, bastion_node.ssh_key)
-    run_command(local_write_key_command, log_out=False)
-
-    set_key_permissions_command = "chmod 400 {}.pem".format(
-        bastion_node.ssh_key_name)
-    bastion_node.execute_command(set_key_permissions_command)
-    local_set_key_permissions_command = "chmod 400 {}/{}.pem".format(
-        SSH_KEY_DIR, bastion_node.ssh_key_name)
-    run_command(local_set_key_permissions_command, log_out=False)
+    setup_ssh_key(bastion_node)
 
     # Get resources for private registry and generate self signed certs
     get_resources_command = \
@@ -346,7 +330,6 @@ def add_k3s_tarball_to_bastion(bastion_node, k3s_version):
 
 
 def add_k3s_images_to_private_registry(bastion_node, k3s_version):
-    failures = []
     # Get k3s files associated with the specified version
     k3s_binary = 'k3s'
     if ARCH == 'arm64':
@@ -363,6 +346,11 @@ def add_k3s_images_to_private_registry(bastion_node, k3s_version):
     images = bastion_node.execute_command(
         'cat k3s-images.txt')[0].strip().split("\n")
     assert images
+    return add_cleaned_images(bastion_node, images)
+
+
+def add_cleaned_images(bastion_node, images):
+    failures = []
     for image in images:
         pull_image(bastion_node, image)
         cleaned_image = re.search(".*(rancher/.*)", image).group(1)
@@ -568,7 +556,7 @@ def deploy_airgap_rancher(bastion_node):
             '-v ${{PWD}}/privkey.pem:/etc/rancher/ssl/key.pem ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
             '-e CATTLE_SYSTEM_CATALOG=bundled ' \
-            '{}/rancher/rancher:{} --no-cacerts'.format(
+            '{}/rancher/rancher:{} --no-cacerts --trace'.format(
                 privileged, bastion_node.host_name, bastion_node.host_name,
                 RANCHER_SERVER_VERSION)
     else:
@@ -576,7 +564,7 @@ def deploy_airgap_rancher(bastion_node):
             'sudo docker run -d {} --restart=unless-stopped ' \
             '-p 80:80 -p 443:443 ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
-            '-e CATTLE_SYSTEM_CATALOG=bundled {}/rancher/rancher:{}'.format(
+            '-e CATTLE_SYSTEM_CATALOG=bundled {}/rancher/rancher:{} --trace'.format(
                 privileged, bastion_node.host_name, bastion_node.host_name,
                 RANCHER_SERVER_VERSION)
     deploy_result = run_command_on_airgap_node(bastion_node, ag_node,
@@ -622,21 +610,35 @@ def run_command_on_airgap_node(bastion_node, ag_node, cmd, log_out=False):
     return result
 
 
-def wait_for_airgap_pods_ready(bastion_node, ag_nodes):
+def wait_for_airgap_pods_ready(bastion_node, ag_nodes,
+                               kubectl='kubectl', kubeconfig=None):
+    if kubeconfig:
+        node_cmd = "{} get nodes --kubeconfig {}".format(kubectl, kubeconfig)
+        command = "{} get pods -A --kubeconfig {}".format(kubectl, kubeconfig)
+    else:
+        node_cmd = "{} get nodes".format(kubectl)
+        command = "{} get pods -A".format(kubectl)
     start = time.time()
     wait_for_pods_to_be_ready = True
     while wait_for_pods_to_be_ready:
         unready_pods = []
+        unready_nodes = []
         if time.time() - start > DEFAULT_CLUSTER_STATE_TIMEOUT:
-            raise AssertionError(
-                "Timed out waiting for k3s cluster to be ready")
-        time.sleep(5)
-        pods = run_command_on_airgap_node(
-            bastion_node, ag_nodes[0], "kubectl get pods -A")
+            raise AssertionError("Timed out waiting for cluster to be ready")
+        time.sleep(10)
+        nodes = run_command_on_airgap_node(bastion_node, ag_nodes[0], node_cmd)
+        nodes_arr = nodes[0].strip().split("\n")[1:]
+        for node in nodes_arr:
+            if "NotReady" in node:
+                print("Waiting for node: {}".format(node))
+                unready_nodes.append(node)
+        if unready_nodes or not nodes_arr:
+            continue
+        pods = run_command_on_airgap_node(bastion_node, ag_nodes[0], command)
         pods_arr = pods[0].strip().split("\n")[1:]
         for pod in pods_arr:
             if "Completed" not in pod and "Running" not in pod:
-                print("Problem pod: {}".format(pod))
+                print("Waiting for pod: {}".format(pod))
                 unready_pods.append(pod)
         if unready_pods or not pods_arr:
             wait_for_pods_to_be_ready = True
@@ -740,6 +742,25 @@ def get_bastion_node(provider_id):
     if bastion_node is None:
         pytest.fail("Did not provide a valid Provider ID for the bastion node")
     return bastion_node
+
+
+def setup_ssh_key(bastion_node):
+    # Copy SSH Key to Bastion and local dir and give it proper permissions
+    write_key_command = "cat <<EOT >> {}.pem\n{}\nEOT".format(
+        bastion_node.ssh_key_name, bastion_node.ssh_key)
+    bastion_node.execute_command(write_key_command)
+    local_write_key_command = \
+        "mkdir -p {} && cat <<EOT >> {}/{}.pem\n{}\nEOT".format(
+            SSH_KEY_DIR, SSH_KEY_DIR,
+            bastion_node.ssh_key_name, bastion_node.ssh_key)
+    run_command(local_write_key_command, log_out=False)
+
+    set_key_permissions_command = "chmod 400 {}.pem".format(
+        bastion_node.ssh_key_name)
+    bastion_node.execute_command(set_key_permissions_command)
+    local_set_key_permissions_command = "chmod 400 {}/{}.pem".format(
+        SSH_KEY_DIR, bastion_node.ssh_key_name)
+    run_command(local_set_key_permissions_command, log_out=False)
 
 
 @pytest.fixture()

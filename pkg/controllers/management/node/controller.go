@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/encryptedstore"
@@ -47,9 +48,13 @@ import (
 )
 
 const (
-	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
-	amazonec2                       = "amazonec2"
-	userNodeRemoveCleanupAnnotation = "nodes.management.cattle.io/user-node-remove-cleanup"
+	defaultEngineInstallURL            = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2                          = "amazonec2"
+	userNodeRemoveCleanupAnnotation    = "cleanup.cattle.io/user-node-remove"
+	userNodeRemoveCleanupAnnotationOld = "nodes.management.cattle.io/user-node-remove-cleanup"
+	userNodeRemoveFinalizerPrefix      = "clusterscoped.controller.cattle.io/user-node-remove_"
+	userNodeRemoveAnnotationPrefix     = "lifecycle.cattle.io/create.user-node-remove_"
+	userScaledownAnnotation            = "nodes.management.cattle.io/scaledown"
 )
 
 // aliases maps Schema field => driver field
@@ -64,6 +69,7 @@ var aliases = map[string]map[string]string{
 	"otc":           map[string]string{"privateKeyFile": "privateKeyFile"},
 	"packet":        map[string]string{"userdata": "userdata"},
 	"vmwarevsphere": map[string]string{"cloudConfig": "cloud-config"},
+	"google":        map[string]string{"authEncodedJson": "authEncodedJson"},
 }
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
@@ -81,6 +87,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		nodeClient:                nodeClient,
 		nodeTemplateClient:        management.Management.NodeTemplates(""),
 		nodePoolLister:            management.Management.NodePools("").Controller().Lister(),
+		nodePoolController:        management.Management.NodePools("").Controller(),
 		nodeTemplateGenericClient: management.Management.NodeTemplates("").ObjectClient().UnstructuredClient(),
 		configMapGetter:           management.K8sClient.CoreV1(),
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
@@ -93,6 +100,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	}
 
 	nodeClient.AddLifecycle(ctx, "node-controller", nodeLifecycle)
+	nodeClient.AddHandler(ctx, "node-controller-sync", nodeLifecycle.sync)
 }
 
 type Lifecycle struct {
@@ -103,6 +111,7 @@ type Lifecycle struct {
 	nodeClient                v3.NodeInterface
 	nodeTemplateClient        v3.NodeTemplateInterface
 	nodePoolLister            v3.NodePoolLister
+	nodePoolController        v3.NodePoolController
 	configMapGetter           typedv1.ConfigMapsGetter
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
@@ -220,7 +229,7 @@ func (m *Lifecycle) getNodePool(nodePoolName string) (*v3.NodePool, error) {
 
 func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 	if obj.Status.NodeTemplateSpec == nil {
-		return obj, nil
+		return m.deleteV1Node(obj)
 	}
 
 	newObj, err := v32.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
@@ -279,6 +288,16 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 	}
 
 	return m.deleteV1Node(newObj.(*v3.Node))
+}
+
+func (m *Lifecycle) enqueueNodePool(obj *v3.Node) {
+	logrus.Errorf("[node] enqueing node pool %s", obj.Spec.NodePoolName)
+	pool, err := m.getNodePool(obj.Spec.NodePoolName)
+	if err != nil {
+		logrus.Errorf("[node] error finding pool %s", obj.Spec.NodePoolName)
+		return
+	}
+	m.nodePoolController.Enqueue(pool.Namespace, pool.Name)
 }
 
 func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
@@ -399,12 +418,51 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 		return err
 	}
 
-	drun := clusterregistrationtokens.NodeCommand(token, nil)
+	cluster, err := m.clusterLister.Get("", obj.Namespace)
+	if err != nil {
+		return err
+	}
+
+	err = m.authenticateRegistry(nodeDir, obj, cluster)
+	if err != nil {
+		return err
+	}
+
+	drun := clusterregistrationtokens.NodeCommand(token, cluster)
 	args := buildAgentCommand(obj, drun)
 	cmd, err := buildCommand(nodeDir, obj, args)
 	if err != nil {
 		return err
 	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, string(output))
+	}
+
+	return nil
+}
+
+// authenticateRegistry authenticates the machine to a private registry if one is defined on the cluster
+// this enables the agent image to be pulled from the private registry
+func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster *v3.Cluster) error {
+	reg := util.GetPrivateRepo(cluster)
+	// if there is no private registry defined or there is a registry without credentials, return since auth is not needed
+	if reg == nil || reg.User == "" || reg.Password == "" {
+		return nil
+	}
+
+	logrus.Infof("[node-controller-rancher-machine] private registry detected, authenticating %s to %s", node.Spec.RequestedHostname, reg.URL)
+
+	login := clusterregistrationtokens.LoginCommand(*reg)
+	args := buildLoginCommand(node, login)
+	cmd, err := buildCommand(nodeDir, node, args)
+	if err != nil {
+		return err
+	}
+
+	logrus.Tracef("[node-controller-rancher-machine] login command: %s", cmd.String())
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrap(err, string(output))
@@ -433,6 +491,9 @@ func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// if the node provision failed let the pool schedule it for delete
+	defer m.enqueueNodePool(obj)
 
 	// Provision in the background so we can poll and save the config
 	done := make(chan error)
@@ -463,10 +524,50 @@ outer:
 	return obj, err
 }
 
-func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
+func (m *Lifecycle) scaledown(obj *v3.Node) (runtime.Object, error) {
+	logrus.Debugf("[node] checking when to scaledown node %s", obj.Name)
+	scaledown, err := time.Parse(time.RFC3339, obj.Spec.ScaledownTime)
+	if err != nil {
+		return obj, fmt.Errorf("[node] failed to parse scaledown time, is it in RFC3339? %s", obj.Spec.ScaledownTime)
+	}
+
+	// time to scaledown, send to nodepool to delete the node
+	pool, err := m.getNodePool(obj.Spec.NodePoolName)
+	if err != nil {
+		return obj, err
+	}
+
+	if scaledown.Before(time.Now()) {
+		logrus.Debugf("[node] enqueing nodepool %s for scaledown immediately", pool.Name)
+		m.nodePoolController.Enqueue(pool.Namespace, pool.Name)
+	} else if after := scaledown.Sub(time.Now()); after > 0 {
+		logrus.Debugf("[node] enqueing nodepool %s for scaledown in %s", pool.Name, after)
+		m.nodePoolController.EnqueueAfter(pool.Namespace, pool.Name, after+(5*time.Second))
+	}
+
+	copy := obj.DeepCopy()
+	copy.Annotations[userScaledownAnnotation] = "true"
+	return m.nodeClient.Update(copy)
+}
+
+func (m *Lifecycle) sync(key string, obj *v3.Node) (runtime.Object, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
 	if cleanupAnnotation, ok := obj.Annotations[userNodeRemoveCleanupAnnotation]; !ok || cleanupAnnotation != "true" {
 		// finalizer from user-node-remove has to be checked/cleaned
 		return m.userNodeRemoveCleanup(obj)
+	}
+
+	return obj, nil
+}
+
+func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
+	if obj.Spec.ScaledownTime != "" {
+		if scaledownAnnotation, ok := obj.Annotations[userScaledownAnnotation]; !ok || scaledownAnnotation != "true" {
+			return m.scaledown(obj)
+		}
 	}
 
 	newObj, err := v32.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
@@ -787,7 +888,12 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		return err
 	}
 
-	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster) {
+	nodePool, err := m.getNodePool(node.Spec.NodePoolName)
+	if err != nil {
+		return err
+	}
+
+	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster, nodePool) {
 		return nil
 	}
 
@@ -807,8 +913,8 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		logrus.Debugf("node [%s] has no NodeDrainInput, creating one with 60s timeout",
 			nodeCopy.Spec.RequestedHostname)
 		nodeCopy.Spec.NodeDrainInput = &rketypes.NodeDrainInput{
-			Force:           false,
-			DeleteLocalData: false,
+			Force:           true,
+			DeleteLocalData: true,
 			GracePeriod:     60,
 			Timeout:         60,
 		}
@@ -846,34 +952,40 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 }
 
 func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
-	copy := obj.DeepCopy()
-	copy.Annotations[userNodeRemoveCleanupAnnotation] = "true"
-	if hasFinalizerWithPrefix(copy, "clusterscoped.controller.cattle.io/user-node-remove_") {
-		// user-node-remove controller functionality is now merged into this controller
-		logrus.Infof("node [%s] has a finalizer for user-node-remove controller and it will be removed",
-			copy.Spec.RequestedHostname)
-		copy = removeFinalizerWithPrefix(copy, "clusterscoped.controller.cattle.io/user-node-remove_")
+	newObj := obj.DeepCopy()
+	newObj.SetFinalizers(removeFinalizerWithPrefix(newObj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
+
+	annos := newObj.GetAnnotations()
+	if annos == nil {
+		annos = make(map[string]string)
+	} else {
+		annos = removeAnnotationWithPrefix(annos, userNodeRemoveAnnotationPrefix)
+		delete(annos, userNodeRemoveCleanupAnnotationOld)
 	}
-	return m.nodeClient.Update(copy)
+
+	annos[userNodeRemoveCleanupAnnotation] = "true"
+	newObj.SetAnnotations(annos)
+	return m.nodeClient.Update(newObj)
 }
 
-func hasFinalizerWithPrefix(node *v3.Node, prefix string) bool {
-	for _, finalizer := range node.Finalizers {
+func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
+	var nf []string
+	for _, finalizer := range finalizers {
 		if strings.HasPrefix(finalizer, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
-func removeFinalizerWithPrefix(node *v3.Node, prefix string) *v3.Node {
-	var newFinalizers []string
-	for _, finalizer := range node.Finalizers {
-		if strings.HasPrefix(finalizer, prefix) {
+			logrus.Debugf("a finalizer with prefix %s will be removed", prefix)
 			continue
 		}
-		newFinalizers = append(newFinalizers, finalizer)
+		nf = append(nf, finalizer)
 	}
-	node.SetFinalizers(newFinalizers)
-	return node
+	return nf
+}
+
+func removeAnnotationWithPrefix(annotations map[string]string, prefix string) map[string]string {
+	for k := range annotations {
+		if strings.HasPrefix(k, prefix) {
+			logrus.Debugf("annotation with prefix %s will be removed", prefix)
+			delete(annotations, k)
+		}
+	}
+	return annotations
 }

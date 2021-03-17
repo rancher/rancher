@@ -7,11 +7,13 @@ import (
 const (
 	ClusterType                                      = "cluster"
 	ClusterFieldAPIEndpoint                          = "apiEndpoint"
+	ClusterFieldAgentEnvVars                         = "agentEnvVars"
 	ClusterFieldAgentFeatures                        = "agentFeatures"
 	ClusterFieldAgentImage                           = "agentImage"
 	ClusterFieldAgentImageOverride                   = "agentImageOverride"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
+	ClusterFieldAppliedAgentEnvVars                  = "appliedAgentEnvVars"
 	ClusterFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                          = "appliedSpec"
@@ -73,11 +75,13 @@ const (
 type Cluster struct {
 	types.Resource
 	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
+	AgentEnvVars                         []EnvVar                       `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
 	AgentFeatures                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	AgentImageOverride                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedAgentEnvVars                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedEnableNetworkPolicy           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`

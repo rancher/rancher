@@ -26,7 +26,7 @@ func Objects() (result []runtime.Object, err error) {
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, &crd)
+		result = append(result, crd)
 	}
 	return
 }

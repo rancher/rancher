@@ -27,13 +27,13 @@ resource "aws_instance" "worker" {
     "kubernetes.io/cluster/clusterid" = "owned"
   }
   provisioner "file" {
-    source = "join_agent.sh"
-    destination = "/tmp/join_agent.sh"
+    source = "join_rke2_agent.sh"
+    destination = "/tmp/join_rke2_agent.sh"
   }
   provisioner "remote-exec" {
     inline = [
-      "chmod +x /tmp/join_agent.sh",
-      "sudo /tmp/join_agent.sh ${var.node_os} ${local.master_fixed_reg_addr} ${local.master_ip} \"${local.node_token}\" ${var.rke2_version} ${var.cluster_type} \"${var.worker_flags}\" ${var.username} ${var.password} ",
+      "chmod +x /tmp/join_rke2_agent.sh",
+      "sudo /tmp/join_rke2_agent.sh ${var.node_os} ${local.master_fixed_reg_addr} ${local.master_ip} \"${local.node_token}\" ${var.rke2_version} ${var.rke2_channel} ${var.cluster_type} \"${var.worker_flags}\" ${var.username} ${var.password} ",
     ]
   }
 }

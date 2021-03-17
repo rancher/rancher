@@ -5,6 +5,9 @@ import (
 	"net/http"
 
 	"github.com/rancher/apiserver/pkg/parse"
+	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/rke2configserver"
+	"github.com/rancher/rancher/pkg/wrangler"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -35,11 +38,16 @@ import (
 	"github.com/rancher/steve/pkg/auth"
 )
 
-func router(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
+func router(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, wranglerContext *wrangler.Context) (func(http.Handler) http.Handler, error) {
 	var (
 		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(scaledContext.Dialer.(*rancherdialer.Factory).TunnelAuthorizer, scaledContext)
+		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
+		rke2Server           = rke2configserver.New(wranglerContext.Core.ServiceAccount().Cache(),
+			wranglerContext.Core.ServiceAccount(),
+			wranglerContext.Core.Secret(),
+			wranglerContext.Mgmt.ClusterRegistrationToken().Cache())
 	)
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
@@ -57,22 +65,30 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		return nil, err
 	}
 
+	metaProxy, err := httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext)
+	if err != nil {
+		return nil, err
+	}
+
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()
 
 	unauthed.Path("/").MatcherFunc(parse.MatchNotBrowser).Handler(managementAPI)
+	unauthed.Handle("/v3/connect/agent", rke2Server)
 	unauthed.Handle("/v3/connect/config", connectConfigHandler)
 	unauthed.Handle("/v3/connect", connectHandler)
 	unauthed.Handle("/v3/connect/register", connectHandler)
-	unauthed.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusterregistrationtokens.ClusterImportHandler))
+	unauthed.Handle("/v3/import/{token}_{clusterId}.yaml", http.HandlerFunc(clusterImport.ClusterImportHandler))
 	unauthed.Handle("/v3/settings/cacerts", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/first-login", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-banners", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
-	unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
+	if features.Legacy.Enabled() {
+		unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
+	}
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver.NewProxy(ctx))
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
@@ -96,7 +112,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
-	authed.PathPrefix("/meta/proxy").Handler(httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext))
+	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/metrics").Handler(metrics.NewMetricsHandler(scaledContext, promhttp.Handler()))
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)

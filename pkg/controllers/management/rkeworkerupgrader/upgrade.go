@@ -286,8 +286,8 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	}
 
 	logrus.Debugf("cluster [%s] worker-upgrade: workerNodeInfo: nodes %v maxAllowed %v upgrading %v notReady %v "+
-		"toProcess %v toPrepare %v done %v", cluster.Name, status.filtered, maxAllowed, status.upgrading,
-		keys(status.notReady), keys(status.toProcess), keys(status.toPrepare), keys(status.upgraded))
+		"toProcess %v toPrepare %v done %v toUncordon %v", cluster.Name, status.filtered, maxAllowed, status.upgrading,
+		keys(status.notReady), keys(status.toProcess), keys(status.toPrepare), keys(status.upgraded), keys(status.toUncordon))
 
 	for _, node := range status.upgraded {
 		if v32.NodeConditionUpgraded.IsTrue(node) {
@@ -298,6 +298,13 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 			return err
 		}
 
+		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to uncordon", clusterName, node.Name)
+	}
+
+	for _, node := range status.toUncordon {
+		if err := uh.updateNodeActive(node); err != nil {
+			return err
+		}
 		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to uncordon", clusterName, node.Name)
 	}
 

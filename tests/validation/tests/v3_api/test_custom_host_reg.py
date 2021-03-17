@@ -54,7 +54,7 @@ def test_deploy_rancher_server():
             'sudo docker run -d --name="rancher-server" ' \
             '--restart=unless-stopped -p 80:80 -p 443:443  ' \
             'rancher/rancher'
-    RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION
+    RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION + " --trace"
     print(RANCHER_SERVER_CMD)
     aws_nodes = AmazonWebServices().create_multiple_nodes(
         1, random_test_name("testsa" + HOST_NAME))
@@ -115,6 +115,10 @@ def test_deploy_rancher_server():
     env_details += "env.ADMIN_TOKEN='" + token + "'\n"
     env_details += "env.USER_TOKEN='" + user_token + "'\n"
 
+    if UPDATE_KDM:
+        update_and_validate_kdm(KDM_URL, admin_token=token,
+                                rancher_api_url=RANCHER_SERVER_URL + "/v3")
+
     if AUTO_DEPLOY_CUSTOM_CLUSTER:
         aws_nodes = \
             AmazonWebServices().create_multiple_nodes(
@@ -141,6 +145,7 @@ def test_deploy_rancher_server():
             i += 1
         validate_cluster_state(client, cluster)
         env_details += "env.CLUSTER_NAME='" + cluster.name + "'\n"
+
     create_config_file(env_details)
 
 

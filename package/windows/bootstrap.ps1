@@ -74,6 +74,8 @@ try
         "$($hostPrefixPath)var\lib"
         "$($hostPrefixPath)var\lib\cni"
         "$($hostPrefixPath)var\lib\rancher"
+        "$($hostPrefixPath)var\lib\rancher\rke"
+        "$($hostPrefixPath)var\lib\rancher\rke\log"
         "$($hostPrefixPath)var\lib\kubelet"
         "$($hostPrefixPath)var\lib\kubelet\volumeplugins"
         "$($hostPrefixPath)run"
@@ -283,6 +285,11 @@ catch
             "$($CATTLE_PREFIX_PATH)etc\kubernetes\bin\kubelet.exe"
             "$($CATTLE_PREFIX_PATH)etc\nginx\nginx.exe"
             "$($CATTLE_PREFIX_PATH)opt\bin\flanneld.exe"
+            "$($CATTLE_PREFIX_PATH)etc\rancher\wins\wins-upgrade.exe"
+            "$($CATTLE_PREFIX_PATH)etc\windows-exporter\windows-exporter.exe"
+        )
+        proxyPorts = @(
+            9796
         )
     }
 } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "$($CATTLE_PREFIX_PATH)etc\rancher\wins\config"

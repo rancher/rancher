@@ -29,12 +29,6 @@ var (
 		true,
 		true,
 		true)
-	SteveProxy = newFeature(
-		"proxy",
-		"Use new experimental proxy for Kubernetes API requests.",
-		false,
-		true,
-		false)
 	MCM = newFeature(
 		"multi-cluster-management",
 		"Multi-cluster provisioning and management of Kubernetes clusters.",
@@ -50,6 +44,24 @@ var (
 	Auth = newFeature(
 		"auth",
 		"Enable authentication",
+		true,
+		false,
+		false)
+	EmbeddedClusterAPI = newFeature(
+		"embedded-cluster-api",
+		"Enable an embedded instance of cluster-api core controller",
+		true,
+		true,
+		true)
+	RKE2 = newFeature(
+		"rke2",
+		"Enable provisioning of RKE2",
+		true,
+		true,
+		true)
+	Legacy = newFeature(
+		"legacy",
+		"Enable legacy features",
 		true,
 		false,
 		false)

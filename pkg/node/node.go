@@ -179,7 +179,7 @@ func IsMachineReady(machine *v3.Node) bool {
 	return false
 }
 
-func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster) bool {
+func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster, nodePool *v3.NodePool) bool {
 	if node.Status.NodeConfig == nil {
 		return false
 	}
@@ -190,6 +190,10 @@ func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster) bool {
 
 	// vsphere nodes with cloud providers need to be drained to unmount vmdk files as vsphere deletes them automatically
 	if nil != cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider {
+		return true
+	}
+
+	if nodePool.Spec.DrainBeforeDelete {
 		return true
 	}
 

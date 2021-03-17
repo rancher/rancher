@@ -60,6 +60,11 @@ func getOwnerWithKind(apiContext *types.APIContext, namespace, ownerKind, name s
 
 	kind, name := getOwner(data)
 
+	if !workload.WorkloadKinds[kind] {
+		kind = ""
+		name = ""
+	}
+
 	ownerCache.Add(key, value{
 		Kind: kind,
 		Name: name,

@@ -21,13 +21,13 @@ resource "aws_instance" "master" {
     "kubernetes.io/cluster/clusterid" = "owned"
   }
   provisioner "file" {
-    source      = "install_master.sh"
-    destination = "/tmp/install_master.sh"
+    source      = "install_rke2_master.sh"
+    destination = "/tmp/install_rke2_master.sh"
   }
   provisioner "remote-exec" {
     inline = [
-      "chmod +x /tmp/install_master.sh",
-      "sudo /tmp/install_master.sh ${var.node_os} ${aws_route53_record.aws_route53.fqdn} ${var.rke2_version} ${var.cluster_type} \"${var.server_flags}\" ${var.username} ${var.password}",
+      "chmod +x /tmp/install_rke2_master.sh",
+      "sudo /tmp/install_rke2_master.sh ${var.node_os} ${aws_route53_record.aws_route53.fqdn} ${var.rke2_version} ${var.rke2_channel} ${var.cluster_type} \"${var.server_flags}\" ${var.username} ${var.password}",
     ]
   }
   provisioner "local-exec" {
@@ -72,13 +72,13 @@ resource "aws_instance" "master2" {
   }
   depends_on       = ["aws_instance.master"]
   provisioner "file" {
-    source      = "join_master.sh"
-    destination = "/tmp/join_master.sh"
+    source      = "join_rke2_master.sh"
+    destination = "/tmp/join_rke2_master.sh"
   }
   provisioner "remote-exec" {
     inline = [
-      "chmod +x /tmp/join_master.sh",
-      "sudo /tmp/join_master.sh ${var.node_os} ${aws_route53_record.aws_route53.fqdn} ${aws_instance.master.public_ip} ${local.node_token} ${var.rke2_version} ${var.cluster_type} \"${var.server_flags}\" ${var.username} ${var.password}",
+      "chmod +x /tmp/join_rke2_master.sh",
+      "sudo /tmp/join_rke2_master.sh ${var.node_os} ${aws_route53_record.aws_route53.fqdn} ${aws_instance.master.public_ip} ${local.node_token} ${var.rke2_version} ${var.rke2_channel} ${var.cluster_type} \"${var.server_flags}\" ${var.username} ${var.password} ",
     ]
   }
 }

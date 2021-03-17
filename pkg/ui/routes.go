@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/apiserver/pkg/parse"
+	"github.com/rancher/rancher/pkg/cacerts"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/slice"
@@ -17,6 +18,7 @@ func New(prefs v3.PreferenceCache) http.Handler {
 	router.UseEncodedPath()
 
 	router.Handle("/", PreferredIndex(prefs))
+	router.Handle("/cacerts", http.HandlerFunc(cacerts.Handler))
 	router.Handle("/asset-manifest.json", ember.ServeAsset())
 	router.Handle("/crossdomain.xml", ember.ServeAsset())
 	router.Handle("/dashboard", http.RedirectHandler("/dashboard/", http.StatusFound))
@@ -27,6 +29,8 @@ func New(prefs v3.PreferenceCache) http.Handler {
 	router.Handle("/VERSION.txt", ember.ServeAsset())
 	router.Handle("/favicon.png", vue.ServeFaviconDashboard())
 	router.Handle("/favicon.ico", vue.ServeFaviconDashboard())
+	router.Path("/verify-auth-azure").Queries("state", "{state}").HandlerFunc(redirectAuth)
+	router.Path("/verify-auth").Queries("state", "{state}").HandlerFunc(redirectAuth)
 	router.PathPrefix("/api-ui").Handler(ember.ServeAsset())
 	router.PathPrefix("/assets/rancher-ui-driver-linode").Handler(emberAlwaysOffline.ServeAsset())
 	router.PathPrefix("/assets").Handler(ember.ServeAsset())

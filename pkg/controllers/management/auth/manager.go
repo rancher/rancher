@@ -25,6 +25,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const (
+	clusterContext = "cluster"
+	projectContext = "project"
+)
+
 var commonClusterAndProjectMgmtPlaneResources = map[string]bool{
 	"catalogtemplates":        true,
 	"catalogtemplateversions": true,
@@ -144,7 +149,7 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "clusterrolebinding-",
 				Labels: map[string]string{
-					rtbNsAndName: membershipBindingOwner,
+					rtbNsAndName: MembershipBindingOwner,
 				},
 			},
 			Subjects: []v1.Subject{subject},
@@ -167,7 +172,7 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 	if crb.Labels == nil {
 		crb.Labels = map[string]string{}
 	}
-	crb.Labels[rtbNsAndName] = membershipBindingOwner
+	crb.Labels[rtbNsAndName] = MembershipBindingOwner
 	logrus.Infof("[%v] Updating clusterRoleBinding %v for cluster membership in cluster %v for subject %v", m.controller, crb.Name, cluster.Name, subject.Name)
 	_, err = m.mgmt.RBAC.ClusterRoleBindings("").Update(crb)
 	return err
@@ -217,7 +222,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "rolebinding-",
 				Labels: map[string]string{
-					rtbNsAndName: membershipBindingOwner,
+					rtbNsAndName: MembershipBindingOwner,
 				},
 			},
 			Subjects: []v1.Subject{subject},
@@ -240,7 +245,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 	if rb.Labels == nil {
 		rb.Labels = map[string]string{}
 	}
-	rb.Labels[rtbNsAndName] = membershipBindingOwner
+	rb.Labels[rtbNsAndName] = MembershipBindingOwner
 	logrus.Infof("[%v] Updating roleBinding %v for project membership in project %v for subject %v", m.controller, rb.Name, project.Name, subject.Name)
 	_, err = m.mgmt.RBAC.RoleBindings(namespace).Update(rb)
 	return err
@@ -365,9 +370,9 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 		}
 		var otherOwners bool
 		for k, v := range objMeta.GetLabels() {
-			if k == rtbNsAndName && v == membershipBindingOwner {
+			if k == rtbNsAndName && v == MembershipBindingOwner {
 				delete(objMeta.GetLabels(), k)
-			} else if v == membershipBindingOwner {
+			} else if v == MembershipBindingOwner {
 				// Another rtb is also linked to this roleBinding so don't delete
 				otherOwners = true
 			}
@@ -500,7 +505,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 						ObjectMeta: metav1.ObjectMeta{
 							Name: bindingName,
 							Labels: map[string]string{
-								bindingKey: crtbInProjectBindingOwner,
+								bindingKey: CrtbInProjectBindingOwner,
 							},
 						},
 						Subjects: []v1.Subject{subject},
@@ -520,7 +525,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	}
 
 	currentRBs := map[string]*v1.RoleBinding{}
-	set := labels.Set(map[string]string{bindingKey: crtbInProjectBindingOwner})
+	set := labels.Set(map[string]string{bindingKey: CrtbInProjectBindingOwner})
 	current, err := m.rbLister.List(projectNamespace, set.AsSelector())
 	if err != nil {
 		return err
@@ -561,7 +566,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 						ObjectMeta: metav1.ObjectMeta{
 							Name: bindingName,
 							Labels: map[string]string{
-								bindingKey: prtbInClusterBindingOwner,
+								bindingKey: PrtbInClusterBindingOwner,
 							},
 						},
 						Subjects: []v1.Subject{subject},
@@ -581,7 +586,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	}
 
 	currentRBs := map[string]*v1.RoleBinding{}
-	set := labels.Set(map[string]string{bindingKey: prtbInClusterBindingOwner})
+	set := labels.Set(map[string]string{bindingKey: PrtbInClusterBindingOwner})
 	current, err := m.rbLister.List(clusterNamespace, set.AsSelector())
 	if err != nil {
 		return err
@@ -770,18 +775,24 @@ func buildRule(resource string, verbs map[string]bool) v1.PolicyRule {
 	}
 }
 
-func (m *manager) checkReferencedRoles(roleTemplateName string) (bool, error) {
+func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext string) (bool, error) {
 	roleTemplate, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
 		return false, err
 	}
 
+	// Only check if we are in the same context, if the roleTemplate is from a different context then
+	// it can't possibly be a owner in the callers context.
+	if roleTemplate.Context != roleTemplateContext {
+		return false, nil
+	}
+
 	// upon upgrades, crtb/prtbs are reconciled before roletemplates.
 	// So these roles won't have the "own" verb at the time of this check added 2.4.6 onwards
-	if roleTemplate.Builtin && roleTemplate.Context == "project" && roleTemplateName == "project-owner" {
+	if roleTemplate.Builtin && roleTemplate.Context == projectContext && roleTemplateName == "project-owner" {
 		return true, nil
 	}
-	if roleTemplate.Builtin && roleTemplate.Context == "cluster" && roleTemplateName == "cluster-owner" {
+	if roleTemplate.Builtin && roleTemplate.Context == clusterContext && roleTemplateName == "cluster-owner" {
 		return true, nil
 	}
 
@@ -796,7 +807,7 @@ func (m *manager) checkReferencedRoles(roleTemplateName string) (bool, error) {
 	if len(roleTemplate.RoleTemplateNames) > 0 {
 		// get referenced roletemplate
 		for _, rtName := range roleTemplate.RoleTemplateNames {
-			isOwnerRole, err = m.checkReferencedRoles(rtName)
+			isOwnerRole, err = m.checkReferencedRoles(rtName, roleTemplateContext)
 			if err != nil {
 				return false, err
 			}

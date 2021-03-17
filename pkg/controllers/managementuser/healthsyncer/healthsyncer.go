@@ -2,7 +2,6 @@ package healthsyncer
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sort"
 	"time"
@@ -12,11 +11,9 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +70,7 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	// As of k8s v1.14, kubeapi returns a successful ComponentStatuses response even if etcd is not available.
 	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 	if _, err := h.k8s.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
-		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
+		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server during namespace check"))
 	}
 
 	cses, err := h.componentStatuses.List(metav1.ListOptions{})
@@ -102,13 +99,9 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return nil
 	}
 
-	wasReady := v32.ClusterConditionReady.IsTrue(cluster)
 	newObj, err := v32.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
 		for i := 0; ; i++ {
 			err := h.getComponentStatus(cluster)
-			if err == nil && !wasReady {
-				err = h.checkClusterAgent()
-			}
 			if err == nil || i > 1 {
 				return cluster, errors.Wrap(err, "cluster health check failed")
 			}
@@ -134,21 +127,6 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	// Purposefully not return error.  This is so when the cluster goes unavailable we don't just keep failing
 	// which will essentially keep the controller alive forever, instead of shutting down.
 	return nil
-}
-
-func (h *HealthSyncer) checkClusterAgent() error {
-	if c, err := h.clusterLister.Get("", h.clusterName); err == nil && c.Spec.Internal {
-		return nil
-	}
-
-	deployment, err := h.k8s.AppsV1().Deployments(namespace.System).Get(h.ctx, "cattle-cluster-agent", metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if condition.Cond(appsv1.DeploymentAvailable).IsTrue(deployment) {
-		return nil
-	}
-	return fmt.Errorf("cluster agent is not ready")
 }
 
 func (h *HealthSyncer) getCluster() (*v3.Cluster, error) {

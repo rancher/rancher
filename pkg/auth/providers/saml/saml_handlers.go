@@ -73,7 +73,7 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (stri
 	if r.URL.Path == serviceProvider.AcsURL.Path {
 		return "", fmt.Errorf("don't wrap Middleware with RequireAccount")
 	}
-
+	log.Debugf("SAML [HandleSamlLogin]: Creating authentication request for %v", s.name)
 	binding := saml.HTTPRedirectBinding
 	bindingLocation := serviceProvider.GetSSOBindingLocation(binding)
 

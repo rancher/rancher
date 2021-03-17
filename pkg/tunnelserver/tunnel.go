@@ -37,6 +37,13 @@ const (
 
 var (
 	ErrClusterNotFound = errors.New("cluster not found")
+	importDrivers      = map[string]bool{
+		v32.ClusterDriverImported: true,
+		v32.ClusterDriverK3s:      true,
+		v32.ClusterDriverK3os:     true,
+		v32.ClusterDriverRancherD: true,
+		v32.ClusterDriverRke2:     true,
+	}
 )
 
 type cluster struct {
@@ -275,27 +282,29 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		err error
 	)
 
-	if cluster.Status.Driver != v32.ClusterDriverImported && cluster.Status.Driver != "" {
+	if !importDrivers[cluster.Status.Driver] && cluster.Status.Driver != "" {
 		return cluster, true, nil
 	}
 
 	changed := false
 
-	driver, err := provisioner.GetDriver(cluster, t.KontainerDriverLister)
-	if err != nil {
-		return cluster, true, err
-	}
-	if driver == "" {
-		logrus.Tracef("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
-		cluster.Status.Driver = v32.ClusterDriverImported
-		changed = true
+	if cluster.Status.Driver == "" {
+		driver, err := provisioner.GetDriver(cluster, t.KontainerDriverLister)
+		if err != nil {
+			return cluster, true, err
+		}
+		if driver == "" {
+			logrus.Tracef("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
+			cluster.Status.Driver = v32.ClusterDriverImported
+			changed = true
+		}
 	}
 
 	apiEndpoint := "https://" + inCluster.Address
 	token := inCluster.Token
 	caCert := inCluster.CACert
 
-	if cluster.Status.Driver == v32.ClusterDriverImported {
+	if importDrivers[cluster.Status.Driver] {
 		if cluster.Status.APIEndpoint != apiEndpoint ||
 			cluster.Status.ServiceAccountToken != token ||
 			cluster.Status.CACert != caCert {
