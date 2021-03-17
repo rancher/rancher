@@ -41,7 +41,7 @@ spec:
                 operator: In
                 values:
                 - {{ template "rancher.fullname" . }}
-            topologyKey: kubernetes.io/hostname
+            topologyKey: {{ .Values.topologyKey | default "kubernetes.io/hostname" }}
 {{- else }}
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
@@ -52,7 +52,7 @@ spec:
                   operator: In
                   values:
                   - {{ template "rancher.fullname" . }}
-              topologyKey: kubernetes.io/hostname
+              topologyKey: {{ .Values.topologyKey | default "kubernetes.io/hostname" }}
 {{- end }}
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

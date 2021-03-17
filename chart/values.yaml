@@ -4,6 +4,7 @@
 additionalTrustedCAs: false
 
 antiAffinity: preferred
+topologyKey: kubernetes.io/hostname
 
 # Audit Logs https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing/
 # The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
