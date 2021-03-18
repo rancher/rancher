@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/generated/controllers/core"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -70,8 +71,8 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		Storage:       opts.Storage,
 		Secrets:       opts.Secrets,
 		CAName:        "tls-rancher-internal-ca",
-		CANamespace:   "cattle-system",
-		CertNamespace: "cattle-system",
+		CANamespace:   namespace.System,
+		CertNamespace: namespace.System,
 		CertName:      "tls-rancher-internal",
 	}); err != nil {
 		return err
