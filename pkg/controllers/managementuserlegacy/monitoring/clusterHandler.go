@@ -359,18 +359,6 @@ func (ch *clusterHandler) deployApp(
 	// e.g. "true", "false", "123", "2379"
 	var knownUnforcedStringKeys []string
 
-	detectNotForcedStringKeys := func(answers map[string]string) []string {
-		var notForcedStringKeys []string
-		for k := range answers {
-			// all boolean keys must NOT be forced to be a string
-			if k == "true" || k == "false" {
-				notForcedStringKeys = append(notForcedStringKeys, k)
-			}
-			// if any default values are numbers, add a check here to ensure those number values are NOT forced as a string
-		}
-		return notForcedStringKeys
-	}
-
 	knownUnforcedStringKeys = append(knownUnforcedStringKeys, detectNotForcedStringKeys(optionalAppAnswers)...)
 	knownUnforcedStringKeys = append(knownUnforcedStringKeys, detectNotForcedStringKeys(mustAppAnswers)...)
 
