@@ -280,8 +280,6 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		TokenClient:                   managementContext.Management.Tokens(""),
 	}
 
-	schema.ActionHandler = handler.ClusterActionHandler
-
 	clusterValidator := ccluster.Validator{
 		ClusterClient:                 managementContext.Management.Clusters(""),
 		ClusterLister:                 managementContext.Management.Clusters("").Controller().Lister(),
@@ -291,7 +289,6 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		GrbLister:                     managementContext.Management.GlobalRoleBindings("").Controller().Lister(),
 		GrLister:                      managementContext.Management.GlobalRoles("").Controller().Lister(),
 	}
-	schema.Validator = clusterValidator.Validator
 
 	if features.Legacy.Enabled() {
 		handler.ClusterScanClient = managementContext.Management.ClusterScans("")
@@ -307,6 +304,8 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		clusterValidator.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace).Controller().Lister()
 	}
 
+	schema.ActionHandler = handler.ClusterActionHandler
+	schema.Validator = clusterValidator.Validator
 }
 
 func Templates(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext) {
