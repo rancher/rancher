@@ -26,6 +26,23 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// APIServiceList is a list of APIService resources
+type APIServiceList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []APIService `json:"items"`
+}
+
+func NewAPIService(namespace, name string, obj APIService) *APIService {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("APIService").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ActiveDirectoryProviderList is a list of ActiveDirectoryProvider resources
 type ActiveDirectoryProviderList struct {
 	metav1.TypeMeta `json:",inline"`

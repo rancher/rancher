@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	gmux "github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/github"
 	"github.com/rancher/rancher/pkg/api/steve/health"
 	"github.com/rancher/rancher/pkg/api/steve/projects"
@@ -30,9 +31,16 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
 	mux.Handle("/v1/github{path:.*}", githubHandler)
+	mux.Handle("/v3/connect", Tunnel(config))
 	health.Register(mux)
+
 	return func(next http.Handler) http.Handler {
 		mux.NotFoundHandler = clusterAPI(next)
 		return mux
 	}, nil
+}
+
+func Tunnel(config *wrangler.Context) http.Handler {
+	config.TunnelAuthorizer.Add(aggregation.New(config))
+	return config.TunnelServer
 }

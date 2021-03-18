@@ -12,16 +12,15 @@ import (
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/remotedialer"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 )
 
-func NewPeerManager(ctx context.Context, context *config.ScaledContext, dialer *remotedialer.Server) (peermanager.PeerManager, error) {
-	return startPeerManager(ctx, context, dialer)
+func NewPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, dialer *remotedialer.Server) (peermanager.PeerManager, error) {
+	return startPeerManager(ctx, endpoints, dialer)
 }
 
 type peerManager struct {
@@ -35,7 +34,7 @@ type peerManager struct {
 	listeners map[chan<- peermanager.Peers]bool
 }
 
-func startPeerManager(ctx context.Context, context *config.ScaledContext, server *remotedialer.Server) (peermanager.PeerManager, error) {
+func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, server *remotedialer.Server) (peermanager.PeerManager, error) {
 	tokenBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if os.IsNotExist(err) || settings.Namespace.Get() == "" || settings.PeerServices.Get() == "" {
 		logrus.Infof("Running in single server mode, will not peer connections")
@@ -62,13 +61,17 @@ func startPeerManager(ctx context.Context, context *config.ScaledContext, server
 		listeners: map[chan<- peermanager.Peers]bool{},
 	}
 
-	context.Core.Endpoints(settings.Namespace.Get()).AddHandler(ctx, "peer-manager-controller", pm.syncService)
+	endpoints.OnChange(ctx, "peer-manager-controller", pm.syncService)
 	return pm, nil
 }
 
-func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (runtime.Object, error) {
+func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (*v1.Endpoints, error) {
 	if endpoint == nil {
 		return nil, nil
+	}
+
+	if endpoint.Namespace != settings.Namespace.Get() {
+		return endpoint, nil
 	}
 
 	parts := strings.SplitN(key, "/", 2)

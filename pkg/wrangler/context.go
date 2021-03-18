@@ -23,10 +23,15 @@ import (
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io"
 	projectv3 "github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/peermanager"
+	"github.com/rancher/rancher/pkg/tunnelserver"
+	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/apply"
+	"github.com/rancher/wrangler/pkg/generated/controllers/apps"
+	appsv1 "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/batch"
 	batchv1 "github.com/rancher/wrangler/pkg/generated/controllers/batch/v1"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -73,11 +78,15 @@ type Context struct {
 
 	Apply               apply.Apply
 	Mgmt                managementv3.Interface
+	Apps                appsv1.Interface
 	Batch               batchv1.Interface
 	Project             projectv3.Interface
 	Catalog             catalogcontrollers.Interface
 	ControllerFactory   controller.SharedControllerFactory
 	MultiClusterManager MultiClusterManager
+	TunnelServer        *remotedialer.Server
+	TunnelAuthorizer    *tunnelserver.Authorizers
+	PeerManager         peermanager.PeerManager
 
 	ASL             accesscontrol.AccessSetLookup
 	ClientConfig    clientcmd.ClientConfig
@@ -163,6 +172,11 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 		return nil, err
 	}
 
+	apps, err := apps.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	project, err := project.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
@@ -208,10 +222,26 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 		return nil, err
 	}
 
+	tunnelAuth := &tunnelserver.Authorizers{}
+	tunnelServer := remotedialer.New(tunnelAuth.Authorize, remotedialer.DefaultErrorWriter)
+	peerManager, err := tunnelserver.NewPeerManager(ctx, steveControllers.Core.Endpoints(), tunnelServer)
+	if err != nil {
+		return nil, err
+	}
+
+	leadership := leader.NewManager("", lockID, steveControllers.K8s)
+	leadership.OnLeader(func(ctx context.Context) error {
+		if peerManager != nil {
+			peerManager.Leader()
+		}
+		return nil
+	})
+
 	return &Context{
 		Controllers:           steveControllers,
 		Apply:                 apply,
 		Mgmt:                  mgmt.Management().V3(),
+		Apps:                  apps.Apps().V1(),
 		Project:               project.Project().V3(),
 		Catalog:               helm.Catalog().V1(),
 		Batch:                 batch.Batch().V1(),
@@ -221,11 +251,13 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 		MultiClusterManager:   noopMCM{},
 		CachedDiscovery:       cache,
 		RESTMapper:            restMapper,
-		leadership:            leader.NewManager("", lockID, steveControllers.K8s),
+		leadership:            leadership,
 		RESTClientGetter:      restClientGetter,
 		CatalogContentManager: content,
 		HelmOperations:        helmop,
 		SystemChartsManager:   systemCharts,
+		TunnelAuthorizer:      tunnelAuth,
+		TunnelServer:          tunnelServer,
 	}, nil
 }
 

@@ -23,6 +23,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
+	"github.com/rancher/rancher/pkg/kontainerdriver"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
@@ -746,33 +747,6 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, d
 	return &spec, v, nil
 }
 
-func GetDriver(cluster *v3.Cluster, driverLister v3.KontainerDriverLister) (string, error) {
-	var driver *v3.KontainerDriver
-	var err error
-
-	if cluster.Spec.GenericEngineConfig != nil {
-		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
-		driver, err = driverLister.Get("", kontainerDriverName)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	if cluster.Spec.EKSConfig != nil {
-		return apimgmtv3.ClusterDriverEKS, nil
-	}
-
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		return apimgmtv3.ClusterDriverRKE, nil
-	}
-
-	if driver == nil {
-		return "", nil
-	}
-
-	return driver.Status.DisplayName, nil
-}
-
 func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 	oldDriver := cluster.Status.Driver
 
@@ -780,7 +754,7 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 		return apimgmtv3.ClusterDriverImported, nil
 	}
 
-	newDriver, err := GetDriver(cluster, p.KontainerDriverLister)
+	newDriver, err := kontainerdriver.GetDriver(cluster, p.KontainerDriverLister)
 	if err != nil {
 		return "", err
 	}

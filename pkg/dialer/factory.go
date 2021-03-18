@@ -12,9 +12,9 @@ import (
 	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/services"
@@ -28,23 +28,18 @@ const (
 	WaitForAgentError = "waiting for cluster [%s] agent to connect"
 )
 
-func NewFactory(apiContext *config.ScaledContext) (*Factory, error) {
-	authorizer := tunnelserver.NewAuthorizer(apiContext)
-	tunneler := tunnelserver.NewTunnelServer(authorizer)
-
+func NewFactory(apiContext *config.ScaledContext, wrangler *wrangler.Context) (*Factory, error) {
 	return &Factory{
-		clusterLister:    apiContext.Management.Clusters("").Controller().Lister(),
-		nodeLister:       apiContext.Management.Nodes("").Controller().Lister(),
-		TunnelServer:     tunneler,
-		TunnelAuthorizer: authorizer,
+		clusterLister: apiContext.Management.Clusters("").Controller().Lister(),
+		nodeLister:    apiContext.Management.Nodes("").Controller().Lister(),
+		TunnelServer:  wrangler.TunnelServer,
 	}, nil
 }
 
 type Factory struct {
-	nodeLister       v3.NodeLister
-	clusterLister    v3.ClusterLister
-	TunnelServer     *remotedialer.Server
-	TunnelAuthorizer *tunnelserver.Authorizer
+	nodeLister    v3.NodeLister
+	clusterLister v3.ClusterLister
+	TunnelServer  *remotedialer.Server
 }
 
 func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {

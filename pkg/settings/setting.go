@@ -19,7 +19,6 @@ var (
 	provider       Provider
 	InjectDefaults string
 
-	AgentInstallScript                = NewSetting("agent-install-script", "./install.sh")
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
@@ -42,6 +41,8 @@ var (
 	HelmMaxHistory                    = NewSetting("helm-max-history", "10")
 	IngressIPDomain                   = NewSetting("ingress-ip-domain", "xip.io")
 	InstallUUID                       = NewSetting("install-uuid", "")
+	InternalServerURL                 = NewSetting("internal-server-url", "")
+	InternalCACerts                   = NewSetting("internal-cacerts", "")
 	JailerTimeout                     = NewSetting("jailer-timeout", "60")
 	KubeconfigGenerateToken           = NewSetting("kubeconfig-generate-token", "true")
 	KubeconfigTokenTTLMinutes         = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
@@ -59,6 +60,8 @@ var (
 	ServerImage                       = NewSetting("server-image", "rancher/rancher")
 	ServerURL                         = NewSetting("server-url", "")
 	ServerVersion                     = NewSetting("server-version", "dev")
+	SystemAgentInstallScript          = NewSetting("system-agent-install-script", "")
+	SystemAgentInstallerImage         = NewSetting("system-agent-installer-image", "docker.io/rancher/system-agent-installer-")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
 	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,fleet-system")
 	TelemetryOpt                      = NewSetting("telemetry-opt", "")

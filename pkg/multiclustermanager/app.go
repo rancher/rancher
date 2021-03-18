@@ -25,7 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemtokens"
 	"github.com/rancher/rancher/pkg/telemetry"
-	"github.com/rancher/rancher/pkg/tunnelserver"
+	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
@@ -55,12 +55,13 @@ type mcm struct {
 	startLock   sync.Mutex
 }
 
-func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*config.ScaledContext, *clustermanager.Manager, error) {
+func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*config.ScaledContext,
+	*clustermanager.Manager, *mcmauthorizer.Authorizer, error) {
 	scaledContext, err := config.NewScaledContext(*wranglerContext.RESTConfig, &config.ScaleContextOptions{
 		ControllerFactory: wranglerContext.ControllerFactory,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	if features.Legacy.Enabled() {
@@ -68,23 +69,18 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	}
 
 	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	dialerFactory, err := dialer.NewFactory(scaledContext)
+	dialerFactory, err := dialer.NewFactory(scaledContext, wranglerContext)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-
 	scaledContext.Dialer = dialerFactory
-	scaledContext.PeerManager, err = tunnelserver.NewPeerManager(ctx, scaledContext, dialerFactory.TunnelServer)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	userManager, err := common.NewUserManager(scaledContext)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	scaledContext.UserManager = userManager
@@ -98,16 +94,20 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	scaledContext.AccessControl = manager
 	scaledContext.ClientGetter = manager
 
-	return scaledContext, manager, nil
+	authorizer := mcmauthorizer.NewAuthorizer(scaledContext)
+	wranglerContext.TunnelAuthorizer.Add(authorizer.AuthorizeTunnel)
+	scaledContext.PeerManager = wranglerContext.PeerManager
+
+	return scaledContext, manager, authorizer, nil
 }
 
 func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*mcm, error) {
-	scaledContext, clusterManager, err := buildScaledContext(ctx, wranglerContext, cfg)
+	scaledContext, clusterManager, tunnelAuthorizer, err := buildScaledContext(ctx, wranglerContext, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	router, err := router(ctx, cfg.LocalClusterEnabled, scaledContext, clusterManager, wranglerContext)
+	router, err := router(ctx, cfg.LocalClusterEnabled, tunnelAuthorizer, scaledContext, clusterManager, wranglerContext)
 	if err != nil {
 		return nil, err
 	}
@@ -186,10 +186,6 @@ func (m *mcm) Start(ctx context.Context) error {
 			var (
 				err error
 			)
-
-			if m.ScaledContext.PeerManager != nil {
-				m.ScaledContext.PeerManager.Leader()
-			}
 
 			management, err = m.ScaledContext.NewManagementContext()
 			if err != nil {

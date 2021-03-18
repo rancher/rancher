@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 
 	rketypes "github.com/rancher/rke/types"
 
@@ -22,7 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
-	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
@@ -37,7 +37,7 @@ const (
 )
 
 type RKENodeConfigServer struct {
-	auth                 *tunnelserver.Authorizer
+	auth                 *mcmauthorizer.Authorizer
 	lookup               *BundleLookup
 	systemAccountManager *systemaccount.Manager
 	serviceOptionsLister v3.RkeK8sServiceOptionLister
@@ -47,7 +47,7 @@ type RKENodeConfigServer struct {
 	nodes                v3.NodeInterface
 }
 
-func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
+func Handler(auth *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext) http.Handler {
 	return &RKENodeConfigServer{
 		auth:                 auth,
 		lookup:               NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
