@@ -29,7 +29,10 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		resp.Write([]byte(err.Error()))
 		return
 	}
-	url := urlBuilder.RelativeToRoot("")
+	url := settings.ServerURL.Get()
+	if url == "" {
+		url = urlBuilder.RelativeToRoot("")
+	}
 
 	authImage := ""
 	authImages := req.URL.Query()["authImage"]
