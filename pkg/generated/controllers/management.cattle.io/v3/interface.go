@@ -30,6 +30,7 @@ func init() {
 }
 
 type Interface interface {
+	APIService() APIServiceController
 	ActiveDirectoryProvider() ActiveDirectoryProviderController
 	AuthConfig() AuthConfigController
 	AuthProvider() AuthProviderController
@@ -116,6 +117,9 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
+func (c *version) APIService() APIServiceController {
+	return NewAPIServiceController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "APIService"}, "apiservices", false, c.controllerFactory)
+}
 func (c *version) ActiveDirectoryProvider() ActiveDirectoryProviderController {
 	return NewActiveDirectoryProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ActiveDirectoryProvider"}, "activedirectoryproviders", false, c.controllerFactory)
 }
