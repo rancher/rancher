@@ -21,8 +21,12 @@ func List() []crd.CRD {
 			c.SchemaObject = nil
 			return c
 		}),
+		newCRD(&v3.APIService{}, func(c crd.CRD) crd.CRD {
+			c.NonNamespace = true
+			c.Status = true
+			return c
+		}),
 		newCRD(&v3.ClusterRegistrationToken{}, func(c crd.CRD) crd.CRD {
-			c.Status = false
 			return c
 		}),
 		newCRD(&v3.Setting{}, func(c crd.CRD) crd.CRD {

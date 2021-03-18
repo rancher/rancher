@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
@@ -16,6 +17,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 		wrangler.Mgmt.Cluster(),
 		wrangler.K8s,
 		wrangler.MultiClusterManager)
+	apiservice.Register(ctx, wrangler)
 	if features.Fleet.Enabled() {
 		return fleetcharts.Register(ctx, wrangler)
 	}

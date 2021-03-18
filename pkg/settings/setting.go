@@ -42,6 +42,8 @@ var (
 	HelmMaxHistory                    = NewSetting("helm-max-history", "10")
 	IngressIPDomain                   = NewSetting("ingress-ip-domain", "xip.io")
 	InstallUUID                       = NewSetting("install-uuid", "")
+	InternalServerURL                 = NewSetting("internal-server-url", "")
+	InternalCACerts                   = NewSetting("internal-cacerts", "")
 	JailerTimeout                     = NewSetting("jailer-timeout", "60")
 	KubeconfigGenerateToken           = NewSetting("kubeconfig-generate-token", "true")
 	KubeconfigTokenTTLMinutes         = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours

@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
+	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
@@ -153,6 +154,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, opts.AuditLevel, opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
+	aggregation := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
@@ -162,6 +164,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			websocket.NewWebsocketHandler,
 			proxy.RewriteLocalCluster,
 			clusterProxy,
+			aggregation,
 			wranglerContext.MultiClusterManager.Middleware,
 			authServer.Management,
 			additionalAPI,
