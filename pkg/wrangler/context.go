@@ -30,6 +30,8 @@ import (
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/apply"
+	admissionreg "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io"
+	admissionregcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apps"
 	appsv1 "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/batch"
@@ -79,6 +81,7 @@ type Context struct {
 	Apply               apply.Apply
 	Mgmt                managementv3.Interface
 	Apps                appsv1.Interface
+	Admission           admissionregcontrollers.Interface
 	Batch               batchv1.Interface
 	Project             projectv3.Interface
 	Catalog             catalogcontrollers.Interface
@@ -177,6 +180,11 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 		return nil, err
 	}
 
+	adminReg, err := admissionreg.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	project, err := project.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
@@ -242,6 +250,7 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 		Apply:                 apply,
 		Mgmt:                  mgmt.Management().V3(),
 		Apps:                  apps.Apps().V1(),
+		Admission:             adminReg.Admissionregistration().V1(),
 		Project:               project.Project().V3(),
 		Catalog:               helm.Catalog().V1(),
 		Batch:                 batch.Batch().V1(),
