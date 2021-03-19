@@ -291,10 +291,10 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 }
 
 func (m *Lifecycle) enqueueNodePool(obj *v3.Node) {
-	logrus.Errorf("[node] enqueing node pool %s", obj.Spec.NodePoolName)
+	logrus.Debugf("[node-controller] enqueing node pool %s", obj.Spec.NodePoolName)
 	pool, err := m.getNodePool(obj.Spec.NodePoolName)
 	if err != nil {
-		logrus.Errorf("[node] error finding pool %s", obj.Spec.NodePoolName)
+		logrus.Errorf("[node-controller] enqueue nodepool error %s: %s", obj.Spec.NodePoolName, err)
 		return
 	}
 	m.nodePoolController.Enqueue(pool.Namespace, pool.Name)
@@ -534,6 +534,9 @@ func (m *Lifecycle) scaledown(obj *v3.Node) (runtime.Object, error) {
 	// time to scaledown, send to nodepool to delete the node
 	pool, err := m.getNodePool(obj.Spec.NodePoolName)
 	if err != nil {
+		if kerror.IsNotFound(err) {
+			return obj, nil
+		}
 		return obj, err
 	}
 
@@ -551,7 +554,7 @@ func (m *Lifecycle) scaledown(obj *v3.Node) (runtime.Object, error) {
 }
 
 func (m *Lifecycle) sync(key string, obj *v3.Node) (runtime.Object, error) {
-	if obj == nil {
+	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
@@ -889,7 +892,7 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 	}
 
 	nodePool, err := m.getNodePool(node.Spec.NodePoolName)
-	if err != nil {
+	if err != nil && !kerror.IsNotFound(err) {
 		return err
 	}
 
