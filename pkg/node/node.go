@@ -193,7 +193,7 @@ func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster, nodePool *v3.NodePool
 		return true
 	}
 
-	if nodePool.Spec.DrainBeforeDelete {
+	if nodePool != nil && nodePool.Spec.DrainBeforeDelete {
 		return true
 	}
 
