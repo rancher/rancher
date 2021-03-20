@@ -17,7 +17,7 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 	if features.Legacy.Enabled() {
 		k3sbasedupgrade.Register(ctx, wranglerContext, management, manager)
 		eks.Register(ctx, wranglerContext, management)
+		clusterupstreamrefresher.Register(ctx, wranglerContext)
 	}
-	clusterupstreamrefresher.Register(ctx, wranglerContext)
 	return systemcharts.Register(ctx, wranglerContext)
 }
