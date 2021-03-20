@@ -235,3 +235,13 @@ func getMetadataConfig() string {
 	}
 	return string(ans)
 }
+
+// getSettingByID returns a setting that is stored with the given id. If none is found
+// an error is return
+func GetSettingByID(id string) (Setting, error) {
+	setting, ok := settings[id]
+	if !ok {
+		return Setting{}, fmt.Errorf("%s is not a valid setting", id)
+	}
+	return setting, nil
+}

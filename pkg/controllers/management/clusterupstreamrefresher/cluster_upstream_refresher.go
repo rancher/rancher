@@ -1,9 +1,12 @@
 package clusterupstreamrefresher
 
 import (
+	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -17,81 +20,126 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-//isKubernetesEngineIndexer
 const (
-	isKEIndexer = "clusters.management.cattle.io/is-ke"
+	noKEv2Provider           = "none"
+	lastRefreshTime          = "clusters.management.cattle.io/ke-last-refresh"
+	refreshCronSettingFormat = "%s-refresh-cron"
 )
 
-var (
-	// for other cloud drivers, please edit HERE
-	cloudDrivers             = []string{apimgmtv3.ClusterDriverEKS}
-	clusterUpstreamRefresher *clusterRefreshController
-)
+type clusterRefreshController struct {
+	secretsCache        wranglerv1.SecretCache
+	clusterClient       v3.ClusterClient
+	clusterCache        v3.ClusterCache
+	clusterEnqueueAfter func(name string, duration time.Duration)
+}
 
 // for other cloud drivers, please edit HERE
 type clusterConfig struct {
 	eksConfig *eksv1.EKSClusterConfigSpec
 }
 
-func init() {
-	// possible settings controller, which references refresh
-	// cron job, will run prior to .
-	// This ensure the CronJob will not be nil
-	clusterUpstreamRefresher = &clusterRefreshController{
-		refreshCronJob: cron.New(),
+func Register(ctx context.Context, wContext *wrangler.Context) {
+	c := clusterRefreshController{
+		secretsCache:        wContext.Core.Secret().Cache(),
+		clusterClient:       wContext.Mgmt.Cluster(),
+		clusterCache:        wContext.Mgmt.Cluster().Cache(),
+		clusterEnqueueAfter: wContext.Mgmt.Cluster().EnqueueAfter,
 	}
+
+	wContext.Mgmt.Cluster().OnChange(ctx, "eks-operator-controller", c.onClusterChange)
 }
 
-type clusterRefreshController struct {
-	refreshCronJob *cron.Cron
-	secretsCache   wranglerv1.SecretCache
-	clusterClient  v3.ClusterClient
-	clusterCache   v3.ClusterCache
-}
+func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+	if cluster == nil || cluster.DeletionTimestamp != nil {
+		return cluster, nil
+	}
 
-func StartClusterUpstreamCronJob(wContext *wrangler.Context) {
-	clusterUpstreamRefresher.secretsCache = wContext.Core.Secret().Cache()
-	clusterUpstreamRefresher.clusterClient = wContext.Mgmt.Cluster()
-	clusterUpstreamRefresher.clusterCache = wContext.Mgmt.Cluster().Cache()
+	provider, ready := getProviderAndReadyStatus(cluster)
+	if provider == noKEv2Provider {
+		// not a KEv2 cluster
+		return cluster, nil
+	}
 
-	clusterUpstreamRefresher.clusterCache.AddIndexer(isKEIndexer, func(obj *apimgmtv3.Cluster) ([]string, error) {
-		// for other cloud drivers, please edit HERE
-		switch {
-		case obj.Spec.EKSConfig != nil:
-			if obj.Status.EKSStatus.UpstreamSpec == nil {
-				logrus.Infof("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", obj.Name)
-				return []string{}, nil
-			}
-			return []string{apimgmtv3.ClusterDriverEKS}, nil
-		default:
-			return []string{}, nil
-		}
-	})
+	if !ready {
+		logrus.Infof("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
+		return cluster, nil
+	}
 
-	schedule, err := cron.ParseStandard(settings.ClusterUpstreamRefreshCron.Get())
+	var lastRefreshTime string
+	if cluster.Annotations != nil {
+		lastRefreshTime = cluster.Annotations[lastRefreshTime]
+	}
+
+	providerRefreshInterval, err := getProviderRefreshInterval(provider)
 	if err != nil {
-		logrus.Errorf("Error parsing upstream cluster refresh cron. Upstream state will not be refreshed: %v", err)
-		return
+		return cluster, err
 	}
-	clusterUpstreamRefresher.refreshCronJob.Schedule(schedule, cron.FuncJob(clusterUpstreamRefresher.refreshAllUpstreamStates))
-	clusterUpstreamRefresher.refreshCronJob.Start()
+
+	nextRefreshTime, err := getNextProviderRefreshTime(providerRefreshInterval, lastRefreshTime)
+	if err != nil {
+		return cluster, err
+	}
+
+	if !time.Now().After(nextRefreshTime) {
+		return cluster, err
+	}
+
+	cluster, err = c.refreshClusterUpstreamSpec(cluster, provider)
+	if err != nil {
+		return cluster, err
+	}
+
+	c.clusterEnqueueAfter(key, providerRefreshInterval)
+
+	return cluster, nil
 }
 
-func (c *clusterRefreshController) refreshAllUpstreamStates() {
-	logrus.Debugf("Refreshing clusters' upstream states")
-	for _, cloudDriver := range cloudDrivers {
-		clusters, err := c.clusterCache.GetByIndex(isKEIndexer, cloudDriver)
-		if err != nil {
-			logrus.Error("error trying to refresh clusters' upstream states")
-			return
+// getProviderAndReadyStatus returns the managed cluster provider of the given
+// custer and whether it is ready to be refresh and synced.
+func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
+	// for other cloud drivers, please edit HERE
+	switch {
+	case cluster.Spec.EKSConfig != nil:
+		if cluster.Status.EKSStatus.UpstreamSpec == nil {
+			logrus.Infof("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
+			return apimgmtv3.ClusterDriverEKS, false
 		}
-
-		for _, cluster := range clusters {
-			if _, err := c.refreshClusterUpstreamSpec(cluster, cloudDriver); err != nil {
-				logrus.Errorf("error refreshing cluster [%s] upstream state", cluster.Name)
-			}
-		}
+		return apimgmtv3.ClusterDriverEKS, true
+	default:
+		return noKEv2Provider, false
 	}
+}
+
+// getProviderRefreshInterval returns the duration that should pass between
+// refreshing a cluster created by the given cloud provider.
+func getProviderRefreshInterval(provider string) (time.Duration, error) {
+	providerCronSetting, err := settings.GetSettingByID(fmt.Sprintf(refreshCronSettingFormat, provider))
+	if err != nil {
+		return 0, err
+	}
+
+	schedule, err := cron.Parse(providerCronSetting.Get())
+	if err != nil {
+		return 0, err
+	}
+
+	next := schedule.Next(time.Now())
+	return schedule.Next(next).Sub(next), nil
+}
+
+// getNextProviderRefreshTIme returns the next time a KEv2 cluster is due to refresh given
+// its last refresh time and cloud provider.
+func getNextProviderRefreshTime(refreshInterval time.Duration, lastRefreshAnno string) (time.Time, error) {
+	if lastRefreshAnno == "" {
+		return time.Now(), nil
+	}
+
+	lastRefreshUnix, err := strconv.ParseInt(lastRefreshAnno, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("unable to parse last KEv2 refresh time [%s]: %v", lastRefreshAnno, err)
+	}
+
+	return time.Unix(lastRefreshUnix, 0).Add(refreshInterval), nil
 }
 
 func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cluster, cloudDriver string) (*mgmtv3.Cluster, error) {
@@ -202,6 +250,11 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	if err != nil {
 		return cluster, err
 	}
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+	cluster.Annotations[lastRefreshTime] = strconv.FormatInt(time.Now().Unix(), 10)
 
 	return c.clusterClient.Update(cluster)
 }
