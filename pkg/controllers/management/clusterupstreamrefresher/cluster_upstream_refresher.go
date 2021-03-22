@@ -22,7 +22,7 @@ import (
 
 const (
 	noKEv2Provider           = "none"
-	lastRefreshTime          = "clusters.management.cattle.io/ke-last-refresh"
+	clLastRefreshTime        = "clusters.management.cattle.io/ke-last-refresh"
 	refreshCronSettingFormat = "%s-refresh-cron"
 )
 
@@ -67,7 +67,7 @@ func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.C
 
 	var lastRefreshTime string
 	if cluster.Annotations != nil {
-		lastRefreshTime = cluster.Annotations[lastRefreshTime]
+		lastRefreshTime = cluster.Annotations[clLastRefreshTime]
 	}
 
 	providerRefreshInterval, err := getProviderRefreshInterval(provider)
@@ -95,7 +95,7 @@ func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.C
 }
 
 // getProviderAndReadyStatus returns the managed cluster provider of the given
-// custer and whether it is ready to be refresh and synced.
+// cluster and whether it is ready to be refresh and synced.
 func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 	// for other cloud drivers, please edit HERE
 	switch {
@@ -254,7 +254,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
-	cluster.Annotations[lastRefreshTime] = strconv.FormatInt(time.Now().Unix(), 10)
+	cluster.Annotations[clLastRefreshTime] = strconv.FormatInt(time.Now().Unix(), 10)
 
 	return c.clusterClient.Update(cluster)
 }
