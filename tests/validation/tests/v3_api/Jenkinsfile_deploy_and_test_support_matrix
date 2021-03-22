@@ -30,6 +30,7 @@ node {
   if ("${env.branch}" != "null" && "${env.branch}" != "") {
     branch = "${env.branch}"
   }
+  def WINDOWS_PYTEST_OPTIONS = "-k \"test_ingress or test_rbac or test_sa or test_secrets or test_service_discovery or test_workload\""
 
   wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
     withFolderProperties {
@@ -184,6 +185,15 @@ node {
                       string(name: 'RANCHER_VALIDATE_RESOURCES_PREFIX', value: "${RANCHER_VALIDATE_RESOURCES_PREFIX}"),
                       string(name: 'RANCHER_CREATE_RESOURCES_PREFIX', value: "${RANCHER_CREATE_RESOURCES_PREFIX}"),
                     ]
+                    if (cluster_arr[i].contains("windows")) {
+                      RANCHER_TEST_OS = "windows"
+                      params.add(string(name: 'RANCHER_TEST_OS', value: "${RANCHER_TEST_OS}"))
+                      params.add(string(name: 'RANCHER_TEST_IMAGE', value: "${RANCHER_TEST_IMAGE}"))
+                      params.add(string(name: 'RANCHER_TEST_IMAGE_OS_BASE', value: "${RANCHER_TEST_IMAGE_OS_BASE}"))
+                      params.add(string(name: 'RANCHER_TEST_IMAGE_NGINX', value: "${RANCHER_TEST_IMAGE_NGINX}"))
+                      params.add(string(name: 'PYTEST_OPTIONS', value: "${WINDOWS_PYTEST_OPTIONS}"))
+
+                    }
                     echo "Params are: ${params}"
                     jobs["test-${i}"] = { build job: 'rancher-v3_needs_cluster', parameters: params }
                   }

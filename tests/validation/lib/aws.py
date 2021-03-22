@@ -30,6 +30,10 @@ AWS_DEFAULT_AMI = "ami-0d5d9d301c853a04a"
 AWS_DEFAULT_USER = "ubuntu"
 AWS_AMI = os.environ.get("AWS_AMI", AWS_DEFAULT_AMI)
 AWS_USER = os.environ.get("AWS_USER", AWS_DEFAULT_USER)
+WINDOWS_AWS_AMI = os.environ.get(
+    "WINDOWS_AWS_AMI", "ami-0d6f7eaedf946c299" #Windows 2019 AMI
+    ) 
+WINDOWS_AWS_USER = "Administrator"
 AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "50")
 AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't3a.medium')
 
