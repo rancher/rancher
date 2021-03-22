@@ -2,6 +2,8 @@ package rbac
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base32"
 	"reflect"
 	"strings"
 
@@ -497,10 +499,11 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 
 func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
 	crbKey := rbRoleSubjectKey(roleName, subject)
+	name := strings.Join([]string{"clusterrolebinding", rbRoleSubjHash(crbKey)}, "-")
 	return crbKey,
 		metav1.ObjectMeta{
-			GenerateName: "clusterrolebinding-",
-			Labels:       map[string]string{rtbOwnerLabel: parentUID},
+			Name:   name,
+			Labels: map[string]string{rtbOwnerLabel: parentUID},
 		},
 		[]rbacv1.Subject{subject},
 		rbacv1.RoleRef{
@@ -593,4 +596,14 @@ func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{idx}, nil
+}
+
+// rbRoleSubjHash takes a rb/crb role/subject key and returns its hash
+// use base32 encoding since all characters in encoding scheme are valid in k8s resource names
+// probability of collision is: 1/32^10 == 1/(2^5)^10 == 1/2^50 which is sufficiently low
+func rbRoleSubjHash(key string) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(key))
+	digest := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))
+	return strings.ToLower(digest[:10])
 }

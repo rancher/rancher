@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"crypto/sha256"
+	"encoding/base32"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
@@ -143,9 +146,11 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbUID string, cluste
 
 	if len(objs) == 0 {
 		logrus.Infof("[%v] Creating clusterRoleBinding for membership in cluster %v for subject %v", m.controller, cluster.Name, subject.Name)
+		nameSuffix := rbRoleSubjHash(key)
+		name := strings.Join([]string{"clusterrolebinding", nameSuffix}, "-")
 		_, err := m.mgmt.RBAC.ClusterRoleBindings("").Create(&v1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "clusterrolebinding-",
+				Name: name,
 				Labels: map[string]string{
 					rtbUID: membershipBindingOwner,
 				},
@@ -216,9 +221,11 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbUID, namespace str
 
 	if len(objs) == 0 {
 		logrus.Infof("[%v] Creating roleBinding for membership in project %v for subject %v", m.controller, project.Name, subject.Name)
+		nameSuffix := rbRoleSubjHash(key)
+		name := strings.Join([]string{"rolebinding", nameSuffix}, "-")
 		_, err := m.mgmt.RBAC.RoleBindings(namespace).Create(&v1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "rolebinding-",
+				Name: name,
 				Labels: map[string]string{
 					rtbUID: membershipBindingOwner,
 				},
@@ -804,4 +811,14 @@ func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext str
 		}
 	}
 	return isOwnerRole, nil
+}
+
+// rbRoleSubjHash takes a rb/crb role/subject key and returns its hash
+// use base32 encoding since all characters in encoding scheme are valid in k8s resource names
+// probability of collision is: 1/32^10 == 1/(2^5)^10 == 1/2^50 which is sufficiently low
+func rbRoleSubjHash(key string) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(key))
+	digest := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))
+	return strings.ToLower(digest[:10])
 }

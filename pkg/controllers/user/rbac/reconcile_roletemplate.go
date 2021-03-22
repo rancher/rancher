@@ -86,9 +86,10 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 		crbs, _ := m.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
 		if len(crbs) == 0 {
 			logrus.Infof("Creating clusterRoleBinding for project access to global resource for subject %v role %v.", subject.Name, role)
+			name := strings.Join([]string{"clusterrolebinding", rbRoleSubjHash(crbKey)}, "-")
 			createdCRB, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "clusterrolebinding-",
+					Name: name,
 					Labels: map[string]string{
 						rtbUID: owner,
 					},
