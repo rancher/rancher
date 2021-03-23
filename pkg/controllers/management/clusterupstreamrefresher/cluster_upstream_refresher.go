@@ -15,15 +15,14 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
 	noKEv2Provider           = "none"
-	clLastRefreshTime        = "clusters.management.cattle.io/ke-last-refresh"
-	refreshCronSettingFormat = "%s-refresh-cron"
+	clusterLastRefreshTime   = "clusters.management.cattle.io/ke-last-refresh"
+	refreshCronSettingFormat = "%s-refresh"
 )
 
 type clusterRefreshController struct {
@@ -46,7 +45,7 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 		clusterEnqueueAfter: wContext.Mgmt.Cluster().EnqueueAfter,
 	}
 
-	wContext.Mgmt.Cluster().OnChange(ctx, "eks-operator-controller", c.onClusterChange)
+	wContext.Mgmt.Cluster().OnChange(ctx, "cluster-refresher-controller", c.onClusterChange)
 }
 
 func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
@@ -66,8 +65,9 @@ func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.C
 	}
 
 	var lastRefreshTime string
+
 	if cluster.Annotations != nil {
-		lastRefreshTime = cluster.Annotations[clLastRefreshTime]
+		lastRefreshTime = cluster.Annotations[clusterLastRefreshTime]
 	}
 
 	providerRefreshInterval, err := getProviderRefreshInterval(provider)
@@ -113,30 +113,26 @@ func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 // getProviderRefreshInterval returns the duration that should pass between
 // refreshing a cluster created by the given cloud provider.
 func getProviderRefreshInterval(provider string) (time.Duration, error) {
-	providerCronSetting, err := settings.GetSettingByID(fmt.Sprintf(refreshCronSettingFormat, provider))
+	providerRefreshSetting, err := settings.GetSettingByID(strings.ToLower(fmt.Sprintf(refreshCronSettingFormat, provider)))
 	if err != nil {
 		return 0, err
 	}
 
-	schedule, err := cron.Parse(providerCronSetting.Get())
-	if err != nil {
-		return 0, err
-	}
+	refreshInterval := providerRefreshSetting.GetInt()
 
-	next := schedule.Next(time.Now())
-	return schedule.Next(next).Sub(next), nil
+	return time.Duration(refreshInterval) * time.Second, nil
 }
 
 // getNextProviderRefreshTIme returns the next time a KEv2 cluster is due to refresh given
 // its last refresh time and cloud provider.
-func getNextProviderRefreshTime(refreshInterval time.Duration, lastRefreshAnno string) (time.Time, error) {
-	if lastRefreshAnno == "" {
+func getNextProviderRefreshTime(refreshInterval time.Duration, lastRefreshTime string) (time.Time, error) {
+	if lastRefreshTime == "" {
 		return time.Now(), nil
 	}
 
-	lastRefreshUnix, err := strconv.ParseInt(lastRefreshAnno, 10, 64)
+	lastRefreshUnix, err := strconv.ParseInt(lastRefreshTime, 10, 64)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("unable to parse last KEv2 refresh time [%s]: %v", lastRefreshAnno, err)
+		return time.Time{}, fmt.Errorf("unable to parse last KEv2 refresh time [%s]: %v", lastRefreshTime, err)
 	}
 
 	return time.Unix(lastRefreshUnix, 0).Add(refreshInterval), nil
@@ -254,7 +250,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
-	cluster.Annotations[clLastRefreshTime] = strconv.FormatInt(time.Now().Unix(), 10)
+	cluster.Annotations[clusterLastRefreshTime] = strconv.FormatInt(time.Now().Unix(), 10)
 
 	return c.clusterClient.Update(cluster)
 }

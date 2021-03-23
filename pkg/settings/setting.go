@@ -98,7 +98,7 @@ var (
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
-	ClusterUpstreamRefreshCron        = NewSetting("eks-refresh-cron", "*/5 * * * *")
+	EKSUpstreamRefresh                = NewSetting("eks-refresh", "300")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
 
 	FleetMinVersion           = NewSetting("fleet-min-version", "")
