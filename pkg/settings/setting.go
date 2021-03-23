@@ -98,6 +98,7 @@ var (
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
+	EKSUpstreamRefreshCron            = NewSetting("eks-refresh-cron", "*/5 * * * *")   // EKSUpstreamRefreshCron is deprecated and will be replaced by EKSUpstreamRefresh
 	EKSUpstreamRefresh                = NewSetting("eks-refresh", "300")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
 
@@ -237,14 +238,4 @@ func getMetadataConfig() string {
 		return ""
 	}
 	return string(ans)
-}
-
-// getSettingByID returns a setting that is stored with the given id. If none is found
-// an error is return
-func GetSettingByID(id string) (Setting, error) {
-	setting, ok := settings[id]
-	if !ok {
-		return Setting{}, fmt.Errorf("%s is not a valid setting", id)
-	}
-	return setting, nil
 }
