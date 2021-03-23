@@ -3,6 +3,7 @@ package clusterupstreamrefresher
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -10,7 +11,19 @@ import (
 	ekscontroller "github.com/rancher/eks-operator/controller"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/robfig/cron"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	eksUpstreamRefresh       = "eks-refresh"
+	eksRefreshCronDeprecated = "eks-refresh-cron"
+	eksRefreshCronAnnotation = "settings.management.cattle.io/migrated"
 )
 
 func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.Cluster) (*eksv1.EKSClusterConfigSpec, error) {
@@ -86,4 +99,68 @@ func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 	}
 
 	return upstreamSpec, err
+}
+
+// MigrateEksRefreshCronSetting migrates the deprecated eks-refresh-cron setting to new
+// setting only if default setting was changed
+// This function will be run only once during startup by pkg/multiclustermanager/app.go
+func MigrateEksRefreshCronSetting(wContext *wrangler.Context) {
+	settingsClient := wContext.Mgmt.Setting()
+	eksCronSetting, err := settingsClient.Get(eksRefreshCronDeprecated, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return
+	} else if err != nil {
+		logrus.Errorf("Unable to complete EKS cron migration, will attempt at next rancher startup. "+
+			"Error getting %s setting: %v", eksRefreshCronDeprecated, err)
+		return
+	}
+	if eksCronSetting.Annotations != nil && eksCronSetting.Annotations[eksRefreshCronAnnotation] == "true" {
+		return
+	}
+
+	eksCronAnnotate := make(map[string]string)
+	if eksCronSetting.Annotations != nil {
+		eksCronAnnotate = eksCronSetting.Annotations
+	}
+	eksCronAnnotate[eksRefreshCronAnnotation] = "true"
+
+	settingsClientCache := wContext.Mgmt.Setting().Cache()
+	eksRefreshSetting, err := settingsClientCache.Get(eksUpstreamRefresh)
+	if errors.IsNotFound(err) {
+		return
+	} else if err != nil {
+		logrus.Errorf("Unable to complete EKS cron migration, will attempt at next rancher startup. "+
+			"Error getting %s setting: %v", eksUpstreamRefresh, err)
+		return
+	}
+
+	if eksRefreshSetting.Value != "" || eksCronSetting.Value == "" {
+		eksCronSetting.SetAnnotations(eksCronAnnotate)
+		if _, err = settingsClient.Update(eksCronSetting); err != nil {
+			logrus.Errorf("Unable to complete EKS cron migration, will attempt at next rancher startup. "+
+				"Error annotating eks-refresh-cron setting: %v", err)
+		}
+		return
+	}
+
+	eksSchedule, err := cron.ParseStandard(eksCronSetting.Value)
+	if err != nil {
+		logrus.Errorf("Unable to complete EKS cron migration, will attempt at next rancher startup. "+
+			"Error parsing cron schedule %s setting: %v", eksRefreshCronDeprecated, err)
+		return
+	}
+
+	next := eksSchedule.Next(time.Now())
+	refreshTime := int(eksSchedule.Next(next).Sub(next) / time.Second)
+
+	err = settings.EKSUpstreamRefresh.Set(fmt.Sprint(refreshTime))
+	if err != nil {
+		logrus.Errorf("Unable to complete EKS cron migration, will attempt at next rancher startup. "+
+			"Error updating eks-refresh setting: %v", err)
+	}
+	eksCronSetting.SetAnnotations(eksCronAnnotate)
+	if _, err = settingsClient.Update(eksCronSetting); err != nil {
+		logrus.Errorf("Unable to complete EKS cron migration, will attempt at next rancher startup. "+
+			"Error annotating eks-refresh-cron setting: %v", err)
+	}
 }

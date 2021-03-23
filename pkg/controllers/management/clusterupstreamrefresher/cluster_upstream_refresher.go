@@ -20,9 +20,8 @@ import (
 )
 
 const (
-	noKEv2Provider           = "none"
-	clusterLastRefreshTime   = "clusters.management.cattle.io/ke-last-refresh"
-	refreshCronSettingFormat = "%s-refresh"
+	noKEv2Provider         = "none"
+	clusterLastRefreshTime = "clusters.management.cattle.io/ke-last-refresh"
 )
 
 type clusterRefreshController struct {
@@ -60,11 +59,11 @@ func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.C
 	}
 
 	if !ready {
-		logrus.Infof("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
 		return cluster, nil
 	}
 
 	var lastRefreshTime string
+	var err error
 
 	if cluster.Annotations != nil {
 		lastRefreshTime = cluster.Annotations[clusterLastRefreshTime]
@@ -75,12 +74,12 @@ func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.C
 		return cluster, err
 	}
 
-	nextRefreshTime, err := getNextProviderRefreshTime(providerRefreshInterval, lastRefreshTime)
+	shouldRefresh, err := shouldRefreshCluster(providerRefreshInterval, lastRefreshTime)
 	if err != nil {
 		return cluster, err
 	}
 
-	if !time.Now().After(nextRefreshTime) {
+	if shouldRefresh {
 		return cluster, err
 	}
 
@@ -113,35 +112,35 @@ func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 // getProviderRefreshInterval returns the duration that should pass between
 // refreshing a cluster created by the given cloud provider.
 func getProviderRefreshInterval(provider string) (time.Duration, error) {
-	providerRefreshSetting, err := settings.GetSettingByID(strings.ToLower(fmt.Sprintf(refreshCronSettingFormat, provider)))
-	if err != nil {
-		return 0, err
-	}
+	var refreshInterval int
 
-	refreshInterval := providerRefreshSetting.GetInt()
+	// for other cloud drivers, please edit HERE
+	switch provider {
+	case apimgmtv3.ClusterDriverEKS:
+		refreshInterval = settings.EKSUpstreamRefresh.GetInt()
+	default:
+		return 300, nil
+	}
 
 	return time.Duration(refreshInterval) * time.Second, nil
 }
 
-// getNextProviderRefreshTIme returns the next time a KEv2 cluster is due to refresh given
-// its last refresh time and cloud provider.
-func getNextProviderRefreshTime(refreshInterval time.Duration, lastRefreshTime string) (time.Time, error) {
+// shouldRefreshCluster checks lastRefreshTime and refreshInterval and returns
+// true when upstream cluster should be refreshed
+func shouldRefreshCluster(refreshInterval time.Duration, lastRefreshTime string) (bool, error) {
 	if lastRefreshTime == "" {
-		return time.Now(), nil
+		return false, fmt.Errorf("lastRefreshTime is required")
 	}
 
 	lastRefreshUnix, err := strconv.ParseInt(lastRefreshTime, 10, 64)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("unable to parse last KEv2 refresh time [%s]: %v", lastRefreshTime, err)
+		return false, fmt.Errorf("unable to parse last KEv2 refresh time [%s]: %v", lastRefreshTime, err)
 	}
 
-	return time.Unix(lastRefreshUnix, 0).Add(refreshInterval), nil
+	return !time.Now().After(time.Unix(lastRefreshUnix, 0).Add(refreshInterval)), nil
 }
 
 func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cluster, cloudDriver string) (*mgmtv3.Cluster, error) {
-	if cluster == nil || cluster.DeletionTimestamp != nil {
-		return nil, nil
-	}
 
 	logrus.Infof("checking cluster [%s] upstream state for changes", cluster.Name)
 
@@ -234,7 +233,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	}
 
 	if !updateClusterConfig {
-		logrus.Infof("cluster [%s] matches upstream, skipping spec sync", cluster.Name)
+		logrus.Debugf("cluster [%s] matches upstream, skipping spec sync", cluster.Name)
 		return cluster, nil
 	}
 
@@ -242,9 +241,9 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	switch cloudDriver {
 	case apimgmtv3.ClusterDriverEKS:
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.EKSConfig)
-	}
-	if err != nil {
-		return cluster, err
+		if err != nil {
+			return cluster, err
+		}
 	}
 
 	if cluster.Annotations == nil {
