@@ -99,7 +99,8 @@ rancherImage: rancher/rancher
 # Defaults to IfNotPresent
 # rancherImagePullPolicy: <pullPolicy>
 
-# Number of Rancher server replicas.
+# Number of Rancher server replicas. Setting to -1 will dynamically choose 1, 2, or 3 based on the number
+# of available nodes in the cluster
 replicas: 3
 
 # Set pod resource requests/limits for Rancher.
