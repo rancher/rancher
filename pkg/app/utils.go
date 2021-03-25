@@ -112,6 +112,7 @@ func DeployApp(mgmtAppClient projv3.AppInterface, projectID string, createOrUpda
 	} else {
 		app = app.DeepCopy()
 		app.Spec.Answers = createOrUpdateApp.Spec.Answers
+		app.Spec.AnswersSetString = createOrUpdateApp.Spec.AnswersSetString
 
 		// clean up status
 		if forceRedeploy {
