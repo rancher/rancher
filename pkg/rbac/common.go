@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -160,4 +161,41 @@ func TypeFromContext(apiContext *types.APIContext, resource *types.RawResource) 
 
 func GetRTBLabel(objMeta metav1.ObjectMeta) string {
 	return objMeta.Namespace + "_" + objMeta.Name
+}
+
+// NameForRoleBinding returns a deterministic name for a RoleBinding with the provided namespace, roleName, and subject
+func NameForRoleBinding(namespace string, role rbacv1.RoleRef, subject rbacv1.Subject) string {
+	var name strings.Builder
+	name.WriteString("rb-")
+	name.WriteString(getBindingHash(namespace, role, subject))
+	nm := name.String()
+	logrus.Debugf("RoleBinding with namespace=%s role.kind=%s role.name=%s subject.kind=%s subject.name=%s has name: %s", namespace, role.Kind, role.Name, subject.Kind, subject.Name, nm)
+	return nm
+}
+
+// NameForClusterRoleBinding returns a deterministic name for a ClusterRoleBinding with the provided roleName and subject
+func NameForClusterRoleBinding(role rbacv1.RoleRef, subject rbacv1.Subject) string {
+	var name strings.Builder
+	name.WriteString("crb-")
+	name.WriteString(getBindingHash("", role, subject))
+	nm := name.String()
+	logrus.Debugf("ClusterRoleBinding with role.kind=%s role.name=%s subject.kind=%s subject.name=%s has name: %s", role.Kind, role.Name, subject.Kind, subject.Name, nm)
+	return nm
+}
+
+// getBindingHash returns a hash created from the passed in arguments
+// uses base32 encoding for hash, since all characters in encoding scheme are valid in k8s resource names
+// probability of collision is: 1/32^10 == 1/(2^5)^10 == 1/2^50 (sufficiently low)
+func getBindingHash(namespace string, role rbacv1.RoleRef, subject rbacv1.Subject) string {
+	var input strings.Builder
+	input.WriteString(namespace)
+	input.WriteString(role.Kind)
+	input.WriteString(role.Name)
+	input.WriteString(subject.Kind)
+	input.WriteString(subject.Name)
+
+	hasher := sha256.New()
+	hasher.Write([]byte(input.String()))
+	digest := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))
+	return strings.ToLower(digest[:10])
 }
