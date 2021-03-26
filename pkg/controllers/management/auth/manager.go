@@ -145,20 +145,31 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 
 	if len(objs) == 0 {
 		logrus.Infof("[%v] Creating clusterRoleBinding for membership in cluster %v for subject %v", m.controller, cluster.Name, subject.Name)
-		_, err := m.mgmt.RBAC.ClusterRoleBindings("").Create(&v1.ClusterRoleBinding{
+		roleRef := v1.RoleRef{
+			Kind: "ClusterRole",
+			Name: roleName,
+		}
+		crbName := pkgrbac.NameForClusterRoleBinding(roleRef, subject) // use deterministic name for crb
+		_, err = m.mgmt.RBAC.ClusterRoleBindings("").Create(&v1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "clusterrolebinding-",
+				Name: crbName,
 				Labels: map[string]string{
 					rtbNsAndName: MembershipBindingOwner,
 				},
 			},
 			Subjects: []v1.Subject{subject},
-			RoleRef: v1.RoleRef{
-				Kind: "ClusterRole",
-				Name: roleName,
-			},
+			RoleRef:  roleRef,
 		})
-		return err
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+
+		// if the binding exists but was not found in the index, manually retrieve it so that we can add appropriate labels
+		crb, err := m.mgmt.RBAC.ClusterRoleBindings("").Get(crbName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		objs = append(objs, crb)
 	}
 
 	crb, _ = objs[0].(*v1.ClusterRoleBinding)
@@ -218,20 +229,32 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 
 	if len(objs) == 0 {
 		logrus.Infof("[%v] Creating roleBinding for membership in project %v for subject %v", m.controller, project.Name, subject.Name)
-		_, err := m.mgmt.RBAC.RoleBindings(namespace).Create(&v1.RoleBinding{
+		roleRef := v1.RoleRef{
+			Kind: "Role",
+			Name: roleName,
+		}
+		// use deterministic name for rb
+		rbName := pkgrbac.NameForRoleBinding(namespace, roleRef, subject)
+		_, err = m.mgmt.RBAC.RoleBindings(namespace).Create(&v1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "rolebinding-",
+				Name: rbName,
 				Labels: map[string]string{
 					rtbNsAndName: MembershipBindingOwner,
 				},
 			},
 			Subjects: []v1.Subject{subject},
-			RoleRef: v1.RoleRef{
-				Kind: "Role",
-				Name: roleName,
-			},
+			RoleRef:  roleRef,
 		})
-		return err
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+
+		// if the binding already exists but was not found in the index, manually retrieve it so that we can add appropriate labels
+		rb, err := m.mgmt.RBAC.RoleBindings(namespace).Get(rbName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		objs = append(objs, rb)
 	}
 
 	rb, _ = objs[0].(*v1.RoleBinding)
