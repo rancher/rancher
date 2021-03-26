@@ -155,3 +155,13 @@ func TypeFromContext(apiContext *types.APIContext, resource *types.RawResource) 
 func GetRTBLabel(objMeta metav1.ObjectMeta) string {
 	return objMeta.Namespace + "_" + objMeta.Name
 }
+
+// HashFromKey takes a rb/crb role/subject key and returns its hash
+// uses base32 encoding since all characters in encoding scheme are valid in k8s resource names
+// probability of collision is: 1/32^10 == 1/(2^5)^10 == 1/2^50 which is sufficiently low
+func HashFromKey(key string) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(key))
+	digest := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))
+	return strings.ToLower(digest[:10])
+}

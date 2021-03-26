@@ -23,7 +23,6 @@ func getRBOwnerKey(rb *v1.RoleBinding) []string {
 
 func rbRoleSubjectKey(roleName string, subject v1.Subject) string {
 	return roleName + "." + subject.Kind + "." + subject.Name
-
 }
 
 func rbRoleSubjectKeys(roleName string, subjects []v1.Subject) []string {

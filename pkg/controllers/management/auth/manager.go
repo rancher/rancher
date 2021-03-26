@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
@@ -145,9 +146,10 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 
 	if len(objs) == 0 {
 		logrus.Infof("[%v] Creating clusterRoleBinding for membership in cluster %v for subject %v", m.controller, cluster.Name, subject.Name)
+		crbName := strings.Join([]string{"clusterrolebinding", pkgrbac.HashFromKey(key)}, "-")
 		_, err := m.mgmt.RBAC.ClusterRoleBindings("").Create(&v1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "clusterrolebinding-",
+				Name: crbName,
 				Labels: map[string]string{
 					rtbNsAndName: MembershipBindingOwner,
 				},
@@ -218,9 +220,10 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 
 	if len(objs) == 0 {
 		logrus.Infof("[%v] Creating roleBinding for membership in project %v for subject %v", m.controller, project.Name, subject.Name)
+		rbName := strings.Join([]string{"rolebinding", pkgrbac.HashFromKey(key)}, "-")
 		_, err := m.mgmt.RBAC.RoleBindings(namespace).Create(&v1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "rolebinding-",
+				Name: rbName,
 				Labels: map[string]string{
 					rtbNsAndName: MembershipBindingOwner,
 				},

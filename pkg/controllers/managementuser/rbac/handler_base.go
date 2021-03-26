@@ -495,10 +495,11 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 
 func bindingParts(roleName, parentNsAndName string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
 	crbKey := rbRoleSubjectKey(roleName, subject)
+	crbName := strings.Join([]string{"clusterrolebinding", pkgrbac.HashFromKey(crbKey)}, "-")
 	return crbKey,
 		metav1.ObjectMeta{
-			GenerateName: "clusterrolebinding-",
-			Labels:       map[string]string{rtbOwnerLabel: parentNsAndName},
+			Name:   crbName,
+			Labels: map[string]string{rtbOwnerLabel: parentNsAndName},
 		},
 		[]rbacv1.Subject{subject},
 		rbacv1.RoleRef{
