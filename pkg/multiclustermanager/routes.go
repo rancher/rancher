@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/apiserver/pkg/parse"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
-	"github.com/rancher/rancher/pkg/wrangler"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -38,7 +37,7 @@ import (
 	"github.com/rancher/steve/pkg/auth"
 )
 
-func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, wranglerContext *wrangler.Context) (func(http.Handler) http.Handler, error) {
+func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
 		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
@@ -65,6 +64,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	if err != nil {
 		return nil, err
 	}
+
+	metricsHandler := metrics.NewMetricsHandler(scaledContext, clusterManager, promhttp.Handler())
 
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
@@ -106,9 +107,10 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
+	authed.Path("/metrics").Handler(metricsHandler)
+	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
-	authed.PathPrefix("/metrics").Handler(metrics.NewMetricsHandler(scaledContext, promhttp.Handler()))
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
