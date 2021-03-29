@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/ehazlett/simplelog"
 	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
+	globalchart "github.com/rancher/rancher/pkg/chart"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rancher"
@@ -25,6 +27,9 @@ import (
 var (
 	profileAddress = "localhost:6060"
 	kubeConfig     string
+
+	//go:embed chart/Chart.yaml chart/values.yaml chart/README.md chart/templates/*
+	chart embed.FS
 )
 
 func main() {
@@ -217,6 +222,9 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	logrus.Infof("Rancher version %s is starting", version.FriendlyVersion())
 	logrus.Infof("Rancher arguments %+v", cfg)
 	ctx := signals.SetupSignalHandler(context.Background())
+
+	// Setup global chart
+	globalchart.Rancher = &chart
 
 	if cfg.AddLocal != "true" && cfg.AddLocal != "auto" {
 		logrus.Fatal("add-local flag must be set to 'true', see Rancher 2.5.0 release notes for more information")

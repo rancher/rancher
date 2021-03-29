@@ -114,7 +114,7 @@ metadata:
   name: cattle-cluster-agent
   namespace: cattle-system
   annotations:
-    management.cattle.io/scale-available: 3
+    management.cattle.io/scale-available: "3"
 spec:
   selector:
     matchLabels:
@@ -203,12 +203,6 @@ spec:
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
-          readinessProbe:
-            initialDelaySeconds: 2
-            periodSeconds: 5
-            httpGet:
-              path: /health
-              port: 8080
       {{- if .PrivateRegistryConfig}}
       imagePullSecrets:
       - name: cattle-private-registry

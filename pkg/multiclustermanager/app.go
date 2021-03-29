@@ -192,7 +192,7 @@ func (m *mcm) Start(ctx context.Context) error {
 				return errors.Wrap(err, "failed to create management context")
 			}
 
-			if err := managementdata.Add(m.wranglerContext, management); err != nil {
+			if err := managementdata.Add(ctx, m.wranglerContext, management); err != nil {
 				return errors.Wrap(err, "failed to add management data")
 			}
 

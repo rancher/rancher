@@ -11,6 +11,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/proxy"
 	authzv1 "k8s.io/api/authorization/v1"
@@ -28,9 +29,7 @@ type Handler struct {
 	clusters      v3.ClusterCache
 }
 
-type ClusterDialerFactory interface {
-	ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error)
-}
+type ClusterDialerFactory func(clusterID string) remotedialer.Dialer
 
 func RewriteLocalCluster(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -157,7 +156,7 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 	if err != nil {
 		return nil, err
 	}
-	dialer := h.dialerFactory.ClusterDialer(host)
+	dialer := h.dialerFactory("steve-cluster-" + host)
 	return dialer(ctx, network, "127.0.0.1:6080")
 }
 

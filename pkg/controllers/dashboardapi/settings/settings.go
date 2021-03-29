@@ -11,11 +11,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Register(settingController managementcontrollers.SettingController, install bool) error {
+func Register(settingController managementcontrollers.SettingController) error {
 	sp := &settingsProvider{
 		settings:     settingController,
 		settingCache: settingController.Cache(),
-		install:      install,
 	}
 
 	if err := settings.SetProvider(sp); err != nil {
@@ -28,7 +27,6 @@ func Register(settingController managementcontrollers.SettingController, install
 type settingsProvider struct {
 	settings     managementcontrollers.SettingClient
 	settingCache managementcontrollers.SettingCache
-	install      bool
 	fallback     map[string]string
 }
 
@@ -104,11 +102,9 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			} else {
 				fallback[newSetting.Name] = newSetting.Value
 			}
-			if s.install {
-				_, err := s.settings.Create(newSetting)
-				if err != nil {
-					return err
-				}
+			_, err := s.settings.Create(newSetting)
+			if err != nil {
+				return err
 			}
 		} else if err != nil {
 			return err
@@ -127,7 +123,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			} else {
 				fallback[obj.Name] = obj.Value
 			}
-			if update && s.install {
+			if update {
 				_, err := s.settings.Update(obj)
 				if err != nil {
 					return err
