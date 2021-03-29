@@ -102,6 +102,9 @@ rancherImage: rancher/rancher
 # Number of Rancher server replicas.
 replicas: 3
 
+# Set priorityClassName to avoid eviction
+priorityClassName: system-node-critical
+
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
@@ -118,7 +121,7 @@ systemDefaultRegistry: ""
 useBundledSystemChart: false
 
 # Certmanager version compatibility
-certmanager: 
+certmanager:
   version: ""
 
 # Rancher custom logos persistence
@@ -131,7 +134,7 @@ customLogos:
   volumeKind: persistentVolumeClaim
   ## Use an existing volume. Custom logos should be copied to the volume by the user
   # volumeName: custom-logos
-  ## Just for volumeKind: persistentVolumeClaim 
+  ## Just for volumeKind: persistentVolumeClaim
   ## To disables dynamic provisioning, set storageClass: "" or storageClass: "-"
   # storageClass: "-"
   accessMode: ReadWriteOnce
