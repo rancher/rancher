@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/rancher/norman/api/access"
@@ -41,6 +42,18 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 		}
 	}
 
+	host := settings.ServerURL.Get()
+	if host == "" {
+		host = apiContext.Request.Host
+	} else {
+		u, err := url.Parse(host)
+		if err == nil {
+			host = u.Host
+		} else {
+			host = apiContext.Request.Host
+		}
+	}
+
 	if endpointEnabled {
 		clusterName := apiContext.ID
 		clusterClient, err := a.ClusterManager.UserContext(clusterName)
@@ -63,9 +76,9 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 			return err
 		}
 
-		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, apiContext.ID, apiContext.Request.Host, tokenKey)
+		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, apiContext.ID, host, tokenKey)
 	} else {
-		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, apiContext.Request.Host, tokenKey)
+		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, host, tokenKey)
 	}
 	if err != nil {
 		return err
