@@ -13,6 +13,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: {{ template "rancher.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
