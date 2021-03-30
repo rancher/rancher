@@ -174,6 +174,66 @@ func listZones(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 	return encodeOutput(result)
 }
 
+func listClusters(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	if cap.Region == "" && cap.Zone == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("either region or zone is required")
+	}
+	if cap.Region != "" && cap.Zone != "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("only one of region or zone can be provided")
+	}
+
+	var location string
+	if cap.Region != "" {
+		location = cap.Region
+	} else {
+		location = cap.Zone
+	}
+
+	client, err := getContainerServiceClient(ctx, cap.Credentials)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	parent := "projects/" + cap.ProjectID + "/locations/" + location
+	result, err := client.Projects.Locations.Clusters.List(parent).Do()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	return encodeOutput(result)
+}
+
+func listSharedSubnets(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	computeClient, err := getComputeServiceClient(ctx, cap.Credentials)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	containerClient, err := getContainerServiceClient(ctx, cap.Credentials)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	hostProject, err := computeClient.Projects.GetXpnHost(cap.ProjectID).Do()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	// If there is no host project for this project, the fields in this returned object will be empty.
+	// In this case, we will return a null object indicating there are no subnets explicitly shared to this project.
+	// The caller will need to call /meta/gkeNetworks and /meta/gkeSubnetworks to get the project's own network and subnet list.
+	var result *container.ListUsableSubnetworksResponse
+	if hostProject.Name != "" {
+		parent := "projects/" + cap.ProjectID
+		filter := "networkProjectId=" + hostProject.Name
+		result, err = containerClient.Projects.Aggregated.UsableSubnetworks.List(parent).Filter(filter).Do()
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+	}
+
+	return encodeOutput(result)
+}
+
 func encodeOutput(result interface{}) ([]byte, int, error) {
 	data, err := json.Marshal(&result)
 	if err != nil {
