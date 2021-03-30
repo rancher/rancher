@@ -173,16 +173,17 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler, catalogManage
 	}
 
 	// take operator answers from overwrite answers
-	answers, version := monitoring.GetOverwroteAppAnswersAndVersion(cluster.Annotations)
-	for ansKey, ansVal := range answers {
-		if strings.HasPrefix(ansKey, "operator.") || strings.HasPrefix(ansKey, "operator-init.") {
-			appAnswers[ansKey] = ansVal
-		}
-	}
+	monitoringInput := monitoring.GetMonitoringInput(cluster.Annotations)
+	answers := monitoringInput.Answers
+	answersSetString := monitoringInput.AnswersSetString
+	version := monitoringInput.Version
+	resolveOperatorPrefix(answers)
+	resolveOperatorPrefix(answersSetString)
 
 	// cannot overwrite mustAppAnswers
 	for mustKey, mustVal := range mustAppAnswers {
 		appAnswers[mustKey] = mustVal
+		delete(answersSetString, mustKey)
 	}
 
 	annotations := map[string]string{
@@ -203,11 +204,12 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler, catalogManage
 			Namespace:   appDeployProjectID,
 		},
 		Spec: v33.AppSpec{
-			Answers:         appAnswers,
-			Description:     "Prometheus Operator for Rancher Monitoring",
-			ExternalID:      appCatalogID,
-			ProjectName:     appProjectName,
-			TargetNamespace: appTargetNamespace,
+			Answers:          appAnswers,
+			AnswersSetString: answersSetString,
+			Description:      "Prometheus Operator for Rancher Monitoring",
+			ExternalID:       appCatalogID,
+			ProjectName:      appProjectName,
+			TargetNamespace:  appTargetNamespace,
 		},
 	}
 
@@ -227,4 +229,12 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler, catalogManage
 	}
 
 	return nil
+}
+
+func resolveOperatorPrefix(answers map[string]string) {
+	for ansKey, ansVal := range answers {
+		if strings.HasPrefix(ansKey, "operator.") || strings.HasPrefix(ansKey, "operator-init.") {
+			answers[ansKey] = ansVal
+		}
+	}
 }

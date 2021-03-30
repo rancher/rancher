@@ -135,23 +135,27 @@ func (h *Handler) viewMonitoring(actionName string, action *types.Action, apiCon
 	if project.DeletionTimestamp != nil {
 		return httperror.NewAPIError(httperror.InvalidType, "deleting Project")
 	}
-
 	if !project.Spec.EnableProjectMonitoring {
 		return httperror.NewAPIError(httperror.InvalidState, "disabling Monitoring")
 	}
 
 	// need to support `map[string]string` as entry value type in norman Builder.convertMap
-	answers, version := monitoring.GetOverwroteAppAnswersAndVersion(project.Annotations)
-	encodeAnswers, err := convert.EncodeToMap(answers)
+	monitoringInput := monitoring.GetMonitoringInput(project.Annotations)
+	encodedAnswers, err := convert.EncodeToMap(monitoringInput.Answers)
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to parse response")
+	}
+	encodedAnswersSetString, err := convert.EncodeToMap(monitoringInput.AnswersSetString)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to parse response")
 	}
 	resp := map[string]interface{}{
-		"answers": encodeAnswers,
-		"type":    "monitoringOutput",
+		"answers":          encodedAnswers,
+		"answersSetString": encodedAnswersSetString,
+		"type":             "monitoringOutput",
 	}
-	if version != "" {
-		resp["version"] = version
+	if monitoringInput.Version != "" {
+		resp["version"] = monitoringInput.Version
 	}
 
 	apiContext.WriteResponse(http.StatusOK, resp)
