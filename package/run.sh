@@ -258,4 +258,4 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     fi
 fi
 
-exec agent
+exec tini -- agent
