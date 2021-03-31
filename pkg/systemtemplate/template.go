@@ -114,7 +114,7 @@ metadata:
   name: cattle-cluster-agent
   namespace: cattle-system
   annotations:
-    management.cattle.io/scale-available: 3
+    management.cattle.io/scale-available: "3"
 spec:
   selector:
     matchLabels:
