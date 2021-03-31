@@ -441,6 +441,24 @@ spec:
                   operator: In
                   values:
                     - "true"
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
+                - key: node-role.kubernetes.io/control-plane
+                  operator: In
+                  values:
+                    - "true"
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
+                - key: node-role.kubernetes.io/master
+                  operator: In
+                  values:
+                    - "true"
       hostNetwork: true
       serviceAccountName: cattle
       tolerations:
