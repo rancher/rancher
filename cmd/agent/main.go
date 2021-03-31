@@ -16,15 +16,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-colorable"
+	"github.com/rancher/rancher/pkg/logserver"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/pkg/signals"
@@ -42,31 +43,72 @@ const (
 )
 
 func main() {
-	if _, err := reconcileKubelet(context.Background()); err != nil {
-		logrus.Warnf("failed to reconcile kubelet, error: %v", err)
-	}
-
-	logrus.SetOutput(colorable.NewColorableStdout())
-	logserver.StartServerWithDefaults()
-	if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-
-	initFeatures()
-
 	var err error
 
-	if os.Getenv("CLUSTER_CLEANUP") == "true" {
-		err = clean.Cluster()
-	} else if os.Getenv("BINDING_CLEANUP") == "true" {
-		err = clean.Bindings()
+	if len(os.Args) > 1 {
+		err = runArgs()
 	} else {
-		err = run()
+		if _, err := reconcileKubelet(context.Background()); err != nil {
+			logrus.Warnf("failed to reconcile kubelet, error: %v", err)
+		}
+
+		logrus.SetOutput(colorable.NewColorableStdout())
+		logserver.StartServerWithDefaults()
+		if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+
+		initFeatures()
+
+		if os.Getenv("CLUSTER_CLEANUP") == "true" {
+			err = clean.Cluster()
+		} else if os.Getenv("BINDING_CLEANUP") == "true" {
+			err = clean.Bindings()
+		} else {
+			err = run()
+		}
 	}
 
 	if err != nil {
 		logrus.Fatal(err)
 	}
+}
+
+func runArgs() error {
+	switch os.Args[1] {
+	case "clean":
+		return runClean()
+	default:
+		return run()
+	}
+}
+
+func runClean() error {
+	if len(os.Args) > 2 {
+		switch os.Args[2] {
+		case "job":
+			return clean.Job()
+		case "script", "scripts":
+			fmt.Print(clean.Script())
+			return nil
+		case "node":
+			return clean.Node()
+		case "link", "links":
+			return clean.Links()
+		case "cluster":
+			return clean.Cluster()
+		case "path", "paths":
+			return clean.Paths()
+		case "firewall", "firewalls":
+			return clean.Firewall()
+		case "windows":
+			return clean.WriteScript()
+		case "binding", "bindings":
+			return clean.Bindings()
+		}
+	}
+
+	return clean.Node()
 }
 
 func initFeatures() {
@@ -115,7 +157,7 @@ func cleanup(ctx context.Context) error {
 		return nil
 	}
 
-	c, err := client.NewEnvClient()
+	c, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return err
 	}
@@ -378,7 +420,7 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
-	c, err := client.NewEnvClient()
+	c, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return false, err
 	}

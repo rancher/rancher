@@ -12,14 +12,10 @@ import (
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
-	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkeworker"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
@@ -253,36 +249,6 @@ func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node)
 
 func AugmentProcesses(token string, processes map[string]rketypes.Process, worker bool, nodeName string,
 	cluster *v3.Cluster) map[string]rketypes.Process {
-	var shared bool
-
-OuterLoop:
-	for _, process := range processes {
-		for _, bind := range process.Binds {
-			parts := strings.Split(bind, ":")
-			if len(parts) > 2 && strings.Contains(parts[2], "shared") {
-				shared = true
-				break OuterLoop
-			}
-		}
-	}
-
-	if shared {
-		agentImage := settings.AgentImage.Get()
-		nodeCommand := clusterregistrationtokens.NodeCommand(token, cluster) + " --no-register --only-write-certs --node-name " + nodeName
-		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
-		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
-		processes["share-mnt"] = rketypes.Process{
-			Name:                    "share-mnt",
-			Args:                    args,
-			Image:                   image.ResolveWithCluster(agentImage, cluster),
-			Binds:                   []string{"/var/run:/var/run"},
-			NetworkMode:             "host",
-			RestartPolicy:           "always",
-			PidMode:                 "host",
-			Privileged:              true,
-			ImageRegistryAuthConfig: privateRegistryConfig,
-		}
-	}
 
 	if worker {
 		// not sure if we really need this anymore

@@ -26,7 +26,7 @@ if [ "$1" = "--" ]; then
     exec "$@"
 fi
 
-if [ "$CLUSTER_CLEANUP" = true ]; then
+if [ "$CLUSTER_CLEANUP" = true ] || [ "$NODE_CLEANUP_JOB" = true ] || [ "$NODE_CLEANUP" = true ]; then
     exec agent
 fi
 

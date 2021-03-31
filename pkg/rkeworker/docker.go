@@ -39,7 +39,7 @@ type NodeConfig struct {
 }
 
 func runProcess(ctx context.Context, name string, p rketypes.Process, start, forceRestart bool) error {
-	c, err := client.NewEnvClient()
+	c, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return err
 	}

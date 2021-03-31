@@ -42,7 +42,7 @@ func Params() map[string]interface{} {
 		}
 	}
 
-	dclient, err := client.NewEnvClient()
+	dclient, err := client.NewClientWithOpts(client.FromEnv)
 	if err == nil {
 		defer dclient.Close()
 		info, err := dclient.Info(context.Background())
