@@ -19,6 +19,7 @@ const (
 	commandFormat                 = "kubectl apply -f %s"
 	insecureCommandFormat         = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat             = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
+	shareMntCommandFormat         = "agent --node-name %s --server %s --token %s%s --no-register --only-write-certs"
 	rke2NodeCommandFormat         = "curl -fL %s | %s sh -s - --server %s --token %s%s"
 	rke2InsecureNodeCommandFormat = "curl --insecure -fL %s | %s sh -s - --server %s --token %s%s"
 	loginCommandFormat            = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
@@ -127,18 +128,6 @@ func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) 
 	return ""
 }
 
-func agentEnvVarsForShell(cluster *v3.Cluster) string {
-	var agentEnvVars []string
-	if cluster != nil {
-		for _, envVar := range cluster.Spec.AgentEnvVars {
-			if envVar.Value != "" {
-				agentEnvVars = append(agentEnvVars, fmt.Sprintf("%s=\"%s\"", envVar.Name, envVar.Value))
-			}
-		}
-	}
-	return strings.Join(agentEnvVars, " ")
-}
-
 func AgentEnvVars(cluster *v3.Cluster, docker bool) string {
 	var agentEnvVars []string
 	if cluster != nil {
@@ -171,6 +160,27 @@ func NodeCommand(token string, cluster *v3.Cluster) (string, error) {
 		rootURL,
 		token,
 		ca), nil
+}
+
+func ShareMntCommand(nodeName, token string, cluster *v3.Cluster) ([]string, error) {
+	rootURL, err := getRootURL()
+	if err != nil {
+		return []string{""}, err
+	}
+
+	cmd := []string{
+		"--no-register", "--only-write-certs",
+		"--node-name", nodeName,
+		"--server", rootURL,
+		"--token", token,
+	}
+
+	ca := systemtemplate.CAChecksum()
+	if ca != "" {
+		cmd = append(cmd, fmt.Sprintf("--ca-checksum %s", ca))
+	}
+
+	return cmd, nil
 }
 
 func LoginCommand(reg rketypes.PrivateRegistry) string {

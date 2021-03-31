@@ -268,21 +268,21 @@ OuterLoop:
 
 	if shared {
 		agentImage := settings.AgentImage.Get()
-		nodeCommandString, err := clusterregistrationtoken.NodeCommand(token, cluster)
+		nodeCommand, err := clusterregistrationtoken.ShareMntCommand(nodeName, token, cluster)
 		if err != nil {
 			return nil, err
 		}
-		nodeCommand := nodeCommandString + " --no-register --only-write-certs --node-name " + nodeName
-		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
 		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
 		processes["share-mnt"] = rketypes.Process{
-			Name:                    "share-mnt",
-			Args:                    args,
-			Image:                   image.ResolveWithCluster(agentImage, cluster),
-			Binds:                   []string{"/var/run:/var/run"},
+			Name:  "share-mnt",
+			Args:  nodeCommand,
+			Image: image.ResolveWithCluster(agentImage, cluster),
+			Binds: []string{
+				"/var/run:/var/run",
+				"/etc/kubernetes:/etc/kubernetes",
+			},
 			NetworkMode:             "host",
 			RestartPolicy:           "always",
-			PidMode:                 "host",
 			Privileged:              true,
 			ImageRegistryAuthConfig: privateRegistryConfig,
 		}

@@ -8,7 +8,7 @@ ARG ARCH=amd64
 RUN rm -f /bin/sh && ln -s /bin/bash /bin/sh
 ENV KUBECTL_VERSION v1.20.7
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git curl ca-certificates jq iproute2 vim-tiny less bash-completion unzip sysstat acl ssh && \
+    apt-get install -y --no-install-recommends git curl ca-certificates jq iproute2 vim-tiny less bash-completion unzip sysstat acl ssh iptables && \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl && \
     DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && \
@@ -25,6 +25,6 @@ ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
-COPY agent run.sh kubectl-shell.sh shell-setup.sh share-root.sh /usr/bin/
+COPY agent run.sh kubectl-shell.sh shell-setup.sh /usr/bin/
 WORKDIR /var/lib/rancher
 ENTRYPOINT ["run.sh"]
