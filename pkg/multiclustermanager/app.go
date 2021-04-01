@@ -14,7 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
-	"github.com/rancher/rancher/pkg/controllers/management/eksupstreamrefresh"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	managementcrds "github.com/rancher/rancher/pkg/crds/management"
 	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
@@ -210,7 +210,7 @@ func (m *mcm) Start(ctx context.Context) error {
 		tokens.StartPurgeDaemon(ctx, management)
 		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
-		eksupstreamrefresh.StartEKSUpstreamCronJob(m.wranglerContext)
+		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
 		logrus.Infof("Rancher startup complete")
 		return nil
 	})
