@@ -34,7 +34,7 @@ RANCHER_K3S_KUBECONFIG_PATH = DATA_SUBDIR + "/k3s_kubeconfig.yaml"
 RANCHER_NODE_OS = os.environ.get("RANCHER_NODE_OS", "ubuntu")
 RANCHER_INSTALL_MODE = os.environ.get("RANCHER_INSTALL_MODE", "INSTALL_K3S_VERSION")
 RANCHER_RDS_ENVIRONMENT = os.environ.get("RANCHER_RDS_ENVIRONMENT", "dev")
-RANCHER_RDS_ENGINE_MODE = os.environ.get("RANCHER_RDS_ENGINE_MODE", "")
+RANCHER_RDS_ENGINE_MODE = os.environ.get("RANCHER_RDS_ENGINE_MODE", "provisioned")
 RANCHER_CLUSTER_TYPE = os.environ.get("RANCHER_CLUSTER_TYPE", "external_db")
 RANCHER_VOLUME_SIZE = os.environ.get("RANCHER_VOLUME_SIZE", "20")
 RANCHER_RHEL_USERNAME = os.environ.get("RANCHER_RHEL_USERNAME")
@@ -116,22 +116,22 @@ def create_multiple_control_cluster():
     if RANCHER_EXTERNAL_DB == "MariaDB":
         RANCHER_EXTERNAL_DB_VERSION = "10.3.20" if not RANCHER_EXTERNAL_DB_VERSION \
             else RANCHER_EXTERNAL_DB_VERSION
-        RANCHER_DB_GROUP_NAME = "default.mariadb10.3" if not RANCHER_DB_GROUP_NAME \
+        RANCHER_DB_GROUP_NAME = "mariadb10.3" if not RANCHER_DB_GROUP_NAME \
             else RANCHER_DB_GROUP_NAME
     elif RANCHER_EXTERNAL_DB == "postgres":
         RANCHER_EXTERNAL_DB_VERSION = "11.5" if not RANCHER_EXTERNAL_DB_VERSION \
             else RANCHER_EXTERNAL_DB_VERSION
-        RANCHER_DB_GROUP_NAME = "default.postgres11" if not RANCHER_DB_GROUP_NAME \
+        RANCHER_DB_GROUP_NAME = "postgres11" if not RANCHER_DB_GROUP_NAME \
             else RANCHER_DB_GROUP_NAME
     elif RANCHER_EXTERNAL_DB == "aurora-mysql":
         RANCHER_EXTERNAL_DB_VERSION = "5.7.mysql_aurora.2.09.0" if not RANCHER_EXTERNAL_DB_VERSION \
             else RANCHER_EXTERNAL_DB_VERSION
-        RANCHER_DB_GROUP_NAME = "default.aurora-mysql5.7" if not RANCHER_DB_GROUP_NAME \
+        RANCHER_DB_GROUP_NAME = "aurora-mysql5.7" if not RANCHER_DB_GROUP_NAME \
             else RANCHER_DB_GROUP_NAME
     else:
         RANCHER_EXTERNAL_DB_VERSION = "5.7" if not RANCHER_EXTERNAL_DB_VERSION \
             else RANCHER_EXTERNAL_DB_VERSION
-        RANCHER_DB_GROUP_NAME = "default.mysql5.7" if not RANCHER_DB_GROUP_NAME \
+        RANCHER_DB_GROUP_NAME = "mysql5.7" if not RANCHER_DB_GROUP_NAME \
             else RANCHER_DB_GROUP_NAME
     tf = Terraform(working_dir=tf_dir,
                    variables={'region': RANCHER_REGION,
