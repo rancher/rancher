@@ -31,6 +31,13 @@ if [ ${1} = "centos8" ] || [ ${1} = "rhel8" ]
 then
   yum install tar -y
   yum install iptables -y
+  workaround="[keyfile]\nunmanaged-devices=interface-name:cali*;interface-name:tunl*;interface-name:vxlan.calico;interface-name:flannel*"
+  if [ ! -e /etc/NetworkManager/conf.d/canal.conf ]; then
+    echo -e $workaround > /etc/NetworkManager/conf.d/canal.conf
+  else
+    echo -e $workaround >> /etc/NetworkManager/conf.d/canal.conf
+  fi
+  sudo systemctl reload NetworkManager
 fi
 
 if [ ${7} = "rke2" ]
