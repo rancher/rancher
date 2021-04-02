@@ -196,7 +196,7 @@ func (m *Manager) Uninstall(namespace, name string) error {
 		return err
 	}
 
-	op, err := m.operation.Uninstall(m.ctx, installUser, namespace, name, bytes.NewBuffer(uninstall))
+	op, err := m.operation.Uninstall(m.ctx, installUser, namespace, name, bytes.NewBuffer(uninstall), "")
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -278,7 +278,7 @@ func (m *Manager) install(namespace, name, minVersion string, values map[string]
 		return err
 	}
 
-	op, err := m.operation.Upgrade(m.ctx, installUser, "", "rancher-charts", bytes.NewBuffer(upgrade))
+	op, err := m.operation.Upgrade(m.ctx, installUser, "", "rancher-charts", bytes.NewBuffer(upgrade), "")
 	if err != nil {
 		return err
 	}

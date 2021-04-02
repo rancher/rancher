@@ -43,6 +43,7 @@ type context struct {
 	IsRKE                 bool
 	PrivateRegistryConfig string
 	Tolerations           string
+	ClusterRegistry       string
 }
 
 var (
@@ -87,9 +88,14 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		authImage = settings.AuthImage.Get()
 	}
 
-	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster))
+	privateRepo := util.GetPrivateRepo(cluster)
+	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(privateRepo)
 	if err != nil {
 		return err
+	}
+	var clusterRegistry string
+	if privateRepo != nil {
+		clusterRegistry = privateRepo.URL
 	}
 
 	if taints != nil {
@@ -115,6 +121,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: privateRegistryConfig,
 		Tolerations:           tolerations,
+		ClusterRegistry:       clusterRegistry,
 	}
 
 	return t.Execute(resp, context)
