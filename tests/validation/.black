@@ -1,0 +1,18 @@
+[tool.black]
+line-length = 88
+include = '\.pyi?$'
+exclude = '''
+/(
+ \.git
+ | \.goi?$
+ | \.tox
+ | \.venv
+ | scripts
+ | package
+ | chart
+ | dist
+)/
+'''
+[tool.autopep8]
+max_line_length = 88
+ignore = "E203,E266,E501,W503,F403,E401,F401,F405,F811"  # or ["E501", "W6"]

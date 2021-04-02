@@ -11,7 +11,7 @@ paramiko==2.6.0
 PyJWT==1.6.4
 pytest-repeat==0.7.0
 pytest-xdist==1.23.0
-pytest==3.8.1
+pytest==3.10.1
 pytest-html==1.20.0
 pytest-ordering==0.6
 python-digitalocean==1.13.2
@@ -20,3 +20,4 @@ PyYAML==5.2
 requests==2.22.0
 rsa==4.0
 websocket-client==0.57.0
+pre-commit==2.11.1
