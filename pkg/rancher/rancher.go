@@ -49,6 +49,7 @@ type Options struct {
 	AuditLevel        int
 	Agent             bool
 	Features          string
+	ClusterRegistry   string
 }
 
 type Rancher struct {
@@ -123,6 +124,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		AccessSetLookup: wranglerContext.ASL,
 		AuthMiddleware:  steveauth.ExistingContext,
 		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache()),
+		ClusterRegistry: opts.ClusterRegistry,
 	})
 	if err != nil {
 		return nil, err
