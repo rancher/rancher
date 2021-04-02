@@ -129,7 +129,7 @@ func getProviderRefreshInterval(provider string) (time.Duration, error) {
 // true when upstream cluster should be refreshed
 func shouldRefreshCluster(refreshInterval time.Duration, lastRefreshTime string) (bool, error) {
 	if lastRefreshTime == "" {
-		return false, fmt.Errorf("lastRefreshTime is required")
+		return false, nil
 	}
 
 	lastRefreshUnix, err := strconv.ParseInt(lastRefreshTime, 10, 64)
