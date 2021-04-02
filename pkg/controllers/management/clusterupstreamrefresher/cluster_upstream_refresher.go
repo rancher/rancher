@@ -56,20 +56,8 @@ func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.C
 	}
 
 	provider, ready := getProviderAndReadyStatus(cluster)
-	if provider == noKEv2Provider {
-		// not a KEv2 cluster
+	if provider == noKEv2Provider || !ready {
 		return cluster, nil
-	}
-
-	if !ready {
-		return cluster, nil
-	}
-
-	var lastRefreshTime string
-	var err error
-
-	if cluster.Annotations != nil {
-		lastRefreshTime = cluster.Annotations[clusterLastRefreshTime]
 	}
 
 	providerRefreshInterval, err := getProviderRefreshInterval(provider)
@@ -77,21 +65,21 @@ func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.C
 		return cluster, err
 	}
 
-	shouldRefresh, err := shouldRefreshCluster(providerRefreshInterval, lastRefreshTime)
+	nextRefresh, err := nextRefreshTime(providerRefreshInterval, cluster.Annotations[clusterLastRefreshTime])
 	if err != nil {
 		return cluster, err
 	}
 
-	if shouldRefresh {
-		return cluster, err
+	now := time.Now()
+	if nextRefresh.Before(now) {
+		cluster, err = c.refreshClusterUpstreamSpec(cluster, provider)
+		if err != nil {
+			return cluster, err
+		}
+		c.clusterEnqueueAfter(key, providerRefreshInterval)
+	} else {
+		c.clusterEnqueueAfter(key, nextRefresh.Sub(now))
 	}
-
-	cluster, err = c.refreshClusterUpstreamSpec(cluster, provider)
-	if err != nil {
-		return cluster, err
-	}
-
-	c.clusterEnqueueAfter(key, providerRefreshInterval)
 
 	return cluster, nil
 }
@@ -103,13 +91,13 @@ func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 	switch {
 	case cluster.Spec.EKSConfig != nil:
 		if cluster.Status.EKSStatus.UpstreamSpec == nil {
-			logrus.Infof("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
+			logrus.Debugf("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
 			return apimgmtv3.ClusterDriverEKS, false
 		}
 		return apimgmtv3.ClusterDriverEKS, true
 	case cluster.Spec.GKEConfig != nil:
 		if cluster.Status.GKEStatus.UpstreamSpec == nil {
-			logrus.Infof("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
+			logrus.Debugf("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
 			return apimgmtv3.ClusterDriverGKE, false
 		}
 		return apimgmtv3.ClusterDriverGKE, true
@@ -122,31 +110,30 @@ func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 // refreshing a cluster created by the given cloud provider.
 func getProviderRefreshInterval(provider string) (time.Duration, error) {
 
-	providerRefreshInterval := settings.GetSettingByID(fmt.Sprintf(refreshSettingFormat, provider))
+	providerRefreshInterval := settings.GetSettingByID(fmt.Sprintf(refreshSettingFormat, strings.ToLower(provider)))
 	if providerRefreshInterval == "" {
-		return 300, nil
+		return 300 * time.Second, nil
 	}
 	refreshInterval, err := strconv.Atoi(providerRefreshInterval)
 	if err != nil {
-		return 300, err
+		return 300 * time.Second, err
 	}
 
 	return time.Duration(refreshInterval) * time.Second, nil
 }
 
-// shouldRefreshCluster checks lastRefreshTime and refreshInterval and returns
-// true when upstream cluster should be refreshed
-func shouldRefreshCluster(refreshInterval time.Duration, lastRefreshTime string) (bool, error) {
+// nextRefreshTime checks lastRefreshTime and refreshInterval and when the next refresh should occur
+func nextRefreshTime(refreshInterval time.Duration, lastRefreshTime string) (time.Time, error) {
 	if lastRefreshTime == "" {
-		return false, fmt.Errorf("lastRefreshTime is required")
+		return time.Time{}, nil
 	}
 
 	lastRefreshUnix, err := strconv.ParseInt(lastRefreshTime, 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("unable to parse last KEv2 refresh time [%s]: %v", lastRefreshTime, err)
+		return time.Time{}, fmt.Errorf("unable to parse last KEv2 refresh time [%s]: %v", lastRefreshTime, err)
 	}
 
-	return !time.Now().After(time.Unix(lastRefreshUnix, 0).Add(refreshInterval)), nil
+	return time.Unix(lastRefreshUnix, 0).Add(refreshInterval), nil
 }
 
 func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cluster, cloudDriver string) (*mgmtv3.Cluster, error) {
@@ -159,7 +146,6 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	// In this second case, the message is set on the Updated condition, but execution continues because the sync was successful.
 	upstreamConfig, err := getComparableUpstreamSpec(c.secretsCache, cluster)
 	if err != nil {
-		var statusErr error
 		var syncFailed string
 		if upstreamConfig == nil {
 			syncFailed = ": syncing failed"
@@ -168,22 +154,13 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		apimgmtv3.ClusterConditionUpdated.False(cluster)
 		apimgmtv3.ClusterConditionUpdated.Message(cluster, fmt.Sprintf("[Syncing error%s] %s", syncFailed, err.Error()))
 
-		cluster, statusErr = c.clusterClient.Update(cluster)
-		if statusErr != nil {
-			return cluster, statusErr
-		}
-
 		if upstreamConfig == nil {
-			return cluster, err
+			return c.updateCluster(cluster)
 		}
 	} else if strings.Contains(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), "[Syncing error") {
 		cluster = cluster.DeepCopy()
 		apimgmtv3.ClusterConditionUpdated.True(cluster)
 		apimgmtv3.ClusterConditionUpdated.Message(cluster, "")
-		cluster, err = c.clusterClient.Update(cluster)
-		if err != nil {
-			return cluster, err
-		}
 	}
 
 	var initialClusterConfig, appliedClusterConfig, upstreamClusterConfig, upstreamSpec interface{}
@@ -213,16 +190,12 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		case apimgmtv3.ClusterDriverGKE:
 			cluster.Status.GKEStatus.UpstreamSpec = upstreamConfig.gkeConfig
 		}
-		cluster, err = c.clusterClient.Update(cluster)
-		if err != nil {
-			return cluster, err
-		}
 	}
 
 	// check if cluster is still updating changes
 	if !reflect.DeepEqual(initialClusterConfig, appliedClusterConfig) {
 		logrus.Infof("cluster [%s] currently updating, skipping spec sync", cluster.Name)
-		return cluster, nil
+		return c.updateCluster(cluster)
 	}
 
 	// check for changes between upstream spec on cluster and initial ClusterConfig object
@@ -248,28 +221,34 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		specMap[key] = value
 	}
 
-	if !updateClusterConfig {
-		logrus.Debugf("cluster [%s] matches upstream, skipping spec sync", cluster.Name)
-		return cluster, nil
+	if updateClusterConfig {
+		logrus.Infof("change detected for cluster [%s], updating spec", cluster.Name)
+		// for other cloud drivers, please edit HERE
+		switch cloudDriver {
+		case apimgmtv3.ClusterDriverEKS:
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.EKSConfig)
+			if err != nil {
+				return cluster, err
+			}
+		case apimgmtv3.ClusterDriverGKE:
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.GKEConfig)
+			if err != nil {
+				return cluster, err
+			}
+		}
+	} else {
+		logrus.Infof("cluster [%s] matches upstream, skipping spec sync", cluster.Name)
 	}
 
-	// for other cloud drivers, please edit HERE
-	switch cloudDriver {
-	case apimgmtv3.ClusterDriverEKS:
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.EKSConfig)
-		if err != nil {
-			return cluster, err
-		}
-	case apimgmtv3.ClusterDriverGKE:
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.GKEConfig)
-		if err != nil {
-			return cluster, err
-		}
-	}
+	return c.updateCluster(cluster)
+}
+
+func (c *clusterRefreshController) updateCluster(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
+	// Update the cluster refresh time.
 	cluster.Annotations[clusterLastRefreshTime] = strconv.FormatInt(time.Now().Unix(), 10)
 
 	return c.clusterClient.Update(cluster)
