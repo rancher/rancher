@@ -37,74 +37,116 @@ func TestFetchImagesFromCharts(t *testing.T) {
 	systemChartBothImages := []string{
 		"rancher/fluentd:v0.1.16",
 	}
+	systemChartBothSources := []string{
+		"rancher-logging:0.1.2",
+		"rancher-monitoring:0.0.4",
+	}
 	systemChartLinuxImagesOnly := []string{
 		"rancher/prom-alertmanager:v0.17.0",
 	}
+	systemChartLinuxSourcesOnly := []string{}
 	systemChartWindowsImagesOnly := []string{
 		"rancher/wmi_exporter-package:v0.0.2",
 	}
+	systemChartWindowsSourcesOnly := []string{}
 	chartLinuxImagesOnly := []string{
 		"rancher/istio-kubectl:1.5.8",
 		"rancher/opa-gatekeeper:v3.1.0-rc.1",
 	}
+	chartLinuxSourcesOnly := []string{
+		"rancher-gatekeeper:v3.1.0-rc.1",
+	}
 	chartWindowsImagesOnly := []string{}
+	chartWindowsSourcesOnly := []string{}
 
 	testCases := []struct {
-		caseName               string
-		inputPath              string
-		inputOsType            OSType
-		outputShouldContain    []string
-		outputShouldNotContain []string
+		caseName                      string
+		inputPath                     string
+		inputOsType                   OSType
+		outputShouldContainImages     []string
+		outputShouldNotContainImages  []string
+		outputShouldContainSources    []string
+		outputShouldNotContainSources []string
 	}{
 		{
 			caseName:    "fetch linux images from system charts",
 			inputPath:   systemChartPath,
 			inputOsType: Linux,
-			outputShouldContain: flatStringSlice(
+			outputShouldContainImages: flatStringSlice(
 				systemChartBothImages,
 				systemChartLinuxImagesOnly,
 			),
-			outputShouldNotContain: systemChartWindowsImagesOnly,
+			outputShouldNotContainImages: systemChartWindowsImagesOnly,
+			outputShouldContainSources: flatStringSlice(
+				systemChartBothSources,
+				systemChartLinuxSourcesOnly,
+			),
+			outputShouldNotContainSources: systemChartWindowsSourcesOnly,
 		},
 		{
 			caseName:    "fetch windows images from system charts",
 			inputPath:   systemChartPath,
 			inputOsType: Windows,
-			outputShouldContain: flatStringSlice(
+			outputShouldContainImages: flatStringSlice(
 				systemChartBothImages,
 				systemChartWindowsImagesOnly,
 			),
-			outputShouldNotContain: systemChartLinuxImagesOnly,
+			outputShouldNotContainImages: systemChartLinuxImagesOnly,
+			outputShouldContainSources: flatStringSlice(
+				systemChartBothSources,
+				systemChartWindowsSourcesOnly,
+			),
+			outputShouldNotContainSources: systemChartLinuxSourcesOnly,
 		},
 		{
-			caseName:               "fetch linux images from charts",
-			inputPath:              chartPath,
-			inputOsType:            Linux,
-			outputShouldContain:    chartLinuxImagesOnly,
-			outputShouldNotContain: chartWindowsImagesOnly,
+			caseName:                      "fetch linux images from charts",
+			inputPath:                     chartPath,
+			inputOsType:                   Linux,
+			outputShouldContainImages:     chartLinuxImagesOnly,
+			outputShouldNotContainImages:  chartWindowsImagesOnly,
+			outputShouldContainSources:    chartLinuxSourcesOnly,
+			outputShouldNotContainSources: chartWindowsSourcesOnly,
 		},
 		{
-			caseName:               "fetch windows images from charts",
-			inputPath:              chartPath,
-			inputOsType:            Windows,
-			outputShouldContain:    chartWindowsImagesOnly,
-			outputShouldNotContain: chartLinuxImagesOnly,
+			caseName:                      "fetch windows images from charts",
+			inputPath:                     chartPath,
+			inputOsType:                   Windows,
+			outputShouldContainImages:     chartWindowsImagesOnly,
+			outputShouldNotContainImages:  chartLinuxImagesOnly,
+			outputShouldContainSources:    chartWindowsImagesOnly,
+			outputShouldNotContainSources: chartLinuxSourcesOnly,
 		},
 	}
 
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
-		images, err := fetchImagesFromCharts(cs.inputPath, cs.inputOsType)
+		imagesSet := make(map[string]map[string]bool)
+		err := fetchImagesFromCharts(cs.inputPath, cs.inputOsType, imagesSet)
+		images, imageSources := getImagesAndSourcesLists(imagesSet)
 		assert.Nilf(err, "%s, failed to fetch images from charts", cs.caseName)
-		if len(cs.outputShouldContain) > 0 {
-			assert.Subset(images, cs.outputShouldContain, cs.caseName)
+		assert.Subset(images, cs.outputShouldContainImages, cs.caseName)
+		for _, nc := range cs.outputShouldNotContainImages {
+			assert.NotContains(images, nc, cs.caseName)
 		}
-		if len(cs.outputShouldNotContain) > 0 {
-			for _, nc := range cs.outputShouldNotContain {
-				assert.NotContains(images, nc, cs.caseName)
-			}
+		assert.Subset(imageSources, cs.outputShouldContainSources, cs.caseName)
+		for _, nc := range cs.outputShouldNotContainSources {
+			assert.NotContains(imageSources, nc, cs.caseName)
 		}
 	}
+}
+
+func getImagesAndSourcesLists(imagesSet map[string]map[string]bool) ([]string, []string) {
+	var images, imageSources []string
+	for image, sources := range imagesSet {
+		images = append(images, image)
+		for source, val := range sources {
+			if !val {
+				continue
+			}
+			imageSources = append(imageSources, source)
+		}
+	}
+	return images, imageSources
 }
 
 func TestFetchImagesFromSystem(t *testing.T) {
@@ -126,17 +168,17 @@ func TestFetchImagesFromSystem(t *testing.T) {
 	}
 
 	testCases := []struct {
-		caseName               string
-		inputRkeSystemImages   map[string]rketypes.RKESystemImages
-		inputOsType            OSType
-		outputShouldContain    []string
-		outputShouldNotContain []string
+		caseName                  string
+		inputRkeSystemImages      map[string]rketypes.RKESystemImages
+		inputOsType               OSType
+		outputShouldContainImages []string
+		outputShouldNotContain    []string
 	}{
 		{
 			caseName:             "fetch linux images from system images",
 			inputRkeSystemImages: linuxInfo.RKESystemImages,
 			inputOsType:          Linux,
-			outputShouldContain: flatStringSlice(
+			outputShouldContainImages: flatStringSlice(
 				bothImages,
 				linuxImagesOnly,
 			),
@@ -146,7 +188,7 @@ func TestFetchImagesFromSystem(t *testing.T) {
 			caseName:             "fetch windows images from system images",
 			inputRkeSystemImages: windowsInfo.RKESystemImages,
 			inputOsType:          Windows,
-			outputShouldContain: flatStringSlice(
+			outputShouldContainImages: flatStringSlice(
 				bothImages,
 				windowsImagesOnly,
 			),
@@ -155,58 +197,55 @@ func TestFetchImagesFromSystem(t *testing.T) {
 	}
 
 	assert := assertlib.New(t)
+
 	for _, cs := range testCases {
-		images, err := fetchImagesFromSystem(cs.inputRkeSystemImages, cs.inputOsType)
+		imagesSet := make(map[string]map[string]bool)
+		err := fetchImagesFromSystem(cs.inputRkeSystemImages, cs.inputOsType, imagesSet)
+		images, imageSources := getImagesAndSourcesLists(imagesSet)
 		assert.Nilf(err, "%s, failed to fetch images from system images", cs.caseName)
-		if len(cs.outputShouldContain) > 0 {
-			assert.Subset(images, cs.outputShouldContain, cs.caseName)
+		assert.Subset(images, cs.outputShouldContainImages, cs.caseName)
+		for _, nc := range cs.outputShouldNotContain {
+			assert.NotContains(images, nc, cs.caseName)
 		}
-		if len(cs.outputShouldNotContain) > 0 {
-			for _, nc := range cs.outputShouldNotContain {
-				assert.NotContains(images, nc, cs.caseName)
-			}
+		for _, source := range imageSources {
+			assert.Equal("system", source)
 		}
 	}
 }
 
-func TestNormalizeImages(t *testing.T) {
+func TestConvertMirroredImages(t *testing.T) {
 	testCases := []struct {
-		caseName          string
-		inputRawImages    []string
-		outputShouldEqual []string
+		caseName                string
+		inputRawImages          map[string]map[string]bool
+		outputImagesShouldEqual map[string]map[string]bool
 	}{
 		{
 			caseName: "normalize images",
-			inputRawImages: []string{
-				// for sort
-				"rancher/rke-tools:v0.1.48",
-				// for unique
-				"rancher/rke-tools:v0.1.49",
-				"rancher/rke-tools:v0.1.49",
-				"rancher/rke-tools:v0.1.49",
+			inputRawImages: map[string]map[string]bool{
+				"rancher/rke-tools:v0.1.48": {"system": true},
+				"rancher/rke-tools:v0.1.49": {"system": true},
 				// for mirror
-				"prom/prometheus:v2.0.1",
-				"quay.io/coreos/flannel:v1.2.3",
-				"gcr.io/google_containers/k8s-dns-kube-dns:1.15.0",
-				"test.io/test:v0.0.1", // not in mirror list
+				"prom/prometheus:v2.0.1":                           {"system": true},
+				"quay.io/coreos/flannel:v1.2.3":                    {"system": true},
+				"gcr.io/google_containers/k8s-dns-kube-dns:1.15.0": {"system": true},
+				"test.io/test:v0.0.1":                              {"test": true}, // not in mirror list
 			},
-			outputShouldEqual: []string{
-				"rancher/coreos-flannel:v1.2.3",
-				"rancher/k8s-dns-kube-dns:1.15.0",
-				"rancher/prom-prometheus:v2.0.1",
-				"rancher/rke-tools:v0.1.48",
-				"rancher/rke-tools:v0.1.49",
-				"test.io/test:v0.0.1",
+			outputImagesShouldEqual: map[string]map[string]bool{
+				"rancher/coreos-flannel:v1.2.3":   {"system": true},
+				"rancher/k8s-dns-kube-dns:1.15.0": {"system": true},
+				"rancher/prom-prometheus:v2.0.1":  {"system": true},
+				"rancher/rke-tools:v0.1.48":       {"system": true},
+				"rancher/rke-tools:v0.1.49":       {"system": true},
+				"test.io/test:v0.0.1":             {"test": true},
 			},
 		},
 	}
 
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
-		images := normalizeImages(cs.inputRawImages)
-		if len(cs.outputShouldEqual) > 0 {
-			assert.Equal(cs.outputShouldEqual, images, cs.caseName)
-		}
+		imagesSet := cs.inputRawImages
+		convertMirroredImages(imagesSet)
+		assert.Equal(cs.outputImagesShouldEqual, imagesSet)
 	}
 }
 
@@ -225,27 +264,51 @@ func TestGetImages(t *testing.T) {
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy, // from system
 		"rancher/fluentd:v0.1.16",                              // from chart
 	}
+	bothSources := []string{
+		"rancher/fluentd:v0.1.16 rancher-logging:0.1.2",
+	}
+	imagesSet := make(map[string]map[string]bool)
+	setRequirementImages(Linux, imagesSet)
+	imagesToAdd, _ := getImagesAndSourcesLists(imagesSet)
+	sourcesToAdd := getImageSourcesList(imagesSet)
+	linuxRKEImage := selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS
 	linuxImagesOnly := append(
-		getRequirementImages(Linux),                         // from requirement
-		selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS, // from system
-		"rancher/prom-alertmanager:v0.17.0",                 // from chart
-		toolsSystemImages.PipelineSystemImages.Jenkins,      // from tools
+		imagesToAdd,                         // from requirement
+		linuxRKEImage,                       // from system
+		"rancher/prom-alertmanager:v0.17.0", // from chart
+		toolsSystemImages.PipelineSystemImages.Jenkins, // from tools
+	)
+	linuxSourcesOnly := append(
+		sourcesToAdd,
+		fmt.Sprintf("%s system", linuxRKEImage),
+		"rancher/prom-alertmanager:v0.17.0 rancher-monitoring:0.0.4",
+	)
+	imagesSet = make(map[string]map[string]bool)
+	setRequirementImages(Windows, imagesSet)
+	imagesToAdd, _ = getImagesAndSourcesLists(imagesSet)
+	sourcesToAdd = getImageSourcesList(imagesSet)
+	windowsRKEImage := selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer
+	windowsSourcesOnly := append(
+		sourcesToAdd,
+		fmt.Sprintf("%s system", windowsRKEImage),
+		"rancher/wmi_exporter-package:v0.0.2 rancher-monitoring:0.0.4",
 	)
 	windowsImagesOnly := append(
-		getRequirementImages(Windows),                                          // from requirement
-		selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer, // from system
-		"rancher/wmi_exporter-package:v0.0.2",                                  // from chart
+		imagesToAdd,     // from requirement
+		windowsRKEImage, // from system
 	)
 
 	testCases := []struct {
-		caseName               string
-		inputSystemChartPath   string
-		inputChartPath         string
-		inputImagesFromArgs    []string
-		inputRkeSystemImages   map[string]rketypes.RKESystemImages
-		inputOsType            OSType
-		outputShouldContain    []string
-		outputShouldNotContain []string
+		caseName                      string
+		inputSystemChartPath          string
+		inputChartPath                string
+		inputImagesFromArgs           []string
+		inputRkeSystemImages          map[string]rketypes.RKESystemImages
+		inputOsType                   OSType
+		outputShouldContainImages     []string
+		outputShouldNotContainImages  []string
+		outputShouldContainSources    []string
+		outputShouldNotContainSources []string
 	}{
 		{
 			caseName:             "get linux images",
@@ -257,11 +320,16 @@ func TestGetImages(t *testing.T) {
 			},
 			inputRkeSystemImages: linuxInfo.RKESystemImages,
 			inputOsType:          Linux,
-			outputShouldContain: flatStringSlice(
+			outputShouldContainImages: flatStringSlice(
 				linuxImagesOnly,
 				bothImages,
 			),
-			outputShouldNotContain: windowsImagesOnly,
+			outputShouldNotContainImages: windowsImagesOnly,
+			outputShouldContainSources: flatStringSlice(
+				linuxSourcesOnly,
+				bothSources,
+			),
+			outputShouldNotContainSources: windowsSourcesOnly,
 		},
 		{
 			caseName:             "get windows images",
@@ -272,27 +340,48 @@ func TestGetImages(t *testing.T) {
 			},
 			inputRkeSystemImages: windowsInfo.RKESystemImages,
 			inputOsType:          Windows,
-			outputShouldContain: flatStringSlice(
+			outputShouldContainImages: flatStringSlice(
 				windowsImagesOnly,
 				bothImages,
 			),
-			outputShouldNotContain: linuxImagesOnly,
+			outputShouldNotContainImages: linuxImagesOnly,
+			outputShouldContainSources: flatStringSlice(
+				windowsSourcesOnly,
+				bothSources,
+			),
+			outputShouldNotContainSources: linuxSourcesOnly,
 		},
 	}
 
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
-		images, err := GetImages(cs.inputSystemChartPath, cs.inputChartPath, []string{}, cs.inputImagesFromArgs, cs.inputRkeSystemImages, cs.inputOsType)
+		images, imageSources, err := GetImages(cs.inputSystemChartPath, cs.inputChartPath, []string{}, cs.inputImagesFromArgs, cs.inputRkeSystemImages, cs.inputOsType)
 		assert.Nilf(err, "%s, failed to get images", cs.caseName)
-		if len(cs.outputShouldContain) > 0 {
-			assert.Subset(images, cs.outputShouldContain, cs.caseName)
+		assert.Subset(images, cs.outputShouldContainImages, cs.caseName)
+		for _, nc := range cs.outputShouldNotContainImages {
+			assert.NotContains(images, nc, cs.caseName)
 		}
-		if len(cs.outputShouldNotContain) > 0 {
-			for _, nc := range cs.outputShouldNotContain {
-				assert.NotContains(images, nc, cs.caseName)
-			}
+		assert.Subset(imageSources, cs.outputShouldContainSources, cs.caseName)
+		for _, nc := range cs.outputShouldNotContainSources {
+			assert.NotContains(imageSources, nc, cs.caseName)
 		}
 	}
+}
+
+func getImageSourcesList(imagesSet map[string]map[string]bool) []string {
+	var imagesAndSources []string
+	for image, sources := range imagesSet {
+		commaSeparatedSources := ""
+		for source, val := range sources {
+			if !val {
+				continue
+			}
+			commaSeparatedSources += fmt.Sprintf("%s,", source)
+		}
+		commaSeparatedSources = strings.TrimSuffix(commaSeparatedSources, ",")
+		imagesAndSources = append(imagesAndSources, fmt.Sprintf("%s %s", image, commaSeparatedSources))
+	}
+	return imagesAndSources
 }
 
 func getTestK8sVersionInfo() (*kd.VersionInfo, *kd.VersionInfo, error) {
