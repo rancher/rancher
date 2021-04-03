@@ -136,3 +136,18 @@ customLogos:
   # storageClass: "-"
   accessMode: ReadWriteOnce
   size: 1Gi
+
+# Rancher post-delete hook
+postDelete:
+  enabled: true
+  image:
+    repository: %POST_DELETE_IMAGE_NAME%
+    tag: %POST_DELETE_IMAGE_TAG%
+  namespaceList:
+    - fleet-system
+    - cattle-system
+    - rancher-operator-system
+  # Number of seconds to wait for an app to be uninstalled
+  timeout: 120
+  # by default, the job will fail if it fail to uninstall any of the apps
+  ignoreTimeoutError: false
