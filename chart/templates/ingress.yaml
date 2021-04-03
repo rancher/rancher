@@ -8,10 +8,7 @@ kind: Ingress
 metadata:
   name: {{ template "rancher.fullname" . }}
   labels:
-    app: {{ template "rancher.fullname" . }}
-    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
+{{ include "rancher.labels" . | indent 4 }}
   annotations:
 {{- if .Values.ingress.configurationSnippet }}
     nginx.ingress.kubernetes.io/configuration-snippet: |
