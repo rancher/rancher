@@ -153,7 +153,10 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
 
 
 def create_rancher_cluster(client, rke2_clusterfilepath):
-    clustername = random_test_name("testcustom-rke2")
+    if CLUSTER_NAME:
+        clustername = CLUSTER_NAME
+    else:
+        clustername = random_test_name("testcustom-rke2")
     cluster = client.create_cluster(name=clustername)
     cluster_token = create_custom_host_registration_token(client, cluster)
     command = cluster_token.insecureCommand
