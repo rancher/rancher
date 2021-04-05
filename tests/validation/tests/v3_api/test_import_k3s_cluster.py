@@ -210,7 +210,7 @@ def create_multiple_control_cluster():
     return k3s_clusterfilepath
 
 
-def create_rancher_cluster(client, k3s_clusterfilepath, validate=True):
+def create_rancher_cluster(client, k3s_clusterfilepath):
     if CLUSTER_NAME:
         clustername = CLUSTER_NAME
     else:

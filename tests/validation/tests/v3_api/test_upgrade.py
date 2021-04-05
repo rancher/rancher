@@ -647,13 +647,21 @@ def upgrade_cluster():
     print("Upgrading cluster {} to version {}".format(
         CLUSTER_NAME, CLUSTER_VERSION))
     client, cluster = get_user_client_and_cluster()
-    if cluster.k3sConfig:
+    if "k3sConfig" in cluster:
         k3s_config = cluster.k3sConfig
         k3s_updated_config = k3s_config.copy()
         k3s_updated_config["kubernetesVersion"] = CLUSTER_VERSION
         client.update(cluster, name=cluster.name, k3sConfig=k3s_updated_config)
         cluster = get_cluster_by_name(client, CLUSTER_NAME)
         assert cluster.k3sConfig["kubernetesVersion"] == CLUSTER_VERSION
+    elif "rke2Config" in cluster:
+        rke2_config = cluster.rke2Config
+        rke2_updated_config = rke2_config.copy()
+        rke2_updated_config["kubernetesVersion"] = CLUSTER_VERSION
+        client.update(cluster, name=cluster.name,
+                      rke2Config=rke2_updated_config)
+        cluster = get_cluster_by_name(client, CLUSTER_NAME)
+        assert cluster.rke2Config["kubernetesVersion"] == CLUSTER_VERSION
 
 
 def wait_for_ready_nodes():
