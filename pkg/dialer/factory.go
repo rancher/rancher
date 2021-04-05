@@ -82,6 +82,14 @@ func HasOnlyPrivateAPIEndpoint(cluster *v3.Cluster) bool {
 		}
 		return cluster.Status.EKSStatus.PrivateRequiresTunnel != nil &&
 			*cluster.Status.EKSStatus.PrivateRequiresTunnel
+	case v32.ClusterDriverGKE:
+		if cluster.Status.GKEStatus.UpstreamSpec != nil &&
+			cluster.Status.GKEStatus.UpstreamSpec.PrivateClusterConfig != nil &&
+			!cluster.Status.GKEStatus.UpstreamSpec.PrivateClusterConfig.EnablePrivateEndpoint {
+			return false
+		}
+		return cluster.Status.GKEStatus.PrivateRequiresTunnel != nil &&
+			*cluster.Status.GKEStatus.PrivateRequiresTunnel
 	default:
 		return false
 	}

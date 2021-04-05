@@ -21,6 +21,7 @@ const (
 	ClusterStatusFieldDriver                               = "driver"
 	ClusterStatusFieldEKSStatus                            = "eksStatus"
 	ClusterStatusFieldFailedSpec                           = "failedSpec"
+	ClusterStatusFieldGKEStatus                            = "gkeStatus"
 	ClusterStatusFieldIstioEnabled                         = "istioEnabled"
 	ClusterStatusFieldLimits                               = "limits"
 	ClusterStatusFieldMonitoringStatus                     = "monitoringStatus"
@@ -52,6 +53,7 @@ type ClusterStatus struct {
 	Driver                               string                      `json:"driver,omitempty" yaml:"driver,omitempty"`
 	EKSStatus                            *EKSStatus                  `json:"eksStatus,omitempty" yaml:"eksStatus,omitempty"`
 	FailedSpec                           *ClusterSpec                `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
+	GKEStatus                            *GKEStatus                  `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
 	IstioEnabled                         bool                        `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	Limits                               map[string]string           `json:"limits,omitempty" yaml:"limits,omitempty"`
 	MonitoringStatus                     *MonitoringStatus           `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
