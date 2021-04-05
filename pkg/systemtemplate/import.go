@@ -75,7 +75,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		tolerations = templates.ToYAML(taints)
 	}
 
-	if cluster != nil && cluster.Spec.AgentEnvVars != nil {
+	if cluster != nil && len(cluster.Spec.AgentEnvVars) > 0 {
 		agentEnvVars = templates.ToYAML(cluster.Spec.AgentEnvVars)
 	}
 

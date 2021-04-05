@@ -9,6 +9,7 @@ import (
 	"time"
 
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
+	gkev1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -34,6 +35,7 @@ type clusterRefreshController struct {
 // for other cloud drivers, please edit HERE
 type clusterConfig struct {
 	eksConfig *eksv1.EKSClusterConfigSpec
+	gkeConfig *gkev1.GKEClusterConfigSpec
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
@@ -185,6 +187,11 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		appliedClusterConfig = cluster.Status.AppliedSpec.EKSConfig
 		upstreamClusterConfig = cluster.Status.EKSStatus.UpstreamSpec
 		upstreamSpec = upstreamConfig.eksConfig
+	case apimgmtv3.ClusterDriverGKE:
+		initialClusterConfig = cluster.Spec.GKEConfig
+		appliedClusterConfig = cluster.Status.AppliedSpec.GKEConfig
+		upstreamClusterConfig = cluster.Status.GKEStatus.UpstreamSpec
+		upstreamSpec = upstreamConfig.gkeConfig
 	}
 
 	// compare saved cluster.Status...UpstreamSpec with upstreamSpec,
@@ -196,6 +203,8 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		switch cloudDriver {
 		case apimgmtv3.ClusterDriverEKS:
 			cluster.Status.EKSStatus.UpstreamSpec = upstreamConfig.eksConfig
+		case apimgmtv3.ClusterDriverGKE:
+			cluster.Status.GKEStatus.UpstreamSpec = upstreamConfig.gkeConfig
 		}
 		cluster, err = c.clusterClient.Update(cluster)
 		if err != nil {
@@ -244,6 +253,11 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		if err != nil {
 			return cluster, err
 		}
+	case apimgmtv3.ClusterDriverGKE:
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.GKEConfig)
+		if err != nil {
+			return cluster, err
+		}
 	}
 
 	if cluster.Annotations == nil {
@@ -262,6 +276,10 @@ func getComparableUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgm
 	case apimgmtv3.ClusterDriverEKS:
 		eksConfig, err := BuildEKSUpstreamSpec(secretsCache, cluster)
 		clusterCfg.eksConfig = eksConfig
+		return clusterCfg, err
+	case apimgmtv3.ClusterDriverGKE:
+		gkeConfig, err := BuildGKEUpstreamSpec(secretsCache, cluster)
+		clusterCfg.gkeConfig = gkeConfig
 		return clusterCfg, err
 	default:
 		return nil, fmt.Errorf("unsupported cloud driver")
