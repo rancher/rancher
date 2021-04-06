@@ -2,6 +2,7 @@ package clusterprovisioner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
@@ -818,9 +818,16 @@ func (p *Provisioner) getSystemImages(spec apimgmtv3.ClusterSpec) (*rketypes.RKE
 		newValue := fmt.Sprintf("%s/%s", privateRegistry, value)
 		updatedMap[key] = newValue
 	}
-	if err := mapstructure.Decode(updatedMap, &systemImages); err != nil {
+	// Decoding updateMap to systemImages using json marshal/unmarshal to honor field names
+	updatedByte, err := json.Marshal(updatedMap)
+	if err != nil {
 		return nil, err
 	}
+	err = json.Unmarshal(updatedByte, &systemImages)
+	if err != nil {
+		return nil, err
+	}
+	logrus.Debugf("Updated system images to use private registry [%s]: %#v", privateRegistry, systemImages)
 	return &systemImages, nil
 }
 
