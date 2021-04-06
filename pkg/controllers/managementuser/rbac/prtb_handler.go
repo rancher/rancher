@@ -246,7 +246,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 	return verbs, nil
 }
 
-// Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rulesfor the give resource and verbs
+// Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rules for the given resource and verbs
 func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool) (string, error) {
 	clusterRoles := m.workload.RBAC.ClusterRoles("")
 	roleName := rt.Name + "-promoted"
