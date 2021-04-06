@@ -144,6 +144,14 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return np.Spec.Ingress[0].From[i].IPBlock.CIDR < np.Spec.Ingress[0].From[j].IPBlock.CIDR
 	})
 
+	// An empty ingress rule allows all traffic to the namespace
+	// so we need to skip creating the network policy here.
+	// This is expected for CNI plugins other than Canal/Flannel.
+	if len(np.Spec.Ingress[0].From) == 0 {
+		logrus.Debugf("netpolMgr: handleHostNetwork: no host addresses found, skipping programming the hn policy")
+		return nil
+	}
+
 	namespaces, err := npmgr.nsLister.List("", labels.Everything())
 	if err != nil {
 		return fmt.Errorf("couldn't list namespaces err=%v", err)
