@@ -41,7 +41,7 @@ MACHINE_TIMEOUT = float(os.environ.get('RANCHER_MACHINE_TIMEOUT', "1200"))
 HARDENED_CLUSTER = ast.literal_eval(
     os.environ.get('RANCHER_HARDENED_CLUSTER', "False"))
 TEST_OS = os.environ.get('RANCHER_TEST_OS', "linux")
-TEST_IMAGE = os.environ.get('RANCHER_TEST_IMAGE', "sangeetha/mytestcontainer")
+TEST_IMAGE = os.environ.get('RANCHER_TEST_IMAGE', "ranchertest/mytestcontainer")
 TEST_IMAGE_PORT = os.environ.get('RANCHER_TEST_IMAGE_PORT', "80")
 TEST_IMAGE_NGINX = os.environ.get('RANCHER_TEST_IMAGE_NGINX', "nginx")
 TEST_IMAGE_OS_BASE = os.environ.get('RANCHER_TEST_IMAGE_OS_BASE', "ubuntu")

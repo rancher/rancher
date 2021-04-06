@@ -4,7 +4,7 @@ import json
 import yaml
 import rancher
 
-TEST_IMAGE_V1 = os.environ.get('RANCHER_TEST_IMAGE_V1', "sangeetha/mytestcontainer")
+TEST_IMAGE_V1 = os.environ.get('RANCHER_TEST_IMAGE_V1', "ranchertest/mytestcontainer")
 
 
 def get_admin_client_v1():

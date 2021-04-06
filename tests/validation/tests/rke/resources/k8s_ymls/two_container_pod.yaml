@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: pod-test-util
-        image: sangeetha/mytestcontainer
+        image: ranchertest/mytestcontainer
         ports:
         - containerPort: 80
       - name: nginx
