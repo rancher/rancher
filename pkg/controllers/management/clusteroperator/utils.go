@@ -1,7 +1,6 @@
 package clusteroperator
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 	"strings"
@@ -245,7 +244,7 @@ func (e *OperatorController) RecordCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*m
 			return err
 		}
 		currentCluster.Status.APIEndpoint = apiEndpoint
-		currentCluster.Status.CACert = base64.StdEncoding.EncodeToString(caSecret.Data["ca"])
+		currentCluster.Status.CACert = caCert
 		currentCluster, err = e.ClusterClient.Update(currentCluster)
 		return err
 	})
