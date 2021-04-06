@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	aksv1 "github.com/rancher/aks-operator/pkg/apis/aks.cattle.io/v1"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	gkev1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -35,6 +36,7 @@ type clusterRefreshController struct {
 
 // for other cloud drivers, please edit HERE
 type clusterConfig struct {
+	aksConfig *aksv1.AKSClusterConfigSpec
 	eksConfig *eksv1.EKSClusterConfigSpec
 	gkeConfig *gkev1.GKEClusterConfigSpec
 }
@@ -89,6 +91,12 @@ func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.C
 func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 	// for other cloud drivers, please edit HERE
 	switch {
+	case cluster.Spec.AKSConfig != nil:
+		if cluster.Status.AKSStatus.UpstreamSpec == nil {
+			logrus.Debugf("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
+			return apimgmtv3.ClusterDriverAKS, false
+		}
+		return apimgmtv3.ClusterDriverAKS, true
 	case cluster.Spec.EKSConfig != nil:
 		if cluster.Status.EKSStatus.UpstreamSpec == nil {
 			logrus.Debugf("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
@@ -166,6 +174,11 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	var initialClusterConfig, appliedClusterConfig, upstreamClusterConfig, upstreamSpec interface{}
 	// for other cloud drivers, please edit HERE
 	switch cloudDriver {
+	case apimgmtv3.ClusterDriverAKS:
+		initialClusterConfig = cluster.Spec.AKSConfig
+		appliedClusterConfig = cluster.Status.AppliedSpec.AKSConfig
+		upstreamClusterConfig = cluster.Status.AKSStatus.UpstreamSpec
+		upstreamSpec = upstreamConfig.aksConfig
 	case apimgmtv3.ClusterDriverEKS:
 		initialClusterConfig = cluster.Spec.EKSConfig
 		appliedClusterConfig = cluster.Status.AppliedSpec.EKSConfig
@@ -185,6 +198,8 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		cluster = cluster.DeepCopy()
 		// for other cloud drivers, please edit HERE
 		switch cloudDriver {
+		case apimgmtv3.ClusterDriverAKS:
+			cluster.Status.AKSStatus.UpstreamSpec = upstreamConfig.aksConfig
 		case apimgmtv3.ClusterDriverEKS:
 			cluster.Status.EKSStatus.UpstreamSpec = upstreamConfig.eksConfig
 		case apimgmtv3.ClusterDriverGKE:
@@ -225,6 +240,11 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		logrus.Infof("change detected for cluster [%s], updating spec", cluster.Name)
 		// for other cloud drivers, please edit HERE
 		switch cloudDriver {
+		case apimgmtv3.ClusterDriverAKS:
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.AKSConfig)
+			if err != nil {
+				return cluster, err
+			}
 		case apimgmtv3.ClusterDriverEKS:
 			err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.EKSConfig)
 			if err != nil {
@@ -259,6 +279,10 @@ func getComparableUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgm
 
 	// for other cloud drivers, please edit HERE
 	switch cluster.Status.Driver {
+	case apimgmtv3.ClusterDriverAKS:
+		aksConfig, err := BuildAKSUpstreamSpec(secretsCache, cluster)
+		clusterCfg.aksConfig = aksConfig
+		return clusterCfg, err
 	case apimgmtv3.ClusterDriverEKS:
 		eksConfig, err := BuildEKSUpstreamSpec(secretsCache, cluster)
 		clusterCfg.eksConfig = eksConfig

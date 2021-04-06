@@ -106,6 +106,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 func skipOperatorCluster(action string, cluster *v3.Cluster) bool {
 	msgFmt := "%s cluster [%s] will be managed by %s-operator-controller, skipping %s"
 	switch {
+	case cluster.Spec.AKSConfig != nil:
+		logrus.Debugf(msgFmt, "AKS", cluster.Name, "aks", action)
+		return true
 	case cluster.Spec.EKSConfig != nil:
 		logrus.Debugf(msgFmt, "EKS", cluster.Name, "eks", action)
 		return true
