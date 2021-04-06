@@ -23,6 +23,7 @@ import (
 const (
 	noKEv2Provider         = "none"
 	clusterLastRefreshTime = "clusters.management.cattle.io/ke-last-refresh"
+	refreshSettingFormat   = "%s-refresh"
 )
 
 type clusterRefreshController struct {
@@ -106,6 +107,12 @@ func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 			return apimgmtv3.ClusterDriverEKS, false
 		}
 		return apimgmtv3.ClusterDriverEKS, true
+	case cluster.Spec.GKEConfig != nil:
+		if cluster.Status.GKEStatus.UpstreamSpec == nil {
+			logrus.Infof("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
+			return apimgmtv3.ClusterDriverGKE, false
+		}
+		return apimgmtv3.ClusterDriverGKE, true
 	default:
 		return noKEv2Provider, false
 	}
@@ -114,14 +121,14 @@ func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 // getProviderRefreshInterval returns the duration that should pass between
 // refreshing a cluster created by the given cloud provider.
 func getProviderRefreshInterval(provider string) (time.Duration, error) {
-	var refreshInterval int
 
-	// for other cloud drivers, please edit HERE
-	switch provider {
-	case apimgmtv3.ClusterDriverEKS:
-		refreshInterval = settings.EKSUpstreamRefresh.GetInt()
-	default:
+	providerRefreshInterval := settings.GetSettingByID(fmt.Sprintf(refreshSettingFormat, provider))
+	if providerRefreshInterval == "" {
 		return 300, nil
+	}
+	refreshInterval, err := strconv.Atoi(providerRefreshInterval)
+	if err != nil {
+		return 300, err
 	}
 
 	return time.Duration(refreshInterval) * time.Second, nil
