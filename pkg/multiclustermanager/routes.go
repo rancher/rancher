@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/norman/customization/gke"
 	"github.com/rancher/rancher/pkg/api/norman/customization/oci"
 	"github.com/rancher/rancher/pkg/api/norman/customization/vsphere"
 	managementapi "github.com/rancher/rancher/pkg/api/norman/server"
@@ -98,12 +99,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	authed.Path("/meta/aksVersions").Handler(capabilities.NewAKSVersionsHandler())
 	authed.Path("/meta/aksVirtualNetworks").Handler(capabilities.NewAKSVirtualNetworksHandler())
-	authed.Path("/meta/gkeMachineTypes").Handler(capabilities.NewGKEMachineTypesHandler())
-	authed.Path("/meta/gkeNetworks").Handler(capabilities.NewGKENetworksHandler())
-	authed.Path("/meta/gkeServiceAccounts").Handler(capabilities.NewGKEServiceAccountsHandler())
-	authed.Path("/meta/gkeSubnetworks").Handler(capabilities.NewGKESubnetworksHandler())
-	authed.Path("/meta/gkeVersions").Handler(capabilities.NewGKEVersionsHandler())
-	authed.Path("/meta/gkeZones").Handler(capabilities.NewGKEZonesHandler())
+	authed.Path("/meta/{resource:gke.+}").Handler(gke.NewGKEHandler(scaledContext))
 	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
