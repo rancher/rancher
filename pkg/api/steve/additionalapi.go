@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/github"
 	"github.com/rancher/rancher/pkg/api/steve/health"
 	"github.com/rancher/rancher/pkg/api/steve/projects"
+	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
@@ -41,6 +42,7 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 }
 
 func Tunnel(config *wrangler.Context) http.Handler {
+	config.TunnelAuthorizer.Add(proxy.NewAuthorizer(config))
 	config.TunnelAuthorizer.Add(aggregation.New(config))
 	return config.TunnelServer
 }

@@ -102,7 +102,6 @@ type Context struct {
 	CatalogContentManager *content.Manager
 	HelmOperations        *helmop.Operations
 	SystemChartsManager   *system.Manager
-	Agent                 bool
 }
 
 type MultiClusterManager interface {
@@ -147,7 +146,7 @@ func (w *Context) Start(ctx context.Context) error {
 	return nil
 }
 
-func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
+func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(restConfig, Scheme)
 	if err != nil {
 		return nil, err
@@ -237,7 +236,7 @@ func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.Clien
 		return nil, err
 	}
 
-	leadership := leader.NewManager("", lockID, steveControllers.K8s)
+	leadership := leader.NewManager("", "cattle-controllers", steveControllers.K8s)
 	leadership.OnLeader(func(ctx context.Context) error {
 		if peerManager != nil {
 			peerManager.Leader()

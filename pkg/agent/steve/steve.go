@@ -2,99 +2,55 @@ package steve
 
 import (
 	"context"
-	"io"
-	"net/http"
-	"sync"
-	"time"
+	"io/ioutil"
+	"os"
 
-	"github.com/rancher/rancher/pkg/rancher"
-	"github.com/sirupsen/logrus"
+	"github.com/rancher/rancher/pkg/agent/cluster"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/wrangler/pkg/apply"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-)
-
-var (
-	running bool
-	runLock sync.Mutex
 )
 
 func Run(ctx context.Context) error {
-	runLock.Lock()
-	defer runLock.Unlock()
-
-	if running {
-		return nil
-	}
-
-	logrus.Info("Starting steve")
 	c, err := rest.InClusterConfig()
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		err = http.ListenAndServe(":8080", http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			resp, err := http.Get("http://localhost:6080/healthz")
-			if err != nil {
-				http.Error(rw, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			defer resp.Body.Close()
-			rw.WriteHeader(resp.StatusCode)
-			_, _ = io.Copy(rw, resp.Body)
-		}))
-		panic("health check server failed: " + err.Error())
-	}()
+	apply, err := apply.NewForConfig(c)
+	if err != nil {
+		return err
+	}
 
-	go func() {
-		for {
-			ctx, cancel := context.WithCancel(ctx)
-			r, err := rancher.New(ctx, reverseClientConfig{cfg: c}, &rancher.Options{
-				BindHost:        "127.0.0.1",
-				HTTPListenPort:  6080,
-				HTTPSListenPort: 0,
-				AddLocal:        "true",
-				Agent:           true,
-			})
-			if err != nil {
-				cancel()
-				logrus.Errorf("failed to initialize Rancher: %v", err)
-				time.Sleep(10 * time.Second)
-				continue
-			}
+	token, url, err := cluster.TokenAndURL()
+	if err != nil {
+		return err
+	}
 
-			if err := r.ListenAndServe(ctx); err != nil {
-				cancel()
-				logrus.Errorf("failed to start Rancher: %v", err)
-				time.Sleep(10 * time.Second)
-				continue
-			}
+	data := map[string][]byte{
+		"url":   []byte(url + "/v3/connect"),
+		"token": []byte("steve-cluster-" + token),
+	}
 
-			cancel()
-		}
-	}()
+	ca, err := ioutil.ReadFile("/etc/kubernetes/ssl/serverca")
+	if os.IsNotExist(err) {
+	} else if err != nil {
+		return err
+	} else {
+		data["ca.crt"] = ca
+	}
 
-	running = true
-	return nil
-}
-
-type reverseClientConfig struct {
-	cfg *rest.Config
-}
-
-func (r reverseClientConfig) RawConfig() (clientcmdapi.Config, error) {
-	panic("not implemented")
-}
-
-func (r reverseClientConfig) ClientConfig() (*rest.Config, error) {
-	return r.cfg, nil
-}
-
-func (r reverseClientConfig) Namespace() (string, bool, error) {
-	return "", false, nil
-}
-
-func (r reverseClientConfig) ConfigAccess() clientcmd.ConfigAccess {
-	panic("not implemented ")
+	return apply.
+		WithDynamicLookup().
+		WithSetID("rancher-steve-aggregation").
+		WithListerNamespace(namespace.System).
+		ApplyObjects(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace.System,
+				Name:      "steve-aggregation",
+			},
+			Data: data,
+		})
 }

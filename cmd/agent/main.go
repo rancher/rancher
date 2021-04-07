@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"strings"
@@ -23,14 +24,13 @@ import (
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
+	"github.com/rancher/rancher/pkg/agent/steve"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
-
-	_ "net/http/pprof"
 )
 
 var (
@@ -286,7 +286,7 @@ func run() error {
 		}
 
 		if isCluster() {
-			err = cluster.RunControllers(topContext)
+			err = steve.Run(topContext)
 			if err != nil {
 				logrus.Fatal(err)
 			}

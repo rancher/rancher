@@ -49,7 +49,6 @@ type Options struct {
 	AuditLogMaxsize   int
 	AuditLogMaxbackup int
 	AuditLevel        int
-	Agent             bool
 	Features          string
 }
 
@@ -83,17 +82,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	lockID := "cattle-controllers"
-	if opts.Agent {
-		lockID = "cattle-agent-controllers"
-	}
-
-	wranglerContext, err := wrangler.NewContext(ctx, lockID, clientConfg, restConfig)
+	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
 	}
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
-	wranglerContext.Agent = opts.Agent
 
 	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
 	kontainerdriver.RegisterIndexers(wranglerContext)
@@ -106,14 +99,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	// Initialize Features as early as possible
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
 
-	if opts.Agent {
-		authServer, err = auth.NewHeaderAuth()
-		if err != nil {
-			return nil, err
-		}
-		features.MCM.Disable()
-		features.Fleet.Disable()
-	} else if features.Auth.Enabled() {
+	if features.Auth.Enabled() {
 		authServer, err = auth.NewServer(ctx, restConfig)
 		if err != nil {
 			return nil, err
@@ -138,7 +124,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1().SubjectAccessReviews(),
-		wranglerContext.MultiClusterManager,
+		wranglerContext.TunnelServer.Dialer,
 		wranglerContext.Mgmt.Cluster().Cache(),
 		localClusterEnabled(opts),
 		steve,
