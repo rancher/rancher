@@ -88,7 +88,7 @@ require (
 	github.com/rancher/eks-operator v1.0.6-rc1
 	github.com/rancher/gke-operator v1.0.1-rc5
 	github.com/rancher/kubernetes-provider-detector v0.1.2
-	github.com/rancher/lasso v0.0.0-20210325230905-459cd42cfdd0
+	github.com/rancher/lasso v0.0.0-20210407025055-18a00567c734
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20210225010917-c7fd1e24145b
 	github.com/rancher/rancher/pkg/apis v0.0.0
@@ -99,7 +99,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20210318171316-376934558c5b
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
-	github.com/rancher/wrangler v0.7.3-0.20210325230949-f096ad3a59c5
+	github.com/rancher/wrangler v0.7.3-0.20210407025123-cf9bb4f55cee
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
@@ -113,7 +113,7 @@ require (
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
-	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/net v0.0.0-20210315170653-34ac3e1c2000
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
