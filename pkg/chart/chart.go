@@ -74,6 +74,10 @@ func Populate(ctx context.Context, config corecontrollers.ConfigMapClient) error
 			version, appVersion := versionAndAppVersion()
 			content = bytes.ReplaceAll(content, []byte("%VERSION%"), []byte(version))
 			content = bytes.ReplaceAll(content, []byte("%APP_VERSION%"), []byte(appVersion))
+		} else if path == "values.yaml" {
+			_, appVersion := versionAndAppVersion()
+			content = bytes.ReplaceAll(content, []byte("%POST_DELETE_IMAGE_NAME%"), []byte(settings.AgentImage.Get()))
+			content = bytes.ReplaceAll(content, []byte("%POST_DELETE_IMAGE_TAG%"), []byte(appVersion))
 		}
 		digest.Write([]byte(path))
 		digest.Write(content)
