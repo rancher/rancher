@@ -100,6 +100,7 @@ var (
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
 	EKSUpstreamRefreshCron            = NewSetting("eks-refresh-cron", "*/5 * * * *")   // EKSUpstreamRefreshCron is deprecated and will be replaced by EKSUpstreamRefresh
 	EKSUpstreamRefresh                = NewSetting("eks-refresh", "300")
+	GKEUpstreamRefresh                = NewSetting("gke-refresh", "300")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
 
 	FleetMinVersion           = NewSetting("fleet-min-version", "")
@@ -238,4 +239,13 @@ func getMetadataConfig() string {
 		return ""
 	}
 	return string(ans)
+}
+
+// GetSettingByID returns a setting that is stored with the given id
+func GetSettingByID(id string) string {
+	if provider == nil {
+		s := settings[id]
+		return s.Default
+	}
+	return provider.Get(id)
 }
