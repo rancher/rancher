@@ -111,6 +111,20 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 		}
 		writer.Write(serialized)
+	case "gkeClusters":
+		if serialized, errCode, err = listClusters(req.Context(), capa); err != nil {
+			logrus.Debugf("[gke-handler] error getting clusters: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
+	case "gkeSharedSubnets":
+		if serialized, errCode, err = listSharedSubnets(req.Context(), capa); err != nil {
+			logrus.Debugf("[gke-handler] error getting shared subnets: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
 	default:
 		handleErr(writer, httperror.NotFound.Status, fmt.Errorf("invalid endpoint %v", resourceType))
 	}
