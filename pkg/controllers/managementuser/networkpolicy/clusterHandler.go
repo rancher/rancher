@@ -128,13 +128,11 @@ func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {
 	//skipping nssyncer, projectSyncer + nodehandler would result into handling nssyncer as well
 }
 
-const creatorLabel = "cattle.io/creator"
-
 // deleteNetworkPolicies removes Rancher created NetworkPolicy resources from the downstream cluster and
 // removes ProjectNetworkPolicy resources from the management cluster
 func (ch *clusterHandler) deleteNetworkPolicies(cluster *v3.Cluster) error {
 	// consider nps for deletion if they were created by Rancher, i.e. they have a label: "cattle.io/creator": "norman"
-	set := labels.Set(map[string]string{creatorLabel: "norman"})
+	set := labels.Set(map[string]string{creatorLabel: creatorNorman})
 	nps, err := ch.npmgr.npLister.List("", set.AsSelector())
 	if err != nil {
 		return fmt.Errorf("npLister: %v", err)

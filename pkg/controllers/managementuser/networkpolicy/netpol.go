@@ -16,12 +16,21 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 const (
-	//FlannelPresenceLabel is used to detect if a node is using flannel plugin or not
+	// FlannelPresenceLabel is used to detect if a node is using flannel plugin or not
 	FlannelPresenceLabel = "flannel.alpha.coreos.com/public-ip"
 	systemProjectLabel   = "authz.management.cattle.io/system-project"
+	creatorLabel         = "cattle.io/creator"
+)
+
+const (
+	defaultNamespacePolicyName              = "np-default"
+	defaultSystemProjectNamespacePolicyName = "np-default-allow-all"
+	hostNetworkPolicyName                   = "hn-nodes"
+	creatorNorman                           = "norman"
 )
 
 type netpolMgr struct {
@@ -94,17 +103,59 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 	if err != nil {
 		return fmt.Errorf("netpolMgr: programNetworkPolicy getSystemNamespaces: err=%v", err)
 	}
-	policyName := "np-default"
+
 	for _, aNS := range namespaces {
 		id, _ := aNS.Labels[nslabels.ProjectIDFieldLabel]
-		if systemNamespaces[aNS.Name] || id == "" {
-			npmgr.delete(aNS.Name, policyName)
+
+		// add an allow all network policy to system project namespaces
+		// this is the same as having no network policy, i.e. it allows all ingress and egress traffic to/from the namespace
+		// this is needed to ensure CIS Scans pass. See: https://github.com/rancher/rancher/issues/30211 for more info
+		// we also guard against overriding existing network policies, the default network policy for a namespace in the system project
+		// will only be added if there are no other network policies in the namespace (network policies are additive)
+		if systemNamespaces[aNS.Name] {
+			npmgr.delete(aNS.Name, defaultNamespacePolicyName)
+
+			// this requirement includes objects with no creatorLabel or a value != creatorNorman
+			labelReq, err := labels.NewRequirement(creatorLabel, selection.NotEquals, []string{creatorNorman})
+			if err != nil { // this won't happen since creatorLabel and creatorNorman are constants and valid per validation rules in labels.NewRequirement
+				return err
+			}
+			// select user network policies, which are ones that don't have a label with creator == norman
+			nps, err := npmgr.npLister.List(aNS.Name, labels.NewSelector().Add(*labelReq))
+			if err != nil {
+				return err
+			}
+
+			// there are existing network policies in this system project based namespace, skip programming default
+			if len(nps) > 0 {
+				logrus.Debugf("netPolMgr: namespace=%s in project=%s has existing network policies, skipping programming %s", aNS.Name, id, defaultSystemProjectNamespacePolicyName)
+				continue
+			}
+
+			// program default network policy for system project based namespace
+			logrus.Debugf("netPolMgr: programming %s for namespace=%s in project=%s", defaultSystemProjectNamespacePolicyName, aNS.Name, id)
+			if err := npmgr.program(generateAllowAllNetworkPolicy(aNS, systemProjectID)); err != nil {
+				return fmt.Errorf(
+					"netPolMgr: programNetworkPolicy: error programming network policy %s for system project based namespace=%s err=%v",
+					defaultSystemProjectNamespacePolicyName, aNS.Name, err,
+				)
+			}
+			continue
+		}
+
+		// namespace is not in system project, so ensure it doesn't have the default policy for system project based namespaces
+		if id != systemProjectID {
+			npmgr.delete(aNS.Name, defaultSystemProjectNamespacePolicyName)
+		}
+		if id == "" {
+			npmgr.delete(aNS.Name, defaultNamespacePolicyName)
 			continue
 		}
 		if aNS.DeletionTimestamp != nil {
 			logrus.Debugf("netpolMgr: programNetworkPolicy: aNS=%+v marked for deletion, skipping", aNS)
 			continue
 		}
+
 		np := generateDefaultNamespaceNetworkPolicy(aNS, projectID, systemProjectID)
 		if err := npmgr.program(np); err != nil {
 			return fmt.Errorf("netpolMgr: programNetworkPolicy: error programming default network policy for ns=%v err=%v", aNS.Name, err)
@@ -120,7 +171,6 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 	}
 
 	logrus.Debugf("netpolMgr: handleHostNetwork: processing %d nodes", len(nodes))
-	policyName := "hn-nodes"
 	np := generateNodesNetworkPolicy()
 	for _, node := range nodes {
 		if _, ok := node.Annotations[FlannelPresenceLabel]; !ok {
@@ -156,7 +206,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 	for _, aNS := range namespaces {
 		projectID, _ := aNS.Labels[nslabels.ProjectIDFieldLabel]
 		if systemNamespaces[aNS.Name] || projectID == "" {
-			npmgr.delete(aNS.Name, policyName)
+			npmgr.delete(aNS.Name, hostNetworkPolicyName)
 			continue
 		}
 		if aNS.DeletionTimestamp != nil || aNS.Status.Phase == corev1.NamespaceTerminating {
@@ -222,10 +272,9 @@ func (npmgr *netpolMgr) getSystemNSInfo(clusterNamespace string) (map[string]boo
 }
 
 func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID string, systemProjectID string) *knetworkingv1.NetworkPolicy {
-	policyName := "np-default"
-	np := &knetworkingv1.NetworkPolicy{
+	return &knetworkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      policyName,
+			Name:      defaultNamespacePolicyName,
 			Namespace: aNS.Name,
 			Labels:    labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: projectID}),
 		},
@@ -253,14 +302,36 @@ func generateDefaultNamespaceNetworkPolicy(aNS *corev1.Namespace, projectID stri
 			},
 		},
 	}
-	return np
+}
+
+func generateAllowAllNetworkPolicy(ns *corev1.Namespace, systemProjectID string) *knetworkingv1.NetworkPolicy {
+	return &knetworkingv1.NetworkPolicy{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      defaultSystemProjectNamespacePolicyName,
+			Namespace: ns.Name,
+			Labels:    labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID}),
+		},
+		Spec: knetworkingv1.NetworkPolicySpec{
+			// An empty PodSelector selects all pods in this Namespace.
+			PodSelector: v1.LabelSelector{},
+			Ingress: []knetworkingv1.NetworkPolicyIngressRule{
+				{},
+			},
+			Egress: []knetworkingv1.NetworkPolicyEgressRule{
+				{},
+			},
+			PolicyTypes: []knetworkingv1.PolicyType{
+				knetworkingv1.PolicyTypeIngress,
+				knetworkingv1.PolicyTypeEgress,
+			},
+		},
+	}
 }
 
 func generateNodesNetworkPolicy() *knetworkingv1.NetworkPolicy {
-	policyName := "hn-nodes"
-	np := &knetworkingv1.NetworkPolicy{
+	return &knetworkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
-			Name: policyName,
+			Name: hostNetworkPolicyName,
 		},
 		Spec: knetworkingv1.NetworkPolicySpec{
 			PodSelector: v1.LabelSelector{},
@@ -274,7 +345,6 @@ func generateNodesNetworkPolicy() *knetworkingv1.NetworkPolicy {
 			},
 		},
 	}
-	return np
 }
 
 func portToString(port knetworkingv1.NetworkPolicyPort) string {
