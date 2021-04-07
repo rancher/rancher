@@ -248,6 +248,12 @@ func (v *Validator) validateK3sBasedVersionUpgrade(request *types.APIContext, sp
 		return err
 	}
 
+	if isK3s && cluster.Spec.K3sConfig == nil {
+		// prevents embedded cluster from have k3sConfig set. Embedded cluster cannot be upgraded. Non-embedded
+		// clusters' config will be set my controller.
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "k3sConfig cannot be changed from nil")
+	}
+
 	// must wait for original status version to be set
 	if cluster.Status.Version == nil {
 		return upgradeNotReadyErr
