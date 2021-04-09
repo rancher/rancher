@@ -91,7 +91,7 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 				Name: role,
 			}
 			crbName := pkgrbac.NameForClusterRoleBinding(roleRef, subject)
-			_, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
+			createdCRB, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: crbName,
 					Labels: map[string]string{
@@ -101,11 +101,15 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 				Subjects: []rbacv1.Subject{subject},
 				RoleRef:  roleRef,
 			})
+			if err == nil {
+				crbsToKeep[createdCRB.Name] = true
+				continue
+			}
 			if !apierrors.IsAlreadyExists(err) {
 				return nil, err
 			}
 
-			// if the binding exists but was not found in the index, manually retrieve it so that we can add appropriate labels
+			// the binding exists but was not found in the index, manually retrieve it so that we can add appropriate labels
 			crb, err := bindingCli.Get(crbName, metav1.GetOptions{})
 			if err != nil {
 				return nil, err
@@ -114,6 +118,7 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 			crbs = append(crbs, crb)
 		}
 
+	CRBs:
 		for _, obj := range crbs {
 			crb, ok := obj.(*rbacv1.ClusterRoleBinding)
 			if !ok {
@@ -123,7 +128,7 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 			crbsToKeep[crb.Name] = true
 			for owner := range crb.Labels {
 				if rtbUID == owner {
-					continue
+					continue CRBs
 				}
 			}
 
