@@ -54,6 +54,10 @@ spec:
                   - {{ template "rancher.fullname" . }}
               topologyKey: kubernetes.io/hostname
 {{- end }}
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
+      tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
       containers:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}

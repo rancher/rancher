@@ -33,3 +33,29 @@ chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 heritage: {{ .Release.Service }}
 release: {{ .Release.Name }}
 {{- end }}
+
+# Windows Support
+
+{{/*
+Windows cluster will add default taint for linux nodes,
+add below linux tolerations to workloads could be scheduled to those linux nodes
+*/}}
+
+{{- define "linux-node-tolerations" -}}
+- key: "cattle.io/os"
+  value: "linux"
+  effect: "NoSchedule"
+  operator: "Equal"
+{{- end -}}
+
+{{- define "linux-node-selector-terms" -}}
+{{- $key := "kubernetes.io/os" -}}
+{{- if semverCompare "<1.14-0" .Capabilities.KubeVersion.GitVersion }}
+{{- $key := "beta.kubernetes.io/os" -}}
+{{- end -}}
+- matchExpressions:
+  - key: {{ $key }}
+    operator: NotIn
+    values:
+    - windows
+{{- end -}}
