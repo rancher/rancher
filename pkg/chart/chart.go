@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/name"
 	v1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,7 @@ func versionAndAppVersion() (string, string) {
 
 	_, err := semver.NewVersion(version)
 	if err != nil {
-		version = "0.0.0-" + appVersion
+		version = name.SafeConcatName("0.0.0", appVersion)
 	}
 
 	if appVersion == "dev" {
