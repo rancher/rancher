@@ -501,6 +501,9 @@ func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool)
 			users, err := management.Mgmt.User().List(v1.ListOptions{
 				LabelSelector: set.String(),
 			})
+			if err != nil {
+				return "", err
+			}
 
 			bindings, err := management.RBAC.ClusterRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
 			if err != nil {
