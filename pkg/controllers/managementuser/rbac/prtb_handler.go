@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"reflect"
+	"sort"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -22,22 +23,22 @@ import (
 
 const owner = "owner-user"
 
-var globalResourcesNeededInProjects = map[string]map[string]bool{
+var globalResourcesNeededInProjects = map[string][]string{
 	"persistentvolumes": {
-		"":     true,
-		"core": true,
+		"",
+		"core",
 	},
 	"storageclasses": {
-		"storage.k8s.io": true,
+		"storage.k8s.io",
 	},
 	"apiservices": {
-		"apiregistration.k8s.io": true,
+		"apiregistration.k8s.io",
 	},
 	"clusterrepos": {
-		"catalog.cattle.io": true,
+		"catalog.cattle.io",
 	},
 	"clusters": {
-		"management.cattle.io": true,
+		"management.cattle.io",
 	},
 }
 
@@ -305,7 +306,7 @@ func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
 	}
 
 	for _, rg := range rule.APIGroups {
-		if _, ok := groups[rg]; ok {
+		if slice.ContainsString(groups, rg) {
 			return true
 		}
 	}
@@ -317,10 +318,16 @@ func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
 	for v := range verbs {
 		vs = append(vs, v)
 	}
+
+	// Sort the verbs, a map does not guarantee order
+	sort.Strings(vs)
+
+	groups := globalResourcesNeededInProjects[resource]
+
 	return rbacv1.PolicyRule{
 		Resources: []string{resource},
 		Verbs:     vs,
-		APIGroups: []string{"*"},
+		APIGroups: groups,
 	}
 }
 
