@@ -7,6 +7,7 @@ import (
 const (
 	NodeDriverType                      = "nodeDriver"
 	NodeDriverFieldActive               = "active"
+	NodeDriverFieldAddCloudCredential   = "addCloudCredential"
 	NodeDriverFieldAnnotations          = "annotations"
 	NodeDriverFieldBuiltin              = "builtin"
 	NodeDriverFieldChecksum             = "checksum"
@@ -31,6 +32,7 @@ const (
 type NodeDriver struct {
 	types.Resource
 	Active               bool              `json:"active,omitempty" yaml:"active,omitempty"`
+	AddCloudCredential   bool              `json:"addCloudCredential,omitempty" yaml:"addCloudCredential,omitempty"`
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Builtin              bool              `json:"builtin,omitempty" yaml:"builtin,omitempty"`
 	Checksum             string            `json:"checksum,omitempty" yaml:"checksum,omitempty"`
