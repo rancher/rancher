@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
@@ -442,7 +443,7 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	desiredRBs := map[string]*v1.RoleBinding{}
 	roleBindings := m.mgmt.RBAC.RoleBindings(namespace)
 	for _, role := range roles {
-		resourceToVerbs := map[string]map[string]bool{}
+		resourceToVerbs := map[string]map[string]string{}
 		for resource, apiGroup := range resources {
 			verbs, err := m.checkForManagementPlaneRules(role, resource, apiGroup)
 			if err != nil {
@@ -507,7 +508,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	roleBindings := m.mgmt.RBAC.RoleBindings(projectNamespace)
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, role := range roles {
-		resourceToVerbs := map[string]map[string]bool{}
+		resourceToVerbs := map[string]map[string]string{}
 		for resource, apiGroup := range resources {
 			// Adding this check, because we want cluster-owners to have access to catalogtemplates/versions of all projects, but no other cluster roles
 			// need to access catalogtemplates of projects they do not belong to
@@ -573,7 +574,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	roleBindings := m.mgmt.RBAC.RoleBindings(clusterNamespace)
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, role := range roles {
-		resourceToVerbs := map[string]map[string]bool{}
+		resourceToVerbs := map[string]map[string]string{}
 		for resource, apiGroup := range resources {
 			verbs, err := m.checkForManagementPlaneRules(role, resource, apiGroup)
 			if err != nil {
@@ -675,7 +676,7 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 }
 
 // If the roleTemplate has rules granting access to a management plane resource, return the verbs for those rules
-func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managementPlaneResource string, apiGroup string) (map[string]bool, error) {
+func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managementPlaneResource string, apiGroup string) (map[string]string, error) {
 	var rules []v1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
@@ -690,12 +691,12 @@ func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, management
 		rules = role.Rules
 	}
 
-	verbs := map[string]bool{}
+	verbs := map[string]string{}
 	for _, rule := range rules {
 		if (slice.ContainsString(rule.Resources, managementPlaneResource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
 			if checkGroup(apiGroup, rule) {
 				for _, v := range rule.Verbs {
-					verbs[v] = true
+					verbs[v] = apiGroup
 				}
 			}
 		}
@@ -713,17 +714,19 @@ func checkGroup(apiGroup string, rule v1.PolicyRule) bool {
 	return false
 }
 
-func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs map[string]map[string]bool, rt *v3.RoleTemplate) error {
+func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs map[string]map[string]string, rt *v3.RoleTemplate) error {
 	roleCli := m.mgmt.RBAC.Roles(namespace)
 	update := false
 	if role, err := m.rLister.Get(namespace, rt.Name); err == nil && role != nil {
 		newRole := role.DeepCopy()
 		for resource, newVerbs := range resourceToVerbs {
-			currentVerbs := map[string]bool{}
+			currentVerbs := map[string]string{}
 			for _, rule := range role.Rules {
 				if slice.ContainsString(rule.Resources, resource) {
 					for _, v := range rule.Verbs {
-						currentVerbs[v] = true
+						if rule.APIGroups[0] == newVerbs[v] {
+							currentVerbs[v] = rule.APIGroups[0]
+						}
 					}
 				}
 			}
@@ -786,15 +789,23 @@ func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[str
 	return nil
 }
 
-func buildRule(resource string, verbs map[string]bool) v1.PolicyRule {
+func buildRule(resource string, verbs map[string]string) v1.PolicyRule {
 	var vs []string
-	for v := range verbs {
+	var apiGroup string
+	for v, g := range verbs {
 		vs = append(vs, v)
+		// This is not efficient but our list of verbs will always be > 10 and we don't know the verbs to access the apiGroup
+		// Checking for empty string also won't help since core api group is empty string
+		apiGroup = g
 	}
+
+	// Sort the verbs, a map does not guarantee order
+	sort.Strings(vs)
+
 	return v1.PolicyRule{
 		Resources: []string{resource},
 		Verbs:     vs,
-		APIGroups: []string{"*"},
+		APIGroups: []string{apiGroup},
 	}
 }
 
