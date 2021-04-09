@@ -310,15 +310,18 @@ type Condition struct {
 }
 
 type NodeDriverSpec struct {
-	DisplayName      string   `json:"displayName"`
-	Description      string   `json:"description"`
-	URL              string   `json:"url" norman:"required"`
-	ExternalID       string   `json:"externalId"`
-	Builtin          bool     `json:"builtin"`
-	Active           bool     `json:"active"`
-	Checksum         string   `json:"checksum"`
-	UIURL            string   `json:"uiUrl"`
-	WhitelistDomains []string `json:"whitelistDomains,omitempty"`
+	DisplayName string `json:"displayName"`
+	Description string `json:"description"`
+	URL         string `json:"url" norman:"required"`
+	ExternalID  string `json:"externalId"`
+	Builtin     bool   `json:"builtin"`
+	Active      bool   `json:"active"`
+	// If AddCloudCredential is true, then the cloud credential schema is created
+	// regardless of whether the node driver is active.
+	AddCloudCredential bool     `json:"addCloudCredential"`
+	Checksum           string   `json:"checksum"`
+	UIURL              string   `json:"uiUrl"`
+	WhitelistDomains   []string `json:"whitelistDomains,omitempty"`
 }
 
 type PublicEndpoint struct {
