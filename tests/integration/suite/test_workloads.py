@@ -341,6 +341,7 @@ def test_workload_redeploy(admin_pc, remove_resource):
              fail_handler=lambda: 'Timed out waiting for timestamp reset')
 
 
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
                                            user_mc, user_factory):
     """Tests workload actions with a read-only user and a member user.
