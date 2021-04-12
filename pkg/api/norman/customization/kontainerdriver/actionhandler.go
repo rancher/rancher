@@ -158,16 +158,17 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 	}
 	systemCatalogHash := helmlib.CatalogSHA256Hash(systemCatalog)
 	systemCatalogChartPath := filepath.Join(helmlib.CatalogCache, systemCatalogHash)
+	rancherVersion := kd.GetRancherVersion()
 
 	var targetImages []string
 	switch apiContext.ID {
 	case linuxImages:
-		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", []string{}, []string{}, rkeSysImages, image.Linux)
+		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", rancherVersion, []string{}, []string{}, rkeSysImages, image.Linux)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
 	case windowsImages:
-		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", []string{}, []string{}, rkeSysImages, image.Windows)
+		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", rancherVersion, []string{}, []string{}, rkeSysImages, image.Windows)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
 		}

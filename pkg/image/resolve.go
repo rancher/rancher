@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -23,14 +24,10 @@ import (
 
 type OSType int
 
-type chart struct {
-	dir     string
-	version string
-}
-
 const (
 	Linux OSType = iota
 	Windows
+	SystemChartsRepoDir = "build/system-charts"
 )
 
 func Resolve(image string) string {
@@ -50,8 +47,8 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	return image
 }
 
-func getChartAndVersion(path string) (map[string]chart, error) {
-	rtn := map[string]chart{}
+func getChartVersions(path, rancherVersion string) (libhelm.ChartVersions, error) {
+	chartVersions := libhelm.ChartVersions{}
 	helm := libhelm.Helm{
 		LocalPath: path,
 		IconPath:  path,
@@ -61,20 +58,72 @@ func getChartAndVersion(path string) (map[string]chart, error) {
 	if err != nil {
 		return nil, err
 	}
-	for k, versions := range index.IndexFile.Entries {
-		// because versions is sorted in reverse order, the first one will be the latest version
+	for _, versions := range index.IndexFile.Entries {
 		if len(versions) > 0 {
-			newestVersionedChart := versions[0]
-			rtn[k] = chart{
-				dir:     newestVersionedChart.Dir,
-				version: newestVersionedChart.Version}
+			// Add latest version (First element is latest, list sorted in descending order)
+			chartVersions = append(chartVersions, versions[0])
+			if strings.Contains(path, SystemChartsRepoDir) {
+				// Skip if rancherVersion is not a valid semver (E.g is a commit hash)
+				if rancherSemVer, err := semver.NewVersion(rancherVersion); err == nil {
+					// Skip first element, the latest version has already been added
+					for _, v := range versions[1:] {
+						questions, err := getQuestions(filepath.Join(path, v.Dir))
+						if err != nil {
+							return nil, fmt.Errorf("no questions file in chart %s:%s", v.Name, v.Version)
+						}
+						min, ok := questions["rancher_min_version"].(string)
+						if !ok {
+							return nil, fmt.Errorf("no rancher_min_version set in chart %s:%s", v.Name, v.Version)
+						}
+						// No ok check, max is optional
+						max, _ := questions["rancher_max_version"].(string)
+						isInRange, err := isInMinMaxRange(rancherSemVer, min, max)
+						if err != nil {
+							return nil, err
+						}
+						if isInRange {
+							chartVersions = append(chartVersions, v)
+						}
+					}
+				}
+			}
 		}
 	}
-
-	return rtn, nil
+	return chartVersions, nil
 }
 
-func pickImagesFromValuesYAML(imagesSet map[string]map[string]bool, charts map[string]chart, basePath, path string, info os.FileInfo, osType OSType) error {
+func getQuestions(versionPath string) (map[interface{}]interface{}, error) {
+	content, err := ioutil.ReadFile(filepath.Join(versionPath, "questions.yaml"))
+	if err != nil {
+		content, err = ioutil.ReadFile(filepath.Join(versionPath, "questions.yml"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	questions := make(map[interface{}]interface{})
+	if err = yaml.Unmarshal(content, &questions); err != nil {
+		return nil, err
+	}
+	return questions, nil
+}
+
+func isInMinMaxRange(rancherSemVer *semver.Version, min, max string) (bool, error) {
+	var minSemVer, maxSemVer *semver.Version
+	var isInRange bool
+	var err error
+	if minSemVer, err = semver.NewVersion(strings.TrimSpace(min)); err == nil {
+		if maxSemVer, err = semver.NewVersion(strings.TrimSpace(max)); err == nil {
+			isInRange = (rancherSemVer.GreaterThan(minSemVer) || rancherSemVer.Equal(minSemVer)) &&
+				(rancherSemVer.LessThan(maxSemVer) || rancherSemVer.Equal(maxSemVer))
+			return isInRange, nil
+		}
+		isInRange = rancherSemVer.GreaterThan(minSemVer) || rancherSemVer.Equal(minSemVer)
+		return isInRange, nil
+	}
+	return false, err
+}
+
+func pickImagesFromValuesYAML(imagesSet map[string]map[string]bool, chartVersions libhelm.ChartVersions, basePath, path string, info os.FileInfo, osType OSType) error {
 	if info.Name() != "values.yaml" {
 		return nil
 	}
@@ -83,9 +132,9 @@ func pickImagesFromValuesYAML(imagesSet map[string]map[string]bool, charts map[s
 		return err
 	}
 	var chartNameAndVersion string
-	for name, chart := range charts {
-		if strings.HasPrefix(relPath, chart.dir) {
-			chartNameAndVersion = fmt.Sprintf("%s:%s", name, chart.version)
+	for _, v := range chartVersions {
+		if strings.HasPrefix(relPath, v.Dir) {
+			chartNameAndVersion = fmt.Sprintf("%s:%s", v.Name, v.Version)
 			break
 		}
 	}
@@ -97,29 +146,28 @@ func pickImagesFromValuesYAML(imagesSet map[string]map[string]bool, charts map[s
 	if err != nil {
 		return err
 	}
-	dataInterface := map[interface{}]interface{}{}
-	if err := yaml.Unmarshal(data, &dataInterface); err != nil {
+	chartValues := map[interface{}]interface{}{}
+	if err := yaml.Unmarshal(data, &chartValues); err != nil {
 		return err
 	}
 
-	walkthroughMap(dataInterface, func(inputMap map[interface{}]interface{}) {
+	walkthroughMap(chartValues, func(inputMap map[interface{}]interface{}) {
 		generateImages(chartNameAndVersion, inputMap, imagesSet, osType)
 	})
 	return nil
 }
 
 func generateImages(chartNameAndVersion string, inputMap map[interface{}]interface{}, output map[string]map[string]bool, osType OSType) {
-	r, repoOk := inputMap["repository"]
-	t, tagOk := inputMap["tag"]
-	if !repoOk || !tagOk {
+	repo, ok := inputMap["repository"].(string)
+	if !ok {
 		return
 	}
-	repo, repoOk := r.(string)
-	if !repoOk {
+	tag, ok := inputMap["tag"]
+	if !ok {
 		return
 	}
 
-	imageName := fmt.Sprintf("%s:%v", repo, t)
+	imageName := fmt.Sprintf("%s:%v", repo, tag)
 
 	// By default, images are added to the generic images list ("linux"). For Windows and multi-OS
 	// images to be considered, they must use a comma-delineated list (e.g. "os: windows",
@@ -167,18 +215,18 @@ func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[inte
 	}
 }
 
-func GetImages(systemChartPath, chartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, []string, error) {
+func GetImages(systemChartPath, chartPath, rancherVersion string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, []string, error) {
 	// fetch images from system charts
 	imagesSet := make(map[string]map[string]bool)
 	if systemChartPath != "" {
-		if err := fetchImagesFromCharts(systemChartPath, osType, imagesSet); err != nil {
+		if err := fetchImagesFromCharts(systemChartPath, rancherVersion, osType, imagesSet); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to fetch images from system charts")
 		}
 	}
 
 	// fetch images from charts
 	if chartPath != "" {
-		if err := fetchImagesFromCharts(chartPath, osType, imagesSet); err != nil {
+		if err := fetchImagesFromCharts(chartPath, rancherVersion, osType, imagesSet); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
 		}
 	}
@@ -227,8 +275,8 @@ func convertMirroredImages(imagesSet map[string]map[string]bool) {
 	}
 }
 
-func fetchImagesFromCharts(path string, osType OSType, imagesSet map[string]map[string]bool) error {
-	chartVersion, err := getChartAndVersion(path)
+func fetchImagesFromCharts(path, rancherVersion string, osType OSType, imagesSet map[string]map[string]bool) error {
+	chartVersions, err := getChartVersions(path, rancherVersion)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get chart and version from %q", path)
 	}
@@ -237,7 +285,7 @@ func fetchImagesFromCharts(path string, osType OSType, imagesSet map[string]map[
 		if err != nil {
 			return err
 		}
-		return pickImagesFromValuesYAML(imagesSet, chartVersion, path, p, info, osType)
+		return pickImagesFromValuesYAML(imagesSet, chartVersions, path, p, info, osType)
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to pick images from values.yaml")
