@@ -3,6 +3,7 @@ package image
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -151,13 +152,15 @@ func pickImagesFromValuesYAML(imagesSet map[string]map[string]bool, chartVersion
 		return err
 	}
 
+	var imagesFound []string
 	walkthroughMap(chartValues, func(inputMap map[interface{}]interface{}) {
-		generateImages(chartNameAndVersion, inputMap, imagesSet, osType)
+		generateImages(chartNameAndVersion, inputMap, imagesSet, &imagesFound, osType)
 	})
+	log.Printf("Images found in %s: %+v", path, imagesFound)
 	return nil
 }
 
-func generateImages(chartNameAndVersion string, inputMap map[interface{}]interface{}, output map[string]map[string]bool, osType OSType) {
+func generateImages(chartNameAndVersion string, inputMap map[interface{}]interface{}, output map[string]map[string]bool, imagesFound *[]string, osType OSType) {
 	repo, ok := inputMap["repository"].(string)
 	if !ok {
 		return
@@ -168,6 +171,7 @@ func generateImages(chartNameAndVersion string, inputMap map[interface{}]interfa
 	}
 
 	imageName := fmt.Sprintf("%s:%v", repo, tag)
+	*imagesFound = append(*imagesFound, imageName)
 
 	// By default, images are added to the generic images list ("linux"). For Windows and multi-OS
 	// images to be considered, they must use a comma-delineated list (e.g. "os: windows",
