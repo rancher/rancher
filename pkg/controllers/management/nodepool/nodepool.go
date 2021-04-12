@@ -63,8 +63,8 @@ func (c *Controller) Create(nodePool *v3.NodePool) (runtime.Object, error) {
 	return nodePool, nil
 }
 
-func (c *Controller) needsReconcile(nodePool *v3.NodePool) bool {
-	changed, _, err := c.createOrCheckNodes(nodePool, true)
+func (c *Controller) needsReconcile(nodePool *v3.NodePool, nodes []*v3.Node) bool {
+	changed, _, err := c.createOrCheckNodes(nodePool, nodes, true)
 	if err != nil {
 		logrus.Debugf("[nodepoool] error checking pool for reconciliation: %s", err)
 	}
@@ -72,8 +72,8 @@ func (c *Controller) needsReconcile(nodePool *v3.NodePool) bool {
 	return changed
 }
 
-func (c *Controller) reconcile(nodePool *v3.NodePool) {
-	_, qty, err := c.createOrCheckNodes(nodePool, false)
+func (c *Controller) reconcile(nodePool *v3.NodePool, nodes []*v3.Node) {
+	_, qty, err := c.createOrCheckNodes(nodePool, nodes, false)
 	if err != nil {
 		logrus.Errorf("[nodepool] reconcile erorr, create or check nodes: %s", err)
 	}
@@ -92,14 +92,18 @@ func (c *Controller) Updated(nodePool *v3.NodePool) (runtime.Object, error) {
 	obj, err := v32.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
 		anno, _ := nodePool.Annotations[ReconcileAnnotation]
 		if anno == "" {
-			go c.deleteBadNodes(nodePool)
-			if c.needsReconcile(nodePool) {
+			nodes, err := c.NodeLister.List(nodePool.Namespace, labels.Everything())
+			if err != nil {
+				return nodePool, err
+			}
+			go c.deleteBadNodes(nodes)
+			if c.needsReconcile(nodePool, nodes) {
 				logrus.Debugf("[nodepool] reconcile needed for %s", nodePool.Name)
 				np, err := c.setReconcileAnnotation(nodePool, "updating")
 				if err != nil {
 					return nodePool, err
 				}
-				go c.reconcile(np)
+				go c.reconcile(np, nodes)
 				return nil, nil
 			}
 		} else if strings.HasPrefix(anno, "updating/") {
@@ -124,19 +128,20 @@ func (c *Controller) Updated(nodePool *v3.NodePool) (runtime.Object, error) {
 func (c *Controller) Remove(nodePool *v3.NodePool) (runtime.Object, error) {
 	logrus.Infof("[nodepool] deleting %s", nodePool.Name)
 
-	allNodes, err := c.nodes(nodePool, false)
+	logrus.Debugf("[nodepool] listing nodes for pool %s", nodePool.Name)
+	nodeList, err := c.Nodes.ListNamespaced(nodePool.Namespace, metav1.ListOptions{})
 	if err != nil {
 		return nodePool, err
 	}
 
-	for _, node := range allNodes {
+	for _, node := range nodeList.Items {
 		_, nodePoolName := ref.Parse(node.Spec.NodePoolName)
 		if nodePoolName != nodePool.Name {
 			continue
 		}
 
-		if err := c.deleteNode(node, 0); err != nil {
-			return nil, err
+		if err := c.deleteNode(&node, 0); err != nil {
+			return nodePool, err
 		}
 	}
 
@@ -317,31 +322,8 @@ func parsePrefix(fullPrefix string) (prefix string, minLength, start int) {
 	return prefix, len(m[2]), start
 }
 
-func (c *Controller) nodes(nodePool *v3.NodePool, simulate bool) ([]*v3.Node, error) {
-	if simulate {
-		return c.NodeLister.List(nodePool.Namespace, labels.Everything())
-	}
-
-	nodeList, err := c.Nodes.ListNamespaced(nodePool.Namespace, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	var nodes []*v3.Node
-	for i := range nodeList.Items {
-		nodes = append(nodes, &nodeList.Items[i])
-	}
-
-	return nodes, nil
-}
-
-func (c *Controller) deleteBadNodes(nodePool *v3.NodePool) {
-	allNodes, err := c.nodes(nodePool, false)
-	if err != nil {
-		logrus.Errorf("[nodepool] error pulling nodes for bad node deletion: %s", err)
-	}
-
-	for _, node := range allNodes {
+func (c *Controller) deleteBadNodes(nodes []*v3.Node) {
+	for _, node := range nodes {
 		if anno, ok := node.Annotations[DeleteNodeAnnotation]; ok && anno == "true" {
 			return
 		}
@@ -352,7 +334,7 @@ func (c *Controller) deleteBadNodes(nodePool *v3.NodePool) {
 	}
 }
 
-func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (bool, int, error) {
+func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, allNodes []*v3.Node, simulate bool) (bool, int, error) {
 	var (
 		err                 error
 		byName              = map[string]*v3.Node{}
@@ -360,11 +342,6 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 		nodes               []*v3.Node
 		deleteNotReadyAfter = nodePool.Spec.DeleteNotReadyAfterSecs * time.Second
 	)
-
-	allNodes, err := c.nodes(nodePool, simulate)
-	if err != nil {
-		return false, nodePool.Spec.Quantity, err
-	}
 
 	quantity := nodePool.Spec.Quantity
 	for _, node := range allNodes {
