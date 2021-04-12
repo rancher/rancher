@@ -90,7 +90,7 @@ func (m *Lifecycle) Create(obj *v3.NodeDriver) (runtime.Object, error) {
 func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	driverLock.Lock()
 	defer driverLock.Unlock()
-	if !obj.Spec.Active {
+	if !obj.Spec.Active && !obj.Spec.AddCloudCredential {
 		return obj, nil
 	}
 
@@ -108,9 +108,6 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	if driver.Exists() && err == nil && !forceUpdate {
 		// add credential schema
 		credFields := map[string]v32.Field{}
-		if err != nil {
-			logrus.Errorf("error getting schema %v", err)
-		}
 		pubCredFields, privateCredFields, passwordFields, defaults := getCredFields(obj.Annotations)
 		for name, field := range existingSchema.Spec.ResourceFields {
 			if SSHKeyFields[name] || passwordFields[name] || privateCredFields[name] {
@@ -361,7 +358,7 @@ func (m *Lifecycle) Updated(obj *v3.NodeDriver) (runtime.Object, error) {
 	}
 
 	if err := m.createOrUpdateNodeForEmbeddedTypeCredential(credentialConfigSchemaName(obj.Spec.DisplayName),
-		obj.Spec.DisplayName+"credentialConfig", obj.Spec.Active); err != nil {
+		obj.Spec.DisplayName+"credentialConfig", obj.Spec.Active || obj.Spec.AddCloudCredential); err != nil {
 		return obj, err
 	}
 
