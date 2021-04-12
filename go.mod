@@ -4,6 +4,7 @@ go 1.14
 
 replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
+	github.com/coreos/go-iptables => github.com/luthermonson/go-iptables v0.5.1-0.20210408103430-3205874193bf
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
@@ -53,6 +54,7 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/etcd v3.3.17+incompatible
+	github.com/coreos/go-iptables v0.5.0
 	github.com/coreos/go-semver v0.3.0
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
@@ -111,6 +113,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
+	github.com/vishvananda/netlink v1.1.0
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
 	github.com/vmware/govmomi v0.21.1-0.20191006164024-1d61d1ba0200
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
