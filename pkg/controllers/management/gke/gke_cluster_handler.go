@@ -153,12 +153,6 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 	switch phase {
 	case "creating":
-		// set provisioning to unknown
-		cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
-		if err != nil {
-			return cluster, err
-		}
-
 		if cluster.Status.GKEStatus.UpstreamSpec == nil {
 			cluster, err = e.setInitialUpstreamSpec(cluster)
 			if err != nil {
