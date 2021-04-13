@@ -25,6 +25,7 @@ func BuildGKEUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 	upstreamSpec.Zone = cluster.Spec.GKEConfig.Zone
 	upstreamSpec.GoogleCredentialSecret = cluster.Spec.GKEConfig.GoogleCredentialSecret
 	upstreamSpec.ProjectID = cluster.Spec.GKEConfig.ProjectID
+	upstreamSpec.Imported = cluster.Spec.GKEConfig.Imported
 
 	return upstreamSpec, nil
 }
