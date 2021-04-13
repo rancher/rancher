@@ -341,7 +341,6 @@ def test_workload_redeploy(admin_pc, remove_resource):
              fail_handler=lambda: 'Timed out waiting for timestamp reset')
 
 
-@pytest.mark.skip(reason="no way of currently testing this")
 def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
                                            user_mc, user_factory):
     """Tests workload actions with a read-only user and a member user.
@@ -386,16 +385,23 @@ def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
         scale=1,
         containers=[{
             'name': 'foo',
-            'image': 'nginx:1.18',
+            'image': 'rancher/mirrored-library-nginx:1.19.9-alpine',
+            'env': [{
+                'key': 'FOO_KEY',
+                'value': 'FOO_VALUE',
+            }]
         }])
     remove_resource(workload)
     wait_for_workload(client, workload.id)
 
-    # Admin user updates the workload to yield a rollback option. We change the
-    # name below.
+    # Admin user updates the workload to yield a rollback option.
     workload.containers = [{
         'name': 'foo',
-        'image': 'nginx:1.19',
+        'image': 'rancher/mirrored-library-nginx:1.19.9-alpine',
+        'env': [{
+            'key': 'BAR_KEY',
+            'value': 'BAR_VALUE',
+        }]
     }]
     workload = client.update_by_id_workload(workload.id, workload)
     wait_for_workload(client, workload.id)
