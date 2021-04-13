@@ -7,6 +7,7 @@ import (
 	catalogtypes "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
@@ -14,13 +15,19 @@ import (
 )
 
 type operation struct {
-	ops *helmop.Operations
+	ops           *helmop.Operations
+	imageOverride string
 }
 
 func newOperation(
-	helmop *helmop.Operations) *operation {
+	helmop *helmop.Operations, clusterRegistry string) *operation {
+	var imageOverride string
+	if clusterRegistry != "" {
+		imageOverride = clusterRegistry + "/" + settings.ShellImage.Get()
+	}
 	return &operation{
-		ops: helmop,
+		ops:           helmop,
+		imageOverride: imageOverride,
 	}
 }
 
@@ -41,11 +48,11 @@ func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	ns, name := nsAndName(apiRequest)
 	switch apiRequest.Action {
 	case "install":
-		op, err = o.ops.Install(apiRequest.Context(), user, ns, name, req.Body)
+		op, err = o.ops.Install(apiRequest.Context(), user, ns, name, req.Body, o.imageOverride)
 	case "upgrade":
-		op, err = o.ops.Upgrade(apiRequest.Context(), user, ns, name, req.Body)
+		op, err = o.ops.Upgrade(apiRequest.Context(), user, ns, name, req.Body, o.imageOverride)
 	case "uninstall":
-		op, err = o.ops.Uninstall(apiRequest.Context(), user, ns, name, req.Body)
+		op, err = o.ops.Uninstall(apiRequest.Context(), user, ns, name, req.Body, o.imageOverride)
 	}
 
 	switch apiRequest.Link {

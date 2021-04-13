@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -56,6 +57,7 @@ func Run(ctx context.Context) error {
 				HTTPSListenPort: 0,
 				AddLocal:        "true",
 				Agent:           true,
+				ClusterRegistry: os.Getenv("CATTLE_CLUSTER_REGISTRY"),
 			})
 			if err != nil {
 				cancel()
