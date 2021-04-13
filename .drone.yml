@@ -1017,6 +1017,21 @@ steps:
     event:
     - push
 
+- name: push-manifest-head
+  image: plugins/manifest
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    spec: manifest-head.tmpl
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - push
+
 - name: push-manifest
   image: plugins/manifest
   settings:
