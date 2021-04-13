@@ -19,6 +19,14 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
   {{- end -}}
 {{- end -}}
 
+{{/*
+Create a default fully qualified chart name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "rancher.chartname" -}}
+  {{- printf "%s-%s" .Chart.Name .Chart.Version | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 # Render Values in configurationSnippet
 {{- define "configurationSnippet" -}}
   {{- tpl (.Values.ingress.configurationSnippet) . | nindent 6 -}}
@@ -29,7 +37,7 @@ Generate the labels.
 */}}
 {{- define "rancher.labels" -}}
 app: {{ template "rancher.fullname" . }}
-chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+chart: {{ template "rancher.chartname" . }}
 heritage: {{ .Release.Service }}
 release: {{ .Release.Name }}
 {{- end }}
