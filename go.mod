@@ -38,6 +38,7 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.20.0
 	k8s.io/mount-utils => k8s.io/mount-utils v0.20.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.20.0
+	sigs.k8s.io/cluster-api => github.com/rancher/cluster-api v0.3.11-0.20210219162658-745452a60720
 )
 
 require (
@@ -46,6 +47,7 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.5
 	github.com/Azure/go-autorest/autorest/to v0.3.1-0.20191028180845-3492b2aff503
 	github.com/DataDog/zstd v1.4.5 // indirect
+	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/semver/v3 v3.1.0
 	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/aws/aws-sdk-go v1.36.7
@@ -62,22 +64,30 @@ require (
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/ghodss/yaml v1.0.0
+	github.com/go-logr/logr v0.3.0 // indirect
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
+	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/googleapis/gnostic v0.5.1 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-multierror v1.0.0
-	github.com/hashicorp/golang-lru v0.5.3
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
+	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
 	github.com/mattn/go-colorable v0.1.2
+	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
+	github.com/onsi/ginkgo v1.14.1 // indirect
+	github.com/onsi/gomega v1.10.2 // indirect
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
+	github.com/pelletier/go-toml v1.8.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.44.1
 	github.com/prometheus/client_golang v1.8.0
@@ -113,6 +123,7 @@ require (
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
+	go.uber.org/zap v1.15.0 // indirect
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/net v0.0.0-20210315170653-34ac3e1c2000
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
@@ -128,18 +139,19 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.3.0
 	helm.sh/helm/v3 v3.3.0
-	k8s.io/api v0.20.0
-	k8s.io/apiextensions-apiserver v0.20.0
-	k8s.io/apimachinery v0.20.0
-	k8s.io/apiserver v0.20.0
+	k8s.io/api v0.20.2
+	k8s.io/apiextensions-apiserver v0.20.2
+	k8s.io/apimachinery v0.20.2
+	k8s.io/apiserver v0.20.2
 	k8s.io/cli-runtime v0.20.0
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/component-base v0.20.2 // indirect
 	k8s.io/gengo v0.0.0-20201113003025-83324d819ded
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.20.0
-	k8s.io/kubectl v0.20.0
+	k8s.io/kubectl v0.20.2
 	k8s.io/kubernetes v1.20.0
-	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009
 	rsc.io/letsencrypt v0.0.3 // indirect
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
 	sigs.k8s.io/yaml v1.2.0

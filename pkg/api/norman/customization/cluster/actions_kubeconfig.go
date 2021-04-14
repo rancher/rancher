@@ -10,21 +10,30 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	var err error
 	var cluster mgmtclient.Cluster
-	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &cluster); err != nil {
+	var nodes []*mgmtv3.Node
+	if err = access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &cluster); err != nil {
 		return err
+	}
+	if apiContext.Type == "cluster" {
+		nodes, err = a.NodeLister.List(cluster.ID, labels.Everything())
+		if err != nil {
+			return err
+		}
 	}
 
 	var (
 		cfg      string
 		tokenKey string
-		err      error
 	)
 
 	endpointEnabled := cluster.LocalClusterAuthEndpoint != nil && cluster.LocalClusterAuthEndpoint.Enabled
@@ -76,7 +85,7 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 			return err
 		}
 
-		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, apiContext.ID, host, tokenKey)
+		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, nodes, apiContext.ID, host, tokenKey)
 	} else {
 		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, host, tokenKey)
 	}

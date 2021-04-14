@@ -268,6 +268,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 
 	handler := ccluster.ActionHandler{
 		NodepoolGetter:                managementContext.Management,
+		NodeLister:                    managementContext.Management.Nodes("").Controller().Lister(),
 		ClusterClient:                 managementContext.Management.Clusters(""),
 		CatalogManager:                managementContext.CatalogManager,
 		UserMgr:                       managementContext.UserManager,
