@@ -20,10 +20,8 @@ import (
 )
 
 const (
-	// FlannelPresenceLabel is used to detect if a node is using flannel plugin or not
-	FlannelPresenceLabel = "flannel.alpha.coreos.com/public-ip"
-	systemProjectLabel   = "authz.management.cattle.io/system-project"
-	creatorLabel         = "cattle.io/creator"
+	systemProjectLabel = "authz.management.cattle.io/system-project"
+	creatorLabel       = "cattle.io/creator"
 )
 
 const (
@@ -173,10 +171,6 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 	logrus.Debugf("netpolMgr: handleHostNetwork: processing %d nodes", len(nodes))
 	np := generateNodesNetworkPolicy()
 	for _, node := range nodes {
-		if _, ok := node.Annotations[FlannelPresenceLabel]; !ok {
-			logrus.Debugf("netpolMgr: handleHostNetwork: node=%v doesn't have flannel label, skipping", node.Name)
-			continue
-		}
 		podCIDRFirstIP, _, err := net.ParseCIDR(node.Spec.PodCIDR)
 		if err != nil {
 			logrus.Debugf("netpolMgr: handleHostNetwork: node=%+v", node)
@@ -187,6 +181,13 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 			CIDR: podCIDRFirstIP.String() + "/32",
 		}
 		np.Spec.Ingress[0].From = append(np.Spec.Ingress[0].From, knetworkingv1.NetworkPolicyPeer{IPBlock: &ipBlock})
+	}
+
+	// An empty ingress rule allows all traffic to the namespace
+	// so we need to skip creating the network policy here if that's what we have.
+	if len(np.Spec.Ingress[0].From) == 0 {
+		logrus.Debugf("netpolMgr: handleHostNetwork: no host addresses found, skipping programming the %s policy", hostNetworkPolicyName)
+		return nil
 	}
 
 	// sort ipblocks so it always appears in a certain order
