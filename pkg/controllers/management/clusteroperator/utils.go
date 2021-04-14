@@ -147,7 +147,7 @@ func (e *OperatorController) SetUnknown(cluster *mgmtv3.Cluster, condition condi
 	var err error
 	cluster, err = e.ClusterClient.Update(cluster)
 	if err != nil {
-		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s unknown with message: %s", cluster.Name, condition, message)
+		return cluster, err
 	}
 	return cluster, nil
 }
@@ -162,7 +162,7 @@ func (e *OperatorController) SetTrue(cluster *mgmtv3.Cluster, condition conditio
 	var err error
 	cluster, err = e.ClusterClient.Update(cluster)
 	if err != nil {
-		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s true with message: %s", cluster.Name, condition, message)
+		return cluster, err
 	}
 	return cluster, nil
 }
@@ -177,7 +177,7 @@ func (e *OperatorController) SetFalse(cluster *mgmtv3.Cluster, condition conditi
 	var err error
 	cluster, err = e.ClusterClient.Update(cluster)
 	if err != nil {
-		return cluster, fmt.Errorf("failed setting cluster [%s] condition %s false with message: %s", cluster.Name, condition, message)
+		return cluster, err
 	}
 	return cluster, nil
 }
