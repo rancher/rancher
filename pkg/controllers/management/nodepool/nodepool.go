@@ -353,6 +353,8 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, allNodes []*v3.No
 		}
 
 		if node.Spec.ScaledownTime != "" {
+			logrus.Debugf("[nodepool] scaledown time detected for %s: %s and now it is %s",
+				node.Name, node.Spec.ScaledownTime, time.Now().Format(time.RFC3339))
 			scaledown, err := time.Parse(time.RFC3339, node.Spec.ScaledownTime)
 			if err != nil {
 				logrus.Errorf("[nodepool] failed to parse scaledown time, is it in RFC3339? %s: %s", node.Spec.ScaledownTime, err)
@@ -368,6 +370,9 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, allNodes []*v3.No
 					quantity--
 					continue
 				}
+
+				// scaledown happening in the future, enqueue after to check again later
+				c.NodePoolController.EnqueueAfter(nodePool.Namespace, nodePool.Name, scaledown.Sub(time.Now()))
 			}
 		}
 
