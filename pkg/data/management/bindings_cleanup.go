@@ -3,15 +3,15 @@ package management
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/agent/clean"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/rancher/rancher/pkg/agent/clean"
-	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func CleanupDuplicateBindings(wContext *wrangler.Context) {
+func CleanupDuplicateBindings(scaledContext *config.ScaledContext, wContext *wrangler.Context) {
 	//check if duplicate binding cleanup has run already
 	logrus.Info("CleanupDuplicateBindings, checking configmap")
 	if adminConfig, err := wContext.K8s.CoreV1().ConfigMaps(cattleNamespace).Get(context.TODO(), bootstrapAdminConfig, v1.GetOptions{}); err != nil {
@@ -28,7 +28,7 @@ func CleanupDuplicateBindings(wContext *wrangler.Context) {
 		}
 		// run cleanup
 		logrus.Info("Calling Duplicate CRB and RB cleanup")
-		err = clean.Bindings()
+		err = clean.Bindings(&scaledContext.RESTConfig)
 		if err != nil {
 			logrus.Warnf("Error in cleaning up Duplicate CRB and RB: %v", err)
 			return
