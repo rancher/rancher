@@ -18,6 +18,19 @@ spec:
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}-post-delete
       restartPolicy: OnFailure
+      {{- with .Values.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ template "rancher.name" . }}-post-delete
           image: "{{ .Values.systemDefaultRegistry }}{{ .Values.postDelete.image.repository }}:{{ .Values.postDelete.image.tag }}"
