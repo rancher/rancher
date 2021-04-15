@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/eks"
 	"github.com/rancher/rancher/pkg/controllers/management/gke"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
-	"github.com/rancher/rancher/pkg/controllers/management/systemcharts"
+	"github.com/rancher/rancher/pkg/controllers/management/managerancher"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -21,5 +21,6 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 		gke.Register(ctx, wranglerContext, management)
 		clusterupstreamrefresher.Register(ctx, wranglerContext)
 	}
-	return systemcharts.Register(ctx, wranglerContext)
+	managerancher.Register(ctx, wranglerContext)
+	return nil
 }

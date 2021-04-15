@@ -27,33 +27,14 @@ var (
 					},
 				}
 			},
-		},
-		{
-			ReleaseNamespace:  "rancher-operator-system",
-			ChartName:         "rancher-operator-crd",
-			MinVersionSetting: settings.RancherOperatorMinVersion,
-			Values: func() map[string]interface{} {
-				return map[string]interface{}{
-					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
-					},
-				}
+			Enabled: func() bool {
+				return features.MCM.Enabled() || features.EmbeddedClusterAPI.Enabled()
 			},
 		},
 		{
-			ReleaseNamespace:  "rancher-operator-system",
-			ChartName:         "rancher-operator",
-			MinVersionSetting: settings.RancherOperatorMinVersion,
-			Values: func() map[string]interface{} {
-				return map[string]interface{}{
-					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
-					},
-					"rke": map[string]interface{}{
-						"enabled": features.RKE2.Enabled(),
-					},
-				}
-			},
+			ReleaseNamespace: "rancher-operator-system",
+			ChartName:        "rancher-operator",
+			Uninstall:        true,
 		},
 	}
 	repoName = "rancher-charts"
@@ -64,6 +45,8 @@ type chartDef struct {
 	ChartName         string
 	MinVersionSetting settings.Setting
 	Values            func() map[string]interface{}
+	Enabled           func() bool
+	Uninstall         bool
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
@@ -96,6 +79,17 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		},
 	}
 	for _, chartDef := range toInstall {
+		if chartDef.Enabled != nil && !chartDef.Enabled() {
+			continue
+		}
+
+		if chartDef.Uninstall {
+			if err := h.manager.Uninstall(chartDef.ReleaseNamespace, chartDef.ChartName); err != nil {
+				return repo, err
+			}
+			continue
+		}
+
 		values := map[string]interface{}{
 			"global": systemGlobalRegistry,
 		}

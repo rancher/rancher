@@ -65,6 +65,12 @@ var (
 		true,
 		false,
 		false)
+	ProvisioningV2 = newFeature(
+		"provisioningv2",
+		"Enable cluster-api based provisioning framework",
+		true,
+		false,
+		false)
 )
 
 type Feature struct {

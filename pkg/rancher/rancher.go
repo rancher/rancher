@@ -2,6 +2,7 @@ package rancher
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -92,12 +93,19 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	kontainerdriver.RegisterIndexers(wranglerContext)
 	managementauth.RegisterWranglerIndexers(wranglerContext)
 
+	// Initialize Features as early as possible
+	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
+		return nil, err
+	}
+	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
+
 	if err := crds.Create(ctx, restConfig); err != nil {
 		return nil, err
 	}
 
-	// Initialize Features as early as possible
-	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
+	if features.MCM.Enabled() && !features.Fleet.Enabled() {
+		return nil, fmt.Errorf("multi-cluster-management features requires fleet=true")
+	}
 
 	if features.Auth.Enabled() {
 		authServer, err = auth.NewServer(ctx, restConfig)
@@ -133,6 +141,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	additionalAPIPreMCM := steveapi.AdditionalAPIsPreMCM(wranglerContext)
 	additionalAPI, err := steveapi.AdditionalAPIs(ctx, wranglerContext, steve)
 	if err != nil {
 		return nil, err
@@ -151,6 +160,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			proxy.RewriteLocalCluster,
 			clusterProxy,
 			aggregation,
+			additionalAPIPreMCM,
 			wranglerContext.MultiClusterManager.Middleware,
 			authServer.Management,
 			additionalAPI,
@@ -178,11 +188,18 @@ func (r *Rancher) Start(ctx context.Context) error {
 	}
 
 	r.Wrangler.OnLeader(func(ctx context.Context) error {
-		return r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
-			if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
-				return err
-			}
+		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
+			return err
+		}
+		err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler)
+		})
+		if err != nil {
+			return err
+		}
+		return r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
+			dashboard.RegisterFleet(ctx, r.Wrangler)
+			return nil
 		})
 	})
 

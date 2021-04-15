@@ -6,6 +6,7 @@ import (
 	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
 	"github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/codegen/generator"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
@@ -27,6 +28,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	k8sschema "k8s.io/apimachinery/pkg/runtime/schema"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
 func main() {
@@ -76,6 +78,34 @@ func main() {
 					planv1.Plan{},
 				},
 				GenerateClients: true,
+			},
+			"provisioning.cattle.io": {
+				Types: []interface{}{
+					"./pkg/apis/provisioning.cattle.io/v1",
+				},
+				GenerateTypes: true,
+			},
+			"fleet.cattle.io": {
+				Types: []interface{}{
+					fleet.GitRepo{},
+					fleet.Bundle{},
+					fleet.Cluster{},
+					fleet.ClusterGroup{},
+					fleet.ClusterRegistrationToken{},
+				},
+			},
+			"rke.cattle.io": {
+				Types: []interface{}{
+					"./pkg/apis/rke.cattle.io/v1",
+				},
+				GenerateTypes: true,
+			},
+			"cluster.x-k8s.io": {
+				Types: []interface{}{
+					capi.Machine{},
+					capi.MachineDeployment{},
+					capi.Cluster{},
+				},
 			},
 		},
 	})

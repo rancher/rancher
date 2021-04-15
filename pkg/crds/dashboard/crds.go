@@ -5,13 +5,26 @@ import (
 
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/crds/provisioningv2"
+	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/crd"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
 
+func FeatureCRD() crd.CRD {
+	return newCRD(&v3.Feature{}, func(c crd.CRD) crd.CRD {
+		c.NonNamespace = true
+		return c.
+			WithColumn("Custom Value", ".spec.value").
+			WithColumn("Default", ".status.default").
+			WithColumn("Description", ".status.description")
+	})
+}
+
 func List() []crd.CRD {
-	return []crd.CRD{
+	result := []crd.CRD{
 		newCRD(&v3.Cluster{}, func(c crd.CRD) crd.CRD {
 			c.Status = false
 			c.NonNamespace = true
@@ -38,13 +51,7 @@ func List() []crd.CRD {
 			return c.
 				WithColumn("Value", ".value")
 		}),
-		newCRD(&v3.Feature{}, func(c crd.CRD) crd.CRD {
-			c.NonNamespace = true
-			return c.
-				WithColumn("Custom Value", ".spec.value").
-				WithColumn("Default", ".status.default").
-				WithColumn("Description", ".status.description")
-		}),
+		FeatureCRD(),
 		newCRD(&catalogv1.ClusterRepo{}, func(c crd.CRD) crd.CRD {
 			c.NonNamespace = true
 			return c.
@@ -70,6 +77,25 @@ func List() []crd.CRD {
 				WithColumn("Status", ".spec.info.status")
 		}),
 	}
+
+	if features.Fleet.Enabled() {
+		result = append(result, crd.CRD{
+			SchemaObject: v3.FleetWorkspace{},
+			NonNamespace: true,
+		})
+	}
+
+	if features.ProvisioningV2.Enabled() {
+		result = append(result, provisioningv2.List()...)
+	}
+	return result
+}
+
+func Webhooks() []runtime.Object {
+	if features.ProvisioningV2.Enabled() {
+		return provisioningv2.Webhooks()
+	}
+	return nil
 }
 
 func Objects() (result []runtime.Object, err error) {
@@ -83,9 +109,30 @@ func Objects() (result []runtime.Object, err error) {
 	return
 }
 
+func CreateFeatureCRD(ctx context.Context, cfg *rest.Config) error {
+	factory, err := crd.NewFactoryFromClient(cfg)
+	if err != nil {
+		return err
+	}
+
+	return factory.BatchCreateCRDs(ctx, FeatureCRD()).BatchWait()
+}
+
 func Create(ctx context.Context, cfg *rest.Config) error {
 	factory, err := crd.NewFactoryFromClient(cfg)
 	if err != nil {
+		return err
+	}
+
+	apply, err := apply.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
+	apply = apply.
+		WithSetID("crd-webhooks").
+		WithDynamicLookup().
+		WithNoDelete()
+	if err := apply.ApplyObjects(Webhooks()...); err != nil {
 		return err
 	}
 
