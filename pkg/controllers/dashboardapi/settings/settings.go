@@ -106,7 +106,9 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			}
 			if s.install {
 				_, err := s.settings.Create(newSetting)
-				if err != nil {
+				// Rancher will race in an HA setup to try and create the settings
+				// so if it exists just move on.
+				if err != nil && !errors.IsAlreadyExists(err) {
 					return err
 				}
 			}
