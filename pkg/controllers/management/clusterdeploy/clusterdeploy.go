@@ -260,22 +260,8 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
-	desiredAgent := getDesiredImage(cluster)
-	if desiredAgent == "" || desiredAgent == "fixed" {
-		desiredAgent = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-	}
-	logrus.Tracef("clusterDeploy: deployAgent: desiredAgent is [%s] for cluster [%s]", desiredAgent, cluster.Name)
-
-	var desiredAuth string
-	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-		desiredAuth = cluster.Spec.DesiredAuthImage
-		if desiredAuth == "" || desiredAuth == "fixed" {
-			desiredAuth = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
-		}
-	}
-	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
-
+	desiredAgent := systemtemplate.GetDesiredAgentImage(cluster)
+	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
 	desiredFeatures := map[string]bool{}
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)

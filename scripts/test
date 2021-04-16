@@ -26,7 +26,7 @@ if [ ${ARCH} == arm64 ]; then
 fi
 
 echo Starting rancher server
-$(dirname $0)/run &> /dev/null &
+$(dirname $0)/run >/tmp/rancher.log 2>&1 &
 PID=$!
 trap cleanup exit
 
