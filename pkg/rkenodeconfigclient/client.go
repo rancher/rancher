@@ -107,7 +107,7 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 			return interval, err
 		}
 
-		logrus.Infof("Waiting for node to register. Either cluster is not ready for registering or etcd and controlplane node have to be registered first")
+		logrus.Infof("Waiting for node to register. Either cluster is not ready for registering, cluster is currently provisioning, or etcd, controlplane and worker node have to be registered")
 		time.Sleep(2 * time.Second)
 	}
 }
