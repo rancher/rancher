@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/wrangler/pkg/schemas"
 	"github.com/rancher/wrangler/pkg/schemas/openapi"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -24,12 +25,14 @@ const (
 )
 
 type handler struct {
-	schemaCache mgmtcontrollers.DynamicSchemaCache
+	schemaCache       mgmtcontrollers.DynamicSchemaCache
+	schemasController mgmtcontrollers.DynamicSchemaController
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := handler{
-		schemaCache: clients.Mgmt.DynamicSchema().Cache(),
+		schemaCache:       clients.Mgmt.DynamicSchema().Cache(),
+		schemasController: clients.Mgmt.DynamicSchema(),
 	}
 	mgmtcontrollers.RegisterDynamicSchemaGeneratingHandler(ctx,
 		clients.Mgmt.DynamicSchema(),
@@ -123,6 +126,19 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 }
 
 func (h *handler) OnChange(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) ([]runtime.Object, v3.DynamicSchemaStatus, error) {
+	if obj.Name == "nodetemplateconfig" {
+		all, err := h.schemaCache.List(labels.Everything())
+		if err != nil {
+			return nil, status, err
+		}
+		for _, schema := range all {
+			if schema.Name == "nodetemplateconfig" {
+				continue
+			}
+			h.schemasController.Enqueue(schema.Name)
+		}
+	}
+
 	name, node, _, err := h.getStyle(obj.Name)
 	if err != nil {
 		return nil, status, err

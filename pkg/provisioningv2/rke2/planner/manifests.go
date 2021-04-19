@@ -6,20 +6,27 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
-func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, runtime string) ([]plan.File, error) {
+func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (result []plan.File, _ error) {
 	// NOTE: The agent does not have a means to delete files.  If you add a manifest that
 	// may not exist in the future then you should create an empty file to "delete" the file
+	if !isControlPlane(machine) {
+		return nil, nil
+	}
 
-	clusterAgent, err := p.getClusterAgent(controlPlane, runtime)
+	clusterAgent, err := p.getClusterAgent(controlPlane, GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if err != nil {
 		return nil, err
 	}
+	result = append(result, clusterAgent)
 
-	return []plan.File{
-		clusterAgent,
-	}, nil
+	return result, nil
+}
+
+func isDefaultTrueEnabled(b *bool) bool {
+	return b == nil || *b
 }
 
 func (p *Planner) getClusterAgent(controlPlane *rkev1.RKEControlPlane, runtime string) (plan.File, error) {

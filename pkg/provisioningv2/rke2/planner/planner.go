@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/randomtoken"
@@ -149,38 +150,51 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	controlPlane, secret, err := p.generateSecrets(controlPlane)
+	controlPlane, secret, err := p.generateSecrets(controlPlane, plan)
 	if err != nil {
 		return err
 	}
 
-	if _, err := p.electInitNode(plan); err != nil {
-		return err
-	}
+	var (
+		firstIgnoreError error
+		joinServer       string
+	)
 
-	var firstIgnoreError error
+	if secret.ServerToken == "" {
+		// This is logic for clusters that are formed outside of Rancher
+		// In this situation you either have nodes with worker role or no role
+		err = p.reconcile(controlPlane, secret, plan, "etcd and control plane", noRole, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+		if err != nil {
+			return err
+		}
+	} else {
+		if _, err := p.electInitNode(plan); err != nil {
+			return err
+		}
 
-	err = p.reconcile(controlPlane, secret, plan, "bootstrap", isInitNode, none, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, "")
-	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-	if err != nil {
-		return err
-	}
+		err = p.reconcile(controlPlane, secret, plan, "bootstrap", isInitNode, none, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, "")
+		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+		if err != nil {
+			return err
+		}
 
-	joinServer, err := p.electInitNode(plan)
-	if err != nil || joinServer == "" {
-		return err
-	}
+		joinServer, err = p.electInitNode(plan)
+		if err != nil || joinServer == "" {
+			return err
+		}
 
-	err = p.reconcile(controlPlane, secret, plan, "etcd", isEtcd, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
-	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-	if err != nil {
-		return err
-	}
+		err = p.reconcile(controlPlane, secret, plan, "etcd", isEtcd, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+		if err != nil {
+			return err
+		}
 
-	err = p.reconcile(controlPlane, secret, plan, "control plane", isControlPlane, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
-	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-	if err != nil {
-		return err
+		err = p.reconcile(controlPlane, secret, plan, "control plane", isControlPlane, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = p.reconcile(controlPlane, secret, plan, "worker", isOnlyWorker, isInitNode, controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer)
@@ -274,7 +288,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 	)
 
 	for _, entry := range entries {
-		// we exclude here and not in collect to ensure that include matched at least on node
+		// we exclude here and not in collect to ensure that include matched at least one node
 		if exclude(entry.Machine) {
 			continue
 		}
@@ -347,66 +361,96 @@ func atMostThree(names []string) []string {
 	return names
 }
 
-func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, entry planEntry, initNode bool, joinServer string) (result plan.NodePlan, _ error) {
-	agent := false
-	config := map[string]interface{}{}
+func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) error {
 	for _, opts := range controlPlane.Spec.NodeConfig {
 		sel, err := metav1.LabelSelectorAsSelector(opts.MachineLabelSelector)
 		if err != nil {
-			return result, err
+			return err
 		}
-		if sel.Matches(labels.Set(entry.Machine.Labels)) {
+		if sel.Matches(labels.Set(machine.Labels)) {
 			config = opts.Config.DeepCopy().Data
 			break
 		}
 	}
 
-	if isControlPlane(entry.Machine) || isEtcd(entry.Machine) {
+	// For externally formed cluster the control-plane and etcd roles are never assigned so here
+	// we check for !worker.
+	if !isOnlyWorker(machine) {
 		for k, v := range controlPlane.Spec.ControlPlaneConfig.Data {
 			config[k] = v
 		}
 	}
 
+	return nil
+}
+
+func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, initNode bool, joinServer string) {
 	if initNode {
 		if GetRuntime(controlPlane.Spec.KubernetesVersion) == RuntimeK3S {
 			config["cluster-init"] = true
 		}
-	} else {
-		// it's very important that the joinServer param isn't used on the initNode because that would
-		// cause the plan to evaluate differently depending on the arguments to desiredPlan, which
-		// should always return the same value for the same node regardless of other arguments
+	} else if joinServer != "" {
+		// it's very important that the joinServer param isn't used on the initNode. The init node is special
+		// because it will be evaluated twice, first with joinServer = "" and then with joinServer == self.
+		// If we use the joinServer param then we will get different nodePlan and cause issues.
 		config["server"] = joinServer
 	}
 
-	if isOnlyEtcd(entry.Machine) {
-		config["role"] = "etcd"
-	} else if isOnlyWorker(entry.Machine) {
-		agent = true
+	if isOnlyEtcd(machine) {
+		config["disable-scheduler"] = false
+		config["disable-cloud-controller"] = false
+		config["disable-api-server"] = false
+		config["disable-controller-manager"] = false
+	} else if isOnlyControlPlane(machine) {
+		config["disable-etcd"] = false
+	}
+}
+
+func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane,
+	machine *capi.Machine) {
+	if isOnlyWorker(machine) || !isDefaultTrueEnabled(controlPlane.Spec.LocalClusterAuthEndpoint.Enabled) {
+		return
 	}
 
+	authFile := fmt.Sprintf(authnWebhookFileName, GetRuntime(controlPlane.Spec.KubernetesVersion))
+	config["kube-apiserver-arg"] = append(convert.ToStringSlice(config["kube-apiserver-arg"]),
+		fmt.Sprintf("authentication-token-webhook-config-file=%s", authFile))
+}
+
+func addLocalClusterAuthenticationEndpointFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane,
+	machine *capi.Machine) plan.NodePlan {
+	if isOnlyWorker(machine) || !isDefaultTrueEnabled(controlPlane.Spec.LocalClusterAuthEndpoint.Enabled) {
+		return nodePlan
+	}
+
+	authFile := fmt.Sprintf(authnWebhookFileName, GetRuntime(controlPlane.Spec.KubernetesVersion))
+	nodePlan.Files = append(nodePlan.Files, plan.File{
+		Content: base64.StdEncoding.EncodeToString(AuthnWebhook),
+		Path:    authFile,
+	})
+
+	return nodePlan
+}
+
+func (p *Planner) addManifests(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
+	files, err := p.getControlPlaneManifests(controlPlane, machine)
+	if err != nil {
+		return nodePlan, err
+	}
+	nodePlan.Files = append(nodePlan.Files, files...)
+
+	return nodePlan, nil
+}
+
+func (p *Planner) addOtherFiles(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane,
+	machine *capi.Machine) (plan.NodePlan, error) {
+	nodePlan = addLocalClusterAuthenticationEndpointFile(nodePlan, controlPlane, machine)
+	return nodePlan, nil
+}
+
+func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
 	runtime := GetRuntime(controlPlane.Spec.KubernetesVersion)
-
-	if isControlPlane(entry.Machine) {
-		data, err := p.loadClusterAgent(controlPlane)
-		if err != nil {
-			return result, err
-		}
-
-		authFile := fmt.Sprintf(authnWebhookFileName, GetRuntime(controlPlane.Spec.KubernetesVersion))
-		result.Files = append(result.Files, []plan.File{
-			{
-				Content: base64.StdEncoding.EncodeToString(data),
-				Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/cluster-agent.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
-			},
-			{
-				Content: base64.StdEncoding.EncodeToString(AuthnWebhook),
-				Path:    authFile,
-			},
-		}...)
-		config["kube-apiserver-arg"] = fmt.Sprintf("authentication-token-webhook-config-file=%s", authFile)
-	}
-
-	image := p.getInstallerImage(controlPlane)
+	image := getInstallerImage(controlPlane)
 
 	instruction := plan.Instruction{
 		Image:   image,
@@ -414,61 +458,135 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 		Args:    []string{"-c", "run.sh"},
 	}
 
-	if agent {
+	if isOnlyWorker(machine) {
 		instruction.Env = []string{
 			fmt.Sprintf("INSTALL_%s_TYPE=agent", strings.ToUpper(runtime)),
 		}
+	}
+
+	nodePlan.Instructions = append(nodePlan.Instructions, instruction)
+	return nodePlan, nil
+}
+
+func addToken(config map[string]interface{}, machine *capi.Machine, secret plan.Secret) {
+	if secret.ServerToken == "" {
+		return
+	}
+	if isOnlyWorker(machine) {
 		config["token"] = secret.AgentToken
 	} else {
 		config["token"] = secret.ServerToken
 		config["agent-token"] = secret.AgentToken
 	}
+}
 
+func addLabels(config map[string]interface{}, machine *capi.Machine) error {
 	var labels []string
-	if data := entry.Machine.Annotations[LabelsAnnotation]; data != "" {
+	if data := machine.Annotations[LabelsAnnotation]; data != "" {
 		labelMap := map[string]string{}
 		if err := json.Unmarshal([]byte(data), &labelMap); err != nil {
-			return result, err
+			return err
 		}
 		for k, v := range labelMap {
 			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
 		}
 	}
 
-	labels = append(labels, MachineUIDLabel+"="+string(entry.Machine.UID))
-
-	sort.Strings(labels)
-	config["node-label"] = labels
-
-	if data := entry.Machine.Annotations[TaintsAnnotation]; data != "" {
-		var (
-			taints      []corev1.Taint
-			taintString []string
-		)
-		if err := json.Unmarshal([]byte(data), &taints); err != nil {
-			return result, err
-		}
-		for _, taint := range taints {
-			taintString = append(taintString, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
-		}
-
-		sort.Strings(taintString)
-		config["node-taint"] = taintString
+	if machine.Spec.InfrastructureRef.Kind != "UnmanagedMachine" {
+		labels = append(labels, MachineUIDLabel+"="+string(machine.UID))
 	}
 
-	result.Instructions = append(result.Instructions, instruction)
+	sort.Strings(labels)
+	if len(labels) > 0 {
+		config["node-label"] = labels
+	}
+	return nil
+}
+
+func addTaints(config map[string]interface{}, machine *capi.Machine) error {
+	var (
+		taints      []corev1.Taint
+		taintString []string
+	)
+
+	data := machine.Annotations[TaintsAnnotation]
+	if data == "" {
+		return nil
+	}
+
+	if err := json.Unmarshal([]byte(data), &taints); err != nil {
+		return err
+	}
+
+	for _, taint := range taints {
+		taintString = append(taintString, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
+	}
+
+	sort.Strings(taintString)
+	config["node-taint"] = taintString
+
+	return nil
+}
+
+func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, secret plan.Secret,
+	initNode bool, joinServer string) (plan.NodePlan, error) {
+	config := map[string]interface{}{}
+	if err := addUserConfig(config, controlPlane, machine); err != nil {
+		return nodePlan, err
+	}
+
+	addRoleConfig(config, controlPlane, machine, initNode, joinServer)
+	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, machine)
+	addToken(config, machine, secret)
+
+	if err := addLabels(config, machine); err != nil {
+		return nodePlan, err
+	}
+
+	if err := addTaints(config, machine); err != nil {
+		return nodePlan, err
+	}
 
 	configData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return result, err
+		return nodePlan, err
 	}
 
-	result.Files = append(result.Files, plan.File{
+	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
 		Path:    fmt.Sprintf("/etc/rancher/%s/config.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
-	return result, nil
+	return nodePlan, nil
+}
+
+func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, entry planEntry, initNode bool, joinServer string) (plan.NodePlan, error) {
+	var (
+		nodePlan plan.NodePlan
+		err      error
+	)
+
+	nodePlan, err = p.addInstruction(nodePlan, controlPlane, entry.Machine)
+	if err != nil {
+		return nodePlan, err
+	}
+
+	nodePlan, err = p.addConfigFile(nodePlan, controlPlane, entry.Machine, secret, initNode, joinServer)
+	if err != nil {
+		return nodePlan, err
+	}
+
+	nodePlan, err = p.addManifests(nodePlan, controlPlane, entry.Machine)
+	if err != nil {
+		return nodePlan, err
+	}
+
+	nodePlan, err = p.addOtherFiles(nodePlan, controlPlane, entry.Machine)
+	if err != nil {
+		return nodePlan, err
+	}
+
+	return nodePlan, nil
 }
 
 func GetRuntime(kubernetesVersion string) string {
@@ -478,12 +596,7 @@ func GetRuntime(kubernetesVersion string) string {
 	return RuntimeRKE2
 }
 
-func (p *Planner) getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
-	if true {
-		// The only working image right now
-		return "docker.io/oats87/system-agent-installer-rke2:v1.19.8-alpha1-rke2r2"
-	}
-
+func getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
 	runtime := GetRuntime(controlPlane.Spec.KubernetesVersion)
 	image := settings.SystemAgentInstallerImage.Get()
 	image = image + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
@@ -510,8 +623,20 @@ func isOnlyEtcd(machine *capi.Machine) bool {
 	return isEtcd(machine) && !isControlPlane(machine)
 }
 
+func isOnlyControlPlane(machine *capi.Machine) bool {
+	return !isEtcd(machine) && isControlPlane(machine)
+}
+
+func isWorker(machine *capi.Machine) bool {
+	return machine.Labels[WorkerRoleLabel] == "true"
+}
+
+func noRole(machine *capi.Machine) bool {
+	return !isEtcd(machine) && !isControlPlane(machine) && !isWorker(machine)
+}
+
 func isOnlyWorker(machine *capi.Machine) bool {
-	return !isEtcd(machine) && !isControlPlane(machine)
+	return !isEtcd(machine) && !isControlPlane(machine) && isWorker(machine)
 }
 
 type planEntry struct {
@@ -540,8 +665,8 @@ func collect(plan *plan.Plan, include func(*capi.Machine) bool) (result []planEn
 	return result, unavailable
 }
 
-func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane) (*rkev1.RKEControlPlane, plan.Secret, error) {
-	secretName, secret, err := p.ensureRKEStateSecret(controlPlane)
+func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane, fullPlan *plan.Plan) (*rkev1.RKEControlPlane, plan.Secret, error) {
+	secretName, secret, err := p.ensureRKEStateSecret(controlPlane, fullPlan)
 	if err != nil {
 		return nil, secret, err
 	}
@@ -551,7 +676,21 @@ func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane) (*rkev1.R
 	return controlPlane, secret, nil
 }
 
-func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (string, plan.Secret, error) {
+func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, fullPlan *plan.Plan) (string, plan.Secret, error) {
+	hasControlPlaneOrEtcd := false
+	for _, machine := range fullPlan.Machines {
+		if isControlPlane(machine) || isEtcd(machine) {
+			hasControlPlaneOrEtcd = true
+			break
+		}
+	}
+
+	if !hasControlPlaneOrEtcd {
+		// In this situation we are either waiting for control plane/etcd to be created or
+		// this is an externally formed cluster and we don't manage the token
+		return "", plan.Secret{}, nil
+	}
+
 	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
 	secret, err := p.secretCache.Get(controlPlane.Namespace, name)
 	if apierror.IsNotFound(err) {

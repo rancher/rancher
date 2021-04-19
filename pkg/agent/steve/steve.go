@@ -30,8 +30,10 @@ func Run(ctx context.Context) error {
 	}
 
 	data := map[string][]byte{
-		"url":   []byte(url + "/v3/connect"),
-		"token": []byte("steve-cluster-" + token),
+		"CATTLE_SERVER": []byte(url),
+		"CATTLE_TOKEN":  []byte(token),
+		"url":           []byte(url + "/v3/connect"),
+		"token":         []byte("steve-cluster-" + token),
 	}
 
 	ca, err := ioutil.ReadFile("/etc/kubernetes/ssl/serverca")
