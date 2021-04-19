@@ -49,8 +49,9 @@ const (
 	KubeletDockerConfigPath    = "/var/lib/kubelet/config.json"
 
 	// MaxEtcdOldEnvVersion The versions are maxed out for minor versions because -rancher1 suffix will cause semver to think its older, example: v1.15.0 > v1.15.0-rancher1
-	MaxEtcdOldEnvVersion = "v3.2.99"
-	MaxK8s115Version     = "v1.15"
+	MaxEtcdOldEnvVersion      = "v3.2.99"
+	MaxK8s115Version          = "v1.15"
+	MaxEtcdNoStrictTLSVersion = "v3.4.14-rancher99"
 
 	EncryptionProviderConfigArgument = "encryption-provider-config"
 )
@@ -855,6 +856,31 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 		"peer-cert-file":              pki.GetCertPath(nodeName),
 		"peer-key-file":               pki.GetKeyPath(nodeName),
 	}
+	// Determine etcd version for correct etcdctl environment variables
+	etcdTag, err := util.GetImageTagFromImage(c.Services.Etcd.Image)
+	if err != nil {
+		logrus.Warn(err)
+	}
+	etcdSemVer, err := util.StrToSemVer(etcdTag)
+	if err != nil {
+		logrus.Warn(err)
+	}
+	maxEtcdOldEnvSemVer, err := util.StrToSemVer(MaxEtcdOldEnvVersion)
+	if err != nil {
+		logrus.Warn(err)
+	}
+	maxEtcdNoStrictTLSVersion, err := util.StrToSemVer(MaxEtcdNoStrictTLSVersion)
+	if err != nil {
+		logrus.Warn(err)
+	}
+
+	// Add in stricter TLS ciphter suites starting with etcd v3.4.15
+	if etcdSemVer.LessThan(*maxEtcdNoStrictTLSVersion) {
+		logrus.Debugf("etcd version [%s] is less than max version [%s] for adding stricter TLS cipher suites, not going to add stricter TLS cipher suites arguments to etcd", etcdSemVer, maxEtcdNoStrictTLSVersion)
+	} else {
+		logrus.Debugf("etcd version [%s] is higher than max version [%s] for adding stricter TLS cipher suites, going to add stricter TLS cipher suites arguments to etcd", etcdSemVer, maxEtcdNoStrictTLSVersion)
+		CommandArgs["cipher-suites"] = "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+	}
 
 	Binds := []string{
 		fmt.Sprintf("%s:%s:z", path.Join(host.PrefixPath, "/var/lib/etcd"), services.EtcdDataDir),
@@ -896,20 +922,6 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 		URL: fmt.Sprintf("https://%s:2379/health", host.InternalAddress),
 	}
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Etcd.Image, c.PrivateRegistriesMap)
-
-	// Determine etcd version for correct etcdctl environment variables
-	etcdTag, err := util.GetImageTagFromImage(c.Services.Etcd.Image)
-	if err != nil {
-		logrus.Warn(err)
-	}
-	etcdSemVer, err := util.StrToSemVer(etcdTag)
-	if err != nil {
-		logrus.Warn(err)
-	}
-	maxEtcdOldEnvSemVer, err := util.StrToSemVer(MaxEtcdOldEnvVersion)
-	if err != nil {
-		logrus.Warn(err)
-	}
 
 	// Configure default etcdctl environment variables
 	Env := []string{}
