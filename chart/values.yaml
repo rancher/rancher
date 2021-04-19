@@ -170,3 +170,4 @@ postDelete:
   timeout: 120
   # by default, the job will fail if it fail to uninstall any of the apps
   ignoreTimeoutError: false
+  
