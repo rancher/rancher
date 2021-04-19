@@ -22,11 +22,18 @@ type RKEClusterStatus struct {
 }
 
 type RKEClusterSpecCommon struct {
-	UpgradeStrategy    ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
-	CNIDriver          string                 `json:"cni,omitempty"`
-	CNIValues          GenericMap             `json:"cniValues,omitempty" wrangler:"nullable"`
-	ControlPlaneConfig GenericMap             `json:"controlPlaneConfig,omitempty" wrangler:"nullable"`
-	NodeConfig         []RKESystemConfig      `json:"config,omitempty"`
+	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
+	UpgradeStrategy          ClusterUpgradeStrategy   `json:"upgradeStrategy,omitempty"`
+	CNIDriver                string                   `json:"cni,omitempty"`
+	CNIValues                GenericMap               `json:"cniValues,omitempty" wrangler:"nullable"`
+	ControlPlaneConfig       GenericMap               `json:"controlPlaneConfig,omitempty" wrangler:"nullable"`
+	NodeConfig               []RKESystemConfig        `json:"config,omitempty"`
+}
+
+type LocalClusterAuthEndpoint struct {
+	Enabled *bool  `json:"enabled,omitempty"`
+	FQDN    string `json:"fqdn,omitempty"`
+	CACerts string `json:"caCerts,omitempty"`
 }
 
 type RKESystemConfig struct {

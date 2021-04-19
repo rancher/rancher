@@ -47,6 +47,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}
 	rocontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
 		clients.Apply.
+			WithSetOwnerReference(false, false).
 			WithCacheTypes(clients.Fleet.Bundle(),
 				clients.Provisioning.Cluster()),
 		"", "manage-rancher", h.OnChange, nil)
