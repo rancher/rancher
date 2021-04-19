@@ -1466,4 +1466,58 @@ volumes:
 trigger:
   event:
   - promote
+---
+kind: pipeline
+name: promote-docker-image
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: docker-image-promote
+  image: quay.io/skopeo/stable:v1.1.1
+  commands:
+  - echo $${DOCKER_PASSWORD} | skopeo login docker.io --username $${DOCKER_USERNAME} --password-stdin
+  - skopeo copy docker://rancher/rancher:$${SOURCE_TAG} docker://rancher/rancher:$${DESTINATION_TAG} --all
+  settings:
+    custom_dns: 1.1.1.1
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  environment:
+    DOCKER_PASSWORD:
+      from_secret: docker_password
+    DOCKER_USERNAME:
+      from_secret: docker_username
+  when:
+    event:
+    - promote
+    target:
+    - promote-docker-image
+
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to push Docker image.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+  when:
+    event:
+      exclude:
+        - pull_request
+    instance:
+      - drone-publish.rancher.io
+    status:
+      - failure
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+  - promote
 ...
