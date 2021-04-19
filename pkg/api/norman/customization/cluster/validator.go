@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"reflect"
 	"strings"
@@ -39,6 +40,16 @@ type Validator struct {
 	CisBenchmarkVersionClient     v3.CisBenchmarkVersionInterface
 	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
 }
+
+const (
+	// https://cloud.google.com/kubernetes-engine/docs/concepts/alias-ips
+	minPodRange      = 24
+	maxPodRange      = 9
+	minServicesRange = 27
+	maxServicesRange = 16
+	minPrimaryRange  = 29
+	maxPrimaryRange  = 8
+)
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	var clusterSpec v32.ClusterSpec
@@ -577,6 +588,9 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 		if err := validateGKENodePools(clusterSpec); err != nil {
 			return err
 		}
+		if err := validateGKEIPRanges(clusterSpec); err != nil {
+			return err
+		}
 	}
 
 	if request.Method != http.MethodPost {
@@ -706,6 +720,54 @@ func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 			continue
 		}
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
+	}
+	return nil
+}
+
+func validateGKEIPRanges(spec *v32.ClusterSpec) error {
+	if spec.GKEConfig.IPAllocationPolicy == nil {
+		return nil
+	}
+	if spec.GKEConfig.IPAllocationPolicy.ClusterIpv4CidrBlock == "" && spec.GKEConfig.IPAllocationPolicy.ServicesIpv4CidrBlock == "" && spec.GKEConfig.IPAllocationPolicy.NodeIpv4CidrBlock == "" {
+		return nil
+	}
+	var errors []string
+	if spec.GKEConfig.IPAllocationPolicy.ClusterIpv4CidrBlock != "" {
+		_, clusterNet, err := net.ParseCIDR(spec.GKEConfig.IPAllocationPolicy.ClusterIpv4CidrBlock)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("invalid CIDR format for pods: [%v]", spec.GKEConfig.IPAllocationPolicy.ClusterIpv4CidrBlock))
+		} else {
+			size, _ := clusterNet.Mask.Size()
+			if size > minPodRange || size < maxPodRange {
+				errors = append(errors, fmt.Sprintf("invalid cluster pod address range: netmask must be between %v and %v", maxPodRange, minPodRange))
+			}
+		}
+	}
+	if spec.GKEConfig.IPAllocationPolicy.ServicesIpv4CidrBlock != "" {
+		_, servicesNet, err := net.ParseCIDR(spec.GKEConfig.IPAllocationPolicy.ServicesIpv4CidrBlock)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("invalid CIDR format for services: [%v]", spec.GKEConfig.IPAllocationPolicy.ServicesIpv4CidrBlock))
+		} else {
+			size, _ := servicesNet.Mask.Size()
+			if size > minServicesRange || size < maxServicesRange {
+				errors = append(errors, fmt.Sprintf("invalid service address range: netmask must be between %v and %v", maxServicesRange, minServicesRange))
+			}
+		}
+	}
+	if spec.GKEConfig.IPAllocationPolicy.NodeIpv4CidrBlock != "" {
+		_, primaryNet, err := net.ParseCIDR(spec.GKEConfig.IPAllocationPolicy.NodeIpv4CidrBlock)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("invalid CIDR format for nodes: [%v]", spec.GKEConfig.IPAllocationPolicy.NodeIpv4CidrBlock))
+		} else {
+			size, _ := primaryNet.Mask.Size()
+			// The size validation is a guess based on the documented requirements, but the real valid value will be based on how many nodes are in the node pool, how many node pools there are, and whether node autoscaling is used.
+			if size > minPrimaryRange || size < maxPrimaryRange {
+				errors = append(errors, fmt.Sprintf("invalid node Ipv4 CIDR block: netmask must be between %v and %v and must be large enough to accomodate your node pool", maxPrimaryRange, minPrimaryRange))
+			}
+		}
+	}
+	if len(errors) > 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf(strings.Join(errors, "; ")))
 	}
 	return nil
 }
