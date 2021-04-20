@@ -142,9 +142,6 @@ func (h *handler) generateCluster(cluster *v1.Cluster, status v1.ClusterStatus) 
 		return h.createClusterAndDeployAgent(cluster, status)
 	default:
 		return h.createCluster(cluster, status, v3.ClusterSpec{
-			ClusterSpecBase: v3.ClusterSpecBase{
-				LocalClusterAuthEndpoint: cluster.Spec.LocalClusterAuthEndpoint,
-			},
 			ImportedConfig: &v3.ImportedConfig{},
 		})
 	}
@@ -189,6 +186,23 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, sp
 	spec.DisplayName = cluster.Name
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
 	spec.FleetWorkspaceName = cluster.Namespace
+	spec.AgentEnvVars = cluster.Spec.AgentEnvVars
+	spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
+	spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
+	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
+
+	if cluster.Spec.RKEConfig != nil {
+		spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
+			FQDN:    cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.FQDN,
+			CACerts: cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.CACerts,
+		}
+		if cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.Enabled == nil {
+			spec.LocalClusterAuthEndpoint.Enabled = true
+		} else {
+			spec.LocalClusterAuthEndpoint.Enabled = *cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.Enabled
+		}
+	}
+
 	newCluster := &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name.SafeConcatName("c", "m", string(cluster.UID[:8])),

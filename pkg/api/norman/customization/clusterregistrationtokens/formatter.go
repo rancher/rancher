@@ -101,7 +101,9 @@ func AgentEnvVars(cluster *v3.Cluster) string {
 	var agentEnvVars []string
 	if cluster != nil {
 		for _, envVar := range cluster.Spec.AgentEnvVars {
-			agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e %s=%s", envVar.Name, envVar.Value))
+			if envVar.Value != "" {
+				agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e %s=%s", envVar.Name, envVar.Value))
+			}
 		}
 	}
 	return strings.Join(agentEnvVars, " ")

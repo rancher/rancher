@@ -154,6 +154,10 @@ func (h *handler) createCluster(mgmtCluster *mgmt.Cluster, status mgmt.ClusterSt
 				ReferencedConfig: &v1.ReferencedConfig{
 					ManagementClusterName: mgmtCluster.Name,
 				},
+				AgentEnvVars:                         mgmtCluster.Spec.AgentEnvVars,
+				DefaultPodSecurityPolicyTemplateName: mgmtCluster.Spec.DefaultPodSecurityPolicyTemplateName,
+				DefaultClusterRoleForProjectMembers:  mgmtCluster.Spec.DefaultClusterRoleForProjectMembers,
+				EnableNetworkPolicy:                  mgmtCluster.Spec.EnableNetworkPolicy,
 			},
 		})
 	}
