@@ -788,19 +788,14 @@ if (-not (Test-Path $image_list))
 
 $fullname_images = @()
 Get-Content -Force -Path $image_list | ForEach-Object {
-	if ($_) {
-		$fullname_image = $_
-		echo "Pulling: $fullname_image"
-		docker pull $fullname_image
-		if (!$?) {
-			$fullname_image = ('{0}-windows-{1}' -f $fullname_image, $os_release_id)
-			echo "Pulling with windows-VERSION suffix: $fullname_image"
-			docker pull $fullname_image
-		}
-		if ($?) {
-			$fullname_images += @($fullname_image)
-		}
-	}
+    if ($_) {
+        $fullname_image = ('{0}-windows-{1}' -f $_, $os_release_id)
+        echo "Pulling $fullname_image"
+        docker pull $fullname_image
+        if ($?) {
+            $fullname_images += @($fullname_image)
+        }
+    }
 }
 
 if (-not $fullname_images)
