@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	normanapi "github.com/rancher/norman/api"
+	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/api/user"
@@ -39,7 +40,8 @@ func NewNormanServer(ctx context.Context, clusterRouter requests.ClusterRouter, 
 
 func newSchemas(ctx context.Context, apiContext *config.ScaledContext) (*types.Schemas, error) {
 	schemas := types.NewSchemas()
-	schemas.AddSchemas(managementschema.Schemas)
+	schemas.AddSchemas(managementschema.AuthSchemas)
+	subscribe.Register(&managementschema.Version, schemas)
 
 	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,

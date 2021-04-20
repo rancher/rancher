@@ -26,11 +26,12 @@ if [ ${ARCH} == arm64 ]; then
 fi
 
 echo Starting rancher server
+touch /tmp/rancher.log
 $(dirname $0)/run >/tmp/rancher.log 2>&1 &
 PID=$!
 trap cleanup exit
 
-tail -f /tmp/rancher.log &
+tail -F /tmp/rancher.log &
 TPID=$!
 while ! curl -sf http://localhost:8080/ping; do
     sleep 2
