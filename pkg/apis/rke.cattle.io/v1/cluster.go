@@ -25,7 +25,7 @@ type RKEClusterSpecCommon struct {
 	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
 	UpgradeStrategy          ClusterUpgradeStrategy   `json:"upgradeStrategy,omitempty"`
 	CNIDriver                string                   `json:"cni,omitempty"`
-	CNIValues                GenericMap               `json:"cniValues,omitempty" wrangler:"nullable"`
+	ChartValues              GenericMap               `json:"chartValues,omitempty" wrangler:"nullable"`
 	ControlPlaneConfig       GenericMap               `json:"controlPlaneConfig,omitempty" wrangler:"nullable"`
 	NodeConfig               []RKESystemConfig        `json:"config,omitempty"`
 }

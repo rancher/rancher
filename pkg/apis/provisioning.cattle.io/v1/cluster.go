@@ -1,9 +1,9 @@
 package v1
 
 import (
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/genericcondition"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -21,11 +21,15 @@ type ClusterSpec struct {
 	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
 	KubernetesVersion         string `json:"kubernetesVersion,omitempty"`
 
-	ClusterAPIConfig         *ClusterAPIConfig           `json:"clusterAPIConfig,omitempty"`
-	RKEConfig                *RKEConfig                  `json:"rkeConfig,omitempty"`
-	ReferencedConfig         *ReferencedConfig           `json:"referencedConfig,omitempty"`
-	RancherValues            v1.GenericMap               `json:"rancherValues,omitempty" wrangler:"nullable"`
-	LocalClusterAuthEndpoint v3.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
+	ClusterAPIConfig *ClusterAPIConfig `json:"clusterAPIConfig,omitempty"`
+	RKEConfig        *RKEConfig        `json:"rkeConfig,omitempty"`
+	ReferencedConfig *ReferencedConfig `json:"referencedConfig,omitempty"`
+	RancherValues    v1.GenericMap     `json:"rancherValues,omitempty" wrangler:"nullable"`
+
+	AgentEnvVars                         []corev1.EnvVar `json:"agentEnvVars,omitempty"`
+	DefaultPodSecurityPolicyTemplateName string          `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
+	DefaultClusterRoleForProjectMembers  string          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	EnableNetworkPolicy                  *bool           `json:"enableNetworkPolicy" norman:"default=false"`
 }
 
 type ClusterStatus struct {
