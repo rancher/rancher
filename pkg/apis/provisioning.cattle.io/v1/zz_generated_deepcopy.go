@@ -123,7 +123,18 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		**out = **in
 	}
 	in.RancherValues.DeepCopyInto(&out.RancherValues)
-	out.LocalClusterAuthEndpoint = in.LocalClusterAuthEndpoint
+	if in.AgentEnvVars != nil {
+		in, out := &in.AgentEnvVars, &out.AgentEnvVars
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.EnableNetworkPolicy != nil {
+		in, out := &in.EnableNetworkPolicy, &out.EnableNetworkPolicy
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
