@@ -40,7 +40,7 @@ var (
 		"Install Fleet when starting Rancher",
 		true,
 		false,
-		false)
+		true)
 	Auth = newFeature(
 		"auth",
 		"Enable authentication",
