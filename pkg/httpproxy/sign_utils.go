@@ -63,6 +63,8 @@ func getCredential(credentialID string, credentials SecretGetter) (map[string]st
 		splitKeys := strings.Split(key, "-")
 		if len(splitKeys) == 2 && strings.HasSuffix(splitKeys[0], "Config") {
 			ans[splitKeys[1]] = string(val)
+		} else {
+			ans[key] = string(val)
 		}
 	}
 	return ans, nil
