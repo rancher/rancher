@@ -9,10 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
@@ -26,6 +22,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
@@ -43,6 +40,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	rkedefaults "github.com/rancher/rke/cluster"
 	rkeservices "github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -703,7 +701,6 @@ func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
 func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	enableNetworkPolicy := values.GetValueN(data, "enableNetworkPolicy")
 	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
-	plugin := convert.ToString(values.GetValueN(convert.ToMapInterface(rkeConfig), "network", "plugin"))
 
 	if enableNetworkPolicy == nil && create {
 		// setting default values for new clusters if value not passed
@@ -715,9 +712,6 @@ func validateNetworkFlag(data map[string]interface{}, create bool) error {
 				return nil
 			}
 			return fmt.Errorf("enableNetworkPolicy should be false for non-RKE clusters")
-		}
-		if plugin != "canal" {
-			return fmt.Errorf("plugin %s should have enableNetworkPolicy %v", plugin, !value)
 		}
 	}
 
