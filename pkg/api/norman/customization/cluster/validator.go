@@ -656,6 +656,7 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 	}
 
 	var errors []string
+	hasRequiredLinuxPool := false
 
 	for _, np := range nodepools {
 		name := *np.Name
@@ -668,6 +669,15 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 			errors = append(errors, fmt.Sprintf("node pool [%s] version cannot be empty", name))
 			continue
 		}
+
+		// Windows images are WINDOWS_LTSC or WINDOWS_SAC. The cluster must have at least one non-Windows node pool.
+		if !hasRequiredLinuxPool && !strings.Contains(strings.ToLower(np.Config.ImageType), "windows") {
+			hasRequiredLinuxPool = true
+		}
+	}
+
+	if !hasRequiredLinuxPool {
+		errors = append(errors, fmt.Sprintf("at least 1 Linux node pool is required"))
 	}
 
 	if len(errors) != 0 {
