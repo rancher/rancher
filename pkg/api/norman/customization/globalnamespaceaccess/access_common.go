@@ -65,23 +65,20 @@ func (ma *MemberAccess) IsAdmin(callerID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	var callerRole string
 	for _, grb := range grbs {
 		if grb.UserName == callerID {
-			callerRole = grb.GlobalRoleName
-			break
-		}
-	}
-	gr, err := ma.GrLister.Get("", callerRole)
-	if err != nil {
-		return false, err
-	}
-	if gr != nil {
-		for _, rule := range gr.Rules {
-			// admin roles have all resources and all verbs allowed
-			if slice.ContainsString(rule.Resources, "*") && slice.ContainsString(rule.APIGroups, "*") && slice.ContainsString(rule.Verbs, "*") {
-				// caller is global admin
-				return true, nil
+			gr, err := ma.GrLister.Get("", grb.GlobalRoleName)
+			if apierrors.IsNotFound(err) {
+				continue
+			} else if err != nil {
+				return false, err
+			}
+			for _, rule := range gr.Rules {
+				// admin roles have all resources and all verbs allowed
+				if slice.ContainsString(rule.Resources, "*") && slice.ContainsString(rule.APIGroups, "*") && slice.ContainsString(rule.Verbs, "*") {
+					// caller is global admin
+					return true, nil
+				}
 			}
 		}
 	}
