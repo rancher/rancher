@@ -119,6 +119,9 @@ func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext) (*m
 	root.PathPrefix("/v3/token").Handler(tokenAPI)
 	root.PathPrefix("/v3/authConfig").Handler(otherAPIs)
 	root.PathPrefix("/v3/principal").Handler(otherAPIs)
+	root.PathPrefix("/v3/user").Handler(otherAPIs)
+	root.PathPrefix("/v3/schema").Handler(otherAPIs)
+	root.PathPrefix("/v3/subscribe").Handler(otherAPIs)
 	return root, nil
 }
 
