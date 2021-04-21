@@ -475,78 +475,86 @@ func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool)
 			return "", errors.Wrap(err, "can not ensure admin user exists")
 		}
 		adminName = admin.Name
+	} else {
+		sort.Slice(users.Items, func(i, j int) bool {
+			return users.Items[i].Name < users.Items[j].Name
+		})
+		adminName = users.Items[0].Name
+	}
 
-		bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
+	bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
+	if err != nil && createClusterRoleBinding {
+		return "", errors.Wrap(err, "Failed to create default admin global role binding")
+	}
+	if err != nil {
+		logrus.Warnf("Failed to create default admin global role binding: %v", err)
+		bindings = &v3.GlobalRoleBindingList{}
+	}
+	if len(bindings.Items) == 0 {
+		adminRole := "admin"
+		if settings.RestrictedDefaultAdmin.Get() == "true" {
+			adminRole = "restricted-admin"
+		}
+		_, err = management.Mgmt.GlobalRoleBinding().Create(
+			&v3.GlobalRoleBinding{
+				ObjectMeta: v1.ObjectMeta{
+					GenerateName: "globalrolebinding-",
+					Labels:       defaultAdminLabel,
+				},
+				UserName:       adminName,
+				GlobalRoleName: adminRole,
+			})
 		if err != nil {
 			logrus.Warnf("Failed to create default admin global role binding: %v", err)
-			bindings = &v3.GlobalRoleBindingList{}
+		} else {
+			logrus.Info("Created default admin user and binding")
 		}
-		if len(bindings.Items) == 0 {
-			adminRole := "admin"
-			if settings.RestrictedDefaultAdmin.Get() == "true" {
-				adminRole = "restricted-admin"
-			}
-			_, err = management.Mgmt.GlobalRoleBinding().Create(
-				&v3.GlobalRoleBinding{
+	}
+
+	if createClusterRoleBinding && settings.RestrictedDefaultAdmin.Get() != "true" {
+		users, err := management.Mgmt.User().List(v1.ListOptions{
+			LabelSelector: set.String(),
+		})
+		if err != nil {
+			return "", err
+		}
+
+		bindings, err := management.RBAC.ClusterRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
+		if err != nil {
+			return "", err
+		}
+		if len(bindings.Items) == 0 && len(users.Items) > 0 {
+			_, err = management.RBAC.ClusterRoleBinding().Create(
+				&rbacv1.ClusterRoleBinding{
 					ObjectMeta: v1.ObjectMeta{
-						GenerateName: "globalrolebinding-",
+						GenerateName: "default-admin-",
 						Labels:       defaultAdminLabel,
+						OwnerReferences: []v1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "User",
+								Name:       users.Items[0].Name,
+								UID:        users.Items[0].UID,
+							},
+						},
 					},
-					UserName:       adminName,
-					GlobalRoleName: adminRole,
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:     "User",
+							APIGroup: rbacv1.GroupName,
+							Name:     users.Items[0].Name,
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "cluster-admin",
+					},
 				})
 			if err != nil {
 				logrus.Warnf("Failed to create default admin global role binding: %v", err)
 			} else {
 				logrus.Info("Created default admin user and binding")
-			}
-		}
-
-		if createClusterRoleBinding && settings.RestrictedDefaultAdmin.Get() != "true" {
-			users, err := management.Mgmt.User().List(v1.ListOptions{
-				LabelSelector: set.String(),
-			})
-			if err != nil {
-				return "", err
-			}
-
-			bindings, err := management.RBAC.ClusterRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
-			if err != nil {
-				return "", err
-			}
-			if len(bindings.Items) == 0 && len(users.Items) > 0 {
-				_, err = management.RBAC.ClusterRoleBinding().Create(
-					&rbacv1.ClusterRoleBinding{
-						ObjectMeta: v1.ObjectMeta{
-							GenerateName: "default-admin-",
-							Labels:       defaultAdminLabel,
-							OwnerReferences: []v1.OwnerReference{
-								{
-									APIVersion: "management.cattle.io/v3",
-									Kind:       "User",
-									Name:       users.Items[0].Name,
-									UID:        users.Items[0].UID,
-								},
-							},
-						},
-						Subjects: []rbacv1.Subject{
-							{
-								Kind:     "User",
-								APIGroup: rbacv1.GroupName,
-								Name:     users.Items[0].Name,
-							},
-						},
-						RoleRef: rbacv1.RoleRef{
-							APIGroup: rbacv1.GroupName,
-							Kind:     "ClusterRole",
-							Name:     "cluster-admin",
-						},
-					})
-				if err != nil {
-					logrus.Warnf("Failed to create default admin global role binding: %v", err)
-				} else {
-					logrus.Info("Created default admin user and binding")
-				}
 			}
 		}
 	}

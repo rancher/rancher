@@ -171,8 +171,6 @@ func (m *mcm) Start(ctx context.Context) error {
 		management *config.ManagementContext
 	)
 
-	defer m.started(ctx)
-
 	if dm := os.Getenv("CATTLE_DEV_MODE"); dm == "" {
 		if err := jailer.CreateJail("driver-jail"); err != nil {
 			return err
