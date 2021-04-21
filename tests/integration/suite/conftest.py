@@ -109,6 +109,8 @@ def admin_mc():
                             verify=False)
     k8s_client = kubernetes_api_client(client, 'local')
     admin = client.list_user(username='admin').data[0]
+    wait_for(lambda: len(client.list_project(name='System',
+                                             clusterId='local')) == 1)
     return ManagementContext(client, k8s_client, user=admin)
 
 
