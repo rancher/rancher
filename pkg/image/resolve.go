@@ -137,6 +137,9 @@ func generateImages(chartNameAndVersion string, inputMap map[interface{}]interfa
 }
 
 func addSourceToImage(imagesSet map[string]map[string]bool, image string, sources ...string) {
+	if image == "" {
+		return
+	}
 	if imagesSet[image] == nil {
 		imagesSet[image] = make(map[string]bool)
 	}
