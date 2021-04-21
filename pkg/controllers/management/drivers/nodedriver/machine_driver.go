@@ -27,19 +27,19 @@ import (
 var (
 	SchemaLock = sync.Mutex{}
 	driverLock = sync.Mutex{}
-	// Aliases maps Driver field => schema field
+	// DriverToSchemaFields maps Driver field => schema field
 	// The opposite of this lives in pkg/controllers/management/node/controller.go
-	Aliases = map[string]map[string]string{
-		"aliyunecs":     map[string]string{"sshKeypath": "sshKeyContents"},
-		"amazonec2":     map[string]string{"sshKeypath": "sshKeyContents", "userdata": "userdata"},
-		"azure":         map[string]string{"customData": "customData"},
-		"digitalocean":  map[string]string{"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
-		"exoscale":      map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
-		"openstack":     map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
-		"otc":           map[string]string{"privateKeyFile": "privateKeyFile"},
-		"packet":        map[string]string{"userdata": "userdata"},
-		"vmwarevsphere": map[string]string{"cloud-config": "cloudConfig"},
-		"google":        map[string]string{"authEncodedJson": "authEncodedJson"},
+	DriverToSchemaFields = map[string]map[string]string{
+		"aliyunecs":     {"sshKeypath": "sshKeyContents"},
+		"amazonec2":     {"sshKeypath": "sshKeyContents", "userdata": "userdata"},
+		"azure":         {"customData": "customData"},
+		"digitalocean":  {"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
+		"exoscale":      {"sshKey": "sshKey", "userdata": "userdata"},
+		"openstack":     {"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
+		"otc":           {"privateKeyFile": "privateKeyFile"},
+		"packet":        {"userdata": "userdata"},
+		"vmwarevsphere": {"cloud-config": "cloudConfig"},
+		"google":        {"authEncodedJson": "authEncodedJson"},
 	}
 	SSHKeyFields = map[string]bool{
 		"sshKeyContents": true,
@@ -189,7 +189,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		if err != nil {
 			return nil, err
 		}
-		if aliases, ok := Aliases[driverName]; ok {
+		if aliases, ok := DriverToSchemaFields[driverName]; ok {
 			// convert path fields to their alias to take file contents
 			if alias, ok := aliases[name]; ok {
 				name = alias
@@ -290,7 +290,7 @@ func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
 
 	driverName := strings.TrimPrefix(obj.Spec.DisplayName, drivers.DockerMachineDriverPrefix)
 
-	if _, ok := Aliases[driverName]; ok {
+	if _, ok := DriverToSchemaFields[driverName]; ok {
 		if val, ok := obj.Annotations[uiFieldHintsAnno]; !ok || val == "" {
 			return true
 		}
@@ -322,7 +322,7 @@ func (m *Lifecycle) addVersionInfo(obj *v3.NodeDriver) *v3.NodeDriver {
 }
 
 func (m *Lifecycle) addUIHintsAnno(driverName string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
-	if aliases, ok := Aliases[driverName]; ok {
+	if aliases, ok := DriverToSchemaFields[driverName]; ok {
 		anno := make(map[string]map[string]string)
 
 		for _, aliased := range aliases {

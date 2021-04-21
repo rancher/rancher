@@ -3,11 +3,14 @@ package machineprovision
 import (
 	"context"
 	errors2 "errors"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	"github.com/rancher/rancher/pkg/controllers/management/node"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -265,22 +268,30 @@ func (h *handler) run(obj runtime.Object, create bool) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	d, err := data.Convert(obj)
+	d, err := data.Convert(obj.DeepCopyObject())
 	if err != nil {
 		return nil, err
 	}
 
-	args, err := h.getArgsEnvAndStatus(typeMeta, meta, d, create)
+	args := d.Map("spec")
+	driver := getNodeDriverName(typeMeta)
+
+	filesSecret, err := constructFilesSecret(driver, args)
 	if err != nil {
 		return obj, err
 	}
 
-	if args.BootstrapSecretName == "" && !args.BootstrapOptional {
+	dArgs, err := h.getArgsEnvAndStatus(typeMeta, meta, d, args, driver, create)
+	if err != nil {
+		return obj, err
+	}
+
+	if dArgs.BootstrapSecretName == "" && !dArgs.BootstrapOptional {
 		return obj,
 			h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), meta.GetNamespace(), meta.GetName(), 2*time.Second)
 	}
 
-	objs, err := h.objects(d.Bool("status", "ready") && create, typeMeta, meta, args)
+	objs, err := h.objects(d.Bool("status", "ready") && create, typeMeta, meta, dArgs, filesSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -290,10 +301,10 @@ func (h *handler) run(obj runtime.Object, create bool) (runtime.Object, error) {
 	}
 
 	if create {
-		return h.patchStatus(obj, d, args.RKEMachineStatus)
+		return h.patchStatus(obj, d, dArgs.RKEMachineStatus)
 	}
 
-	return obj, h.apply.WithOwner(obj).ApplyObjects(objs...)
+	return obj, nil
 }
 
 func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKEMachineStatus) (runtime.Object, error) {
@@ -391,4 +402,37 @@ func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType
 		return obj, err
 	}
 	return obj, updateErr
+}
+
+func constructFilesSecret(driver string, config map[string]interface{}) (*corev1.Secret, error) {
+	secretData := make(map[string][]byte)
+	// Check if the required driver has aliased fields
+	if fields, ok := node.SchemaToDriverFields[driver]; ok {
+		for schemaField, driverField := range fields {
+			if fileContents, ok := config[schemaField].(string); ok {
+				// Delete our aliased fields
+				delete(config, schemaField)
+				if fileContents == "" {
+					continue
+				}
+
+				fileName := driverField
+				if ok := nodedriver.SSHKeyFields[schemaField]; ok {
+					fileName = "id_rsa"
+				}
+
+				// The ending newline gets stripped, add em back
+				if !strings.HasSuffix(fileContents, "\n") {
+					fileContents = fileContents + "\n"
+				}
+
+				// Add the file to the secret
+				secretData[fileName] = []byte(fileContents)
+				// Add the field and path
+				config[driverField] = path.Join(pathToMachineFiles, fileName)
+			}
+		}
+		return &corev1.Secret{Data: secretData}, nil
+	}
+	return nil, nil
 }
