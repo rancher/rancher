@@ -70,6 +70,10 @@ func (s *DeferredServer) Start(ctx context.Context) error {
 
 		return mcm.Start(ctx)
 	})
+	if mcm != nil {
+		// always start, even on error
+		mcm.started(ctx)
+	}
 	if err != nil {
 		return err
 	}
