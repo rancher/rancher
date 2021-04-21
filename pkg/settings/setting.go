@@ -94,6 +94,7 @@ var (
 	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.6")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
+	RKE2ChartDefaultBranch            = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
 	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.6")
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
