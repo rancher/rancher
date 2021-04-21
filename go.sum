@@ -946,8 +946,8 @@ github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4b
 github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/apiserver v0.0.0-20210209001659-a17289640582 h1:J9ubiCnLYwIHS++Qwxnwq8dwZzZH9GF7yvN0AmFWd14=
 github.com/rancher/apiserver v0.0.0-20210209001659-a17289640582/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
-github.com/rancher/channelserver v0.5.1-0.20210420051202-6da925b19e03 h1:PL9PD1slzvIGe09YD3lHGsF/kWxAYdo5EjQqB/r5a6E=
-github.com/rancher/channelserver v0.5.1-0.20210420051202-6da925b19e03/go.mod h1:1/9aBa8mXEIinRiT6Qlv/zbt6Nv9uorv+kFVNYvpmiI=
+github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430 h1:Wes0yXZk6y5rOkGXAIBiX/pK5L8mvxj1+wTlaA6A2t0=
+github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430/go.mod h1:1/9aBa8mXEIinRiT6Qlv/zbt6Nv9uorv+kFVNYvpmiI=
 github.com/rancher/client-go v1.20.0-rancher.1 h1:B85UDTIx+0XgOyv0obL9HJSNdY3mNBi1+wm26TOQZ8o=
 github.com/rancher/client-go v1.20.0-rancher.1/go.mod h1:UTdyXFcu9VZV4qQRKGXCa0KdMX4HTCXClRs4s7yFdDQ=
 github.com/rancher/cluster-api v0.3.11-0.20210219162658-745452a60720 h1:xukDZatq3YEx3BuLOxulUAlWSv5fKvukkgJ9ix3CIqs=
