@@ -86,7 +86,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.14.0
 	github.com/rancher/apiserver v0.0.0-20210209001659-a17289640582
-	github.com/rancher/channelserver v0.5.1-0.20210420051202-6da925b19e03
+	github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430
 	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
 	github.com/rancher/eks-operator v1.0.6-rc1
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210225010648-40ee92df4aea
