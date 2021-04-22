@@ -33,7 +33,7 @@ const (
 
 var driverData = map[string]map[string][]string{
 	Amazonec2driver:    {"publicCredentialFields": []string{"accessKey"}, "privateCredentialFields": []string{"secretKey"}},
-	Azuredriver:        {"publicCredentialFields": []string{"clientId", "subscriptionId"}, "privateCredentialFields": []string{"clientSecret"}},
+	Azuredriver:        {"publicCredentialFields": []string{"clientId", "subscriptionId", "tenantId"}, "privateCredentialFields": []string{"clientSecret"}},
 	DigitalOceandriver: {"privateCredentialFields": []string{"accessToken"}},
 	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
 	Linodedriver:       {"privateCredentialFields": []string{"token"}, "passwordFields": []string{"rootPass"}},
