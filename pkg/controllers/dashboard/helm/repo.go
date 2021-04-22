@@ -248,7 +248,7 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 }
 
 func shouldRefresh(spec *catalog.RepoSpec, status *catalog.RepoStatus) bool {
-	if status.Branch != spec.GitBranch {
+	if spec.GitRepo != "" && status.Branch != spec.GitBranch {
 		return true
 	}
 	if spec.URL != "" && spec.URL != status.URL {
