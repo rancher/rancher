@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -17,12 +18,17 @@ import (
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cis"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/namespace"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/robfig/cron"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	gkeapi "google.golang.org/api/container/v1"
+	"google.golang.org/api/option"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,6 +44,7 @@ type Validator struct {
 	CisConfigLister               v3.CisConfigLister
 	CisBenchmarkVersionClient     v3.CisBenchmarkVersionInterface
 	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
+	Secrets                       v1.SecretInterface
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -585,7 +592,7 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 
 	// validation for creates only
 
-	if err := validateGKEClusterName(v.ClusterClient, clusterSpec); err != nil {
+	if err := v.validateGKEClusterName(request, v.ClusterClient, clusterSpec); err != nil {
 		return err
 	}
 
@@ -686,36 +693,52 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 	return nil
 }
 
-func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+func (v *Validator) validateGKEClusterName(request *types.APIContext, client v3.ClusterInterface, spec *v32.ClusterSpec) error {
 	// validate cluster does not reference an GKE cluster that is already backed by a Rancher cluster
 	name := spec.GKEConfig.ClusterName
 	region := spec.GKEConfig.Region
 	zone := spec.GKEConfig.Zone
 	msgSuffix := fmt.Sprintf("in region [%s]", region)
+	location := region
 	if region == "" {
 		msgSuffix = fmt.Sprintf("in zone [%s]", spec.GKEConfig.Zone)
+		location = zone
 	}
 
-	// cluster client is being used instead of lister to avoid the use of an outdated cache
-	clusters, err := client.List(metav1.ListOptions{})
+	cli, err := v.getGKEClient(request, spec.GKEConfig.GoogleCredentialSecret)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher GKE clusters "+msgSuffix)
+		return httperror.NewAPIError(httperror.ServerError, "failed to get GKE credential")
 	}
 
-	for _, cluster := range clusters.Items {
-		if cluster.Spec.GKEConfig == nil {
-			continue
-		}
-		if name != cluster.Spec.GKEConfig.ClusterName {
-			continue
-		}
-		if region != "" && region != cluster.Spec.GKEConfig.Region {
-			continue
-		}
-		if zone != "" && zone != cluster.Spec.GKEConfig.Zone {
+	parent := "projects/" + spec.GKEConfig.ProjectID + "/locations/" + location
+	result, err := cli.Projects.Locations.Clusters.List(parent).Do()
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, "failed to list GKE clusters")
+	}
+
+	for _, cluster := range result.Clusters {
+		if name != cluster.Name {
 			continue
 		}
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
 	}
 	return nil
+}
+
+func (v *Validator) getGKEClient(request *types.APIContext, credential string) (*gkeapi.Service, error) {
+	var accessCred mgmtclient.CloudCredential
+	credentialErr := "error accessing cloud credential"
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
+		return nil, httperror.NewAPIError(httperror.NotFound, credentialErr)
+	}
+	secret, err := v.Secrets.GetNamespaced(namespace.GlobalNamespace, accessCred.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, httperror.NewAPIError(httperror.ServerError, "error finding cloud credential secret")
+	}
+	ctx := context.Background()
+	ts, err := google.CredentialsFromJSON(ctx, secret.Data["googlecredentialConfig-authEncodedJson"], gkeapi.CloudPlatformScope)
+	if err != nil {
+		return nil, err
+	}
+	return gkeapi.NewService(ctx, option.WithHTTPClient(oauth2.NewClient(ctx, ts.TokenSource)))
 }

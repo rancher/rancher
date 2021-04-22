@@ -283,6 +283,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		Users:                         managementContext.Management.Users(""),
 		GrbLister:                     managementContext.Management.GlobalRoleBindings("").Controller().Lister(),
 		GrLister:                      managementContext.Management.GlobalRoles("").Controller().Lister(),
+		Secrets:                       managementContext.Core.Secrets(""),
 		CisConfigClient:               managementContext.Management.CisConfigs(namespace.GlobalNamespace),
 		CisConfigLister:               managementContext.Management.CisConfigs(namespace.GlobalNamespace).Controller().Lister(),
 		CisBenchmarkVersionClient:     managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace),
