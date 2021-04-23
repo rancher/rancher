@@ -85,7 +85,7 @@ require (
 	github.com/prometheus/client_golang v1.8.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.14.0
-	github.com/rancher/apiserver v0.0.0-20210209001659-a17289640582
+	github.com/rancher/apiserver v0.0.0-20210423001905-8cca34223733
 	github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430
 	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
 	github.com/rancher/eks-operator v1.0.6-rc1
@@ -95,16 +95,16 @@ require (
 	github.com/rancher/lasso v0.0.0-20210408231703-9ddd9378d08d
 	github.com/rancher/lasso/controller-runtime v0.0.0-20210219163000-fcdfcec12969
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20210225010917-c7fd1e24145b
+	github.com/rancher/norman v0.0.0-20210423002317-8e6ffc77a819
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20210318171128-d1ebd5202be4
 	github.com/rancher/rke v1.3.0-rc1.0.20210421002614-3c0f9553436b
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20210318171316-376934558c5b
+	github.com/rancher/steve v0.0.0-20210423003643-0a9ab631701f
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
-	github.com/rancher/wrangler v0.8.1-0.20210419181004-70e0f567025d
+	github.com/rancher/wrangler v0.8.1-0.20210423011911-297eea725160
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
