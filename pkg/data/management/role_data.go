@@ -387,7 +387,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		return "", errors.Wrap(err, "problem reconciling role templates")
 	}
 
-	adminName, err := BootstrapAdmin(wrangler, false)
+	adminName, err := BootstrapAdmin(wrangler)
 	if err != nil {
 		return "", err
 	}
@@ -425,9 +425,9 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 	return role
 }
 
-// bootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
+// BootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
 // already created the admin user and should not attempt it again. Otherwise attempt to create the admin.
-func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool) (string, error) {
+func BootstrapAdmin(management *wrangler.Context) (string, error) {
 	if settings.NoDefaultAdmin.Get() == "true" {
 		return "", nil
 	}
@@ -475,81 +475,25 @@ func BootstrapAdmin(management *wrangler.Context, createClusterRoleBinding bool)
 			return "", errors.Wrap(err, "can not ensure admin user exists")
 		}
 		adminName = admin.Name
-	} else {
-		sort.Slice(users.Items, func(i, j int) bool {
-			return users.Items[i].Name < users.Items[j].Name
-		})
-		adminName = users.Items[0].Name
-	}
 
-	bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
-	if err != nil && createClusterRoleBinding {
-		return "", errors.Wrap(err, "Failed to create default admin global role binding")
-	}
-	if err != nil {
-		logrus.Warnf("Failed to create default admin global role binding: %v", err)
-		bindings = &v3.GlobalRoleBindingList{}
-	}
-	if len(bindings.Items) == 0 {
-		adminRole := "admin"
-		if settings.RestrictedDefaultAdmin.Get() == "true" {
-			adminRole = "restricted-admin"
-		}
-		_, err = management.Mgmt.GlobalRoleBinding().Create(
-			&v3.GlobalRoleBinding{
-				ObjectMeta: v1.ObjectMeta{
-					GenerateName: "globalrolebinding-",
-					Labels:       defaultAdminLabel,
-				},
-				UserName:       adminName,
-				GlobalRoleName: adminRole,
-			})
+		bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			logrus.Warnf("Failed to create default admin global role binding: %v", err)
-		} else {
-			logrus.Info("Created default admin user and binding")
+			bindings = &v3.GlobalRoleBindingList{}
 		}
-	}
-
-	if createClusterRoleBinding && settings.RestrictedDefaultAdmin.Get() != "true" {
-		users, err := management.Mgmt.User().List(v1.ListOptions{
-			LabelSelector: set.String(),
-		})
-		if err != nil {
-			return "", err
-		}
-
-		bindings, err := management.RBAC.ClusterRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
-		if err != nil {
-			return "", err
-		}
-		if len(bindings.Items) == 0 && len(users.Items) > 0 {
-			_, err = management.RBAC.ClusterRoleBinding().Create(
-				&rbacv1.ClusterRoleBinding{
+		if len(bindings.Items) == 0 {
+			adminRole := "admin"
+			if settings.RestrictedDefaultAdmin.Get() == "true" {
+				adminRole = "restricted-admin"
+			}
+			_, err = management.Mgmt.GlobalRoleBinding().Create(
+				&v3.GlobalRoleBinding{
 					ObjectMeta: v1.ObjectMeta{
-						GenerateName: "default-admin-",
+						GenerateName: "globalrolebinding-",
 						Labels:       defaultAdminLabel,
-						OwnerReferences: []v1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "User",
-								Name:       users.Items[0].Name,
-								UID:        users.Items[0].UID,
-							},
-						},
 					},
-					Subjects: []rbacv1.Subject{
-						{
-							Kind:     "User",
-							APIGroup: rbacv1.GroupName,
-							Name:     users.Items[0].Name,
-						},
-					},
-					RoleRef: rbacv1.RoleRef{
-						APIGroup: rbacv1.GroupName,
-						Kind:     "ClusterRole",
-						Name:     "cluster-admin",
-					},
+					UserName:       adminName,
+					GlobalRoleName: adminRole,
 				})
 			if err != nil {
 				logrus.Warnf("Failed to create default admin global role binding: %v", err)

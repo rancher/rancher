@@ -6,10 +6,11 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func addLocalCluster(embedded bool, adminName string, wrangler *wrangler.Context) error {
+func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 	c := &v3.Cluster{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "local",
@@ -32,18 +33,16 @@ func addLocalCluster(embedded bool, adminName string, wrangler *wrangler.Context
 			},
 		},
 	}
-	if adminName != "" {
-		c.Annotations = map[string]string{
-			"field.cattle.io/creatorId": adminName,
-		}
-	}
 	if embedded {
 		c.Status.Driver = v32.ClusterDriverLocal
 	}
 
 	// Ignore error
-	_, _ = wrangler.Mgmt.Cluster().Create(c)
-	return nil
+	_, err := wrangler.Mgmt.Cluster().Create(c)
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+	return err
 }
 
 func removeLocalCluster(wrangler *wrangler.Context) error {
