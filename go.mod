@@ -88,7 +88,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.10.0
 	github.com/rancher/apiserver v0.0.0-20210209001659-a17289640582
-	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
+	github.com/rancher/dynamiclistener v0.2.4
 	github.com/rancher/eks-operator v1.0.6
 	github.com/rancher/gke-operator v1.0.1-rc8
 	github.com/rancher/kubernetes-provider-detector v0.1.2
