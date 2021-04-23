@@ -65,6 +65,28 @@ func getSchemas(name string, spec *v3.DynamicSchemaSpec) (string, string, string
 	if err != nil {
 		return "", "", "", nil, err
 	}
+	for name, field := range specSchema.ResourceFields {
+		defMap, ok := field.Default.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// set to nil because if map is len() == 0
+		field.Default = nil
+
+		switch field.Type {
+		case "string", "password":
+			field.Default = defMap["stringValue"]
+		case "int":
+			field.Default = defMap["intValue"]
+		case "boolean":
+			field.Default = defMap["boolValue"]
+		case "array[string]":
+			field.Default = defMap["stringSliceValue"]
+		}
+
+		specSchema.ResourceFields[name] = field
+	}
 
 	statusSchema, err := getStatusSchema(allSchemas)
 	if err != nil {
