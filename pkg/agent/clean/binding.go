@@ -32,6 +32,7 @@ import (
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -47,19 +48,23 @@ type bindingsCleanup struct {
 	roleBindings        v1.RoleBindingClient
 }
 
-func Bindings() error {
+func Bindings(clientConfig *restclient.Config) error {
 	logrus.Info("Starting bindings cleanup")
 	if os.Getenv("DRY_RUN") == "true" {
 		logrus.Info("DRY_RUN is true, no objects will be deleted/modified")
 		dryRun = true
 	}
-
-	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-	if err != nil {
-		logrus.Errorf("Error in building the cluster config %v", err)
-		return err
+	var config *restclient.Config
+	var err error
+	if clientConfig != nil {
+		config = clientConfig
+	} else {
+		config, err = clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+		if err != nil {
+			logrus.Errorf("Error in building the cluster config %v", err)
+			return err
+		}
 	}
-
 	// No one wants to be slow
 	config.RateLimiter = ratelimit.None
 
