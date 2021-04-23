@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/eks-operator v1.0.6-rc1
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210422223946-04ef5f7e36c2
-	github.com/rancher/gke-operator v1.0.1-rc8
+	github.com/rancher/gke-operator v1.0.1-rc9
 	github.com/rancher/norman v0.0.0-20210423002317-8e6ffc77a819
 	github.com/rancher/rke v1.3.0-rc1.0.20210421002614-3c0f9553436b
 	github.com/rancher/wrangler v0.8.1-0.20210424161928-8b8ba672bd0b
