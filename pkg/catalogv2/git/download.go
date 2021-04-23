@@ -28,10 +28,6 @@ func gitDir(namespace, name, gitURL string) string {
 }
 
 func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool) (string, error) {
-	if branch == "" {
-		branch = "master"
-	}
-
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS)
 	if err != nil {
 		return "", err
@@ -41,10 +37,6 @@ func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecur
 }
 
 func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool) (string, error) {
-	if branch == "" {
-		branch = "master"
-	}
-
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS)
 	if err != nil {
 		return "", err

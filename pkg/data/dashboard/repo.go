@@ -15,10 +15,6 @@ import (
 )
 
 var (
-	packagedRepos = map[string]string{
-		"rancher-charts":         settings.ChartDefaultBranch.Get(),
-		"rancher-partner-charts": settings.PartnerChartDefaultBranch.Get(),
-	}
 	prefix = "rancher-"
 )
 
@@ -34,8 +30,8 @@ func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 				GitBranch: branchName,
 			},
 		})
-	} else if err == nil && repo.Spec.GitBranch != packagedRepos[repoName] {
-		repo.Spec.GitBranch = packagedRepos[repoName]
+	} else if err == nil && repo.Spec.GitBranch != branchName {
+		repo.Spec.GitBranch = branchName
 		_, err = wrangler.Catalog.ClusterRepo().Update(repo)
 	}
 
@@ -43,10 +39,11 @@ func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 }
 
 func addRepos(ctx context.Context, wrangler *wrangler.Context) error {
-	for repoName, branchName := range packagedRepos {
-		if err := addRepo(wrangler, repoName, branchName); err != nil {
-			return err
-		}
+	if err := addRepo(wrangler, "rancher-charts", settings.ChartDefaultBranch.Get()); err != nil {
+		return err
+	}
+	if err := addRepo(wrangler, "rancher-partner-charts", settings.PartnerChartDefaultBranch.Get()); err != nil {
+		return err
 	}
 
 	if features.RKE2.Enabled() {
