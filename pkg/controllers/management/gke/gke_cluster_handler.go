@@ -164,7 +164,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster GKE [%s] to finish creating", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "creating")
 		}
 		logrus.Infof("waiting for cluster GKE [%s] create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -272,7 +272,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			} else {
 				logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
 			}
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "waiting")
 		}
 		logrus.Infof("waiting for cluster GKE [%s] pre-create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
