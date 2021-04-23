@@ -146,26 +146,18 @@ func addSourceToImage(imagesSet map[string]map[string]bool, image string, source
 }
 
 func walkthroughMap(data interface{}, walkFunc func(map[interface{}]interface{})) {
-	inputMap, isMap := data.(map[interface{}]interface{})
-	if isMap {
+	if inputMap, isMap := data.(map[interface{}]interface{}); isMap {
 		// Run the walkFunc on the root node and each child node
 		walkFunc(inputMap)
 		for _, value := range inputMap {
 			walkthroughMap(value, walkFunc)
 		}
-		return
-	}
-	// Check if data is a list
-	inputList, isList := data.([]interface{})
-	if isList {
+	} else if inputList, isList := data.([]interface{}); isList {
 		// Run the walkFunc on each element in the root node, ignoring the root itself
 		for _, elem := range inputList {
 			walkthroughMap(elem, walkFunc)
 		}
-		return
 	}
-	// Element is neither a map nor a list
-	return
 }
 
 func GetImages(systemChartPath, chartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, []string, error) {
