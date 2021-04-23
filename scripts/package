@@ -57,7 +57,7 @@ if [ ! -d build/charts ]; then
             echo "Skipped CRD: $TGZ_REL_PATH"
         else
             echo "Extract: $TGZ_REL_PATH"
-            tar -xvf $TGZ_REL_PATH -C $(dirname $TGZ_REL_PATH)
+            tar -xf $TGZ_REL_PATH -C $(dirname $TGZ_REL_PATH)
         fi
     done
 
