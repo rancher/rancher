@@ -1095,6 +1095,316 @@ depends_on:
 - default-windows-20H2
 ---
 kind: pipeline
+name: docker-image-digests-linux-amd64
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  settings:
+    github-repository: "rancher/rancher"
+    github-token:
+      from_secret: github_token
+    github_tag: "${DRONE_TAG}"
+    input-file: "rancher-images.txt"
+    output-file: "rancher-images-digests-linux-amd64.txt"
+    registry: "docker.io"
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-linux-amd64
+---
+kind: pipeline
+name: docker-image-digests-linux-arm64
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  settings:
+    github-repository: "rancher/rancher"
+    github-token:
+      from_secret: github_token
+    github_tag: "${DRONE_TAG}"
+    input-file: "rancher-images.txt"
+    output-file: "rancher-images-digests-linux-arm64.txt"
+    registry: "docker.io"
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-linux-arm64
+---
+kind: pipeline
+name: docker-image-digests-windows-1809
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1809
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  settings:
+    github-repository: "rancher/rancher"
+    github-token:
+      from_secret: github_token
+    github_tag: "${DRONE_TAG}"
+    input-file: "rancher-windows-images.txt"
+    output-file: "rancher-images-digests-windows-1809.txt"
+    registry: "docker.io"
+  volumes:
+    - name: docker_pipe
+      path: \\\\.\\pipe\\docker_engine
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-windows-1809
+---
+kind: pipeline
+name: docker-image-digests-windows-1903
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1903
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  settings:
+    github-repository: "rancher/rancher"
+    github-token:
+      from_secret: github_token
+    github_tag: "${DRONE_TAG}"
+    input-file: "rancher-windows-images.txt"
+    output-file: "rancher-images-digests-windows-1903.txt"
+    registry: "docker.io"
+  volumes:
+    - name: docker_pipe
+      path: \\\\.\\pipe\\docker_engine
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-windows-1903
+---
+kind: pipeline
+name: docker-image-digests-windows-1909
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1909
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  settings:
+    github-repository: "rancher/rancher"
+    github-token:
+      from_secret: github_token
+    github_tag: "${DRONE_TAG}"
+    input-file: "rancher-windows-images.txt"
+    output-file: "rancher-images-digests-windows-1909.txt"
+    registry: "docker.io"
+  volumes:
+    - name: docker_pipe
+      path: \\\\.\\pipe\\docker_engine
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-windows-1909
+---
+kind: pipeline
+name: docker-image-digests-windows-2004
+
+platform:
+  os: windows
+  arch: amd64
+  version: 2004
+
+# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
+clone:
+  disable: true
+
+steps:
+- name: clone
+  image: luthermonson/drone-git:windows-2004-amd64
+  settings:
+    depth: 20
+
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  settings:
+    github-repository: "rancher/rancher"
+    github-token:
+      from_secret: github_token
+    github_tag: "${DRONE_TAG}"
+    input-file: "rancher-windows-images.txt"
+    output-file: "rancher-images-digests-windows-2004.txt"
+    registry: "docker.io"
+  volumes:
+    - name: docker_pipe
+      path: \\\\.\\pipe\\docker_engine
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-windows-2004
+---
+kind: pipeline
+name: docker-image-digests-windows-20H2
+
+platform:
+  os: windows
+  arch: amd64
+  version: 20H2
+
+# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
+clone:
+  disable: true
+
+steps:
+- name: clone
+  image: luthermonson/drone-git:windows-20H2-amd64
+  settings:
+    depth: 1
+
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  settings:
+    github-repository: "rancher/rancher"
+    github-token:
+      from_secret: github_token
+    github_tag: "${DRONE_TAG}"
+    input-file: "rancher-windows-images.txt"
+    output-file: "rancher-images-digests-windows-20H2.txt"
+    registry: "docker.io"
+  volumes:
+    - name: docker_pipe
+      path: \\\\.\\pipe\\docker_engine
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-windows-20H2
+---
+kind: pipeline
 name: publish
 
 platform:
