@@ -89,22 +89,22 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 
-	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
-	kontainerdriver.RegisterIndexers(wranglerContext)
-	managementauth.RegisterWranglerIndexers(wranglerContext)
-
 	// Initialize Features as early as possible
 	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
 		return nil, err
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
 
+	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
+	kontainerdriver.RegisterIndexers(wranglerContext)
+	managementauth.RegisterWranglerIndexers(wranglerContext)
+
 	if err := crds.Create(ctx, restConfig); err != nil {
 		return nil, err
 	}
 
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
-		return nil, fmt.Errorf("multi-cluster-management features requires fleet=true")
+		return nil, fmt.Errorf("multi-cluster-management features requires feature fleet=true")
 	}
 
 	if features.Auth.Enabled() {

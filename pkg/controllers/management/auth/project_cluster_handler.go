@@ -302,14 +302,11 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 			return obj, nil
 		}
 
-		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
-		if !ok {
-			logrus.Warnf("Cluster %v has no creatorId annotation. Cannot create %s project", metaAccessor.GetName(), name)
-			return obj, nil
-		}
+		annotation := map[string]string{}
 
-		annotation := map[string]string{
-			creatorIDAnn: creatorID,
+		creatorID := metaAccessor.GetAnnotations()[creatorIDAnn]
+		if creatorID != "" {
+			annotation[creatorIDAnn] = creatorID
 		}
 
 		if name == project.System {
