@@ -453,53 +453,46 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 		return adminName, nil
 	}
 
-	users, err := management.Mgmt.User().List(v1.ListOptions{})
-	if err != nil {
-		return "", err
+	// Config map does not exist and no users, attempt to create the default admin user
+	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+	admin, err := management.Mgmt.User().Create(&v3.User{
+		ObjectMeta: v1.ObjectMeta{
+			GenerateName: "user-",
+			Labels:       defaultAdminLabel,
+		},
+		DisplayName:        "Default Admin",
+		Username:           "admin",
+		Password:           string(hash),
+		MustChangePassword: true,
+	})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return "", errors.Wrap(err, "can not ensure admin user exists")
 	}
+	adminName = admin.Name
 
-	if len(users.Items) == 0 {
-		// Config map does not exist and no users, attempt to create the default admin user
-		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-		admin, err := management.Mgmt.User().Create(&v3.User{
-			ObjectMeta: v1.ObjectMeta{
-				GenerateName: "user-",
-				Labels:       defaultAdminLabel,
-			},
-			DisplayName:        "Default Admin",
-			Username:           "admin",
-			Password:           string(hash),
-			MustChangePassword: true,
-		})
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return "", errors.Wrap(err, "can not ensure admin user exists")
+	bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
+	if err != nil {
+		logrus.Warnf("Failed to create default admin global role binding: %v", err)
+		bindings = &v3.GlobalRoleBindingList{}
+	}
+	if len(bindings.Items) == 0 {
+		adminRole := "admin"
+		if settings.RestrictedDefaultAdmin.Get() == "true" {
+			adminRole = "restricted-admin"
 		}
-		adminName = admin.Name
-
-		bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
+		_, err = management.Mgmt.GlobalRoleBinding().Create(
+			&v3.GlobalRoleBinding{
+				ObjectMeta: v1.ObjectMeta{
+					GenerateName: "globalrolebinding-",
+					Labels:       defaultAdminLabel,
+				},
+				UserName:       adminName,
+				GlobalRoleName: adminRole,
+			})
 		if err != nil {
 			logrus.Warnf("Failed to create default admin global role binding: %v", err)
-			bindings = &v3.GlobalRoleBindingList{}
-		}
-		if len(bindings.Items) == 0 {
-			adminRole := "admin"
-			if settings.RestrictedDefaultAdmin.Get() == "true" {
-				adminRole = "restricted-admin"
-			}
-			_, err = management.Mgmt.GlobalRoleBinding().Create(
-				&v3.GlobalRoleBinding{
-					ObjectMeta: v1.ObjectMeta{
-						GenerateName: "globalrolebinding-",
-						Labels:       defaultAdminLabel,
-					},
-					UserName:       adminName,
-					GlobalRoleName: adminRole,
-				})
-			if err != nil {
-				logrus.Warnf("Failed to create default admin global role binding: %v", err)
-			} else {
-				logrus.Info("Created default admin user and binding")
-			}
+		} else {
+			logrus.Info("Created default admin user and binding")
 		}
 	}
 
