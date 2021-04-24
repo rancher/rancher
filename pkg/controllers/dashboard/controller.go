@@ -52,7 +52,6 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 
 func RegisterFleet(ctx context.Context, wrangler *wrangler.Context) {
 	if features.Fleet.Enabled() {
-		fleetcharts.WaitForFleet(ctx, wrangler)
 		fleetcluster.Register(ctx, wrangler)
 		fleetworkspace.Register(ctx, wrangler)
 	}

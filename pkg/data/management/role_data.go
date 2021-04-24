@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"sort"
+	"sync"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -30,7 +31,10 @@ const (
 	defaultAdminLabelValue = "admin-user"
 )
 
-var defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
+var (
+	defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
+	adminCreateLock   sync.Mutex
+)
 
 func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
@@ -428,6 +432,9 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 // BootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
 // already created the admin user and should not attempt it again. Otherwise attempt to create the admin.
 func BootstrapAdmin(management *wrangler.Context) (string, error) {
+	adminCreateLock.Lock()
+	defer adminCreateLock.Unlock()
+
 	if settings.NoDefaultAdmin.Get() == "true" {
 		return "", nil
 	}
@@ -453,46 +460,53 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 		return adminName, nil
 	}
 
-	// Config map does not exist and no users, attempt to create the default admin user
-	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-	admin, err := management.Mgmt.User().Create(&v3.User{
-		ObjectMeta: v1.ObjectMeta{
-			GenerateName: "user-",
-			Labels:       defaultAdminLabel,
-		},
-		DisplayName:        "Default Admin",
-		Username:           "admin",
-		Password:           string(hash),
-		MustChangePassword: true,
-	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return "", errors.Wrap(err, "can not ensure admin user exists")
-	}
-	adminName = admin.Name
-
-	bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
+	users, err := management.Mgmt.User().List(v1.ListOptions{})
 	if err != nil {
-		logrus.Warnf("Failed to create default admin global role binding: %v", err)
-		bindings = &v3.GlobalRoleBindingList{}
+		return "", err
 	}
-	if len(bindings.Items) == 0 {
-		adminRole := "admin"
-		if settings.RestrictedDefaultAdmin.Get() == "true" {
-			adminRole = "restricted-admin"
+
+	if len(users.Items) == 0 {
+		// Config map does not exist and no users, attempt to create the default admin user
+		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		admin, err := management.Mgmt.User().Create(&v3.User{
+			ObjectMeta: v1.ObjectMeta{
+				GenerateName: "user-",
+				Labels:       defaultAdminLabel,
+			},
+			DisplayName:        "Default Admin",
+			Username:           "admin",
+			Password:           string(hash),
+			MustChangePassword: true,
+		})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return "", errors.Wrap(err, "can not ensure admin user exists")
 		}
-		_, err = management.Mgmt.GlobalRoleBinding().Create(
-			&v3.GlobalRoleBinding{
-				ObjectMeta: v1.ObjectMeta{
-					GenerateName: "globalrolebinding-",
-					Labels:       defaultAdminLabel,
-				},
-				UserName:       adminName,
-				GlobalRoleName: adminRole,
-			})
+		adminName = admin.Name
+
+		bindings, err := management.Mgmt.GlobalRoleBinding().List(v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			logrus.Warnf("Failed to create default admin global role binding: %v", err)
-		} else {
-			logrus.Info("Created default admin user and binding")
+			bindings = &v3.GlobalRoleBindingList{}
+		}
+		if len(bindings.Items) == 0 {
+			adminRole := "admin"
+			if settings.RestrictedDefaultAdmin.Get() == "true" {
+				adminRole = "restricted-admin"
+			}
+			_, err = management.Mgmt.GlobalRoleBinding().Create(
+				&v3.GlobalRoleBinding{
+					ObjectMeta: v1.ObjectMeta{
+						GenerateName: "globalrolebinding-",
+						Labels:       defaultAdminLabel,
+					},
+					UserName:       adminName,
+					GlobalRoleName: adminRole,
+				})
+			if err != nil {
+				logrus.Warnf("Failed to create default admin global role binding: %v", err)
+			} else {
+				logrus.Info("Created default admin user and binding")
+			}
 		}
 	}
 

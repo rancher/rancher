@@ -47,22 +47,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			AllowClusterScoped: true,
 		})
 
-	clients.Fleet.ClusterRegistrationToken().OnChange(ctx, "workspace-backport",
-		func(s string, obj *fleet.ClusterRegistrationToken) (*fleet.ClusterRegistrationToken, error) {
-			if obj == nil {
-				return nil, nil
-			}
-			return obj, h.onFleetObject(obj)
-		})
 	clients.Fleet.Cluster().OnChange(ctx, "workspace-backport",
 		func(s string, obj *fleet.Cluster) (*fleet.Cluster, error) {
-			if obj == nil {
-				return nil, nil
-			}
-			return obj, h.onFleetObject(obj)
-		})
-	clients.Fleet.ClusterGroup().OnChange(ctx, "workspace-backport",
-		func(s string, obj *fleet.ClusterGroup) (*fleet.ClusterGroup, error) {
 			if obj == nil {
 				return nil, nil
 			}
