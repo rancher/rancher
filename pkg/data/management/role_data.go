@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"sort"
+	"sync"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -30,7 +31,10 @@ const (
 	defaultAdminLabelValue = "admin-user"
 )
 
-var defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
+var (
+	defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
+	adminCreateLock   sync.Mutex
+)
 
 func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
@@ -428,6 +432,9 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 // BootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
 // already created the admin user and should not attempt it again. Otherwise attempt to create the admin.
 func BootstrapAdmin(management *wrangler.Context) (string, error) {
+	adminCreateLock.Lock()
+	defer adminCreateLock.Unlock()
+
 	if settings.NoDefaultAdmin.Get() == "true" {
 		return "", nil
 	}

@@ -3,14 +3,26 @@ package dashboard
 import (
 	"context"
 
+	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/crds/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/crd"
+	"github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+)
+
+var (
+	bootstrapFleet = map[string]interface{}{
+		"bundles.fleet.cattle.io":  fleetv1alpha1api.Bundle{},
+		"clusters.fleet.cattle.io": fleetv1alpha1api.Cluster{},
+		"gitrepos.fleet.cattle.io": fleetv1alpha1api.GitRepo{},
+	}
 )
 
 func FeatureCRD() crd.CRD {
@@ -23,7 +35,7 @@ func FeatureCRD() crd.CRD {
 	})
 }
 
-func List() []crd.CRD {
+func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 	result := []crd.CRD{
 		newCRD(&v3.Cluster{}, func(c crd.CRD) crd.CRD {
 			c.Status = false
@@ -83,12 +95,51 @@ func List() []crd.CRD {
 			SchemaObject: v3.FleetWorkspace{},
 			NonNamespace: true,
 		})
+		result, err = fleetBootstrap(result, cfg)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if features.ProvisioningV2.Enabled() {
 		result = append(result, provisioningv2.List()...)
 	}
-	return result
+	return result, nil
+}
+
+func fleetBootstrap(crds []crd.CRD, cfg *rest.Config) ([]crd.CRD, error) {
+	if !features.Fleet.Enabled() {
+		return crds, nil
+	}
+
+	f, err := apiextensions.NewFactoryFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	for name, schemaObj := range bootstrapFleet {
+		_, err = f.Apiextensions().V1().CustomResourceDefinition().Get(name, metav1.GetOptions{})
+		if err == nil {
+			continue
+		} else if !apierror.IsNotFound(err) {
+			return nil, err
+		}
+
+		crds = append(crds, crd.CRD{
+			SchemaObject: schemaObj,
+			Status:       true,
+			// Ensure labels/annotations are set so that helm will manage this
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "Helm",
+			},
+			Annotations: map[string]string{
+				"meta.helm.sh/release-name":      "fleet-crd",
+				"meta.helm.sh/release-namespace": "fleet-system",
+			},
+		})
+	}
+
+	return crds, nil
 }
 
 func Webhooks() []runtime.Object {
@@ -96,17 +147,6 @@ func Webhooks() []runtime.Object {
 		return provisioningv2.Webhooks()
 	}
 	return nil
-}
-
-func Objects() (result []runtime.Object, err error) {
-	for _, crdDef := range List() {
-		crd, err := crdDef.ToCustomResourceDefinition()
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, crd)
-	}
-	return
 }
 
 func CreateFeatureCRD(ctx context.Context, cfg *rest.Config) error {
@@ -136,7 +176,12 @@ func Create(ctx context.Context, cfg *rest.Config) error {
 		return err
 	}
 
-	return factory.BatchCreateCRDs(ctx, List()...).BatchWait()
+	crds, err := List(cfg)
+	if err != nil {
+		return err
+	}
+
+	return factory.BatchCreateCRDs(ctx, crds...).BatchWait()
 }
 
 func newCRD(obj interface{}, customize func(crd.CRD) crd.CRD) crd.CRD {

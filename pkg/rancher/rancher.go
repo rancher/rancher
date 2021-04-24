@@ -187,6 +187,12 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return err
 	}
 
+	if features.MCM.Enabled() {
+		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
+			return err
+		}
+	}
+
 	r.Wrangler.OnLeader(func(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err

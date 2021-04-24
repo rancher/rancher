@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	managementcrds "github.com/rancher/rancher/pkg/crds/management"
@@ -148,7 +147,6 @@ func (m *mcm) started(ctx context.Context) {
 }
 
 func (m *mcm) Wait(ctx context.Context) {
-	fleetcharts.WaitForFleet(ctx, m.wranglerContext)
 	select {
 	case <-m.startedChan:
 		for {
@@ -182,7 +180,6 @@ func (m *mcm) Start(ctx context.Context) error {
 	}
 
 	m.wranglerContext.OnLeader(func(ctx context.Context) error {
-		fleetcharts.WaitForFleet(ctx, m.wranglerContext)
 		err := m.wranglerContext.StartWithTransaction(ctx, func(ctx context.Context) error {
 			var (
 				err error
