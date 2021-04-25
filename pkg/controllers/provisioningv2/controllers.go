@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/multiclusterchart"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/bootstrap"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
@@ -20,6 +21,10 @@ import (
 
 func Register(ctx context.Context, clients *wrangler.Context) error {
 	cluster.Register(ctx, clients)
+
+	if features.Fleet.Enabled() {
+		multiclusterchart.Register(ctx, clients)
+	}
 
 	if features.RKE2.Enabled() {
 		if features.MCM.Enabled() {
