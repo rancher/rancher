@@ -26,6 +26,23 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// CustomMachineList is a list of CustomMachine resources
+type CustomMachineList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []CustomMachine `json:"items"`
+}
+
+func NewCustomMachine(namespace, name string, obj CustomMachine) *CustomMachine {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CustomMachine").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // RKEBootstrapList is a list of RKEBootstrap resources
 type RKEBootstrapList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -87,23 +104,6 @@ type RKEControlPlaneList struct {
 
 func NewRKEControlPlane(namespace, name string, obj RKEControlPlane) *RKEControlPlane {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RKEControlPlane").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// UnmanagedMachineList is a list of UnmanagedMachine resources
-type UnmanagedMachineList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []UnmanagedMachine `json:"items"`
-}
-
-func NewUnmanagedMachine(namespace, name string, obj UnmanagedMachine) *UnmanagedMachine {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("UnmanagedMachine").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

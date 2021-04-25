@@ -195,11 +195,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, sp
 		spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
 			FQDN:    cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.FQDN,
 			CACerts: cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.CACerts,
-		}
-		if cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.Enabled == nil {
-			spec.LocalClusterAuthEndpoint.Enabled = true
-		} else {
-			spec.LocalClusterAuthEndpoint.Enabled = *cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.Enabled
+			Enabled: cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.Enabled,
 		}
 	}
 

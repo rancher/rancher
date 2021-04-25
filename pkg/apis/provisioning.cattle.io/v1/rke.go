@@ -9,15 +9,17 @@ import (
 type RKENodePool struct {
 	rkev1.RKECommonNodeConfig
 
-	Paused           bool                         `json:"paused,omitempty"`
-	EtcdRole         *bool                        `json:"etcdRole,omitempty" wrangler:"default=true"`
-	ControlPlaneRole *bool                        `json:"controlPlaneRole,omitempty" wrangler:"default=true"`
-	WorkerRole       *bool                        `json:"workerRole,omitempty" wrangler:"default=true"`
-	NodeConfig       *corev1.ObjectReference      `json:"nodeConfig,omitempty" wrangler:"required"`
-	Name             string                       `json:"name,omitempty" wrangler:"required"`
-	DisplayName      string                       `json:"displayName,omitempty"`
-	Quantity         *int32                       `json:"quantity,omitempty"`
-	RollingUpdate    *RKEMachinePoolRollingUpdate `json:"rollingUpdate,omitempty"`
+	Paused                       bool                         `json:"paused,omitempty"`
+	EtcdRole                     bool                         `json:"etcdRole,omitempty" wrangler:"default=true"`
+	ControlPlaneRole             bool                         `json:"controlPlaneRole,omitempty" wrangler:"default=true"`
+	WorkerRole                   bool                         `json:"workerRole,omitempty" wrangler:"default=true"`
+	NodeConfig                   *corev1.ObjectReference      `json:"nodeConfig,omitempty" wrangler:"required"`
+	Name                         string                       `json:"name,omitempty" wrangler:"required"`
+	DisplayName                  string                       `json:"displayName,omitempty"`
+	Quantity                     *int32                       `json:"quantity,omitempty"`
+	RollingUpdate                *RKEMachinePoolRollingUpdate `json:"rollingUpdate,omitempty"`
+	MachineDeploymentLabels      map[string]string            `json:"machineDeploymentLabels,omitempty"`
+	MachineDeploymentAnnotations map[string]string            `json:"machineDeploymentAnnotations,omitempty"`
 }
 
 type RKEMachinePoolRollingUpdate struct {

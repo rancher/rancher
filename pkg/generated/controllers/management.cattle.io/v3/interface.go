@@ -73,6 +73,7 @@ type Interface interface {
 	MonitorMetric() MonitorMetricController
 	MultiClusterApp() MultiClusterAppController
 	MultiClusterAppRevision() MultiClusterAppRevisionController
+	MultiClusterChart() MultiClusterChartController
 	Node() NodeController
 	NodeDriver() NodeDriverController
 	NodePool() NodePoolController
@@ -245,6 +246,9 @@ func (c *version) MultiClusterApp() MultiClusterAppController {
 }
 func (c *version) MultiClusterAppRevision() MultiClusterAppRevisionController {
 	return NewMultiClusterAppRevisionController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MultiClusterAppRevision"}, "multiclusterapprevisions", true, c.controllerFactory)
+}
+func (c *version) MultiClusterChart() MultiClusterChartController {
+	return NewMultiClusterChartController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MultiClusterChart"}, "multiclustercharts", true, c.controllerFactory)
 }
 func (c *version) Node() NodeController {
 	return NewNodeController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Node"}, "nodes", true, c.controllerFactory)

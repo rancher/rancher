@@ -111,13 +111,25 @@ func getSchemas(name string, spec *v3.DynamicSchemaSpec) (string, string, string
 		}
 	}
 
-	specSchema.ID = nodeConfigID
-	delete(specSchema.ResourceFields, "common")
-	if err := allSchemas.AddSchema(*specSchema); err != nil {
+	nodeConfigSchema := *specSchema
+	nodeConfigSchema.ID = nodeConfigID
+	nodeConfigSchema.ResourceFields = removeKey(nodeConfigSchema.ResourceFields, "common")
+	nodeConfigSchema.ResourceFields = removeKey(nodeConfigSchema.ResourceFields, "providerID")
+	if err := allSchemas.AddSchema(nodeConfigSchema); err != nil {
 		return "", "", "", nil, err
 	}
 
 	return nodeConfigID, templateID, machineID, allSchemas, nil
+}
+
+func removeKey(fields map[string]schemas.Field, key string) map[string]schemas.Field {
+	result := map[string]schemas.Field{}
+	for k, v := range fields {
+		if k != key {
+			result[k] = v
+		}
+	}
+	return result
 }
 
 func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSchemaSpec) (*schemas.Schema, error) {
@@ -138,6 +150,10 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 
 	specSchema.ResourceFields["common"] = schemas.Field{
 		Type: commonField.ID,
+	}
+
+	specSchema.ResourceFields["providerID"] = schemas.Field{
+		Type: "string",
 	}
 
 	if err := allSchemas.AddSchema(specSchema); err != nil {

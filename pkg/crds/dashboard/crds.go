@@ -99,6 +99,11 @@ func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 		if err != nil {
 			return nil, err
 		}
+		if features.ProvisioningV2.Enabled() {
+			result = append(result, crd.CRD{
+				SchemaObject: v3.MultiClusterChart{},
+			}.WithStatus())
+		}
 	}
 
 	if features.ProvisioningV2.Enabled() {

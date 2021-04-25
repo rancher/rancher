@@ -85,7 +85,7 @@ func rke2() []crd.CRD {
 			}
 			return c
 		}),
-		newRKECRD(&rkev1.UnmanagedMachine{}, func(c crd.CRD) crd.CRD {
+		newRKECRD(&rkev1.CustomMachine{}, func(c crd.CRD) crd.CRD {
 			c.Labels = map[string]string{
 				"cluster.x-k8s.io/v1alpha4": "v1",
 			}

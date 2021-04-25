@@ -14,26 +14,34 @@ import (
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/types/config"
 	rketypes "github.com/rancher/rke/types"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	commandFormat            = "kubectl apply -f %s"
 	insecureCommandFormat    = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
+	rke2NodeCommandFormat    = "curl -sfL %s | %s sh -s --server %s --token %s%s"
 	loginCommandFormat       = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
 
 type Formatter struct {
-	Clusters v3.ClusterInterface
+	Clusters v3.ClusterLister
 }
 
 func NewFormatter(managementContext *config.ScaledContext) *Formatter {
 	clusterFormatter := Formatter{
-		Clusters: managementContext.Management.Clusters(""),
+		Clusters: managementContext.Management.Clusters("").Controller().Lister(),
 	}
 	return &clusterFormatter
+}
+
+func (f *Formatter) isRKE2(clusterID string) bool {
+	cluster, err := f.Clusters.Get("", clusterID)
+	if err != nil {
+		return false
+	}
+	return cluster.Annotations["objectset.rio.cattle.io/owner-gvk"] == "provisioning.cattle.io/v1, Kind=Cluster"
 }
 
 func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawResource) {
@@ -52,16 +60,31 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		resource.Values["manifestUrl"] = url
 		rootURL := getRootURL(request)
 
-		cluster, _ := f.Clusters.Get(clusterID, metav1.GetOptions{})
+		cluster, _ := f.Clusters.Get("", clusterID)
+		if cluster == nil {
+			// We used to use a client, not lister which would always return non-nil even on error
+			// this is to keep that behavior with listers.
+			cluster = &v3.Cluster{}
+		}
 
 		agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-		// for linux
-		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
-			AgentEnvVars(cluster),
-			agentImage,
-			rootURL,
-			token,
-			ca)
+		if f.isRKE2(clusterID) {
+			// for linux
+			resource.Values["nodeCommand"] = fmt.Sprintf(rke2NodeCommandFormat,
+				rootURL+"/system-agent-install.sh",
+				AgentEnvVars(cluster),
+				rootURL,
+				token,
+				ca)
+		} else {
+			// for linux
+			resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
+				AgentEnvVars(cluster),
+				agentImage,
+				rootURL,
+				token,
+				ca)
+		}
 		// for windows
 		var agentImageDockerEnv string
 		if util.GetPrivateRepoURL(cluster) != "" {
@@ -97,12 +120,24 @@ func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) 
 	return ""
 }
 
+func agentEnvVarsForShell(cluster *v3.Cluster) string {
+	var agentEnvVars []string
+	if cluster != nil {
+		for _, envVar := range cluster.Spec.AgentEnvVars {
+			if envVar.Value != "" {
+				agentEnvVars = append(agentEnvVars, fmt.Sprintf("%s=\"%s\"", envVar.Name, envVar.Value))
+			}
+		}
+	}
+	return strings.Join(agentEnvVars, " ")
+}
+
 func AgentEnvVars(cluster *v3.Cluster) string {
 	var agentEnvVars []string
 	if cluster != nil {
 		for _, envVar := range cluster.Spec.AgentEnvVars {
 			if envVar.Value != "" {
-				agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e %s=%s", envVar.Name, envVar.Value))
+				agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e \"%s=%s\"", envVar.Name, envVar.Value))
 			}
 		}
 	}

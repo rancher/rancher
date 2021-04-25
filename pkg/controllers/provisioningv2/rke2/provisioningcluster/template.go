@@ -1,4 +1,4 @@
-package ranchercluster
+package provisioningcluster
 
 import (
 	"encoding/json"
@@ -139,19 +139,34 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			continue
 		}
 
-		nodePoolName := name.SafeConcatName(cluster.Name, "nodepool", nodePool.Name)
+		var (
+			nodePoolName = name.SafeConcatName(cluster.Name, "nodepool", nodePool.Name)
+			infraRef     corev1.ObjectReference
+		)
 
-		machineTemplate, err := toMachineTemplate(nodePoolName, cluster, nodePool, dynamic, dynamicSchema)
-		if err != nil {
-			return nil, err
+		if nodePool.NodeConfig.APIVersion == "" || nodePool.NodeConfig.APIVersion == "provisioning.cattle.io/v1" {
+			machineTemplate, err := toMachineTemplate(nodePoolName, cluster, nodePool, dynamic, dynamicSchema)
+			if err != nil {
+				return nil, err
+			}
+
+			result = append(result, machineTemplate)
+			infraRef = corev1.ObjectReference{
+				Kind:       machineTemplate.GetObjectKind().GroupVersionKind().Kind,
+				Namespace:  cluster.Namespace,
+				Name:       nodePoolName,
+				APIVersion: "rke-node.cattle.io/v1",
+			}
+		} else {
+			infraRef = *nodePool.NodeConfig
 		}
-
-		result = append(result, machineTemplate)
 
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cluster.Namespace,
-				Name:      nodePoolName,
+				Namespace:   cluster.Namespace,
+				Name:        nodePoolName,
+				Labels:      nodePool.MachineDeploymentLabels,
+				Annotations: nodePool.MachineDeploymentAnnotations,
 			},
 			Spec: capi.MachineDeploymentSpec{
 				ClusterName: capiCluster.Name,
@@ -174,12 +189,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 								APIVersion: "rke.cattle.io/v1",
 							},
 						},
-						InfrastructureRef: corev1.ObjectReference{
-							Kind:       machineTemplate.GetObjectKind().GroupVersionKind().Kind,
-							Namespace:  cluster.Namespace,
-							Name:       nodePoolName,
-							APIVersion: "rke-node.cattle.io/v1",
-						},
+						InfrastructureRef: infraRef,
 					},
 				},
 				Paused: nodePool.Paused,
@@ -195,11 +205,11 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			}
 		}
 
-		if defaultTrue(nodePool.EtcdRole) {
+		if nodePool.EtcdRole {
 			machineDeployment.Spec.Template.Labels[planner.EtcdRoleLabel] = "true"
 		}
 
-		if defaultTrue(nodePool.ControlPlaneRole) {
+		if nodePool.ControlPlaneRole {
 			machineDeployment.Spec.Template.Labels[planner.ControlPlaneRoleLabel] = "true"
 			machineDeployment.Spec.Template.Labels[capi.MachineControlPlaneLabelName] = "true"
 		}
@@ -220,13 +230,6 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 	}
 
 	return result, nil
-}
-
-func defaultTrue(b *bool) bool {
-	if b == nil {
-		return true
-	}
-	return *b
 }
 
 func assign(labels map[string]string, key string, value interface{}) error {

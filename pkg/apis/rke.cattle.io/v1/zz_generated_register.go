@@ -28,11 +28,11 @@ import (
 )
 
 var (
+	CustomMachineResourceName        = "custommachines"
 	RKEBootstrapResourceName         = "rkebootstraps"
 	RKEBootstrapTemplateResourceName = "rkebootstraptemplates"
 	RKEClusterResourceName           = "rkeclusters"
 	RKEControlPlaneResourceName      = "rkecontrolplanes"
-	UnmanagedMachineResourceName     = "unmanagedmachines"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -56,6 +56,8 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&CustomMachine{},
+		&CustomMachineList{},
 		&RKEBootstrap{},
 		&RKEBootstrapList{},
 		&RKEBootstrapTemplate{},
@@ -64,8 +66,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RKEClusterList{},
 		&RKEControlPlane{},
 		&RKEControlPlaneList{},
-		&UnmanagedMachine{},
-		&UnmanagedMachineList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

@@ -30,11 +30,11 @@ func init() {
 }
 
 type Interface interface {
+	CustomMachine() CustomMachineController
 	RKEBootstrap() RKEBootstrapController
 	RKEBootstrapTemplate() RKEBootstrapTemplateController
 	RKECluster() RKEClusterController
 	RKEControlPlane() RKEControlPlaneController
-	UnmanagedMachine() UnmanagedMachineController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -47,6 +47,9 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
+func (c *version) CustomMachine() CustomMachineController {
+	return NewCustomMachineController(schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "CustomMachine"}, "custommachines", true, c.controllerFactory)
+}
 func (c *version) RKEBootstrap() RKEBootstrapController {
 	return NewRKEBootstrapController(schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "RKEBootstrap"}, "rkebootstraps", true, c.controllerFactory)
 }
@@ -58,7 +61,4 @@ func (c *version) RKECluster() RKEClusterController {
 }
 func (c *version) RKEControlPlane() RKEControlPlaneController {
 	return NewRKEControlPlaneController(schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "RKEControlPlane"}, "rkecontrolplanes", true, c.controllerFactory)
-}
-func (c *version) UnmanagedMachine() UnmanagedMachineController {
-	return NewUnmanagedMachineController(schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "UnmanagedMachine"}, "unmanagedmachines", true, c.controllerFactory)
 }
