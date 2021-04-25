@@ -740,6 +740,23 @@ func NewMultiClusterAppRevision(namespace, name string, obj MultiClusterAppRevis
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// MultiClusterChartList is a list of MultiClusterChart resources
+type MultiClusterChartList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []MultiClusterChart `json:"items"`
+}
+
+func NewMultiClusterChart(namespace, name string, obj MultiClusterChart) *MultiClusterChart {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("MultiClusterChart").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // NodeList is a list of Node resources
 type NodeList struct {
 	metav1.TypeMeta `json:",inline"`

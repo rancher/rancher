@@ -560,6 +560,8 @@ github.com/rancher/cluster-api v0.3.11-0.20210219162658-745452a60720 h1:xukDZatq
 github.com/rancher/cluster-api v0.3.11-0.20210219162658-745452a60720/go.mod h1:cTAQMrC7olFcAppt8OVGHjt2MvXTcpoCG30Co3TmIlI=
 github.com/rancher/eks-operator v1.0.6-rc1 h1:VY2lLcaHtBMByd7pq7px4fB+GW0cd0cfessODbmH+Tc=
 github.com/rancher/eks-operator v1.0.6-rc1/go.mod h1:GB2kyPtIN0r+DGlUcDgEUMsB4qRwZH7OKsraemZT+GA=
+github.com/rancher/fleet/pkg/apis v0.0.0-20210422223946-04ef5f7e36c2 h1:HAyDrUkXmnltge/zwVxZQSm0CPjEqnajyZCndQ26Hk4=
+github.com/rancher/fleet/pkg/apis v0.0.0-20210422223946-04ef5f7e36c2/go.mod h1:RKVnqsx+c9juaMp74p54zxCvQfMZw2KVCzkowaLtUmQ=
 github.com/rancher/gke-operator v1.0.1-rc8 h1:wyK2Qgx5Y1dzX2yIe+uE3y6J5+cBKSmUywzb1AaAzac=
 github.com/rancher/gke-operator v1.0.1-rc8/go.mod h1:kLoR/DmYaMllbN2N+HQiQAk4yMmCew/w/SHHJrUqSFo=
 github.com/rancher/lasso v0.0.0-20200427171700-e0509f89f319/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
@@ -576,6 +578,7 @@ github.com/rancher/rke v1.3.0-rc1.0.20210421002614-3c0f9553436b/go.mod h1:osU/R8
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
 github.com/rancher/wrangler v0.6.2-0.20200515155908-1923f3f8ec3f/go.mod h1:NmtmlLkchboIksYJuBemwcP4RBfv8FpeyhVoWXB9Wdc=
 github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106/go.mod h1:iKqQcYs4YSDjsme52OZtQU4jHPmLlIiM93aj2c8c/W8=
+github.com/rancher/wrangler v0.6.2-0.20200829053106-7e1dd4260224/go.mod h1:I7qe4DZNMOLKVa9ax7DJdBZ0XtKOppLF/dalhPX3vaE=
 github.com/rancher/wrangler v0.7.3-0.20201020003736-e86bc912dfac/go.mod h1:goezjesEKwMxHLfltdjg9DW0xWV7txQee6vOuSDqXAI=
 github.com/rancher/wrangler v0.8.1-0.20210424161928-8b8ba672bd0b h1:wfV34BpSq/iYF2x3pKjjljMFzXFNsV0XHXjnEn3yyoo=
 github.com/rancher/wrangler v0.8.1-0.20210424161928-8b8ba672bd0b/go.mod h1:aj/stIidTzU6UEKKRB8JyrrqNMJAfDMziL1+zhG8lc0=
@@ -1202,6 +1205,7 @@ rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7/go.mod h1:PHgbrJT7lCHcxMU+mDHEm+nx46H4zuuHZkDP6icnhu0=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.14/go.mod h1:LEScyzhFmoF5pso/YSeBstl57mOzx9xlU9n85RGrDQg=
+sigs.k8s.io/cli-utils v0.16.0 h1:Wr32m1oxjIqc9G9l+igr13PeIM9LCyq8jQ8KjXKelvg=
 sigs.k8s.io/cli-utils v0.16.0/go.mod h1:9Jqm9K2W6ShhCxsEuaz6HSRKKOXigPUx3ZfypGgxBLY=
 sigs.k8s.io/controller-runtime v0.4.0/go.mod h1:ApC79lpY3PHW9xj/w9pj+lYkLgwAAUZwfXkME1Lajns=
 sigs.k8s.io/controller-runtime v0.8.2 h1:SBWmI0b3uzMIUD/BIXWNegrCeZmPJ503pOtwxY0LPHM=

@@ -244,21 +244,6 @@ func (in *RKEMachinePoolRollingUpdate) DeepCopy() *RKEMachinePoolRollingUpdate {
 func (in *RKENodePool) DeepCopyInto(out *RKENodePool) {
 	*out = *in
 	in.RKECommonNodeConfig.DeepCopyInto(&out.RKECommonNodeConfig)
-	if in.EtcdRole != nil {
-		in, out := &in.EtcdRole, &out.EtcdRole
-		*out = new(bool)
-		**out = **in
-	}
-	if in.ControlPlaneRole != nil {
-		in, out := &in.ControlPlaneRole, &out.ControlPlaneRole
-		*out = new(bool)
-		**out = **in
-	}
-	if in.WorkerRole != nil {
-		in, out := &in.WorkerRole, &out.WorkerRole
-		*out = new(bool)
-		**out = **in
-	}
 	if in.NodeConfig != nil {
 		in, out := &in.NodeConfig, &out.NodeConfig
 		*out = new(corev1.ObjectReference)
@@ -273,6 +258,20 @@ func (in *RKENodePool) DeepCopyInto(out *RKENodePool) {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
 		*out = new(RKEMachinePoolRollingUpdate)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.MachineDeploymentLabels != nil {
+		in, out := &in.MachineDeploymentLabels, &out.MachineDeploymentLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.MachineDeploymentAnnotations != nil {
+		in, out := &in.MachineDeploymentAnnotations, &out.MachineDeploymentAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	return
 }

@@ -89,7 +89,7 @@ require (
 	github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430
 	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
 	github.com/rancher/eks-operator v1.0.6-rc1
-	github.com/rancher/fleet/pkg/apis v0.0.0-20210225010648-40ee92df4aea
+	github.com/rancher/fleet/pkg/apis v0.0.0-20210422223946-04ef5f7e36c2
 	github.com/rancher/gke-operator v1.0.1-rc8
 	github.com/rancher/kubernetes-provider-detector v0.1.2
 	github.com/rancher/lasso v0.0.0-20210408231703-9ddd9378d08d
@@ -103,7 +103,7 @@ require (
 	github.com/rancher/rke v1.3.0-rc1.0.20210421002614-3c0f9553436b
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20210423003643-0a9ab631701f
-	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
+	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3
 	github.com/rancher/wrangler v0.8.1-0.20210424161928-8b8ba672bd0b
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.0

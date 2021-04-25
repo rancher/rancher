@@ -71,6 +71,7 @@ var (
 	MonitorMetricResourceName                           = "monitormetrics"
 	MultiClusterAppResourceName                         = "multiclusterapps"
 	MultiClusterAppRevisionResourceName                 = "multiclusterapprevisions"
+	MultiClusterChartResourceName                       = "multiclustercharts"
 	NodeResourceName                                    = "nodes"
 	NodeDriverResourceName                              = "nodedrivers"
 	NodePoolResourceName                                = "nodepools"
@@ -212,6 +213,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&MultiClusterAppList{},
 		&MultiClusterAppRevision{},
 		&MultiClusterAppRevisionList{},
+		&MultiClusterChart{},
+		&MultiClusterChartList{},
 		&Node{},
 		&NodeList{},
 		&NodeDriver{},
