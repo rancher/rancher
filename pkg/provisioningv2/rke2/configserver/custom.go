@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +16,7 @@ import (
 
 const (
 	machineRequestType = "rke.cattle.io/machine-request"
-	nameHeader         = "X-Cattle-Id"
+	machineIDHeader    = "X-Cattle-Id"
 	headerPrefix       = "X-Cattle-"
 )
 
@@ -25,10 +26,11 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string,
 		return "", "", nil
 	}
 
-	name := req.Header.Get(nameHeader)
-	if name == "" {
+	machineID := req.Header.Get(machineIDHeader)
+	if machineID == "" {
 		return "", "", nil
 	}
+	machineID = name.SafeConcatName(machineID)
 
 	tokens, err := r.clusterTokenCache.GetByIndex(tokenIndex, token)
 	if err != nil {
@@ -41,12 +43,13 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string,
 			data[strings.ToLower(strings.TrimPrefix(k, headerPrefix))] = v
 		}
 	}
+	data["id"] = machineID
 
 	if len(tokens) == 0 {
 		return "", "", nil
 	}
 
-	secretName := machineRequestSecretName(name)
+	secretName := machineRequestSecretName(machineID)
 	secret, err := r.secretsCache.Get(tokens[0].Namespace, secretName)
 	if apierror.IsNotFound(err) {
 		secret, err = r.createSecret(tokens[0].Namespace, secretName, data)
@@ -59,7 +62,10 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string,
 	if err != nil {
 		return "", "", err
 	}
-	return secret.Labels[machineNamespaceLabel], secret.Labels[machineNameLabel], nil
+
+	machineNamespace, machineName := secret.Labels[machineNamespaceLabel], secret.Labels[machineNameLabel]
+	_ = r.secrets.Delete(secret.Namespace, secret.Name, nil)
+	return machineNamespace, machineName, nil
 }
 
 func (r *RKE2ConfigServer) createSecret(namespace, name string, data map[string]interface{}) (*corev1.Secret, error) {
@@ -111,5 +117,5 @@ func (r *RKE2ConfigServer) waitReady(secret *corev1.Secret) (*corev1.Secret, err
 
 func machineRequestSecretName(name string) string {
 	hash := sha256.Sum256([]byte(name))
-	return "req-" + hex.EncodeToString(hash[:])[:12]
+	return "custom-" + hex.EncodeToString(hash[:])[:12]
 }

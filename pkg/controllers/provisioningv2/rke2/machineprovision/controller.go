@@ -70,7 +70,7 @@ func validGVK(gvk schema.GroupVersionKind) bool {
 	return gvk.Group == "rke-node.cattle.io" &&
 		gvk.Version == "v1" &&
 		strings.HasSuffix(gvk.Kind, "Machine") &&
-		gvk.Kind != "UnmanagedMachine"
+		gvk.Kind != "CustomMachine"
 }
 
 func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error) {

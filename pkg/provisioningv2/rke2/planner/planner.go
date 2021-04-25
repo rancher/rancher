@@ -22,11 +22,13 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/summary"
+	"github.com/rancher/wrangler/pkg/yaml"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
@@ -57,6 +59,11 @@ const (
 )
 
 var (
+	fileParams = []string{
+		"audit-policy-file",
+		"cloud-provider-config",
+		"private-registry",
+	}
 	AuthnWebhook = []byte(`
 apiVersion: v1
 kind: Config
@@ -408,7 +415,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 
 func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane,
 	machine *capi.Machine) {
-	if isOnlyWorker(machine) || !isDefaultTrueEnabled(controlPlane.Spec.LocalClusterAuthEndpoint.Enabled) {
+	if isOnlyWorker(machine) || !controlPlane.Spec.LocalClusterAuthEndpoint.Enabled {
 		return
 	}
 
@@ -419,7 +426,7 @@ func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, 
 
 func addLocalClusterAuthenticationEndpointFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane,
 	machine *capi.Machine) plan.NodePlan {
-	if isOnlyWorker(machine) || !isDefaultTrueEnabled(controlPlane.Spec.LocalClusterAuthEndpoint.Enabled) {
+	if isOnlyWorker(machine) || !controlPlane.Spec.LocalClusterAuthEndpoint.Enabled {
 		return nodePlan
 	}
 
@@ -438,6 +445,47 @@ func (p *Planner) addManifests(nodePlan plan.NodePlan, controlPlane *rkev1.RKECo
 		return nodePlan, err
 	}
 	nodePlan.Files = append(nodePlan.Files, files...)
+
+	return nodePlan, nil
+}
+
+func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane,
+	machine *capi.Machine) (plan.NodePlan, error) {
+	if isOnlyWorker(machine) {
+		return nodePlan, nil
+	}
+
+	var chartConfigs []runtime.Object
+	for chart, values := range controlPlane.Spec.ChartValues.Data {
+		data, err := json.Marshal(values)
+		if err != nil {
+			return plan.NodePlan{}, err
+		}
+
+		chartConfigs = append(chartConfigs, &helmChartConfig{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "HelmChartConfig",
+				APIVersion: "helm.cattle.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      chart,
+				Namespace: "kube-system",
+			},
+			Spec: helmChartConfigSpec{
+				ValuesContent: string(data),
+			},
+		})
+	}
+	contents, err := yaml.ToBytes(chartConfigs)
+	if err != nil {
+		return plan.NodePlan{}, err
+	}
+
+	nodePlan.Files = append(nodePlan.Files, plan.File{
+		Content: base64.StdEncoding.EncodeToString(contents),
+		Name:    "chart-config",
+		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/managed-chart-config.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
+	})
 
 	return nodePlan, nil
 }
@@ -492,10 +540,7 @@ func addLabels(config map[string]interface{}, machine *capi.Machine) error {
 		}
 	}
 
-	if machine.Spec.InfrastructureRef.Kind != "UnmanagedMachine" {
-		labels = append(labels, MachineUIDLabel+"="+string(machine.UID))
-	}
-
+	labels = append(labels, MachineUIDLabel+"="+string(machine.UID))
 	sort.Strings(labels)
 	if len(labels) > 0 {
 		config["node-label"] = labels
@@ -547,6 +592,21 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		return nodePlan, err
 	}
 
+	for _, fileParam := range fileParams {
+		content, ok := config[fileParam]
+		if !ok {
+			continue
+		}
+		filePath := fmt.Sprintf("/var/lib/rancher/%s/etcd/%sconfig.yaml",
+			GetRuntime(controlPlane.Spec.KubernetesVersion), fileParam)
+		config[fileParam] = filePath
+
+		nodePlan.Files = append(nodePlan.Files, plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(convert.ToString(content))),
+			Path:    filePath,
+		})
+	}
+
 	configData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return nodePlan, err
@@ -577,6 +637,11 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 	}
 
 	nodePlan, err = p.addManifests(nodePlan, controlPlane, entry.Machine)
+	if err != nil {
+		return nodePlan, err
+	}
+
+	nodePlan, err = p.addChartConfigs(nodePlan, controlPlane, entry.Machine)
 	if err != nil {
 		return nodePlan, err
 	}
@@ -729,4 +794,19 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, full
 		ServerToken: string(secret.Data["serverToken"]),
 		AgentToken:  string(secret.Data["agentToken"]),
 	}, nil
+}
+
+type helmChartConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec helmChartConfigSpec `json:"spec,omitempty"`
+}
+
+type helmChartConfigSpec struct {
+	ValuesContent string `json:"valuesContent,omitempty"`
+}
+
+func (h *helmChartConfig) DeepCopyObject() runtime.Object {
+	panic("unsupported")
 }

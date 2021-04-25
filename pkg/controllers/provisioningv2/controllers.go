@@ -8,9 +8,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/bootstrap"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/managesystemagent"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/planstatus"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/ranchercluster"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/provisioningcluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/rkecluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/unmanaged"
 	"github.com/rancher/rancher/pkg/features"
@@ -31,12 +32,13 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 			dynamicschema.Register(ctx, clients)
 		}
 		rkecluster.Register(ctx, clients)
-		ranchercluster.Register(ctx, clients)
+		provisioningcluster.Register(ctx, clients)
 		bootstrap.Register(ctx, clients)
 		machineprovision.Register(ctx, clients)
 		planner.Register(ctx, clients)
 		planstatus.Register(ctx, clients)
 		unmanaged.Register(ctx, clients)
+		managesystemagent.Register(ctx, clients)
 	}
 
 	if features.EmbeddedClusterAPI.Enabled() {

@@ -3,6 +3,7 @@ package managesystemagent
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -10,67 +11,72 @@ import (
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/name"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
-	workerAffinity = corev1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-			NodeSelectorTerms: []corev1.NodeSelectorTerm{{
-				MatchExpressions: []corev1.NodeSelectorRequirement{
-					{
-						Key:      "node-role.kubernetes.io/etcd",
-						Operator: corev1.NodeSelectorOpNotIn,
-						Values:   []string{"true"},
-					},
-					{
-						Key:      "node-role.kubernetes.io/control-plane",
-						Operator: corev1.NodeSelectorOpNotIn,
-						Values:   []string{"true"},
-					},
-					{
-						Key:      "node-role.kubernetes.io/master",
-						Operator: corev1.NodeSelectorOpNotIn,
-						Values:   []string{"true"},
-					},
-					{
-						Key:      "beta.kubernetes.io/os",
-						Operator: corev1.NodeSelectorOpNotIn,
-						Values:   []string{"windows"},
-					},
-				},
-			}},
+	workerSelector = metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "node-role.kubernetes.io/etcd",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"true"},
+			},
+			{
+				Key:      "node-role.kubernetes.io/control-plane",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"true"},
+			},
+			{
+				Key:      "beta.kubernetes.io/os",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"windows"},
+			},
 		},
 	}
-	controlPlaneAffinity = corev1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-			NodeSelectorTerms: []corev1.NodeSelectorTerm{
-				{
-					MatchExpressions: []corev1.NodeSelectorRequirement{{
-						Key:      "node-role.kubernetes.io/etcd",
-						Operator: corev1.NodeSelectorOpIn,
-						Values:   []string{"true"},
-					}},
-				},
-				{
-					MatchExpressions: []corev1.NodeSelectorRequirement{{
-						Key:      "node-role.kubernetes.io/control-plane",
-						Operator: corev1.NodeSelectorOpIn,
-						Values:   []string{"true"},
-					}},
-				},
-				{
-					MatchExpressions: []corev1.NodeSelectorRequirement{{
-						Key:      "node-role.kubernetes.io/master",
-						Operator: corev1.NodeSelectorOpIn,
-						Values:   []string{"true"},
-					}},
-				},
+	controlPlaneSelector = metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "node-role.kubernetes.io/etcd",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"true"},
+			},
+			{
+				Key:      "node-role.kubernetes.io/control-plane",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
+			},
+		},
+	}
+	etcdSelector = metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "node-role.kubernetes.io/etcd",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
+			},
+			{
+				Key:      "node-role.kubernetes.io/control-plane",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"true"},
+			},
+		},
+	}
+	controlPlaneAndEtcdSelector = metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "node-role.kubernetes.io/etcd",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
+			},
+			{
+				Key:      "node-role.kubernetes.io/control-plane",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
 			},
 		},
 	}
@@ -86,6 +92,12 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			WithCacheTypes(clients.Fleet.Bundle(),
 				clients.Provisioning.Cluster()),
 		"", "manage-system-agent", h.OnChange, nil)
+	rocontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
+		clients.Apply.
+			WithSetOwnerReference(false, false).
+			WithCacheTypes(clients.Mgmt.MultiClusterChart(),
+				clients.Provisioning.Cluster()),
+		"", "manage-system-upgrade-controller", h.OnChangeInstallSUC, nil)
 }
 
 func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterStatus) ([]runtime.Object, rancherv1.ClusterStatus, error) {
@@ -99,14 +111,25 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 			Name:      name.SafeConcatName(cluster.Name, "managed", "system", "agent"),
 		},
 		Spec: v1alpha1.BundleSpec{
+			BundleDeploymentOptions: v1alpha1.BundleDeploymentOptions{
+				DefaultNamespace: namespaces.System,
+			},
 			Resources: []v1alpha1.BundleResource{
 				{
-					Name:    "one.yaml",
-					Content: installer("true", &workerAffinity),
+					Name:    "cp.yaml",
+					Content: installer("cp", "false", &controlPlaneSelector),
 				},
 				{
-					Name:    "two.yaml",
-					Content: installer("false", &controlPlaneAffinity),
+					Name:    "etcd.yaml",
+					Content: installer("etcd", "false", &etcdSelector),
+				},
+				{
+					Name:    "cp-and-etcd.yaml",
+					Content: installer("cp-and-etcd", "false", &controlPlaneAndEtcdSelector),
+				},
+				{
+					Name:    "worker.yaml",
+					Content: installer("worker", "true", &workerSelector),
 				},
 			},
 			Targets: []v1alpha1.BundleTarget{
@@ -136,71 +159,49 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 	}, status, nil
 }
 
-func installer(agentEnvValue string, affinity *corev1.NodeAffinity) string {
-	ds := &appsv1.DaemonSet{
+func installer(name, agentEnvValue string, selector *metav1.LabelSelector) string {
+	image := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
+	version := "latest"
+	if len(image) == 2 {
+		version = image[1]
+	}
+
+	plan := &upgradev1.Plan{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Plan",
+			APIVersion: "upgrade.cattle.io/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "system-agent-upgrader-worker",
+			Name:      "system-agent-upgrader-" + name,
 			Namespace: namespaces.System,
 		},
-		Spec: v1.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app": "system-agent-upgrader",
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": "system-agent-upgrader",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Volumes: []corev1.Volume{{
-						Name: "host",
-						VolumeSource: corev1.VolumeSource{
-							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/",
-							},
+		Spec: upgradev1.PlanSpec{
+			Concurrency: 10,
+			Version:     version,
+			Tolerations: []corev1.Toleration{{
+				Operator: corev1.TolerationOpExists,
+			}},
+			NodeSelector: selector,
+			Upgrade: &upgradev1.ContainerSpec{
+				Image:   settings.PrefixPrivateRegistry(image[0]),
+				Command: nil,
+				Args:    nil,
+				Env: []corev1.EnvVar{{
+					Name:  "CATTLE_ROLE_WORKER",
+					Value: agentEnvValue,
+				}},
+				EnvFrom: []corev1.EnvFromSource{{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "steve-aggregation",
 						},
-					}},
-					HostIPC:     true,
-					HostPID:     true,
-					HostNetwork: true,
-					DNSPolicy:   corev1.DNSClusterFirstWithHostNet,
-					Tolerations: []corev1.Toleration{{
-						Operator: corev1.TolerationOpExists,
-					}},
-					Containers: []corev1.Container{{
-						Name:  "installer",
-						Image: settings.PrefixPrivateRegistry(settings.SystemAgentUpgradeImage.Get()),
-						Env: []corev1.EnvVar{{
-							Name:  "CATTLE_ROLE_WORKER",
-							Value: agentEnvValue,
-						}},
-						EnvFrom: []corev1.EnvFromSource{{
-							SecretRef: &corev1.SecretEnvSource{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "steve-aggregation",
-								},
-							},
-						}},
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "host",
-							MountPath: "/host",
-						}},
-						SecurityContext: &corev1.SecurityContext{
-							Privileged: &[]bool{true}[0],
-						},
-					}},
-					RestartPolicy: corev1.RestartPolicyOnFailure,
-					Affinity: &corev1.Affinity{
-						NodeAffinity: affinity,
 					},
-				},
+				}},
 			},
 		},
 	}
-	file, err := json.Marshal(ds)
+
+	file, err := json.Marshal(plan)
 	if err != nil {
 		panic(err)
 	}

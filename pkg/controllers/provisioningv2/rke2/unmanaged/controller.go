@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -26,34 +28,40 @@ import (
 )
 
 const (
-	machineRequestType = "rke.cattle.io/machine-request"
+	machineRequestType        = "rke.cattle.io/machine-request"
+	clusterByClusterReference = "clusterByClusterReference"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := handler{
-		unmanagedMachine: clients.RKE.UnmanagedMachine(),
+		unmanagedMachine: clients.RKE.CustomMachine(),
 		mgmtClusterCache: clients.Mgmt.Cluster().Cache(),
+		clusterCache:     clients.Provisioning.Cluster().Cache(),
 		capiClusterCache: clients.CAPI.Cluster().Cache(),
 		machineCache:     clients.CAPI.Machine().Cache(),
 		secrets:          clients.Core.Secret(),
 		apply: clients.Apply.WithSetID("unmanaged-machine").
-			WithSetOwnerReference(true, true).
 			WithCacheTypes(
 				clients.Mgmt.Cluster(),
 				clients.Provisioning.Cluster(),
-				clients.RKE.UnmanagedMachine(),
+				clients.RKE.CustomMachine(),
 				clients.CAPI.Machine(),
 				clients.RKE.RKEBootstrap()),
 	}
-	clients.RKE.UnmanagedMachine().OnChange(ctx, "unmanaged-machine", h.onUnmanagedMachineChange)
+	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-machine", h.onUnmanagedMachineChange)
 	clients.Core.Secret().OnChange(ctx, "unmanaged-machine", h.onSecretChange)
+
+	h.clusterCache.AddIndexer(clusterByClusterReference, func(obj *rancherv1.Cluster) ([]string, error) {
+		return []string{obj.Status.ClusterName}, nil
+	})
 }
 
 type handler struct {
-	unmanagedMachine rkecontroller.UnmanagedMachineClient
+	unmanagedMachine rkecontroller.CustomMachineClient
 	mgmtClusterCache mgmtcontroller.ClusterCache
 	capiClusterCache capicontrollers.ClusterCache
 	machineCache     capicontrollers.MachineCache
+	clusterCache     rocontrollers.ClusterCache
 	secrets          corecontrollers.SecretClient
 	apply            apply.Apply
 }
@@ -93,6 +101,12 @@ func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Sec
 		return secret, nil
 	}
 
+	go func() {
+		// Only keep requests for 1 minute
+		time.Sleep(time.Minute)
+		_ = h.secrets.Delete(secret.Namespace, secret.Name, nil)
+	}()
+
 	data := data.Object{}
 	if err := json.Unmarshal(secret.Data["data"], &data); err != nil {
 		// ignore invalid json, wait until it's valid
@@ -100,7 +114,7 @@ func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Sec
 	}
 
 	capiCluster, err := h.getCAPICluster(secret)
-	if apierror.IsNotFound(err) {
+	if apierror.IsNotFound(err) || capiCluster == nil {
 		return secret, nil
 	} else if err != nil {
 		return secret, err
@@ -209,7 +223,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 				Namespace: capiCluster.Namespace,
 			},
 		},
-		&rkev1.UnmanagedMachine{
+		&rkev1.CustomMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      machineName,
 				Namespace: capiCluster.Namespace,
@@ -234,7 +248,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 					},
 				},
 				InfrastructureRef: corev1.ObjectReference{
-					Kind:       "UnmanagedMachine",
+					Kind:       "CustomMachine",
 					Namespace:  capiCluster.Namespace,
 					Name:       machineName,
 					APIVersion: "rke.cattle.io/v1",
@@ -252,20 +266,15 @@ func (h *handler) getCAPICluster(secret *corev1.Secret) (*capi.Cluster, error) {
 		return nil, err
 	}
 
-	owner, err := h.apply.FindOwner(cluster)
-	if err == apply.ErrOwnerNotFound {
-		return nil, nil
+	rClusters, err := h.clusterCache.GetByIndex(clusterByClusterReference, cluster.Name)
+	if err != nil || len(rClusters) == 0 {
+		return nil, err
 	}
 
-	rcluster, ok := owner.(*rancherv1.Cluster)
-	if !ok {
-		return nil, nil
-	}
-
-	return h.capiClusterCache.Get(rcluster.Namespace, rcluster.Name)
+	return h.capiClusterCache.Get(rClusters[0].Namespace, rClusters[0].Name)
 }
 
-func (h *handler) onUnmanagedMachineChange(key string, machine *rkev1.UnmanagedMachine) (*rkev1.UnmanagedMachine, error) {
+func (h *handler) onUnmanagedMachineChange(key string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
 	if machine != nil && !machine.Status.Ready {
 		machine = machine.DeepCopy()
 		machine.Status.Ready = true

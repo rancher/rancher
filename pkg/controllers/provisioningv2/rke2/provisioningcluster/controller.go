@@ -1,4 +1,4 @@
-package ranchercluster
+package provisioningcluster
 
 import (
 	"context"
@@ -135,6 +135,10 @@ func (h *handler) infraWatch(obj runtime.Object) (runtime.Object, error) {
 func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv1.ClusterStatus) ([]runtime.Object, rancherv1.ClusterStatus, error) {
 	if obj.Spec.RKEConfig == nil || obj.Status.ClusterName == "" {
 		return nil, status, nil
+	}
+
+	if obj.Spec.KubernetesVersion == "" {
+		return nil, status, fmt.Errorf("kubernetesVersion not set on %s/%s", obj.Namespace, obj.Name)
 	}
 
 	status, err := h.updateClusterProvisioningStatus(obj, status)

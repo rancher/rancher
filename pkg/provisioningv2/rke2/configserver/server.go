@@ -131,7 +131,7 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 }
 
 func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, error) {
-	machineID := req.Header.Get(nameHeader)
+	machineID := req.Header.Get(machineIDHeader)
 	if machineID == "" {
 		return "", nil, nil
 	}

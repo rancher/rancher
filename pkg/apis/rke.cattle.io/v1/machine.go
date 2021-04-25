@@ -25,17 +25,18 @@ type RKEMachineStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type UnmanagedMachine struct {
+type CustomMachine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   UnmanagedMachineSpec   `json:"spec,omitempty"`
-	Status UnmanagedMachineStatus `json:"status,omitempty"`
+	Spec   CustomMachineSpec   `json:"spec,omitempty"`
+	Status CustomMachineStatus `json:"status,omitempty"`
 }
 
-type UnmanagedMachineSpec struct {
+type CustomMachineSpec struct {
+	ProviderID string `json:"providerID,omitempty"`
 }
 
-type UnmanagedMachineStatus struct {
+type CustomMachineStatus struct {
 	Ready bool `json:"ready,omitempty"`
 }

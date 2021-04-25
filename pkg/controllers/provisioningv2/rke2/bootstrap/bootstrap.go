@@ -12,15 +12,20 @@ import (
 
 var (
 	defaultSystemAgentInstallScript = "https://raw.githubusercontent.com/rancher/system-agent/main/install.sh"
-	localAgentInstallScript         = "./install.sh"
+	localAgentInstallScripts        = []string{
+		"/var/lib/rancher-data/system-agent-install.sh",
+		"./system-agent-install.sh",
+	}
 )
 
 func InstallScript() ([]byte, error) {
 	url := settings.SystemAgentInstallScript.Get()
 	if url == "" {
-		script, err := ioutil.ReadFile(localAgentInstallScript)
-		if !os.IsNotExist(err) {
-			return script, err
+		for _, localAgentInstallScript := range localAgentInstallScripts {
+			script, err := ioutil.ReadFile(localAgentInstallScript)
+			if !os.IsNotExist(err) {
+				return script, err
+			}
 		}
 	}
 
