@@ -158,11 +158,17 @@ func addSourceToImage(imagesSet map[string]map[string]bool, image string, source
 	}
 }
 
-func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[interface{}]interface{})) {
-	walkFunc(inputMap)
-	for _, value := range inputMap {
-		if v, ok := value.(map[interface{}]interface{}); ok {
-			walkthroughMap(v, walkFunc)
+func walkthroughMap(data interface{}, walkFunc func(map[interface{}]interface{})) {
+	if inputMap, isMap := data.(map[interface{}]interface{}); isMap {
+		// Run the walkFunc on the root node and each child node
+		walkFunc(inputMap)
+		for _, value := range inputMap {
+			walkthroughMap(value, walkFunc)
+		}
+	} else if inputList, isList := data.([]interface{}); isList {
+		// Run the walkFunc on each element in the root node, ignoring the root itself
+		for _, elem := range inputList {
+			walkthroughMap(elem, walkFunc)
 		}
 	}
 }
