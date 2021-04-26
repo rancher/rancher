@@ -86,11 +86,14 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 		}
 
 		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, nodes, apiContext.ID, host, tokenKey)
+		if err != nil {
+			return err
+		}
 	} else {
 		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, host, tokenKey)
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	data := map[string]interface{}{
