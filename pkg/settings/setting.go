@@ -60,6 +60,7 @@ var (
 	ServerImage                       = NewSetting("server-image", "rancher/rancher")
 	ServerURL                         = NewSetting("server-url", "")
 	ServerVersion                     = NewSetting("server-version", "dev")
+	SystemAgentVersion                = NewSetting("system-agent-version", "")
 	SystemAgentInstallScript          = NewSetting("system-agent-install-script", "")
 	SystemAgentInstallerImage         = NewSetting("system-agent-installer-image", "docker.io/rancher/system-agent-installer-")
 	SystemAgentUpgradeImage           = NewSetting("system-agent-upgrade-image", "rancher/system-agent:v0.0.1-alpha7-suc")
@@ -104,6 +105,7 @@ var (
 	EKSUpstreamRefresh                = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                = NewSetting("gke-refresh", "300")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
+	MachineProvisionImage             = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher55")
 
 	FleetMinVersion           = NewSetting("fleet-min-version", "")
 	RancherOperatorMinVersion = NewSetting("rancher-operator-min-version", "")

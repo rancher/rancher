@@ -49,13 +49,73 @@ func getStatusSchema(allSchemas *schemas.Schemas) (*schemas.Schema, error) {
 	return allSchemas.Import(rkev1.RKEMachineStatus{})
 }
 
-func getSchemas(name string, spec *v3.DynamicSchemaSpec) (string, string, string, *schemas.Schemas, error) {
-	var (
-		nodeConfigID = name + "Config"
-		machineID    = name + "Machine"
-		templateID   = name + "MachineTemplate"
-	)
+func addConfigSchema(name string, specSchema, statusSchema *schemas.Schema, allSchemas *schemas.Schemas) (string, error) {
+	nodeConfigFields := removeKey(specSchema.ResourceFields, "common")
+	nodeConfigFields = removeKey(nodeConfigFields, "providerID")
+	id := name + "Config"
+	return id, allSchemas.AddSchema(schemas.Schema{
+		ID:             id,
+		ResourceFields: nodeConfigFields,
+	})
+}
 
+func addMachineSchema(name string, specSchema, statusSchema *schemas.Schema, allSchemas *schemas.Schemas) (string, error) {
+	id := name + "Machine"
+	return id, allSchemas.AddSchema(schemas.Schema{
+		ID: id,
+		ResourceFields: map[string]schemas.Field{
+			"spec": {
+				Type: specSchema.ID,
+			},
+			"status": {
+				Type: statusSchema.ID,
+			},
+		},
+	})
+}
+
+func addMachineTemplateSchema(name string, specSchema, statusSchema *schemas.Schema, allSchemas *schemas.Schemas) (string, error) {
+	templateTemplateSpecSchemaID := name + "MachineTemplateTemplateSpec"
+	err := allSchemas.AddSchema(schemas.Schema{
+		ID: templateTemplateSpecSchemaID,
+		ResourceFields: map[string]schemas.Field{
+			"spec": {
+				Type: specSchema.ID,
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	templateSpecSchemaID := name + "MachineTemplateTemplate"
+	err = allSchemas.AddSchema(schemas.Schema{
+		ID: templateSpecSchemaID,
+		ResourceFields: map[string]schemas.Field{
+			"template": {
+				Type: templateTemplateSpecSchemaID,
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	id := name + "MachineTemplate"
+	return id, allSchemas.AddSchema(schemas.Schema{
+		ID: id,
+		ResourceFields: map[string]schemas.Field{
+			"spec": {
+				Type: templateSpecSchemaID,
+			},
+			"status": {
+				Type: statusSchema.ID,
+			},
+		},
+	})
+}
+
+func getSchemas(name string, spec *v3.DynamicSchemaSpec) (string, string, string, *schemas.Schemas, error) {
 	allSchemas, err := schemas.NewSchemas()
 	if err != nil {
 		return "", "", "", nil, err
@@ -65,57 +125,24 @@ func getSchemas(name string, spec *v3.DynamicSchemaSpec) (string, string, string
 	if err != nil {
 		return "", "", "", nil, err
 	}
-	for name, field := range specSchema.ResourceFields {
-		defMap, ok := field.Default.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		// set to nil because if map is len() == 0
-		field.Default = nil
-
-		switch field.Type {
-		case "string", "password":
-			field.Default = defMap["stringValue"]
-		case "int":
-			field.Default = defMap["intValue"]
-		case "boolean":
-			field.Default = defMap["boolValue"]
-		case "array[string]":
-			field.Default = defMap["stringSliceValue"]
-		}
-
-		specSchema.ResourceFields[name] = field
-	}
 
 	statusSchema, err := getStatusSchema(allSchemas)
 	if err != nil {
 		return "", "", "", nil, err
 	}
 
-	baseSchema := schemas.Schema{
-		ResourceFields: map[string]schemas.Field{
-			"spec": {
-				Type: specSchema.ID,
-			},
-			"status": {
-				Type: statusSchema.ID,
-			},
-		},
+	nodeConfigID, err := addConfigSchema(name, specSchema, statusSchema, allSchemas)
+	if err != nil {
+		return "", "", "", nil, err
 	}
 
-	for _, id := range []string{machineID, templateID} {
-		baseSchema.ID = id
-		if err := allSchemas.AddSchema(baseSchema); err != nil {
-			return "", "", "", nil, err
-		}
+	templateID, err := addMachineTemplateSchema(name, specSchema, statusSchema, allSchemas)
+	if err != nil {
+		return "", "", "", nil, err
 	}
 
-	nodeConfigSchema := *specSchema
-	nodeConfigSchema.ID = nodeConfigID
-	nodeConfigSchema.ResourceFields = removeKey(nodeConfigSchema.ResourceFields, "common")
-	nodeConfigSchema.ResourceFields = removeKey(nodeConfigSchema.ResourceFields, "providerID")
-	if err := allSchemas.AddSchema(nodeConfigSchema); err != nil {
+	machineID, err := addMachineSchema(name, specSchema, statusSchema, allSchemas)
+	if err != nil {
 		return "", "", "", nil, err
 	}
 
@@ -154,6 +181,29 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 
 	specSchema.ResourceFields["providerID"] = schemas.Field{
 		Type: "string",
+	}
+
+	for name, field := range specSchema.ResourceFields {
+		defMap, ok := field.Default.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// set to nil because if map is len() == 0
+		field.Default = nil
+
+		switch field.Type {
+		case "string", "password":
+			field.Default = defMap["stringValue"]
+		case "int":
+			field.Default = defMap["intValue"]
+		case "boolean":
+			field.Default = defMap["boolValue"]
+		case "array[string]":
+			field.Default = defMap["stringSliceValue"]
+		}
+
+		specSchema.ResourceFields[name] = field
 	}
 
 	if err := allSchemas.AddSchema(specSchema); err != nil {

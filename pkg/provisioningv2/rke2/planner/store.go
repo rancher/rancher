@@ -151,13 +151,13 @@ func isRKEBootstrap(machine *capi.Machine) bool {
 }
 
 func (p *PlanStore) UpdatePlan(machine *capi.Machine, plan plan.NodePlan) error {
+	if !isRKEBootstrap(machine) {
+		return fmt.Errorf("machine %s/%s is not using RKEBootstrap", machine.Namespace, machine.Name)
+	}
+
 	data, err := json.Marshal(plan)
 	if err != nil {
 		return err
-	}
-
-	if !isRKEBootstrap(machine) {
-		return fmt.Errorf("machine %s/%s is not using RKEBootstrap", machine.Namespace, machine.Name)
 	}
 
 	secret, err := p.secrets.Get(machine.Namespace, PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})

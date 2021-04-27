@@ -2,6 +2,7 @@ package provisioningcluster
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -100,8 +101,11 @@ func toMachineTemplate(nodePoolName string, cluster *rancherv1.Cluster, nodePool
 	}
 
 	nodePoolData.Set("common", commonData)
-	if nodePool.CloudCredentialSecretName == "" {
+	if cluster.Spec.CloudCredentialSecretName != "" {
 		nodePoolData.SetNested(cluster.Spec.CloudCredentialSecretName, "common", "cloudCredentialSecretName")
+	}
+	if nodePool.CloudCredentialSecretName != "" {
+		nodePoolData.SetNested(nodePool.CloudCredentialSecretName, "common", "cloudCredentialSecretName")
 	}
 
 	return &unstructured.Unstructured{
@@ -134,10 +138,22 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		})
 	}
 
+	nodePoolNames := map[string]bool{}
 	for _, nodePool := range cluster.Spec.RKEConfig.NodePools {
-		if nodePool.Name == "" || nodePool.NodeConfig == nil || nodePool.NodeConfig.Name == "" || nodePool.NodeConfig.Kind == "" {
+		if nodePool.Name == "" || nodePool.NodeConfig == nil || nodePool.NodeConfig.Name == "" || nodePool.NodeConfig.Kind == "" ||
+			(nodePool.Quantity != nil && *nodePool.Quantity == 0) {
 			continue
 		}
+		if !nodePool.EtcdRole &&
+			!nodePool.ControlPlaneRole &&
+			!nodePool.WorkerRole {
+			return nil, fmt.Errorf("at least one role of etcd, control-plane or worker must be assigned to nodePool [%s]", nodePool.Name)
+		}
+
+		if nodePoolNames[nodePool.Name] {
+			return nil, fmt.Errorf("duplicate nodePool name [%s] used", nodePool.Name)
+		}
+		nodePoolNames[nodePool.Name] = true
 
 		var (
 			nodePoolName = name.SafeConcatName(cluster.Name, "nodepool", nodePool.Name)
@@ -212,6 +228,10 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		if nodePool.ControlPlaneRole {
 			machineDeployment.Spec.Template.Labels[planner.ControlPlaneRoleLabel] = "true"
 			machineDeployment.Spec.Template.Labels[capi.MachineControlPlaneLabelName] = "true"
+		}
+
+		if nodePool.WorkerRole {
+			machineDeployment.Spec.Template.Labels[planner.WorkerRoleLabel] = "true"
 		}
 
 		if len(nodePool.Labels) > 0 {

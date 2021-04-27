@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
 	name2 "github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
@@ -97,7 +98,7 @@ func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, da
 
 	return driverArgs{
 		DriverName:          driver,
-		ImageName:           "thedadams/rancher-machine:secret",
+		ImageName:           settings.PrefixPrivateRegistry(settings.MachineProvisionImage.Get()),
 		ImagePullPolicy:     corev1.PullAlways,
 		EnvSecret:           secret,
 		StateSecretName:     secretName,

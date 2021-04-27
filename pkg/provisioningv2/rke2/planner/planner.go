@@ -483,7 +483,6 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(contents),
-		Name:    "chart-config",
 		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/managed-chart-config.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
@@ -508,7 +507,7 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 
 	if isOnlyWorker(machine) {
 		instruction.Env = []string{
-			fmt.Sprintf("INSTALL_%s_TYPE=agent", strings.ToUpper(runtime)),
+			fmt.Sprintf("INSTALL_%s_EXEC=agent", strings.ToUpper(runtime)),
 		}
 	}
 
@@ -731,13 +730,12 @@ func collect(plan *plan.Plan, include func(*capi.Machine) bool) (result []planEn
 }
 
 func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane, fullPlan *plan.Plan) (*rkev1.RKEControlPlane, plan.Secret, error) {
-	secretName, secret, err := p.ensureRKEStateSecret(controlPlane, fullPlan)
+	_, secret, err := p.ensureRKEStateSecret(controlPlane, fullPlan)
 	if err != nil {
 		return nil, secret, err
 	}
 
 	controlPlane = controlPlane.DeepCopy()
-	controlPlane.Status.ClusterStateSecretName = secretName
 	return controlPlane, secret, nil
 }
 
@@ -773,6 +771,14 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, full
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: controlPlane.Namespace,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "rke.cattle.io/v1",
+						Kind:       "RKEControlPlane",
+						Name:       controlPlane.Name,
+						UID:        controlPlane.UID,
+					},
+				},
 			},
 			Data: map[string][]byte{
 				"serverToken": []byte(serverToken),

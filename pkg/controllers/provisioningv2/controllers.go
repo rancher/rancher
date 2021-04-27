@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/planstatus"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/provisioningcluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/rkecluster"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/rkecontrolplane"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/unmanaged"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/capi"
@@ -38,6 +39,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 		planner.Register(ctx, clients)
 		planstatus.Register(ctx, clients)
 		unmanaged.Register(ctx, clients)
+		rkecontrolplane.Register(ctx, clients)
 		managesystemagent.Register(ctx, clients)
 	}
 
