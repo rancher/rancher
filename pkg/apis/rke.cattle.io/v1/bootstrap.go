@@ -15,6 +15,7 @@ type RKEBootstrap struct {
 }
 
 type RKEBootstrapSpec struct {
+	ClusterName string `json:"clusterName,omitempty"`
 }
 
 type RKEBootstrapStatus struct {

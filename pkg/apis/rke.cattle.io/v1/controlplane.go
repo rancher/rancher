@@ -19,12 +19,12 @@ type RKEControlPlaneSpec struct {
 	RKEClusterSpecCommon
 
 	KubernetesVersion     string `json:"kubernetesVersion,omitempty"`
+	ClusterName           string `json:"clusterName,omitempty"`
 	ManagementClusterName string `json:"managementClusterName,omitempty" wrangler:"required"`
 }
 
 type RKEControlPlaneStatus struct {
-	Conditions             []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	Ready                  bool                                `json:"ready,omitempty"`
-	ObservedGeneration     int64                               `json:"observedGeneration"`
-	ClusterStateSecretName string                              `json:"clusterStateSecretName,omitempty"`
+	Conditions         []genericcondition.GenericCondition `json:"conditions,omitempty"`
+	Ready              bool                                `json:"ready,omitempty"`
+	ObservedGeneration int64                               `json:"observedGeneration"`
 }

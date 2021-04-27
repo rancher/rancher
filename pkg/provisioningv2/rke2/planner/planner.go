@@ -170,7 +170,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	if secret.ServerToken == "" {
 		// This is logic for clusters that are formed outside of Rancher
 		// In this situation you either have nodes with worker role or no role
-		err = p.reconcile(controlPlane, secret, plan, "etcd and control plane", noRole, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		err = p.reconcile(controlPlane, secret, plan, "etcd and control plane", true, noRole, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
 		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 		if err != nil {
 			return err
@@ -180,7 +180,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 			return err
 		}
 
-		err = p.reconcile(controlPlane, secret, plan, "bootstrap", isInitNode, none, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, "")
+		err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isInitNode, none, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, "")
 		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 		if err != nil {
 			return err
@@ -191,20 +191,20 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 			return err
 		}
 
-		err = p.reconcile(controlPlane, secret, plan, "etcd", isEtcd, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
 		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 		if err != nil {
 			return err
 		}
 
-		err = p.reconcile(controlPlane, secret, plan, "control plane", isControlPlane, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		err = p.reconcile(controlPlane, secret, plan, "control plane", true, isControlPlane, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
 		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = p.reconcile(controlPlane, secret, plan, "worker", isOnlyWorker, isInitNode, controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer)
+	err = p.reconcile(controlPlane, secret, plan, "worker", false, isOnlyWorker, isInitNode, controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return err
@@ -285,6 +285,7 @@ func (p *Planner) electInitNode(plan *plan.Plan) (string, error) {
 
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, plan *plan.Plan,
 	tierName string,
+	required bool,
 	include, exclude roleFilter, concurrency int, joinServer string) error {
 	entries, unavailable := collect(plan, include)
 
@@ -333,7 +334,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 		}
 	}
 
-	if len(entries) == 0 {
+	if required && len(entries) == 0 {
 		return ErrWaiting("waiting for at least one " + tierName + " node")
 	}
 
@@ -483,7 +484,6 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(contents),
-		Name:    "chart-config",
 		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/managed-chart-config.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
@@ -508,7 +508,7 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 
 	if isOnlyWorker(machine) {
 		instruction.Env = []string{
-			fmt.Sprintf("INSTALL_%s_TYPE=agent", strings.ToUpper(runtime)),
+			fmt.Sprintf("INSTALL_%s_EXEC=agent", strings.ToUpper(runtime)),
 		}
 	}
 
@@ -731,13 +731,12 @@ func collect(plan *plan.Plan, include func(*capi.Machine) bool) (result []planEn
 }
 
 func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane, fullPlan *plan.Plan) (*rkev1.RKEControlPlane, plan.Secret, error) {
-	secretName, secret, err := p.ensureRKEStateSecret(controlPlane, fullPlan)
+	_, secret, err := p.ensureRKEStateSecret(controlPlane, fullPlan)
 	if err != nil {
 		return nil, secret, err
 	}
 
 	controlPlane = controlPlane.DeepCopy()
-	controlPlane.Status.ClusterStateSecretName = secretName
 	return controlPlane, secret, nil
 }
 
@@ -773,6 +772,14 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, full
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: controlPlane.Namespace,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "rke.cattle.io/v1",
+						Kind:       "RKEControlPlane",
+						Name:       controlPlane.Name,
+						UID:        controlPlane.UID,
+					},
+				},
 			},
 			Data: map[string][]byte{
 				"serverToken": []byte(serverToken),

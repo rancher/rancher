@@ -56,7 +56,7 @@ type handler struct {
 	machines            capicontrollers.MachineController
 	settingsCache       mgmtcontrollers.SettingCache
 	rkeBootstrapCache   rkecontroller.RKEBootstrapCache
-	rkeBootstrap        rkecontroller.RKEBootstrapClient
+	rkeBootstrap        rkecontroller.RKEBootstrapController
 	kubeconfigManager   *kubeconfig.Manager
 	dynamic             *dynamic.Controller
 }
@@ -213,7 +213,7 @@ func (h *handler) getMachine(obj *rkev1.RKEBootstrap) (*capi.Machine, error) {
 
 		return h.machineCache.Get(obj.Namespace, ref.Name)
 	}
-	return nil, fmt.Errorf("not machine associated to RKEBootstrap %s/%s", obj.Namespace, obj.Name)
+	return nil, fmt.Errorf("no machine associated to RKEBootstrap %s/%s", obj.Namespace, obj.Name)
 }
 
 func (h *handler) assignBootStrapSecret(machine *capi.Machine, obj *rkev1.RKEBootstrap) (*corev1.Secret, []runtime.Object, error) {
@@ -284,6 +284,10 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, nil
 	}
 
+	if !bootstrap.Status.Ready || bootstrap.Status.DataSecretName == nil || *bootstrap.Status.DataSecretName == "" {
+		return bootstrap, nil
+	}
+
 	machine, err := h.getMachine(bootstrap)
 	if err != nil {
 		return bootstrap, err
@@ -317,7 +321,7 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 	nodeLabelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"rke.cattle.io/machine": string(machine.GetUID())}}
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Set(nodeLabelSelector.MatchLabels).String()})
 	if err != nil || len(nodes.Items) == 0 || nodes.Items[0].Spec.ProviderID == "" {
-		h.machines.EnqueueAfter(machine.Namespace, machine.Name, nodeErrorEnqueueTime)
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, nodeErrorEnqueueTime)
 		return bootstrap, nil
 	}
 
