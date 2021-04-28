@@ -64,6 +64,13 @@ if [ "$AGENT_TAG" = dev ]; then
     AGENT_TAG="master-head"
 fi
 
+# If you’re changing this, also change rancher/cmd/rancherd/go.mod
+# Also, when changing RKE2_VERSION here, be sure to pull the variables that follow from https://github.com/rancher/rke2/blob/$RKE2_VERSION/scripts/version.sh
+RKE2_VERSION=v1.20.5-rke2r1
+RKE2_ETCD_VERSION=${RKE2_ETCD_VERSION:-v3.4.13-k3s1}
+RKE2_IMAGE_BUILD_VERSION=${RKE2_IMAGE_BUILD_VERSION:-build20210223}
+RKE2_PAUSE_VERSION=${RKE2_PAUSE_VERSION:-3.2}
+
 echo "ARCH: $ARCH"
 echo "CHART_REPO: $CHART_REPO"
 echo "CHART_VERSION: $CHART_VERSION"
