@@ -56,10 +56,10 @@ ingress:
   # Defaults to true
   # options: true, false
   enabled: true
-  extraAnnotations:
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+  extraAnnotations: {}
+  # nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+  # nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+  # nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
 
   # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
   # configurationSnippet: |
