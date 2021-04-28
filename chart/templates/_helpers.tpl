@@ -67,3 +67,13 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
     values:
     - windows
 {{- end -}}
+
+{{- define "system_default_registry" -}}
+{{- if .Values.systemDefaultRegistry -}}
+  {{- if hasSuffix "/" .Values.systemDefaultRegistry -}}
+    {{- printf "%s" .Values.systemDefaultRegistry -}}
+  {{- else -}}
+    {{- printf "%s/" .Values.systemDefaultRegistry -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
