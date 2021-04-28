@@ -12,6 +12,7 @@ package clean
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -29,7 +30,9 @@ import (
 	"github.com/rancher/wrangler/pkg/start"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -45,18 +48,23 @@ type bindingsCleanup struct {
 	roleBindings        v1.RoleBindingClient
 }
 
-func Bindings() error {
+func Bindings(clientConfig *restclient.Config) error {
 	logrus.Info("Starting bindings cleanup")
 	if os.Getenv("DRY_RUN") == "true" {
 		logrus.Info("DRY_RUN is true, no objects will be deleted/modified")
 		dryRun = true
 	}
-
-	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-	if err != nil {
-		panic(err)
+	var config *restclient.Config
+	var err error
+	if clientConfig != nil {
+		config = clientConfig
+	} else {
+		config, err = clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+		if err != nil {
+			logrus.Errorf("Error in building the cluster config %v", err)
+			return err
+		}
 	}
-
 	// No one wants to be slow
 	config.RateLimiter = ratelimit.None
 
@@ -201,13 +209,28 @@ func (bc *bindingsCleanup) cleanObjectDuplicates(bindingType string, newLabel bo
 }
 
 func (bc *bindingsCleanup) dedupeCRB(bindings []k8srbacv1.ClusterRoleBinding) error {
-	// Sort by creation timestamp so we keep the oldest
-	sort.Sort(crbByCreation(bindings))
+	//check if CRB with deterministic name exists
+	deterministicFound, crbName, err := bc.checkIfDeterministicCRBExists(bindings[0])
+	if err != nil {
+		if !k8sErrors.IsNotFound(err) {
+			logrus.Errorf("error attempting to lookup deterministic CRB: %v", err)
+		}
+		logrus.Infof("binding with deterministic name not found, will delete all except the oldest binding")
+	}
 
-	// Leave the first one alone, we only need the duplicates
-	duplicates := bindings[1:]
+	duplicates := bindings
+	if !deterministicFound {
+		// Sort by creation timestamp so we keep the oldest
+		sort.Sort(crbByCreation(bindings))
+		// Leave the first one alone, we only need the duplicates
+		duplicates = bindings[1:]
+	}
 
 	for _, binding := range duplicates {
+		if deterministicFound && strings.EqualFold(binding.Name, crbName) {
+			logrus.Infof("found the CRB with the deterministic name %v, will not delete this", binding.Name)
+			continue
+		}
 		if !dryRun {
 			if err := bc.clusterRoleBindings.Delete(binding.Name, &metav1.DeleteOptions{}); err != nil {
 				logrus.Errorf("error attempting to delete CRB %v %v", binding.Name, err)
@@ -232,11 +255,26 @@ func (bc *bindingsCleanup) dedupeRB(roleBindings []k8srbacv1.RoleBinding) (int, 
 	}
 
 	for _, bindings := range bindingMap {
-		// Sort by creation timestamp so we keep the oldest
-		sort.Sort(roleBindingByCreation(bindings))
-		// Leave the first one alone, we only need the duplicates
-		duplicates := bindings[1:]
+		//check if RB with deterministic name exists
+		deterministicFound, rbName, err := bc.checkIfDeterministicRBExists(bindings[0])
+		if err != nil {
+			if !k8sErrors.IsNotFound(err) {
+				logrus.Errorf("error attempting to lookup deterministic RB: %v", err)
+			}
+			logrus.Infof("binding with deterministic name not found, will delete all except the oldest binding")
+		}
+		duplicates := bindings
+		if !deterministicFound {
+			// Sort by creation timestamp so we keep the oldest
+			sort.Sort(roleBindingByCreation(bindings))
+			// Leave the first one alone, we only need the duplicates
+			duplicates = bindings[1:]
+		}
 		for _, binding := range duplicates {
+			if deterministicFound && strings.EqualFold(binding.Name, rbName) {
+				logrus.Infof("found the RB with the deterministic name %v in namespace %v, will not delete this", binding.Name, binding.Namespace)
+				continue
+			}
 			duplicatesFound++
 			if !dryRun {
 				if err := bc.roleBindings.Delete(binding.Namespace, binding.Name, &metav1.DeleteOptions{}); err != nil {
@@ -248,6 +286,53 @@ func (bc *bindingsCleanup) dedupeRB(roleBindings []k8srbacv1.RoleBinding) (int, 
 		}
 	}
 	return duplicatesFound, nil
+}
+
+func (bc *bindingsCleanup) checkIfDeterministicCRBExists(sampleBinding k8srbacv1.ClusterRoleBinding) (bool, string, error) {
+	var deterministicFound bool = false
+	crbName, err := getDeterministicBindingName(sampleBinding)
+	if err != nil {
+		return deterministicFound, "", err
+	}
+	namedBinding, err := bc.clusterRoleBindings.Get(crbName, metav1.GetOptions{})
+	if err != nil || namedBinding == nil {
+		return deterministicFound, crbName, err
+	}
+	return true, crbName, nil
+}
+
+func (bc *bindingsCleanup) checkIfDeterministicRBExists(sampleBinding k8srbacv1.RoleBinding) (bool, string, error) {
+	var deterministicFound bool = false
+	rbName, err := getDeterministicBindingName(sampleBinding)
+	if err != nil {
+		return deterministicFound, "", err
+	}
+	namedBinding, err := bc.roleBindings.Get(sampleBinding.Namespace, rbName, metav1.GetOptions{})
+	if err != nil || namedBinding == nil {
+		return deterministicFound, rbName, err
+	}
+	return true, rbName, nil
+}
+
+func getDeterministicBindingName(object interface{}) (string, error) {
+	if crb, ok := object.(k8srbacv1.ClusterRoleBinding); ok {
+		if len(crb.Subjects) > 1 {
+			return "", fmt.Errorf("found more than one subject for this CRB, cannot cleanup %v", crb.Name)
+		}
+		subject := crb.Subjects[0]
+		crbName := pkgrbac.NameForClusterRoleBinding(crb.RoleRef, subject)
+		logrus.Debugf("deterministic crb name for %v is %v", crb.Name, crbName)
+		return crbName, nil
+	} else if rb, ok := object.(k8srbacv1.RoleBinding); ok {
+		if len(crb.Subjects) > 1 {
+			return "", fmt.Errorf("found more than one subject for this RB, cannot cleanup %v", rb.Name)
+		}
+		subject := rb.Subjects[0]
+		rbName := pkgrbac.NameForRoleBinding(rb.Namespace, rb.RoleRef, subject)
+		logrus.Debugf("deterministic rb name for %v in ns %v is %v", rb.Name, rb.Namespace, rbName)
+		return rbName, nil
+	}
+	return "", nil
 }
 
 // createLabelSelectors creates the labels required to list both clusterRoleBindings and
@@ -274,6 +359,10 @@ func createLabelSelectors(newLabel bool, obj metav1.ObjectMeta, objType string) 
 	}
 
 	return labelSelectors
+}
+
+func rbRoleSubjectKey(roleName string, subject k8srbacv1.Subject) string {
+	return roleName + "." + subject.Kind + "." + subject.Name
 }
 
 type crbByCreation []k8srbacv1.ClusterRoleBinding
