@@ -659,14 +659,13 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 	hasRequiredLinuxPool := false
 
 	for _, np := range nodepools {
-		name := *np.Name
-		if name == "" {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("node pool name cannot be an empty string"))
+		if np.Name == nil || *np.Name == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("node pool name cannot be empty"))
 		}
 
 		version := np.Version
 		if version == nil || *version == "" {
-			errors = append(errors, fmt.Sprintf("node pool [%s] version cannot be empty", name))
+			errors = append(errors, fmt.Sprintf("node pool [%s] version cannot be empty", *np.Name))
 			continue
 		}
 
