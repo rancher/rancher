@@ -14,6 +14,12 @@ if [ ! -z $DRONE_BRANCH ] && [ -z $DRONE_TAG ];then
 fi
 echo "RUNTIME_TAG: $RUNTIME_TAG"
 
+RKE2_VERSION=$(grep 'ARG RKE2_VERSION=' ../../package/Dockerfile.runtime | sed 's/.*RKE2_VERSION=//')
+# These variables come from https://github.com/rancher/rke2/blob/$RKE2_VERSION/scripts/version.sh for the RKE2_VERSION
+RKE2_ETCD_VERSION=${RKE2_ETCD_VERSION:-v3.4.13-k3s1}
+RKE2_IMAGE_BUILD_VERSION=${RKE2_IMAGE_BUILD_VERSION:-build20210223}
+RKE2_PAUSE_VERSION=${RKE2_PAUSE_VERSION:-3.2}
+
 go build -o ../../bin/rancherd-${ARCH} \
     -ldflags '-w -s -extldflags "-static"
     -X github.com/rancher/rke2/pkg/images.KubernetesVersion='${RKE2_VERSION}'-'${ARCH}'

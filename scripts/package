@@ -27,7 +27,7 @@ docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMA
 
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 if [ "${ARCH}" == amd64 ]; then
-    docker build --build-arg RKE2_VERSION=${RKE2_VERSION} -t ${RUNTIME_IMAGE} -f Dockerfile.runtime .
+    docker build -t ${RUNTIME_IMAGE} -f Dockerfile.runtime .
 fi
 
 mkdir -p ../dist
