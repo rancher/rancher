@@ -535,7 +535,6 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.Container{},
 			m.Move{From: "command", To: "entrypoint"},
 			m.Move{From: "args", To: "command"},
-			mapper.EnvironmentMapper{},
 			&m.Embed{Field: "securityContext"},
 			&m.Embed{Field: "lifecycle"},
 		).
