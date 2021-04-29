@@ -1133,9 +1133,6 @@ steps:
   - name: docker
     path: /var/run/docker.sock
   when:
-    instance:
-      include:
-      - drone-publish.rancher.io
     event:
     - tag
 
@@ -1174,9 +1171,6 @@ steps:
   - name: docker
     path: /var/run/docker.sock
   when:
-    instance:
-      include:
-      - drone-publish.rancher.io
     event:
     - tag
 
@@ -1216,9 +1210,6 @@ steps:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
   when:
-    instance:
-      include:
-      - drone-publish.rancher.io
     event:
     - tag
 
@@ -1258,9 +1249,6 @@ steps:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
   when:
-    instance:
-      include:
-      - drone-publish.rancher.io
     event:
     - tag
 
@@ -1300,9 +1288,6 @@ steps:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
   when:
-    instance:
-      include:
-      - drone-publish.rancher.io
     event:
     - tag
 
@@ -1351,9 +1336,6 @@ steps:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
   when:
-    instance:
-      include:
-      - drone-publish.rancher.io
     event:
     - tag
 
@@ -1402,9 +1384,6 @@ steps:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
   when:
-    instance:
-      include:
-      - drone-publish.rancher.io
     event:
     - tag
 
