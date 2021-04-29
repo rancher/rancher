@@ -656,8 +656,8 @@ github.com/prometheus/procfs v0.2.0 h1:wH4vA7pcjKuZzjF7lM8awk4fnuJO6idemZXoKnULU
 github.com/prometheus/procfs v0.2.0/go.mod h1:lV6e/gmhEcM9IjHGsFOCxxuZ+z1YqCvr4OA4YeYWdaU=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
-github.com/rancher/aks-operator v1.0.1-rc4 h1:H/GCiEFetQt1/dRcee1y8vx0eSJCsCuiV/rTePw0ADM=
-github.com/rancher/aks-operator v1.0.1-rc4/go.mod h1:c3rHKpVkpWhPCgcMQue5BfDAhrSUrvXK33JHFKgdU+w=
+github.com/rancher/aks-operator v1.0.1-rc6 h1:ML5nh0509YiTKESJknXa8FsDrtKQThvFbZ/jWUFxdUU=
+github.com/rancher/aks-operator v1.0.1-rc6/go.mod h1:c3rHKpVkpWhPCgcMQue5BfDAhrSUrvXK33JHFKgdU+w=
 github.com/rancher/eks-operator v1.0.6-rc1 h1:VY2lLcaHtBMByd7pq7px4fB+GW0cd0cfessODbmH+Tc=
 github.com/rancher/eks-operator v1.0.6-rc1/go.mod h1:GB2kyPtIN0r+DGlUcDgEUMsB4qRwZH7OKsraemZT+GA=
 github.com/rancher/fleet/pkg/apis v0.0.0-20210428191153-f414eab0e4de h1:k8019s2eb27ACgl8qoAJjZW9i5+0437bcDwNtoBMszo=

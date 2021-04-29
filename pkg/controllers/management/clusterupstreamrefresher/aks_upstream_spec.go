@@ -19,7 +19,6 @@ func BuildAKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 	upstreamSpec.ClusterName = cluster.Spec.AKSConfig.ClusterName
 	upstreamSpec.ResourceLocation = cluster.Spec.AKSConfig.ResourceLocation
 	upstreamSpec.ResourceGroup = cluster.Spec.AKSConfig.ResourceGroup
-	upstreamSpec.TenantID = cluster.Spec.AKSConfig.TenantID
 	upstreamSpec.AzureCredentialSecret = cluster.Spec.AKSConfig.AzureCredentialSecret
 	upstreamSpec.Imported = cluster.Spec.AKSConfig.Imported
 

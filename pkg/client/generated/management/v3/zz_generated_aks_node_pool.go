@@ -25,8 +25,8 @@ type AKSNodePool struct {
 	MaxPods             *int64   `json:"maxPods,omitempty" yaml:"maxPods,omitempty"`
 	MinCount            *int64   `json:"minCount,omitempty" yaml:"minCount,omitempty"`
 	Mode                string   `json:"mode,omitempty" yaml:"mode,omitempty"`
-	Name                string   `json:"name,omitempty" yaml:"name,omitempty"`
-	OrchestratorVersion string   `json:"orchestratorVersion,omitempty" yaml:"orchestratorVersion,omitempty"`
+	Name                *string  `json:"name,omitempty" yaml:"name,omitempty"`
+	OrchestratorVersion *string  `json:"orchestratorVersion,omitempty" yaml:"orchestratorVersion,omitempty"`
 	OsDiskSizeGB        *int64   `json:"osDiskSizeGB,omitempty" yaml:"osDiskSizeGB,omitempty"`
 	OsDiskType          string   `json:"osDiskType,omitempty" yaml:"osDiskType,omitempty"`
 	OsType              string   `json:"osType,omitempty" yaml:"osType,omitempty"`
