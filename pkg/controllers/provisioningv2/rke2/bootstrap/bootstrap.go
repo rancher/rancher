@@ -28,7 +28,7 @@ func InstallScript() ([]byte, error) {
 	}
 	ca := systemtemplate.CAChecksum()
 	return []byte(fmt.Sprintf(`#!/usr/bin/env sh
-CATTLE_AGENT_BINARY_URL="%s"
+CATTLE_SERVER="%s"
 CATTLE_CA_CHECKSUM="%s"
 
 %s
