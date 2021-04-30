@@ -10,6 +10,8 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/catalog/manager"
+	"github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io"
+	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2beta2"
@@ -221,8 +223,8 @@ type UserContext struct {
 	Storage        storagev1.Interface
 	Policy         policyv1beta1.Interface
 
-	RBACw wrbacv1.Interface
-	rbacw *rbac.Factory
+	RBACw        wrbacv1.Interface
+	Provisioning provisioningcontrollers.Interface
 }
 
 func (w *UserContext) UserOnlyContext() *UserOnlyContext {
@@ -451,11 +453,17 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	opts := &generic.FactoryOptions{
 		SharedControllerFactory: controllerFactory,
 	}
-	context.rbacw, err = rbac.NewFactoryFromConfigWithOptions(&wranglerConf, opts)
+	rbacw, err := rbac.NewFactoryFromConfigWithOptions(&wranglerConf, opts)
 	if err != nil {
 		return nil, err
 	}
-	context.RBACw = context.rbacw.Rbac().V1()
+	context.RBACw = rbacw.Rbac().V1()
+
+	provisioning, err := provisioning.NewFactoryFromConfigWithOptions(&wranglerConf, opts)
+	if err != nil {
+		return nil, err
+	}
+	context.Provisioning = provisioning.Provisioning().V1()
 
 	dynamicConfig := config
 	if dynamicConfig.NegotiatedSerializer == nil {

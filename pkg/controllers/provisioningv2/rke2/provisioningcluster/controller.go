@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -14,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/relatedresource"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -55,7 +57,6 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clients.Apply.
-			WithSetID("rke-cluster").
 			// Because capi wants to own objects we don't set ownerreference with apply
 			WithDynamicLookup().
 			WithCacheTypes(
@@ -69,6 +70,16 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		"rke-cluster",
 		h.OnRancherClusterChange,
 		nil)
+
+	relatedresource.Watch(ctx, "provisioning-cluster-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if cp, ok := obj.(*rkev1.RKEControlPlane); ok {
+			return []relatedresource.Key{{
+				Namespace: namespace,
+				Name:      cp.Spec.ClusterName,
+			}}, nil
+		}
+		return nil, nil
+	}, clients.Provisioning.Cluster(), clients.RKE.RKEControlPlane())
 }
 
 func byNodeInfraIndex(obj *rancherv1.Cluster) ([]string, error) {

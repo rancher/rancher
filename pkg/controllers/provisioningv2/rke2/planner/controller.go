@@ -25,9 +25,9 @@ type handler struct {
 	planner *planner.Planner
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.Context, planner *planner.Planner) {
 	h := handler{
-		planner: planner.New(ctx, clients),
+		planner: planner,
 	}
 	v1.RegisterRKEControlPlaneStatusHandler(ctx,
 		clients.RKE.RKEControlPlane(), "", "planner", h.OnChange)

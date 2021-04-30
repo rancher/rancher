@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/settings"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
 	"github.com/rancher/rancher/pkg/features"
@@ -40,6 +41,9 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	certsexpiration.Register(ctx, cluster)
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
+	if features.RKE2.Enabled() {
+		snapshotbackpopulate.Register(ctx, cluster)
+	}
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()

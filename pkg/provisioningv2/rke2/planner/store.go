@@ -9,6 +9,7 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -172,4 +173,17 @@ func (p *PlanStore) UpdatePlan(machine *capi.Machine, plan plan.NodePlan) error 
 	secret.Data["plan"] = data
 	_, err = p.secrets.Update(secret)
 	return err
+}
+
+func assignAndCheckPlan(store *PlanStore, msg string, server planEntry, newPlan plan.NodePlan) error {
+	if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, newPlan) {
+		if err := store.UpdatePlan(server.Machine, newPlan); err != nil {
+			return err
+		}
+		return ErrWaiting(fmt.Sprintf("starting %s", msg))
+	}
+	if !server.Plan.InSync {
+		return ErrWaiting(fmt.Sprintf("waiting for %s", msg))
+	}
+	return nil
 }

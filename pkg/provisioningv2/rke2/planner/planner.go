@@ -2,13 +2,17 @@ package planner
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -49,9 +53,6 @@ const (
 
 	LabelsAnnotation = "rke.cattle.io/labels"
 	TaintsAnnotation = "rke.cattle.io/taints"
-
-	RuntimeK3S  = "k3s"
-	RuntimeRKE2 = "rke2"
 
 	SecretTypeMachinePlan = "rke.cattle.io/machine-plan"
 
@@ -109,16 +110,20 @@ type Planner struct {
 	capiClusters                  capicontrollers.ClusterCache
 	managementClusters            mgmtcontrollers.ClusterCache
 	kubeconfig                    *kubeconfig.Manager
+	locker                        locker.Locker
+	etcdRestore                   *etcdRestore
+	etcdCreate                    *etcdCreate
 }
 
 func New(ctx context.Context, clients *wrangler.Context) *Planner {
 	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(clusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
 		return []string{obj.Spec.ClusterName}, nil
 	})
+	store := NewStore(clients.Core.Secret(),
+		clients.CAPI.Machine().Cache())
 	return &Planner{
-		ctx: ctx,
-		store: NewStore(clients.Core.Secret(),
-			clients.CAPI.Machine().Cache()),
+		ctx:                           ctx,
+		store:                         store,
 		machines:                      clients.CAPI.Machine(),
 		secretClient:                  clients.Core.Secret(),
 		secretCache:                   clients.Core.Secret().Cache(),
@@ -126,6 +131,8 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		capiClusters:                  clients.CAPI.Cluster().Cache(),
 		managementClusters:            clients.Mgmt.Cluster().Cache(),
 		kubeconfig:                    kubeconfig.New(clients),
+		etcdRestore:                   newETCDRestore(clients, store),
+		etcdCreate:                    newETCDCreate(clients, store),
 	}
 }
 
@@ -147,6 +154,9 @@ func (p *Planner) getCAPICluster(controlPlane *rkev1.RKEControlPlane) (*capi.Clu
 }
 
 func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
+	p.locker.Lock(string(controlPlane.UID))
+	defer p.locker.Unlock(string(controlPlane.UID))
+
 	cluster, err := p.getCAPICluster(controlPlane)
 	if err != nil {
 		return err
@@ -176,6 +186,14 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 			return err
 		}
 	} else {
+		if err := p.etcdCreate.Create(controlPlane, plan); err != nil {
+			return err
+		}
+
+		if err := p.etcdRestore.Restore(controlPlane, plan); err != nil {
+			return err
+		}
+
 		if _, err := p.electInitNode(plan); err != nil {
 			return err
 		}
@@ -369,6 +387,25 @@ func atMostThree(names []string) []string {
 	return names
 }
 
+func (p *Planner) addETCDSnapshotCredential(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) error {
+	if !isEtcd(machine) || controlPlane.Spec.ETCDSnapshotCloudCredentialName == "" {
+		return nil
+	}
+
+	cred, err := getS3Credential(p.secretCache,
+		controlPlane.Namespace,
+		controlPlane.Spec.ETCDSnapshotCloudCredentialName,
+		convert.ToString(config["etcd-s3-region"]))
+	if err != nil {
+		return err
+	}
+
+	config["etcd-s3-access-key"] = cred.AccessKey
+	config["etcd-s3-secret-key"] = cred.SecretKey
+	config["etcd-s3-region"] = cred.Region
+	return nil
+}
+
 func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) error {
 	for _, opts := range controlPlane.Spec.NodeConfig {
 		sel, err := metav1.LabelSelectorAsSelector(opts.MachineLabelSelector)
@@ -381,9 +418,7 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		}
 	}
 
-	// For externally formed cluster the control-plane and etcd roles are never assigned so here
-	// we check for !worker.
-	if !isOnlyWorker(machine) {
+	if isControlPlane(machine) || isEtcd(machine) {
 		for k, v := range controlPlane.Spec.ControlPlaneConfig.Data {
 			config[k] = v
 		}
@@ -484,7 +519,8 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(contents),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/managed-chart-config.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/managed-chart-config.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Dynamic: true,
 	})
 
 	return nodePlan, nil
@@ -494,6 +530,20 @@ func (p *Planner) addOtherFiles(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	machine *capi.Machine) (plan.NodePlan, error) {
 	nodePlan = addLocalClusterAuthenticationEndpointFile(nodePlan, controlPlane, machine)
 	return nodePlan, nil
+}
+
+func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string) string {
+	restartStamp := sha256.New()
+	restartStamp.Write([]byte(image))
+	for _, file := range nodePlan.Files {
+		if file.Dynamic {
+			continue
+		}
+		restartStamp.Write([]byte(file.Path))
+		restartStamp.Write([]byte(file.Content))
+	}
+	restartStamp.Write([]byte(strconv.FormatInt(controlPlane.Status.ConfigGeneration, 10)))
+	return hex.EncodeToString(restartStamp.Sum(nil))
 }
 
 func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
@@ -509,6 +559,7 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 	if isOnlyWorker(machine) {
 		instruction.Env = []string{
 			fmt.Sprintf("INSTALL_%s_EXEC=agent", strings.ToUpper(runtime)),
+			fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image)),
 		}
 	}
 
@@ -573,10 +624,18 @@ func addTaints(config map[string]interface{}, machine *capi.Machine) error {
 	return nil
 }
 
+func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
+	return fmt.Sprintf("/var/lib/rancher/%s/etc/config-files/%s",
+		GetRuntime(controlPlane.Spec.KubernetesVersion), filename)
+}
+
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, secret plan.Secret,
 	initNode bool, joinServer string) (plan.NodePlan, error) {
 	config := map[string]interface{}{}
 	if err := addUserConfig(config, controlPlane, machine); err != nil {
+		return nodePlan, err
+	}
+	if err := p.addETCDSnapshotCredential(config, controlPlane, machine); err != nil {
 		return nodePlan, err
 	}
 
@@ -597,8 +656,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		if !ok {
 			continue
 		}
-		filePath := fmt.Sprintf("/var/lib/rancher/%s/etcd/%sconfig.yaml",
-			GetRuntime(controlPlane.Spec.KubernetesVersion), fileParam)
+		filePath := configFile(controlPlane, fileParam)
 		config[fileParam] = filePath
 
 		nodePlan.Files = append(nodePlan.Files, plan.File{
@@ -626,11 +684,6 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 		err      error
 	)
 
-	nodePlan, err = p.addInstruction(nodePlan, controlPlane, entry.Machine)
-	if err != nil {
-		return nodePlan, err
-	}
-
 	nodePlan, err = p.addConfigFile(nodePlan, controlPlane, entry.Machine, secret, initNode, joinServer)
 	if err != nil {
 		return nodePlan, err
@@ -651,14 +704,13 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 		return nodePlan, err
 	}
 
-	return nodePlan, nil
-}
-
-func GetRuntime(kubernetesVersion string) string {
-	if strings.Contains(kubernetesVersion, RuntimeK3S) {
-		return RuntimeK3S
+	// Add instruction last because it hashes config content
+	nodePlan, err = p.addInstruction(nodePlan, controlPlane, entry.Machine)
+	if err != nil {
+		return nodePlan, err
 	}
-	return RuntimeRKE2
+
+	return nodePlan, nil
 }
 
 func getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
@@ -676,7 +728,7 @@ func isInitNode(machine *capi.Machine) bool {
 	return machine.Labels[InitNodeLabel] == "true"
 }
 
-func none(machine *capi.Machine) bool {
+func none(_ *capi.Machine) bool {
 	return false
 }
 
