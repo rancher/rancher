@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/locker"
+	"github.com/moby/locker"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"

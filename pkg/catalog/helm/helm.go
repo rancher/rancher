@@ -28,7 +28,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 
 	"github.com/blang/semver"
-	"github.com/docker/docker/pkg/locker"
+	"github.com/moby/locker"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"

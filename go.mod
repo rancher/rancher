@@ -77,6 +77,7 @@ require (
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/mitchellh/mapstructure v1.1.2
+	github.com/moby/locker v1.0.1
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
