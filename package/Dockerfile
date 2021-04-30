@@ -37,10 +37,10 @@ ENV LINODE_UI_DRIVER_VERSION v0.3.0
 ENV RANCHER_METADATA_BRANCH ${RANCHER_METADATA_BRANCH}
 ENV HELM_VERSION v3.3.1
 ENV KUSTOMIZE_VERSION v3.5.4
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.0.1-alpha12
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=0.3.500
-ENV CATTLE_RANCHER_OPERATOR_MIN_VERSION=0.1.300
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.2.0-alpha01
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
@@ -139,7 +139,12 @@ RUN mkdir -p /usr/share/rancher/ui && \
     mkdir -p /usr/share/rancher/ui-dashboard/dashboard && \
     cd /usr/share/rancher/ui-dashboard/dashboard && \
     curl -sL https://releases.rancher.com/dashboard/${CATTLE_DASHBOARD_UI_VERSION}.tar.gz | tar xvzf - --strip-components=2 && \
-    ln -s dashboard/index.html ../index.html
+    ln -s dashboard/index.html ../index.html && \
+    cd ../../ui/assets && \
+    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm -O && \
+    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -O && \
+    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -O && \
+    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh -o system-agent-install.sh
 
 ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz

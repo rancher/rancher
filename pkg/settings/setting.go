@@ -107,9 +107,8 @@ var (
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
 	MachineProvisionImage             = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher55")
 
-	FleetMinVersion           = NewSetting("fleet-min-version", "")
-	RancherOperatorMinVersion = NewSetting("rancher-operator-min-version", "")
-	RancherWebhookMinVersion  = NewSetting("rancher-webhook-min-version", "")
+	FleetMinVersion          = NewSetting("fleet-min-version", "")
+	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
 )
 
 func FullShellImage() string {

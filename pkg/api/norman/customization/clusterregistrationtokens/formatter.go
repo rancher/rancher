@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	commandFormat            = "kubectl apply -f %s"
-	insecureCommandFormat    = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat        = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
-	rke2NodeCommandFormat    = "curl -sfL %s | %s sh -s --server %s --token %s%s"
-	loginCommandFormat       = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
-	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
+	commandFormat                 = "kubectl apply -f %s"
+	insecureCommandFormat         = "curl --insecure -sfL %s | kubectl apply -f -"
+	nodeCommandFormat             = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
+	rke2NodeCommandFormat         = "curl -sfL %s | %s sh -s - --server %s --token %s%s"
+	rke2InsecureNodeCommandFormat = "curl --insecure -sfL %s | %s sh -s - --server %s --token %s%s"
+	loginCommandFormat            = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
+	windowsNodeCommandFormat      = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
 
 type Formatter struct {
@@ -71,6 +72,12 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		if f.isRKE2(clusterID) {
 			// for linux
 			resource.Values["nodeCommand"] = fmt.Sprintf(rke2NodeCommandFormat,
+				rootURL+"/system-agent-install.sh",
+				AgentEnvVars(cluster),
+				rootURL,
+				token,
+				ca)
+			resource.Values["inseucreNodeCommand"] = fmt.Sprintf(rke2NodeCommandFormat,
 				rootURL+"/system-agent-install.sh",
 				AgentEnvVars(cluster),
 				rootURL,
