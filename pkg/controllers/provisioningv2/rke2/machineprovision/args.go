@@ -35,6 +35,10 @@ type driverArgs struct {
 	Args                []string
 }
 
+func MachineStateSecretName(machineName string) string {
+	return name2.SafeConcatName(machineName, "machine", "state")
+}
+
 func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, data data.Object, create bool) (driverArgs, error) {
 	var (
 		url, hash, cloudCredentialSecretName string
@@ -77,7 +81,7 @@ func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, da
 		secret.Data[k] = []byte(v)
 	}
 
-	secretName := name2.SafeConcatName(meta.GetName(), "machine", "state")
+	secretName := MachineStateSecretName(meta.GetName())
 
 	cmd := []string{
 		fmt.Sprintf("--driver-download-url=%s", url),
