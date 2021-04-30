@@ -1104,14 +1104,14 @@ platform:
 steps:
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.11
-  settings:
-    github-repository: "rancher/rancher"
-    github-token:
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
       from_secret: github_token
-    github_tag: "${DRONE_TAG}"
-    input-file: "rancher-images.txt"
-    output-file: "rancher-images-digests-linux-amd64.txt"
-    registry: "docker.io"
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-linux-amd64.txt"
+    PLUGIN_REGISTRY: "docker.io"
   volumes:
   - name: docker
     path: /var/run/docker.sock
@@ -1145,14 +1145,14 @@ platform:
 steps:
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.11
-  settings:
-    github-repository: "rancher/rancher"
-    github-token:
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
       from_secret: github_token
-    github_tag: "${DRONE_TAG}"
-    input-file: "rancher-images.txt"
-    output-file: "rancher-images-digests-linux-arm64.txt"
-    registry: "docker.io"
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-linux-arm64.txt"
+    PLUGIN_REGISTRY: "docker.io"
   volumes:
   - name: docker
     path: /var/run/docker.sock
@@ -1187,14 +1187,14 @@ platform:
 steps:
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.11
-  settings:
-    github-repository: "rancher/rancher"
-    github-token:
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
       from_secret: github_token
-    github_tag: "${DRONE_TAG}"
-    input-file: "rancher-windows-images.txt"
-    output-file: "rancher-images-digests-windows-1809.txt"
-    registry: "docker.io"
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-1809.txt"
+    PLUGIN_REGISTRY: "docker.io"
   volumes:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
@@ -1229,14 +1229,14 @@ platform:
 steps:
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.11
-  settings:
-    github-repository: "rancher/rancher"
-    github-token:
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
       from_secret: github_token
-    github_tag: "${DRONE_TAG}"
-    input-file: "rancher-windows-images.txt"
-    output-file: "rancher-images-digests-windows-1903.txt"
-    registry: "docker.io"
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-1903.txt"
+    PLUGIN_REGISTRY: "docker.io"
   volumes:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
@@ -1271,14 +1271,14 @@ platform:
 steps:
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.11
-  settings:
-    github-repository: "rancher/rancher"
-    github-token:
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
       from_secret: github_token
-    github_tag: "${DRONE_TAG}"
-    input-file: "rancher-windows-images.txt"
-    output-file: "rancher-images-digests-windows-1909.txt"
-    registry: "docker.io"
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-1909.txt"
+    PLUGIN_REGISTRY: "docker.io"
   volumes:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
@@ -1322,14 +1322,14 @@ steps:
 
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.11
-  settings:
-    github-repository: "rancher/rancher"
-    github-token:
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
       from_secret: github_token
-    github_tag: "${DRONE_TAG}"
-    input-file: "rancher-windows-images.txt"
-    output-file: "rancher-images-digests-windows-2004.txt"
-    registry: "docker.io"
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-2004.txt"
+    PLUGIN_REGISTRY: "docker.io"
   volumes:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
@@ -1373,14 +1373,14 @@ steps:
 
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.11
-  settings:
-    github-repository: "rancher/rancher"
-    github-token:
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
       from_secret: github_token
-    github_tag: "${DRONE_TAG}"
-    input-file: "rancher-windows-images.txt"
-    output-file: "rancher-images-digests-windows-20H2.txt"
-    registry: "docker.io"
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-20H2.txt"
+    PLUGIN_REGISTRY: "docker.io"
   volumes:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
