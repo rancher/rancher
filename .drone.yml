@@ -1191,6 +1191,7 @@ trigger:
     - promote
 
 depends_on:
+- default-linux-amd64
 - default-linux-arm64
 ---
 kind: pipeline
@@ -1233,6 +1234,7 @@ trigger:
     - promote
 
 depends_on:
+- default-linux-amd64
 - default-windows-1809
 ---
 kind: pipeline
@@ -1275,6 +1277,7 @@ trigger:
     - promote
 
 depends_on:
+- default-linux-amd64
 - default-windows-1903
 ---
 kind: pipeline
@@ -1317,6 +1320,7 @@ trigger:
     - promote
 
 depends_on:
+- default-linux-amd64
 - default-windows-1909
 ---
 kind: pipeline
@@ -1368,6 +1372,7 @@ trigger:
     - promote
 
 depends_on:
+- default-linux-amd64
 - default-windows-2004
 ---
 kind: pipeline
@@ -1419,6 +1424,7 @@ trigger:
     - promote
 
 depends_on:
+- default-linux-amd64
 - default-windows-20H2
 ---
 kind: pipeline
