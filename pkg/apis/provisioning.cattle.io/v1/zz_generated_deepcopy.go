@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	genericcondition "github.com/rancher/wrangler/pkg/genericcondition"
 	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -156,6 +157,13 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]genericcondition.GenericCondition, len(*in))
 		copy(*out, *in)
 	}
+	if in.ETCDSnapshots != nil {
+		in, out := &in.ETCDSnapshots, &out.ETCDSnapshots
+		*out = make([]rkecattleiov1.ETCDSnapshot, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
@@ -189,6 +197,16 @@ func (in *ImportedConfig) DeepCopy() *ImportedConfig {
 func (in *RKEConfig) DeepCopyInto(out *RKEConfig) {
 	*out = *in
 	in.RKEClusterSpecCommon.DeepCopyInto(&out.RKEClusterSpecCommon)
+	if in.ETCDSnapshotCreate != nil {
+		in, out := &in.ETCDSnapshotCreate, &out.ETCDSnapshotCreate
+		*out = new(rkecattleiov1.ETCDSnapshotCreate)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ETCDSnapshotRestore != nil {
+		in, out := &in.ETCDSnapshotRestore, &out.ETCDSnapshotRestore
+		*out = new(rkecattleiov1.ETCDSnapshot)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.NodePools != nil {
 		in, out := &in.NodePools, &out.NodePools
 		*out = make([]RKENodePool, len(*in))

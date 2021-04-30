@@ -22,6 +22,9 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 	}
 	result = append(result, clusterAgent)
 
+	addons := p.getAddons(controlPlane, GetRuntime(controlPlane.Spec.KubernetesVersion))
+	result = append(result, addons)
+
 	return result, nil
 }
 
@@ -37,6 +40,15 @@ func (p *Planner) getClusterAgent(controlPlane *rkev1.RKEControlPlane, runtime s
 
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString(data),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/cluster-agent.yaml", runtime),
+		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/cluster-agent.yaml", runtime),
+		Dynamic: true,
 	}, nil
+}
+
+func (p *Planner) getAddons(controlPlane *rkev1.RKEControlPlane, runtime string) plan.File {
+	return plan.File{
+		Content: base64.StdEncoding.EncodeToString([]byte(controlPlane.Spec.AdditionalManifest)),
+		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/addons.yaml", runtime),
+		Dynamic: true,
+	}
 }

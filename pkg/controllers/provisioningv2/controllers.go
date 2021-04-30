@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/unmanaged"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/capi"
+	planner2 "github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 )
@@ -29,6 +30,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	}
 
 	if features.RKE2.Enabled() {
+		rkePlanner := planner2.New(ctx, clients)
 		if features.MCM.Enabled() {
 			dynamicschema.Register(ctx, clients)
 		}
@@ -36,7 +38,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 		provisioningcluster.Register(ctx, clients)
 		bootstrap.Register(ctx, clients)
 		machineprovision.Register(ctx, clients)
-		planner.Register(ctx, clients)
+		planner.Register(ctx, clients, rkePlanner)
 		planstatus.Register(ctx, clients)
 		unmanaged.Register(ctx, clients)
 		rkecontrolplane.Register(ctx, clients)
