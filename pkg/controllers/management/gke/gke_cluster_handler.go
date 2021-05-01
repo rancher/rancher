@@ -246,6 +246,18 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster GKE [%s] to update", cluster.Name)
+
+			// If the HealthSyncer runs while upgrading a zonal cluster, the control plane may not be reachable.
+			// This adds additional context to the error message to help explain that this is normal.
+			readyMsg := apimgmtv3.ClusterConditionReady.GetMessage(cluster)
+			helpMsg := ": control plane may be unavailable while it is being upgraded"
+			if apimgmtv3.ClusterConditionReady.IsFalse(cluster) && strings.Contains(readyMsg, "connect: connection refused") && !strings.Contains(readyMsg, helpMsg) {
+				msg := apimgmtv3.ClusterConditionReady.GetMessage(cluster) + helpMsg
+				// return here; ClusterConditionUpdated is most likely already set, and
+				// if not will be set on the next loop
+				return e.SetFalse(cluster, apimgmtv3.ClusterConditionReady, msg)
+			}
+
 			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
 		}
 		logrus.Infof("waiting for cluster GKE [%s] update failure to be resolved", cluster.Name)
