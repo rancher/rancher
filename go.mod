@@ -95,18 +95,18 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.15.0
-	github.com/rancher/aks-operator v1.0.1-rc8
+	github.com/rancher/aks-operator v1.0.1-rc9
 	github.com/rancher/apiserver v0.0.0-20210519053359-f943376c4b42
 	github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430
 	github.com/rancher/dynamiclistener v0.2.1-0.20201110045217-9b1b7d3132e8
-	github.com/rancher/eks-operator v1.0.6-rc1
+	github.com/rancher/eks-operator v1.1.1-rc3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210608014113-99e848822739
-	github.com/rancher/gke-operator v1.1.1-rc1
+	github.com/rancher/gke-operator v1.1.1-rc3
 	github.com/rancher/kubernetes-provider-detector v0.1.2
 	github.com/rancher/lasso v0.0.0-20210608205930-775fcaf2f523
 	github.com/rancher/lasso/controller-runtime v0.0.0-20210608205930-775fcaf2f523
 	github.com/rancher/machine v0.15.0-rancher60
-	github.com/rancher/norman v0.0.0-20210513204752-e48df26b54bd
+	github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
