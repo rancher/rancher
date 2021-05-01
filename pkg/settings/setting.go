@@ -51,6 +51,7 @@ var (
 	KubernetesVersionToSystemImages   = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent         = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated      = NewSetting("k8s-versions-deprecated", "")
+	KDMBranch                         = NewSetting("kdm-branch", "dev-v2.6")
 	MachineVersion                    = NewSetting("machine-version", "dev")
 	Namespace                         = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PeerServices                      = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
@@ -228,10 +229,7 @@ func GetEnvKey(key string) string {
 }
 
 func getMetadataConfig() string {
-	branch := os.Getenv("RANCHER_METADATA_BRANCH")
-	if branch == "" {
-		branch = "dev-v2.5"
-	}
+	branch := KDMBranch.Get()
 	data := map[string]interface{}{
 		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
 		"refresh-interval-minutes": "1440",
