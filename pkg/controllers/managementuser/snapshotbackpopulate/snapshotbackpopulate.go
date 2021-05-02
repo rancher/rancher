@@ -24,8 +24,8 @@ type handler struct {
 func Register(ctx context.Context, userContext *config.UserContext) {
 	h := handler{
 		clusterName:  userContext.ClusterName,
-		clusterCache: userContext.Provisioning.Cluster().Cache(),
-		clusters:     userContext.Provisioning.Cluster(),
+		clusterCache: userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
+		clusters:     userContext.Management.Wrangler.Provisioning.Cluster(),
 	}
 	userContext.Core.ConfigMaps("kube-system").AddHandler(ctx, "snapshotbackpopulate", h.OnChange)
 }
