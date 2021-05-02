@@ -123,7 +123,7 @@ func (h *handler) getBootstrapSecret(namespace, name string) (*corev1.Secret, er
 		}
 
 		hash := sha256.Sum256(secret.Data["token"])
-		data, err := Bootstrap(base64.URLEncoding.EncodeToString(hash[:]))
+		data, err := InstallScript(base64.URLEncoding.EncodeToString(hash[:]))
 		if err != nil {
 			return nil, err
 		}

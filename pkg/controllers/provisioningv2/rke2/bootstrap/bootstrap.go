@@ -18,21 +18,30 @@ var (
 	}
 )
 
-func InstallScript() ([]byte, error) {
+func InstallScript(token string) ([]byte, error) {
 	data, err := installScript()
 	if err != nil {
 		return nil, err
 	}
-	if settings.SystemAgentVersion.Get() == "" || settings.ServerURL.Get() == "" {
-		return data, nil
+	binaryURL := ""
+	if settings.SystemAgentVersion.Get() != "" && settings.ServerURL.Get() != "" {
+		binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
 	}
 	ca := systemtemplate.CAChecksum()
+	if ca != "" {
+		ca = "CATTLE_CA_CHECKSUM=\"" + ca + "\""
+	}
+	if token != "" {
+		token = "CATTLE_TOKEN=\"" + token + "\""
+	}
 	return []byte(fmt.Sprintf(`#!/usr/bin/env sh
+%s
 CATTLE_SERVER="%s"
-CATTLE_CA_CHECKSUM="%s"
+%s
+%s
 
 %s
-`, settings.ServerURL.Get(), ca, data)), nil
+`, binaryURL, settings.ServerURL.Get(), ca, token, data)), nil
 }
 
 func installScript() ([]byte, error) {
@@ -57,20 +66,4 @@ func installScript() ([]byte, error) {
 	defer resp.Body.Close()
 
 	return ioutil.ReadAll(resp.Body)
-}
-
-func Bootstrap(token string) ([]byte, error) {
-	script, err := InstallScript()
-	if err != nil {
-		return nil, err
-	}
-
-	url, ca := settings.ServerURL.Get(), systemtemplate.CAChecksum()
-	return []byte(fmt.Sprintf(`#!/usr/bin/env sh
-CATTLE_SERVER="%s"
-CATTLE_CA_CHECKSUM="%s"
-CATTLE_TOKEN="%s"
-
-%s
-`, url, ca, token, script)), nil
 }

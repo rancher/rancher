@@ -14,6 +14,7 @@ type RKECommonNodeConfig struct {
 
 type RKEMachineStatus struct {
 	JobComplete               bool   `json:"jobComplete,omitempty"`
+	JobName                   string `json:"jobName,omitempty"`
 	Ready                     bool   `json:"ready,omitempty"`
 	DriverHash                string `json:"driverHash,omitempty"`
 	DriverURL                 string `json:"driverUrl,omitempty"`

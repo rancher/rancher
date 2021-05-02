@@ -547,22 +547,20 @@ func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, i
 }
 
 func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
-	runtime := GetRuntime(controlPlane.Spec.KubernetesVersion)
 	image := getInstallerImage(controlPlane)
 
 	instruction := plan.Instruction{
 		Image:   image,
 		Command: "sh",
 		Args:    []string{"-c", "run.sh"},
+		Env: []string{
+			fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image)),
+		},
 	}
 
 	if isOnlyWorker(machine) {
-		instruction.Env = []string{
-			fmt.Sprintf("INSTALL_%s_EXEC=agent", strings.ToUpper(runtime)),
-			fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image)),
-		}
+		instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
 	}
-
 	nodePlan.Instructions = append(nodePlan.Instructions, instruction)
 	return nodePlan, nil
 }

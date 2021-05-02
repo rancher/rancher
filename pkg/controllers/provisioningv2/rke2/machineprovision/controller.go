@@ -113,6 +113,7 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 	if err != nil {
 		return job, err
 	}
+	newStatus.JobName = job.Name
 
 	if _, err := h.patchStatus(infraMachine, d, newStatus); err != nil {
 		return job, err

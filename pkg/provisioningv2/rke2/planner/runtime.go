@@ -18,6 +18,10 @@ func GetRuntimeServerUnit(kubernetesVersion string) string {
 	return RuntimeRKE2 + "-server"
 }
 
+func GetRuntimeEnv(kubernetesVersion string) string {
+	return strings.ToUpper(GetRuntimeEnv(kubernetesVersion))
+}
+
 func GetRuntime(kubernetesVersion string) string {
 	if strings.Contains(kubernetesVersion, RuntimeK3S) {
 		return RuntimeK3S
