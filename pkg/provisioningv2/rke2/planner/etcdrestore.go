@@ -8,11 +8,13 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 type etcdRestore struct {
 	controlPlane rkecontroller.RKEControlPlaneClient
+	secrets      corecontrollers.SecretCache
 	s3Args       *s3Args
 	store        *PlanStore
 }
@@ -20,6 +22,7 @@ type etcdRestore struct {
 func newETCDRestore(clients *wrangler.Context, store *PlanStore) *etcdRestore {
 	return &etcdRestore{
 		controlPlane: clients.RKE.RKEControlPlane(),
+		secrets:      clients.Core.Secret().Cache(),
 		store:        store,
 		s3Args: &s3Args{
 			secretCache: clients.Core.Secret().Cache(),
@@ -99,7 +102,7 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 		return plan.NodePlan{}, err
 	}
 
-	return plan.NodePlan{
+	return commonNodePlan(e.secrets, controlPlane, plan.NodePlan{
 		Files: s3Files,
 		Instructions: []plan.Instruction{
 			ensureInstalledInstruction(controlPlane),
@@ -111,12 +114,12 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 				Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
 			},
 		},
-	}, nil
+	})
 }
 
-func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) plan.NodePlan {
+func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
 	image := getInstallerImage(controlPlane)
-	return plan.NodePlan{
+	return commonNodePlan(e.secrets, controlPlane, plan.NodePlan{
 		Instructions: []plan.Instruction{
 			ensureInstalledInstruction(controlPlane),
 			{
@@ -128,13 +131,16 @@ func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) plan.NodePla
 				},
 			},
 		},
-	}
+	})
 }
 
 func (e *etcdRestore) etcdShutdown(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
 	servers, _ := collect(clusterPlan, isEtcd)
 
-	stopPlan := e.stopPlan(controlPlane)
+	stopPlan, err := e.stopPlan(controlPlane)
+	if err != nil {
+		return err
+	}
 
 	updated := false
 	for _, server := range servers {

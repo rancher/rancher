@@ -7,12 +7,14 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
 type etcdCreate struct {
 	controlPlane rkecontroller.RKEControlPlaneClient
+	secrets      corecontrollers.SecretCache
 	store        *PlanStore
 	s3Args       *s3Args
 }
@@ -20,6 +22,7 @@ type etcdCreate struct {
 func newETCDCreate(clients *wrangler.Context, store *PlanStore) *etcdCreate {
 	return &etcdCreate{
 		controlPlane: clients.RKE.RKEControlPlane(),
+		secrets:      clients.Core.Secret().Cache(),
 		store:        store,
 		s3Args: &s3Args{
 			secretCache: clients.Core.Secret().Cache(),
@@ -91,7 +94,7 @@ func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *r
 		return plan.NodePlan{}, err
 	}
 
-	return plan.NodePlan{
+	return commonNodePlan(e.secrets, controlPlane, plan.NodePlan{
 		Files: s3Files,
 		Instructions: []plan.Instruction{{
 			Name:    "create",
@@ -100,7 +103,7 @@ func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *r
 			Env:     s3Env,
 			Args:    append(args, s3Args...),
 		}},
-	}, nil
+	})
 }
 
 func (e *etcdCreate) Create(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
