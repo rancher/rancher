@@ -7,7 +7,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -29,7 +28,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -51,7 +49,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -73,7 +70,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -95,7 +91,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -117,7 +112,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -139,7 +133,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -168,7 +161,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -190,7 +182,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -212,7 +203,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -234,7 +224,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -256,7 +245,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -278,7 +266,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
@@ -300,7 +287,6 @@ webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
-    caBundle: Cg==
     service:
       name: webhook-service
       namespace: cattle-system
