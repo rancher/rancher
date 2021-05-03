@@ -282,6 +282,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) *rkev1.RKEControlPlane {
 			ETCDSnapshotCreate:    cluster.Spec.RKEConfig.ETCDSnapshotCreate,
 			KubernetesVersion:     cluster.Spec.KubernetesVersion,
 			ManagementClusterName: cluster.Status.ClusterName,
+			AgentEnvVars:          cluster.Spec.AgentEnvVars,
 			ClusterName:           cluster.Name,
 		},
 	}
