@@ -5,9 +5,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -18,7 +20,7 @@ var (
 	}
 )
 
-func InstallScript(token string) ([]byte, error) {
+func InstallScript(token string, envVars []corev1.EnvVar) ([]byte, error) {
 	data, err := installScript()
 	if err != nil {
 		return nil, err
@@ -34,14 +36,22 @@ func InstallScript(token string) ([]byte, error) {
 	if token != "" {
 		token = "CATTLE_TOKEN=\"" + token + "\""
 	}
+	envVarBuf := &strings.Builder{}
+	for _, envVar := range envVars {
+		if envVar.Value == "" {
+			continue
+		}
+		envVarBuf.WriteString(fmt.Sprintf("%s=\"%s\"\n", envVar.Name, envVar.Value))
+	}
 	return []byte(fmt.Sprintf(`#!/usr/bin/env sh
+%s
 %s
 CATTLE_SERVER="%s"
 %s
 %s
 
 %s
-`, binaryURL, settings.ServerURL.Get(), ca, token, data)), nil
+`, envVarBuf.String(), binaryURL, settings.ServerURL.Get(), ca, token, data)), nil
 }
 
 func installScript() ([]byte, error) {

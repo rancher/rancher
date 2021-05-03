@@ -117,19 +117,19 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 			Resources: []v1alpha1.BundleResource{
 				{
 					Name:    "cp.yaml",
-					Content: installer("cp", "false", "false", "true", &controlPlaneSelector),
+					Content: installer("cp", "false", "false", "true", cluster.Spec.AgentEnvVars, &controlPlaneSelector),
 				},
 				{
 					Name:    "etcd.yaml",
-					Content: installer("etcd", "false", "true", "false", &etcdSelector),
+					Content: installer("etcd", "false", "true", "false", cluster.Spec.AgentEnvVars, &etcdSelector),
 				},
 				{
 					Name:    "cp-and-etcd.yaml",
-					Content: installer("cp-and-etcd", "false", "true", "true", &controlPlaneAndEtcdSelector),
+					Content: installer("cp-and-etcd", "false", "true", "true", cluster.Spec.AgentEnvVars, &controlPlaneAndEtcdSelector),
 				},
 				{
 					Name:    "worker.yaml",
-					Content: installer("worker", "true", "false", "false", &workerSelector),
+					Content: installer("worker", "true", "false", "false", cluster.Spec.AgentEnvVars, &workerSelector),
 				},
 			},
 			Targets: []v1alpha1.BundleTarget{
@@ -159,7 +159,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 	}, status, nil
 }
 
-func installer(name, worker, etcd, controlPlane string, selector *metav1.LabelSelector) string {
+func installer(name, worker, etcd, controlPlane string, envs []corev1.EnvVar, selector *metav1.LabelSelector) string {
 	image := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
 	version := "latest"
 	if len(image) == 2 {
@@ -186,7 +186,7 @@ func installer(name, worker, etcd, controlPlane string, selector *metav1.LabelSe
 				Image:   settings.PrefixPrivateRegistry(image[0]),
 				Command: nil,
 				Args:    nil,
-				Env: []corev1.EnvVar{
+				Env: append(envs, []corev1.EnvVar{
 					{
 						Name:  "CATTLE_ROLE_WORKER",
 						Value: worker,
@@ -199,7 +199,7 @@ func installer(name, worker, etcd, controlPlane string, selector *metav1.LabelSe
 						Name:  "CATTLE_ROLE_CONTROL_PLANE",
 						Value: controlPlane,
 					},
-				},
+				}...),
 				EnvFrom: []corev1.EnvFromSource{{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{

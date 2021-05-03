@@ -59,6 +59,8 @@ type handler struct {
 	rkeBootstrap        rkecontroller.RKEBootstrapController
 	kubeconfigManager   *kubeconfig.Manager
 	dynamic             *dynamic.Controller
+	capiClusters        capicontrollers.ClusterCache
+	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -73,6 +75,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		rkeBootstrap:        clients.RKE.RKEBootstrap(),
 		kubeconfigManager:   kubeconfig.New(clients),
 		dynamic:             clients.Dynamic,
+		capiClusters:        clients.CAPI.Cluster().Cache(),
+		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
 	}
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
 		clients.RKE.RKEBootstrap(),
@@ -106,7 +110,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-provider-sync", h.associateMachineWithNode)
 }
 
-func (h *handler) getBootstrapSecret(namespace, name string) (*corev1.Secret, error) {
+func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar) (*corev1.Secret, error) {
 	sa, err := h.serviceAccountCache.Get(namespace, name)
 	if apierror.IsNotFound(err) {
 		return nil, nil
@@ -123,7 +127,7 @@ func (h *handler) getBootstrapSecret(namespace, name string) (*corev1.Secret, er
 		}
 
 		hash := sha256.Sum256(secret.Data["token"])
-		data, err := InstallScript(base64.URLEncoding.EncodeToString(hash[:]))
+		data, err := InstallScript(base64.URLEncoding.EncodeToString(hash[:]), envVars)
 		if err != nil {
 			return nil, err
 		}
@@ -216,12 +220,37 @@ func (h *handler) getMachine(obj *rkev1.RKEBootstrap) (*capi.Machine, error) {
 	return nil, fmt.Errorf("no machine associated to RKEBootstrap %s/%s", obj.Namespace, obj.Name)
 }
 
+func (h *handler) getEnvVar(machine *capi.Machine) ([]corev1.EnvVar, error) {
+	capiCluster, err := h.capiClusters.Get(machine.Namespace, machine.Spec.ClusterName)
+	if apierror.IsNotFound(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	if capiCluster.Spec.ControlPlaneRef == nil || capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
+		return nil, nil
+	}
+
+	cp, err := h.rkeControlPlanes.Get(machine.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	return cp.Spec.AgentEnvVars, nil
+}
+
 func (h *handler) assignBootStrapSecret(machine *capi.Machine, obj *rkev1.RKEBootstrap) (*corev1.Secret, []runtime.Object, error) {
 	if capi.MachinePhase(machine.Status.Phase) != capi.MachinePhasePending &&
 		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseDeleting &&
 		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseFailed &&
 		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseProvisioning {
 		return nil, nil, nil
+	}
+
+	envVars, err := h.getEnvVar(machine)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	secretName := name.SafeConcatName(obj.Name, "machine", "bootstrap")
@@ -237,7 +266,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, obj *rkev1.RKEBoo
 		},
 	}
 
-	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name)
+	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars)
 	if err != nil {
 		return nil, nil, err
 	}
