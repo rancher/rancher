@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/pspdelete"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
@@ -43,6 +44,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	nsserviceaccount.Register(ctx, cluster)
 	if features.RKE2.Enabled() {
 		snapshotbackpopulate.Register(ctx, cluster)
+		pspdelete.Register(ctx, cluster)
 	}
 
 	// register controller for API
