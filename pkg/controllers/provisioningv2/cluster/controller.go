@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	byCluster         = "by-cluster"
+	ByCluster         = "by-cluster"
 	creatorIDAnn      = "field.cattle.io/creatorId"
 	managedAnnotation = "provisioning.cattle.io/managed"
 )
@@ -81,7 +81,7 @@ func Register(
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 
-	clusterCache.AddIndexer(byCluster, byClusterIndex)
+	clusterCache.AddIndexer(ByCluster, byClusterIndex)
 	clients.Provisioning.Cluster().Informer().GetIndexer().ListKeys()
 }
 
@@ -113,7 +113,7 @@ func (h *handler) clusterWatch(namespace, name string, obj runtime.Object) ([]re
 	if !ok {
 		return nil, nil
 	}
-	operatorClusters, err := h.clusterCache.GetByIndex(byCluster, cluster.Name)
+	operatorClusters, err := h.clusterCache.GetByIndex(ByCluster, cluster.Name)
 	if err != nil || len(operatorClusters) == 0 {
 		// ignore
 		return nil, nil

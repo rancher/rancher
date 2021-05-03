@@ -4,15 +4,12 @@ import (
 	"context"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-)
-
-var (
-	byCluster = "by-cluster"
 )
 
 type handler struct {
@@ -40,7 +37,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 		return configMap, nil
 	}
 
-	cluster, err := h.clusterCache.GetByIndex(byCluster, h.clusterName)
+	cluster, err := h.clusterCache.GetByIndex(cluster2.ByCluster, h.clusterName)
 	if err != nil || len(cluster) != 1 {
 		return configMap, err
 	}
