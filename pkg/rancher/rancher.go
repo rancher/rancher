@@ -236,6 +236,8 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 		return err
 	}
 
+	r.Steve.StartAggregation(ctx)
+
 	<-ctx.Done()
 	return ctx.Err()
 }
