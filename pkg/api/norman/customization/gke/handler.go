@@ -139,12 +139,23 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 
 	var accessCred client.CloudCredential //var to check access
 	if err := access.ByID(h.generateAPIContext(req), &schema.Version, client.CloudCredentialType, credID, &accessCred); err != nil {
-		if apiError, ok := err.(*httperror.APIError); ok {
-			if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
-				return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
-			}
+		apiError, ok := err.(*httperror.APIError)
+		if !ok {
+			return httperror.NotFound.Status, err
 		}
-		return httperror.NotFound.Status, err
+		if apiError.Code.Status == httperror.NotFound.Status {
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
+		}
+		if apiError.Code.Status != httperror.PermissionDenied.Status {
+			return httperror.InvalidBodyContent.Status, err
+		}
+		var clusterID string
+		if clusterID = req.URL.Query().Get("clusterID"); clusterID == "" {
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
+		}
+		if errCode, err := h.clusterCheck(req, clusterID, credID); err != nil {
+			return errCode, err
+		}
 	}
 
 	cc, err := h.secretsLister.Get(ns, name)
@@ -167,6 +178,24 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	zone := req.URL.Query().Get("zone")
 	if zone != "" {
 		cap.Zone = zone
+	}
+
+	return http.StatusOK, nil
+}
+
+func (h *handler) clusterCheck(req *http.Request, clusterID, cloudCredentialID string) (int, error) {
+	var cluster client.Cluster
+	if err := access.ByID(h.generateAPIContext(req), &schema.Version, client.ClusterType, clusterID, &cluster); err != nil {
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
+				return httperror.InvalidBodyContent.Status, fmt.Errorf("cluster not found")
+			}
+		}
+		return httperror.InvalidBodyContent.Status, err
+	}
+
+	if cluster.GKEConfig.GoogleCredentialSecret != cloudCredentialID {
+		return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
 	}
 
 	return http.StatusOK, nil
