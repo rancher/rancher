@@ -58,9 +58,16 @@ func (c *checker) check() error {
 }
 
 func (c *checker) checkCluster(cluster *v3.Cluster) error {
+	if cluster.Spec.Internal {
+		return nil
+	}
+
 	hasSession := c.tunnelServer.HasSession(proxy.Prefix + cluster.Name)
-	Connected.CreateUnknownIfNotExists(cluster)
-	if hasSession == Connected.IsTrue(cluster) {
+	// The simpler condition of hasSession == Connected.IsTrue(cluster) is not
+	// used because it treat a non-existent conditions as False
+	if hasSession && Connected.IsTrue(cluster) {
+		return nil
+	} else if !hasSession && Connected.IsFalse(cluster) {
 		return nil
 	}
 

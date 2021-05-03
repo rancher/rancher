@@ -339,6 +339,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 			}
 		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
 			outOfSync = append(outOfSync, entry.Machine.Name)
+			// Conditions
+			// 1. If plan is not in sync then there is no harm in updating it to something else because
+			//    the node will have already been considered unavailable.
+			// 2. concurrency == 0 which means infinite concurrency.
+			// 3. unavailable < concurrency meaning we have capacity to make something unavailable
 			if !entry.Plan.InSync || concurrency == 0 || unavailable < concurrency {
 				if entry.Plan.InSync {
 					unavailable++
@@ -630,6 +635,13 @@ func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, secret plan.Secret,
 	initNode bool, joinServer string) (plan.NodePlan, error) {
 	config := map[string]interface{}{}
+
+	files, err := p.addRegistryConfig(config, controlPlane)
+	if err != nil {
+		return nodePlan, err
+	}
+	nodePlan.Files = append(nodePlan.Files, files...)
+
 	if err := addUserConfig(config, controlPlane, machine); err != nil {
 		return nodePlan, err
 	}

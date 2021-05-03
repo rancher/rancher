@@ -277,9 +277,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) *rkev1.RKEControlPlane {
 			Namespace: cluster.Namespace,
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
-			RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
-				UpgradeStrategy: rkev1.ClusterUpgradeStrategy{},
-			},
+			RKEClusterSpecCommon:  cluster.Spec.RKEConfig.RKEClusterSpecCommon,
 			ETCDSnapshotRestore:   cluster.Spec.RKEConfig.ETCDSnapshotRestore,
 			ETCDSnapshotCreate:    cluster.Spec.RKEConfig.ETCDSnapshotCreate,
 			KubernetesVersion:     cluster.Spec.KubernetesVersion,

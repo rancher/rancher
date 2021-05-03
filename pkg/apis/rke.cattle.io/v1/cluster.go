@@ -29,6 +29,7 @@ type RKEClusterSpecCommon struct {
 	NodeConfig                      []RKESystemConfig        `json:"workerConfig,omitempty"`
 	ETCDSnapshotCloudCredentialName string                   `json:"etcdSnapshotCloudCredentialName,omitempty"`
 	AdditionalManifest              string                   `json:"additionalManifest,omitempty"`
+	Registries                      *Registry                `json:"registries,omitempty"`
 }
 
 type LocalClusterAuthEndpoint struct {
