@@ -689,10 +689,10 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 }
 
 func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, entry planEntry, initNode bool, joinServer string) (plan.NodePlan, error) {
-	var (
-		nodePlan plan.NodePlan
-		err      error
-	)
+	nodePlan, err := commonNodePlan(p.secretCache, controlPlane, plan.NodePlan{})
+	if err != nil {
+		return nodePlan, err
+	}
 
 	nodePlan, err = p.addConfigFile(nodePlan, controlPlane, entry.Machine, secret, initNode, joinServer)
 	if err != nil {
