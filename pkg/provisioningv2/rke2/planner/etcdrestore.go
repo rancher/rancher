@@ -71,7 +71,7 @@ func (e *etcdRestore) etcdRestore(controlPlane *rkev1.RKEControlPlane, clusterPl
 		}
 	}
 
-	return fmt.Errorf("failed to find etcd node to restore on")
+	return ErrWaiting("failed to find etcd node to restore on")
 }
 
 func ensureInstalledInstruction(controlPlane *rkev1.RKEControlPlane) plan.Instruction {
@@ -88,7 +88,6 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 	args := []string{
 		"server",
 		"--cluster-reset",
-		fmt.Sprintf("----cluster-reset-restore-path"),
 	}
 
 	if snapshot.S3 == nil {
@@ -102,9 +101,14 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 		return plan.NodePlan{}, err
 	}
 
+	stopPlan, err := e.stopPlan(controlPlane)
+	if err != nil {
+		return plan.NodePlan{}, err
+	}
+
 	return commonNodePlan(e.secrets, controlPlane, plan.NodePlan{
 		Files: s3Files,
-		Instructions: []plan.Instruction{
+		Instructions: append(stopPlan.Instructions, []plan.Instruction{
 			ensureInstalledInstruction(controlPlane),
 			{
 				Name:    "restore",
@@ -113,7 +117,7 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 				Args:    append(args, s3Args...),
 				Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
 			},
-		},
+		}...),
 	})
 }
 
@@ -129,6 +133,11 @@ func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePl
 				Args: []string{
 					"stop", GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
 				},
+			},
+			{
+				Name:    "shutdown",
+				Image:   image,
+				Command: fmt.Sprintf("%s-killall.sh", GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
 			},
 		},
 	})
