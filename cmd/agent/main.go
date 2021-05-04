@@ -63,7 +63,7 @@ func main() {
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			err = clean.Bindings()
+			err = clean.Bindings(nil)
 		} else {
 			err = run()
 		}

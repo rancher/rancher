@@ -147,6 +147,9 @@ func generatePodNetworkPolicy(pod *corev1.Pod, policyName string) *knetworkingv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      policyName,
 			Namespace: pod.Namespace,
+			Labels: map[string]string{
+				creatorLabel: creatorNorman,
+			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",

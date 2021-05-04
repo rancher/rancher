@@ -119,21 +119,34 @@ func generateImages(chartNameAndVersion string, inputMap map[interface{}]interfa
 		return
 	}
 
-	// distinguish images by os
-	os := inputMap["os"]
-	switch os {
-	case "windows": // must have indicate `os: windows` if the image is using in Windows cluster
-		if osType != Windows {
-			return
+	imageName := fmt.Sprintf("%s:%v", repo, t)
+
+	// By default, images are added to the generic images list ("linux"). For Windows and multi-OS
+	// images to be considered, they must use a comma-delineated list (e.g. "os: windows",
+	// "os: windows,linux", and "os: linux,windows").
+	if osList, ok := inputMap["os"].(string); ok {
+		for _, os := range strings.Split(osList, ",") {
+			switch strings.TrimSpace(strings.ToLower(os)) {
+			case "windows":
+				if osType == Windows {
+					addSourceToImage(output, imageName, chartNameAndVersion)
+					return
+				}
+			case "linux":
+				if osType == Linux {
+					addSourceToImage(output, imageName, chartNameAndVersion)
+					return
+				}
+			}
 		}
-	default:
-		if osType != Linux {
-			return
+	} else {
+		if inputMap["os"] != nil {
+			panic(fmt.Sprintf("Field 'os:' for image %s contains neither a string nor nil", imageName))
+		}
+		if osType == Linux {
+			addSourceToImage(output, imageName, chartNameAndVersion)
 		}
 	}
-
-	imageName := fmt.Sprintf("%s:%v", repo, t)
-	addSourceToImage(output, imageName, chartNameAndVersion)
 }
 
 func addSourceToImage(imagesSet map[string]map[string]bool, image string, sources ...string) {
@@ -145,11 +158,17 @@ func addSourceToImage(imagesSet map[string]map[string]bool, image string, source
 	}
 }
 
-func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[interface{}]interface{})) {
-	walkFunc(inputMap)
-	for _, value := range inputMap {
-		if v, ok := value.(map[interface{}]interface{}); ok {
-			walkthroughMap(v, walkFunc)
+func walkthroughMap(data interface{}, walkFunc func(map[interface{}]interface{})) {
+	if inputMap, isMap := data.(map[interface{}]interface{}); isMap {
+		// Run the walkFunc on the root node and each child node
+		walkFunc(inputMap)
+		for _, value := range inputMap {
+			walkthroughMap(value, walkFunc)
+		}
+	} else if inputList, isList := data.([]interface{}); isList {
+		// Run the walkFunc on each element in the root node, ignoring the root itself
+		for _, elem := range inputList {
+			walkthroughMap(elem, walkFunc)
 		}
 	}
 }

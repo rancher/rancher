@@ -24,7 +24,7 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
 ENV CATTLE_K3S_VERSION v1.19.8+k3s1
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher54
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher55
 ENV CATTLE_ETCD_VERSION v3.4.3
 ENV CATTLE_CHANNELSERVER_VERSION v0.5.0
 ENV LOGLEVEL_VERSION v0.1.3
@@ -39,8 +39,8 @@ ENV KUSTOMIZE_VERSION v3.5.4
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=0.3.500
-ENV CATTLE_RANCHER_OPERATOR_MIN_VERSION=0.1.300
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.1.0-beta900
+ENV CATTLE_RANCHER_OPERATOR_MIN_VERSION=0.1.400
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.1.000
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -113,8 +113,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry /usr/bin/k3s /usr/bin/kubectl /usr/bin/channelserver && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.5.8-rc4
-ENV CATTLE_DASHBOARD_UI_VERSION v2.5.8-rc4
+ENV CATTLE_UI_VERSION 2.5.8-rc17
+ENV CATTLE_DASHBOARD_UI_VERSION v2.5.8-rc18
 ENV CATTLE_CLI_VERSION v2.4.11-rc4
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION 1.1.9
