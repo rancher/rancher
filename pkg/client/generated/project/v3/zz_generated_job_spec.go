@@ -4,6 +4,7 @@ const (
 	JobSpecType                               = "jobSpec"
 	JobSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	JobSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	JobSpecFieldCompletionMode                = "completionMode"
 	JobSpecFieldContainers                    = "containers"
 	JobSpecFieldDNSConfig                     = "dnsConfig"
 	JobSpecFieldDNSPolicy                     = "dnsPolicy"
@@ -35,6 +36,7 @@ const (
 	JobSpecFieldSetHostnameAsFQDN             = "setHostnameAsFQDN"
 	JobSpecFieldShareProcessNamespace         = "shareProcessNamespace"
 	JobSpecFieldSubdomain                     = "subdomain"
+	JobSpecFieldSuspend                       = "suspend"
 	JobSpecFieldSysctls                       = "sysctls"
 	JobSpecFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	JobSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -47,6 +49,7 @@ const (
 type JobSpec struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	DNSConfig                     *PodDNSConfig                  `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                         `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
@@ -78,6 +81,7 @@ type JobSpec struct {
 	SetHostnameAsFQDN             *bool                          `json:"setHostnameAsFQDN,omitempty" yaml:"setHostnameAsFQDN,omitempty"`
 	ShareProcessNamespace         *bool                          `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	Suspend                       *bool                          `json:"suspend,omitempty" yaml:"suspend,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

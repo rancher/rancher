@@ -9,6 +9,7 @@ const (
 	CronJobFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	CronJobFieldAnnotations                   = "annotations"
 	CronJobFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	CronJobFieldCompletionMode                = "completionMode"
 	CronJobFieldContainers                    = "containers"
 	CronJobFieldCreated                       = "created"
 	CronJobFieldCreatorID                     = "creatorId"
@@ -70,6 +71,7 @@ type CronJob struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                         `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`

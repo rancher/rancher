@@ -2,6 +2,8 @@ package client
 
 import (
 	"github.com/rancher/norman/types"
+
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -28,6 +30,7 @@ const (
 	DaemonSetFieldHostname                      = "hostname"
 	DaemonSetFieldImagePullSecrets              = "imagePullSecrets"
 	DaemonSetFieldLabels                        = "labels"
+	DaemonSetFieldMaxSurge                      = "maxSurge"
 	DaemonSetFieldName                          = "name"
 	DaemonSetFieldNamespaceId                   = "namespaceId"
 	DaemonSetFieldNodeID                        = "nodeId"
@@ -88,6 +91,7 @@ type DaemonSet struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MaxSurge                      intstr.IntOrString             `json:"maxSurge,omitempty" yaml:"maxSurge,omitempty"`
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`

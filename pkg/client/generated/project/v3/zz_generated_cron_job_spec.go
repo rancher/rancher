@@ -4,6 +4,7 @@ const (
 	CronJobSpecType                               = "cronJobSpec"
 	CronJobSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	CronJobSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	CronJobSpecFieldCompletionMode                = "completionMode"
 	CronJobSpecFieldContainers                    = "containers"
 	CronJobSpecFieldCronJobConfig                 = "cronJobConfig"
 	CronJobSpecFieldDNSConfig                     = "dnsConfig"
@@ -47,6 +48,7 @@ const (
 type CronJobSpec struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	CronJobConfig                 *CronJobConfig                 `json:"cronJobConfig,omitempty" yaml:"cronJobConfig,omitempty"`
 	DNSConfig                     *PodDNSConfig                  `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`

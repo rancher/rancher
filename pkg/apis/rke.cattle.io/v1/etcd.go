@@ -21,6 +21,7 @@ type ETCDSnapshotCreate struct {
 type ETCDSnapshot struct {
 	Name      string          `json:"name,omitempty"`
 	NodeName  string          `json:"nodeName,omitempty"`
-	CreatedAt metav1.Time     `json:"createdAt,omitempty"`
+	CreatedAt *metav1.Time    `json:"createdAt,omitempty"`
+	Size      int64           `json:"size,omitempty"`
 	S3        *ETCDSnapshotS3 `json:"s3,omitempty"`
 }

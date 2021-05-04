@@ -2,6 +2,8 @@ package client
 
 import (
 	"github.com/rancher/norman/types"
+
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -9,6 +11,7 @@ const (
 	WorkloadFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	WorkloadFieldAnnotations                   = "annotations"
 	WorkloadFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	WorkloadFieldCompletionMode                = "completionMode"
 	WorkloadFieldContainers                    = "containers"
 	WorkloadFieldCreated                       = "created"
 	WorkloadFieldCreatorID                     = "creatorId"
@@ -34,6 +37,7 @@ const (
 	WorkloadFieldJobConfig                     = "jobConfig"
 	WorkloadFieldJobStatus                     = "jobStatus"
 	WorkloadFieldLabels                        = "labels"
+	WorkloadFieldMaxSurge                      = "maxSurge"
 	WorkloadFieldName                          = "name"
 	WorkloadFieldNamespaceId                   = "namespaceId"
 	WorkloadFieldNodeID                        = "nodeId"
@@ -64,6 +68,7 @@ const (
 	WorkloadFieldStatefulSetConfig             = "statefulSetConfig"
 	WorkloadFieldStatefulSetStatus             = "statefulSetStatus"
 	WorkloadFieldSubdomain                     = "subdomain"
+	WorkloadFieldSuspend                       = "suspend"
 	WorkloadFieldSysctls                       = "sysctls"
 	WorkloadFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	WorkloadFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -84,6 +89,7 @@ type Workload struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                         `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -109,6 +115,7 @@ type Workload struct {
 	JobConfig                     *JobConfig                     `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
 	JobStatus                     *JobStatus                     `json:"jobStatus,omitempty" yaml:"jobStatus,omitempty"`
 	Labels                        map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MaxSurge                      intstr.IntOrString             `json:"maxSurge,omitempty" yaml:"maxSurge,omitempty"`
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
@@ -139,6 +146,7 @@ type Workload struct {
 	StatefulSetConfig             *StatefulSetConfig             `json:"statefulSetConfig,omitempty" yaml:"statefulSetConfig,omitempty"`
 	StatefulSetStatus             *StatefulSetStatus             `json:"statefulSetStatus,omitempty" yaml:"statefulSetStatus,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	Suspend                       *bool                          `json:"suspend,omitempty" yaml:"suspend,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

@@ -86,7 +86,7 @@ func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *r
 		args = append(args, fmt.Sprintf("--name=%s", snapshot.Name))
 	}
 	if nodeName != "" {
-		args = append(args, fmt.Sprintf("--node-name=%s", snapshot.Name))
+		args = append(args, fmt.Sprintf("--node-name=%s", nodeName))
 	}
 
 	s3Args, s3Env, s3Files, err := e.s3Args.ToArgs(snapshot.S3, controlPlane)
@@ -107,7 +107,7 @@ func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *r
 }
 
 func (e *etcdCreate) Create(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
-	if controlPlane.Spec.ETCDSnapshotRestore == nil {
+	if controlPlane.Spec.ETCDSnapshotCreate == nil {
 		return e.resetEtcdCreateState(controlPlane)
 	}
 
