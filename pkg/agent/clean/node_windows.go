@@ -88,7 +88,7 @@ func Node() error {
 }
 
 func spawnCleanup() error {
-	if err := WriteScript(); err != nil {
+	if err := writeScript(); err != nil {
 		return err
 	}
 	winsArgs := createWinsArgs("Spawn")
@@ -100,7 +100,7 @@ func spawnCleanup() error {
 	return nil
 }
 
-func WriteScript() error {
+func writeScript() error {
 	// add a null file to the container for wins to find and make a hash
 	psPath := getPowershellPath()
 	if !fileExists(psPath) {
@@ -150,7 +150,7 @@ func fileExists(path string) bool {
 }
 
 func Links() error {
-	if err := WriteScript(); err != nil {
+	if err := writeScript(); err != nil {
 		return err
 	}
 	winsArgs := createWinsArgs("Network")
@@ -163,7 +163,7 @@ func Links() error {
 }
 
 func Paths() error {
-	if err := WriteScript(); err != nil {
+	if err := writeScript(); err != nil {
 		return err
 	}
 	winsArgs := createWinsArgs("Paths")
@@ -184,7 +184,7 @@ func getAgentImage() string {
 }
 
 func cleanDocker() error {
-	if err := WriteScript(); err != nil {
+	if err := writeScript(); err != nil {
 		return err
 	}
 	winsArgs := createWinsArgs("Docker")
@@ -232,7 +232,7 @@ func waitForK8sPods(ctx context.Context, c *client.Client) error {
 }
 
 func Firewall() error {
-	if err := WriteScript(); err != nil {
+	if err := writeScript(); err != nil {
 		return err
 	}
 	winsArgs := createWinsArgs("Firewall")

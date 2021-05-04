@@ -101,10 +101,8 @@ func runClean() error {
 			return clean.Paths()
 		case "firewall", "firewalls":
 			return clean.Firewall()
-		case "windows":
-			return clean.WriteScript()
 		case "binding", "bindings":
-			return clean.Bindings()
+			return clean.Bindings(nil)
 		}
 	}
 
