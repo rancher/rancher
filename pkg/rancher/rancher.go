@@ -226,6 +226,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	r.Wrangler.MultiClusterManager.Wait(ctx)
 
+	go r.Steve.StartAggregation(ctx)
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
@@ -235,8 +236,6 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 		r.opts.NoCACerts); err != nil {
 		return err
 	}
-
-	r.Steve.StartAggregation(ctx)
 
 	<-ctx.Done()
 	return ctx.Err()
