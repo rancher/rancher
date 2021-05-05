@@ -3,6 +3,8 @@ set -e
 
 ./k3s-images.sh
 
+./create-components-file.sh
+
 source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
