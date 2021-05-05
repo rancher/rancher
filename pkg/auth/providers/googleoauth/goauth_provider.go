@@ -427,3 +427,10 @@ func (g *googleOauthProvider) getDirectoryService(ctx context.Context, userEmail
 	}
 	return srv, nil
 }
+
+func (g *googleOauthProvider) GetUserExtraAttributes(token *v3.Token) map[string][]string {
+	extras := make(map[string][]string)
+	extras["principalid"] = []string{token.UserPrincipal.Name}
+	extras["username"] = []string{token.UserPrincipal.LoginName}
+	return extras
+}

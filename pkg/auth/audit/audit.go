@@ -58,8 +58,9 @@ type log struct {
 var userKey struct{}
 
 type User struct {
-	Name  string   `json:"name,omitempty"`
-	Group []string `json:"group,omitempty"`
+	Name  string              `json:"name,omitempty"`
+	Group []string            `json:"group,omitempty"`
+	Extra map[string][]string `json:"extra,omitempty"`
 	// RequestUser is the --as user
 	RequestUser string `json:"requestUser,omitempty"`
 	// RequestGroups is the --as-group list
@@ -71,6 +72,7 @@ func getUserInfo(req *http.Request) *User {
 	return &User{
 		Name:  user.GetName(),
 		Group: user.GetGroups(),
+		Extra: user.GetExtra(),
 	}
 }
 

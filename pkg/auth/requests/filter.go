@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/audit"
+	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/util"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -27,10 +29,13 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	// clean extra
+	//clean extra that is not part of userInfo
 	for header := range req.Header {
 		if strings.HasPrefix(header, "Impersonate-Extra-") {
-			req.Header.Del(header)
+			key := strings.TrimPrefix(header, "Impersonate-Extra-")
+			if !providers.IsValidUserExtraAttribute(key) {
+				req.Header.Del(header)
+			}
 		}
 	}
 
@@ -39,6 +44,14 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	for _, group := range userInfo.GetGroups() {
 		req.Header.Add("Impersonate-Group", group)
 	}
+
+	for key, extras := range userInfo.GetExtra() {
+		for _, s := range extras {
+			req.Header.Add("Impersonate-Extra-"+key, s)
+		}
+	}
+
+	logrus.Tracef("Rancher Auth Filter ##headers %v: ", req.Header)
 
 	auditUser, ok := audit.FromContext(req.Context())
 	if ok {

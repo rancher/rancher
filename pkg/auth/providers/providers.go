@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
@@ -28,6 +29,7 @@ var (
 	LocalProvider          = "local"
 	providersByType        = make(map[string]common.AuthProvider)
 	confMu                 sync.Mutex
+	userExtraAttributesMap = map[string]bool{"principalid": true, "username": true}
 )
 
 func GetProvider(providerName string) (common.AuthProvider, error) {
@@ -131,6 +133,13 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providersByType[publicclient.GoogleOAuthProviderType] = p
 }
 
+func IsValidUserExtraAttribute(key string) bool {
+	if _, ok := userExtraAttributesMap[strings.ToLower(key)]; ok {
+		return true
+	}
+	return false
+}
+
 func AuthenticateUser(ctx context.Context, input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
 	return providers[providerName].AuthenticateUser(ctx, input)
 }
@@ -178,4 +187,8 @@ func CanAccessWithGroupProviders(providerName string, userPrincipalID string, gr
 
 func RefetchGroupPrincipals(principalID string, providerName string, secret string) ([]v3.Principal, error) {
 	return providers[providerName].RefetchGroupPrincipals(principalID, secret)
+}
+
+func GetUserExtraAttributes(providerName string, token *v3.Token) map[string][]string {
+	return providers[providerName].GetUserExtraAttributes(token)
 }
