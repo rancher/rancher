@@ -56,7 +56,7 @@ func (e *etcdCreate) startOrRestartCreate(controlPlane *rkev1.RKEControlPlane, s
 }
 
 func (e *etcdCreate) etcdCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, snapshot *rkev1.ETCDSnapshotCreate) error {
-	servers, _ := collect(clusterPlan, func(machine *capi.Machine) bool {
+	servers := collect(clusterPlan, func(machine *capi.Machine) bool {
 		if !isEtcd(machine) || machine.Status.NodeRef == nil {
 			return false
 		}

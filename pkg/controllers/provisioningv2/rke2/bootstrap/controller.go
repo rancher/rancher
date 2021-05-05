@@ -5,19 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"time"
 
-	"github.com/rancher/lasso/pkg/dynamic"
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
-	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/relatedresource"
@@ -25,12 +19,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
@@ -38,10 +28,9 @@ const (
 	ClusterNameLabel = "rke.cattle.io/cluster-name"
 	planSecret       = "rke.cattle.io/plan-secret-name"
 	roleLabel        = "rke.cattle.io/service-account-role"
+	rkeBootstrapName = "rke.cattle.io/rkebootstrap-name"
 	roleBootstrap    = "bootstrap"
 	rolePlan         = "plan"
-
-	nodeErrorEnqueueTime = 15 * time.Second
 )
 
 var (
@@ -51,14 +40,7 @@ var (
 type handler struct {
 	serviceAccountCache corecontrollers.ServiceAccountCache
 	secretCache         corecontrollers.SecretCache
-	rancherClusterCache ranchercontrollers.ClusterCache
 	machineCache        capicontrollers.MachineCache
-	machines            capicontrollers.MachineController
-	settingsCache       mgmtcontrollers.SettingCache
-	rkeBootstrapCache   rkecontroller.RKEBootstrapCache
-	rkeBootstrap        rkecontroller.RKEBootstrapController
-	kubeconfigManager   *kubeconfig.Manager
-	dynamic             *dynamic.Controller
 	capiClusters        capicontrollers.ClusterCache
 	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
 }
@@ -67,14 +49,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		serviceAccountCache: clients.Core.ServiceAccount().Cache(),
 		secretCache:         clients.Core.Secret().Cache(),
-		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
-		machines:            clients.CAPI.Machine(),
 		machineCache:        clients.CAPI.Machine().Cache(),
-		settingsCache:       clients.Mgmt.Setting().Cache(),
-		rkeBootstrapCache:   clients.RKE.RKEBootstrap().Cache(),
-		rkeBootstrap:        clients.RKE.RKEBootstrap(),
-		kubeconfigManager:   kubeconfig.New(clients),
-		dynamic:             clients.Dynamic,
 		capiClusters:        clients.CAPI.Cluster().Cache(),
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
 	}
@@ -95,7 +70,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 	relatedresource.Watch(ctx, "rke-machine-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 		if sa, ok := obj.(*corev1.ServiceAccount); ok {
-			if name, ok := sa.Labels[planner.MachineNameLabel]; ok {
+			if name, ok := sa.Labels[rkeBootstrapName]; ok {
 				return []relatedresource.Key{
 					{
 						Namespace: sa.Namespace,
@@ -105,9 +80,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			}
 		}
 		return nil, nil
-	}, clients.CAPI.Machine(), clients.Core.ServiceAccount())
-
-	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-provider-sync", h.associateMachineWithNode)
+	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount())
 }
 
 func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar) (*corev1.Secret, error) {
@@ -127,7 +100,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		}
 
 		hash := sha256.Sum256(secret.Data["token"])
-		data, err := InstallScript(base64.URLEncoding.EncodeToString(hash[:]), envVars)
+		data, err := installer.InstallScript(base64.URLEncoding.EncodeToString(hash[:]), envVars)
 		if err != nil {
 			return nil, err
 		}
@@ -156,6 +129,7 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, obj *rkev1.RKEBootstra
 			Namespace: obj.Namespace,
 			Labels: map[string]string{
 				planner.MachineNameLabel: machine.Name,
+				rkeBootstrapName:         obj.Name,
 				roleLabel:                rolePlan,
 				planSecret:               secretName,
 			},
@@ -306,122 +280,4 @@ func (h *handler) OnChange(obj *rkev1.RKEBootstrap, status rkev1.RKEBootstrapSta
 
 	result = append(result, objs...)
 	return result, status, nil
-}
-
-func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {
-	if bootstrap == nil || bootstrap.DeletionTimestamp != nil {
-		return bootstrap, nil
-	}
-
-	if !bootstrap.Status.Ready || bootstrap.Status.DataSecretName == nil || *bootstrap.Status.DataSecretName == "" {
-		return bootstrap, nil
-	}
-
-	machine, err := h.getMachine(bootstrap)
-	if err != nil {
-		return bootstrap, err
-	}
-
-	if machine.Spec.ProviderID != nil && *machine.Spec.ProviderID != "" {
-		// If the machine already has its provider ID set, then we do not need to continue
-		return bootstrap, nil
-	}
-
-	rancherCluster, err := h.rancherClusterCache.Get(machine.Namespace, machine.Spec.ClusterName)
-	if err != nil {
-		return bootstrap, err
-	}
-
-	secret, err := h.kubeconfigManager.GetKubeConfig(rancherCluster, rancherCluster.Status)
-	if err != nil {
-		return bootstrap, err
-	}
-
-	config, err := clientcmd.RESTConfigFromKubeConfig(secret.Data["value"])
-	if err != nil {
-		return bootstrap, err
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return bootstrap, err
-	}
-
-	nodeLabelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"rke.cattle.io/machine": string(machine.GetUID())}}
-	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Set(nodeLabelSelector.MatchLabels).String()})
-	if err != nil || len(nodes.Items) == 0 || nodes.Items[0].Spec.ProviderID == "" {
-		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, nodeErrorEnqueueTime)
-		return bootstrap, nil
-	}
-
-	return bootstrap, h.updateMachine(&nodes.Items[0], machine, rancherCluster)
-}
-
-func (h *handler) updateMachineJoinURL(node *corev1.Node, machine *capi.Machine, rancherCluster *v1.Cluster) error {
-	address := ""
-	for _, nodeAddress := range node.Status.Addresses {
-		switch nodeAddress.Type {
-		case corev1.NodeInternalIP:
-			address = nodeAddress.Address
-		case corev1.NodeExternalIP:
-			if address == "" {
-				address = nodeAddress.Address
-			}
-		}
-	}
-
-	url := fmt.Sprintf("https://%s:%d", address, getJoinURLPort(rancherCluster))
-	if machine.Annotations[planner.JoinURLAnnotation] == url {
-		return nil
-	}
-
-	machine = machine.DeepCopy()
-	if machine.Annotations == nil {
-		machine.Annotations = map[string]string{}
-	}
-
-	machine.Annotations[planner.JoinURLAnnotation] = url
-	_, err := h.machines.Update(machine)
-	return err
-}
-
-func (h *handler) updateMachine(node *corev1.Node, machine *capi.Machine, rancherCluster *v1.Cluster) error {
-	if err := h.updateMachineJoinURL(node, machine, rancherCluster); err != nil {
-		return err
-	}
-
-	gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
-	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
-	if apierror.IsNotFound(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	d, err := data.Convert(infra)
-	if err != nil {
-		return err
-	}
-
-	if d.String("spec", "providerID") != node.Spec.ProviderID {
-		data, err := data.Convert(infra.DeepCopyObject())
-		if err != nil {
-			return err
-		}
-
-		data.SetNested(node.Spec.ProviderID, "spec", "providerID")
-		_, err = h.dynamic.Update(&unstructured.Unstructured{
-			Object: data,
-		})
-		return err
-	}
-
-	return nil
-}
-
-func getJoinURLPort(cluster *v1.Cluster) int {
-	if planner.GetRuntime(cluster.Spec.KubernetesVersion) == planner.RuntimeRKE2 {
-		return 9345
-	}
-	return 6443
 }

@@ -24,7 +24,7 @@ func (l *Logger) Enabled() bool {
 }
 
 func (l *Logger) Info(msg string, keysAndValues ...interface{}) {
-	l.withValues(keysAndValues...).Info(msg)
+	l.withValues(keysAndValues...).Debug(msg)
 }
 
 func (l *Logger) Error(err error, msg string, keysAndValues ...interface{}) {

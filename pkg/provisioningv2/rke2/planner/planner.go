@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -180,7 +181,9 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	if secret.ServerToken == "" {
 		// This is logic for clusters that are formed outside of Rancher
 		// In this situation you either have nodes with worker role or no role
-		err = p.reconcile(controlPlane, secret, plan, "etcd and control plane", true, noRole, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		err = p.reconcile(controlPlane, secret, plan, "etcd and control plane", true, noRole, isInitNode,
+			controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+			controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 		if err != nil {
 			return err
@@ -198,7 +201,9 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 			return err
 		}
 
-		err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isInitNode, none, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, "")
+		err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isInitNode, none,
+			controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, "",
+			controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 		if err != nil {
 			return err
@@ -209,20 +214,26 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 			return err
 		}
 
-		err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode,
+			controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+			controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 		if err != nil {
 			return err
 		}
 
-		err = p.reconcile(controlPlane, secret, plan, "control plane", true, isControlPlane, isInitNode, controlPlane.Spec.UpgradeStrategy.ServerConcurrency, joinServer)
+		err = p.reconcile(controlPlane, secret, plan, "control plane", true, isControlPlane, isInitNode,
+			controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+			controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = p.reconcile(controlPlane, secret, plan, "worker", false, isOnlyWorker, isInitNode, controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer)
+	err = p.reconcile(controlPlane, secret, plan, "worker", false, isOnlyWorker, isInitNode,
+		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
+		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return err
@@ -269,7 +280,7 @@ func (p *Planner) setInitNodeMark(machine *capi.Machine) (*capi.Machine, error) 
 }
 
 func (p *Planner) electInitNode(plan *plan.Plan) (string, error) {
-	entries, _ := collect(plan, isEtcd)
+	entries := collect(plan, isEtcd)
 	joinURL := ""
 	for _, entry := range entries {
 		if !isInitNode(entry.Machine) {
@@ -301,17 +312,56 @@ func (p *Planner) electInitNode(plan *plan.Plan) (string, error) {
 	return machine.Annotations[JoinURLAnnotation], nil
 }
 
-func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, plan *plan.Plan,
+func calculateConcurrency(maxUnavailable string, entries []planEntry, exclude roleFilter) (int, int, error) {
+	var (
+		count, unavailable int
+	)
+
+	for _, entry := range entries {
+		if !exclude(entry.Machine) {
+			count++
+		}
+		if entry.Plan != nil && !entry.Plan.InSync {
+			unavailable++
+		}
+	}
+
+	num, err := strconv.Atoi(maxUnavailable)
+	if err == nil {
+		return num, unavailable, nil
+	}
+
+	if maxUnavailable == "" {
+		return 1, unavailable, nil
+	}
+
+	percentage, err := strconv.ParseFloat(strings.TrimSuffix(maxUnavailable, "%"), 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("concurrency must be a number or a percentage: %w", err)
+	}
+
+	max := float64(count) * (percentage / float64(100))
+	return int(math.Ceil(max)), unavailable, nil
+}
+
+func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, clusterPlan *plan.Plan,
 	tierName string,
 	required bool,
-	include, exclude roleFilter, concurrency int, joinServer string) error {
-	entries, unavailable := collect(plan, include)
-
+	include, exclude roleFilter, maxUnavailable string, joinServer string, drainOptions rkev1.DrainOptions) error {
 	var (
 		outOfSync   []string
 		nonReady    []string
 		errMachines []string
+		draining    []string
+		uncordoned  []string
 	)
+
+	entries := collect(clusterPlan, include)
+
+	concurrency, unavailable, err := calculateConcurrency(maxUnavailable, entries, exclude)
+	if err != nil {
+		return err
+	}
 
 	for _, entry := range entries {
 		// we exclude here and not in collect to ensure that include matched at least one node
@@ -348,12 +398,24 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 				if entry.Plan.InSync {
 					unavailable++
 				}
-				if err := p.store.UpdatePlan(entry.Machine, plan); err != nil {
+				if ok, err := p.drain(entry.Machine, clusterPlan, drainOptions); err != nil {
 					return err
+				} else if ok {
+					if err := p.store.UpdatePlan(entry.Machine, plan); err != nil {
+						return err
+					}
+				} else {
+					draining = append(draining, entry.Machine.Name)
 				}
 			}
 		} else if !entry.Plan.InSync {
 			outOfSync = append(outOfSync, entry.Machine.Name)
+		} else {
+			if ok, err := p.undrain(entry.Machine); err != nil {
+				return err
+			} else if !ok {
+				uncordoned = append(uncordoned, entry.Machine.Name)
+			}
 		}
 	}
 
@@ -370,6 +432,16 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 	outOfSync = atMostThree(outOfSync)
 	if len(outOfSync) > 0 {
 		return ErrWaiting("provisioning " + tierName + " node(s) " + strings.Join(outOfSync, ","))
+	}
+
+	draining = atMostThree(draining)
+	if len(draining) > 0 {
+		return ErrWaiting("draining " + tierName + " node(s) " + strings.Join(outOfSync, ","))
+	}
+
+	uncordoned = atMostThree(uncordoned)
+	if len(uncordoned) > 0 {
+		return ErrWaiting("uncordoning " + tierName + " node(s) " + strings.Join(outOfSync, ","))
 	}
 
 	nonReady = atMostThree(nonReady)
@@ -771,7 +843,7 @@ type planEntry struct {
 	Plan    *plan.Node
 }
 
-func collect(plan *plan.Plan, include func(*capi.Machine) bool) (result []planEntry, unavailable int) {
+func collect(plan *plan.Plan, include func(*capi.Machine) bool) (result []planEntry) {
 	for name, machine := range plan.Machines {
 		if !include(machine) {
 			continue
@@ -783,13 +855,10 @@ func collect(plan *plan.Plan, include func(*capi.Machine) bool) (result []planEn
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		if result[i].Plan != nil && !result[i].Plan.InSync {
-			unavailable++
-		}
 		return result[i].Machine.Name < result[j].Machine.Name
 	})
 
-	return result, unavailable
+	return result
 }
 
 func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane, fullPlan *plan.Plan) (*rkev1.RKEControlPlane, plan.Secret, error) {

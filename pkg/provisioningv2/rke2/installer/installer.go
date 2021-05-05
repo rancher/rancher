@@ -1,4 +1,4 @@
-package bootstrap
+package installer
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	defaultSystemAgentInstallScript = "https://raw.githubusercontent.com/rancher/system-agent/main/install.sh"
+	defaultSystemAgentInstallScript = "https://raw.githubusercontent.com/ibuildthecloud/system-agent/main/install.sh"
 	localAgentInstallScripts        = []string{
 		"/usr/share/rancher/ui/assets/system-agent-install.sh",
 		"./system-agent-install.sh",
@@ -34,7 +34,7 @@ func InstallScript(token string, envVars []corev1.EnvVar) ([]byte, error) {
 		ca = "CATTLE_CA_CHECKSUM=\"" + ca + "\""
 	}
 	if token != "" {
-		token = "CATTLE_TOKEN=\"" + token + "\""
+		token = "CATTLE_ROLE_NONE=true\nCATTLE_TOKEN=\"" + token + "\""
 	}
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {

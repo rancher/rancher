@@ -57,7 +57,7 @@ func (e *etcdRestore) startOrRestartRestore(controlPlane *rkev1.RKEControlPlane)
 }
 
 func (e *etcdRestore) etcdRestore(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
-	servers, _ := collect(clusterPlan, isEtcd)
+	servers := collect(clusterPlan, isEtcd)
 
 	for _, server := range servers {
 		if controlPlane.Spec.ETCDSnapshotRestore.S3 != nil ||
@@ -144,7 +144,7 @@ func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePl
 }
 
 func (e *etcdRestore) etcdShutdown(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
-	servers, _ := collect(clusterPlan, isEtcd)
+	servers := collect(clusterPlan, isEtcd)
 
 	stopPlan, err := e.stopPlan(controlPlane)
 	if err != nil {

@@ -49,14 +49,38 @@ type RKEClusterSpec struct {
 }
 
 type ClusterUpgradeStrategy struct {
-	// How many controlplane nodes should be upgrade at time, defaults to 1
-	ServerConcurrency int `json:"serverConcurrency,omitempty" norman:"min=1"`
+	// How many controlplane nodes should be upgrade at time, defaults to 1, 0 is infinite. Percentages are
+	// accepted too.
+	ControlPlaneConcurrency  string       `json:"controlPlaneConcurrency,omitempty"`
+	ControlPlaneDrainOptions DrainOptions `json:"controlPlaneDrainOptions,omitempty"`
+
 	// How many workers should be upgraded at a time
-	WorkerConcurrency int `json:"workerConcurrency,omitempty" norman:"min=1"`
-	// Whether controlplane nodes should be drained
-	DrainServerNodes bool `json:"drainServerNodes,omitempty"`
-	// Whether worker nodes should be drained
-	DrainWorkerNodes bool `json:"drainWorkerNodes,omitempty"`
+	WorkerConcurrency  string       `json:"workerConcurrency,omitempty"`
+	WorkerDrainOptions DrainOptions `json:"workerDrainOptions,omitempty"`
+}
+
+type DrainOptions struct {
+	// Enable will require nodes be drained before upgrade
+	Enabled bool `json:"enabled,omitempty"`
+	// Drain node even if there are pods not managed by a ReplicationController, Job, or DaemonSet
+	// Drain will not proceed without Force set to true if there are such pods
+	Force bool `json:"force,omitempty"`
+	// If there are DaemonSet-managed pods, drain will not proceed without IgnoreDaemonSets set to true
+	// (even when set to true, kubectl won't delete pods - so setting default to true)
+	IgnoreDaemonSets *bool `json:"ignoreDaemonSets,omitempty"`
+	// IgnoreErrors Ignore errors occurred between drain nodes in group
+	IgnoreErrors bool
+	// Continue even if there are pods using emptyDir
+	DeleteEmptyDirData bool `json:"deleteEmptyDirData,omitempty"`
+	// DisableEviction forces drain to use delete rather than evict
+	DisableEviction bool `json:"disableEviction,omitempty"`
+	//Period of time in seconds given to each pod to terminate gracefully.
+	// If negative, the default value specified in the pod will be used
+	GracePeriod int `json:"gracePeriod,omitempty"`
+	// Time to wait (in seconds) before giving up for one try
+	Timeout int `json:"timeout"`
+	// SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.
+	SkipWaitForDeleteTimeoutSeconds int `json:"skipWaitForDeleteTimeoutSeconds,omitempty"`
 }
 
 type Endpoint struct {
