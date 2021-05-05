@@ -13,6 +13,8 @@ cd $(dirname $0)/../package
 
 ../scripts/k3s-images.sh
 
+../scripts/create-components-file.sh
+
 cp ../bin/rancher.yaml ../bin/rancher-namespace.yaml ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 
 IMAGE=${REPO}/rancher:${TAG}

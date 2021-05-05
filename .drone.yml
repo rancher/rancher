@@ -194,6 +194,8 @@ steps:
     - "bin/rancher-*"
     - "bin/rancherd-*"
     prerelease: true
+    title: "Pre-release ${DRONE_TAG}"
+    note: ./bin/rancher-components.txt
   when:
     event:
     - tag
