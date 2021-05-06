@@ -69,5 +69,6 @@ func (h *handler) OnChange(obj *v1.RKECluster, status v1.RKEClusterStatus) (v1.R
 	}
 
 	status.Ready = condition.Cond("Provisioned").IsTrue(&status)
+	status.ObservedGeneration = obj.Generation
 	return status, nil
 }

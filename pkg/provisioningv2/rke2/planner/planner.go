@@ -502,7 +502,7 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 
 	if isControlPlane(machine) || isEtcd(machine) {
 		for k, v := range controlPlane.Spec.ControlPlaneConfig.Data {
-			if v == nil {
+			if v != nil {
 				config[k] = v
 			}
 		}
