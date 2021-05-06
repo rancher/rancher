@@ -435,8 +435,7 @@ def raw_remove_custom_resource(admin_mc, request):
                     version,
                     metadata["namespace"],
                     crd.spec.names.plural,
-                    metadata["name"],
-                    {})
+                    metadata["name"])
             except ApiException as e:
                 body = json.loads(e.body)
                 if body["code"] not in WAIT_HTTP_ERROR_CODES:
