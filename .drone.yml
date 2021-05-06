@@ -1458,6 +1458,11 @@ steps:
     target: releases.rancher.com/server-charts
     token:
       from_secret: google_auth_key
+  when:
+    event:
+    - promote
+    target:
+    - promote-stable
 
 - name: slack_notify
   image: plugins/slack
@@ -1468,8 +1473,9 @@ steps:
       from_secret: slack_webhook
   when:
     event:
-      exclude:
-        - pull_request
+    - promote
+    target:
+    - promote-stable
     instance:
       - drone-publish.rancher.io
     status:
@@ -1522,8 +1528,9 @@ steps:
       from_secret: slack_webhook
   when:
     event:
-      exclude:
-        - pull_request
+    - promote
+    target:
+    - promote-docker-image
     instance:
       - drone-publish.rancher.io
     status:
