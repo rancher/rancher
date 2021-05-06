@@ -36,7 +36,7 @@ func Run(ctx context.Context) error {
 		"token":         []byte("steve-cluster-" + token),
 	}
 
-	ca, err := ioutil.ReadFile("/etc/kubernetes/ssl/serverca")
+	ca, err := ioutil.ReadFile("/etc/kubernetes/ssl/certs/serverca")
 	if os.IsNotExist(err) {
 	} else if err != nil {
 		return err
