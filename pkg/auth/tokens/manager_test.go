@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
@@ -32,6 +33,8 @@ var (
 
 // TestTokenStreamTransformer validates that the function properly filters data in websocket
 func TestTokenStreamTransformer(t *testing.T) {
+	features.TokenHashing.Set(true)
+
 	assert := assert.New(t)
 
 	tokenManager := Manager{

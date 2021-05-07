@@ -83,12 +83,19 @@ var (
 		true,
 		false,
 		false)
+	TokenHashing = newFeature(
+		"token-hashing",
+		"Enable one way hashing of tokens. Once enabled token hashing can not be disabled",
+		false,
+		true,
+		true)
 )
 
 type Feature struct {
 	name        string
 	description string
-	// val is the effective value- it is equal to default until explicitly changed
+	// val is the effective value- it is equal to default until explicitly changed.
+	// The order of precedence is lockedValue > value > default
 	val bool
 	// default value of feature
 	def bool
@@ -154,8 +161,14 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 				newFeatureState.Status.Description = f.description
 			}
 
-			if newFeatureState, err = featuresClient.Update(newFeatureState); err != nil {
+			newFeatureState, err = featuresClient.Update(newFeatureState)
+			if err != nil {
 				logrus.Errorf("unable to update feature %s in initialize features: %v", f.name, err)
+				continue
+			}
+
+			if newFeatureState.Status.LockedValue != nil {
+				f.Set(*newFeatureState.Status.LockedValue)
 				continue
 			}
 
@@ -245,6 +258,9 @@ func GetFeatureByName(name string) *Feature {
 func IsEnabled(feature *v3.Feature) bool {
 	if feature == nil {
 		return false
+	}
+	if feature.Status.LockedValue != nil {
+		return *feature.Status.LockedValue
 	}
 	if feature.Spec.Value == nil {
 		return feature.Status.Default

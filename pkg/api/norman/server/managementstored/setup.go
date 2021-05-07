@@ -172,7 +172,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	User(ctx, schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	Setting(schemas)
-	Feature(schemas)
+	Feature(schemas, apiContext)
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas, apiContext)
 	Tokens(ctx, schemas, apiContext)
@@ -572,9 +572,10 @@ func Setting(schemas *types.Schemas) {
 	schema.Store = settingstore.New(schema.Store)
 }
 
-func Feature(schemas *types.Schemas) {
+func Feature(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.FeatureType)
-	schema.Validator = feature.Validator
+	validator := feature.Validator{FeatureLister: management.Management.Features("").Controller().Lister()}
+	schema.Validator = validator.Validator
 	schema.Formatter = feature.Formatter
 	schema.Store = featStore.New(schema.Store)
 }

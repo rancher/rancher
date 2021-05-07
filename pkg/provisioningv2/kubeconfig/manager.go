@@ -11,6 +11,7 @@ import (
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -173,7 +174,7 @@ func (m *Manager) createUserToken(userName string) (string, error) {
 		Token:        tokenValue,
 	}
 
-	if settings.TokenHashing.Get() == "true" {
+	if features.TokenHashing.Enabled() {
 		tokenHash, err := createSHA256Hash(tokenValue)
 		if err != nil {
 			return "", err
