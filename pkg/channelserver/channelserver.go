@@ -5,14 +5,22 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/rancher/channelserver/pkg/config"
+	"github.com/rancher/channelserver/pkg/model"
 	"github.com/rancher/channelserver/pkg/server"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/schemas"
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	configs     map[string]*config.Config
+	configsInit sync.Once
 )
 
 func GetURLAndInterval() (string, time.Duration) {
@@ -66,14 +74,43 @@ func (d *DynamicSource) URL() string {
 	return url
 }
 
-func NewHandler(ctx context.Context) http.Handler {
-	interval := &DynamicInterval{}
-	urls := []config.Source{
-		&DynamicSource{},
-		config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
+func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernetesVersion string) model.Release {
+	fallBack := model.Release{
+		AgentArgs:  map[string]schemas.Field{},
+		ServerArgs: map[string]schemas.Field{},
 	}
+	for _, releaseData := range GetReleaseConfigByRuntime(ctx, runtime).ReleasesConfig().Releases {
+		if releaseData.Version == kubernetesVersion {
+			return releaseData
+		}
+		for k, v := range releaseData.ServerArgs {
+			fallBack.ServerArgs[k] = v
+		}
+		for k, v := range releaseData.AgentArgs {
+			fallBack.AgentArgs[k] = v
+		}
+	}
+	return fallBack
+}
+
+func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Config {
+	configsInit.Do(func() {
+		interval := &DynamicInterval{}
+		urls := []config.Source{
+			&DynamicSource{},
+			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
+		}
+		configs = map[string]*config.Config{
+			"k3s":  config.NewConfig(ctx, "k3s", interval, getChannelServerArg(), urls),
+			"rke2": config.NewConfig(ctx, "rke2", interval, getChannelServerArg(), urls),
+		}
+	})
+	return configs[runtime]
+}
+
+func NewHandler(ctx context.Context) http.Handler {
 	return server.NewHandler(map[string]*config.Config{
-		"v1-k3s-release":  config.NewConfig(ctx, "k3s", interval, getChannelServerArg(), urls),
-		"v1-rke2-release": config.NewConfig(ctx, "rke2", interval, getChannelServerArg(), urls),
+		"v1-k3s-release":  GetReleaseConfigByRuntime(ctx, "k3s"),
+		"v1-rke2-release": GetReleaseConfigByRuntime(ctx, "rke2"),
 	})
 }
