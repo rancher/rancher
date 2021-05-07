@@ -19,7 +19,7 @@ func GetRuntimeServerUnit(kubernetesVersion string) string {
 }
 
 func GetRuntimeEnv(kubernetesVersion string) string {
-	return strings.ToUpper(GetRuntimeEnv(kubernetesVersion))
+	return strings.ToUpper(GetRuntime(kubernetesVersion))
 }
 
 func GetRuntime(kubernetesVersion string) string {
