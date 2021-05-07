@@ -491,23 +491,17 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		}
 		if sel.Matches(labels.Set(machine.Labels)) {
 			for k, v := range opts.Config.Data {
-				if v == nil {
-					continue
-				}
 				config[k] = v
 			}
 			break
 		}
 	}
 
-	if isControlPlane(machine) || isEtcd(machine) {
-		for k, v := range controlPlane.Spec.ControlPlaneConfig.Data {
-			if v != nil {
-				config[k] = v
-			}
-		}
+	for k, v := range controlPlane.Spec.ControlPlaneConfig.Data {
+		config[k] = v
 	}
 
+	filterConfigData(config, controlPlane, machine)
 	return nil
 }
 
