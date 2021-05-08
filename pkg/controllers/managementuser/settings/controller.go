@@ -13,7 +13,8 @@ import (
 
 var (
 	toCopy = map[string]bool{
-		settings.InstallUUID.Name: true,
+		settings.InstallUUID.Name:     true,
+		settings.IngressIPDomain.Name: true,
 	}
 )
 
