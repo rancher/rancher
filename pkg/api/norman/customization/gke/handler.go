@@ -76,42 +76,42 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	switch resourceType {
 	case "gkeMachineTypes":
 		if serialized, errCode, err = listMachineTypes(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting machine types: %v", err)
+			logrus.Errorf("[gke-handler] error getting machine types: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeNetworks":
 		if serialized, errCode, err = listNetworks(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting networks: %v", err)
+			logrus.Errorf("[gke-handler] error getting networks: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeServiceAccounts":
 		if serialized, errCode, err = listServiceAccounts(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting serviceaccounts: %v", err)
+			logrus.Errorf("[gke-handler] error getting serviceaccounts: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeSubnetworks":
 		if serialized, errCode, err = listSubnetworks(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting subnetworks: %v", err)
+			logrus.Errorf("[gke-handler] error getting subnetworks: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeVersions":
 		if serialized, errCode, err = listVersions(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting versions: %v", err)
+			logrus.Errorf("[gke-handler] error getting versions: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeZones":
 		if serialized, errCode, err = listZones(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting zones: %v", err)
+			logrus.Errorf("[gke-handler] error getting zones: %v", err)
 			handleErr(writer, errCode, err)
 			return
 
@@ -119,14 +119,14 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 		writer.Write(serialized)
 	case "gkeClusters":
 		if serialized, errCode, err = listClusters(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting clusters: %v", err)
+			logrus.Errorf("[gke-handler] error getting clusters: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeSharedSubnets":
 		if serialized, errCode, err = listSharedSubnets(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting shared subnets: %v", err)
+			logrus.Errorf("[gke-handler] error getting shared subnets: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
@@ -139,7 +139,7 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credID string) (int, error) {
 	ns, name := ref.Parse(credID)
 	if ns == "" || name == "" {
-		logrus.Debugf("[GKE] invalid cloud credential ID %s", credID)
+		logrus.Errorf("[GKE] invalid cloud credential ID %s", credID)
 		return http.StatusBadRequest, fmt.Errorf("invalid cloud credential ID %s", credID)
 	}
 
@@ -166,14 +166,14 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 
 	cc, err := h.secretsLister.Get(ns, name)
 	if err != nil {
-		logrus.Debugf("[GKE] error accessing cloud credential %s", credID)
+		logrus.Errorf("[GKE] error accessing cloud credential %s", credID)
 		return httperror.InvalidBodyContent.Status, fmt.Errorf("error accessing cloud credential %s", credID)
 	}
 	cap.Credentials = string(cc.Data["googlecredentialConfig-authEncodedJson"])
 
 	cap.ProjectID = req.URL.Query().Get("projectId")
 	if cap.ProjectID == "" {
-		logrus.Debugf("[GKE] error getting projectId")
+		logrus.Errorf("[GKE] error getting projectId")
 		return http.StatusBadRequest, fmt.Errorf("error getting projectId")
 	}
 
