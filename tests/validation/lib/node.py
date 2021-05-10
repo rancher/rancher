@@ -91,6 +91,8 @@ class Node(object):
                     self.public_ip_address, username=self.ssh_user,
                     key_filename=self.ssh_key_path, port=int(self.ssh_port))
 
+            transport = self._ssh_client.get_transport()
+            transport.set_keepalive(30)
             result = self._ssh_client.exec_command(command)
             if result and len(result) == 3 and result[1].readable():
                 result = [str(result[1].read(), 'utf-8'),

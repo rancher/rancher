@@ -205,6 +205,10 @@ def test_deploy_private_registry_without_image_push():
     assert load_res is None
 
 
+def test_deploy_windows_images_server():
+    add_windows_images_server()
+
+
 def setup_rancher_server():
     base_url = "https://" + RANCHER_AG_HOSTNAME
     wait_for_status_code(url=base_url + "/v3", expected_code=401)
@@ -761,6 +765,107 @@ def setup_ssh_key(bastion_node):
     local_set_key_permissions_command = "chmod 400 {}/{}.pem".format(
         SSH_KEY_DIR, bastion_node.ssh_key_name)
     run_command(local_set_key_permissions_command, log_out=False)
+
+
+def check_windows_command_output(win_node, command, output=None, error=None):
+    result = win_node.execute_command(command)
+    if output is not None:
+        print(command)
+        error_msg = 'The expected output of the Windows command was {0} ' \
+                    'but received {1}'.format(output, result[0])
+        assert (output in result[0]) is True, error_msg
+    if error is not None:
+        print(command)
+        error_msg = 'The expected error of the Windows command was {0} ' \
+                    'but received {1}'.format(error, result[1])
+        assert (error in result[1]) is True, error_msg
+    return result
+
+
+def add_windows_images_server():
+    docker_config = '{ "debug" : true, "experimental" : true, "allow-nondistributable-artifacts": ' \
+                    '["<registry_host>"], "insecure-registries": ["<registry_host>"]}'
+    bastion_node = get_bastion_node(BASTION_ID)
+    docker_config = docker_config.replace('<registry_host>',
+                                          bastion_node.host_name)
+    node_name = AG_HOST_NAME + "-agwin"
+    aws = AmazonWebServices()
+    win_node = aws.create_node(node_name, ssh_user='Administrator')
+    aws.wait_for_node_state(node=win_node)
+    time.sleep(60 * 6)
+    win_node.ssh_password = aws.decrypt_windows_password(win_node.provider_node_id)
+    win_path = "C:\\ProgramData\\docker\\config\\daemon.json"
+    win_command = "echo {0} > {1}".format(docker_config, win_path)
+    check_windows_command_output(win_node, win_command, error='')
+    win_command = 'powershell -command "restart-service docker"'
+    check_windows_command_output(win_node, win_command, error='')
+    win_sac_version_cmd = 'powershell -command "Get-ItemProperty'\
+                          ' \'HKLM:\\SOFTWARE\\Microsoft\\Windows '\
+                          'NT\\CurrentVersion\\\' | '\
+                          'Select-Object -ExpandProperty ReleaseId"'
+    out = check_windows_command_output(win_node, win_sac_version_cmd, error='')
+    print(out)
+    win_sac_version = out[0]
+    win_sac_version = "".join(filter(str.isalnum, win_sac_version))
+
+    print('==== DOWNLOAD RELEASE SCRIPTS ====')
+
+    win_command = 'powershell -NonInteractive -command '\
+                  '"$ProgressPreference=\'SilentlyContinue\'; '\
+                  'Invoke-WebRequest '\
+                  '\'https://github.com/rancher/rancher/releases/'\
+                  'download/{0}/rancher-windows-images.txt\' '\
+                  '-OutFile \'.\\rancher-windows-images.txt\''\
+                  .format(RANCHER_SERVER_VERSION)
+    check_windows_command_output(win_node, win_command, output='', error='')
+
+    win_command = 'powershell -NonInteractive -command '\
+                  '"$ProgressPreference=\'SilentlyContinue\'; '\
+                  'Invoke-WebRequest '\
+                  '\'https://github.com/rancher/rancher/releases/'\
+                  'download/{0}/rancher-save-images.ps1\' '\
+                  '-OutFile \'.\\rancher-save-images.ps1\''\
+                  .format(RANCHER_SERVER_VERSION)
+    check_windows_command_output(win_node, win_command, output='', error='')
+
+    win_command = 'powershell -NonInteractive -command '\
+                  '"$ProgressPreference=\'SilentlyContinue\'; '\
+                  'Invoke-WebRequest ' \
+                  '\'https://github.com/rancher/rancher/releases/'\
+                  'download/{0}/rancher-load-images.ps1\' '\
+                  '-OutFile \'.\\rancher-load-images.ps1\''\
+                  .format(RANCHER_SERVER_VERSION)
+    check_windows_command_output(win_node, win_command, output='', error='')
+
+    print('==== SAVE IMAGES ====')
+    win_command = 'powershell -NonInteractive -File .\\rancher-save-images.ps1'
+    check_windows_command_output(win_node, win_command, error='')
+
+    print('==== DOCKER LOGIN ====')
+    win_command = 'docker login -u {0} -p {1} {2}'\
+                  .format(PRIVATE_REGISTRY_USERNAME,
+                          PRIVATE_REGISTRY_PASSWORD,
+                          bastion_node.host_name)
+    check_windows_command_output(win_node, win_command, output='Succeeded')
+
+    print('==== LOAD IMAGES ====')
+    win_command = 'powershell -NonInteractive -File ' \
+                  '.\\rancher-load-images.ps1 --registry {0}'\
+                  .format(bastion_node.host_name)
+    check_windows_command_output(win_node, win_command, error='')
+
+    print('==== RETAG IMAGES ON REGISTRY ====')
+    linux_command = 'wget -O rancher-windows-images.txt ' \
+                    'https://github.com/rancher/rancher/releases/' \
+                    'download/{0}/rancher-windows-images.txt'\
+                    .format(RANCHER_SERVER_VERSION)
+    bastion_node.execute_command(linux_command)
+
+    linux_command = './rancher-load-images.sh --image-list ./rancher-images.txt  '\
+                    '--windows-image-list ./rancher-windows-images.txt '\
+                    '--registry {0} --windows-versions "{1}"'\
+                    .format(bastion_node.host_name, win_sac_version)
+    bastion_node.execute_command(linux_command)
 
 
 @pytest.fixture()
