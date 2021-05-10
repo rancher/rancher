@@ -422,7 +422,9 @@ func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 
 	ctx := context.Background()
 	ts, err := controller.GetTokenSource(ctx, e.SecretsCache, cluster.Spec.GKEConfig)
-
+	if err != nil {
+		return "", false, err
+	}
 	netDialer := net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
