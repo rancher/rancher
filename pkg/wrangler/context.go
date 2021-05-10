@@ -166,7 +166,7 @@ func (w *Context) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := w.ControllerFactory.Start(ctx, 5); err != nil {
+	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
 		return err
 	}
 	w.leadership.Start(ctx)
