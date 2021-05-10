@@ -61,12 +61,12 @@ func toRegistryConfig(secrets v1.SecretCache, runtime, namespace string, registr
 				registryConfig.TLS.KeyFile = file.Path
 				files = append(files, file)
 			}
+		}
 
-			if ca := secret.Data["ca.crt"]; len(ca) != 0 {
-				file := toFile(runtime, fmt.Sprintf("tls/registries/%s/ca.crt", registryName), ca)
-				registryConfig.TLS.CAFile = file.Path
-				files = append(files, file)
-			}
+		if len(config.CABundle) > 0 {
+			file := toFile(runtime, fmt.Sprintf("tls/registries/%s/ca.crt", registryName), config.CABundle)
+			registryConfig.TLS.CAFile = file.Path
+			files = append(files, file)
 		}
 
 		if config.AuthConfigSecretName != "" {
@@ -88,7 +88,10 @@ func toRegistryConfig(secrets v1.SecretCache, runtime, namespace string, registr
 		configs[registryName] = registryConfig
 	}
 
-	data, err := json.Marshal(configs)
+	data, err := json.Marshal(map[string]interface{}{
+		"mirrors": registry.Mirrors,
+		"configs": configs,
+	})
 	if err != nil {
 		return nil, nil, err
 	}

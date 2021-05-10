@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -34,13 +35,14 @@ const (
 )
 
 type Manager struct {
-	deploymentCache appcontroller.DeploymentCache
-	daemonsetCache  appcontroller.DaemonSetCache
-	tokens          mgmtcontrollers.TokenClient
-	userCache       mgmtcontrollers.UserCache
-	users           mgmtcontrollers.UserClient
-	secretCache     corecontrollers.SecretCache
-	secrets         corecontrollers.SecretClient
+	deploymentCache  appcontroller.DeploymentCache
+	daemonsetCache   appcontroller.DaemonSetCache
+	tokens           mgmtcontrollers.TokenClient
+	userCache        mgmtcontrollers.UserCache
+	users            mgmtcontrollers.UserClient
+	secretCache      corecontrollers.SecretCache
+	secrets          corecontrollers.SecretClient
+	kubeConfigLocker locker.Locker
 }
 
 func New(clients *wrangler.Context) *Manager {
@@ -59,7 +61,7 @@ func getKubeConfigSecretName(clusterName string) string {
 	return clusterName + "-kubeconfig"
 }
 
-func (m *Manager) GetToken(clusterNamespace, clusterName string) (string, error) {
+func (m *Manager) getToken(clusterNamespace, clusterName string) (string, error) {
 	kubeConfigSecretName := getKubeConfigSecretName(clusterName)
 	if token, err := m.getSavedToken(clusterNamespace, kubeConfigSecretName); err != nil || token != "" {
 		return token, err
@@ -214,17 +216,22 @@ func (m *Manager) GetCTRBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) 
 	}, nil
 }
 
-func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*corev1.Secret, error) {
-	var (
-		name       = getKubeConfigSecretName(cluster.Name)
-		tokenValue string
-	)
-
-	if cluster.Spec.ClusterAPIConfig != nil {
-		name = getKubeConfigSecretName(cluster.Spec.ClusterAPIConfig.ClusterName)
+func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, managementClusterName string) (map[string][]byte, error) {
+	secret, err := m.secretCache.Get(clusterNamespace, secretName)
+	if err == nil {
+		return secret.Data, nil
 	}
 
-	tokenValue, err := m.GetToken(cluster.Namespace, cluster.Name)
+	lockID := clusterNamespace + "/" + clusterName
+	m.kubeConfigLocker.Lock(lockID)
+	defer m.kubeConfigLocker.Unlock(lockID)
+
+	secret, err = m.secrets.Get(clusterNamespace, secretName, metav1.GetOptions{})
+	if err == nil {
+		return secret.Data, nil
+	}
+
+	tokenValue, err := m.getToken(clusterNamespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +241,7 @@ func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*
 	data, err := clientcmd.Write(clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"cluster": {
-				Server:                   fmt.Sprintf("%s/k8s/clusters/%s", serverURL, status.ClusterName),
+				Server:                   fmt.Sprintf("%s/k8s/clusters/%s", serverURL, managementClusterName),
 				CertificateAuthorityData: []byte(strings.TrimSpace(cacert)),
 			},
 		},
@@ -255,14 +262,42 @@ func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*
 		return nil, err
 	}
 
-	return &corev1.Secret{
+	secret, err = m.secrets.Create(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      name,
+			Namespace: clusterNamespace,
+			Name:      secretName,
 		},
 		Data: map[string][]byte{
 			"value": data,
 			"token": []byte(tokenValue),
 		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return secret.Data, nil
+}
+
+func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*corev1.Secret, error) {
+	var (
+		name = getKubeConfigSecretName(cluster.Name)
+	)
+
+	if cluster.Spec.ClusterAPIConfig != nil {
+		name = getKubeConfigSecretName(cluster.Spec.ClusterAPIConfig.ClusterName)
+	}
+
+	data, err := m.getKubeConfigData(cluster.Namespace, cluster.Name, name, status.ClusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      name,
+		},
+		Data: data,
 	}, nil
 }

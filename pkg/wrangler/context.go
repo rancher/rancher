@@ -125,6 +125,8 @@ type Context struct {
 	CatalogContentManager *content.Manager
 	HelmOperations        *helmop.Operations
 	SystemChartsManager   *system.Manager
+
+	started bool
 }
 
 type MultiClusterManager interface {
@@ -162,8 +164,12 @@ func (w *Context) Start(ctx context.Context) error {
 	w.controllerLock.Lock()
 	defer w.controllerLock.Unlock()
 
-	if err := w.Dynamic.Register(ctx, w.SharedControllerFactory); err != nil {
-		return err
+	if !w.started {
+		if err := w.Dynamic.Register(ctx, w.SharedControllerFactory); err != nil {
+			return err
+		}
+		w.SystemChartsManager.Start(ctx)
+		w.started = true
 	}
 
 	if err := w.ControllerFactory.Start(ctx, 5); err != nil {

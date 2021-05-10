@@ -37,6 +37,7 @@ type handler struct {
 	pods            corecontrollers.PodCache
 	secrets         corecontrollers.SecretCache
 	machines        capicontrollers.MachineCache
+	namespaces      corecontrollers.NamespaceCache
 	nodeDriverCache mgmtcontrollers.NodeDriverCache
 	dynamic         *dynamic.Controller
 }
@@ -56,6 +57,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secrets:         clients.Core.Secret().Cache(),
 		machines:        clients.CAPI.Machine().Cache(),
 		nodeDriverCache: clients.Mgmt.NodeDriver().Cache(),
+		namespaces:      clients.Core.Namespace().Cache(),
 		dynamic:         clients.Dynamic,
 	}
 
@@ -183,8 +185,40 @@ func getMachineStatusFromPod(pod *corev1.Pod) rkev1.RKEMachineStatus {
 	return rkev1.RKEMachineStatus{}
 }
 
+func (h *handler) namespaceIsRemoved(obj runtime.Object) (bool, error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return false, err
+	}
+
+	ns, err := h.namespaces.Get(meta.GetNamespace())
+	if err != nil {
+		return false, err
+	}
+
+	return ns.DeletionTimestamp != nil, nil
+}
+
 func (h *handler) OnRemove(_ string, obj runtime.Object) (runtime.Object, error) {
-	obj, err := h.run(obj, false)
+	if removed, err := h.namespaceIsRemoved(obj); err != nil || removed {
+		return obj, err
+	}
+
+	metaObj, err := meta.Accessor(obj)
+	if err != nil {
+		return obj, err
+	}
+
+	ref := metav1.GetControllerOf(metaObj)
+	if ref != nil && ref.Kind == "Machine" {
+		_, err = h.machines.Get(metaObj.GetNamespace(), ref.Name)
+		if apierror.IsNotFound(err) {
+			// Controlling machine has been deleted (normally a finalizer blocks this)
+			return obj, nil
+		}
+	}
+
+	obj, err = h.run(obj, false)
 	if err != nil {
 		return nil, err
 	}

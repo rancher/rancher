@@ -1,11 +1,17 @@
 package planstatus
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"strings"
 
+	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
@@ -22,20 +28,91 @@ const (
 )
 
 type handler struct {
-	secrets        corecontrollers.SecretClient
-	machines       capicontrollers.MachineClient
-	machineCache   capicontrollers.MachineCache
-	bootstrapCache rkecontroller.RKEBootstrapCache
+	secrets              corecontrollers.SecretClient
+	machines             capicontrollers.MachineClient
+	machineCache         capicontrollers.MachineCache
+	bootstrapCache       rkecontroller.RKEBootstrapCache
+	capiClusterCache     capicontrollers.ClusterCache
+	rkeControlPlaneCache rkecontroller.RKEControlPlaneCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := handler{
-		secrets:        clients.Core.Secret(),
-		machines:       clients.CAPI.Machine(),
-		machineCache:   clients.CAPI.Machine().Cache(),
-		bootstrapCache: clients.RKE.RKEBootstrap().Cache(),
+		secrets:              clients.Core.Secret(),
+		machines:             clients.CAPI.Machine(),
+		machineCache:         clients.CAPI.Machine().Cache(),
+		bootstrapCache:       clients.RKE.RKEBootstrap().Cache(),
+		capiClusterCache:     clients.CAPI.Cluster().Cache(),
+		rkeControlPlaneCache: clients.RKE.RKEControlPlane().Cache(),
 	}
 	clients.Core.Secret().OnChange(ctx, "plan-status", h.OnChange)
+}
+
+func (h *handler) setJoinURLFromOutput(machine *capi.Machine, nodePlan *plan.Node) error {
+	if !planner.IsEtcdOnlyInitNode(machine) || machine.Annotations[planner.JoinURLAnnotation] != "" {
+		return nil
+	}
+
+	address, ok := nodePlan.Output["capture-address"]
+	if !ok {
+		return nil
+	}
+
+	var str string
+	scanner := bufio.NewScanner(bytes.NewBuffer(address))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "{") {
+			str = line
+			break
+		}
+	}
+
+	if str == "" {
+		return nil
+	}
+
+	dbInfo := &dbinfo{}
+	if err := json.Unmarshal([]byte(str), dbInfo); err != nil {
+		return err
+	}
+
+	if len(dbInfo.Members) == 0 {
+		return nil
+	}
+
+	if len(dbInfo.Members[0].ClientURLs) == 0 {
+		return nil
+	}
+
+	u, err := url.Parse(dbInfo.Members[0].ClientURLs[0])
+	if err != nil {
+		return err
+	}
+
+	cluster, err := h.capiClusterCache.Get(machine.Namespace, machine.Spec.ClusterName)
+	if err != nil {
+		return err
+	}
+
+	if cluster.Spec.ControlPlaneRef == nil {
+		return nil
+	}
+
+	rkeControlPlane, err := h.rkeControlPlaneCache.Get(machine.Namespace, cluster.Spec.ControlPlaneRef.Name)
+	if err != nil {
+		return err
+	}
+
+	joinURL := fmt.Sprintf("https://%s:%d", u.Hostname(),
+		planner.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion))
+	machine = machine.DeepCopy()
+	if machine.Annotations == nil {
+		machine.Annotations = map[string]string{}
+	}
+	machine.Annotations[planner.JoinURLAnnotation] = joinURL
+	_, err = h.machines.Update(machine)
+	return err
 }
 
 func (h *handler) updateMachineProvisionStatus(secret *corev1.Secret) error {
@@ -67,6 +144,22 @@ func (h *handler) updateMachineProvisionStatus(secret *corev1.Secret) error {
 	plan, err := planner.SecretToNode(secret)
 	if err != nil {
 		return err
+	}
+
+	if err := h.setJoinURLFromOutput(machine, plan); err != nil {
+		return err
+	}
+
+	if planner.IsEtcdOnlyInitNode(machine) && machine.Annotations[planner.JoinURLAnnotation] == "" {
+		address, ok := plan.Output["capture-address"]
+		if ok {
+			str := string(address)
+			i := strings.Index(str, "{")
+			if i >= 0 {
+
+			}
+
+		}
 	}
 
 	status, reason, message := planner.GetPlanStatusReasonMessage(plan)
@@ -140,4 +233,11 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 func hash(plan []byte) string {
 	result := sha256.Sum256(plan)
 	return hex.EncodeToString(result[:])
+}
+
+type dbinfo struct {
+	Members []member `json:"members,omitempty"`
+}
+type member struct {
+	ClientURLs []string `json:"clientURLs,omitempty"`
 }

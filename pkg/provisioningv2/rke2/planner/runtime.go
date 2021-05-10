@@ -1,6 +1,8 @@
 package planner
 
-import "strings"
+import (
+	"strings"
+)
 
 var (
 	RuntimeK3S  = "k3s"
@@ -27,4 +29,11 @@ func GetRuntime(kubernetesVersion string) string {
 		return RuntimeK3S
 	}
 	return RuntimeRKE2
+}
+
+func GetRuntimeSupervisorPort(kubernetesVersion string) int {
+	if GetRuntime(kubernetesVersion) == RuntimeRKE2 {
+		return 9345
+	}
+	return 6443
 }

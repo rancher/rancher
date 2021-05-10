@@ -137,7 +137,7 @@ func (h *handler) updateMachineJoinURL(node *corev1.Node, machine *capi.Machine,
 		}
 	}
 
-	url := fmt.Sprintf("https://%s:%d", address, getJoinURLPort(rancherCluster))
+	url := fmt.Sprintf("https://%s:%d", address, planner.GetRuntimeSupervisorPort(rancherCluster.Spec.KubernetesVersion))
 	if machine.Annotations[planner.JoinURLAnnotation] == url {
 		return nil
 	}
@@ -184,11 +184,4 @@ func (h *handler) updateMachine(node *corev1.Node, machine *capi.Machine, ranche
 	}
 
 	return nil
-}
-
-func getJoinURLPort(cluster *v1.Cluster) int {
-	if planner.GetRuntime(cluster.Spec.KubernetesVersion) == planner.RuntimeRKE2 {
-		return 9345
-	}
-	return 6443
 }
