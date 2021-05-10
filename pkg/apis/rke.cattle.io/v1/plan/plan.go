@@ -11,9 +11,10 @@ type Plan struct {
 }
 
 type Node struct {
-	Plan        NodePlan  `json:"plan,omitempty"`
-	AppliedPlan *NodePlan `json:"appliedPlan,omitempty"`
-	InSync      bool      `json:"inSync,omitempty"`
+	Plan        NodePlan          `json:"plan,omitempty"`
+	AppliedPlan *NodePlan         `json:"appliedPlan,omitempty"`
+	Output      map[string][]byte `json:"-"`
+	InSync      bool              `json:"inSync,omitempty"`
 }
 
 type Secret struct {
@@ -22,11 +23,12 @@ type Secret struct {
 }
 
 type Instruction struct {
-	Name    string   `json:"name,omitempty"`
-	Image   string   `json:"image,omitempty"`
-	Env     []string `json:"env,omitempty"`
-	Args    []string `json:"args,omitempty"`
-	Command string   `json:"command,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	Image      string   `json:"image,omitempty"`
+	Env        []string `json:"env,omitempty"`
+	Args       []string `json:"args,omitempty"`
+	Command    string   `json:"command,omitempty"`
+	SaveOutput bool     `json:"saveOutput,omitempty"`
 }
 
 type File struct {
