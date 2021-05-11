@@ -128,7 +128,7 @@ func (w *Context) Start(ctx context.Context) error {
 	w.controllerLock.Lock()
 	defer w.controllerLock.Unlock()
 
-	if err := w.ControllerFactory.Start(ctx, 5); err != nil {
+	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
 		return err
 	}
 	w.leadership.Start(ctx)
