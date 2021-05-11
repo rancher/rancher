@@ -16,10 +16,10 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -417,7 +417,10 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 		return err
 	}
 
-	drun := clusterregistrationtokens.NodeCommand(token, cluster)
+	drun, err := clusterregistrationtoken.NodeCommand(token, cluster)
+	if err != nil {
+		return err
+	}
 	args := buildAgentCommand(obj, drun)
 	cmd, err := buildCommand(nodeDir, obj, args)
 	if err != nil {
@@ -443,7 +446,7 @@ func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster 
 
 	logrus.Infof("[node-controller-rancher-machine] private registry detected, authenticating %s to %s", node.Spec.RequestedHostname, reg.URL)
 
-	login := clusterregistrationtokens.LoginCommand(*reg)
+	login := clusterregistrationtoken.LoginCommand(*reg)
 	args := buildLoginCommand(node, login)
 	cmd, err := buildCommand(nodeDir, node, args)
 	if err != nil {

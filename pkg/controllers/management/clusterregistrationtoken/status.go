@@ -1,18 +1,17 @@
-package clusterregistrationtokens
+package clusterregistrationtoken
 
 import (
 	"fmt"
 	"net/url"
 	"strings"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
-	"github.com/rancher/rancher/pkg/types/config"
 	rketypes "github.com/rancher/rke/types"
 )
 
@@ -26,86 +25,87 @@ const (
 	windowsNodeCommandFormat      = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
 
-type Formatter struct {
-	Clusters v3.ClusterLister
-}
-
-func NewFormatter(managementContext *config.ScaledContext) *Formatter {
-	clusterFormatter := Formatter{
-		Clusters: managementContext.Management.Clusters("").Controller().Lister(),
-	}
-	return &clusterFormatter
-}
-
-func (f *Formatter) isRKE2(clusterID string) bool {
-	cluster, err := f.Clusters.Get("", clusterID)
+func (h *handler) isRKE2(clusterID string) bool {
+	cluster, err := h.clusters.Get("", clusterID)
 	if err != nil {
 		return false
 	}
 	return cluster.Annotations["objectset.rio.cattle.io/owner-gvk"] == "provisioning.cattle.io/v1, Kind=Cluster"
 }
 
-func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawResource) {
+func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRegistrationTokenStatus, error) {
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
 		ca = " --ca-checksum " + ca
 	}
 
-	token, _ := resource.Values["token"].(string)
-	clusterID := convert.ToString(resource.Values["clusterId"])
-	if token != "" {
-		url := getURL(request, token, clusterID)
-		resource.Values["insecureCommand"] = fmt.Sprintf(insecureCommandFormat, url)
-		resource.Values["command"] = fmt.Sprintf(commandFormat, url)
-		resource.Values["token"] = token
-		resource.Values["manifestUrl"] = url
-		rootURL := getRootURL(request)
+	token := crt.Status.Token
+	clusterID := convert.ToString(crt.Spec.ClusterName)
+	if token == "" {
+		return crt.Status, nil
+	}
 
-		cluster, _ := f.Clusters.Get("", clusterID)
-		if cluster == nil {
-			// We used to use a client, not lister which would always return non-nil even on error
-			// this is to keep that behavior with listers.
-			cluster = &v3.Cluster{}
-		}
+	crtStatus := crt.Status.DeepCopy()
 
-		agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-		if f.isRKE2(clusterID) {
-			// for linux
-			resource.Values["nodeCommand"] = fmt.Sprintf(rke2NodeCommandFormat,
-				rootURL+"/system-agent-install.sh",
-				AgentEnvVars(cluster),
-				rootURL,
-				token,
-				ca)
-			resource.Values["insecureNodeCommand"] = fmt.Sprintf(rke2InsecureNodeCommandFormat,
-				rootURL+"/system-agent-install.sh",
-				AgentEnvVars(cluster),
-				rootURL,
-				token,
-				ca)
-		} else {
-			// for linux
-			resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
-				AgentEnvVars(cluster),
-				agentImage,
-				rootURL,
-				token,
-				ca)
-		}
-		// for windows
-		var agentImageDockerEnv string
-		if util.GetPrivateRepoURL(cluster) != "" {
-			// patch the AGENT_IMAGE env
-			agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
-		}
-		resource.Values["windowsNodeCommand"] = fmt.Sprintf(windowsNodeCommandFormat,
-			agentImageDockerEnv,
+	url, err := getURL(token, clusterID)
+	if err != nil {
+		return crt.Status, err
+	}
+
+	crtStatus.InsecureCommand = fmt.Sprintf(insecureCommandFormat, url)
+	crtStatus.Command = fmt.Sprintf(commandFormat, url)
+	crtStatus.Token = token
+	crtStatus.ManifestURL = url
+
+	rootURL, err := getRootURL()
+	if err != nil {
+		return crt.Status, err
+	}
+
+	cluster, err := h.clusters.Get("", clusterID)
+	if err != nil {
+		return crt.Status, err
+	}
+
+	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
+	if h.isRKE2(clusterID) {
+		// for linux
+		crtStatus.NodeCommand = fmt.Sprintf(rke2NodeCommandFormat,
+			rootURL+"/system-agent-install.sh",
+			AgentEnvVars(cluster),
+			rootURL,
+			token,
+			ca)
+		crtStatus.InsecureNodeCommand = fmt.Sprintf(rke2InsecureNodeCommandFormat,
+			rootURL+"/system-agent-install.sh",
+			AgentEnvVars(cluster),
+			rootURL,
+			token,
+			ca)
+	} else {
+		// for linux
+		crtStatus.NodeCommand = fmt.Sprintf(nodeCommandFormat,
+			AgentEnvVars(cluster),
 			agentImage,
 			rootURL,
 			token,
-			ca,
-			getWindowsPrefixPathArg(cluster.Spec.RancherKubernetesEngineConfig))
+			ca)
 	}
+	// for windows
+	var agentImageDockerEnv string
+	if util.GetPrivateRepoURL(cluster) != "" {
+		// patch the AGENT_IMAGE env
+		agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
+	}
+	crtStatus.WindowsNodeCommand = fmt.Sprintf(windowsNodeCommandFormat,
+		agentImageDockerEnv,
+		agentImage,
+		rootURL,
+		token,
+		ca,
+		getWindowsPrefixPathArg(cluster.Spec.RancherKubernetesEngineConfig))
+
+	return *crtStatus, nil
 }
 
 func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) string {
@@ -151,18 +151,22 @@ func AgentEnvVars(cluster *v3.Cluster) string {
 	return strings.Join(agentEnvVars, " ")
 }
 
-func NodeCommand(token string, cluster *v3.Cluster) string {
+func NodeCommand(token string, cluster *v3.Cluster) (string, error) {
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
 		ca = " --ca-checksum " + ca
 	}
 
+	rootURL, err := getRootURL()
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf(nodeCommandFormat,
 		AgentEnvVars(cluster),
 		image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
-		getRootURL(nil),
+		rootURL,
 		token,
-		ca)
+		ca), nil
 }
 
 func LoginCommand(reg rketypes.PrivateRegistry) string {
@@ -189,41 +193,29 @@ func escapeSpecialChars(s string) string {
 	return string(escaped)
 }
 
-func getRootURL(request *types.APIContext) string {
+func getRootURL() (string, error) {
 	serverURL := settings.ServerURL.Get()
-	if serverURL == "" {
-		if request != nil {
-			serverURL = request.URLBuilder.RelativeToRoot("")
-		}
-	} else {
-		u, err := url.Parse(serverURL)
-		if err != nil {
-			if request != nil {
-				serverURL = request.URLBuilder.RelativeToRoot("")
-			}
-		} else {
-			u.Path = ""
-			serverURL = u.String()
-		}
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		return "", err
 	}
 
-	return serverURL
+	u.Path = ""
+	return u.String(), nil
 }
 
-func getURL(request *types.APIContext, token, clusterID string) string {
+func getURL(token, clusterID string) (string, error) {
 	path := "/v3/import/" + token + "_" + clusterID + ".yaml"
 	serverURL := settings.ServerURL.Get()
 	if serverURL == "" {
-		serverURL = request.URLBuilder.RelativeToRoot(path)
-	} else {
-		u, err := url.Parse(serverURL)
-		if err != nil {
-			serverURL = request.URLBuilder.RelativeToRoot(path)
-		} else {
-			u.Path = path
-			serverURL = u.String()
-		}
+		return "", fmt.Errorf("server-url setting is not set")
+	}
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		return "", err
 	}
 
-	return serverURL
+	u.Path = path
+	serverURL = u.String()
+	return serverURL, nil
 }

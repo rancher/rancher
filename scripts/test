@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-CWD=$(pwd -P)
 cleanup()
 {
     EXIT=$?
@@ -9,17 +8,13 @@ cleanup()
     echo Stopping rancher server
     kill $PID
     wait $PID
-    echo Cleanup DIND
-    TESTS="$CWD/$(dirname $0)/../tests"
-    for dindYML in $(find $TESTS -iname 'dind-*.yml'); do
-        rke remove --dind --force --config $dindYML
-        rm -f $dindYML
-    done
     return $EXIT
 }
 
+cd $(dirname $0)/..
+
 #[ "${ARCH}" == "amd64" ] && RACE=-race
-go test -cover -tags=test .././...
+go test -cover -tags=test ./pkg/...
 
 if [ ${ARCH} == arm64 ]; then
     export ETCD_UNSUPPORTED_ARCH=arm64
@@ -27,7 +22,7 @@ fi
 
 echo Starting rancher server
 touch /tmp/rancher.log
-$(dirname $0)/run >/tmp/rancher.log 2>&1 &
+./scripts/run >/tmp/rancher.log 2>&1 &
 PID=$!
 trap cleanup exit
 
@@ -42,6 +37,16 @@ done
 
 echo Running tests
 
-cd $(dirname $0)/../tests/integration
+#KUBECONFIG=/etc/rancher/k3s/k3s.yaml go test -parallel 4 ./tests/integration/pkg/tests/... >/tmp/rancher-test.log 2>&1 &
+#TESTPID=$!
+
+cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel
+
+#tail -f /tmp/rancher-test.log &
+#echo Waiting on go tests
+#wait -n $TESTPID || {
+    #cat /tmp/rancher-test.log
+    #exit 1
+#}

@@ -251,12 +251,13 @@ func (c *ClusterRegistrationTokenSpec) ObjClusterName() string {
 }
 
 type ClusterRegistrationTokenStatus struct {
-	InsecureCommand    string `json:"insecureCommand"`
-	Command            string `json:"command"`
-	WindowsNodeCommand string `json:"windowsNodeCommand"`
-	NodeCommand        string `json:"nodeCommand"`
-	ManifestURL        string `json:"manifestUrl"`
-	Token              string `json:"token"`
+	InsecureCommand     string `json:"insecureCommand"`
+	Command             string `json:"command"`
+	WindowsNodeCommand  string `json:"windowsNodeCommand"`
+	NodeCommand         string `json:"nodeCommand"`
+	InsecureNodeCommand string `json:"insecureNodeCommand"`
+	ManifestURL         string `json:"manifestUrl"`
+	Token               string `json:"token"`
 }
 
 type GenerateKubeConfigOutput struct {
