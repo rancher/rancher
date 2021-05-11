@@ -72,20 +72,20 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 		// for linux
 		crtStatus.NodeCommand = fmt.Sprintf(rke2NodeCommandFormat,
 			rootURL+"/system-agent-install.sh",
-			AgentEnvVars(cluster),
+			AgentEnvVars(cluster, false),
 			rootURL,
 			token,
 			ca)
 		crtStatus.InsecureNodeCommand = fmt.Sprintf(rke2InsecureNodeCommandFormat,
 			rootURL+"/system-agent-install.sh",
-			AgentEnvVars(cluster),
+			AgentEnvVars(cluster, false),
 			rootURL,
 			token,
 			ca)
 	} else {
 		// for linux
 		crtStatus.NodeCommand = fmt.Sprintf(nodeCommandFormat,
-			AgentEnvVars(cluster),
+			AgentEnvVars(cluster, true),
 			agentImage,
 			rootURL,
 			token,
@@ -139,12 +139,16 @@ func agentEnvVarsForShell(cluster *v3.Cluster) string {
 	return strings.Join(agentEnvVars, " ")
 }
 
-func AgentEnvVars(cluster *v3.Cluster) string {
+func AgentEnvVars(cluster *v3.Cluster, docker bool) string {
 	var agentEnvVars []string
 	if cluster != nil {
 		for _, envVar := range cluster.Spec.AgentEnvVars {
 			if envVar.Value != "" {
-				agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e \"%s=%s\"", envVar.Name, envVar.Value))
+				if docker {
+					agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e \"%s=%s\"", envVar.Name, envVar.Value))
+				} else {
+					agentEnvVars = append(agentEnvVars, fmt.Sprintf("%s=\"%s\"", envVar.Name, envVar.Value))
+				}
 			}
 		}
 	}
@@ -162,7 +166,7 @@ func NodeCommand(token string, cluster *v3.Cluster) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf(nodeCommandFormat,
-		AgentEnvVars(cluster),
+		AgentEnvVars(cluster, true),
 		image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
 		rootURL,
 		token,
