@@ -76,8 +76,12 @@ func NewManager(ctx context.Context,
 		desiredCharts:    map[desiredKey]map[string]interface{}{},
 	}
 
-	go m.runSync()
 	return m, nil
+}
+
+func (m *Manager) Start(ctx context.Context) {
+	m.ctx = ctx
+	go m.runSync()
 }
 
 func (m *Manager) runSync() {

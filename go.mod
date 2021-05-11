@@ -95,7 +95,7 @@ require (
 	github.com/prometheus/common v0.15.0
 	github.com/rancher/apiserver v0.0.0-20210423001905-8cca34223733
 	github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430
-	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
+	github.com/rancher/dynamiclistener v0.2.1-0.20201110045217-9b1b7d3132e8
 	github.com/rancher/eks-operator v1.0.6-rc1
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210428191153-f414eab0e4de
 	github.com/rancher/gke-operator v1.0.1
@@ -110,7 +110,7 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20210318171128-d1ebd5202be4
 	github.com/rancher/rke v1.3.0-rc1.0.20210503155726-c25848db1e86
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20210504013807-97ff535abc0f
+	github.com/rancher/steve v0.0.0-20210510220646-43139e348a66
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3
 	github.com/rancher/wrangler v0.8.1-0.20210506052526-673b7f8692d9
 	github.com/robfig/cron v1.1.0
@@ -121,7 +121,7 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
-	github.com/vmware/govmomi v0.21.1-0.20191006164024-1d61d1ba0200
+	github.com/vmware/govmomi v0.23.2-0.20201015235820-81318771d0e0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect

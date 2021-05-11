@@ -231,6 +231,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		}
 	}
 
+	joinServer = p.getControlPlaneJoinURL(plan)
 	err = p.reconcile(controlPlane, secret, plan, "worker", false, isOnlyWorker, isInitNode,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
@@ -279,16 +280,28 @@ func (p *Planner) setInitNodeMark(machine *capi.Machine) (*capi.Machine, error) 
 	return p.machines.Update(machine)
 }
 
+func (p *Planner) getControlPlaneJoinURL(plan *plan.Plan) string {
+	entries := collect(plan, isControlPlane)
+	for _, entry := range entries {
+		if entry.Machine.Annotations[JoinURLAnnotation] != "" {
+			return entry.Machine.Annotations[JoinURLAnnotation]
+		}
+	}
+
+	return ""
+}
+
 func (p *Planner) electInitNode(plan *plan.Plan) (string, error) {
 	entries := collect(plan, isEtcd)
 	joinURL := ""
+	initNodeFound := false
 	for _, entry := range entries {
 		if !isInitNode(entry.Machine) {
 			continue
 		}
 
 		// Clear old or misconfigured init nodes
-		if entry.Machine.DeletionTimestamp != nil || joinURL != "" {
+		if entry.Machine.DeletionTimestamp != nil || initNodeFound {
 			if err := p.clearInitNodeMark(entry.Machine); err != nil {
 				return "", err
 			}
@@ -296,20 +309,25 @@ func (p *Planner) electInitNode(plan *plan.Plan) (string, error) {
 		}
 
 		joinURL = entry.Machine.Annotations[JoinURLAnnotation]
+		initNodeFound = true
 	}
 
-	if joinURL != "" {
+	if initNodeFound {
+		// joinURL could still be blank at this point which is fine, we are just waiting then
 		return joinURL, nil
 	}
 
-	if len(entries) == 0 {
-		return "", nil
+	for _, entry := range entries {
+		if entry.Machine.DeletionTimestamp == nil {
+			_, err := p.setInitNodeMark(entry.Machine)
+			if err != nil {
+				return "", err
+			}
+			return entry.Machine.Annotations[JoinURLAnnotation], nil
+		}
 	}
-	machine, err := p.setInitNodeMark(entries[0].Machine)
-	if err != nil {
-		return "", err
-	}
-	return machine.Annotations[JoinURLAnnotation], nil
+
+	return "", nil
 }
 
 func calculateConcurrency(maxUnavailable string, entries []planEntry, exclude roleFilter) (int, int, error) {
@@ -518,12 +536,12 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	}
 
 	if isOnlyEtcd(machine) {
-		config["disable-scheduler"] = false
-		config["disable-cloud-controller"] = false
-		config["disable-api-server"] = false
-		config["disable-controller-manager"] = false
+		config["disable-scheduler"] = true
+		config["disable-cloud-controller"] = true
+		config["disable-api-server"] = true
+		config["disable-controller-manager"] = true
 	} else if isOnlyControlPlane(machine) {
-		config["disable-etcd"] = false
+		config["disable-etcd"] = true
 	}
 }
 
@@ -643,6 +661,24 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 	return nodePlan, nil
 }
 
+func (p *Planner) addInitNodeInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
+	nodePlan.Instructions = append(nodePlan.Instructions, plan.Instruction{
+		Name:       "capture-address",
+		Image:      getInstallerImage(controlPlane),
+		Command:    "curl",
+		SaveOutput: true,
+		Args: []string{
+			"-f",
+			"--retry", "20",
+			"--retry-delay", "5",
+			"--cacert", fmt.Sprintf("/var/lib/rancher/%s/server/tls/server-ca.crt",
+				GetRuntime(controlPlane.Spec.KubernetesVersion)),
+			fmt.Sprintf("https://localhost:%d/db/info", GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
+		},
+	})
+	return nodePlan, nil
+}
+
 func addToken(config map[string]interface{}, machine *capi.Machine, secret plan.Secret) {
 	if secret.ServerToken == "" {
 		return
@@ -709,15 +745,17 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	initNode bool, joinServer string) (plan.NodePlan, error) {
 	config := map[string]interface{}{}
 
+	// Must call addUserConfig first because it will filter out non-kdm data
+	if err := addUserConfig(config, controlPlane, machine); err != nil {
+		return nodePlan, err
+	}
+
 	files, err := p.addRegistryConfig(config, controlPlane)
 	if err != nil {
 		return nodePlan, err
 	}
 	nodePlan.Files = append(nodePlan.Files, files...)
 
-	if err := addUserConfig(config, controlPlane, machine); err != nil {
-		return nodePlan, err
-	}
 	if err := p.addETCDSnapshotCredential(config, controlPlane, machine); err != nil {
 		return nodePlan, err
 	}
@@ -793,6 +831,13 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 		return nodePlan, err
 	}
 
+	if initNode && isOnlyEtcd(entry.Machine) {
+		nodePlan, err = p.addInitNodeInstruction(nodePlan, controlPlane, entry.Machine)
+		if err != nil {
+			return nodePlan, err
+		}
+	}
+
 	return nodePlan, nil
 }
 
@@ -809,6 +854,10 @@ func isEtcd(machine *capi.Machine) bool {
 
 func isInitNode(machine *capi.Machine) bool {
 	return machine.Labels[InitNodeLabel] == "true"
+}
+
+func IsEtcdOnlyInitNode(machine *capi.Machine) bool {
+	return isInitNode(machine) && isOnlyEtcd(machine)
 }
 
 func none(_ *capi.Machine) bool {

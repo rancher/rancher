@@ -947,8 +947,8 @@ github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430/go.mod h1:
 github.com/rancher/client-go v0.21.0-rancher.1 h1:WVy7jpVmdjIRVkgXpBRlNx4jnGkLCFS1Qu/hUFCOGN4=
 github.com/rancher/client-go v0.21.0-rancher.1/go.mod h1:nNBytTF9qPFDEhoqgEPaarobC8QPae13bElIVHzIglA=
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
-github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09 h1:Rh+7vXWJF/bA5ZLtUEBbOQX/wBQ9cFvtUoMOJXrJqVY=
-github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
+github.com/rancher/dynamiclistener v0.2.1-0.20201110045217-9b1b7d3132e8 h1:B4dt8sHPyt+hzYzFoWtKWTppls0KzSu2jEIV2jyY4sY=
+github.com/rancher/dynamiclistener v0.2.1-0.20201110045217-9b1b7d3132e8/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
 github.com/rancher/eks-operator v1.0.6-rc1 h1:VY2lLcaHtBMByd7pq7px4fB+GW0cd0cfessODbmH+Tc=
 github.com/rancher/eks-operator v1.0.6-rc1/go.mod h1:GB2kyPtIN0r+DGlUcDgEUMsB4qRwZH7OKsraemZT+GA=
 github.com/rancher/fleet/pkg/apis v0.0.0-20210428191153-f414eab0e4de h1:k8019s2eb27ACgl8qoAJjZW9i5+0437bcDwNtoBMszo=
@@ -987,8 +987,8 @@ github.com/rancher/rke v1.3.0-rc1.0.20210503155726-c25848db1e86 h1:pYGXFJf1ruCs6
 github.com/rancher/rke v1.3.0-rc1.0.20210503155726-c25848db1e86/go.mod h1:8teMbZiv6i0IwNzsIjmaqbLIDEBZmvFv1j+1P7uUgyY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20210504013807-97ff535abc0f h1:lbwjKi/yIem8tqoovpMeRicewpw1aHMtCZa6dE17uMI=
-github.com/rancher/steve v0.0.0-20210504013807-97ff535abc0f/go.mod h1:EI4TA179IvxGtWDBZNqy942SfQfqSblVB/0+bpix194=
+github.com/rancher/steve v0.0.0-20210510220646-43139e348a66 h1:Z16dOxxhoUfu5NkqW0tRB+AWoYeS2DIPaCHgPm/HV1k=
+github.com/rancher/steve v0.0.0-20210510220646-43139e348a66/go.mod h1:EI4TA179IvxGtWDBZNqy942SfQfqSblVB/0+bpix194=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3 h1:Ja/AEVsfVaVQvQ/5bl1uSWNzpnrsigrXnwCPB/8bDSM=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3/go.mod h1:Ja346o44aTPWADc/5Jm93+KgctT6KtftuOosgz0F2AM=
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
@@ -1135,8 +1135,8 @@ github.com/vmihailenco/msgpack v4.0.1+incompatible/go.mod h1:fy3FlTQTDXWkZ7Bh6Ac
 github.com/vmware/govcloudair v0.0.2/go.mod h1:Vxktpba+eP4dX5YzYP869DRPSm5ChQ2A/GUrmKSLvlo=
 github.com/vmware/govmomi v0.20.3/go.mod h1:URlwyTFZX72RmxtxuaFL2Uj3fD1JTvZdx59bHWk6aFU=
 github.com/vmware/govmomi v0.21.0/go.mod h1:zbnFoBQ9GIjs2RVETy8CNEpb+L+Lwkjs3XZUL0B3/m0=
-github.com/vmware/govmomi v0.21.1-0.20191006164024-1d61d1ba0200 h1:30ytRyVf5Ps39TwXXKxkrTPmFl89jpmx0jLhsSEALig=
-github.com/vmware/govmomi v0.21.1-0.20191006164024-1d61d1ba0200/go.mod h1:zbnFoBQ9GIjs2RVETy8CNEpb+L+Lwkjs3XZUL0B3/m0=
+github.com/vmware/govmomi v0.23.2-0.20201015235820-81318771d0e0 h1:vFYRzFxHXDERRZ3nLuLHEvTP1oZwu+tgSb8XHSki2tU=
+github.com/vmware/govmomi v0.23.2-0.20201015235820-81318771d0e0/go.mod h1:Y+Wq4lst78L85Ge/F8+ORXIWiKYqaro1vhAulACy9Lc=
 github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf h1:rNDPsfcxtUaONfrSnv7GtyET89rxz/TpTYsJOf+I0oo=
 github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf/go.mod h1:hJzJEIRgv3HH5JAGJq14tlIuEnRiVIjmkY/0uv89bOE=
 github.com/vmware/vmw-guestinfo v0.0.0-20170707015358-25eff159a728/go.mod h1:x9oS4Wk2s2u4tS29nEaDLdzvuHdB19CvSGJjPgkZJNk=

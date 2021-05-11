@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/authn"
 	"github.com/rancher/rancher/pkg/api/norman/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
-	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterscan"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
@@ -400,8 +399,6 @@ func ClusterRegistrationTokens(schemas *types.Schemas, management *config.Scaled
 	schema.Store = &cluster.RegistrationTokenStore{
 		Store: schema.Store,
 	}
-	tokenFormatter := clusterregistrationtokens.NewFormatter(management)
-	schema.Formatter = tokenFormatter.Formatter
 }
 
 func Tokens(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledContext) {

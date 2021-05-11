@@ -78,6 +78,24 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 			Name:     saName,
 		},
 	}
+	rb2 := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name2.SafeConcatName(saName, "extension"),
+			Namespace: meta.GetNamespace(),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      saName,
+				Namespace: meta.GetNamespace(),
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     "rke2-machine-provisioner",
+		},
+	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
@@ -160,6 +178,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 		sa,
 		role,
 		rb,
+		rb2,
 		job,
 	}, nil
 }

@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -252,7 +252,7 @@ func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node)
 }
 
 func AugmentProcesses(token string, processes map[string]rketypes.Process, worker bool, nodeName string,
-	cluster *v3.Cluster) map[string]rketypes.Process {
+	cluster *v3.Cluster) (map[string]rketypes.Process, error) {
 	var shared bool
 
 OuterLoop:
@@ -268,7 +268,11 @@ OuterLoop:
 
 	if shared {
 		agentImage := settings.AgentImage.Get()
-		nodeCommand := clusterregistrationtokens.NodeCommand(token, cluster) + " --no-register --only-write-certs --node-name " + nodeName
+		nodeCommandString, err := clusterregistrationtoken.NodeCommand(token, cluster)
+		if err != nil {
+			return nil, err
+		}
+		nodeCommand := nodeCommandString + " --no-register --only-write-certs --node-name " + nodeName
 		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
 		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
 		processes["share-mnt"] = rketypes.Process{
@@ -307,7 +311,7 @@ OuterLoop:
 		}
 	}
 
-	return processes
+	return processes, nil
 }
 
 func EnhanceWindowsProcesses(processes map[string]rketypes.Process) map[string]rketypes.Process {

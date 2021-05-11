@@ -2,8 +2,10 @@ package planner
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
@@ -109,6 +111,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	result := &plan.Node{}
 	planData := secret.Data["plan"]
 	appliedPlanData := secret.Data["appliedPlan"]
+	output := secret.Data["applied-output"]
 
 	if len(planData) > 0 {
 		if err := json.Unmarshal(planData, &result.Plan); err != nil {
@@ -124,6 +127,21 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 			return nil, err
 		}
 		result.AppliedPlan = newPlan
+	}
+
+	if len(output) > 0 {
+		gz, err := gzip.NewReader(bytes.NewBuffer(output))
+		if err != nil {
+			return nil, err
+		}
+		output, err = ioutil.ReadAll(gz)
+		if err != nil {
+			return nil, err
+		}
+		result.Output = map[string][]byte{}
+		if err := json.Unmarshal(output, &result.Output); err != nil {
+			return nil, err
+		}
 	}
 
 	result.InSync = bytes.Equal(planData, appliedPlanData)

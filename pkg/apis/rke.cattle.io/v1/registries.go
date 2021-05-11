@@ -6,12 +6,12 @@ type Mirror struct {
 	// one by one until a working one is found. The endpoint must be a valid url
 	// with host specified.
 	// The scheme, host and path from the endpoint URL will be used.
-	Endpoints []string `json:"endpoints,omitempty"`
+	Endpoints []string `json:"endpoint,omitempty"`
 
 	// Rewrites are repository rewrite rules for a namespace. When fetching image resources
 	// from an endpoint and a key matches the repository via regular expression matching
 	// it will be replaced with the corresponding value from the map in the resource request.
-	Rewrites map[string]string `json:"rewrites,omitempty"`
+	Rewrites map[string]string `json:"rewrite,omitempty"`
 }
 
 const (
@@ -50,9 +50,10 @@ type Registry struct {
 type RegistryConfig struct {
 	// Auth contains information to authenticate to the registry.
 	AuthConfigSecretName string `json:"authConfigSecretName,omitempty"`
-	// TLS is a pair of CA/Cert/Key which then are used when creating the transport
+	// TLS is a pair of Cert/Key which then are used when creating the transport
 	// that communicates with the registry.
 	TLSSecretName string `json:"tlsSecretName,omitempty"`
+	CABundle      []byte `json:"caBundle,omitempty"`
 
 	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty"`
 }

@@ -52,8 +52,11 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rk
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == hostAddress {
 
-			np.Processes = nodeserver.AugmentProcesses(token, tempNode.Processes, false,
+			np.Processes, err = nodeserver.AugmentProcesses(token, tempNode.Processes, false,
 				node.Status.NodeConfig.HostnameOverride, cluster)
+			if err != nil {
+				return np, err
+			}
 
 			np.Processes = nodeserver.AppendTaintsToKubeletArgs(np.Processes, node.Status.NodeConfig.Taints)
 
@@ -100,8 +103,11 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 			if hostDockerInfo.OSType == "windows" { // compatible with Windows
 				np.Processes = nodeserver.EnhanceWindowsProcesses(tempNode.Processes)
 			} else {
-				np.Processes = nodeserver.AugmentProcesses(token, tempNode.Processes, true,
+				np.Processes, err = nodeserver.AugmentProcesses(token, tempNode.Processes, true,
 					node.Status.NodeConfig.HostnameOverride, cluster)
+				if err != nil {
+					return np, err
+				}
 			}
 			np.Processes = nodeserver.AppendTaintsToKubeletArgs(np.Processes, node.Status.NodeConfig.Taints)
 			np.Files = tempNode.Files

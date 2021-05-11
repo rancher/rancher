@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machinedrain"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machinenodelookup"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineorphan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/managesystemagent"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/planner"
@@ -47,6 +48,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 		rkecontrolplane.Register(ctx, clients)
 		managesystemagent.Register(ctx, clients)
 		machinedrain.Register(ctx, clients)
+		machineorphan.Register(ctx, clients)
 	}
 
 	if features.EmbeddedClusterAPI.Enabled() {
