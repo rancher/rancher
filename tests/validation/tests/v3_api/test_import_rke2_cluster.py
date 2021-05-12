@@ -25,7 +25,7 @@ RANCHER_RKE2_NO_OF_WORKER_NODES = \
 RANCHER_RKE2_SERVER_FLAGS = os.environ.get("RANCHER_RKE2_SERVER_FLAGS", "server")
 RANCHER_RKE2_WORKER_FLAGS = os.environ.get("RANCHER_RKE2_WORKER_FLAGS", "agent")
 RANCHER_RKE2_OPERATING_SYSTEM = os.environ.get("RANCHER_RKE2_OPERATING_SYSTEM")
-
+AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "20")
 RANCHER_RKE2_RHEL_USERNAME = os.environ.get("RANCHER_RKE2_RHEL_USERNAME", "")
 RANCHER_RKE2_RHEL_PASSWORD = os.environ.get("RANCHER_RKE2_RHEL_PASSWORD", "")
 RANCHER_RKE2_KUBECONFIG_PATH = DATA_SUBDIR + "/rke2_kubeconfig.yaml"
@@ -100,7 +100,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                               'qa_space': RANCHER_QA_SPACE,
                               'node_os': RANCHER_RKE2_OPERATING_SYSTEM,
                               'cluster_type': cluster_type,
-                              'iam_role': RANCHER_IAM_ROLE})
+                              'iam_role': RANCHER_IAM_ROLE,
+                              'volume_size': AWS_VOLUME_SIZE})
     print("Creating cluster")
     tf.init()
     tf.plan(out="plan_server.out")
@@ -127,7 +128,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                                   'cluster_type': cluster_type,
                                   'no_of_worker_nodes': int(RANCHER_RKE2_NO_OF_WORKER_NODES),
                                   'worker_flags': RANCHER_RKE2_WORKER_FLAGS,
-                                  'iam_role': RANCHER_IAM_ROLE})
+                                  'iam_role': RANCHER_IAM_ROLE,
+                                  'volume_size': AWS_VOLUME_SIZE})
 
     print("Joining worker nodes")
     tf.init()
