@@ -100,8 +100,8 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210428191153-f414eab0e4de
 	github.com/rancher/gke-operator v1.0.1
 	github.com/rancher/kubernetes-provider-detector v0.1.2
-	github.com/rancher/lasso v0.0.0-20210408231703-9ddd9378d08d
-	github.com/rancher/lasso/controller-runtime v0.0.0-20210219163000-fcdfcec12969
+	github.com/rancher/lasso v0.0.0-20210512210011-31c3967449d3
+	github.com/rancher/lasso/controller-runtime v0.0.0-20210512210011-31c3967449d3
 	github.com/rancher/machine v0.15.0-rancher57
 	github.com/rancher/norman v0.0.0-20210504005327-7b74a9f308a7
 	github.com/rancher/rancher/pkg/apis v0.0.0
