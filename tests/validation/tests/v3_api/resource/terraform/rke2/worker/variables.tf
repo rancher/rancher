@@ -8,6 +8,7 @@ variable "dependency" {
   default = null
 }
 variable "ec2_instance_class" {}
+variable "volume_size" {}
 variable "iam_role" {}
 variable "node_os" {}
 variable "no_of_worker_nodes" {}

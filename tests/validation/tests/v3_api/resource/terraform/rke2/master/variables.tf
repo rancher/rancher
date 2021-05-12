@@ -4,6 +4,7 @@ variable "aws_ami" {}
 variable "aws_user" {}
 variable "cluster_type" {}
 variable "ec2_instance_class" {}
+variable "volume_size" {}
 variable "iam_role" {}
 variable "node_os" {}
 variable "no_of_server_nodes" {}

@@ -147,6 +147,7 @@ node {
                       string(name: 'RANCHER_RKE2_CHANNEL', value: "${RANCHER_RKE2_CHANNEL}"),
                       string(name: 'RANCHER_TEST_IMAGE', value: "${RANCHER_TEST_IMAGE}"),
                       string(name: 'RANCHER_TEST_IMAGE_PORT', value: "${RANCHER_TEST_IMAGE_PORT}"),
+                      string(name: 'AWS_VOLUME_SIZE', value: "${AWS_VOLUME_SIZE}"),
                     ]
                     echo "Params are: ${params}"
                     jobs["test-${i}"] = { build job: 'rancher_v3_import_rke2_cluster', parameters: params }
