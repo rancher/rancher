@@ -619,6 +619,10 @@ $script_name = $MyInvocation.InvocationName
 $image_list = "rancher-windows-images.txt"
 $images = "rancher-windows-images.tar.gz"
 $os_release_id = $(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' | Select-Object -ExpandProperty ReleaseId)
+if ($os_release_id -eq "2009") {
+    $os_release_id = "20H2"
+}
+
 $registry = $null
 $help = $false
 
@@ -730,6 +734,10 @@ $script_name = $MyInvocation.InvocationName
 $image_list = "rancher-windows-images.txt"
 $images = "rancher-windows-images.tar.gz"
 $os_release_id = $(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' | Select-Object -ExpandProperty ReleaseId)
+if ($os_release_id -eq "2009") {
+    $os_release_id = "20H2"
+}
+
 $help = $false
 
 function usage {
