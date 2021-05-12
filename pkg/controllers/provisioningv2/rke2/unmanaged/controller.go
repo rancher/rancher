@@ -275,7 +275,7 @@ func (h *handler) getCAPICluster(secret *corev1.Secret) (*capi.Cluster, error) {
 }
 
 func (h *handler) onUnmanagedMachineChange(key string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
-	if machine != nil && !machine.Status.Ready {
+	if machine != nil && !machine.Status.Ready && machine.Spec.ProviderID != "" {
 		machine = machine.DeepCopy()
 		machine.Status.Ready = true
 		return h.unmanagedMachine.UpdateStatus(machine)

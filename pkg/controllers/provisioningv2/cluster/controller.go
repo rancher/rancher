@@ -2,6 +2,8 @@ package cluster
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 
 	"github.com/rancher/norman/types/convert"
@@ -199,9 +201,10 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, sp
 		}
 	}
 
+	hash := sha256.Sum256([]byte(cluster.Namespace + "/" + cluster.Name))
 	newCluster := &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name.SafeConcatName("c", "m", string(cluster.UID[:8])),
+			Name:        name.SafeConcatName("c", "m", hex.EncodeToString(hash[:])[:8]),
 			Labels:      cluster.Labels,
 			Annotations: map[string]string{},
 		},

@@ -2,9 +2,11 @@ package clients
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/kubeconfig"
+	"github.com/rancher/wrangler/pkg/ratelimit"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
@@ -57,6 +59,9 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 	if err != nil {
 		return nil, err
 	}
+
+	rest.Timeout = 30 * time.Minute
+	rest.RateLimiter = ratelimit.None
 
 	context, err := wrangler.NewContext(ctx, config, rest)
 	if err != nil {

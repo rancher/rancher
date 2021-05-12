@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/generic"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,7 +60,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		dynamic:             clients.Dynamic,
 	}
 
-	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-provider-sync", h.associateMachineWithNode)
+	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-node-lookup", h.associateMachineWithNode)
 }
 
 func (h *handler) getMachine(obj *rkev1.RKEBootstrap) (*capi.Machine, error) {
@@ -72,7 +73,7 @@ func (h *handler) getMachine(obj *rkev1.RKEBootstrap) (*capi.Machine, error) {
 
 		return h.machineCache.Get(obj.Namespace, ref.Name)
 	}
-	return nil, fmt.Errorf("no machine associated to RKEBootstrap %s/%s", obj.Namespace, obj.Name)
+	return nil, generic.ErrSkip
 }
 
 func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {

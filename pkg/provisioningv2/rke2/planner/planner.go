@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/summary"
@@ -144,7 +145,7 @@ func PlanSecretFromBootstrapName(bootstrapName string) string {
 func (p *Planner) getCAPICluster(controlPlane *rkev1.RKEControlPlane) (*capi.Cluster, error) {
 	ref := metav1.GetControllerOf(controlPlane)
 	if ref == nil {
-		return nil, fmt.Errorf("RKEControlPlane %s/%s has no owner", controlPlane.Namespace, controlPlane.Name)
+		return nil, generic.ErrSkip
 	}
 	gvk := schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
 	if gvk.Kind != "Cluster" || gvk.Group != "cluster.x-k8s.io" {
@@ -232,6 +233,10 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	}
 
 	joinServer = p.getControlPlaneJoinURL(plan)
+	if joinServer == "" {
+		return ErrWaiting("waiting for control plane to be available")
+	}
+
 	err = p.reconcile(controlPlane, secret, plan, "worker", false, isOnlyWorker, isInitNode,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
@@ -501,6 +506,12 @@ func (p *Planner) addETCDSnapshotCredential(config map[string]interface{}, contr
 	return nil
 }
 
+func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) {
+	if GetRuntime(controlPlane.Spec.KubernetesVersion) == RuntimeRKE2 {
+		config["cni"] = "calico"
+	}
+}
+
 func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) error {
 	for _, opts := range controlPlane.Spec.NodeConfig {
 		sel, err := metav1.LabelSelectorAsSelector(opts.MachineLabelSelector)
@@ -744,6 +755,8 @@ func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, secret plan.Secret,
 	initNode bool, joinServer string) (plan.NodePlan, error) {
 	config := map[string]interface{}{}
+
+	addDefaults(config, controlPlane, machine)
 
 	// Must call addUserConfig first because it will filter out non-kdm data
 	if err := addUserConfig(config, controlPlane, machine); err != nil {

@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"sync"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
@@ -18,6 +19,7 @@ var (
 	cachePodName      = "registry-cache"
 	cachePodNamespace = "default"
 	cacheServiceName  = "registry.default.svc.cluster.local"
+	cacheLock         sync.Mutex
 )
 
 func createPasswordSecret(clients *clients.Clients, namespace string) (*corev1.Secret, error) {
@@ -72,7 +74,7 @@ func createRegistrySecret(clients *clients.Clients) (*corev1.Secret, error) {
 		return nil, err
 	}
 
-	return clients.Core.Secret().Create(&corev1.Secret{
+	secret, err = clients.Core.Secret().Create(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cachePodName,
 			Namespace: cachePodNamespace,
@@ -84,6 +86,12 @@ func createRegistrySecret(clients *clients.Clients) (*corev1.Secret, error) {
 			corev1.TLSPrivateKeyKey: key,
 		},
 	})
+	if err == nil {
+		return secret, nil
+	} else if apierrors.IsAlreadyExists(err) {
+		return clients.Core.Secret().Get(cachePodNamespace, cachePodName, metav1.GetOptions{})
+	}
+	return nil, err
 }
 
 func createService(clients *clients.Clients) error {
@@ -177,6 +185,9 @@ func getPod(clients *clients.Clients) (*corev1.Pod, error) {
 }
 
 func createSharedObjects(clients *clients.Clients) (*corev1.Secret, error) {
+	cacheLock.Lock()
+	defer cacheLock.Unlock()
+
 	registrySecret, err := createRegistrySecret(clients)
 	if err != nil {
 		return nil, err

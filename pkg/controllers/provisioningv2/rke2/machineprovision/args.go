@@ -9,6 +9,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/generic"
 	name2 "github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -162,7 +163,7 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object) (string, st
 	}
 
 	if machine == nil {
-		return "", "", nil, fmt.Errorf("failed to find capi machine for %s/%s", meta.GetNamespace(), meta.GetName())
+		return "", "", nil, generic.ErrSkip
 	}
 
 	if cloudCredentialSecretName == "" {

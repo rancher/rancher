@@ -79,8 +79,16 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 				}, nil
 			}
 		}
+		if machine, ok := obj.(*capi.Machine); ok {
+			if machine.Spec.Bootstrap.ConfigRef != nil && machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap" {
+				return []relatedresource.Key{{
+					Namespace: machine.Namespace,
+					Name:      machine.Spec.Bootstrap.ConfigRef.Name,
+				}}, nil
+			}
+		}
 		return nil, nil
-	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount())
+	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount(), clients.CAPI.Machine())
 }
 
 func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar) (*corev1.Secret, error) {
