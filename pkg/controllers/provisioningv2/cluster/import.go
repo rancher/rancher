@@ -21,7 +21,7 @@ import (
 )
 
 func (h *handler) createClusterAndDeployAgent(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
-	objs, status, err := h.createCluster(cluster, status, v3.ClusterSpec{
+	objs, status, err := h.createClusterAndClusterRoleBindings(cluster, status, v3.ClusterSpec{
 		ImportedConfig: &v3.ImportedConfig{},
 	})
 	if err != nil {

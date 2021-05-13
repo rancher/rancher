@@ -30,6 +30,12 @@ type ClusterSpec struct {
 	DefaultPodSecurityPolicyTemplateName string          `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	EnableNetworkPolicy                  *bool           `json:"enableNetworkPolicy" norman:"default=false"`
+	DefaultUsers                         []UserConfig    `json:"defaultUsers,omitempty"`
+}
+
+type UserConfig struct {
+	Username         string `json:"username"`
+	RoleTemplateName string `json:"roleTemplateName"`
 }
 
 type ClusterStatus struct {

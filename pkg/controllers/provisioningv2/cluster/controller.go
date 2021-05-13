@@ -21,6 +21,7 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -35,6 +36,8 @@ type handler struct {
 	mgmtClusters      mgmtcontrollers.ClusterClient
 	clusterTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
 	clusterTokens     mgmtcontrollers.ClusterRegistrationTokenClient
+	usersCache        mgmtcontrollers.UserCache
+	crtbs             mgmtcontrollers.ClusterRoleTemplateBindingClient
 	clusters          rocontrollers.ClusterController
 	clusterCache      rocontrollers.ClusterCache
 	secretCache       corecontrollers.SecretCache
@@ -49,6 +52,8 @@ func Register(
 	h := handler{
 		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
 		mgmtClusters:      clients.Mgmt.Cluster(),
+		usersCache:        clients.Mgmt.User().Cache(),
+		crtbs:             clients.Mgmt.ClusterRoleTemplateBinding(),
 		clusterTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:     clients.Mgmt.ClusterRegistrationToken(),
 		settings:          clients.Mgmt.Setting().Cache(),
@@ -141,7 +146,7 @@ func (h *handler) generateCluster(cluster *v1.Cluster, status v1.ClusterStatus) 
 	case cluster.Spec.ClusterAPIConfig != nil:
 		return h.createClusterAndDeployAgent(cluster, status)
 	default:
-		return h.createCluster(cluster, status, v3.ClusterSpec{
+		return h.createClusterAndClusterRoleBindings(cluster, status, v3.ClusterSpec{
 			ImportedConfig: &v3.ImportedConfig{},
 		})
 	}
@@ -182,7 +187,7 @@ func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error
 	return cluster, err
 }
 
-func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
+func (h *handler) createClusterAndClusterRoleBindings(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
 	spec.DisplayName = cluster.Name
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
 	spec.FleetWorkspaceName = cluster.Namespace
@@ -260,13 +265,43 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 			objs = append(objs, secret)
 			status.ClientSecretName = secret.Name
 
-			ctrb, err := h.kubeconfigManager.GetCTRBForAdmin(cluster, status)
+			crtb, err := h.kubeconfigManager.GetCTRBForAdmin(cluster, status)
 			if err != nil {
 				return nil, status, err
 			}
-			objs = append(objs, ctrb)
+			objs = append(objs, crtb)
+		}
+		// assigning default users specified in spec
+		users, err := h.usersCache.List(labels.Everything())
+		if err != nil {
+			return nil, status, err
+		}
+
+		for _, userConfig := range cluster.Spec.DefaultUsers {
+			crtb := h.CRTBForUser(userConfig, status, users)
+			if crtb != nil {
+				objs = append(objs, crtb)
+			}
 		}
 	}
 
 	return objs, status, nil
+}
+
+func (h handler) CRTBForUser(userConfig v1.UserConfig, status v1.ClusterStatus, users []*v3.User) *v3.ClusterRoleTemplateBinding {
+	for _, user := range users {
+		if userConfig.Username == user.Username {
+			crtb := &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name.SafeConcatName("crtb", name.Hex(status.ClusterName+"-"+userConfig.Username, 5)),
+					Namespace: status.ClusterName,
+				},
+				ClusterName:      status.ClusterName,
+				UserName:         user.Name,
+				RoleTemplateName: userConfig.RoleTemplateName,
+			}
+			return crtb
+		}
+	}
+	return nil
 }
