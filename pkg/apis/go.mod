@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/pkg/apis
 
-go 1.14
+go 1.16
 
 replace (
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/ibuildthecloud/system-upgrade-controller/pkg/apis v0.0.0-20200823050544-4b08ab2b5a02
