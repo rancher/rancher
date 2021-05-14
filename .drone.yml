@@ -1,37 +1,5 @@
 ---
 kind: pipeline
-name: provisioning-tests
-
-platform:
-  os: linux
-  arch: amd64
-
-steps:
-- name: build
-  image: rancher/dapper:v0.5.4
-  commands:
-  - dapper provisioning-tests
-  privileged: true
-  volumes:
-  - name: docker
-    path: /var/run/docker.sock
-  when:
-    event:
-    - push
-    - pull_request
-    - tag
-
-volumes:
-- name: docker
-  host:
-    path: /var/run/docker.sock
-
-trigger:
-  event:
-    exclude:
-    - promote
----
-kind: pipeline
 name: default-linux-amd64
 
 platform:
