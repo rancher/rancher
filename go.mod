@@ -1,6 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.14
+go 1.16
 
 replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0

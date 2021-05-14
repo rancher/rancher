@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/cmd/rancherd
 
-go 1.14
+go 1.16
 
 replace (
 	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.9
