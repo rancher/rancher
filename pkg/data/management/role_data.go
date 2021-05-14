@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"os"
 	"reflect"
 	"sort"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
@@ -20,6 +22,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -467,7 +470,14 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 
 	if len(users.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
-		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		bootstrapPassword := os.Getenv("CATTLE_BOOTSTRAP_PASSWORD")
+		if bootstrapPassword == "" {
+			bootstrapPassword, err = randomtoken.Generate()
+			if err != nil {
+				return "", err
+			}
+		}
+		hash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
 		admin, err := management.Mgmt.User().Create(&v3.User{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "user-",
@@ -480,6 +490,22 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 		})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return "", errors.Wrap(err, "can not ensure admin user exists")
+		}
+		if err == nil {
+			var serverURL string
+			if settings.ServerURL.Get() != "" {
+				serverURL = settings.ServerURL.Get()
+			}
+			if serverURL == "" {
+				ip, err := net.ChooseHostInterface()
+				if err == nil {
+					serverURL = ip.String()
+				}
+			}
+			if serverURL == "" {
+				serverURL = "localhost"
+			}
+			logrus.Infof("Default username/password created, use https://%s/dashboard/?setup=%s to setup password", serverURL, bootstrapPassword)
 		}
 		adminName = admin.Name
 

@@ -6,4 +6,8 @@ Check out our docs at https://rancher.com/docs/rancher/v2.x/en/
 
 Browse to https://{{ .Values.hostname }}
 
+If this is the first time you installed Rancher, run this command to get link to setup initial password:
+
+$ echo https://{{ .Values.hostname }}/dashboard/?setup=$(kubectl get secret --namespace {{ .Release.Namespace }} bootstrap-secret -o jsonpath="{.data.bootstrapPassword}" | base64 --decode)
+
 Happy Containering!
