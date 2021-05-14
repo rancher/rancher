@@ -12,7 +12,6 @@ import (
 )
 
 func TestCustomOneNode(t *testing.T) {
-	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +56,6 @@ func TestCustomOneNode(t *testing.T) {
 }
 
 func TestCustomThreeNode(t *testing.T) {
-	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +104,6 @@ func TestCustomThreeNode(t *testing.T) {
 }
 
 func TestCustomUniqueRoles(t *testing.T) {
-	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
