@@ -208,6 +208,7 @@ func (t *Authorizer) authorizeNode(register bool, cluster *v3.Cluster, inNode *c
 		}
 	}
 
+	logrus.Tracef("updateDockerInfo: cluster [%s] node [%s] dockerInfo [%v]", cluster.Name, machine.Name, inNode.DockerInfo)
 	machine, err = t.updateDockerInfo(machine, inNode)
 	return machine, true, err
 }
