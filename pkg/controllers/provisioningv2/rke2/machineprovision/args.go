@@ -20,7 +20,12 @@ import (
 )
 
 var (
-	regExHyphen = regexp.MustCompile("([a-z])([A-Z])")
+	regExHyphen     = regexp.MustCompile("([a-z])([A-Z])")
+	envNameOverride = map[string]string{
+		"amazonec2": "AWS",
+		"rackspace": "OS",
+		"openstack": "OS",
+	}
 )
 
 type driverArgs struct {
@@ -78,7 +83,11 @@ func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, da
 	}
 
 	for k, v := range secrets {
-		k := strings.ToUpper(driver + "_" + regExHyphen.ReplaceAllString(k, "${1}_${2}"))
+		envName := envNameOverride[driver]
+		if envName == "" {
+			envName = driver
+		}
+		k := strings.ToUpper(envName + "_" + regExHyphen.ReplaceAllString(k, "${1}_${2}"))
 		secret.Data[k] = []byte(v)
 	}
 
