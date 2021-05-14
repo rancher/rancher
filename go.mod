@@ -41,6 +41,7 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.21.0
 	k8s.io/mount-utils => k8s.io/mount-utils v0.21.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.21.0
+	sigs.k8s.io/cluster-api => github.com/rancher/cluster-api v0.3.11-0.20210514043303-8726f6e84d41
 )
 
 require (
