@@ -41,6 +41,7 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.21.0
 	k8s.io/mount-utils => k8s.io/mount-utils v0.21.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.21.0
+	sigs.k8s.io/cluster-api => github.com/rancher/cluster-api v0.3.11-0.20210514043303-8726f6e84d41
 )
 
 require (
@@ -100,8 +101,8 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210428191153-f414eab0e4de
 	github.com/rancher/gke-operator v1.0.1
 	github.com/rancher/kubernetes-provider-detector v0.1.2
-	github.com/rancher/lasso v0.0.0-20210408231703-9ddd9378d08d
-	github.com/rancher/lasso/controller-runtime v0.0.0-20210219163000-fcdfcec12969
+	github.com/rancher/lasso v0.0.0-20210512210011-31c3967449d3
+	github.com/rancher/lasso/controller-runtime v0.0.0-20210512210011-31c3967449d3
 	github.com/rancher/machine v0.15.0-rancher57
 	github.com/rancher/norman v0.0.0-20210513204752-e48df26b54bd
 	github.com/rancher/rancher/pkg/apis v0.0.0

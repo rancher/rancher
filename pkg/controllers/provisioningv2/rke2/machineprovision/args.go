@@ -9,6 +9,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/generic"
 	name2 "github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -19,7 +20,12 @@ import (
 )
 
 var (
-	regExHyphen = regexp.MustCompile("([a-z])([A-Z])")
+	regExHyphen     = regexp.MustCompile("([a-z])([A-Z])")
+	envNameOverride = map[string]string{
+		"amazonec2": "AWS",
+		"rackspace": "OS",
+		"openstack": "OS",
+	}
 )
 
 type driverArgs struct {
@@ -77,7 +83,11 @@ func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, da
 	}
 
 	for k, v := range secrets {
-		k := strings.ToUpper(driver + "_" + regExHyphen.ReplaceAllString(k, "${1}_${2}"))
+		envName := envNameOverride[driver]
+		if envName == "" {
+			envName = driver
+		}
+		k := strings.ToUpper(envName + "_" + regExHyphen.ReplaceAllString(k, "${1}_${2}"))
 		secret.Data[k] = []byte(v)
 	}
 
@@ -162,7 +172,7 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object) (string, st
 	}
 
 	if machine == nil {
-		return "", "", nil, fmt.Errorf("failed to find capi machine for %s/%s", meta.GetNamespace(), meta.GetName())
+		return "", "", nil, generic.ErrSkip
 	}
 
 	if cloudCredentialSecretName == "" {

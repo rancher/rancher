@@ -1,14 +1,13 @@
 package defaults
 
 var (
-	PodTestImage = "ibuildthecloud/systemd-node"
-	//RKE2Version         = "v1.21.0-alpha2+rke2r1"
-
+	PodTestImage        = "rancher/systemd-node:v0.0.1"
 	SomeK8sVersion      = "v1.20.5+k3s1"
 	WatchTimeoutSeconds = int64(60 * 10)
 	CommonClusterConfig = map[string]interface{}{
 		"service-cidr": "10.45.0.0/16",
 		"cluster-cidr": "10.44.0.0/16",
+		"garbage":      "value",
 	}
 
 	One   = int32(1)

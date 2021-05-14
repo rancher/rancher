@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	corev1 "k8s.io/api/core/v1"
@@ -79,8 +80,16 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 				}, nil
 			}
 		}
+		if machine, ok := obj.(*capi.Machine); ok {
+			if machine.Spec.Bootstrap.ConfigRef != nil && machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap" {
+				return []relatedresource.Key{{
+					Namespace: machine.Namespace,
+					Name:      machine.Spec.Bootstrap.ConfigRef.Name,
+				}}, nil
+			}
+		}
 		return nil, nil
-	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount())
+	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount(), clients.CAPI.Machine())
 }
 
 func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar) (*corev1.Secret, error) {
@@ -191,7 +200,7 @@ func (h *handler) getMachine(obj *rkev1.RKEBootstrap) (*capi.Machine, error) {
 
 		return h.machineCache.Get(obj.Namespace, ref.Name)
 	}
-	return nil, fmt.Errorf("no machine associated to RKEBootstrap %s/%s", obj.Namespace, obj.Name)
+	return nil, generic.ErrSkip
 }
 
 func (h *handler) getEnvVar(machine *capi.Machine) ([]corev1.EnvVar, error) {
@@ -235,6 +244,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, obj *rkev1.RKEBoo
 			Namespace: obj.Namespace,
 			Labels: map[string]string{
 				planner.MachineNameLabel: machine.Name,
+				rkeBootstrapName:         obj.Name,
 				roleLabel:                roleBootstrap,
 			},
 		},

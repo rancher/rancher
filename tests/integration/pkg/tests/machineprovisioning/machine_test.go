@@ -13,8 +13,6 @@ import (
 )
 
 func TestSingleNodeAllRoles(t *testing.T) {
-	t.Parallel()
-
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -70,8 +68,6 @@ func TestSingleNodeAllRoles(t *testing.T) {
 }
 
 func TestThreeNodesAllRoles(t *testing.T) {
-	t.Parallel()
-
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -101,9 +97,7 @@ func TestThreeNodesAllRoles(t *testing.T) {
 	}
 }
 
-func TestSevenNodesUniqueRoles(t *testing.T) {
-	t.Parallel()
-
+func TestFiveNodesUniqueRoles(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -121,11 +115,11 @@ func TestSevenNodesUniqueRoles(t *testing.T) {
 					},
 					{
 						ControlPlaneRole: true,
-						Quantity:         &defaults.Two,
+						Quantity:         &defaults.One,
 					},
 					{
 						WorkerRole: true,
-						Quantity:   &defaults.Two,
+						Quantity:   &defaults.One,
 					},
 				},
 			},
@@ -142,8 +136,6 @@ func TestSevenNodesUniqueRoles(t *testing.T) {
 }
 
 func TestFiveNodesServerAndWorkerRoles(t *testing.T) {
-	t.Parallel()
-
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)

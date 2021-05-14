@@ -12,8 +12,6 @@ import (
 )
 
 func TestCustomOneNode(t *testing.T) {
-	t.Parallel()
-
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -57,9 +55,7 @@ func TestCustomOneNode(t *testing.T) {
 	assert.Equal(t, machines.Items[0].Labels[planner.EtcdRoleLabel], "true")
 }
 
-func TestCustomTreeNode(t *testing.T) {
-	t.Parallel()
-
+func TestCustomThreeNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -108,8 +104,6 @@ func TestCustomTreeNode(t *testing.T) {
 }
 
 func TestCustomUniqueRoles(t *testing.T) {
-	t.Parallel()
-
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +133,7 @@ func TestCustomUniqueRoles(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 1; i++ {
 		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane")
 		if err != nil {
 			t.Fatal(err)
@@ -161,7 +155,7 @@ func TestCustomUniqueRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Len(t, machines.Items, 6)
+	assert.Len(t, machines.Items, 5)
 	var (
 		worker       = 0
 		controlPlane = 0
@@ -181,5 +175,5 @@ func TestCustomUniqueRoles(t *testing.T) {
 
 	assert.Equal(t, worker, 1)
 	assert.Equal(t, etcd, 3)
-	assert.Equal(t, controlPlane, 2)
+	assert.Equal(t, controlPlane, 1)
 }

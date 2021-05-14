@@ -115,7 +115,7 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 			time.Sleep(time.Second)
 			continue
 		}
-		return tokens.Items[0].Status.NodeCommand, nil
+		return tokens.Items[0].Status.InsecureNodeCommand, nil
 	}
 
 	return "", fmt.Errorf("timeout getting custom command")

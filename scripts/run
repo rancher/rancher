@@ -6,7 +6,7 @@ cd $(dirname $0)/..
 
 CMD=bin/rancher
 if [ ! -x $CMD ]; then
-    ./scripts/build
+    ./scripts/build-server
 fi
 
 rm -rf build/testdata

@@ -952,6 +952,8 @@ github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430 h1:Wes0yXZ
 github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430/go.mod h1:1/9aBa8mXEIinRiT6Qlv/zbt6Nv9uorv+kFVNYvpmiI=
 github.com/rancher/client-go v0.21.0-rancher.1 h1:WVy7jpVmdjIRVkgXpBRlNx4jnGkLCFS1Qu/hUFCOGN4=
 github.com/rancher/client-go v0.21.0-rancher.1/go.mod h1:nNBytTF9qPFDEhoqgEPaarobC8QPae13bElIVHzIglA=
+github.com/rancher/cluster-api v0.3.11-0.20210514043303-8726f6e84d41 h1:4YsdMzVRGze/N9cAgeqbGNTjuY08wtVB92+OinhOtw8=
+github.com/rancher/cluster-api v0.3.11-0.20210514043303-8726f6e84d41/go.mod h1:iDmIO2c5/RSiSciQnI7Xocfe8hTu+KafcgEuc/hnhS4=
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
 github.com/rancher/dynamiclistener v0.2.1-0.20201110045217-9b1b7d3132e8 h1:B4dt8sHPyt+hzYzFoWtKWTppls0KzSu2jEIV2jyY4sY=
 github.com/rancher/dynamiclistener v0.2.1-0.20201110045217-9b1b7d3132e8/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
@@ -970,10 +972,11 @@ github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB
 github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/lasso v0.0.0-20210218205127-cbbdbcc1c003/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
-github.com/rancher/lasso v0.0.0-20210408231703-9ddd9378d08d h1:vfjPEF6M7Jf1/zK1xF7z2drLfniooKcgDQdoXO5+U7w=
 github.com/rancher/lasso v0.0.0-20210408231703-9ddd9378d08d/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
-github.com/rancher/lasso/controller-runtime v0.0.0-20210219163000-fcdfcec12969 h1:hIAPazatZTEnV5rHCG961B0PFwq43mGK4r5JSQdqkug=
-github.com/rancher/lasso/controller-runtime v0.0.0-20210219163000-fcdfcec12969/go.mod h1:+0JeyzD5Cb1eavAbVF1+7SfQUItne0C+UxsTk+PU1Ms=
+github.com/rancher/lasso v0.0.0-20210512210011-31c3967449d3 h1:XXC5QpCq78JXDfuhBxa2c0dAAUiAcO1lzKdV6EccsjQ=
+github.com/rancher/lasso v0.0.0-20210512210011-31c3967449d3/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
+github.com/rancher/lasso/controller-runtime v0.0.0-20210512210011-31c3967449d3 h1:72p3wzjiunmDZwnzMbqNcuF5OWT9VAPaNT87p5BXTN4=
+github.com/rancher/lasso/controller-runtime v0.0.0-20210512210011-31c3967449d3/go.mod h1:+0JeyzD5Cb1eavAbVF1+7SfQUItne0C+UxsTk+PU1Ms=
 github.com/rancher/machine v0.15.0-rancher57 h1:OGzaz1cuzC6oVZfywB8U22iOiSH3yYvIsh2PCIfcSeY=
 github.com/rancher/machine v0.15.0-rancher57/go.mod h1:VXpVeBwwGyMOuuUWaNKBxm54Qz9g9Vp6LDkaOtDX0lo=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
@@ -1774,8 +1777,6 @@ sigs.k8s.io/aws-iam-authenticator v0.5.1 h1:0Nv09uOayy99IOYgNamMl0cwTuQWRtEuUu6s
 sigs.k8s.io/aws-iam-authenticator v0.5.1/go.mod h1:yPDLi58MDx1UtCrRMOykLm1IyKKPGHgcGCafcbn2s3E=
 sigs.k8s.io/cli-utils v0.16.0 h1:Wr32m1oxjIqc9G9l+igr13PeIM9LCyq8jQ8KjXKelvg=
 sigs.k8s.io/cli-utils v0.16.0/go.mod h1:9Jqm9K2W6ShhCxsEuaz6HSRKKOXigPUx3ZfypGgxBLY=
-sigs.k8s.io/cluster-api v0.3.11-0.20210430180359-45b6080c2764 h1:KR5002Y1x1g+BYmsoaODC/Z43xdKSY0B6bOcwfBa9Bk=
-sigs.k8s.io/cluster-api v0.3.11-0.20210430180359-45b6080c2764/go.mod h1:iDmIO2c5/RSiSciQnI7Xocfe8hTu+KafcgEuc/hnhS4=
 sigs.k8s.io/controller-runtime v0.4.0/go.mod h1:ApC79lpY3PHW9xj/w9pj+lYkLgwAAUZwfXkME1Lajns=
 sigs.k8s.io/controller-runtime v0.8.2/go.mod h1:U/l+DUopBc1ecfRZ5aviA9JDmGFQKvLf5YkZNx2e0sU=
 sigs.k8s.io/controller-runtime v0.9.0-beta.0 h1:GMy39zuf8ywrQyNuc24wR1mdiJCSGJnxaaqakZldaug=

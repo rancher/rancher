@@ -37,16 +37,8 @@ done
 
 echo Running tests
 
-#KUBECONFIG=/etc/rancher/k3s/k3s.yaml go test -parallel 4 ./tests/integration/pkg/tests/... >/tmp/rancher-test.log 2>&1 &
-#TESTPID=$!
-
 cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel
 
 #tail -f /tmp/rancher-test.log &
-#echo Waiting on go tests
-#wait -n $TESTPID || {
-    #cat /tmp/rancher-test.log
-    #exit 1
-#}
