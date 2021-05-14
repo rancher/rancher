@@ -25,10 +25,4 @@ done
 
 echo Running tests
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -v -parallel 2 -timeout 20m ./tests/integration/pkg/tests/... || {
-    set -x
-    kubectl get all -A
-    kubectl get clusters.provisioning.cattle.io -A
-    kubectl get machines -A
-    exit 1
-}
+go test -v -parallel 2 -timeout 20m ./tests/integration/pkg/tests/...
