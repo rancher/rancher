@@ -666,7 +666,11 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 	}
 
 	if isOnlyWorker(machine) {
-		instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+		if GetRuntime(controlPlane.Spec.KubernetesVersion) == RuntimeRKE2 {
+			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_TYPE=agent", GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+		} else {
+			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+		}
 	}
 	nodePlan.Instructions = append(nodePlan.Instructions, instruction)
 	return nodePlan, nil
