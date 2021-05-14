@@ -78,6 +78,7 @@ func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb fun
 		}
 	}()
 
+	var last interface{} = obj
 	for event := range result.ResultChan() {
 		switch event.Type {
 		case watch.Added:
@@ -85,6 +86,7 @@ func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb fun
 		case watch.Modified:
 			fallthrough
 		case watch.Deleted:
+			last = event.Object
 			done, err := cb(event.Object)
 			if err != nil || done {
 				return err
@@ -92,5 +94,5 @@ func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb fun
 		}
 	}
 
-	return fmt.Errorf("timeout waiting condition")
+	return fmt.Errorf("timeout waiting condition: %v", last)
 }
