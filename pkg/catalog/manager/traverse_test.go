@@ -194,3 +194,19 @@ func Test_Set_Catalog_Error_State(t *testing.T) {
 		assert.Equal(t, "Error syncing catalog testCatalog", v32.CatalogConditionRefreshed.GetMessage(&c.catalog))
 	}
 }
+
+func TestCompressHelmVersionCommits(t *testing.T) {
+	a := assert.New(t)
+	payload := map[string]v32.VersionCommits{
+		"foo": {
+			Value: map[string]string{
+				"bar": "baz",
+			},
+		},
+	}
+	uncompressedPayload, err := compressHelmVersionCommits(payload)
+	a.NoError(err)
+	compressedPayload, err := decompressHelmVersionCommits(uncompressedPayload)
+	a.NoError(err)
+	a.Equal(compressedPayload, payload)
+}

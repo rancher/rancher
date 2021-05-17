@@ -35,11 +35,13 @@ type CatalogSpec struct {
 }
 
 type CatalogStatus struct {
-	LastRefreshTimestamp string `json:"lastRefreshTimestamp,omitempty"`
-	Commit               string `json:"commit,omitempty"`
-	// helmVersionCommits records hash of each helm template version
+	LastRefreshTimestamp         string             `json:"lastRefreshTimestamp,omitempty"`
+	Commit                       string             `json:"commit,omitempty"`
+	Conditions                   []CatalogCondition `json:"conditions,omitempty"`
+	CompressedHelmVersionCommits []byte             `json:"compressedHelmVersionCommits,omitempty"`
+
+	// Deprecated in favor of `CompressedHelmVersionCommits`
 	HelmVersionCommits map[string]VersionCommits `json:"helmVersionCommits,omitempty"`
-	Conditions         []CatalogCondition        `json:"conditions,omitempty"`
 }
 
 var (

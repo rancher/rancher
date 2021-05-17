@@ -5,57 +5,59 @@ import (
 )
 
 const (
-	ClusterCatalogType                      = "clusterCatalog"
-	ClusterCatalogFieldAnnotations          = "annotations"
-	ClusterCatalogFieldBranch               = "branch"
-	ClusterCatalogFieldClusterID            = "clusterId"
-	ClusterCatalogFieldCommit               = "commit"
-	ClusterCatalogFieldConditions           = "conditions"
-	ClusterCatalogFieldCreated              = "created"
-	ClusterCatalogFieldCreatorID            = "creatorId"
-	ClusterCatalogFieldDescription          = "description"
-	ClusterCatalogFieldHelmVersion          = "helmVersion"
-	ClusterCatalogFieldKind                 = "kind"
-	ClusterCatalogFieldLabels               = "labels"
-	ClusterCatalogFieldLastRefreshTimestamp = "lastRefreshTimestamp"
-	ClusterCatalogFieldName                 = "name"
-	ClusterCatalogFieldNamespaceId          = "namespaceId"
-	ClusterCatalogFieldOwnerReferences      = "ownerReferences"
-	ClusterCatalogFieldPassword             = "password"
-	ClusterCatalogFieldRemoved              = "removed"
-	ClusterCatalogFieldState                = "state"
-	ClusterCatalogFieldTransitioning        = "transitioning"
-	ClusterCatalogFieldTransitioningMessage = "transitioningMessage"
-	ClusterCatalogFieldURL                  = "url"
-	ClusterCatalogFieldUUID                 = "uuid"
-	ClusterCatalogFieldUsername             = "username"
+	ClusterCatalogType                              = "clusterCatalog"
+	ClusterCatalogFieldAnnotations                  = "annotations"
+	ClusterCatalogFieldBranch                       = "branch"
+	ClusterCatalogFieldClusterID                    = "clusterId"
+	ClusterCatalogFieldCommit                       = "commit"
+	ClusterCatalogFieldCompressedHelmVersionCommits = "compressedHelmVersionCommits"
+	ClusterCatalogFieldConditions                   = "conditions"
+	ClusterCatalogFieldCreated                      = "created"
+	ClusterCatalogFieldCreatorID                    = "creatorId"
+	ClusterCatalogFieldDescription                  = "description"
+	ClusterCatalogFieldHelmVersion                  = "helmVersion"
+	ClusterCatalogFieldKind                         = "kind"
+	ClusterCatalogFieldLabels                       = "labels"
+	ClusterCatalogFieldLastRefreshTimestamp         = "lastRefreshTimestamp"
+	ClusterCatalogFieldName                         = "name"
+	ClusterCatalogFieldNamespaceId                  = "namespaceId"
+	ClusterCatalogFieldOwnerReferences              = "ownerReferences"
+	ClusterCatalogFieldPassword                     = "password"
+	ClusterCatalogFieldRemoved                      = "removed"
+	ClusterCatalogFieldState                        = "state"
+	ClusterCatalogFieldTransitioning                = "transitioning"
+	ClusterCatalogFieldTransitioningMessage         = "transitioningMessage"
+	ClusterCatalogFieldURL                          = "url"
+	ClusterCatalogFieldUUID                         = "uuid"
+	ClusterCatalogFieldUsername                     = "username"
 )
 
 type ClusterCatalog struct {
 	types.Resource
-	Annotations          map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Branch               string             `json:"branch,omitempty" yaml:"branch,omitempty"`
-	ClusterID            string             `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Commit               string             `json:"commit,omitempty" yaml:"commit,omitempty"`
-	Conditions           []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description          string             `json:"description,omitempty" yaml:"description,omitempty"`
-	HelmVersion          string             `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
-	Kind                 string             `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Labels               map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
-	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty" yaml:"lastRefreshTimestamp,omitempty"`
-	Name                 string             `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId          string             `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Password             string             `json:"password,omitempty" yaml:"password,omitempty"`
-	Removed              string             `json:"removed,omitempty" yaml:"removed,omitempty"`
-	State                string             `json:"state,omitempty" yaml:"state,omitempty"`
-	Transitioning        string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	URL                  string             `json:"url,omitempty" yaml:"url,omitempty"`
-	UUID                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	Username             string             `json:"username,omitempty" yaml:"username,omitempty"`
+	Annotations                  map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Branch                       string             `json:"branch,omitempty" yaml:"branch,omitempty"`
+	ClusterID                    string             `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Commit                       string             `json:"commit,omitempty" yaml:"commit,omitempty"`
+	CompressedHelmVersionCommits string             `json:"compressedHelmVersionCommits,omitempty" yaml:"compressedHelmVersionCommits,omitempty"`
+	Conditions                   []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created                      string             `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                    string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description                  string             `json:"description,omitempty" yaml:"description,omitempty"`
+	HelmVersion                  string             `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
+	Kind                         string             `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Labels                       map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LastRefreshTimestamp         string             `json:"lastRefreshTimestamp,omitempty" yaml:"lastRefreshTimestamp,omitempty"`
+	Name                         string             `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId                  string             `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences              []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Password                     string             `json:"password,omitempty" yaml:"password,omitempty"`
+	Removed                      string             `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                        string             `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning                string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage         string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	URL                          string             `json:"url,omitempty" yaml:"url,omitempty"`
+	UUID                         string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Username                     string             `json:"username,omitempty" yaml:"username,omitempty"`
 }
 
 type ClusterCatalogCollection struct {

@@ -1,7 +1,11 @@
 package manager
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -54,15 +58,31 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		}
 	}
 
+	allExistingHelmVersionCommits, err := decompressHelmVersionCommits(catalog.Status.CompressedHelmVersionCommits)
+	if err != nil {
+		return err
+	}
+
+	// Deprecation strategy: always delete the value of the deprecated field when it's not nil, and
+	// if the new field is nil, then temporarily use the value of the deprecated field.
+	if catalog.Status.HelmVersionCommits != nil {
+		if allExistingHelmVersionCommits == nil {
+			allExistingHelmVersionCommits = catalog.Status.HelmVersionCommits
+		}
+		catalog.Status.HelmVersionCommits = nil
+	}
+
 	entriesWithErrors, entriesToProcess := m.preprocessCatalog(catalog, index.IndexFile.Entries)
 	for chart, metadata := range entriesToProcess {
 		newHelmVersionCommits[chart] = v32.VersionCommits{
 			Value: map[string]string{},
 		}
+
 		existingHelmVersionCommits := map[string]string{}
-		if catalog.Status.HelmVersionCommits[chart].Value != nil {
-			existingHelmVersionCommits = catalog.Status.HelmVersionCommits[chart].Value
+		if allExistingHelmVersionCommits[chart].Value != nil {
+			existingHelmVersionCommits = allExistingHelmVersionCommits[chart].Value
 		}
+
 		keywords := map[string]struct{}{}
 		// comparing version commit with the previous commit to detect if a template has been changed.
 		hasChanged := false
@@ -242,7 +262,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	}
 
 	toDeleteChart := []string{}
-	for chart := range catalog.Status.HelmVersionCommits {
+	for chart := range allExistingHelmVersionCommits {
 		if _, ok := index.IndexFile.Entries[chart]; !ok {
 			toDeleteChart = append(toDeleteChart, getValidTemplateName(catalog.Name, chart))
 		}
@@ -258,7 +278,10 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	failedTemplates = failedTemplates + len(entriesWithErrors)
 	logrus.Infof("Catalog sync done. %v templates created, %v templates updated, %v templates deleted, %v templates failed", createdTemplates, updatedTemplates, deletedTemplates, failedTemplates)
 
-	catalog.Status.HelmVersionCommits = newHelmVersionCommits
+	catalog.Status.CompressedHelmVersionCommits, err = compressHelmVersionCommits(newHelmVersionCommits)
+	if err != nil {
+		return err
+	}
 
 	if projectCatalog != nil {
 		projectCatalog.Catalog = *catalog
@@ -332,4 +355,46 @@ func processInvalidChartErrors(entriesWithErrors []ChartsWithErrors) string {
 		fmt.Fprintf(&invalidChartErrors, "%s;", errorInfo.error.Error())
 	}
 	return invalidChartErrors.String()
+}
+
+func compressHelmVersionCommits(m map[string]v32.VersionCommits) ([]byte, error) {
+	// If the map is empty, there's nothing to compress.
+	if m == nil {
+		return nil, nil
+	}
+
+	buf := &bytes.Buffer{}
+	gw := gzip.NewWriter(buf)
+	if err := json.NewEncoder(gw).Encode(m); err != nil {
+		return nil, err
+	}
+	if err := gw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func decompressHelmVersionCommits(b []byte) (map[string]v32.VersionCommits, error) {
+	// If the byte array is empty, there's nothing to decompress.
+	if b == nil {
+		return nil, nil
+	}
+
+	gr, err := gzip.NewReader(bytes.NewBuffer(b))
+	if err != nil {
+		return nil, err
+	}
+	if err := gr.Close(); err != nil {
+		return nil, err
+	}
+	data, err := ioutil.ReadAll(gr)
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]v32.VersionCommits)
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }

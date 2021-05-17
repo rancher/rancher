@@ -5,53 +5,55 @@ import (
 )
 
 const (
-	CatalogType                      = "catalog"
-	CatalogFieldAnnotations          = "annotations"
-	CatalogFieldBranch               = "branch"
-	CatalogFieldCommit               = "commit"
-	CatalogFieldConditions           = "conditions"
-	CatalogFieldCreated              = "created"
-	CatalogFieldCreatorID            = "creatorId"
-	CatalogFieldDescription          = "description"
-	CatalogFieldHelmVersion          = "helmVersion"
-	CatalogFieldKind                 = "kind"
-	CatalogFieldLabels               = "labels"
-	CatalogFieldLastRefreshTimestamp = "lastRefreshTimestamp"
-	CatalogFieldName                 = "name"
-	CatalogFieldOwnerReferences      = "ownerReferences"
-	CatalogFieldPassword             = "password"
-	CatalogFieldRemoved              = "removed"
-	CatalogFieldState                = "state"
-	CatalogFieldTransitioning        = "transitioning"
-	CatalogFieldTransitioningMessage = "transitioningMessage"
-	CatalogFieldURL                  = "url"
-	CatalogFieldUUID                 = "uuid"
-	CatalogFieldUsername             = "username"
+	CatalogType                              = "catalog"
+	CatalogFieldAnnotations                  = "annotations"
+	CatalogFieldBranch                       = "branch"
+	CatalogFieldCommit                       = "commit"
+	CatalogFieldCompressedHelmVersionCommits = "compressedHelmVersionCommits"
+	CatalogFieldConditions                   = "conditions"
+	CatalogFieldCreated                      = "created"
+	CatalogFieldCreatorID                    = "creatorId"
+	CatalogFieldDescription                  = "description"
+	CatalogFieldHelmVersion                  = "helmVersion"
+	CatalogFieldKind                         = "kind"
+	CatalogFieldLabels                       = "labels"
+	CatalogFieldLastRefreshTimestamp         = "lastRefreshTimestamp"
+	CatalogFieldName                         = "name"
+	CatalogFieldOwnerReferences              = "ownerReferences"
+	CatalogFieldPassword                     = "password"
+	CatalogFieldRemoved                      = "removed"
+	CatalogFieldState                        = "state"
+	CatalogFieldTransitioning                = "transitioning"
+	CatalogFieldTransitioningMessage         = "transitioningMessage"
+	CatalogFieldURL                          = "url"
+	CatalogFieldUUID                         = "uuid"
+	CatalogFieldUsername                     = "username"
 )
 
 type Catalog struct {
 	types.Resource
-	Annotations          map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Branch               string             `json:"branch,omitempty" yaml:"branch,omitempty"`
-	Commit               string             `json:"commit,omitempty" yaml:"commit,omitempty"`
-	Conditions           []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description          string             `json:"description,omitempty" yaml:"description,omitempty"`
-	HelmVersion          string             `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
-	Kind                 string             `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Labels               map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
-	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty" yaml:"lastRefreshTimestamp,omitempty"`
-	Name                 string             `json:"name,omitempty" yaml:"name,omitempty"`
-	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Password             string             `json:"password,omitempty" yaml:"password,omitempty"`
-	Removed              string             `json:"removed,omitempty" yaml:"removed,omitempty"`
-	State                string             `json:"state,omitempty" yaml:"state,omitempty"`
-	Transitioning        string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	URL                  string             `json:"url,omitempty" yaml:"url,omitempty"`
-	UUID                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	Username             string             `json:"username,omitempty" yaml:"username,omitempty"`
+	Annotations                  map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Branch                       string             `json:"branch,omitempty" yaml:"branch,omitempty"`
+	Commit                       string             `json:"commit,omitempty" yaml:"commit,omitempty"`
+	CompressedHelmVersionCommits string             `json:"compressedHelmVersionCommits,omitempty" yaml:"compressedHelmVersionCommits,omitempty"`
+	Conditions                   []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created                      string             `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                    string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description                  string             `json:"description,omitempty" yaml:"description,omitempty"`
+	HelmVersion                  string             `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
+	Kind                         string             `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Labels                       map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LastRefreshTimestamp         string             `json:"lastRefreshTimestamp,omitempty" yaml:"lastRefreshTimestamp,omitempty"`
+	Name                         string             `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences              []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Password                     string             `json:"password,omitempty" yaml:"password,omitempty"`
+	Removed                      string             `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                        string             `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning                string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage         string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	URL                          string             `json:"url,omitempty" yaml:"url,omitempty"`
+	UUID                         string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Username                     string             `json:"username,omitempty" yaml:"username,omitempty"`
 }
 
 type CatalogCollection struct {
