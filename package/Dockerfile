@@ -25,19 +25,18 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
-ENV CATTLE_K3S_VERSION v1.19.8+k3s1
+ENV CATTLE_K3S_VERSION v1.20.6+k3s1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher58
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION v3.4.3
+ENV CATTLE_ETCD_VERSION v3.4.15
 ENV LOGLEVEL_VERSION v0.1.3
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.14
-ENV KUBECTL_VERSION v1.19.7
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV HELM_VERSION v3.3.1
-ENV KUSTOMIZE_VERSION v3.5.4
+ENV KUSTOMIZE_VERSION v3.10.0
 ENV CATTLE_SYSTEM_AGENT_VERSION v0.0.1-alpha18
 
 # System charts minimal version
@@ -76,20 +75,13 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
     K3S_URL_amd64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s \
     K3S_URL_arm64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-arm64 \
     K3S_URL=K3S_URL_${ARCH} \
-    ETCD_URL_amd64=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-amd64.tar.gz \
-    ETCD_URL_arm64=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-arm64.tar.gz \
-    ETCD_URL=ETCD_URL_${ARCH} \
-    KUSTOMIZE_URL_amd64=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz \
-    KUSTOMIZE_URL_arm64=https://github.com/brendarearden/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_arm64.tar.gz \
-    KUSTOMIZE_URL=KUSTOMIZE_URL_${ARCH}
+    ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz \
+    KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
-RUN if [ "${ARCH}" == "arm64" ]; then \
-    curl -sLf ${!KUSTOMIZE_URL} | tar xvzf - --strip-components=1 -C /usr/bin; else \
-    curl -sOL ${!KUSTOMIZE_URL} && \
+RUN curl -sOL ${KUSTOMIZE_URL} && \
     sleep 1 && \
     tar xzf kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz -C /usr/bin && \
-    rm kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz; \
-    fi
+    rm kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
 # set up helm 2
 RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
@@ -106,9 +98,9 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
     mkdir -p /var/lib/rancher/k3s/agent/images/ && \
-    curl -sfL ${!ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
+    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
-    curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
+    curl -sLf https://storage.googleapis.com/kubernetes-release/release/${CATTLE_K3S_VERSION%+*}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/tini /usr/bin/telemetry /usr/bin/k3s /usr/bin/kubectl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 

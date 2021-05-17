@@ -5,13 +5,13 @@ ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher58
-ENV CATTLE_K3S_VERSION v1.19.8+k3s1
-ENV CATTLE_ETCD_VERSION v3.4.3
+ENV CATTLE_K3S_VERSION v1.20.6+k3s1
+ENV CATTLE_ETCD_VERSION v3.4.15
 # version used by helm plugin install script
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher3
 # helm 3 version
 ENV HELM_VERSION v3.3.1
-ENV KUSTOMIZE_VERSION v3.5.4
+ENV KUSTOMIZE_VERSION v3.10.0
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.6
@@ -25,7 +25,7 @@ RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACH
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
-RUN wget -O - https://storage.googleapis.com/golang/go1.16.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local
+RUN wget -O - https://storage.googleapis.com/golang/go1.16.4.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
     curl -sL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.27.0; \
@@ -46,20 +46,13 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
     K3S_URL_amd64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s \
     K3S_URL_arm64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-arm64 \
     K3S_URL=K3S_URL_${ARCH} \
-    ETCD_URL_amd64=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-amd64.tar.gz \
-    ETCD_URL_arm64=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-arm64.tar.gz \
-    ETCD_URL=ETCD_URL_${ARCH} \
-    KUSTOMIZE_URL_amd64=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz \
-    KUSTOMIZE_URL_arm64=https://github.com/brendarearden/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_arm64.tar.gz \
-    KUSTOMIZE_URL=KUSTOMIZE_URL_${ARCH}
+    ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz \
+    KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
-RUN if [ "${ARCH}" == "arm64" ]; then \
-    curl -sLf ${!KUSTOMIZE_URL} | tar xvzf - --strip-components=1 -C /usr/bin; else \
-    curl -sOL ${!KUSTOMIZE_URL} && \
+RUN curl -sOL ${KUSTOMIZE_URL} && \
     sleep 1 && \
     tar xzf kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz -C /usr/bin && \
-    rm kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz; \
-    fi
+    rm kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
 # set up helm 2
 RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
@@ -77,7 +70,7 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 RUN curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
-    curl -sfL ${!ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd && \
+    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd && \
     chmod +x /usr/bin/k3s && \
     mkdir -p /go/src/github.com/rancher/rancher/.kube && \
     ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml
