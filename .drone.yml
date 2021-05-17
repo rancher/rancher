@@ -1062,49 +1062,6 @@ depends_on:
 - default-windows-1903
 ---
 kind: pipeline
-name: docker-image-digests-windows-1909
-
-platform:
-  os: windows
-  arch: amd64
-  version: 1909
-
-steps:
-- name: docker-image-digests
-  image: rancher/drone-docker-image-digests:v0.0.11
-  environment:
-    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
-    PLUGIN_GITHUB_TOKEN:
-      from_secret: github_token
-    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
-    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
-    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-1909.txt"
-    PLUGIN_REGISTRY: "docker.io"
-  volumes:
-    - name: docker_pipe
-      path: \\\\.\\pipe\\docker_engine
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    event:
-    - tag
-
-volumes:
-  - name: docker_pipe
-    host:
-      path: \\\\.\\pipe\\docker_engine
-
-trigger:
-  event:
-    exclude:
-    - promote
-
-depends_on:
-- default-linux-amd64
-- default-windows-1909
----
-kind: pipeline
 name: docker-image-digests-windows-2004
 
 platform:
