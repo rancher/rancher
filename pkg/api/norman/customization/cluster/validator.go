@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -68,6 +69,10 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	}
 
 	if err := v.validateGenericEngineConfig(request, &clusterSpec); err != nil {
+		return err
+	}
+
+	if err := v.validateAKSConfig(request, data, &clusterSpec); err != nil {
 		return err
 	}
 
@@ -340,6 +345,104 @@ func (v *Validator) validateGenericEngineConfig(request *types.APIContext, spec 
 
 	return nil
 
+}
+
+func (v *Validator) validateAKSConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {
+	aksConfig, ok := cluster["aksConfig"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	var prevCluster *v3.Cluster
+
+	if request.Method == http.MethodPut {
+		var err error
+		prevCluster, err = v.ClusterLister.Get("", request.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// check user's access to cloud credential
+	if azureCredential, ok := aksConfig["azureCredentialSecret"].(string); ok {
+		if err := validateAKSCredentialAuth(request, azureCredential, prevCluster); err != nil {
+			return err
+		}
+	}
+
+	createFromImport := request.Method == http.MethodPost && aksConfig["imported"] == true
+
+	if !createFromImport {
+		if err := validateAKSKubernetesVersion(clusterSpec, prevCluster); err != nil {
+			return err
+		}
+		if err := validateAKSNodePools(clusterSpec); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateAKSCredentialAuth validates that a user has access to the credential they are setting and the credential
+// they are overwriting. If there is no previous credential such as during a create or the old credential cannot
+// be found, the auth check will succeed as long as the user can access the new credential.
+func validateAKSCredentialAuth(request *types.APIContext, credential string, prevCluster *v3.Cluster) error {
+	var accessCred mgmtclient.CloudCredential
+	credentialErr := "error accessing cloud credential"
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
+		return httperror.NewAPIError(httperror.NotFound, credentialErr)
+	}
+
+	if prevCluster == nil || prevCluster.Spec.AKSConfig == nil {
+		return nil
+	}
+
+	// validate the user has access to the old cloud credential before allowing them to change it
+	credential = prevCluster.Spec.AKSConfig.AzureCredentialSecret
+	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.NotFound.Status {
+				// old cloud credential doesn't exist anymore, anyone can change it
+				return nil
+			}
+		}
+		return httperror.NewAPIError(httperror.NotFound, credentialErr)
+	}
+
+	return nil
+}
+
+// validateAKSKubernetesVersion checks whether a kubernetes version is provided
+func validateAKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	clusterVersion := spec.AKSConfig.KubernetesVersion
+
+	if to.String(clusterVersion) == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
+	}
+
+	return nil
+}
+
+// validateAKSNodePools checks whether a given NodePool version is empty or not supported.
+// More involved validation is performed in the aks-operator.
+func validateAKSNodePools(spec *v32.ClusterSpec) error {
+	nodePools := spec.AKSConfig.NodePools
+	if nodePools == nil {
+		return nil
+	}
+	if len(nodePools) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one nodepool"))
+	}
+
+	for _, np := range nodePools {
+		name := np.Name
+		if to.String(name) == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("nodePool Name cannot be an empty string"))
+		}
+	}
+
+	return nil
 }
 
 func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {

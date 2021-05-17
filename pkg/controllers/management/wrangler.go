@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/aks"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	"github.com/rancher/rancher/pkg/controllers/management/eks"
@@ -18,6 +19,7 @@ import (
 func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, management *config.ManagementContext, manager *clustermanager.Manager) error {
 	if features.Legacy.Enabled() {
 		k3sbasedupgrade.Register(ctx, wranglerContext, management, manager)
+		aks.Register(ctx, wranglerContext, management)
 		eks.Register(ctx, wranglerContext, management)
 		gke.Register(ctx, wranglerContext, management)
 		clusterupstreamrefresher.Register(ctx, wranglerContext)

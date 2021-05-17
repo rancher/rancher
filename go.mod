@@ -45,10 +45,10 @@ replace (
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go v43.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.12
-	github.com/Azure/go-autorest/autorest/adal v0.9.5
-	github.com/Azure/go-autorest/autorest/to v0.3.1-0.20191028180845-3492b2aff503
+	github.com/Azure/azure-sdk-for-go v50.0.1-0.20210114072321-4a06a7dc9c3c+incompatible
+	github.com/Azure/go-autorest/autorest v0.11.16
+	github.com/Azure/go-autorest/autorest/adal v0.9.11-0.20210111195520-9fc88b15294e
+	github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/sprig/v3 v3.2.2
@@ -94,6 +94,7 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.15.0
+	github.com/rancher/aks-operator v1.0.1-rc3
 	github.com/rancher/apiserver v0.0.0-20210423001905-8cca34223733
 	github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430
 	github.com/rancher/dynamiclistener v0.2.1-0.20201110045217-9b1b7d3132e8
