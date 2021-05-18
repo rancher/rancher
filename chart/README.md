@@ -79,7 +79,7 @@ helm install rancher rancher-latest/rancher \
 ```
 
 - [Let’s Encrypt](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
-  
+
 ```bash
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
