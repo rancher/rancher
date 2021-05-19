@@ -565,6 +565,132 @@ depends_on:
 
 ---
 kind: pipeline
+name: docker-image-digests-linux-amd64
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
+      from_secret: github_token
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-linux-amd64.txt"
+    PLUGIN_REGISTRY: "docker.io"
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-linux-amd64
+---
+kind: pipeline
+name: docker-image-digests-linux-arm64
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
+      from_secret: github_token
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-linux-arm64.txt"
+    PLUGIN_REGISTRY: "docker.io"
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-linux-amd64
+- default-linux-arm64
+---
+kind: pipeline
+name: docker-image-digests-windows-1809
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1809
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-image-digests:v0.0.11
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
+      from_secret: github_token
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-1809.txt"
+    PLUGIN_REGISTRY: "docker.io"
+  volumes:
+    - name: docker_pipe
+      path: \\\\.\\pipe\\docker_engine
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-linux-amd64
+- default-windows-1809
+---
+kind: pipeline
 name: publish
 
 platform:
