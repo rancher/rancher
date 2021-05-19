@@ -949,8 +949,8 @@ github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40T
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
 github.com/quobyte/api v0.1.8/go.mod h1:jL7lIHrmqQ7yh05OJ+eEEdHr0u/kmT1Ff9iHd+4H6VI=
 github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4bJ1FwuaBZ6dt1VcDX5/O662mwR8GWqS4l68H6hkoYQ=
-github.com/rancher/aks-operator v1.0.1-rc3 h1:xZcctCgES0+h6vcCSU7tCBlkOVqBtlnsyti/RnDiHuU=
-github.com/rancher/aks-operator v1.0.1-rc3/go.mod h1:c3rHKpVkpWhPCgcMQue5BfDAhrSUrvXK33JHFKgdU+w=
+github.com/rancher/aks-operator v1.0.1-rc4 h1:H/GCiEFetQt1/dRcee1y8vx0eSJCsCuiV/rTePw0ADM=
+github.com/rancher/aks-operator v1.0.1-rc4/go.mod h1:c3rHKpVkpWhPCgcMQue5BfDAhrSUrvXK33JHFKgdU+w=
 github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/apiserver v0.0.0-20210519053359-f943376c4b42 h1:yjpulamf2dZz62++nQQaFjZv+qv5aR4Uwm3uj39AJ8Y=
 github.com/rancher/apiserver v0.0.0-20210519053359-f943376c4b42/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
@@ -998,8 +998,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAX
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
 github.com/rancher/remotedialer v0.2.6-0.20210318171128-d1ebd5202be4 h1:wo4G9nT0YUdHMQe6g++ojYMUvNtHoybhLJ2Ckr/L1N8=
 github.com/rancher/remotedialer v0.2.6-0.20210318171128-d1ebd5202be4/go.mod h1:dbzn9NF1JWbGEHL6Q/1KG4KFROILiY/j6wmfF1Np3fk=
-github.com/rancher/rke v1.3.0-rc1.0.20210517195002-462a7ba01ebb h1:54NJsyVA7Mk7PPjRPtIS+z8+GwPZN6caWfpVm6h/Dxw=
-github.com/rancher/rke v1.3.0-rc1.0.20210517195002-462a7ba01ebb/go.mod h1:8teMbZiv6i0IwNzsIjmaqbLIDEBZmvFv1j+1P7uUgyY=
+github.com/rancher/rke v1.3.0-rc1.0.20210519220830-89e84194d108 h1:9rm+n/pj6OPPpw0n7HSVuuVdCwA73C14q0W0NAW0cXM=
+github.com/rancher/rke v1.3.0-rc1.0.20210519220830-89e84194d108/go.mod h1:8teMbZiv6i0IwNzsIjmaqbLIDEBZmvFv1j+1P7uUgyY=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
 github.com/rancher/steve v0.0.0-20210519053530-dde5805b76eb h1:nRIvWGqaA1yoE9VXNC9k2aYyAw+bILiPdykiU0WT9Fw=
