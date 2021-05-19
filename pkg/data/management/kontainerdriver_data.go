@@ -115,7 +115,7 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		"opentelekomcloudcontainerengine",
 		"https://otc-rancher.obs.eu-de.otc.t-systems.com/cluster/driver/1.0.2/kontainer-engine-driver-otccce_linux_amd64.tar.gz",
 		"f2c0a8d1195cd51ae1ccdeb4a8defd2c3147b9a2c7510b091be0c12028740f5f",
-		"https://otc-rancher.obs.eu-de.otc.t-systems.com/cluster/ui/v1.0.3/component.js",
+		"https://otc-rancher.obs.eu-de.otc.t-systems.com/cluster/ui/v1.1.0/component.js",
 		false,
 		"*.otc.t-systems.com",
 	); err != nil {
