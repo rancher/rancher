@@ -47,6 +47,7 @@ func TestSingleNodeAllRoles(t *testing.T) {
 	}
 
 	assert.Equal(t, len(machines.Items), 1)
+	machine := machines.Items[0]
 
 	clusterClients, err := clients.ForCluster(c.Namespace, c.Name)
 	if err != nil {
@@ -65,6 +66,7 @@ func TestSingleNodeAllRoles(t *testing.T) {
 
 	// This shouldn't be one, fix when node args starts returning what is from the config file
 	assert.Len(t, args, 1)
+	assert.Len(t, machine.Status.Addresses, 2)
 }
 
 func TestThreeNodesAllRoles(t *testing.T) {

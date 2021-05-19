@@ -172,14 +172,27 @@ func (h *handler) updateMachine(node *corev1.Node, machine *capi.Machine, ranche
 	}
 
 	if d.String("spec", "providerID") != node.Spec.ProviderID {
-		data, err := data.Convert(infra.DeepCopyObject())
+		obj, err := data.Convert(infra.DeepCopyObject())
 		if err != nil {
 			return err
 		}
 
-		data.SetNested(node.Spec.ProviderID, "spec", "providerID")
+		obj.SetNested(node.Status.Addresses, "status", "addresses")
+		newObj, err := h.dynamic.UpdateStatus(&unstructured.Unstructured{
+			Object: obj,
+		})
+		if err != nil {
+			return err
+		}
+
+		obj, err = data.Convert(newObj)
+		if err != nil {
+			return err
+		}
+
+		obj.SetNested(node.Spec.ProviderID, "spec", "providerID")
 		_, err = h.dynamic.Update(&unstructured.Unstructured{
-			Object: data,
+			Object: obj,
 		})
 		return err
 	}

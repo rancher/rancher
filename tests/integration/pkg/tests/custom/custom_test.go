@@ -53,6 +53,7 @@ func TestCustomOneNode(t *testing.T) {
 	assert.Equal(t, machines.Items[0].Labels[planner.WorkerRoleLabel], "true")
 	assert.Equal(t, machines.Items[0].Labels[planner.ControlPlaneRoleLabel], "true")
 	assert.Equal(t, machines.Items[0].Labels[planner.EtcdRoleLabel], "true")
+	assert.Len(t, machines.Items[0].Status.Addresses, 2)
 }
 
 func TestCustomThreeNode(t *testing.T) {

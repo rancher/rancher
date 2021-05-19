@@ -3,6 +3,7 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
 type RKECommonNodeConfig struct {
@@ -12,14 +13,15 @@ type RKECommonNodeConfig struct {
 }
 
 type RKEMachineStatus struct {
-	JobComplete               bool   `json:"jobComplete,omitempty"`
-	JobName                   string `json:"jobName,omitempty"`
-	Ready                     bool   `json:"ready,omitempty"`
-	DriverHash                string `json:"driverHash,omitempty"`
-	DriverURL                 string `json:"driverUrl,omitempty"`
-	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
-	FailureReason             string `json:"failureReason,omitempty"`
-	FailureMessage            string `json:"failureMessage,omitempty"`
+	JobComplete               bool                  `json:"jobComplete,omitempty"`
+	JobName                   string                `json:"jobName,omitempty"`
+	Ready                     bool                  `json:"ready,omitempty"`
+	DriverHash                string                `json:"driverHash,omitempty"`
+	DriverURL                 string                `json:"driverUrl,omitempty"`
+	CloudCredentialSecretName string                `json:"cloudCredentialSecretName,omitempty"`
+	FailureReason             string                `json:"failureReason,omitempty"`
+	FailureMessage            string                `json:"failureMessage,omitempty"`
+	Addresses                 []capi.MachineAddress `json:"addresses,omitempty"`
 }
 
 // +genclient
@@ -38,5 +40,6 @@ type CustomMachineSpec struct {
 }
 
 type CustomMachineStatus struct {
-	Ready bool `json:"ready,omitempty"`
+	Ready     bool                  `json:"ready,omitempty"`
+	Addresses []capi.MachineAddress `json:"addresses,omitempty"`
 }
