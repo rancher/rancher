@@ -48,6 +48,13 @@ func main() {
 				},
 				GenerateTypes: true,
 			},
+			"ui.cattle.io": {
+				PackageName: "ui.cattle.io",
+				Types: []interface{}{
+					"./pkg/apis/ui.cattle.io/v1",
+				},
+				GenerateTypes: true,
+			},
 			"cluster.cattle.io": {
 				PackageName: "cluster.cattle.io",
 				Types: []interface{}{
