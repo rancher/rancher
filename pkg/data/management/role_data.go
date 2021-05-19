@@ -94,6 +94,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	userRole.addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
@@ -406,6 +407,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 func addUserRules(role *roleBuilder) *roleBuilder {
 	role.
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").

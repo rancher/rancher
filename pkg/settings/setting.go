@@ -64,7 +64,7 @@ var (
 	SystemAgentVersion                = NewSetting("system-agent-version", "")
 	SystemAgentInstallScript          = NewSetting("system-agent-install-script", "")
 	SystemAgentInstallerImage         = NewSetting("system-agent-installer-image", "docker.io/rancher/system-agent-installer-")
-	SystemAgentUpgradeImage           = NewSetting("system-agent-upgrade-image", "rancher/system-agent:v0.0.1-alpha7-suc")
+	SystemAgentUpgradeImage           = NewSetting("system-agent-upgrade-image", "rancher/system-agent:v0.0.1-alpha18-suc")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
 	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,fleet-system")
 	TelemetryOpt                      = NewSetting("telemetry-opt", "")

@@ -6,6 +6,7 @@ import (
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	uiv1 "github.com/rancher/rancher/pkg/apis/ui.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/crds/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/wrangler/pkg/apply"
@@ -37,6 +38,14 @@ func FeatureCRD() crd.CRD {
 
 func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 	result := []crd.CRD{
+		newCRD(&uiv1.NavLink{}, func(c crd.CRD) crd.CRD {
+			c.Status = false
+			c.NonNamespace = true
+			c.GVK.Kind = "NavLink"
+			c.GVK.Group = "ui.cattle.io"
+			c.GVK.Version = "v1"
+			return c
+		}),
 		newCRD(&v3.Cluster{}, func(c crd.CRD) crd.CRD {
 			c.Status = false
 			c.NonNamespace = true
