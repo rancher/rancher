@@ -8,7 +8,7 @@ import (
 	steve "github.com/rancher/steve/pkg/server"
 )
 
-func Register(ctx context.Context, server *steve.Server) error {
+func Register(ctx context.Context, server *steve.Server) {
 	server.SchemaFactory.AddTemplate(schema2.Template{
 		Group: "ui.cattle.io",
 		Kind:  "NavLink",
@@ -18,6 +18,4 @@ func Register(ctx context.Context, server *steve.Server) error {
 			}
 		},
 	})
-
-	return nil
 }

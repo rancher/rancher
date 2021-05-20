@@ -164,7 +164,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			wranglerContext.MultiClusterManager.Middleware,
 			authServer.Management,
 			additionalAPI,
-			requests.NewRequireAuthenticatedFilter("/v1/"),
+			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.settings"),
 		}.Handler(steve),
 		Wrangler:   wranglerContext,
 		Steve:      steve,
