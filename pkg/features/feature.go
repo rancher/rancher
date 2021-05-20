@@ -47,6 +47,12 @@ var (
 		true,
 		false,
 		true)
+	Gitops = newFeature(
+		"continuous-delivery",
+		"Gitops components in fleet",
+		true,
+		false,
+		true)
 	Auth = newFeature(
 		"auth",
 		"Enable authentication",
@@ -170,6 +176,24 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 			f.Set(*featureState.Spec.Value)
 		}
 	}
+}
+
+func SetFeature(featuresClient managementv3.FeatureClient, featureName string, value bool) error {
+	if featuresClient == nil {
+		return nil
+	}
+
+	featureState, err := featuresClient.Get(featureName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	featureState.Spec.Value = &[]bool{value}[0]
+	if _, err = featuresClient.Update(featureState); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // applyArgumentDefaults reads the features arguments and uses their values to overwrite

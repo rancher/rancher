@@ -7,6 +7,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 )
@@ -67,6 +68,10 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		"apiServerURL": settings.ServerURL.Get(),
 		"apiServerCA":  settings.CACerts.Get(),
 		"global":       systemGlobalRegistry,
+	}
+
+	fleetChartValues["gitops"] = map[string]interface{}{
+		"enabled": features.Gitops.Enabled(),
 	}
 
 	gitjobChartValues := make(map[string]interface{})
