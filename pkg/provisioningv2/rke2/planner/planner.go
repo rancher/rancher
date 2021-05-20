@@ -548,8 +548,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 
 	if isOnlyEtcd(machine) {
 		config["disable-scheduler"] = true
-		config["disable-cloud-controller"] = true
-		config["disable-api-server"] = true
+		config["disable-apiserver"] = true
 		config["disable-controller-manager"] = true
 	} else if isOnlyControlPlane(machine) {
 		config["disable-etcd"] = true
