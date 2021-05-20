@@ -140,9 +140,11 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 	nodePoolNames := map[string]bool{}
 	for _, nodePool := range cluster.Spec.RKEConfig.NodePools {
-		if nodePool.Name == "" || nodePool.NodeConfig == nil || nodePool.NodeConfig.Name == "" || nodePool.NodeConfig.Kind == "" ||
-			(nodePool.Quantity != nil && *nodePool.Quantity == 0) {
+		if nodePool.Quantity != nil && *nodePool.Quantity == 0 {
 			continue
+		}
+		if nodePool.Name == "" || nodePool.NodeConfig == nil || nodePool.NodeConfig.Name == "" || nodePool.NodeConfig.Kind == "" {
+			return nil, fmt.Errorf("invalid nodePool [%s] missing name or valid config", nodePool.Name)
 		}
 		if !nodePool.EtcdRole &&
 			!nodePool.ControlPlaneRole &&
