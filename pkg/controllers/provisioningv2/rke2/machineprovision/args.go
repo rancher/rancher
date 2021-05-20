@@ -9,6 +9,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/data/convert"
 	"github.com/rancher/wrangler/pkg/generic"
 	name2 "github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
@@ -77,7 +78,7 @@ func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, da
 		Data: map[string][]byte{},
 	}
 
-	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(meta, data)
+	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(meta, data, create)
 	if err != nil {
 		return driverArgs{}, err
 	}
@@ -150,7 +151,7 @@ func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
 	return d.String("status", "dataSecretName"), nil
 }
 
-func (h *handler) getSecretData(meta metav1.Object, obj data.Object) (string, string, map[string]string, error) {
+func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool) (string, string, map[string]string, error) {
 	var (
 		err     error
 		machine *capi.Machine
@@ -171,7 +172,7 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object) (string, st
 		}
 	}
 
-	if machine == nil {
+	if machine == nil && create {
 		return "", "", nil, generic.ErrSkip
 	}
 
@@ -223,6 +224,12 @@ func toArgs(driverName string, args map[string]interface{}) (cmd []string) {
 				}
 			}
 		}
+	}
+
+	if driverName == "amazonec2" &&
+		convert.ToString(args["securityGroup"]) != "rancher-nodes" &&
+		args["securityGroupReadonly"] == nil {
+		cmd = append(cmd, "--amazonec2-security-group-readonly")
 	}
 
 	sort.Strings(cmd)

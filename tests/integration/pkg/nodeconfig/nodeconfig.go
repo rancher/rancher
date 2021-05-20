@@ -20,7 +20,12 @@ import (
 
 func FromNode(node *corev1.Node) ([]string, error) {
 	var args []string
-	return args, json.Unmarshal([]byte(node.Annotations["k3s.io/node-args"]), &args)
+	str := node.Annotations["rke2.io/node-args"]
+	if str == "" {
+		str = node.Annotations["k3s.io/node-args"]
+	}
+
+	return args, json.Unmarshal([]byte(str), &args)
 }
 
 func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectReference, error) {
