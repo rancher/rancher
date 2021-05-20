@@ -120,12 +120,12 @@ func createService(clients *clients.Clients) error {
 }
 
 func getPod(clients *clients.Clients) (*corev1.Pod, error) {
-	pod, err := clients.Core.Pod().Get("default", "registry-cache", metav1.GetOptions{})
+	pod, err := clients.Core.Pod().Get(cachePodNamespace, cachePodName, metav1.GetOptions{})
 	if err == nil || !apierrors.IsNotFound(err) {
 		return pod, err
 	}
 
-	return clients.Core.Pod().Create(&corev1.Pod{
+	pod, err = clients.Core.Pod().Create(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cachePodName,
 			Namespace: cachePodNamespace,
@@ -182,6 +182,10 @@ func getPod(clients *clients.Clients) (*corev1.Pod, error) {
 			},
 		},
 	})
+	if apierrors.IsAlreadyExists(err) {
+		return clients.Core.Pod().Get(cachePodNamespace, cachePodName, metav1.GetOptions{})
+	}
+	return pod, err
 }
 
 func createSharedObjects(clients *clients.Clients) (*corev1.Secret, error) {

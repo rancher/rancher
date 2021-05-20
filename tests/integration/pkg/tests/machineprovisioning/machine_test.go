@@ -65,7 +65,7 @@ func TestSingleNodeAllRoles(t *testing.T) {
 	}
 
 	// This shouldn't be one, fix when node args starts returning what is from the config file
-	assert.Len(t, args, 1)
+	assert.Greater(t, len(args), 10)
 	assert.Len(t, machine.Status.Addresses, 2)
 }
 
