@@ -1,4 +1,4 @@
-package multiclusterchart
+package managedchart
 
 import (
 	tar2 "archive/tar"
@@ -36,37 +36,37 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			clients.Core.ConfigMap().Cache(),
 			clients.Core.Secret().Cache(),
 			clients.Catalog.ClusterRepo().Cache()),
-		mccCache:      clients.Mgmt.MultiClusterChart().Cache(),
-		mccController: clients.Mgmt.MultiClusterChart(),
+		mccCache:      clients.Mgmt.ManagedChart().Cache(),
+		mccController: clients.Mgmt.ManagedChart(),
 		bundleCache:   clients.Fleet.Bundle().Cache(),
 	}
 
 	clients.Catalog.ClusterRepo().OnChange(ctx, "mcc-repo", h.OnRepoChange)
 	relatedresource.Watch(ctx,
 		"mcc-from-bundle-trigger",
-		relatedresource.OwnerResolver(true, v3.SchemeGroupVersion.String(), "MultiClusterChart"),
-		clients.Mgmt.MultiClusterChart(),
+		relatedresource.OwnerResolver(true, v3.SchemeGroupVersion.String(), "ManagedChart"),
+		clients.Mgmt.ManagedChart(),
 		clients.Fleet.Bundle())
-	mgmtcontrollers.RegisterMultiClusterChartGeneratingHandler(ctx,
-		clients.Mgmt.MultiClusterChart(),
+	mgmtcontrollers.RegisterManagedChartGeneratingHandler(ctx,
+		clients.Mgmt.ManagedChart(),
 		clients.Apply.
 			WithSetOwnerReference(true, true).
 			WithCacheTypes(
-				clients.Mgmt.MultiClusterChart(),
+				clients.Mgmt.ManagedChart(),
 				clients.Fleet.Bundle()),
 		"Defined",
 		"mcc-bundle",
 		h.OnChange,
 		nil)
-	clients.Mgmt.MultiClusterChart().Cache().AddIndexer(chartByRepo, func(obj *v3.MultiClusterChart) ([]string, error) {
+	clients.Mgmt.ManagedChart().Cache().AddIndexer(chartByRepo, func(obj *v3.ManagedChart) ([]string, error) {
 		return []string{obj.Spec.RepoName}, nil
 	})
 }
 
 type handler struct {
 	charts        *content.Manager
-	mccCache      mgmtcontrollers.MultiClusterChartCache
-	mccController mgmtcontrollers.MultiClusterChartController
+	mccCache      mgmtcontrollers.ManagedChartCache
+	mccController mgmtcontrollers.ManagedChartController
 	bundleCache   fleetcontrollers.BundleCache
 }
 
@@ -83,7 +83,7 @@ func (h *handler) OnRepoChange(key string, _ *v1.ClusterRepo) (*v1.ClusterRepo, 
 	return nil, nil
 }
 
-func (h *handler) OnChange(mcc *v3.MultiClusterChart, status v3.MultiClusterChartStatus) ([]runtime.Object, v3.MultiClusterChartStatus, error) {
+func (h *handler) OnChange(mcc *v3.ManagedChart, status v3.ManagedChartStatus) ([]runtime.Object, v3.ManagedChartStatus, error) {
 	chart, err := h.charts.Chart("", mcc.Spec.RepoName, mcc.Spec.Chart, mcc.Spec.Version)
 	if err != nil {
 		return nil, status, err
@@ -162,7 +162,7 @@ func (h *handler) OnChange(mcc *v3.MultiClusterChart, status v3.MultiClusterChar
 	}, status, err
 }
 
-func (h *handler) updateStatus(status v3.MultiClusterChartStatus, bundle *v1alpha1.Bundle) (v3.MultiClusterChartStatus, error) {
+func (h *handler) updateStatus(status v3.ManagedChartStatus, bundle *v1alpha1.Bundle) (v3.ManagedChartStatus, error) {
 	bundle, err := h.bundleCache.Get(bundle.Namespace, bundle.Name)
 	if apierrors.IsNotFound(err) {
 		return status, nil

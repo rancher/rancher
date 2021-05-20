@@ -8,15 +8,15 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type MultiClusterChart struct {
+type ManagedChart struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MultiClusterChartSpec   `json:"spec"`
-	Status MultiClusterChartStatus `json:"status"`
+	Spec   ManagedChartSpec   `json:"spec"`
+	Status ManagedChartStatus `json:"status"`
 }
 
-type MultiClusterChartSpec struct {
+type ManagedChartSpec struct {
 	Paused           bool               `json:"paused,omitempty"`
 	Chart            string             `json:"chart,omitempty"`
 	RepoName         string             `json:"repoName,omitempty"`
@@ -33,10 +33,9 @@ type MultiClusterChartSpec struct {
 	Diff             *fleet.DiffOptions `json:"diff,omitempty"`
 
 	RolloutStrategy *fleet.RolloutStrategy `json:"rolloutStrategy,omitempty"`
-	Resources       []fleet.BundleResource `json:"resources,omitempty"`
 	Targets         []fleet.BundleTarget   `json:"targets,omitempty"`
 }
 
-type MultiClusterChartStatus struct {
+type ManagedChartStatus struct {
 	fleet.BundleStatus
 }
