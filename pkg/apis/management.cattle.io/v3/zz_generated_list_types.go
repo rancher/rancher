@@ -689,6 +689,23 @@ func NewLocalProvider(namespace, name string, obj LocalProvider) *LocalProvider 
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ManagedChartList is a list of ManagedChart resources
+type ManagedChartList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ManagedChart `json:"items"`
+}
+
+func NewManagedChart(namespace, name string, obj ManagedChart) *ManagedChart {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ManagedChart").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // MonitorMetricList is a list of MonitorMetric resources
 type MonitorMetricList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -733,23 +750,6 @@ type MultiClusterAppRevisionList struct {
 
 func NewMultiClusterAppRevision(namespace, name string, obj MultiClusterAppRevision) *MultiClusterAppRevision {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("MultiClusterAppRevision").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// MultiClusterChartList is a list of MultiClusterChart resources
-type MultiClusterChartList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []MultiClusterChart `json:"items"`
-}
-
-func NewMultiClusterChart(namespace, name string, obj MultiClusterChart) *MultiClusterChart {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("MultiClusterChart").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

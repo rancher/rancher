@@ -110,7 +110,7 @@ func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 		}
 		if features.ProvisioningV2.Enabled() {
 			result = append(result, crd.CRD{
-				SchemaObject: v3.MultiClusterChart{},
+				SchemaObject: v3.ManagedChart{},
 			}.WithStatus())
 		}
 	}

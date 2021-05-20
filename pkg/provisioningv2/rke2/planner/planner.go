@@ -810,7 +810,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
-		Path:    fmt.Sprintf("/etc/rancher/%s/config.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    fmt.Sprintf("/etc/rancher/%s/config.yaml.d/50-rancher.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
 	return nodePlan, nil

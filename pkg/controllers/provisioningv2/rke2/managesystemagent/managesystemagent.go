@@ -95,7 +95,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	rocontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithSetOwnerReference(false, false).
-			WithCacheTypes(clients.Mgmt.MultiClusterChart(),
+			WithCacheTypes(clients.Mgmt.ManagedChart(),
 				clients.Provisioning.Cluster()),
 		"", "manage-system-upgrade-controller", h.OnChangeInstallSUC, nil)
 }

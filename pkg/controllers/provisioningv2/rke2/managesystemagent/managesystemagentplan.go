@@ -16,12 +16,12 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 		return nil, status, nil
 	}
 
-	mcc := &v3.MultiClusterChart{
+	mcc := &v3.ManagedChart{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      name.SafeConcatName(cluster.Name, "managed", "system-upgrade-controller"),
 		},
-		Spec: v3.MultiClusterChartSpec{
+		Spec: v3.ManagedChartSpec{
 			DefaultNamespace: namespaces.System,
 			RepoName:         "rancher-charts",
 			Chart:            "system-upgrade-controller",
