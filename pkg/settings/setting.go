@@ -108,7 +108,7 @@ var (
 	EKSUpstreamRefresh                = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                = NewSetting("gke-refresh", "300")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage             = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher58")
+	MachineProvisionImage             = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher59")
 
 	FleetMinVersion          = NewSetting("fleet-min-version", "")
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
