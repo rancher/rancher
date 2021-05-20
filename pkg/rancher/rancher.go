@@ -155,6 +155,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Auth: authServer.Authenticator.Chain(
 			auditFilter),
 		Handler: responsewriter.Chain{
+			auth.SetXAPICattleAuthHeader,
 			responsewriter.ContentTypeOptions,
 			websocket.NewWebsocketHandler,
 			proxy.RewriteLocalCluster,
