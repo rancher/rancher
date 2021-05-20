@@ -31,7 +31,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 }
 
 func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, error) {
-	if machine == nil || machine.Spec.ClusterName == "" {
+	if machine == nil || machine.Spec.ClusterName == "" || machine.DeletionTimestamp == nil {
 		return machine, nil
 	}
 

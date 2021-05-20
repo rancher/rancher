@@ -77,7 +77,7 @@ func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, da
 		Data: map[string][]byte{},
 	}
 
-	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(meta, data)
+	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(meta, data, create)
 	if err != nil {
 		return driverArgs{}, err
 	}
@@ -150,7 +150,7 @@ func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
 	return d.String("status", "dataSecretName"), nil
 }
 
-func (h *handler) getSecretData(meta metav1.Object, obj data.Object) (string, string, map[string]string, error) {
+func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool) (string, string, map[string]string, error) {
 	var (
 		err     error
 		machine *capi.Machine
@@ -171,7 +171,7 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object) (string, st
 		}
 	}
 
-	if machine == nil {
+	if machine == nil && create {
 		return "", "", nil, generic.ErrSkip
 	}
 
