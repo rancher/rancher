@@ -9,6 +9,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/data/convert"
 	"github.com/rancher/wrangler/pkg/generic"
 	name2 "github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
@@ -223,6 +224,12 @@ func toArgs(driverName string, args map[string]interface{}) (cmd []string) {
 				}
 			}
 		}
+	}
+
+	if driverName == "amazonec2" &&
+		convert.ToString(args["securityGroup"]) != "rancher-nodes" &&
+		args["securityGroupReadonly"] == nil {
+		cmd = append(cmd, "--amazonec2-security-group-readonly")
 	}
 
 	sort.Strings(cmd)
