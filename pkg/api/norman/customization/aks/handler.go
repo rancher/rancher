@@ -128,15 +128,10 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 		logrus.Debugf("[AKS] error accessing cloud credential %s", credID)
 		return httperror.InvalidBodyContent.Status, fmt.Errorf("error accessing cloud credential %s", credID)
 	}
+	cap.TenantID = string(cc.Data["azurecredentialConfig-tenantId"])
 	cap.SubscriptionID = string(cc.Data["azurecredentialConfig-subscriptionId"])
 	cap.ClientID = string(cc.Data["azurecredentialConfig-clientId"])
 	cap.ClientSecret = string(cc.Data["azurecredentialConfig-clientSecret"])
-
-	cap.TenantID = req.URL.Query().Get("tenantId")
-	if cap.TenantID == "" {
-		logrus.Debugf("[AKS] error getting tenantId")
-		return http.StatusBadRequest, fmt.Errorf("error getting tenantId")
-	}
 
 	cap.BaseURL = req.URL.Query().Get("baseUrl")
 	if cap.BaseURL == "" {
