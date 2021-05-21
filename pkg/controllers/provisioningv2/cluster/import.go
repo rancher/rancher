@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/yaml"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
@@ -56,15 +55,6 @@ func (h *handler) deployAgent(cluster *v1.Cluster, status v1.ClusterStatus) (boo
 	}
 
 	if len(tokens) == 0 {
-		_, err := h.clusterTokens.Create(&v3.ClusterRegistrationToken{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "import-",
-				Namespace:    status.ClusterName,
-			},
-			Spec: v3.ClusterRegistrationTokenSpec{
-				ClusterName: status.ClusterName,
-			},
-		})
 		h.clusters.EnqueueAfter(cluster.Namespace, cluster.Name, 2*time.Second)
 		return false, err
 	}

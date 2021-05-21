@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/gvk"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +33,7 @@ func getInfraRef(rkeCluster *rkev1.RKECluster) *corev1.ObjectReference {
 	return infraRef
 }
 
-func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache) (result []runtime.Object, _ error) {
+func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
 	infraRef := cluster.Spec.RKEConfig.InfrastructureRef
 	if infraRef == nil {
 		rkeCluster := rkeCluster(cluster)
@@ -46,7 +47,7 @@ func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSch
 	capiCluster := capiCluster(cluster, rkeControlPlane, infraRef)
 	result = append(result, capiCluster)
 
-	machineDeployments, err := machineDeployments(cluster, capiCluster, dynamic, dynamicSchema)
+	machineDeployments, err := machineDeployments(cluster, capiCluster, dynamic, dynamicSchema, secrets)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +74,7 @@ func pruneBySchema(kind string, data map[string]interface{}, dynamicSchema mgmtc
 }
 
 func toMachineTemplate(nodePoolName string, cluster *rancherv1.Cluster, nodePool rancherv1.RKENodePool,
-	dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache) (runtime.Object, error) {
+	dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (runtime.Object, error) {
 	apiVersion := nodePool.NodeConfig.APIVersion
 	kind := nodePool.NodeConfig.Kind
 	if apiVersion == "" {
@@ -101,11 +102,17 @@ func toMachineTemplate(nodePoolName string, cluster *rancherv1.Cluster, nodePool
 	}
 
 	nodePoolData.Set("common", commonData)
-	if cluster.Spec.CloudCredentialSecretName != "" {
-		nodePoolData.SetNested(cluster.Spec.CloudCredentialSecretName, "common", "cloudCredentialSecretName")
-	}
+	secretName := cluster.Spec.CloudCredentialSecretName
 	if nodePool.CloudCredentialSecretName != "" {
-		nodePoolData.SetNested(nodePool.CloudCredentialSecretName, "common", "cloudCredentialSecretName")
+		secretName = nodePool.CloudCredentialSecretName
+	}
+
+	if secretName != "" {
+		_, err := secrets.Get(cluster.Namespace, secretName)
+		if err != nil {
+			return nil, err
+		}
+		nodePoolData.SetNested(secretName, "common", "cloudCredentialSecretName")
 	}
 
 	return &unstructured.Unstructured{
@@ -126,7 +133,7 @@ func toMachineTemplate(nodePoolName string, cluster *rancherv1.Cluster, nodePool
 }
 
 func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, dynamic *dynamic.Controller,
-	dynamicSchema mgmtcontroller.DynamicSchemaCache) (result []runtime.Object, _ error) {
+	dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
 	bootstrapName := name.SafeConcatName(cluster.Name, "bootstrap", "template")
 
 	if len(cluster.Spec.RKEConfig.NodePools) > 0 {
@@ -163,7 +170,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		)
 
 		if nodePool.NodeConfig.APIVersion == "" || nodePool.NodeConfig.APIVersion == "provisioning.cattle.io/v1" {
-			machineTemplate, err := toMachineTemplate(nodePoolName, cluster, nodePool, dynamic, dynamicSchema)
+			machineTemplate, err := toMachineTemplate(nodePoolName, cluster, nodePool, dynamic, dynamicSchema, secrets)
 			if err != nil {
 				return nil, err
 			}

@@ -198,15 +198,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
-		err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
-			return dashboard.Register(ctx, r.Wrangler)
-		})
-		if err != nil {
-			return err
-		}
 		return r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
-			dashboard.RegisterFleet(ctx, r.Wrangler)
-			return nil
+			return dashboard.Register(ctx, r.Wrangler)
 		})
 	})
 

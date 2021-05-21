@@ -134,15 +134,9 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 			},
 			Targets: []v1alpha1.BundleTarget{
 				{
+					ClusterName: cluster.Name,
 					ClusterSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "metadata.name",
-								Operator: metav1.LabelSelectorOpIn,
-								Values: []string{
-									cluster.Name,
-								},
-							},
 							{
 								Key:      "provisioning.cattle.io/unmanaged-system-agent",
 								Operator: metav1.LabelSelectorOpDoesNotExist,

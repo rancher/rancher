@@ -4,11 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
+	"regexp"
 
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
@@ -20,6 +21,7 @@ import (
 	"github.com/rancher/wrangler/pkg/kstatus"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/pkg/yaml"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,9 +29,12 @@ import (
 )
 
 const (
-	ByCluster         = "by-cluster"
-	creatorIDAnn      = "field.cattle.io/creatorId"
-	managedAnnotation = "provisioning.cattle.io/managed"
+	ByCluster    = "by-cluster"
+	creatorIDAnn = "field.cattle.io/creatorId"
+)
+
+var (
+	mgmtNameRegexp = regexp.MustCompile("c-[a-z0-9]{5}|local")
 )
 
 type handler struct {
@@ -40,9 +45,11 @@ type handler struct {
 	clusters          rocontrollers.ClusterController
 	clusterCache      rocontrollers.ClusterCache
 	secretCache       corecontrollers.SecretCache
-	settings          mgmtcontrollers.SettingCache
 	kubeconfigManager *kubeconfig.Manager
 	apply             apply.Apply
+
+	capiClusters capicontrollers.ClusterCache
+	capiMachines capicontrollers.MachineCache
 }
 
 func Register(
@@ -53,17 +60,25 @@ func Register(
 		mgmtClusters:      clients.Mgmt.Cluster(),
 		clusterTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:     clients.Mgmt.ClusterRegistrationToken(),
-		settings:          clients.Mgmt.Setting().Cache(),
 		clusters:          clients.Provisioning.Cluster(),
 		clusterCache:      clients.Provisioning.Cluster().Cache(),
 		secretCache:       clients.Core.Secret().Cache(),
+		capiClusters:      clients.CAPI.Cluster().Cache(),
+		capiMachines:      clients.CAPI.Machine().Cache(),
 		kubeconfigManager: kubeconfig.New(clients),
 		apply: clients.Apply.WithCacheTypes(
 			clients.Provisioning.Cluster(),
 			clients.Mgmt.Cluster()),
 	}
 
-	clients.Provisioning.Cluster().OnChange(ctx, "cluster-label", h.addLabel)
+	mgmtcontrollers.RegisterClusterGeneratingHandler(ctx,
+		clients.Mgmt.Cluster(),
+		clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
+		"",
+		"provisioning-cluster-create",
+		h.generateProvisioning,
+		nil)
+
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clients.Apply.WithCacheTypes(clients.Mgmt.Cluster(),
@@ -78,13 +93,16 @@ func Register(
 			AllowClusterScoped: true,
 		},
 	)
+
 	clients.Mgmt.Cluster().OnChange(ctx, "cluster-watch", h.createToken)
 	clusterCache := clients.Provisioning.Cluster().Cache()
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 
 	clusterCache.AddIndexer(ByCluster, byClusterIndex)
-	clients.Provisioning.Cluster().Informer().GetIndexer().ListKeys()
+
+	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
+	clients.Provisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
 }
 
 func byClusterIndex(obj *v1.Cluster) ([]string, error) {
@@ -92,22 +110,6 @@ func byClusterIndex(obj *v1.Cluster) ([]string, error) {
 		return nil, nil
 	}
 	return []string{obj.Status.ClusterName}, nil
-}
-
-func (h *handler) addLabel(_ string, cluster *v1.Cluster) (*v1.Cluster, error) {
-	if cluster == nil {
-		return nil, nil
-	}
-	if cluster.Labels["metadata.name"] == cluster.Name {
-		return cluster, nil
-	}
-
-	cluster = cluster.DeepCopy()
-	if cluster.Labels == nil {
-		cluster.Labels = map[string]string{}
-	}
-	cluster.Labels["metadata.name"] = cluster.Name
-	return h.clusters.Update(cluster)
 }
 
 func (h *handler) clusterWatch(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
@@ -128,17 +130,32 @@ func (h *handler) clusterWatch(namespace, name string, obj runtime.Object) ([]re
 	}, nil
 }
 
-func (h *handler) generateCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
-	if cluster.Spec.ReferencedConfig != nil {
-		return h.referenceCluster(cluster, status)
+func (h *handler) isLegacyCluster(cluster interface{}) bool {
+	if c, ok := cluster.(*v3.Cluster); ok {
+		return mgmtNameRegexp.MatchString(c.Name)
+	} else if c, ok := cluster.(*v1.Cluster); ok {
+		return mgmtNameRegexp.MatchString(c.Name)
 	}
+	return false
+}
 
-	if owningCluster, err := h.apply.FindOwner(cluster); errors.Is(err, apply.ErrOwnerNotFound) || errors.Is(err, apply.ErrNoInformerFound) {
-	} else if _, ok := owningCluster.(*v3.Cluster); err == nil && ok {
-		// Do not generate v3.Cluster if this cluster was generated from a v3.Cluster
+func (h *handler) generateProvisioning(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
+	if !h.isLegacyCluster(cluster) || cluster.Spec.FleetWorkspaceName == "" {
 		return nil, status, nil
 	}
+	return []runtime.Object{
+		&v1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cluster.Name,
+				Namespace:   cluster.Spec.FleetWorkspaceName,
+				Labels:      yaml.CleanAnnotationsForExport(cluster.Labels),
+				Annotations: yaml.CleanAnnotationsForExport(cluster.Annotations),
+			},
+		},
+	}, status, nil
+}
 
+func (h *handler) generateCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
 	switch {
 	case cluster.Spec.ClusterAPIConfig != nil:
 		return h.createClusterAndDeployAgent(cluster, status)
@@ -165,7 +182,7 @@ func NormalizeCluster(cluster *v3.Cluster) (runtime.Object, error) {
 }
 
 func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil || cluster.Annotations[managedAnnotation] != "true" {
+	if cluster == nil {
 		return cluster, nil
 	}
 	_, err := h.clusterTokenCache.Get(cluster.Name, "default-token")
@@ -185,6 +202,22 @@ func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error
 }
 
 func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
+	if h.isLegacyCluster(cluster) {
+		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Name)
+		if err != nil {
+			return nil, status, err
+		}
+		return h.updateStatus(nil, cluster, status, mgmtCluster)
+	}
+	return h.createNewCluster(cluster, status, spec)
+}
+
+func mgmtClusterName(clusterNamespace, clusterName string) string {
+	hash := sha256.Sum256([]byte(clusterNamespace + "/" + clusterName))
+	return name.SafeConcatName("c", "m", hex.EncodeToString(hash[:])[:8])
+}
+
+func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
 	spec.DisplayName = cluster.Name
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
 	spec.FleetWorkspaceName = cluster.Namespace
@@ -201,10 +234,9 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, sp
 		}
 	}
 
-	hash := sha256.Sum256([]byte(cluster.Namespace + "/" + cluster.Name))
 	newCluster := &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name.SafeConcatName("c", "m", hex.EncodeToString(hash[:])[:8]),
+			Name:        mgmtClusterName(cluster.Namespace, cluster.Name),
 			Labels:      cluster.Labels,
 			Annotations: map[string]string{},
 		},
@@ -221,7 +253,6 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, sp
 	}
 
 	newCluster.Annotations[creatorIDAnn] = userName
-	newCluster.Annotations[managedAnnotation] = "true"
 
 	normalizedCluster, err := NormalizeCluster(newCluster)
 	if err != nil {
@@ -260,7 +291,9 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 			return nil, status, err
 		}
 		if secret != nil {
-			objs = append(objs, secret)
+			if secret.UID == "" {
+				objs = append(objs, secret)
+			}
 			status.ClientSecretName = secret.Name
 
 			ctrb, err := h.kubeconfigManager.GetCTRBForAdmin(cluster, status)
