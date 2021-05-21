@@ -5,8 +5,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcluster"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetworkspace"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
@@ -48,11 +46,4 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 	}
 
 	return nil
-}
-
-func RegisterFleet(ctx context.Context, wrangler *wrangler.Context) {
-	if features.Fleet.Enabled() {
-		fleetcluster.Register(ctx, wrangler)
-		fleetworkspace.Register(ctx, wrangler)
-	}
 }

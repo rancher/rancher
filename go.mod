@@ -102,8 +102,8 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210428191153-f414eab0e4de
 	github.com/rancher/gke-operator v1.0.1
 	github.com/rancher/kubernetes-provider-detector v0.1.2
-	github.com/rancher/lasso v0.0.0-20210520191230-f56329537235
-	github.com/rancher/lasso/controller-runtime v0.0.0-20210520191230-f56329537235
+	github.com/rancher/lasso v0.0.0-20210521213517-f33d4f991ffe
+	github.com/rancher/lasso/controller-runtime v0.0.0-20210521213517-f33d4f991ffe
 	github.com/rancher/machine v0.15.0-rancher59
 	github.com/rancher/norman v0.0.0-20210513204752-e48df26b54bd
 	github.com/rancher/rancher/pkg/apis v0.0.0
@@ -114,7 +114,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20210520191028-52f86dce9bd4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3
-	github.com/rancher/wrangler v0.8.1-0.20210520191132-94dbdf4854e5
+	github.com/rancher/wrangler v0.8.1-0.20210521213200-39dd8bf93e9f
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39

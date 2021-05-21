@@ -360,6 +360,10 @@ func (a *featureGeneratingHandler) Remove(key string, obj *v3.Feature) (*v3.Feat
 }
 
 func (a *featureGeneratingHandler) Handle(obj *v3.Feature, status v3.FeatureStatus) (v3.FeatureStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.FeatureGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

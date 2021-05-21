@@ -220,6 +220,8 @@ func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, m
 	secret, err := m.secretCache.Get(clusterNamespace, secretName)
 	if err == nil {
 		return secret.Data, nil
+	} else if !apierror.IsNotFound(err) {
+		return nil, err
 	}
 
 	lockID := clusterNamespace + "/" + clusterName
@@ -280,15 +282,15 @@ func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, m
 }
 
 func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*corev1.Secret, error) {
-	var (
-		name = getKubeConfigSecretName(cluster.Name)
-	)
-
 	if cluster.Spec.ClusterAPIConfig != nil {
-		name = getKubeConfigSecretName(cluster.Spec.ClusterAPIConfig.ClusterName)
+		return m.secretCache.Get(cluster.Namespace, getKubeConfigSecretName(cluster.Spec.ClusterAPIConfig.ClusterName))
 	}
 
-	data, err := m.getKubeConfigData(cluster.Namespace, cluster.Name, name, status.ClusterName)
+	var (
+		secretName = getKubeConfigSecretName(cluster.Name)
+	)
+
+	data, err := m.getKubeConfigData(cluster.Namespace, cluster.Name, secretName, status.ClusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +298,7 @@ func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
-			Name:      name,
+			Name:      secretName,
 		},
 		Data: data,
 	}, nil

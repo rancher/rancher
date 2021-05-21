@@ -360,6 +360,10 @@ func (a *catalogGeneratingHandler) Remove(key string, obj *v3.Catalog) (*v3.Cata
 }
 
 func (a *catalogGeneratingHandler) Handle(obj *v3.Catalog, status v3.CatalogStatus) (v3.CatalogStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.CatalogGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

@@ -360,6 +360,10 @@ func (a *bundleGeneratingHandler) Remove(key string, obj *v1alpha1.Bundle) (*v1a
 }
 
 func (a *bundleGeneratingHandler) Handle(obj *v1alpha1.Bundle, status v1alpha1.BundleStatus) (v1alpha1.BundleStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.BundleGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

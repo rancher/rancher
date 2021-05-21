@@ -360,6 +360,10 @@ func (a *nodeGeneratingHandler) Remove(key string, obj *v3.Node) (*v3.Node, erro
 }
 
 func (a *nodeGeneratingHandler) Handle(obj *v3.Node, status v3.NodeStatus) (v3.NodeStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.NodeGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

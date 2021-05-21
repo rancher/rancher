@@ -23,13 +23,12 @@ type ClusterSpec struct {
 
 	ClusterAPIConfig *ClusterAPIConfig `json:"clusterAPIConfig,omitempty"`
 	RKEConfig        *RKEConfig        `json:"rkeConfig,omitempty"`
-	ReferencedConfig *ReferencedConfig `json:"referencedConfig,omitempty"`
 	RancherValues    rkev1.GenericMap  `json:"rancherValues,omitempty" wrangler:"nullable"`
 
 	AgentEnvVars                         []corev1.EnvVar `json:"agentEnvVars,omitempty"`
 	DefaultPodSecurityPolicyTemplateName string          `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
-	EnableNetworkPolicy                  *bool           `json:"enableNetworkPolicy" norman:"default=false"`
+	EnableNetworkPolicy                  *bool           `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
 }
 
 type ClusterStatus struct {
@@ -48,8 +47,4 @@ type ImportedConfig struct {
 
 type ClusterAPIConfig struct {
 	ClusterName string `json:"clusterName,omitempty"`
-}
-
-type ReferencedConfig struct {
-	ManagementClusterName string `json:"managementClusterName,omitempty"`
 }

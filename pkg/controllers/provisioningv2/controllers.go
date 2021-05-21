@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetcluster"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetworkspace"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/managedchart"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/bootstrap"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/dynamicschema"
@@ -30,6 +32,8 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 
 	if features.Fleet.Enabled() {
 		managedchart.Register(ctx, clients)
+		fleetcluster.Register(ctx, clients)
+		fleetworkspace.Register(ctx, clients)
 	}
 
 	if features.RKE2.Enabled() {

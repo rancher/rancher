@@ -54,8 +54,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			}
 			return obj, h.onFleetObject(obj)
 		})
-	clients.Fleet.GitRepo().OnChange(ctx, "workspace-backport",
-		func(s string, obj *fleet.GitRepo) (*fleet.GitRepo, error) {
+	clients.Fleet.Bundle().OnChange(ctx, "workspace-backport",
+		func(s string, obj *fleet.Bundle) (*fleet.Bundle, error) {
 			if obj == nil {
 				return nil, nil
 			}

@@ -360,6 +360,10 @@ func (a *projectGeneratingHandler) Remove(key string, obj *v3.Project) (*v3.Proj
 }
 
 func (a *projectGeneratingHandler) Handle(obj *v3.Project, status v3.ProjectStatus) (v3.ProjectStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ProjectGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

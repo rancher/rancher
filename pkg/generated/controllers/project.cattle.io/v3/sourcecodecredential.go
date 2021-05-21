@@ -360,6 +360,10 @@ func (a *sourceCodeCredentialGeneratingHandler) Remove(key string, obj *v3.Sourc
 }
 
 func (a *sourceCodeCredentialGeneratingHandler) Handle(obj *v3.SourceCodeCredential, status v3.SourceCodeCredentialStatus) (v3.SourceCodeCredentialStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.SourceCodeCredentialGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
