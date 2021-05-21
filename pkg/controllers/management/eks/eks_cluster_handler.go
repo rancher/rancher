@@ -6,11 +6,11 @@ import (
 	stderrors "errors"
 	"fmt"
 	"net"
+	"net/url"
 	"reflect"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/rancher/eks-operator/controller"
@@ -21,7 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/dialer"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/util"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -34,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/aws-iam-authenticator/pkg/token"
 )
@@ -256,6 +254,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		}
 
 		if cluster.Status.EKSStatus.PrivateRequiresTunnel == nil && !*cluster.Status.EKSStatus.UpstreamSpec.PublicAccess {
+			// In this case, the API endpoint is private and it has not been determined if Rancher must tunnel to communicate with it.
 			// Check to see if we can still use the public API endpoint even though
 			// the cluster has private-only access
 			serviceToken, mustTunnel, err := e.generateSATokenWithPublicAPI(cluster)
@@ -418,16 +417,17 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 
 // generateAndSetServiceAccount uses the API endpoint and CA cert to generate a service account token. The token is then copied to the cluster status.
 func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-	accessToken, err := e.getAccessToken(cluster)
-	if err != nil {
-		return cluster, err
-	}
-
 	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
-	saToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, accessToken, clusterDialer)
+
+	restConfig, err := e.getRestConfig(cluster, clusterDialer)
+	if err != nil {
+		return cluster, err
+	}
+
+	saToken, err := clusteroperator.GenerateSAToken(restConfig)
 	if err != nil {
 		return cluster, err
 	}
@@ -487,52 +487,47 @@ func (e *eksOperatorController) deployEKSOperator() error {
 	return e.DeployOperator(eksOperator, eksOperatorTemplate, eksShortName)
 }
 
+// generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.
+// This function is called if the cluster has only privateEndpoint enabled and is not publicly available.
+// If Rancher is able to communicate with the cluster through its API endpoint even though it is private, then this function will retrieve
+// a service account token and the *bool returned will refer to a false value (doesn't have to tunnel).
+//
+// If the Rancher server cannot connect to the cluster's API endpoint, then one of the two errors below will happen.
+// In this case, we know that Rancher must use the cluster agent tunnel for communication. This function will return an empty service account token,
+// and the *bool return value will refer to a true value (must tunnel).
+//
+// If an error different from the two below occur, then the *bool return value will be nil, indicating that Rancher was not able to determine if
+// tunneling is required to communicate with the cluster.
 func (e *eksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, *bool, error) {
-	var publicAccess *bool
-	accessToken, err := e.getAccessToken(cluster)
+	restConfig, err := e.getRestConfig(cluster, (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext)
 	if err != nil {
 		return "", nil, err
 	}
 
-	netDialer := net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}
-
-	serviceToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, accessToken, netDialer.DialContext)
+	requiresTunnel := new(bool)
+	serviceToken, err := clusteroperator.GenerateSAToken(restConfig)
 	if err != nil {
+		*requiresTunnel = true
 		var dnsError *net.DNSError
 		if stderrors.As(err, &dnsError) && !dnsError.IsTemporary {
-			return "", aws.Bool(true), nil
+			return "", requiresTunnel, nil
 		}
-	} else {
-		publicAccess = aws.Bool(false)
+
+		// In the existence of a proxy, it may be the case that the following error occurs,
+		// in which case rancher should use the tunnel connection to communicate with the cluster.
+		var urlError *url.Error
+		if stderrors.As(err, &urlError) && urlError.Timeout() {
+			return "", requiresTunnel, nil
+		}
+
+		// Not able to determine if tunneling is required.
+		requiresTunnel = nil
 	}
 
-	return serviceToken, publicAccess, err
-}
-
-func generateSAToken(endpoint, ca, token string, dialer typesDialer.Dialer) (string, error) {
-	decodedCA, err := base64.StdEncoding.DecodeString(ca)
-	if err != nil {
-		return "", err
-	}
-
-	restConfig := &rest.Config{
-		Host: endpoint,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: decodedCA,
-		},
-		BearerToken: token,
-		Dial:        dialer,
-	}
-
-	clientset, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return "", fmt.Errorf("error creating clientset: %v", err)
-	}
-
-	return util.GenerateServiceAccountToken(clientset)
+	return serviceToken, requiresTunnel, err
 }
 
 func (e *eksOperatorController) getAccessToken(cluster *mgmtv3.Cluster) (string, error) {
@@ -554,6 +549,27 @@ func (e *eksOperatorController) getAccessToken(cluster *mgmtv3.Cluster) (string,
 	}
 
 	return awsToken.Token, nil
+}
+
+func (e *eksOperatorController) getRestConfig(cluster *mgmtv3.Cluster, dialer typesDialer.Dialer) (*rest.Config, error) {
+	accessToken, err := e.getAccessToken(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedCA, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rest.Config{
+		Host: cluster.Status.APIEndpoint,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData: decodedCA,
+		},
+		BearerToken: accessToken,
+		Dial:        dialer,
+	}, nil
 }
 
 func notFound(err error) bool {
