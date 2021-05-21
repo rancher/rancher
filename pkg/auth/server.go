@@ -17,9 +17,11 @@ import (
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clusterrouter"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/rest"
 )
 
@@ -157,4 +159,24 @@ func (s *Server) Start(ctx context.Context, leader bool) error {
 		return s.OnLeader(ctx)
 	}
 	return nil
+}
+
+func SetXAPICattleAuthHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if features.Auth.Enabled() {
+			user, ok := request.UserFrom(req.Context())
+			if ok {
+				ok = false
+				for _, group := range user.GetGroups() {
+					if group == "system:authenticated" {
+						ok = true
+					}
+				}
+			}
+			rw.Header().Set("X-API-Cattle-Auth", fmt.Sprint(ok))
+		} else {
+			rw.Header().Set("X-API-Cattle-Auth", "none")
+		}
+		next.ServeHTTP(rw, req)
+	})
 }
