@@ -360,6 +360,10 @@ func (a *rKEControlPlaneGeneratingHandler) Remove(key string, obj *v1.RKEControl
 }
 
 func (a *rKEControlPlaneGeneratingHandler) Handle(obj *v1.RKEControlPlane, status v1.RKEControlPlaneStatus) (v1.RKEControlPlaneStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.RKEControlPlaneGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

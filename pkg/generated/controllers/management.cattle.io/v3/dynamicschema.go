@@ -360,6 +360,10 @@ func (a *dynamicSchemaGeneratingHandler) Remove(key string, obj *v3.DynamicSchem
 }
 
 func (a *dynamicSchemaGeneratingHandler) Handle(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) (v3.DynamicSchemaStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.DynamicSchemaGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

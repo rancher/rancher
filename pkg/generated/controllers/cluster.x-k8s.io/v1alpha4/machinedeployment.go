@@ -360,6 +360,10 @@ func (a *machineDeploymentGeneratingHandler) Remove(key string, obj *v1alpha4.Ma
 }
 
 func (a *machineDeploymentGeneratingHandler) Handle(obj *v1alpha4.MachineDeployment, status v1alpha4.MachineDeploymentStatus) (v1alpha4.MachineDeploymentStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.MachineDeploymentGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

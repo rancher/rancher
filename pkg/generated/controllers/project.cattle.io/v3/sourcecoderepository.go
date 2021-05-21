@@ -360,6 +360,10 @@ func (a *sourceCodeRepositoryGeneratingHandler) Remove(key string, obj *v3.Sourc
 }
 
 func (a *sourceCodeRepositoryGeneratingHandler) Handle(obj *v3.SourceCodeRepository, status v3.SourceCodeRepositoryStatus) (v3.SourceCodeRepositoryStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.SourceCodeRepositoryGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

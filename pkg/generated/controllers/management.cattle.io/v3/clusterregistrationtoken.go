@@ -360,6 +360,10 @@ func (a *clusterRegistrationTokenGeneratingHandler) Remove(key string, obj *v3.C
 }
 
 func (a *clusterRegistrationTokenGeneratingHandler) Handle(obj *v3.ClusterRegistrationToken, status v3.ClusterRegistrationTokenStatus) (v3.ClusterRegistrationTokenStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ClusterRegistrationTokenGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

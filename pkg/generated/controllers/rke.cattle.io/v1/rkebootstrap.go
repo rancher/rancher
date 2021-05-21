@@ -360,6 +360,10 @@ func (a *rKEBootstrapGeneratingHandler) Remove(key string, obj *v1.RKEBootstrap)
 }
 
 func (a *rKEBootstrapGeneratingHandler) Handle(obj *v1.RKEBootstrap, status v1.RKEBootstrapStatus) (v1.RKEBootstrapStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.RKEBootstrapGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

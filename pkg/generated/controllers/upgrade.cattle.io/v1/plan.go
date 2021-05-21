@@ -360,6 +360,10 @@ func (a *planGeneratingHandler) Remove(key string, obj *v1.Plan) (*v1.Plan, erro
 }
 
 func (a *planGeneratingHandler) Handle(obj *v1.Plan, status v1.PlanStatus) (v1.PlanStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.PlanGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

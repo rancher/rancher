@@ -360,6 +360,10 @@ func (a *multiClusterAppGeneratingHandler) Remove(key string, obj *v3.MultiClust
 }
 
 func (a *multiClusterAppGeneratingHandler) Handle(obj *v3.MultiClusterApp, status v3.MultiClusterAppStatus) (v3.MultiClusterAppStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.MultiClusterAppGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

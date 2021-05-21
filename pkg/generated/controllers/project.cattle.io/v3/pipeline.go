@@ -360,6 +360,10 @@ func (a *pipelineGeneratingHandler) Remove(key string, obj *v3.Pipeline) (*v3.Pi
 }
 
 func (a *pipelineGeneratingHandler) Handle(obj *v3.Pipeline, status v3.PipelineStatus) (v3.PipelineStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.PipelineGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

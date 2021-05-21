@@ -360,6 +360,10 @@ func (a *templateVersionGeneratingHandler) Remove(key string, obj *v3.TemplateVe
 }
 
 func (a *templateVersionGeneratingHandler) Handle(obj *v3.TemplateVersion, status v3.TemplateVersionStatus) (v3.TemplateVersionStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.TemplateVersionGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

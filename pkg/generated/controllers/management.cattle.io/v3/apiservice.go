@@ -360,6 +360,10 @@ func (a *aPIServiceGeneratingHandler) Remove(key string, obj *v3.APIService) (*v
 }
 
 func (a *aPIServiceGeneratingHandler) Handle(obj *v3.APIService, status v3.APIServiceStatus) (v3.APIServiceStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.APIServiceGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

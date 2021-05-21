@@ -360,6 +360,10 @@ func (a *appRevisionGeneratingHandler) Remove(key string, obj *v3.AppRevision) (
 }
 
 func (a *appRevisionGeneratingHandler) Handle(obj *v3.AppRevision, status v3.AppRevisionStatus) (v3.AppRevisionStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.AppRevisionGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

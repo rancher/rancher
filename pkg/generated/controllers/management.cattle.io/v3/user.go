@@ -360,6 +360,10 @@ func (a *userGeneratingHandler) Remove(key string, obj *v3.User) (*v3.User, erro
 }
 
 func (a *userGeneratingHandler) Handle(obj *v3.User, status v3.UserStatus) (v3.UserStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.UserGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

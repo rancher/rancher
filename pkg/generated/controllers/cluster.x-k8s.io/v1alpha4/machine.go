@@ -360,6 +360,10 @@ func (a *machineGeneratingHandler) Remove(key string, obj *v1alpha4.Machine) (*v
 }
 
 func (a *machineGeneratingHandler) Handle(obj *v1alpha4.Machine, status v1alpha4.MachineStatus) (v1alpha4.MachineStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.MachineGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

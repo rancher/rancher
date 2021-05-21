@@ -360,6 +360,10 @@ func (a *managedChartGeneratingHandler) Remove(key string, obj *v3.ManagedChart)
 }
 
 func (a *managedChartGeneratingHandler) Handle(obj *v3.ManagedChart, status v3.ManagedChartStatus) (v3.ManagedChartStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ManagedChartGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

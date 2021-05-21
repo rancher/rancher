@@ -360,6 +360,10 @@ func (a *fleetWorkspaceGeneratingHandler) Remove(key string, obj *v3.FleetWorksp
 }
 
 func (a *fleetWorkspaceGeneratingHandler) Handle(obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) (v3.FleetWorkspaceStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.FleetWorkspaceGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

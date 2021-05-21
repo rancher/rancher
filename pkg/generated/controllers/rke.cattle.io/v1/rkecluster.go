@@ -360,6 +360,10 @@ func (a *rKEClusterGeneratingHandler) Remove(key string, obj *v1.RKECluster) (*v
 }
 
 func (a *rKEClusterGeneratingHandler) Handle(obj *v1.RKECluster, status v1.RKEClusterStatus) (v1.RKEClusterStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.RKEClusterGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
