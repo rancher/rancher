@@ -5,7 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/docker/client"
+	"github.com/rancher/rancher/pkg/rkeworker"
+
 	"github.com/rancher/norman/types/slice"
 	"github.com/sirupsen/logrus"
 )
@@ -32,7 +33,7 @@ func Params() map[string]interface{} {
 		"requestedHostname": os.Getenv("CATTLE_NODE_NAME"),
 	}
 
-	dclient, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
+	dclient, err := rkeworker.NewDockerClient()
 	if err != nil {
 		logrus.Errorf("Error getting docker client: %v", err)
 	} else {

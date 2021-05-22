@@ -39,7 +39,7 @@ type NodeConfig struct {
 }
 
 func runProcess(ctx context.Context, name string, p rketypes.Process, start, forceRestart bool) error {
-	c, err := client.NewEnvClient()
+	c, err := NewDockerClient()
 	if err != nil {
 		return err
 	}
@@ -464,4 +464,8 @@ func getWindowsPrefixPath() string {
 
 	new = append(new, "") // always add trailing slash
 	return strings.Join(new, "\\")
+}
+
+func NewDockerClient() (*client.Client, error) {
+	return client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
 }

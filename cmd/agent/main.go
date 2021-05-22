@@ -19,7 +19,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -28,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
+	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -115,7 +115,7 @@ func cleanup(ctx context.Context) error {
 		return nil
 	}
 
-	c, err := client.NewEnvClient()
+	c, err := rkeworker.NewDockerClient()
 	if err != nil {
 		return err
 	}
@@ -378,7 +378,7 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
-	c, err := client.NewEnvClient()
+	c, err := rkeworker.NewDockerClient()
 	if err != nil {
 		return false, err
 	}
