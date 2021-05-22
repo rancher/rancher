@@ -30,7 +30,7 @@ type systemTokens struct {
 // EnsureSystemToken creates tokens or updates their values if they already exist and returns their value.
 // TTL defaults to 1 hour, after that this method will auto-refresh. If your token will be in use for more
 // than one hour without calling this method again you must pass in an overrideTTL.
-// However, the overrideTTL must not be 0, otherwise the token will never be cleaned up.
+// However, if the overrideTTL is 0 the token will never be cleaned up; this should be done with caution.
 func (t *systemTokens) EnsureSystemToken(tokenName, description, kind, username string, overrideTTL *int64, randomize bool) (string, error) {
 	var err error
 	if !randomize {
