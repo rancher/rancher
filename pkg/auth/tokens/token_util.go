@@ -122,7 +122,7 @@ func GetKubeConfigToken(userName, responseType string, userMGR user.Manager) (*v
 		return nil, "", err
 	}
 
-	return token, tokenVal, err
+	return token, tokenVal, nil
 }
 
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid

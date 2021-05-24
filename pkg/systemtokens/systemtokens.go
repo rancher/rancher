@@ -63,55 +63,52 @@ func (t *systemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 		return "", errors.New("failed to generate token key")
 	}
 
-	token, err := t.tokenLister.Get("", tokenName)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return "", err
+	if !randomize {
+		token, err := t.tokenLister.Get("", tokenName)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return "", err
+			}
 		}
-		// not found error, make new token
-		token = &v3.Token{
-			ObjectMeta: v1.ObjectMeta{
-				Name: tokenName,
-				Labels: map[string]string{
-					tokens.UserIDLabel:    userName,
-					tokens.TokenKindLabel: kind,
-				},
-			},
-			TTLMillis:    3600000, // 1 hour, token purge daemon will cleanup
-			Description:  description,
-			UserID:       userName,
-			AuthProvider: "local",
-			IsDerived:    true,
-			Token:        key,
+		if err == nil {
+			if err := t.tokenClient.Delete(token.Name, &v1.DeleteOptions{}); err != nil {
+				return "", err
+			}
 		}
-		if overrideTTL != nil {
-			token.TTLMillis = *overrideTTL
-		}
-		if randomize {
-			token.ObjectMeta.Name = ""
-			token.ObjectMeta.GenerateName = tokenName
-		}
+	}
 
-		err = tokens.ConvertTokenKeyToHash(token)
-		if err != nil {
-			return "", err
-		}
-		logrus.Infof("Creating system token for %v, token: %v", userName, tokenName)
-		token, err = t.tokenClient.Create(token)
-		if err != nil {
-			return "", err
-		}
-	} else {
-		token.Token = key
-		err = tokens.ConvertTokenKeyToHash(token)
-		if err != nil {
-			return "", err
-		}
-		logrus.Infof("Updating system token for %v, token: %v", userName, tokenName)
-		token, err = t.tokenClient.Update(token)
-		if err != nil {
-			return "", err
-		}
+	// not found error, make new token
+	token := &v3.Token{
+		ObjectMeta: v1.ObjectMeta{
+			Name: tokenName,
+			Labels: map[string]string{
+				tokens.UserIDLabel:    userName,
+				tokens.TokenKindLabel: kind,
+			},
+		},
+		TTLMillis:    3600000, // 1 hour, token purge daemon will cleanup
+		Description:  description,
+		UserID:       userName,
+		AuthProvider: "local",
+		IsDerived:    true,
+		Token:        key,
+	}
+	if overrideTTL != nil {
+		token.TTLMillis = *overrideTTL
+	}
+	if randomize {
+		token.ObjectMeta.Name = ""
+		token.ObjectMeta.GenerateName = tokenName
+	}
+
+	err = tokens.ConvertTokenKeyToHash(token)
+	if err != nil {
+		return "", err
+	}
+	logrus.Infof("Creating system token for %v, token: %v", userName, tokenName)
+	token, err = t.tokenClient.Create(token)
+	if err != nil {
+		return "", err
 	}
 
 	fullVal := fmt.Sprintf("%s:%s", token.Name, key)
