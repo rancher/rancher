@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -160,6 +161,11 @@ func (m *mcm) Wait(ctx context.Context) {
 		}
 	case <-ctx.Done():
 	}
+}
+
+func (m *mcm) NormanSchemas() *types.Schemas {
+	<-m.startedChan
+	return m.ScaledContext.Schemas
 }
 
 func (m *mcm) Middleware(next http.Handler) http.Handler {

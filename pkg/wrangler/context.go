@@ -12,6 +12,7 @@ import (
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
+	"github.com/rancher/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
 	managementv3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -130,6 +131,7 @@ type Context struct {
 }
 
 type MultiClusterManager interface {
+	NormanSchemas() *types.Schemas
 	ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error)
 	Start(ctx context.Context) error
 	Wait(ctx context.Context)
@@ -329,6 +331,10 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 }
 
 type noopMCM struct {
+}
+
+func (n noopMCM) NormanSchemas() *types.Schemas {
+	return nil
 }
 
 func (n noopMCM) ClusterDialer(clusterID string) func(ctx context.Context, network string, address string) (net.Conn, error) {
