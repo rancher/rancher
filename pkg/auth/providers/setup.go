@@ -25,6 +25,8 @@ var authConfigTypes = []string{
 	client.OKTAConfigType,
 	client.ShibbolethConfigType,
 	client.GoogleOauthConfigType,
+	client.OIDCConfigType,
+	client.KeyCloakOIDCConfigType,
 }
 
 func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {

@@ -407,3 +407,32 @@ type ShibbolethConfig struct {
 type AuthSystemImages struct {
 	KubeAPIAuth string `json:"kubeAPIAuth,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type OIDCConfig struct {
+	AuthConfig `json:",inline" mapstructure:",squash"`
+
+	ClientID     string `json:"clientId" norman:"required"`
+	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
+	Scopes       string `json:"scope", norman:"required,notnullable"`
+	AuthEndpoint string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	Issuer       string `json:"issuer" norman:"required,notnullable"`
+	Certificate  string `json:"certificate,omitempty"`
+	PrivateKey   string `json:"privateKey" norman:"type=password"`
+	RancherURL   string `json:"rancherUrl" norman:"required,notnullable"`
+}
+
+type OIDCTestOutput struct {
+	RedirectURL string `json:"redirectUrl"`
+}
+
+type OIDCApplyInput struct {
+	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
+	Code       string     `json:"code,omitempty"`
+	Enabled    bool       `json:"enabled,omitempty"`
+}
+
+type KeyCloakOIDCConfig struct {
+	OIDCConfig `json:",inline" mapstructure:",squash"`
+}

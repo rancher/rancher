@@ -58,6 +58,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/bshuster-repo/logrus-logstash-hook v1.0.0 // indirect
 	github.com/coreos/etcd v3.3.17+incompatible
+	github.com/coreos/go-oidc/v3 v3.0.0
 	github.com/coreos/go-semver v0.3.0
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
