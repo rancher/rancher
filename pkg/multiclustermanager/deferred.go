@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/client-go/kubernetes"
@@ -47,6 +48,14 @@ func (s *DeferredServer) Wait(ctx context.Context) {
 		s.mcm.Wait(ctx)
 		break
 	}
+}
+
+func (s *DeferredServer) NormanSchemas() *types.Schemas {
+	mcm := s.getMCM()
+	if mcm == nil {
+		return nil
+	}
+	return mcm.NormanSchemas()
 }
 
 func (s *DeferredServer) Start(ctx context.Context) error {

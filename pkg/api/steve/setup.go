@@ -15,7 +15,7 @@ import (
 
 func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) error {
 	userpreferences.Register(server.BaseSchemas, server.ClientFactory)
-	if err := clusters.Register(ctx, server); err != nil {
+	if err := clusters.Register(ctx, server, config); err != nil {
 		return err
 	}
 	machine.Register(server, config)
