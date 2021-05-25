@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-07-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mcuadros/go-version"
 )
 
@@ -26,7 +27,7 @@ type subnet struct {
 	AddressRange string `json:"addressRange"`
 }
 
-var matchAzureNetwork = regexp.MustCompile("/resourceGroups/(.+?)/")
+var matchResourceGroup = regexp.MustCompile("/resource[gG]roups/(.+?)/")
 
 func NewClientAuthorizer(cap *Capabilities) (autorest.Authorizer, error) {
 	oauthConfig, err := adal.NewOAuthConfig(cap.AuthBaseURL, cap.TenantID)
@@ -64,6 +65,18 @@ func NewNetworkServiceClient(cap *Capabilities) (*network.VirtualNetworksClient,
 	containerService.Authorizer = authorizer
 
 	return &containerService, nil
+}
+
+func NewClusterClient(cap *Capabilities) (*containerservice.ManagedClustersClient, error) {
+	authorizer, err := NewClientAuthorizer(cap)
+	if err != nil {
+		return nil, err
+	}
+
+	client := containerservice.NewManagedClustersClientWithBaseURI(cap.BaseURL, cap.SubscriptionID)
+	client.Authorizer = authorizer
+
+	return &client, nil
 }
 
 type sortableVersion []string
@@ -122,17 +135,17 @@ func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, e
 		return nil, http.StatusInternalServerError, err
 	}
 
-	result, err := clientNetwork.ListAll(ctx)
+	networkList, err := clientNetwork.ListAll(ctx)
 	if err != nil {
 		return nil, http.StatusBadRequest, fmt.Errorf("failed to get networks: %v", err)
 	}
 
 	var networks []virtualNetworksResponseBody
 
-	for result.NotDone() {
+	for networkList.NotDone() {
 		var batch []virtualNetworksResponseBody
 
-		for _, azureNetwork := range result.Values() {
+		for _, azureNetwork := range networkList.Values() {
 			var subnets []subnet
 
 			if azureNetwork.Subnets != nil {
@@ -150,7 +163,7 @@ func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, e
 				return nil, http.StatusInternalServerError, fmt.Errorf("no ID on virtual network")
 			}
 
-			match := matchAzureNetwork.FindStringSubmatch(*azureNetwork.ID)
+			match := matchResourceGroup.FindStringSubmatch(*azureNetwork.ID)
 
 			if len(match) < 2 || match[1] == "" {
 				return nil, http.StatusInternalServerError, fmt.Errorf("could not parse virtual network ID")
@@ -169,13 +182,52 @@ func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, e
 
 		networks = append(networks, batch...)
 
-		err = result.NextWithContext(ctx)
+		err = networkList.NextWithContext(ctx)
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
 	}
 
 	return encodeOutput(networks)
+}
+
+type clustersResponseBody struct {
+	ResourceGroup string `json:"resourceGroup"`
+	ClusterName   string `json:"clusterName"`
+}
+
+func listClusters(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	clientCluster, err := NewClusterClient(cap)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	clusterList, err := clientCluster.List(ctx)
+	if err != nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("failed to get cluster list: %v", err)
+	}
+
+	var clusters []clustersResponseBody
+
+	for clusterList.NotDone() {
+		for _, cluster := range clusterList.Values() {
+			var tmpCluster clustersResponseBody
+			if cluster.ID != nil {
+				tmpCluster.ResourceGroup = matchResourceGroup.FindStringSubmatch(to.String(cluster.ID))[1]
+			}
+			if cluster.Name != nil {
+				tmpCluster.ClusterName = to.String(cluster.Name)
+			}
+			clusters = append(clusters, tmpCluster)
+		}
+
+		err = clusterList.NextWithContext(ctx)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+	}
+
+	return encodeOutput(clusters)
 }
 
 func encodeOutput(result interface{}) ([]byte, int, error) {

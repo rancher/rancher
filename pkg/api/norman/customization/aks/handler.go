@@ -90,6 +90,13 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 			return
 		}
 		writer.Write(serialized)
+	case "aksClusters":
+		if serialized, errCode, err = listClusters(req.Context(), capa); err != nil {
+			logrus.Debugf("[aks-handler] error getting clusters: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
 	default:
 		handleErr(writer, httperror.NotFound.Status, fmt.Errorf("invalid endpoint %v", resourceType))
 	}
