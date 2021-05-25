@@ -42,16 +42,16 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 			cluster.Spec.RKEConfig.ControlPlaneConfig.Data[k] = v
 		}
 
-		for i, np := range cluster.Spec.RKEConfig.NodePools {
+		for i, np := range cluster.Spec.RKEConfig.MachinePools {
 			if np.NodeConfig == nil {
 				podConfig, err := nodeconfig.NewPodConfig(clients, cluster.Namespace)
 				if err != nil {
 					return nil, err
 				}
-				cluster.Spec.RKEConfig.NodePools[i].NodeConfig = podConfig
+				cluster.Spec.RKEConfig.MachinePools[i].NodeConfig = podConfig
 			}
 			if np.Name == "" {
-				cluster.Spec.RKEConfig.NodePools[i].Name = fmt.Sprintf("pool-%d", i)
+				cluster.Spec.RKEConfig.MachinePools[i].Name = fmt.Sprintf("pool-%d", i)
 			}
 		}
 

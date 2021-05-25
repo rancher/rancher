@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	nodeAPIGroup = "rke-node.cattle.io"
+	nodeAPIGroup = "rke-machine.cattle.io"
 )
 
 type handler struct {

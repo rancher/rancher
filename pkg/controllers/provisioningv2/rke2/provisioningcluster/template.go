@@ -73,38 +73,38 @@ func pruneBySchema(kind string, data map[string]interface{}, dynamicSchema mgmtc
 	return nil
 }
 
-func toMachineTemplate(nodePoolName string, cluster *rancherv1.Cluster, nodePool rancherv1.RKENodePool,
+func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machinePool rancherv1.RKEMachinePool,
 	dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (runtime.Object, error) {
-	apiVersion := nodePool.NodeConfig.APIVersion
-	kind := nodePool.NodeConfig.Kind
+	apiVersion := machinePool.NodeConfig.APIVersion
+	kind := machinePool.NodeConfig.Kind
 	if apiVersion == "" {
 		apiVersion = "provisioning.cattle.io/v1"
 	}
 
 	gvk := schema.FromAPIVersionAndKind(apiVersion, kind)
-	nodeConfig, err := dynamic.Get(gvk, cluster.Namespace, nodePool.NodeConfig.Name)
+	nodeConfig, err := dynamic.Get(gvk, cluster.Namespace, machinePool.NodeConfig.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	nodePoolData, err := data.Convert(nodeConfig.DeepCopyObject())
+	machinePoolData, err := data.Convert(nodeConfig.DeepCopyObject())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := pruneBySchema(gvk.Kind, nodePoolData, dynamicSchema); err != nil {
+	if err := pruneBySchema(gvk.Kind, machinePoolData, dynamicSchema); err != nil {
 		return nil, err
 	}
 
-	commonData, err := convert.EncodeToMap(nodePool.RKECommonNodeConfig)
+	commonData, err := convert.EncodeToMap(machinePool.RKECommonNodeConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	nodePoolData.Set("common", commonData)
+	machinePoolData.Set("common", commonData)
 	secretName := cluster.Spec.CloudCredentialSecretName
-	if nodePool.CloudCredentialSecretName != "" {
-		secretName = nodePool.CloudCredentialSecretName
+	if machinePool.CloudCredentialSecretName != "" {
+		secretName = machinePool.CloudCredentialSecretName
 	}
 
 	if secretName != "" {
@@ -112,20 +112,20 @@ func toMachineTemplate(nodePoolName string, cluster *rancherv1.Cluster, nodePool
 		if err != nil {
 			return nil, err
 		}
-		nodePoolData.SetNested(secretName, "common", "cloudCredentialSecretName")
+		machinePoolData.SetNested(secretName, "common", "cloudCredentialSecretName")
 	}
 
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       strings.TrimSuffix(kind, "Config") + "MachineTemplate",
-			"apiVersion": "rke-node.cattle.io/v1",
+			"apiVersion": "rke-machine.cattle.io/v1",
 			"metadata": map[string]interface{}{
-				"name":      nodePoolName,
+				"name":      machinePoolName,
 				"namespace": cluster.Namespace,
 			},
 			"spec": map[string]interface{}{
 				"template": map[string]interface{}{
-					"spec": map[string]interface{}(nodePoolData),
+					"spec": map[string]interface{}(machinePoolData),
 				},
 			},
 		},
@@ -136,7 +136,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 	dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
 	bootstrapName := name.SafeConcatName(cluster.Name, "bootstrap", "template")
 
-	if len(cluster.Spec.RKEConfig.NodePools) > 0 {
+	if len(cluster.Spec.RKEConfig.MachinePools) > 0 {
 		result = append(result, &rkev1.RKEBootstrapTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
@@ -145,32 +145,32 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		})
 	}
 
-	nodePoolNames := map[string]bool{}
-	for _, nodePool := range cluster.Spec.RKEConfig.NodePools {
-		if nodePool.Quantity != nil && *nodePool.Quantity == 0 {
+	machinePoolNames := map[string]bool{}
+	for _, machinePool := range cluster.Spec.RKEConfig.MachinePools {
+		if machinePool.Quantity != nil && *machinePool.Quantity == 0 {
 			continue
 		}
-		if nodePool.Name == "" || nodePool.NodeConfig == nil || nodePool.NodeConfig.Name == "" || nodePool.NodeConfig.Kind == "" {
-			return nil, fmt.Errorf("invalid nodePool [%s] missing name or valid config", nodePool.Name)
+		if machinePool.Name == "" || machinePool.NodeConfig == nil || machinePool.NodeConfig.Name == "" || machinePool.NodeConfig.Kind == "" {
+			return nil, fmt.Errorf("invalid machinePool [%s] missing name or valid config", machinePool.Name)
 		}
-		if !nodePool.EtcdRole &&
-			!nodePool.ControlPlaneRole &&
-			!nodePool.WorkerRole {
-			return nil, fmt.Errorf("at least one role of etcd, control-plane or worker must be assigned to nodePool [%s]", nodePool.Name)
+		if !machinePool.EtcdRole &&
+			!machinePool.ControlPlaneRole &&
+			!machinePool.WorkerRole {
+			return nil, fmt.Errorf("at least one role of etcd, control-plane or worker must be assigned to machinePool [%s]", machinePool.Name)
 		}
 
-		if nodePoolNames[nodePool.Name] {
-			return nil, fmt.Errorf("duplicate nodePool name [%s] used", nodePool.Name)
+		if machinePoolNames[machinePool.Name] {
+			return nil, fmt.Errorf("duplicate machinePool name [%s] used", machinePool.Name)
 		}
-		nodePoolNames[nodePool.Name] = true
+		machinePoolNames[machinePool.Name] = true
 
 		var (
-			nodePoolName = name.SafeConcatName(cluster.Name, "nodepool", nodePool.Name)
-			infraRef     corev1.ObjectReference
+			machinePoolName = name.SafeConcatName(cluster.Name, machinePool.Name)
+			infraRef        corev1.ObjectReference
 		)
 
-		if nodePool.NodeConfig.APIVersion == "" || nodePool.NodeConfig.APIVersion == "provisioning.cattle.io/v1" {
-			machineTemplate, err := toMachineTemplate(nodePoolName, cluster, nodePool, dynamic, dynamicSchema, secrets)
+		if machinePool.NodeConfig.APIVersion == "" || machinePool.NodeConfig.APIVersion == "provisioning.cattle.io/v1" {
+			machineTemplate, err := toMachineTemplate(machinePoolName, cluster, machinePool, dynamic, dynamicSchema, secrets)
 			if err != nil {
 				return nil, err
 			}
@@ -179,28 +179,28 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			infraRef = corev1.ObjectReference{
 				Kind:       machineTemplate.GetObjectKind().GroupVersionKind().Kind,
 				Namespace:  cluster.Namespace,
-				Name:       nodePoolName,
-				APIVersion: "rke-node.cattle.io/v1",
+				Name:       machinePoolName,
+				APIVersion: "rke-machine.cattle.io/v1",
 			}
 		} else {
-			infraRef = *nodePool.NodeConfig
+			infraRef = *machinePool.NodeConfig
 		}
 
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   cluster.Namespace,
-				Name:        nodePoolName,
-				Labels:      nodePool.MachineDeploymentLabels,
-				Annotations: nodePool.MachineDeploymentAnnotations,
+				Name:        machinePoolName,
+				Labels:      machinePool.MachineDeploymentLabels,
+				Annotations: machinePool.MachineDeploymentAnnotations,
 			},
 			Spec: capi.MachineDeploymentSpec{
 				ClusterName: capiCluster.Name,
-				Replicas:    nodePool.Quantity,
+				Replicas:    machinePool.Quantity,
 				Template: capi.MachineTemplateSpec{
 					ObjectMeta: capi.ObjectMeta{
 						Labels: map[string]string{
 							capi.ClusterLabelName:           capiCluster.Name,
-							capi.MachineDeploymentLabelName: nodePoolName,
+							capi.MachineDeploymentLabelName: machinePoolName,
 						},
 						Annotations: map[string]string{},
 					},
@@ -217,40 +217,40 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 						InfrastructureRef: infraRef,
 					},
 				},
-				Paused: nodePool.Paused,
+				Paused: machinePool.Paused,
 			},
 		}
-		if nodePool.RollingUpdate != nil {
+		if machinePool.RollingUpdate != nil {
 			machineDeployment.Spec.Strategy = &capi.MachineDeploymentStrategy{
 				Type: capi.RollingUpdateMachineDeploymentStrategyType,
 				RollingUpdate: &capi.MachineRollingUpdateDeployment{
-					MaxUnavailable: nodePool.RollingUpdate.MaxUnavailable,
-					MaxSurge:       nodePool.RollingUpdate.MaxSurge,
+					MaxUnavailable: machinePool.RollingUpdate.MaxUnavailable,
+					MaxSurge:       machinePool.RollingUpdate.MaxSurge,
 				},
 			}
 		}
 
-		if nodePool.EtcdRole {
+		if machinePool.EtcdRole {
 			machineDeployment.Spec.Template.Labels[planner.EtcdRoleLabel] = "true"
 		}
 
-		if nodePool.ControlPlaneRole {
+		if machinePool.ControlPlaneRole {
 			machineDeployment.Spec.Template.Labels[planner.ControlPlaneRoleLabel] = "true"
 			machineDeployment.Spec.Template.Labels[capi.MachineControlPlaneLabelName] = "true"
 		}
 
-		if nodePool.WorkerRole {
+		if machinePool.WorkerRole {
 			machineDeployment.Spec.Template.Labels[planner.WorkerRoleLabel] = "true"
 		}
 
-		if len(nodePool.Labels) > 0 {
-			if err := assign(machineDeployment.Spec.Template.Annotations, planner.LabelsAnnotation, nodePool.Labels); err != nil {
+		if len(machinePool.Labels) > 0 {
+			if err := assign(machineDeployment.Spec.Template.Annotations, planner.LabelsAnnotation, machinePool.Labels); err != nil {
 				return nil, err
 			}
 		}
 
-		if len(nodePool.Taints) > 0 {
-			if err := assign(machineDeployment.Spec.Template.Annotations, planner.TaintsAnnotation, nodePool.Taints); err != nil {
+		if len(machinePool.Taints) > 0 {
+			if err := assign(machineDeployment.Spec.Template.Annotations, planner.TaintsAnnotation, machinePool.Taints); err != nil {
 				return nil, err
 			}
 		}

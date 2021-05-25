@@ -72,7 +72,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 }
 
 func validGVK(gvk schema.GroupVersionKind) bool {
-	return gvk.Group == "rke-node.cattle.io" &&
+	return gvk.Group == "rke-machine.cattle.io" &&
 		gvk.Version == "v1" &&
 		strings.HasSuffix(gvk.Kind, "Machine") &&
 		gvk.Kind != "CustomMachine"

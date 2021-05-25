@@ -23,7 +23,7 @@ func TestSingleNodeAllRoles(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				NodePools: []provisioningv1api.RKENodePool{{
+				MachinePools: []provisioningv1api.RKEMachinePool{{
 					EtcdRole:         true,
 					ControlPlaneRole: true,
 					WorkerRole:       true,
@@ -80,7 +80,7 @@ func TestThreeNodesAllRoles(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				NodePools: []provisioningv1api.RKENodePool{{
+				MachinePools: []provisioningv1api.RKEMachinePool{{
 					EtcdRole:         true,
 					ControlPlaneRole: true,
 					WorkerRole:       true,
@@ -110,7 +110,7 @@ func TestFiveNodesUniqueRoles(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				NodePools: []provisioningv1api.RKENodePool{
+				MachinePools: []provisioningv1api.RKEMachinePool{
 					{
 						EtcdRole: true,
 						Quantity: &defaults.Three,
@@ -148,7 +148,7 @@ func TestFiveNodesServerAndWorkerRoles(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				NodePools: []provisioningv1api.RKENodePool{
+				MachinePools: []provisioningv1api.RKEMachinePool{
 					{
 						EtcdRole:         true,
 						ControlPlaneRole: true,

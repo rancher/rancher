@@ -6,14 +6,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-type RKENodePool struct {
+type RKEMachinePool struct {
 	rkev1.RKECommonNodeConfig
 
 	Paused                       bool                         `json:"paused,omitempty"`
 	EtcdRole                     bool                         `json:"etcdRole,omitempty"`
 	ControlPlaneRole             bool                         `json:"controlPlaneRole,omitempty"`
 	WorkerRole                   bool                         `json:"workerRole,omitempty"`
-	NodeConfig                   *corev1.ObjectReference      `json:"nodeConfigRef,omitempty" wrangler:"required"`
+	NodeConfig                   *corev1.ObjectReference      `json:"machineConfigRef,omitempty" wrangler:"required"`
 	Name                         string                       `json:"name,omitempty" wrangler:"required"`
 	DisplayName                  string                       `json:"displayName,omitempty"`
 	Quantity                     *int32                       `json:"quantity,omitempty"`
@@ -60,6 +60,6 @@ type RKEConfig struct {
 
 	ETCDSnapshotCreate  *rkev1.ETCDSnapshotCreate `json:"etcdSnapshotCreate,omitempty"`
 	ETCDSnapshotRestore *rkev1.ETCDSnapshot       `json:"etcdSnapshotRestore,omitempty"`
-	NodePools           []RKENodePool             `json:"nodePools,omitempty"`
+	MachinePools        []RKEMachinePool          `json:"machinePools,omitempty"`
 	InfrastructureRef   *corev1.ObjectReference   `json:"infrastructureRef,omitempty"`
 }
