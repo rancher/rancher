@@ -12,6 +12,7 @@ import (
 type s3Args struct {
 	prefix      string
 	secretCache corecontrollers.SecretCache
+	env         bool
 }
 
 func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControlPlane) (args []string, env []string, files []plan.File, err error) {
@@ -28,8 +29,8 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 		fmt.Sprintf("--%ss3-bucket=%s", s.prefix, s3.Bucket))
 
 	credName := s3.CloudCredentialName
-	if credName == "" {
-		credName = controlPlane.Spec.ETCDSnapshotCloudCredentialName
+	if credName == "" && controlPlane.Spec.ETCD != nil && controlPlane.Spec.ETCD.S3 != nil {
+		credName = controlPlane.Spec.ETCD.S3.CloudCredentialName
 	}
 
 	s3Cred, err = getS3Credential(s.secretCache, controlPlane.Namespace, s3.CloudCredentialName, s3.Region)
@@ -41,7 +42,11 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 		args = append(args, fmt.Sprintf("--%ss3-access-key=%s", s.prefix, s3Cred.AccessKey))
 	}
 	if s3Cred.SecretKey != "" {
-		env = append(env, fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", s3Cred.SecretKey))
+		if s.env {
+			env = append(env, fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", s3Cred.SecretKey))
+		} else {
+			args = append(args, fmt.Sprintf("--%ss3-secret-key=%s", s.prefix, s3Cred.SecretKey))
+		}
 	}
 	if s3Cred.Region != "" {
 		args = append(args, fmt.Sprintf("--%ss3-region=%s", s.prefix, s3Cred.Region))

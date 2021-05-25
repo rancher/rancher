@@ -26,6 +26,7 @@ func newETCDCreate(clients *wrangler.Context, store *PlanStore) *etcdCreate {
 		store:        store,
 		s3Args: &s3Args{
 			secretCache: clients.Core.Secret().Cache(),
+			env:         true,
 		},
 	}
 }
