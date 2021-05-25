@@ -90,7 +90,7 @@ if_test_all_snapshot = \
 DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            'resource')
 # As of release 2.4 default rke scan profile is "rke-cis-1.4"
-CIS_SCAN_PROFILE = os.environ.get('RANCHER_CIS_SCAN_PROFILE', "rke-cis-1.4")
+CIS_SCAN_PROFILE = os.environ.get('RANCHER_CIS_SCAN_PROFILE', "rke-cis-1.5")
 
 # here are all supported roles for RBAC testing
 CLUSTER_MEMBER = "cluster-member"
@@ -2693,58 +2693,13 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
 
 def configure_cis_requirements(aws_nodes, profile, node_roles, client,
                                cluster):
-    i = 0
-    if profile == 'rke-cis-1.4':
-        for aws_node in aws_nodes:
-            aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-            aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-            aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
-            if node_roles[i] == ["etcd"]:
-                aws_node.execute_command("sudo useradd etcd")
-            docker_run_cmd = \
-                get_custom_host_registration_cmd(client,
-                                                 cluster,
-                                                 node_roles[i],
-                                                 aws_node)
-            aws_node.execute_command(docker_run_cmd)
-            i += 1
-    elif profile == 'rke-cis-1.5':
-        for aws_node in aws_nodes:
-            aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-            aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-            aws_node.execute_command("sudo sysctl -w vm.panic_on_oom=0")
-            aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
-            aws_node.execute_command("sudo sysctl -w "
-                                     "kernel.keys.root_maxbytes=25000000")
-            if node_roles[i] == ["etcd"]:
-                aws_node.execute_command("sudo groupadd -g 52034 etcd")
-                aws_node.execute_command("sudo useradd -u 52034 -g 52034 etcd")
-            docker_run_cmd = \
-                get_custom_host_registration_cmd(client,
-                                                 cluster,
-                                                 node_roles[i],
-                                                 aws_node)
-            aws_node.execute_command(docker_run_cmd)
-            i += 1
-    time.sleep(5)
+    prepare_hardened_nodes(aws_nodes, profile, node_roles, client, cluster, True)
     cluster = validate_cluster_state(client, cluster)
 
     # the workloads under System project to get active
     time.sleep(20)
-    if profile == 'rke-cis-1.5':
-        create_kubeconfig(cluster)
-        network_policy_file = DATA_SUBDIR + "/default-allow-all.yaml"
-        account_update_file = DATA_SUBDIR + "/account_update.yaml"
-        items = execute_kubectl_cmd("get namespaces -A")["items"]
-        all_ns = [item["metadata"]["name"] for item in items]
-        for ns in all_ns:
-            execute_kubectl_cmd("apply -f {0} -n {1}".
-                                format(network_policy_file, ns))
-        namespace = ["default", "kube-system"]
-        for ns in namespace:
-            execute_kubectl_cmd('patch serviceaccount default'
-                                ' -n {0} -p "$(cat {1})"'.
-                                format(ns, account_update_file))
+    create_kubeconfig(cluster)
+    prepare_hardened_cluster('rke-cis-1.5', kube_fname)
     return cluster
 
 
@@ -2962,3 +2917,77 @@ def update_and_validate_kdm(kdm_url, admin_token=ADMIN_TOKEN,
     kdm_refresh_url = rancher_api_url + "/kontainerdrivers?action=refresh"
     response = requests.post(kdm_refresh_url, verify=False, headers=header)
     assert response.ok
+
+
+def prepare_hardened_nodes(aws_nodes, profile, node_roles, 
+client=None, cluster=None, custom_cluster=False):
+    i = 0
+    if profile == 'rke-cis-1.4':
+        for aws_node in aws_nodes:
+            aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
+            aws_node.execute_command("sudo sysctl -w kernel.panic=10")
+            aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
+            if "etcd" in node_roles[i]:
+                aws_node.execute_command("sudo useradd etcd")
+            if custom_cluster:
+                docker_run_cmd = \
+                get_custom_host_registration_cmd(client,
+                                                 cluster,
+                                                 node_roles[i],
+                                                 aws_node)
+                aws_node.execute_command(docker_run_cmd)
+            i += 1
+    elif profile == 'rke-cis-1.5':
+        for aws_node in aws_nodes:
+            # conf_file = DATA_SUBDIR + "/sysctl-config.txt"
+            # file1 = open(conf_file,'r')
+            # data = file1.readlines()
+            # file1.close()
+            # data = [x.strip() for x in data]
+            # aws_node.execute_command("sudo touch /etc/sysctl.d/90-kubelet.conf")
+            # aws_node.execute_command("sudo touch test")
+            # for line in data:
+            #     print("echo {0} >> test".format(line))
+            #     aws_node.execute_command("echo {0} >> test".format(line))
+
+            # aws_node.execute_command("sudo cp test /etc/sysctl.d/90-kubelet.conf")
+            # aws_node.execute_command("sudo sysctl -p /etc/sysctl.d/90-kubelet.conf")
+            # file1 = open("myfile.txt","w")
+            # f = open("/etc/sysctl.d/90-kubelet.conf", "w")
+            aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
+            aws_node.execute_command("sudo sysctl -w kernel.panic=10")
+            aws_node.execute_command("sudo sysctl -w vm.panic_on_oom=0")
+            aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
+            aws_node.execute_command("sudo sysctl -w "
+                                     "kernel.keys.root_maxbytes=25000000")
+            # print("Sysctl success")
+            if "etcd" in node_roles[i]:
+                aws_node.execute_command("sudo groupadd -g 52034 etcd")
+                aws_node.execute_command("sudo useradd -u 52034 -g 52034 etcd")
+            if custom_cluster:
+                docker_run_cmd = \
+                get_custom_host_registration_cmd(client,
+                                                 cluster,
+                                                 node_roles[i],
+                                                 aws_node)
+                aws_node.execute_command(docker_run_cmd)
+            i += 1
+    time.sleep(5)
+    return aws_nodes
+
+
+def prepare_hardened_cluster(profile, kubeconfig_path):
+    if profile == 'rke-cis-1.5': 
+        network_policy_file = DATA_SUBDIR + "/default-allow-all.yaml"
+        account_update_file = DATA_SUBDIR + "/account_update.yaml"
+        items = execute_kubectl_cmd("get namespaces -A", 
+        kubeconfig=kubeconfig_path)["items"]
+        all_ns = [item["metadata"]["name"] for item in items]
+        for ns in all_ns:
+            execute_kubectl_cmd("apply -f {0} -n {1}".
+                                format(network_policy_file, ns), 
+                                kubeconfig=kubeconfig_path)
+            execute_kubectl_cmd('patch serviceaccount default'
+                                ' -n {0} -p "$(cat {1})"'.
+                                format(ns, account_update_file), 
+                                kubeconfig=kubeconfig_path)
