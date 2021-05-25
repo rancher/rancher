@@ -27,6 +27,7 @@ func newETCDRestore(clients *wrangler.Context, store *PlanStore) *etcdRestore {
 		s3Args: &s3Args{
 			secretCache: clients.Core.Secret().Cache(),
 			prefix:      "etcd-",
+			env:         true,
 		},
 	}
 }

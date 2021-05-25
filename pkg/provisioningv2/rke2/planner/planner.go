@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/summary"
@@ -115,6 +116,7 @@ type Planner struct {
 	locker                        locker.Locker
 	etcdRestore                   *etcdRestore
 	etcdCreate                    *etcdCreate
+	etcdArgs                      s3Args
 }
 
 func New(ctx context.Context, clients *wrangler.Context) *Planner {
@@ -487,23 +489,37 @@ func atMostThree(names []string) []string {
 	return names
 }
 
-func (p *Planner) addETCDSnapshotCredential(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) error {
-	if !isEtcd(machine) || controlPlane.Spec.ETCDSnapshotCloudCredentialName == "" {
-		return nil
+func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (result []plan.File, _ error) {
+	if !isEtcd(machine) || controlPlane.Spec.ETCD == nil {
+		return nil, nil
 	}
 
-	cred, err := getS3Credential(p.secretCache,
-		controlPlane.Namespace,
-		controlPlane.Spec.ETCDSnapshotCloudCredentialName,
-		convert.ToString(config["etcd-s3-region"]))
+	if controlPlane.Spec.ETCD.DisableSnapshots {
+		config["etcd-disable-snapshot"] = true
+	}
+	if controlPlane.Spec.ETCD.SnapshotRetention > 0 {
+		config["etcd-snapshot-retention"] = controlPlane.Spec.ETCD.SnapshotRetention
+	}
+	if controlPlane.Spec.ETCD.SnapshotScheduleCron != "" {
+		config["etcd-snapshot-schedule-cron"] = controlPlane.Spec.ETCD.SnapshotScheduleCron
+	}
+
+	args, _, files, err := p.etcdArgs.ToArgs(controlPlane.Spec.ETCD.S3, controlPlane)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	for _, arg := range args {
+		k, v := kv.Split(arg, "=")
+		k = strings.TrimPrefix(k, "--")
+		if v == "" {
+			config[k] = true
+		} else {
+			config[k] = v
+		}
+	}
+	result = files
 
-	config["etcd-s3-access-key"] = cred.AccessKey
-	config["etcd-s3-secret-key"] = cred.SecretKey
-	config["etcd-s3-region"] = cred.Region
-	return nil
+	return
 }
 
 func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) {
@@ -772,9 +788,11 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	}
 	nodePlan.Files = append(nodePlan.Files, files...)
 
-	if err := p.addETCDSnapshotCredential(config, controlPlane, machine); err != nil {
+	files, err = p.addETCD(config, controlPlane, machine)
+	if err != nil {
 		return nodePlan, err
 	}
+	nodePlan.Files = append(nodePlan.Files, files...)
 
 	addRoleConfig(config, controlPlane, machine, initNode, joinServer)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, machine)

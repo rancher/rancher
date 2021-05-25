@@ -25,3 +25,10 @@ type ETCDSnapshot struct {
 	Size      int64           `json:"size,omitempty"`
 	S3        *ETCDSnapshotS3 `json:"s3,omitempty"`
 }
+
+type ETCD struct {
+	DisableSnapshots     bool            `json:"disableSnapshots,omitempty"`
+	SnapshotScheduleCron string          `json:"snapshotScheduleCron,omitempty"`
+	SnapshotRetention    int             `json:"snapshotRetention,omitempty"`
+	S3                   *ETCDSnapshotS3 `json:"s3,omitempty"`
+}
