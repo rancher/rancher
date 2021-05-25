@@ -56,19 +56,19 @@ const (
 	userNodeRemoveAnnotationPrefix     = "lifecycle.cattle.io/create.user-node-remove_"
 )
 
-// aliases maps Schema field => driver field
+// SchemaToDriverFields maps Schema field => driver field
 // The opposite of this lives in pkg/controllers/management/drivers/nodedriver/machine_driver.go
-var aliases = map[string]map[string]string{
-	"aliyunecs":     map[string]string{"sshKeyContents": "sshKeypath"},
-	"amazonec2":     map[string]string{"sshKeyContents": "sshKeypath", "userdata": "userdata"},
-	"azure":         map[string]string{"customData": "customData"},
-	"digitalocean":  map[string]string{"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
-	"exoscale":      map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
-	"openstack":     map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
-	"otc":           map[string]string{"privateKeyFile": "privateKeyFile"},
-	"packet":        map[string]string{"userdata": "userdata"},
-	"vmwarevsphere": map[string]string{"cloudConfig": "cloud-config"},
-	"google":        map[string]string{"authEncodedJson": "authEncodedJson"},
+var SchemaToDriverFields = map[string]map[string]string{
+	"aliyunecs":     {"sshKeyContents": "sshKeypath"},
+	"amazonec2":     {"sshKeyContents": "sshKeypath", "userdata": "userdata"},
+	"azure":         {"customData": "customData"},
+	"digitalocean":  {"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
+	"exoscale":      {"sshKey": "sshKey", "userdata": "userdata"},
+	"openstack":     {"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
+	"otc":           {"privateKeyFile": "privateKeyFile"},
+	"packet":        {"userdata": "userdata"},
+	"vmwarevsphere": {"cloudConfig": "cloud-config"},
+	"google":        {"authEncodedJson": "authEncodedJson"},
 }
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
@@ -346,7 +346,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 		baseDir = os.TempDir()
 	}
 	// Check if the required driver has aliased fields
-	if fields, ok := aliases[driver]; ok {
+	if fields, ok := SchemaToDriverFields[driver]; ok {
 		hasher := sha256.New()
 		for schemaField, driverField := range fields {
 			if fileRaw, ok := config[schemaField]; ok {

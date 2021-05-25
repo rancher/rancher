@@ -15,13 +15,17 @@ const (
 	InfraMachineVersion = "rke.cattle.io/infra-machine-version"
 	InfraMachineKind    = "rke.cattle.io/infra-machine-kind"
 	InfraMachineName    = "rke.cattle.io/infra-machine-name"
+
+	pathToMachineFiles = "/path/to/machine/files"
 )
 
 func getJobName(name string) string {
 	return name2.SafeConcatName(name, "machine", "provision")
 }
 
-func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, args driverArgs) ([]runtime.Object, error) {
+func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, args driverArgs, filesSecret *corev1.Secret) ([]runtime.Object, error) {
+	var volumes []corev1.Volume
+	var volumeMounts []corev1.VolumeMount
 	machineGVK := schema.FromAPIVersionAndKind(typeMeta.GetAPIVersion(), typeMeta.GetKind())
 	saName := getJobName(meta.GetName())
 	secret := &corev1.Secret{
@@ -38,6 +42,34 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 
 	if args.BootstrapOptional && args.BootstrapSecretName == "" {
 		args.BootstrapSecretName = "not-found"
+	}
+
+	if filesSecret != nil {
+		if filesSecret.Name == "" {
+			filesSecret.Name = saName
+			filesSecret.Namespace = meta.GetNamespace()
+		}
+
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "machine-files",
+			ReadOnly:  true,
+			MountPath: pathToMachineFiles,
+		})
+
+		keysToPaths := make([]corev1.KeyToPath, 0, len(filesSecret.Data))
+		for file := range filesSecret.Data {
+			keysToPaths = append(keysToPaths, corev1.KeyToPath{Key: file, Path: file})
+		}
+		volumes = append(volumes, corev1.Volume{
+			Name: "machine-files",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  filesSecret.Name,
+					Items:       keysToPaths,
+					DefaultMode: &[]int32{0600}[0],
+				},
+			},
+		})
 	}
 
 	sa := &corev1.ServiceAccount{
@@ -113,7 +145,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 					},
 				},
 				Spec: corev1.PodSpec{
-					Volumes: []corev1.Volume{
+					Volumes: append(volumes, []corev1.Volume{
 						{
 							Name: "bootstrap",
 							VolumeSource: corev1.VolumeSource{
@@ -134,7 +166,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 								},
 							},
 						},
-					},
+					}...),
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
@@ -151,7 +183,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 									},
 								},
 							},
-							VolumeMounts: []corev1.VolumeMount{
+							VolumeMounts: append(volumeMounts, []corev1.VolumeMount{
 								{
 									Name:      "bootstrap",
 									ReadOnly:  false,
@@ -163,7 +195,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 									MountPath: "/etc/ssl/certs/ca-additional.pem",
 									SubPath:   "ca-additional.pem",
 								},
-							},
+							}...),
 						},
 					},
 					ServiceAccountName: saName,
@@ -178,6 +210,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 		sa,
 		role,
 		rb,
+		filesSecret,
 		rb2,
 		job,
 	}, nil
