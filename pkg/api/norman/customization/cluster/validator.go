@@ -449,13 +449,16 @@ func validateAKSNodePools(spec *v32.ClusterSpec) error {
 		return nil
 	}
 	if len(nodePools) == 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one nodepool"))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must have at least one nodepool")
 	}
 
 	for _, np := range nodePools {
 		name := np.Name
 		if to.String(name) == "" {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("nodePool Name cannot be an empty string"))
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodePool Name cannot be an empty string")
+		}
+		if np.OsType == "Windows" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "windows node pools are not supported")
 		}
 	}
 
