@@ -110,7 +110,7 @@ func newAuditLog(writer *LogWriter, req *http.Request) (*auditLog, error) {
 	contentType := req.Header.Get("Content-Type")
 	loginReq := isLoginRequest(req.RequestURI)
 	if writer.Level >= levelRequest || loginReq {
-		if bodyMethods[req.Method] && contentType == contentTypeJSON {
+		if bodyMethods[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
 			reqBody, err := readBodyWithoutLosingContent(req)
 			if err != nil {
 				return nil, err
