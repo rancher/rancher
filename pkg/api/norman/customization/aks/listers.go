@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-09-01/containerservice"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-07-01/network"
 	"github.com/Azure/go-autorest/autorest"
@@ -41,6 +42,18 @@ func NewClientAuthorizer(cap *Capabilities) (autorest.Authorizer, error) {
 	}
 
 	return autorest.NewBearerAuthorizer(spToken), nil
+}
+
+func NewVirtualMachineClient(cap *Capabilities) (*compute.VirtualMachineSizesClient, error) {
+	authorizer, err := NewClientAuthorizer(cap)
+	if err != nil {
+		return nil, err
+	}
+
+	virtualMachine := compute.NewVirtualMachineSizesClient(cap.SubscriptionID)
+	virtualMachine.Authorizer = authorizer
+
+	return &virtualMachine, nil
 }
 
 func NewContainerServiceClient(cap *Capabilities) (*containerservice.ContainerServicesClient, error) {
@@ -228,6 +241,29 @@ func listClusters(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 	}
 
 	return encodeOutput(clusters)
+}
+
+func listVMSizes(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	if cap.ResourceLocation == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("region is required")
+	}
+
+	virtualMachine, err := NewVirtualMachineClient(cap)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	vmMachineSizeList, err := virtualMachine.List(ctx, cap.ResourceLocation)
+	if err != nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("failed to get VM sizes: %v", err)
+	}
+
+	vmSizes := make([]string, 0, len(*vmMachineSizeList.Value))
+
+	for _, virtualMachineSize := range *vmMachineSizeList.Value {
+		vmSizes = append(vmSizes, to.String(virtualMachineSize.Name))
+	}
+
+	return encodeOutput(vmSizes)
 }
 
 func encodeOutput(result interface{}) ([]byte, int, error) {

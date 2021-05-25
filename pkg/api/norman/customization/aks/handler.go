@@ -97,6 +97,13 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 			return
 		}
 		writer.Write(serialized)
+	case "aksVMSizes":
+		if serialized, errCode, err = listVMSizes(req.Context(), capa); err != nil {
+			logrus.Debugf("[aks-handler] error getting VM sizes: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
 	default:
 		handleErr(writer, httperror.NotFound.Status, fmt.Errorf("invalid endpoint %v", resourceType))
 	}
