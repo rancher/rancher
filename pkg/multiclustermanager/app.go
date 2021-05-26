@@ -220,7 +220,7 @@ func (m *mcm) Start(ctx context.Context) error {
 		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
-		managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
+		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
 		logrus.Infof("Rancher startup complete")
 		return nil
 	})
