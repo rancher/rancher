@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
+	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -24,6 +25,12 @@ import (
 const (
 	syncInterval = 15 * time.Second
 )
+
+var excludedComponentMap = map[string][]string{
+	"aks":     {"controller-manager", "scheduler"},
+	"tencent": {"controller-manager", "scheduler"},
+	"lke":     {"controller-manager", "scheduler"},
+}
 
 type ClusterControllerLifecycle interface {
 	Stop(cluster *v3.Cluster)
@@ -78,13 +85,22 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
 	}
 	cluster.Status.ComponentStatuses = []v32.ClusterComponentStatus{}
+	clusterType := cluster.Status.Provider // the provider detector is more accurate but we can fall back on the driver in some cases
+	if clusterType == "" {
+		clusterType = cluster.Status.Driver
+	}
+	excludedComponents, ok := excludedComponentMap[clusterType]
 	for _, cs := range cses.Items {
+		if ok && slice.ContainsString(excludedComponents, cs.Name) {
+			continue
+		}
 		clusterCS := convertToClusterComponentStatus(&cs)
 		cluster.Status.ComponentStatuses = append(cluster.Status.ComponentStatuses, *clusterCS)
 	}
 	sort.Slice(cluster.Status.ComponentStatuses, func(i, j int) bool {
 		return cluster.Status.ComponentStatuses[i].Name < cluster.Status.ComponentStatuses[j].Name
 	})
+
 	return nil
 }
 
