@@ -381,6 +381,20 @@ func (v *Validator) validateAKSConfig(request *types.APIContext, cluster map[str
 		}
 	}
 
+	if request.Method != http.MethodPost {
+		return nil
+	}
+
+	// validation for creates only
+	if err := validateAKSClusterName(v.ClusterClient, clusterSpec); err != nil {
+		return err
+	}
+
+	region, regionOk := aksConfig["resourceLocation"]
+	if !regionOk || region == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide region")
+	}
+
 	return nil
 }
 
@@ -416,6 +430,9 @@ func validateAKSCredentialAuth(request *types.APIContext, credential string, pre
 // validateAKSKubernetesVersion checks whether a kubernetes version is provided
 func validateAKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
 	clusterVersion := spec.AKSConfig.KubernetesVersion
+	if clusterVersion == nil {
+		return nil
+	}
 
 	if to.String(clusterVersion) == "" {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
@@ -442,6 +459,34 @@ func validateAKSNodePools(spec *v32.ClusterSpec) error {
 		}
 	}
 
+	return nil
+}
+
+func validateAKSClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+	// validate cluster does not reference an AKS cluster that is already backed by a Rancher cluster
+	name := spec.AKSConfig.ClusterName
+	region := spec.AKSConfig.ResourceLocation
+	msgSuffix := fmt.Sprintf("in region [%s]", region)
+
+	// cluster client is being used instead of lister to avoid the use of an outdated cache
+	clusters, err := client.List(metav1.ListOptions{})
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher AKS clusters "+msgSuffix)
+	}
+
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.AKSConfig == nil {
+			continue
+		}
+		if name != cluster.Spec.AKSConfig.ClusterName {
+			continue
+		}
+		if region != "" && region != cluster.Spec.AKSConfig.ResourceLocation {
+			continue
+		}
+
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for AKS cluster [%s] "+msgSuffix, name))
+	}
 	return nil
 }
 
