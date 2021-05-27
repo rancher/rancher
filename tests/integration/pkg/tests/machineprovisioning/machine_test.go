@@ -137,7 +137,8 @@ func TestFiveNodesUniqueRoles(t *testing.T) {
 	}
 }
 
-func TestFiveNodesServerAndWorkerRoles(t *testing.T) {
+func TestFourNodesServerAndWorkerRoles(t *testing.T) {
+	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +157,7 @@ func TestFiveNodesServerAndWorkerRoles(t *testing.T) {
 					},
 					{
 						WorkerRole: true,
-						Quantity:   &defaults.Two,
+						Quantity:   &defaults.One,
 					},
 				},
 			},
