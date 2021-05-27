@@ -26,7 +26,7 @@ func Register(server *steve.Server, clients *wrangler.Context) {
 			schema.LinkHandlers["sshkeys"] = sshClient
 			schema.Formatter = func(request *types.APIRequest, resource *types.RawResource) {
 				if err := request.AccessControl.CanUpdate(request, types.APIObject{}, request.Schema); err != nil ||
-					resource.APIObject.Data().String("spec", "infrastructureRef", "apiVersion") != "rke-node.cattle.io/v1" {
+					resource.APIObject.Data().String("spec", "infrastructureRef", "apiVersion") != "rke-machine.cattle.io/v1" {
 					delete(resource.Links, "shell")
 					delete(resource.Links, "sshkeys")
 				}

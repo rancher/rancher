@@ -88,7 +88,7 @@ func byNodeInfraIndex(obj *rancherv1.Cluster) ([]string, error) {
 	}
 
 	var result []string
-	for _, np := range obj.Spec.RKEConfig.NodePools {
+	for _, np := range obj.Spec.RKEConfig.MachinePools {
 		if np.NodeConfig == nil {
 			continue
 		}

@@ -23,7 +23,7 @@ func TestSingleNodeAllRoles(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				NodePools: []provisioningv1api.RKENodePool{{
+				MachinePools: []provisioningv1api.RKEMachinePool{{
 					EtcdRole:         true,
 					ControlPlaneRole: true,
 					WorkerRole:       true,
@@ -80,7 +80,7 @@ func TestThreeNodesAllRoles(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				NodePools: []provisioningv1api.RKENodePool{{
+				MachinePools: []provisioningv1api.RKEMachinePool{{
 					EtcdRole:         true,
 					ControlPlaneRole: true,
 					WorkerRole:       true,
@@ -110,7 +110,7 @@ func TestFiveNodesUniqueRoles(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				NodePools: []provisioningv1api.RKENodePool{
+				MachinePools: []provisioningv1api.RKEMachinePool{
 					{
 						EtcdRole: true,
 						Quantity: &defaults.Three,
@@ -137,7 +137,8 @@ func TestFiveNodesUniqueRoles(t *testing.T) {
 	}
 }
 
-func TestFiveNodesServerAndWorkerRoles(t *testing.T) {
+func TestFourNodesServerAndWorkerRoles(t *testing.T) {
+	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +149,7 @@ func TestFiveNodesServerAndWorkerRoles(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				NodePools: []provisioningv1api.RKENodePool{
+				MachinePools: []provisioningv1api.RKEMachinePool{
 					{
 						EtcdRole:         true,
 						ControlPlaneRole: true,
@@ -156,7 +157,7 @@ func TestFiveNodesServerAndWorkerRoles(t *testing.T) {
 					},
 					{
 						WorkerRole: true,
-						Quantity:   &defaults.Two,
+						Quantity:   &defaults.One,
 					},
 				},
 			},

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -11,8 +12,10 @@ import (
 	"github.com/rancher/rancher/tests/integration/pkg/nodeconfig"
 	"github.com/rancher/rancher/tests/integration/pkg/registry"
 	"github.com/rancher/rancher/tests/integration/pkg/wait"
+	"github.com/rancher/wrangler/pkg/condition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
@@ -42,16 +45,16 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 			cluster.Spec.RKEConfig.ControlPlaneConfig.Data[k] = v
 		}
 
-		for i, np := range cluster.Spec.RKEConfig.NodePools {
+		for i, np := range cluster.Spec.RKEConfig.MachinePools {
 			if np.NodeConfig == nil {
 				podConfig, err := nodeconfig.NewPodConfig(clients, cluster.Namespace)
 				if err != nil {
 					return nil, err
 				}
-				cluster.Spec.RKEConfig.NodePools[i].NodeConfig = podConfig
+				cluster.Spec.RKEConfig.MachinePools[i].NodeConfig = podConfig
 			}
 			if np.Name == "" {
-				cluster.Spec.RKEConfig.NodePools[i].Name = fmt.Sprintf("pool-%d", i)
+				cluster.Spec.RKEConfig.MachinePools[i].Name = fmt.Sprintf("pool-%d", i)
 			}
 		}
 
@@ -75,6 +78,29 @@ func Machines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*ca
 
 func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
 	err := wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
+		c = obj.(*provisioningv1api.Cluster)
+		return c.Status.ClusterName != "", nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	mgmtCluster, err := clients.Mgmt.Cluster().Get(c.Status.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	err = wait.Object(clients.Ctx, func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+		return clients.Mgmt.Cluster().Watch(opts)
+	}, mgmtCluster, func(obj runtime.Object) (bool, error) {
+		mgmtCluster = obj.(*v3.Cluster)
+		return condition.Cond("Ready").IsTrue(mgmtCluster), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
 		c = obj.(*provisioningv1api.Cluster)
 		return c.Status.Ready, nil
 	})

@@ -150,18 +150,6 @@ func (h *handler) updateMachineProvisionStatus(secret *corev1.Secret) error {
 		return err
 	}
 
-	if planner.IsEtcdOnlyInitNode(machine) && machine.Annotations[planner.JoinURLAnnotation] == "" {
-		address, ok := plan.Output["capture-address"]
-		if ok {
-			str := string(address)
-			i := strings.Index(str, "{")
-			if i >= 0 {
-
-			}
-
-		}
-	}
-
 	status, reason, message := planner.GetPlanStatusReasonMessage(plan)
 	if corev1.ConditionStatus(Provisioned.GetStatus(machine)) != status ||
 		Provisioned.GetReason(machine) != string(reason) ||
