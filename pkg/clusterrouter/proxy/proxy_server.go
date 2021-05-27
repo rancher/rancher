@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rancher/kontainer-engine/drivers/gke"
 	"github.com/rancher/norman/httperror"
 	factory "github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -121,6 +123,19 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		newCluster, err := clusterLister.Get("", cluster.Name)
 		if err != nil {
 			return "", err
+		}
+
+		if newCluster.Status.Driver == "googleKubernetesEngine" && newCluster.Spec.GenericEngineConfig != nil {
+			cred, _ := (*newCluster.Spec.GenericEngineConfig)["credential"].(string)
+			tokenSource, err := gke.GetTokenSource(context.Background(), cred)
+			if err != nil {
+				return "", fmt.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
+			}
+			token, err := tokenSource.Token()
+			if err != nil {
+				return "", fmt.Errorf("unable to retrieve token from token source for GKE oauth2: %v", err)
+			}
+			return "Bearer " + token.AccessToken, nil
 		}
 
 		return "Bearer " + newCluster.Status.ServiceAccountToken, nil
