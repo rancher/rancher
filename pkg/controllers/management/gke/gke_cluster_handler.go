@@ -203,9 +203,9 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			if err != nil {
 				return cluster, err
 			}
-			if mustTunnel {
+			if mustTunnel != nil {
 				cluster = cluster.DeepCopy()
-				cluster.Status.GKEStatus.PrivateRequiresTunnel = &mustTunnel
+				cluster.Status.GKEStatus.PrivateRequiresTunnel = mustTunnel
 				cluster.Status.ServiceAccountToken = serviceToken
 				return e.ClusterClient.Update(cluster)
 			}
@@ -417,23 +417,25 @@ func (e *gkeOperatorController) deployGKEOperator() error {
 	return e.DeployOperator(gkeOperator, gkeOperatorTemplate, gkeShortName)
 }
 
-func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, bool, error) {
-	var publicAccess bool
-
+func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, *bool, error) {
 	ctx := context.Background()
 	ts, err := controller.GetTokenSource(ctx, e.SecretsCache, cluster.Spec.GKEConfig)
+	if err != nil {
+		return "", nil, err
+	}
 
 	netDialer := net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}
+	publicAccess := new(bool)
 	serviceToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, ts, netDialer.DialContext)
 	if err != nil {
 		if strings.Contains(err.Error(), "dial tcp") {
-			return "", true, nil
+			*publicAccess = true
+			return "", publicAccess, nil
 		}
-	} else {
-		publicAccess = false
+		return "", nil, err
 	}
 
 	return serviceToken, publicAccess, err

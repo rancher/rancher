@@ -186,9 +186,9 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			if err != nil {
 				return cluster, err
 			}
-			if mustTunnel {
+			if mustTunnel != nil {
 				cluster = cluster.DeepCopy()
-				cluster.Status.AKSStatus.PrivateRequiresTunnel = &mustTunnel
+				cluster.Status.AKSStatus.PrivateRequiresTunnel = mustTunnel
 				cluster.Status.ServiceAccountToken = serviceToken
 				return e.ClusterClient.Update(cluster)
 			}
@@ -387,9 +387,13 @@ func (e *aksOperatorController) deployAKSOperator() error {
 	return e.DeployOperator(aksOperator, aksOperatorTemplate, aksShortName)
 }
 
-func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, bool, error) {
+func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, *bool, error) {
 	restConfig, err := e.getKubeConfig(cluster)
+	if err != nil {
+		return "", nil, err
+	}
 
+	requiresTunnel := new(bool)
 	netDialer := net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
@@ -398,11 +402,13 @@ func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 	if err != nil {
 		var dnsError *net.DNSError
 		if stderrors.As(err, &dnsError) && !dnsError.IsTemporary {
-			return "", true, nil
+			*requiresTunnel = true
+			return "", requiresTunnel, nil
 		}
+		requiresTunnel = nil
 	}
 
-	return serviceToken, false, err
+	return serviceToken, requiresTunnel, err
 }
 
 func generateSAToken(restConfig *rest.Config, dialer typesDialer.Dialer) (string, error) {
