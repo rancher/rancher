@@ -67,9 +67,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 		managementlegacy.Register(ctx, management, manager)
 	}
 
-	// Register last
-	auth.RegisterLate(ctx, management)
-
 	if features.Legacy.Enabled() {
 		// Ensure caches are available for user controllers, these are used as part of
 		// registration
@@ -77,4 +74,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 		management.Management.ClusterAlertRules("").Controller()
 	}
 
+	// Register last
+	auth.RegisterLate(ctx, management)
 }

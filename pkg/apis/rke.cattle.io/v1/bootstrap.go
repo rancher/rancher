@@ -37,5 +37,6 @@ type RKEBootstrapTemplate struct {
 }
 
 type RKEBootstrapTemplateSpec struct {
-	Template RKEBootstrap `json:"template,omitempty" wrangler:"required"`
+	ClusterName string       `json:"clusterName,omitempty"`
+	Template    RKEBootstrap `json:"template,omitempty" wrangler:"required"`
 }
