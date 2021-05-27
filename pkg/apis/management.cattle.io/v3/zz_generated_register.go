@@ -77,6 +77,7 @@ var (
 	NodePoolResourceName                                = "nodepools"
 	NodeTemplateResourceName                            = "nodetemplates"
 	NotifierResourceName                                = "notifiers"
+	OIDCProviderResourceName                            = "oidcproviders"
 	OpenLdapProviderResourceName                        = "openldapproviders"
 	PodSecurityPolicyTemplateResourceName               = "podsecuritypolicytemplates"
 	PodSecurityPolicyTemplateProjectBindingResourceName = "podsecuritypolicytemplateprojectbindings"
@@ -225,6 +226,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodeTemplateList{},
 		&Notifier{},
 		&NotifierList{},
+		&OIDCProvider{},
+		&OIDCProviderList{},
 		&OpenLdapProvider{},
 		&OpenLdapProviderList{},
 		&PodSecurityPolicyTemplate{},

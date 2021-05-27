@@ -618,7 +618,41 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
 		MustImport(&Version, v3.GoogleOauthConfigApplyInput{}).
-		MustImport(&Version, v3.GoogleOauthConfigTestOutput{})
+		MustImport(&Version, v3.GoogleOauthConfigTestOutput{}).
+		//OIDC Config
+		MustImportAndCustomize(&Version, v3.OIDCConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "oidcConfig",
+					Output: "oidcTestOutput",
+				},
+				"testAndApply": {
+					Input: "oidcApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.OIDCApplyInput{}).
+		MustImport(&Version, v3.OIDCTestOutput{}).
+		//KeyCloakOIDC Config
+		MustImportAndCustomize(&Version, v3.KeyCloakOIDCConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "keyCloakOidcConfig",
+					Output: "keyCloakOidcTestOutput",
+				},
+				"testAndApply": {
+					Input: "keyCloakOidcApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		})
 }
 
 func configSchema(schema *types.Schema) {

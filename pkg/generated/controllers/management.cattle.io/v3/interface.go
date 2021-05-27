@@ -79,6 +79,7 @@ type Interface interface {
 	NodePool() NodePoolController
 	NodeTemplate() NodeTemplateController
 	Notifier() NotifierController
+	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
 	PodSecurityPolicyTemplate() PodSecurityPolicyTemplateController
 	PodSecurityPolicyTemplateProjectBinding() PodSecurityPolicyTemplateProjectBindingController
@@ -264,6 +265,9 @@ func (c *version) NodeTemplate() NodeTemplateController {
 }
 func (c *version) Notifier() NotifierController {
 	return NewNotifierController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Notifier"}, "notifiers", true, c.controllerFactory)
+}
+func (c *version) OIDCProvider() OIDCProviderController {
+	return NewOIDCProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCProvider"}, "oidcproviders", false, c.controllerFactory)
 }
 func (c *version) OpenLdapProvider() OpenLdapProviderController {
 	return NewOpenLdapProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OpenLdapProvider"}, "openldapproviders", false, c.controllerFactory)

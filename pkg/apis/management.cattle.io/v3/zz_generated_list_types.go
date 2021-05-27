@@ -842,6 +842,23 @@ func NewNotifier(namespace, name string, obj Notifier) *Notifier {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// OIDCProviderList is a list of OIDCProvider resources
+type OIDCProviderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []OIDCProvider `json:"items"`
+}
+
+func NewOIDCProvider(namespace, name string, obj OIDCProvider) *OIDCProvider {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("OIDCProvider").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // OpenLdapProviderList is a list of OpenLdapProvider resources
 type OpenLdapProviderList struct {
 	metav1.TypeMeta `json:",inline"`

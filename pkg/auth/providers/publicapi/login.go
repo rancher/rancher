@@ -8,6 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
+
+	"github.com/rancher/rancher/pkg/auth/providers/oidc"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/rancher/norman/httperror"
@@ -154,6 +158,12 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.GoogleOAuthProviderType:
 		input = &v32.GoogleOauthLogin{}
 		providerName = googleoauth.Name
+	case client.OIDCProviderType:
+		input = &v32.OIDCLogin{}
+		providerName = oidc.Name
+	case client.KeyCloakOIDCProviderType:
+		input = &v32.OIDCLogin{}
+		providerName = keycloakoidc.Name
 	default:
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
