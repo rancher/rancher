@@ -695,15 +695,14 @@ func (p *Planner) addInitNodeInstruction(nodePlan plan.NodePlan, controlPlane *r
 	nodePlan.Instructions = append(nodePlan.Instructions, plan.Instruction{
 		Name:       "capture-address",
 		Image:      getInstallerImage(controlPlane),
-		Command:    "curl",
+		Command:    "sh",
 		SaveOutput: true,
 		Args: []string{
-			"-f",
-			"--retry", "20",
-			"--retry-delay", "5",
-			"--cacert", fmt.Sprintf("/var/lib/rancher/%s/server/tls/server-ca.crt",
-				GetRuntime(controlPlane.Spec.KubernetesVersion)),
-			fmt.Sprintf("https://localhost:%d/db/info", GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
+			"-c",
+			fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert "+
+				"/var/lib/rancher/%s/server/tls/server-ca.crt https://localhost:%d/db/info | grep 'clientURLs'",
+				GetRuntime(controlPlane.Spec.KubernetesVersion),
+				GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
 		},
 	})
 	return nodePlan, nil
