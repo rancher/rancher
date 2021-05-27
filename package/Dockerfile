@@ -1,14 +1,18 @@
-FROM ubuntu:18.04
-RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils && \
+FROM registry.suse.com/suse/sle15:15.3
+
+RUN zypper -n ar --refresh --priority 100 'https://updates.suse.com/SUSE/Products/SLE-BCI/$releasever_major-SP$releasever_minor/$basearch/product/' SLE_BCI && \
+    zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk && \
+    zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
+    rpm -e libsolv-tools zypper libzypp container-suseconnect ; \
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
+
 RUN mkdir /root/.kube && \
     ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
     ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config && \
     ln -s /usr/bin/rancher /usr/bin/reset-password && \
-    ln -s /usr/bin/rancher /usr/bin/ensure-default-admin && \
-    rm -f /bin/sh && ln -s /bin/bash /bin/sh
+    ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64

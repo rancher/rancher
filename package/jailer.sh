@@ -22,11 +22,12 @@ mkdir -p /opt/jail/$NAME/bin
 # Copy over required files to the jail
 if [[ -d /lib64 ]]; then
   cp -r /lib64 /opt/jail/$NAME
+  cp -r /usr/lib64 /opt/jail/$NAME/usr
 fi
 
 cp -r /lib /opt/jail/$NAME
 cp -r /usr/lib /opt/jail/$NAME/usr
-cp /etc/ssl/certs/ca-certificates.crt /opt/jail/$NAME/etc/ssl/certs
+cp /var/lib/ca-certificates/ca-bundle.pem /opt/jail/$NAME/etc/ssl/certs
 cp /etc/resolv.conf /opt/jail/$NAME/etc/
 cp /etc/passwd /opt/jail/$NAME/etc/
 cp /etc/hosts /opt/jail/$NAME/etc/
