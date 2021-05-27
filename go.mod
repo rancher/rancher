@@ -58,6 +58,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/bshuster-repo/logrus-logstash-hook v1.0.0 // indirect
 	github.com/coreos/etcd v3.3.17+incompatible
+	github.com/coreos/go-iptables v0.6.0
 	github.com/coreos/go-oidc/v3 v3.0.0
 	github.com/coreos/go-semver v0.3.0
 	github.com/crewjam/saml v0.4.5
@@ -123,6 +124,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
+	github.com/vishvananda/netlink v1.1.0
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
 	github.com/vmware/govmomi v0.23.2-0.20201015235820-81318771d0e0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
