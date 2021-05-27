@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -21,7 +20,8 @@ import (
 )
 
 const (
-	nodeAPIGroup = "rke-machine.cattle.io"
+	machineAPIGroup       = "rke-machine.cattle.io"
+	machineConfigAPIGroup = "rke-machine-config.cattle.io"
 )
 
 type handler struct {
@@ -250,19 +250,20 @@ func (h *handler) OnChange(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus)
 		}
 		crd := crd.CRD{
 			GVK: schema.GroupVersionKind{
-				Group:   nodeAPIGroup,
+				Group:   machineAPIGroup,
 				Version: rkev1.SchemeGroupVersion.Version,
 				Kind:    convert.Capitalize(id),
 			},
 			Schema: props,
 			Labels: map[string]string{
-				"cluster.x-k8s.io/v1alpha4": "v1",
+				"cluster.x-k8s.io/v1alpha4":      "v1",
+				"auth.cattle.io/cluster-indexed": "true",
 			},
 			Status: true,
 		}
 
 		if nodeConfigID == id {
-			crd.GVK.Group = rancherv1.SchemeGroupVersion.Group
+			crd.GVK.Group = machineConfigAPIGroup
 		}
 
 		crdObj, err := crd.ToCustomResourceDefinition()

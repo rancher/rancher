@@ -9,6 +9,8 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/wrangler/pkg/relatedresource"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -19,6 +21,12 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(),
 		"", "rke-control-plane", h.OnChange)
+	relatedresource.Watch(ctx, "rke-control-plane-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		return []relatedresource.Key{{
+			Namespace: namespace,
+			Name:      name,
+		}}, nil
+	}, clients.RKE.RKEControlPlane(), clients.Provisioning.Cluster())
 }
 
 type handler struct {

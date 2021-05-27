@@ -147,20 +147,17 @@ func (w *Context) OnLeader(f func(ctx context.Context) error) {
 }
 
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
-	defer func() {
-		if err == nil {
-			err = w.Start(ctx)
-		}
-	}()
-
-	w.controllerLock.Lock()
-	defer w.controllerLock.Unlock()
-
 	transaction := controller.NewHandlerTransaction(ctx)
 	if err := f(transaction); err != nil {
 		transaction.Rollback()
 		return err
 	}
+
+	if err = w.Start(ctx); err != nil {
+		return err
+	}
+
+	w.SharedControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
 	transaction.Commit()
 	return nil
 }

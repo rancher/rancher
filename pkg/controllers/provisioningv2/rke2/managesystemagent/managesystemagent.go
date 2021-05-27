@@ -101,7 +101,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 }
 
 func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterStatus) ([]runtime.Object, rancherv1.ClusterStatus, error) {
-	if cluster.Spec.RKEConfig == nil {
+	if cluster.Spec.RKEConfig == nil || settings.SystemAgentUpgradeImage.Get() == "" {
 		return nil, status, nil
 	}
 

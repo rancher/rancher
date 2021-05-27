@@ -78,7 +78,7 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	apiVersion := machinePool.NodeConfig.APIVersion
 	kind := machinePool.NodeConfig.Kind
 	if apiVersion == "" {
-		apiVersion = "provisioning.cattle.io/v1"
+		apiVersion = "rke-machine-config.cattle.io/v1"
 	}
 
 	gvk := schema.FromAPIVersionAndKind(apiVersion, kind)
@@ -141,6 +141,14 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
 				Name:      bootstrapName,
+			},
+			Spec: rkev1.RKEBootstrapTemplateSpec{
+				ClusterName: cluster.Name,
+				Template: rkev1.RKEBootstrap{
+					Spec: rkev1.RKEBootstrapSpec{
+						ClusterName: cluster.Name,
+					},
+				},
 			},
 		})
 	}
