@@ -78,28 +78,35 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	switch resourceType {
 	case "aksVersions":
 		if serialized, errCode, err = listKubernetesVersions(req.Context(), capa); err != nil {
-			logrus.Debugf("[aks-handler] error getting kubernetes versions: %v", err)
+			logrus.Errorf("[aks-handler] error getting kubernetes versions: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "aksVirtualNetworks":
 		if serialized, errCode, err = listVirtualNetworks(req.Context(), capa); err != nil {
-			logrus.Debugf("[aks-handler] error getting networks: %v", err)
+			logrus.Errorf("[aks-handler] error getting networks: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "aksClusters":
 		if serialized, errCode, err = listClusters(req.Context(), capa); err != nil {
-			logrus.Debugf("[aks-handler] error getting clusters: %v", err)
+			logrus.Errorf("[aks-handler] error getting clusters: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "aksVMSizes":
 		if serialized, errCode, err = listVMSizes(req.Context(), capa); err != nil {
-			logrus.Debugf("[aks-handler] error getting VM sizes: %v", err)
+			logrus.Errorf("[aks-handler] error getting VM sizes: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
+	case "aksLocations":
+		if serialized, errCode, err = listLocations(req.Context(), capa); err != nil {
+			logrus.Errorf("[aks-handler] error getting locations: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
@@ -112,7 +119,7 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credID string) (int, error) {
 	ns, name := ref.Parse(credID)
 	if ns == "" || name == "" {
-		logrus.Debugf("[AKS] invalid cloud credential ID %s", credID)
+		logrus.Errorf("[AKS] invalid cloud credential ID %s", credID)
 		return http.StatusBadRequest, fmt.Errorf("invalid cloud credential ID %s", credID)
 	}
 
@@ -139,7 +146,7 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 
 	cc, err := h.secretsLister.Get(ns, name)
 	if err != nil {
-		logrus.Debugf("[AKS] error accessing cloud credential %s", credID)
+		logrus.Errorf("[AKS] error accessing cloud credential %s", credID)
 		return httperror.InvalidBodyContent.Status, fmt.Errorf("error accessing cloud credential %s", credID)
 	}
 	cap.TenantID = string(cc.Data["azurecredentialConfig-tenantId"])

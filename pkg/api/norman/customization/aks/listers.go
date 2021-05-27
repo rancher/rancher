@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-09-01/containerservice"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-07-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/subscription/mgmt/2020-09-01/subscription"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -92,6 +93,18 @@ func NewClusterClient(cap *Capabilities) (*containerservice.ManagedClustersClien
 	return &client, nil
 }
 
+func NewSubscriptionServiceClient(cap *Capabilities) (*subscription.SubscriptionsClient, error) {
+	authorizer, err := NewClientAuthorizer(cap)
+	if err != nil {
+		return nil, err
+	}
+
+	subscriptionService := subscription.NewSubscriptionsClient()
+	subscriptionService.Authorizer = authorizer
+
+	return &subscriptionService, nil
+}
+
 type sortableVersion []string
 
 func (s sortableVersion) Len() int {
@@ -165,8 +178,8 @@ func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, e
 				for _, azureSubnet := range *azureNetwork.Subnets {
 					if azureSubnet.Name != nil {
 						subnets = append(subnets, subnet{
-							Name:         *azureSubnet.Name,
-							AddressRange: *azureSubnet.AddressPrefix,
+							Name:         to.String(azureSubnet.Name),
+							AddressRange: to.String(azureSubnet.AddressPrefix),
 						})
 					}
 				}
@@ -187,7 +200,7 @@ func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, e
 			}
 
 			batch = append(batch, virtualNetworksResponseBody{
-				Name:          *azureNetwork.Name,
+				Name:          to.String(azureNetwork.Name),
 				ResourceGroup: match[1],
 				Subnets:       subnets,
 			})
@@ -224,12 +237,15 @@ func listClusters(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 
 	for clusterList.NotDone() {
 		for _, cluster := range clusterList.Values() {
-			var tmpCluster clustersResponseBody
-			if cluster.ID != nil {
-				tmpCluster.ResourceGroup = matchResourceGroup.FindStringSubmatch(to.String(cluster.ID))[1]
+			tmpCluster := clustersResponseBody{
+				ClusterName: to.String(cluster.Name),
 			}
-			if cluster.Name != nil {
-				tmpCluster.ClusterName = to.String(cluster.Name)
+			if cluster.ID != nil {
+				match := matchResourceGroup.FindStringSubmatch(to.String(cluster.ID))
+				if len(match) < 2 || match[1] == "" {
+					return nil, http.StatusInternalServerError, fmt.Errorf("could not parse virtual network ID")
+				}
+				tmpCluster.ResourceGroup = match[1]
 			}
 			clusters = append(clusters, tmpCluster)
 		}
@@ -264,6 +280,33 @@ func listVMSizes(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 	}
 
 	return encodeOutput(vmSizes)
+}
+
+type locationsResponseBody struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+}
+
+func listLocations(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	clientSubscription, err := NewSubscriptionServiceClient(cap)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	locationList, err := clientSubscription.ListLocations(ctx, cap.SubscriptionID)
+	if err != nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("failed to get locations: %v", err)
+	}
+
+	var locations []locationsResponseBody
+
+	for _, location := range *locationList.Value {
+		locations = append(locations, locationsResponseBody{
+			Name:        to.String(location.Name),
+			DisplayName: to.String(location.DisplayName),
+		})
+	}
+
+	return encodeOutput(locations)
 }
 
 func encodeOutput(result interface{}) ([]byte, int, error) {
