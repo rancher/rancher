@@ -1,7 +1,6 @@
 from .common import *  # NOQA
 import pytest
 import requests
-import semver
 
 namespace = {'client': None,
              'cluster': None,
@@ -104,9 +103,6 @@ def get_chart_latest_version(catalog, chart_name):
     for chart in charts:
         versions.append(chart["version"])
     latest = versions[0]
-    for version in versions:
-        if semver.compare(latest, version) < 0:
-            latest = version
     return latest
 
 

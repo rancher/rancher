@@ -1,0 +1,31 @@
+%{ if cluster_provider != "" }
+additionalLoggingSources:
+  %{ if cluster_provider == "aks" }
+  aks:
+    enabled: true
+  %{ endif }
+  %{ if cluster_provider == "eks" }
+  eks:
+    enabled: true
+  %{ endif }
+  %{ if cluster_provider == "gke" }
+  gke:
+    enabled: true
+  %{ endif }
+  %{ if cluster_provider == "k3s" }
+  k3s:
+    container_engine: systemd
+    enabled: true
+  %{ endif }
+  %{ if cluster_provider == "rke" }
+  rke:
+    enabled: true
+    fluentbit:
+      log_level: info
+      mem_buffer_limit: 5MB
+  %{ endif }
+  %{ if cluster_provider == "rke2" }
+  rke2:
+    enabled: true
+  %{ endif }
+%{ endif }
