@@ -35,6 +35,12 @@ var (
 		true,
 		false,
 		true)
+	MCMAgent = newFeature(
+		"multi-cluster-management-agent",
+		"Run downstream controllers for multi-cluster management.",
+		false,
+		false,
+		false)
 	Fleet = newFeature(
 		"fleet",
 		"Install Fleet when starting Rancher",

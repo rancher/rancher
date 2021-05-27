@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/mcmagent"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
@@ -41,6 +42,13 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 
 	if features.ProvisioningV2.Enabled() {
 		if err := provisioningv2.Register(ctx, wrangler); err != nil {
+			return err
+		}
+	}
+
+	if features.MCMAgent.Enabled() || features.MCM.Enabled() {
+		err := mcmagent.Register(ctx, wrangler)
+		if err != nil {
 			return err
 		}
 	}
