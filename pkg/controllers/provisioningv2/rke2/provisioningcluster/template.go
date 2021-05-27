@@ -74,7 +74,7 @@ func pruneBySchema(kind string, data map[string]interface{}, dynamicSchema mgmtc
 }
 
 func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machinePool rancherv1.RKEMachinePool,
-	dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (runtime.Object, error) {
+	dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (*unstructured.Unstructured, error) {
 	apiVersion := machinePool.NodeConfig.APIVersion
 	kind := machinePool.NodeConfig.Kind
 	if apiVersion == "" {
@@ -177,7 +177,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			infraRef        corev1.ObjectReference
 		)
 
-		if machinePool.NodeConfig.APIVersion == "" || machinePool.NodeConfig.APIVersion == "provisioning.cattle.io/v1" {
+		if machinePool.NodeConfig.APIVersion == "" || machinePool.NodeConfig.APIVersion == "rke-machine-config.cattle.io/v1" {
 			machineTemplate, err := toMachineTemplate(machinePoolName, cluster, machinePool, dynamic, dynamicSchema, secrets)
 			if err != nil {
 				return nil, err
@@ -185,10 +185,10 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 			result = append(result, machineTemplate)
 			infraRef = corev1.ObjectReference{
-				Kind:       machineTemplate.GetObjectKind().GroupVersionKind().Kind,
-				Namespace:  cluster.Namespace,
-				Name:       machinePoolName,
-				APIVersion: "rke-machine.cattle.io/v1",
+				APIVersion: machineTemplate.GetAPIVersion(),
+				Kind:       machineTemplate.GetKind(),
+				Namespace:  machineTemplate.GetNamespace(),
+				Name:       machineTemplate.GetName(),
 			}
 		} else {
 			infraRef = *machinePool.NodeConfig

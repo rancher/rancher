@@ -485,94 +485,85 @@ func (w *UserContext) Start(ctx context.Context) error {
 	return w.ControllerFactory.Start(ctx, 5)
 }
 
-func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
+func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	var err error
 	context := &UserOnlyContext{
-		RESTConfig: *steve.RestConfigDefaults(&config),
+		RESTConfig:        *config.RESTConfig,
+		ControllerFactory: config.ControllerFactory,
+		K8sClient:         config.K8s,
 	}
 
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, wrangler.Scheme)
-	if err != nil {
-		return nil, err
-	}
-	context.ControllerFactory = controllerFactory
-
-	context.K8sClient, err = kubernetes.NewForConfig(&config)
+	context.Apps, err = appsv1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Apps, err = appsv1.NewFromControllerFactory(controllerFactory)
+	context.Core, err = corev1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Core, err = corev1.NewFromControllerFactory(controllerFactory)
+	context.Project, err = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Project, err = projectv3.NewFromControllerFactory(controllerFactory)
+	context.Storage, err = storagev1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Storage, err = storagev1.NewFromControllerFactory(controllerFactory)
+	context.RBAC, err = rbacv1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.RBAC, err = rbacv1.NewFromControllerFactory(controllerFactory)
+	context.Extensions, err = extv1beta1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Extensions, err = extv1beta1.NewFromControllerFactory(controllerFactory)
+	context.Policy, err = policyv1beta1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Policy, err = policyv1beta1.NewFromControllerFactory(controllerFactory)
+	context.BatchV1, err = batchv1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.BatchV1, err = batchv1.NewFromControllerFactory(controllerFactory)
+	context.BatchV1Beta1, err = batchv1beta1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.BatchV1Beta1, err = batchv1beta1.NewFromControllerFactory(controllerFactory)
+	context.Autoscaling, err = autoscaling.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Autoscaling, err = autoscaling.NewFromControllerFactory(controllerFactory)
+	context.Monitoring, err = monitoringv1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Monitoring, err = monitoringv1.NewFromControllerFactory(controllerFactory)
+	context.Cluster, err = clusterv3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Cluster, err = clusterv3.NewFromControllerFactory(controllerFactory)
+	context.Istio, err = istiov1alpha3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.Istio, err = istiov1alpha3.NewFromControllerFactory(controllerFactory)
+	context.APIRegistration, err = apiregistrationv1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	context.APIRegistration, err = apiregistrationv1.NewFromControllerFactory(controllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
-	dynamicConfig := config
+	dynamicConfig := context.RESTConfig
 	if dynamicConfig.NegotiatedSerializer == nil {
 		dynamicConfig.NegotiatedSerializer = dynamic.NegotiatedSerializer
 	}

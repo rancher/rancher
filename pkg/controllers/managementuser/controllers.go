@@ -3,7 +3,6 @@ package managementuser
 import (
 	"context"
 
-	"github.com/rancher/rancher/pkg/controllers/managementagent"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/certsexpiration"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
@@ -58,12 +57,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 		clusterauthtoken.Register(ctx, cluster)
 	}
 
-	if clusterRec.Spec.Internal {
-		err := managementagent.Register(ctx, cluster.UserOnlyContext())
-		if err != nil {
-			return err
-		}
-	} else {
+	if !clusterRec.Spec.Internal {
 		err := settings.Register(ctx, cluster)
 		if err != nil {
 			return err
