@@ -16,6 +16,7 @@ var authConfigTypes = []string{
 	client.GithubConfigType,
 	client.LocalConfigType,
 	client.ActiveDirectoryConfigType,
+	client.SambaBoxConfigType,
 	client.AzureADConfigType,
 	client.OpenLdapConfigType,
 	client.FreeIpaConfigType,

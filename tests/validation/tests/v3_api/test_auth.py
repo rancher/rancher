@@ -65,6 +65,8 @@ PASSWORD = ""
 
 if AUTH_PROVIDER == "activeDirectory":
     PASSWORD = AUTH_USER_PASSWORD
+elif AUTH_PROVIDER == "sambaBox":
+    PASSWORD = AUTH_USER_PASSWORD
 elif AUTH_PROVIDER == "openLdap":
     PASSWORD = OPENLDAP_AUTH_USER_PASSWORD
 elif AUTH_PROVIDER == "freeIpa":
@@ -166,6 +168,18 @@ def test_ad_service_account_login():
         enable_ad(admin_user, admin_token)
         login(SERVICE_ACCOUNT_NAME, SERVICE_ACCOUNT_PASSWORD)
 
+def test_sbx_service_account_login():
+    delete_project_users()
+    delete_cluster_users()
+    auth_setup_data = setup["auth_setup_data"]
+    admin_user = auth_setup_data["admin_user"]
+    # admin_user here is the AD admin user
+    if AUTH_PROVIDER == "sambaBox":
+        admin_token = login(admin_user, AUTH_USER_PASSWORD)
+        disable_sbx(admin_user, admin_token)
+        enable_sbx(admin_user, admin_token)
+        login(SERVICE_ACCOUNT_NAME, SERVICE_ACCOUNT_PASSWORD)
+
 
 def test_special_character_users_login_access_mode_required():
     access_mode = "required"
@@ -187,6 +201,9 @@ def special_character_users_login(access_mode):
     if AUTH_PROVIDER == "activeDirectory":
         disable_ad(admin_user, admin_token)
         enable_ad(admin_user, admin_token)
+    if AUTH_PROVIDER == "sambaBox":
+        disable_sbx(admin_user, admin_token)
+        enable_sbx(admin_user, admin_token)
     if AUTH_PROVIDER == "openLdap":
         disable_openldap(admin_user, admin_token)
         enable_openldap(admin_user, admin_token)
@@ -195,6 +212,31 @@ def special_character_users_login(access_mode):
         enable_freeipa(admin_user, admin_token)
 
     if AUTH_PROVIDER == "activeDirectory":
+        for user in auth_setup_data["specialchar_in_username"]:
+            allowed_principal_ids.append(principal_lookup(user, admin_token))
+        for user in auth_setup_data["specialchar_in_password"]:
+            allowed_principal_ids.append(principal_lookup(user, admin_token))
+        for user in auth_setup_data["specialchar_in_userdn"]:
+            allowed_principal_ids.append(principal_lookup(user, admin_token))
+        for group in auth_setup_data["specialchar_in_groupname"]:
+            allowed_principal_ids.append(principal_lookup(group, admin_token))
+
+        allowed_principal_ids.append(
+            principal_lookup(admin_user, admin_token))
+        add_users_to_site_access(
+            admin_token, access_mode, allowed_principal_ids)
+
+        for user in auth_setup_data["specialchar_in_username"]:
+            login(user, PASSWORD)
+        for user in auth_setup_data["specialchar_in_password"]:
+            login(user, AD_SPECIAL_CHAR_PASSWORD)
+        for user in auth_setup_data["specialchar_in_userdn"]:
+            login(user, PASSWORD)
+        for group in auth_setup_data["specialchar_in_groupname"]:
+            for user in auth_setup_data[group]:
+                login(user, PASSWORD)
+
+    if AUTH_PROVIDER == "sambaBox":
         for user in auth_setup_data["specialchar_in_username"]:
             allowed_principal_ids.append(principal_lookup(user, admin_token))
         for user in auth_setup_data["specialchar_in_password"]:
@@ -422,6 +464,9 @@ def validate_access_control_disable_and_enable_auth(access_mode):
     if AUTH_PROVIDER == "activeDirectory":
         disable_ad(admin_user, admin_token)
         enable_ad(admin_user, admin_token)
+    if AUTH_PROVIDER == "sambaBox":
+        disable_sbx(admin_user, admin_token)
+        enable_sbx(admin_user, admin_token)
     if AUTH_PROVIDER == "openLdap":
         disable_openldap(admin_user, admin_token)
         enable_openldap(admin_user, admin_token)
@@ -446,6 +491,11 @@ def validate_access_control_disable_and_enable_auth(access_mode):
                        expected_status=setup["permission_denied_code"])
             enable_ad(user, token,
                       expected_status=setup["permission_denied_code"])
+        if AUTH_PROVIDER == "sambaBox":
+            disable_sbx(user, token,
+                       expected_status=setup["permission_denied_code"])
+            enable_sbx(user, token,
+                      expected_status=setup["permission_denied_code"])
         if AUTH_PROVIDER == "openLdap":
             disable_openldap(user, token,
                              expected_status=setup["permission_denied_code"])
@@ -467,6 +517,8 @@ def validate_access_control_disable_and_enable_nestedgroups(access_mode):
     token = login(admin_user, PASSWORD)
     if AUTH_PROVIDER == "activeDirectory":
         enable_ad(admin_user, token)
+    if AUTH_PROVIDER == "sambaBox":
+        enable_sbx(admin_user, token)
     if AUTH_PROVIDER == "openLdap":
         enable_openldap(admin_user, token)
     if AUTH_PROVIDER == "freeIpa":
@@ -489,7 +541,7 @@ def validate_access_control_disable_and_enable_nestedgroups(access_mode):
         for user in auth_setup_data["users_under_nestedgroups"]:
             login(user, PASSWORD)
 
-    if AUTH_PROVIDER == "activeDirectory" or AUTH_PROVIDER == "openLdap":
+    if AUTH_PROVIDER == "activeDirectory" or AUTH_PROVIDER == "sambaBox" or AUTH_PROVIDER == "openLdap":
         for user in auth_setup_data["users_under_nestedgroups"]:
             login(user, PASSWORD,
                   expected_status=setup["permission_denied_code"])
@@ -498,6 +550,8 @@ def validate_access_control_disable_and_enable_nestedgroups(access_mode):
         # successfully
         if AUTH_PROVIDER == "activeDirectory":
             enable_ad(admin_user, token, nested=True)
+        if AUTH_PROVIDER == "sambaBox":
+            enable_sbx(admin_user, token, nested=True)
         if AUTH_PROVIDER == "openLdap":
             enable_openldap(admin_user, token, nested=True)
 
@@ -649,6 +703,63 @@ def disable_ad(username, token, expected_status=200):
     print("Disable ActiveDirectory request for " +
           username + " " + str(expected_status))
     assert r.status_code == expected_status
+    
+
+def enable_sbx(username, token, enable_url=CATTLE_AUTH_ENABLE_URL,
+              password=AUTH_USER_PASSWORD, nested=False, expected_status=200):
+    headers = {'Authorization': 'Bearer ' + token}
+    active_directory_config = {
+        "accessMode": "unrestricted",
+        "certificate": CA_CERTIFICATE,
+        "connectionTimeout": CONNECTION_TIMEOUT,
+        "defaultLoginDomain": DEFAULT_LOGIN_DOMAIN,
+        "groupDNAttribute": "distinguishedName",
+        "groupMemberMappingAttribute": "member",
+        "groupMemberUserAttribute": "distinguishedName",
+        "groupNameAttribute": "name",
+        "groupObjectClass": "group",
+        "groupSearchAttribute": "sAMAccountName",
+        "nestedGroupMembershipEnabled": nested,
+        "port": PORT,
+        "servers": [HOSTNAME_OR_IP_ADDRESS],
+        "serviceAccountUsername": SERVICE_ACCOUNT_NAME,
+        "tls": get_tls(CA_CERTIFICATE),
+        "userDisabledBitMask": 2,
+        "userEnabledAttribute": "userAccountControl",
+        "userLoginAttribute": "sAMAccountName",
+        "userNameAttribute": "name",
+        "userObjectClass": "person",
+        "userSearchAttribute": "sAMAccountName|sn|givenName",
+        "userSearchBase": USER_SEARCH_BASE,
+        "serviceAccountPassword": SERVICE_ACCOUNT_PASSWORD
+    }
+
+    ca_cert = active_directory_config["certificate"]
+    active_directory_config["certificate"] = ca_cert.replace('\\n', '\n')
+
+    r = requests.post(enable_url,
+                      json={"sambaBoxConfig": active_directory_config,
+                            "enabled": True,
+                            "username": username,
+                            "password": password},
+                      verify=False, headers=headers)
+    nested_msg = " nested group " if nested else " "
+    print(f"Enable SambaBox{nested_msg}request for {username} "
+          f"{expected_status}")
+    assert r.status_code == expected_status
+
+
+def disable_sbx(username, token, expected_status=200):
+    headers = {'Authorization': 'Bearer ' + token}
+    r = requests.post(CATTLE_AUTH_DISABLE_URL,
+                      json={"enabled": False,
+                            "username": username,
+                            "password": AUTH_USER_PASSWORD
+                            },
+                      verify=False, headers=headers)
+    print("Disable SambaBox request for " +
+          username + " " + str(expected_status))
+    assert r.status_code == expected_status
 
 
 def enable_freeipa(username, token, enable_url=CATTLE_AUTH_ENABLE_URL,
@@ -767,7 +878,7 @@ def create_project_client(request):
     the clusters.
     '''
 
-    if AUTH_PROVIDER not in ("activeDirectory", "openLdap", "freeIpa"):
+    if AUTH_PROVIDER not in ("activeDirectory", "sambaBox", "openLdap", "freeIpa"):
         assert False, "Auth Provider set is not supported"
     setup["auth_setup_data"] = load_setup_data()
     client = get_admin_client()
@@ -777,6 +888,8 @@ def create_project_client(request):
         admin_user = auth_setup_data["admin_user"]
         if AUTH_PROVIDER == 'activeDirectory':
             enable_ad(admin_user, ADMIN_TOKEN)
+        if AUTH_PROVIDER == 'sambaBox':
+            enable_sbx(admin_user, ADMIN_TOKEN)
         elif AUTH_PROVIDER == 'openLdap':
             enable_openldap(admin_user, ADMIN_TOKEN)
         elif AUTH_PROVIDER == 'freeIpa':

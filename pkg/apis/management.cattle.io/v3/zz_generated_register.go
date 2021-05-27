@@ -30,6 +30,7 @@ import (
 var (
 	APIServiceResourceName                              = "apiservices"
 	ActiveDirectoryProviderResourceName                 = "activedirectoryproviders"
+	SambaBoxProviderResourceName                        = "sambaboxproviders"
 	AuthConfigResourceName                              = "authconfigs"
 	AuthProviderResourceName                            = "authproviders"
 	AuthTokenResourceName                               = "authtokens"
@@ -131,6 +132,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&APIServiceList{},
 		&ActiveDirectoryProvider{},
 		&ActiveDirectoryProviderList{},
+		&SambaBoxProvider{},
+		&SambaBoxProviderList{},
 		&AuthConfig{},
 		&AuthConfigList{},
 		&AuthProvider{},

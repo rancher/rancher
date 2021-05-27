@@ -34,6 +34,7 @@ func NewHandler(ctx context.Context, mgmtCtx *config.ScaledContext, opts ...Serv
 
 var authProviderTypes = []string{
 	v3public.ActiveDirectoryProviderType,
+	v3public.SambaBoxProviderType,
 	v3public.AzureADProviderType,
 	v3public.GithubProviderType,
 	v3public.LocalProviderType,

@@ -15,11 +15,12 @@ def test_auth_configs(admin_mc):
 
     configs = client.list_auth_config()
 
-    assert configs.pagination.total == 12
+    assert configs.pagination.total == 13
 
     gh = None
     local = None
     ad = None
+    sbx = None
     azure = None
     openldap = None
     freeIpa = None
@@ -37,6 +38,8 @@ def test_auth_configs(admin_mc):
             local = c
         elif c.type == "activeDirectoryConfig":
             ad = c
+        elif c.type == "sambaBoxConfig":
+            sbx = c
         elif c.type == "azureADConfig":
             azure = c
         elif c.type == "openLdapConfig":
@@ -57,7 +60,7 @@ def test_auth_configs(admin_mc):
             shibboleth = c
 
     for x in [gh, local, ad, azure, openldap,
-              freeIpa, ping, adfs, keycloak, okta, googleoauth]:
+              freeIpa, ping, adfs, keycloak, okta, googleoauth, sbx]:
         assert x is not None
         config = client.by_id_auth_config(x.id)
         with pytest.raises(ApiError) as e:
@@ -68,6 +71,8 @@ def test_auth_configs(admin_mc):
     assert gh.actions.configureTest
 
     assert ad.actions.testAndApply
+
+    assert sbx.actions.testAndApply
 
     assert azure.actions.testAndApply
     assert azure.actions.configureTest

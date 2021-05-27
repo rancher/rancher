@@ -32,6 +32,14 @@ type ActiveDirectoryConfigList struct {
 	Items []ActiveDirectoryConfig `json:"items"`
 }
 
+// SambaBoxConfigList is a list of SambaBoxConfig resources
+type SambaBoxConfigList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []SambaBoxConfig `json:"items"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GithubConfigList is a list of GithubConfig resources
