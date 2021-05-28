@@ -48,7 +48,7 @@ else:
 
 
 class AmazonWebServices(CloudProviderBase):
-    
+
     def __init__(self):
         self._client = boto3.client(
             'ec2',
@@ -467,6 +467,27 @@ class AmazonWebServices(CloudProviderBase):
     def upsert_route_53_record_cname(
             self, record_name, record_value, action='UPSERT',
             record_type='CNAME', record_ttl=300):
+        return self._route53_client.change_resource_record_sets(
+            HostedZoneId=AWS_HOSTED_ZONE_ID,
+            ChangeBatch={
+                'Comment': 'Record created or updated for automation',
+                'Changes': [{
+                    'Action': action,
+                    'ResourceRecordSet': {
+                        'Name': record_name,
+                        'Type': record_type,
+                        'TTL': record_ttl,
+                        'ResourceRecords': [{
+                            'Value': record_value
+                        }]
+                    }
+                }]
+            }
+        )
+
+    def upsert_route_53_record_a(
+            self, record_name, record_value, action='UPSERT',
+            record_type='A', record_ttl=300):
         return self._route53_client.change_resource_record_sets(
             HostedZoneId=AWS_HOSTED_ZONE_ID,
             ChangeBatch={
