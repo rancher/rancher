@@ -294,9 +294,9 @@ func rkeControlPlane(cluster *rancherv1.Cluster) *rkev1.RKEControlPlane {
 			Namespace: cluster.Namespace,
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
-			RKEClusterSpecCommon:  cluster.Spec.RKEConfig.RKEClusterSpecCommon,
-			ETCDSnapshotRestore:   cluster.Spec.RKEConfig.ETCDSnapshotRestore,
-			ETCDSnapshotCreate:    cluster.Spec.RKEConfig.ETCDSnapshotCreate,
+			RKEClusterSpecCommon:  *cluster.Spec.RKEConfig.RKEClusterSpecCommon.DeepCopy(),
+			ETCDSnapshotRestore:   cluster.Spec.RKEConfig.ETCDSnapshotRestore.DeepCopy(),
+			ETCDSnapshotCreate:    cluster.Spec.RKEConfig.ETCDSnapshotCreate.DeepCopy(),
 			KubernetesVersion:     cluster.Spec.KubernetesVersion,
 			ManagementClusterName: cluster.Status.ClusterName,
 			AgentEnvVars:          cluster.Spec.AgentEnvVars,
