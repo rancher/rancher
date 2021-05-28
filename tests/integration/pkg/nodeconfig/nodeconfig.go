@@ -66,20 +66,20 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 
 	err = wait.ClusterScopedList(clients.Ctx, clients.CRD.CustomResourceDefinition().Watch, func(obj runtime.Object) (bool, error) {
 		crd := obj.(*v1.CustomResourceDefinition)
-		return crd.Name == "podconfigs.provisioning.cattle.io" && condition.Cond("Established").IsTrue(crd), nil
+		return crd.Name == "podconfigs.rke-machine-config.cattle.io" && condition.Cond("Established").IsTrue(crd), nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	podConfig := &unstructured.Unstructured{}
-	podConfig.SetAPIVersion("provisioning.cattle.io/v1")
+	podConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
 	podConfig.SetKind("PodConfig")
 	podConfig.SetNamespace(namespace)
 	podConfig.SetGenerateName("pod-config-")
 	podConfig.Object["image"] = defaults.PodTestImage
 	podConfigClient := clients.Dynamic.Resource(schema.GroupVersionResource{
-		Group:    "provisioning.cattle.io",
+		Group:    "rke-machine-config.cattle.io",
 		Version:  "v1",
 		Resource: "podconfigs",
 	})
@@ -93,8 +93,7 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 	})
 
 	return &corev1.ObjectReference{
-		Kind:       result.GetKind(),
-		Name:       result.GetName(),
-		APIVersion: result.GetAPIVersion(),
+		Kind: result.GetKind(),
+		Name: result.GetName(),
 	}, nil
 }

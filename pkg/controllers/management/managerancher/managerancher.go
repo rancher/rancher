@@ -26,6 +26,7 @@ import (
 const (
 	chartConfigMapName = "chart-contents"
 	staticFeatures     = "multi-cluster-management=false," +
+		"multi-cluster-management-agent=true," +
 		"fleet=false," +
 		"legacy=false," +
 		"rke2=false," +
