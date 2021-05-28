@@ -196,12 +196,13 @@ func (p *proxy) secretGetter(req *http.Request) SecretGetter {
 			return nil, fmt.Errorf("failed to find user")
 		}
 		decision, reason, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
-			User:       user,
-			Verb:       "get",
-			Namespace:  namespace,
-			APIVersion: "v1",
-			Resource:   "secrets",
-			Name:       name,
+			User:            user,
+			Verb:            "get",
+			Namespace:       namespace,
+			APIVersion:      "v1",
+			Resource:        "secrets",
+			Name:            name,
+			ResourceRequest: true,
 		})
 		if err != nil {
 			return nil, err
