@@ -123,12 +123,14 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
+		if kerror.IsNotFound(err) {
+			return nil // no cluster, we'll never figure out if this is an RKE1 cluster
+		}
 		return err
 	}
 
 	if cluster.Status.Driver != v32.ClusterDriverRKE {
-		// not an rke node, bail out
-		return nil
+		return nil // not an rke node, bail out
 	}
 
 	userContext, err := m.clusterManager.UserContext(node.Namespace)
