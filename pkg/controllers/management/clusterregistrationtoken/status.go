@@ -20,8 +20,8 @@ const (
 	insecureCommandFormat         = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat             = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
 	shareMntCommandFormat         = "agent --node-name %s --server %s --token %s%s --no-register --only-write-certs"
-	rke2NodeCommandFormat         = "curl -fL %s | %s sh -s - --server %s --token %s%s"
-	rke2InsecureNodeCommandFormat = "curl --insecure -fL %s | %s sh -s - --server %s --token %s%s"
+	rke2NodeCommandFormat         = "curl -fL %s | sudo %s sh -s - --server %s --token %s%s"
+	rke2InsecureNodeCommandFormat = "curl --insecure -fL %s | sudo %s sh -s - --server %s --token %s%s"
 	loginCommandFormat            = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat      = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
