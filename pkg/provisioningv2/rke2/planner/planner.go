@@ -681,11 +681,7 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 	}
 
 	if isOnlyWorker(machine) {
-		if GetRuntime(controlPlane.Spec.KubernetesVersion) == RuntimeRKE2 {
-			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_TYPE=agent", GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
-		} else {
-			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
-		}
+		instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
 	}
 	nodePlan.Instructions = append(nodePlan.Instructions, instruction)
 	return nodePlan, nil
@@ -699,6 +695,7 @@ func (p *Planner) addInitNodeInstruction(nodePlan plan.NodePlan, controlPlane *r
 		SaveOutput: true,
 		Args: []string{
 			"-c",
+			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
 			fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert "+
 				"/var/lib/rancher/%s/server/tls/server-ca.crt https://localhost:%d/db/info | grep 'clientURLs'",
 				GetRuntime(controlPlane.Spec.KubernetesVersion),
