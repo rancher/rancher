@@ -176,7 +176,7 @@ func walkthroughMap(data interface{}, walkFunc func(map[interface{}]interface{})
 	}
 }
 
-func GetImages(systemChartPath, chartPath string, k3sUpgradeImages, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, []string, error) {
+func GetImages(systemChartPath, chartPath string, externalImages map[string][]string, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, []string, error) {
 	// fetch images from system charts
 	imagesSet := make(map[string]map[string]bool)
 	if systemChartPath != "" {
@@ -204,8 +204,9 @@ func GetImages(systemChartPath, chartPath string, k3sUpgradeImages, imagesFromAr
 	// set rancher images from args
 	setImages("rancher", imagesFromArgs, imagesSet)
 
-	// set images for k3s-upgrade
-	setImages("k3sUpgrade", k3sUpgradeImages, imagesSet)
+	for source, sourceImages := range externalImages {
+		setImages(source, sourceImages, imagesSet)
+	}
 
 	convertMirroredImages(imagesSet)
 

@@ -69,9 +69,10 @@ if [ ! -d $CHART_REPO_DIR ]; then
     rm -f $INDEX_PATH $CHART_REPO_DIR/assets/index.yaml
 fi
 
-TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE
-
 if [ ${ARCH} == amd64 ]; then
+    # Move this out of ARCH check for local dev on non-amd64 hardware.
+    TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE
+
     # rancherd tarball
     rm -rf build/rancherd/bundle
     mkdir -p build/rancherd/bundle
