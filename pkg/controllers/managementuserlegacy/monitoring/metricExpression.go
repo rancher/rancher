@@ -77,10 +77,7 @@ func yamlToObject(yml string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(jsondata, obj); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(jsondata, obj)
 }
 
 func generate(text string, data templateData) (string, error) {

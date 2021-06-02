@@ -282,7 +282,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
 		}
-		logrus.Error(fmt.Sprintf("failed to sync templates. Multiple error(s) occured: %v", invalidChartErrors))
+		logrus.Error(fmt.Sprintf("failed to sync templates. Multiple error(s) occurred: %v", invalidChartErrors))
 		return &controller.ForgetError{Err: errors.Errorf("failed to sync templates. Multiple error(s) occurred: %v", invalidChartErrors)}
 	}
 	if len(errstrings) > 0 {

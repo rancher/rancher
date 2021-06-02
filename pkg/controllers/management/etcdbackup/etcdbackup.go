@@ -228,7 +228,9 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 			}
 			return true, nil
 		})
-
+		if err != nil {
+			return b, err
+		}
 		return b, inErr
 	})
 	if err != nil {
@@ -395,7 +397,6 @@ func GetS3Client(sbc *rketypes.S3BackupConfig, timeout int, dialer dialer.Dialer
 	if sbc == nil {
 		return nil, fmt.Errorf("Can't find S3 backup target configuration")
 	}
-	var s3Client = &minio.Client{}
 	var creds *credentials.Credentials
 	var tr http.RoundTripper = &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,

@@ -33,7 +33,7 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 		credName = controlPlane.Spec.ETCD.S3.CloudCredentialName
 	}
 
-	s3Cred, err = getS3Credential(s.secretCache, controlPlane.Namespace, s3.CloudCredentialName, s3.Region)
+	s3Cred, err = getS3Credential(s.secretCache, controlPlane.Namespace, credName, s3.Region)
 	if err != nil {
 		return
 	}

@@ -2,9 +2,12 @@
     "linters": {
         "disable-all": true,
         "enable": [
-            "govet",
-            "golint",
-            "goimports"
+           "govet",
+           "revive",
+           "goimports",
+           "misspell",
+           "ineffassign",
+           "gofmt"
         ]
     },
     "linters-settings": {
@@ -42,6 +45,18 @@
             {
                 "path":"pkg/apis/management.cattle.io/v3/zz_generated_list_types.go",
                 "text":".*lobalDns.*"
+            },
+            {
+                "linters": "revive",
+                "text": "should have comment"
+            },
+            {
+                "linters": "revive",
+                "text": "should be of the form"
+            },
+            {
+                "linters": "typecheck",
+                "text": "imported but not used as apierrors"
             }
         ]
     }

@@ -190,7 +190,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 		lookupUsingClient = true
 	}
 
-	storedToken := &v3.Token{}
+	var storedToken *v3.Token
 	if lookupUsingClient {
 		storedToken, err = a.tokenClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {

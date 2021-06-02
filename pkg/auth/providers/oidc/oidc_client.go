@@ -28,12 +28,10 @@ func GetClientWithCertKey(httpClient *http.Client, certificate, key string) erro
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM([]byte(certificate))
-	httpClient = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:      caCertPool,
-				Certificates: []tls.Certificate{keyPair},
-			},
+	httpClient.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs:      caCertPool,
+			Certificates: []tls.Certificate{keyPair},
 		},
 	}
 	return nil

@@ -1390,11 +1390,7 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 		return err
 	}
 
-	if err = util.DeleteLegacyServiceAccountAndRoleBinding(clientset); err != nil {
-		return err
-	}
-
-	return nil
+	return util.DeleteLegacyServiceAccountAndRoleBinding(clientset)
 }
 
 func logClusterConfig(config containerservice.ManagedCluster) {

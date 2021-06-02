@@ -49,11 +49,7 @@ var (
 
 func RegisterIndexer(ctx context.Context, apiContext *config.ScaledContext) error {
 	informer := apiContext.Management.Users("").Controller().Informer()
-	if err := informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer}); err != nil {
-		return err
-	}
-
-	return nil
+	return informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
 }
 
 func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager {
@@ -174,7 +170,7 @@ func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
 		lookupUsingClient = true
 	}
 
-	storedToken := &v3.Token{}
+	var storedToken *v3.Token
 	if lookupUsingClient {
 		storedToken, err = m.tokensClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {

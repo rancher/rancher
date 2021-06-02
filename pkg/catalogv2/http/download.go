@@ -59,6 +59,9 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	}
 
 	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
 	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.String()), nil
 }
 

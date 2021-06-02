@@ -57,8 +57,5 @@ func registerIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 	if err := podsecuritypolicy.RegisterIndexers(ctx, scaledContext); err != nil {
 		return err
 	}
-	if err := podsecuritypolicy2.RegisterIndexers(ctx, scaledContext); err != nil {
-		return err
-	}
-	return nil
+	return podsecuritypolicy2.RegisterIndexers(ctx, scaledContext)
 }

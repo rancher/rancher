@@ -199,10 +199,7 @@ func (md *MetadataController) saveAllServiceOptions(linuxSvcOptions map[string]r
 		return err
 	}
 	// save windows options
-	if err := md.saveServiceOptions(windowsSvcOptions, localWindowsSvcOptions, Windows); err != nil {
-		return err
-	}
-	return nil
+	return md.saveServiceOptions(windowsSvcOptions, localWindowsSvcOptions, Windows)
 }
 
 func (md *MetadataController) saveServiceOptions(k8sVersionServiceOptions map[string]rketypes.KubernetesServicesOptions,
@@ -750,7 +747,7 @@ func getUserSettings(userSettings map[string]string, defaultK8sVersions map[stri
 
 func getDefaultK8sVersion(rancherDefaultK8sVersions map[string]string, k8sCurrVersions []string, rancherVersion string) (string, error) {
 	defaultK8sVersion, ok := rancherDefaultK8sVersions["user"]
-	if defaultK8sVersion != "" {
+	if ok && defaultK8sVersion != "" {
 		found := false
 		for _, k8sVersion := range k8sCurrVersions {
 			if k8sVersion == defaultK8sVersion {

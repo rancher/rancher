@@ -142,7 +142,7 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 	if err != nil {
 		return err
 	}
-	commands := make([]string, 0)
+	var commands []string
 	if IsHelm3(obj.Status.HelmVersion) {
 		err = createKustomizeFiles(tempDirs, obj.Name)
 		if err != nil {

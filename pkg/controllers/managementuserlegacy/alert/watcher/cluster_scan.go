@@ -133,10 +133,7 @@ func (csw *ClusterScanWatcher) sendAlert(cs *v3.ClusterScan, alertRule *v3.Clust
 	data["component_name"] = cs.Name
 	data["logs"] = csw.getAlertMessage(cs, alertRule)
 
-	if err := csw.alertManager.SendAlert(data); err != nil {
-		return err
-	}
-	return nil
+	return csw.alertManager.SendAlert(data)
 }
 
 func (csw *ClusterScanWatcher) getAlertMessage(cs *v3.ClusterScan, alertRule *v3.ClusterAlertRule) string {

@@ -8,10 +8,10 @@ tox -e flake8
 
 cd ../..
 
-if ! command -v golangci-lint; then	echo Running: go fmt	
-    echo Skipping validation: no golangci-lint available	test -z "$(go fmt ./... | tee /dev/stderr)"
-    exit	
-fi	
+if ! command -v golangci-lint; then
+    echo "Skipping validation on ARCH's other than linux amd64"
+    exit
+fi
 
 echo Running: golangci-lint
 golangci-lint run

@@ -92,7 +92,7 @@ func createSecurityScanNamespace(nsClient rcorev1.NamespaceInterface, projectLis
 			},
 		},
 	}
-	if ns, err = nsClient.Create(ns); err != nil && !kerrors.IsAlreadyExists(err) {
+	if _, err = nsClient.Create(ns); err != nil && !kerrors.IsAlreadyExists(err) {
 		return fmt.Errorf("error while creating namespace %v: %v", nsName, err)
 	}
 	return nil
