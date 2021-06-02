@@ -123,10 +123,19 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}) {
 }
 
 func (m *Manager) Uninstall(namespace, name string) error {
+	if ok, err := m.hasStatus(namespace, name, action.ListDeployed|action.ListFailed); err != nil {
+		return err
+	} else if !ok {
+		return nil
+	}
+
 	uninstall, err := json.Marshal(types.ChartUninstallAction{
 		Timeout: &metav1.Duration{Duration: 5 * time.Minute},
 	})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -174,22 +183,10 @@ func (m *Manager) install(namespace, name, minVersion string, values map[string]
 		return nil
 	}
 
-	if ok, err := m.isPendingUninstall(namespace, name); err != nil {
+	if ok, err := m.hasStatus(namespace, name, action.ListPendingInstall); err != nil {
 		return err
 	} else if ok {
-		uninstall, err := json.Marshal(types.ChartUninstallAction{
-			Timeout: &metav1.Duration{Duration: 5 * time.Minute},
-		})
-		if err != nil {
-			return err
-		}
-
-		op, err := m.operation.Uninstall(m.ctx, installUser, namespace, name, bytes.NewBuffer(uninstall))
-		if err != nil {
-			return err
-		}
-
-		if err := m.waitPodDone(op); err != nil {
+		if err = m.Uninstall(namespace, name); err != nil {
 			return err
 		}
 	}
@@ -362,7 +359,7 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, desir
 	return false, version, desiredValue, nil
 }
 
-func (m *Manager) isPendingUninstall(namespace, name string) (bool, error) {
+func (m *Manager) hasStatus(namespace, name string, stateMask action.ListStates) (bool, error) {
 	helmcfg := &action.Configuration{}
 	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
 		return false, err
@@ -370,19 +367,12 @@ func (m *Manager) isPendingUninstall(namespace, name string) (bool, error) {
 
 	l := action.NewList(helmcfg)
 	l.Filter = "^" + name + "$"
-	l.Pending = true
-	l.SetStateMask()
+	l.StateMask = stateMask
 
 	releases, err := l.Run()
 	if err != nil {
 		return false, err
 	}
 
-	for _, release := range releases {
-		if release.Info.Status == release2.StatusPendingInstall {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return len(releases) != 0, nil
 }
