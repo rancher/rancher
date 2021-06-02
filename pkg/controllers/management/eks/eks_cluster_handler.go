@@ -86,23 +86,6 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, nil
 	}
 
-	if err := e.deployEKSOperator(); err != nil {
-		failedToDeployEKSOperatorErr := "failed to deploy eks-operator: %v"
-		var conditionErr error
-		if cluster.Spec.EKSConfig.Imported {
-			cluster, conditionErr = e.SetFalse(cluster, apimgmtv3.ClusterConditionPending, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
-			if conditionErr != nil {
-				return cluster, conditionErr
-			}
-		} else {
-			cluster, conditionErr = e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
-			if conditionErr != nil {
-				return cluster, conditionErr
-			}
-		}
-		return cluster, err
-	}
-
 	// set driver name
 	if cluster.Status.Driver == "" {
 		cluster = cluster.DeepCopy()

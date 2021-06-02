@@ -80,23 +80,6 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, nil
 	}
 
-	if err := e.deployGKEOperator(); err != nil {
-		failedToDeployGKEOperatorErr := "failed to deploy gke-operator: %v"
-		var conditionErr error
-		if cluster.Spec.GKEConfig.Imported {
-			cluster, conditionErr = e.SetFalse(cluster, apimgmtv3.ClusterConditionPending, fmt.Sprintf(failedToDeployGKEOperatorErr, err))
-			if conditionErr != nil {
-				return cluster, conditionErr
-			}
-		} else {
-			cluster, conditionErr = e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, fmt.Sprintf(failedToDeployGKEOperatorErr, err))
-			if conditionErr != nil {
-				return cluster, conditionErr
-			}
-		}
-		return cluster, err
-	}
-
 	// set driver name
 	if cluster.Status.Driver == "" {
 		cluster = cluster.DeepCopy()

@@ -113,6 +113,9 @@ var (
 
 	FleetMinVersion          = NewSetting("fleet-min-version", "")
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
+	AKSOperatorMinVersion    = NewSetting("aks-operator-min-version", "")
+	EKSOperatorMinVersion    = NewSetting("eks-operator-min-version", "")
+	GKEOperatorMinVersion    = NewSetting("gke-operator-min-version", "")
 )
 
 func FullShellImage() string {
