@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -923,7 +924,7 @@ func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) er
 	if err != nil {
 		return err
 	}
-	exists, err := s3Client.BucketExists(bucket)
+	exists, err := s3Client.BucketExists(context.TODO(), bucket)
 	if err != nil {
 		return fmt.Errorf("Unable to validate S3 backup target configuration: %v", err)
 	}
