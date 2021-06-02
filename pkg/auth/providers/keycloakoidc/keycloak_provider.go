@@ -36,6 +36,8 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 			httpClient: &http.Client{},
 		},
 		oidc.OpenIDCProvider{
+			Name:        Name,
+			Type:        client.KeyCloakOIDCConfigType,
 			CTX:         ctx,
 			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
 			Secrets:     mgmtCtx.Core.Secrets(""),
@@ -47,10 +49,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 
 func (k *keyCloakOIDCProvider) GetName() string {
 	return Name
-}
-
-func (k *keyCloakOIDCProvider) GetType() string {
-	return client.KeyCloakConfigType
 }
 
 func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token v3.Token) ([]v3.Principal, error) {

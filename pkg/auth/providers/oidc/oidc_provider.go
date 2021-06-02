@@ -33,6 +33,8 @@ const (
 )
 
 type OpenIDCProvider struct {
+	Name        string
+	Type        string
 	CTX         context.Context
 	AuthConfigs v3.AuthConfigInterface
 	Secrets     corev1.SecretInterface
@@ -53,6 +55,8 @@ type claimInfo struct {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	return &OpenIDCProvider{
+		Name:        Name,
+		Type:        client.OIDCConfigType,
 		CTX:         ctx,
 		AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
 		Secrets:     mgmtCtx.Core.Secrets(""),
@@ -63,10 +67,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 
 func (o *OpenIDCProvider) GetName() string {
 	return Name
-}
-
-func (o *OpenIDCProvider) getType() string {
-	return client.OIDCConfigType
 }
 
 func (o *OpenIDCProvider) CustomizeSchema(schema *types.Schema) {
@@ -169,11 +169,11 @@ func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, to
 	}
 
 	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: o.GetName() + "_" + principalType + "://" + searchValue},
+		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + principalType + "://" + searchValue},
 		DisplayName:   searchValue,
 		LoginName:     searchValue,
 		PrincipalType: principalType,
-		Provider:      o.GetName(),
+		Provider:      o.Name,
 	}
 
 	principals = append(principals, p)
@@ -208,7 +208,7 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.P
 			DisplayName:   externalID,
 			LoginName:     externalID,
 			PrincipalType: UserType,
-			Provider:      o.GetName(),
+			Provider:      o.Name,
 		}
 	} else {
 		p = o.groupToPrincipal(externalID)
@@ -249,16 +249,16 @@ func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, gr
 	return allowed, nil
 }
 
-func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, info claimInfo) v3.Principal {
-	displayName := info.Name
+func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo claimInfo) v3.Principal {
+	displayName := claimInfo.Name
 	if displayName == "" {
 		displayName = userInfo.Email
 	}
 	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: o.GetName() + "_" + UserType + "://" + userInfo.Subject},
+		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + UserType + "://" + userInfo.Subject},
 		DisplayName:   displayName,
 		LoginName:     userInfo.Email,
-		Provider:      o.GetName(),
+		Provider:      o.Name,
 		PrincipalType: UserType,
 		Me:            false,
 	}
@@ -267,9 +267,9 @@ func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, info claimInf
 
 func (o *OpenIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: o.GetName() + "_" + GroupType + "://" + groupName},
+		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + GroupType + "://" + groupName},
 		DisplayName:   groupName,
-		Provider:      o.GetName(),
+		Provider:      o.Name,
 		PrincipalType: GroupType,
 		Me:            false,
 	}
@@ -302,7 +302,7 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
-	config.Type = client.OIDCConfigType
+	config.Type = o.Type
 	config.ObjectMeta = storedOidcConfig.ObjectMeta
 
 	if config.PrivateKey != "" {
@@ -324,7 +324,7 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 }
 
 func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
-	authConfigObj, err := o.AuthConfigs.ObjectClient().UnstructuredClient().Get(o.GetName(), metav1.GetOptions{})
+	authConfigObj, err := o.AuthConfigs.ObjectClient().UnstructuredClient().Get(o.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("[generic oidc]: failed to retrieve OIDCConfig, error: %v", err)
 	}
