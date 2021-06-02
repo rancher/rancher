@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	minio "github.com/minio/minio-go"
-	"github.com/minio/minio-go/pkg/credentials"
+	minio "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
@@ -414,19 +414,20 @@ func GetS3Client(sbc *v3.S3BackupConfig, timeout int, dialer dialer.Dialer) (*mi
 	}
 
 	bucketLookup := getBucketLookupType(endpoint)
-	s3Client, err := minio.NewWithOptions(endpoint, &minio.Options{
+	opt := minio.Options{
 		Creds:        creds,
 		Region:       sbc.Region,
 		Secure:       true,
 		BucketLookup: bucketLookup,
-	})
+		Transport:    tr,
+	}
+	if sbc.CustomCA != "" {
+		opt.Transport = getCustomCATransport(tr, sbc.CustomCA)
+	}
+	s3Client, err := minio.New(endpoint, &opt)
 	if err != nil {
 		return nil, err
 	}
-	if sbc.CustomCA != "" {
-		tr = getCustomCATransport(tr, sbc.CustomCA)
-	}
-	s3Client.SetCustomTransport(tr)
 	return s3Client, nil
 }
 
