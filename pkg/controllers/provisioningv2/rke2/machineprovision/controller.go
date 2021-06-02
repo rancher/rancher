@@ -207,21 +207,7 @@ func (h *handler) OnRemove(_ string, obj runtime.Object) (runtime.Object, error)
 		return obj, err
 	}
 
-	metaObj, err := meta.Accessor(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	ref := metav1.GetControllerOf(metaObj)
-	if ref != nil && ref.Kind == "Machine" {
-		_, err = h.machines.Get(metaObj.GetNamespace(), ref.Name)
-		if apierror.IsNotFound(err) {
-			// Controlling machine has been deleted (normally a finalizer blocks this)
-			return obj, nil
-		}
-	}
-
-	obj, err = h.run(obj, false)
+	obj, err := h.run(obj, false)
 	if err != nil {
 		return nil, err
 	}

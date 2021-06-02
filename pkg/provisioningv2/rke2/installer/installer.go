@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	defaultSystemAgentInstallScript = "https://raw.githubusercontent.com/ibuildthecloud/system-agent/main/install.sh"
+	defaultSystemAgentInstallScript = "https://raw.githubusercontent.com/rancher/system-agent/main/install.sh"
 	localAgentInstallScripts        = []string{
 		"/usr/share/rancher/ui/assets/system-agent-install.sh",
 		"./system-agent-install.sh",

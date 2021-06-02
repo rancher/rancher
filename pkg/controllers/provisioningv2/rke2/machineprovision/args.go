@@ -164,7 +164,7 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool
 		}
 
 		machine, err = h.machines.Get(meta.GetNamespace(), ref.Name)
-		if err != nil {
+		if err != nil && !apierror.IsNotFound(err) {
 			return "", "", nil, err
 		}
 	}

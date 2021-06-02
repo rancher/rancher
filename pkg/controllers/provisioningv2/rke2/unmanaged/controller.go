@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -28,8 +28,7 @@ import (
 )
 
 const (
-	machineRequestType        = "rke.cattle.io/machine-request"
-	clusterByClusterReference = "clusterByClusterReference"
+	machineRequestType = "rke.cattle.io/machine-request"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -50,10 +49,6 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}
 	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-machine", h.onUnmanagedMachineChange)
 	clients.Core.Secret().OnChange(ctx, "unmanaged-machine", h.onSecretChange)
-
-	h.clusterCache.AddIndexer(clusterByClusterReference, func(obj *rancherv1.Cluster) ([]string, error) {
-		return []string{obj.Status.ClusterName}, nil
-	})
 }
 
 type handler struct {
@@ -266,7 +261,7 @@ func (h *handler) getCAPICluster(secret *corev1.Secret) (*capi.Cluster, error) {
 		return nil, err
 	}
 
-	rClusters, err := h.clusterCache.GetByIndex(clusterByClusterReference, cluster.Name)
+	rClusters, err := h.clusterCache.GetByIndex(clusterindex.ClusterV1ByClusterV3Reference, cluster.Name)
 	if err != nil || len(rClusters) == 0 {
 		return nil, err
 	}

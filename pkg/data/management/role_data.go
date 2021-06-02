@@ -94,7 +94,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	userRole.addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").
-		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
@@ -124,6 +123,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRoleTemplate("Cluster Member", "cluster-member", "cluster", false, false, false).
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("get", "list", "watch").
@@ -188,8 +188,12 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRoleTemplate("Manage Cluster Backups", "backups-manage", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("etcdbackups").verbs("*")
 
+	rb.addRoleTemplate("Manage Navlinks", "navlinks-manage", "cluster", false, false, false).
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("*")
+
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", false, false, false).
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("*").
@@ -229,6 +233,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", false, false, false).
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("*").
@@ -265,6 +270,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", false, false, false).
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("get", "list", "watch").
@@ -382,6 +388,9 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 	rb.addRoleTemplate("View Monitoring", "monitoring-ui-view", "project", true, false, false)
 
+	rb.addRoleTemplate("View Navlinks", "navlinks-view", "project", true, false, false).
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch")
+
 	// Not specific to project or cluster
 	// TODO When clusterevents has value, consider adding this back in
 	//rb.addRoleTemplate("View Events", "events-view", "", true, false, false).
@@ -407,7 +416,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 func addUserRules(role *roleBuilder) *roleBuilder {
 	role.
-		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").

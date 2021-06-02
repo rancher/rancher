@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,6 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string,
 	if machineID == "" {
 		return "", "", nil
 	}
-	machineID = name.SafeConcatName(machineID)
 
 	tokens, err := r.clusterTokenCache.GetByIndex(tokenIndex, token)
 	if err != nil {

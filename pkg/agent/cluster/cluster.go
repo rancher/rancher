@@ -44,6 +44,10 @@ func TokenAndURL() (string, string, error) {
 	return token, url, err
 }
 
+func CAChecksum() string {
+	return os.Getenv("CATTLE_CA_CHECKSUM")
+}
+
 func getTokenFromAPI() ([]byte, []byte, error) {
 	cfg, err := kubeconfig.GetNonInteractiveClientConfig("").ClientConfig()
 	if err != nil {
