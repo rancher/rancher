@@ -3,10 +3,12 @@ package managerancher
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
@@ -25,26 +27,30 @@ import (
 
 const (
 	chartConfigMapName = "chart-contents"
-	staticFeatures     = "multi-cluster-management=false," +
-		"multi-cluster-management-agent=true," +
-		"fleet=false," +
-		"legacy=false," +
-		"rke2=false," +
-		"provisioningv2=false," +
-		"embedded-cluster-api=false"
+)
+
+var (
+	staticFeatures = features.MCM.Name() + "=false," +
+		features.MCMAgent.Name() + "=true," +
+		features.Fleet.Name() + "=false," +
+		features.RKE2.Name() + "=false," +
+		features.ProvisioningV2.Name() + "=false," +
+		features.EmbeddedClusterAPI.Name() + "=false"
 )
 
 type handler struct {
-	configMaps corecontrollers.ConfigMapCache
-	settings   mgmtcontrollers.SettingCache
-	clusters   rocontrollers.ClusterCache
+	configMaps   corecontrollers.ConfigMapCache
+	settings     mgmtcontrollers.SettingCache
+	clusters     rocontrollers.ClusterCache
+	mgmtClusters mgmtcontrollers.ClusterCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
-		configMaps: clients.Core.ConfigMap().Cache(),
-		settings:   clients.Mgmt.Setting().Cache(),
-		clusters:   clients.Provisioning.Cluster().Cache(),
+		configMaps:   clients.Core.ConfigMap().Cache(),
+		settings:     clients.Mgmt.Setting().Cache(),
+		clusters:     clients.Provisioning.Cluster().Cache(),
+		mgmtClusters: clients.Mgmt.Cluster().Cache(),
 	}
 	rocontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
 		clients.Apply.
@@ -78,23 +84,42 @@ func (h *handler) resolveClusters(namespace, name string, _ runtime.Object) (res
 }
 
 func (h *handler) values(cluster *rancherv1.Cluster) (map[string]interface{}, error) {
-	reg := settings.SystemDefaultRegistry.Get()
-
+	features, err := h.features(cluster)
+	if err != nil {
+		return nil, err
+	}
 	return mergeEnv(data.MergeMaps(map[string]interface{}{
-		"systemDefaultRegistry": reg,
+		"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 		"ingress": map[string]interface{}{
 			"enabled": false,
 		},
 		"replicas": -1,
 		"tls":      "external",
-	}, cluster.Spec.RancherValues.Data)), nil
+	}, cluster.Spec.RancherValues.Data), features), nil
 }
 
-func mergeEnv(values map[string]interface{}) map[string]interface{} {
+func (h *handler) features(cluster *rancherv1.Cluster) (string, error) {
+	monitoringV1 := false
+	if cluster.Status.ClusterName != "" {
+		mgmtCluster, err := h.mgmtClusters.Get(cluster.Status.ClusterName)
+		if err != nil {
+			return "", err
+		}
+		monitoringV1 = mgmtCluster.Spec.EnableClusterMonitoring
+	}
+
+	return fmt.Sprintf("%s,%s=%t,%s=%t", staticFeatures,
+		features.Legacy.Name(),
+		features.Legacy.Enabled(),
+		features.MonitoringV1.Name(),
+		monitoringV1), nil
+}
+
+func mergeEnv(values map[string]interface{}, features string) map[string]interface{} {
 	envs := []interface{}{
 		map[string]interface{}{
 			"name":  "CATTLE_FEATURES",
-			"value": staticFeatures,
+			"value": features,
 		},
 		map[string]interface{}{
 			"name":  "CATTLE_NO_DEFAULT_ADMIN",
@@ -106,7 +131,7 @@ func mergeEnv(values map[string]interface{}) map[string]interface{} {
 		itemMap := convert.ToMapInterface(item)
 		switch itemMap["name"] {
 		case "CATTLE_FEATURES":
-			itemMap["value"] = staticFeatures + "," + convert.ToString(itemMap["value"])
+			itemMap["value"] = features + "," + convert.ToString(itemMap["value"])
 			envs = envs[1:]
 		case "CATTLE_NO_DEFAULT_ADMIN":
 			envs[1] = itemMap
