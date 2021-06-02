@@ -2,7 +2,7 @@ package defaults
 
 var (
 	PodTestImage        = "rancher/systemd-node:v0.0.2"
-	SomeK8sVersion      = "v1.21.1-rc1+k3s1"
+	SomeK8sVersion      = "v1.21.1+k3s1"
 	WatchTimeoutSeconds = int64(60 * 10)
 	CommonClusterConfig = map[string]interface{}{
 		"service-cidr": "10.45.0.0/16",
