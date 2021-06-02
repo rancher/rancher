@@ -67,6 +67,7 @@ var (
 		"audit-policy-file",
 		"cloud-provider-config",
 		"private-registry",
+		"flannel-conf",
 	}
 	AuthnWebhook = []byte(`
 apiVersion: v1
