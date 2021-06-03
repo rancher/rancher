@@ -326,9 +326,12 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	userID := s.clientState.GetState(r, "Rancher_UserID")
 	if userID != "" && rancherAction == testAndEnableAction {
 		user, err := s.userMGR.SetPrincipalOnCurrentUserByUserID(userID, userPrincipal)
-		if err != nil {
+		if err != nil && user == nil {
 			log.Errorf("SAML: Error setting principal on current user %v", err)
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+			return
+		} else if err != nil && user != nil {
+			http.Redirect(w, r, redirectURL+"errorCode=422&errMsg="+err.Error(), http.StatusFound)
 			return
 		}
 

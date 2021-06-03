@@ -148,6 +148,14 @@ func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 		return nil, err
 	}
 
+	// ensure this principal is unique to this user
+	if conflict, err := m.GetUserByPrincipalID(principal.Name); err != nil {
+		return nil, err
+	} else if conflict != nil && conflict.UID != user.UID {
+		logrus.Errorf("refusing to set principal [%s] on user [%s], principal already in use on user [%s]", principal.Name, user.DisplayName, conflict.DisplayName)
+		return user, errors.New("refusing to set principal on user that is already bound to another user")
+	}
+
 	if providerExists(user.PrincipalIDs, principal.Provider) {
 		var principalIDs []string
 		for _, id := range user.PrincipalIDs {
