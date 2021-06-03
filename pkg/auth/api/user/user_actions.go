@@ -8,18 +8,27 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
+	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpassword")
+
 	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
 		resource.AddAction(apiContext, "refreshauthprovideraccess")
+	}
+
+	//restrictedAdmin should not see changePassword and setPassword for GlobalAdmin user
+	if h.isAdminResource(resource.ID) && h.isRestrictedAdmin(apiContext) {
+		delete(resource.Actions, "setpassword")
+		delete(resource.Actions, "changepassword")
 	}
 }
 
@@ -34,6 +43,8 @@ type Handler struct {
 	UserClient               v3.UserInterface
 	GlobalRoleBindingsClient v3.GlobalRoleBindingInterface
 	UserAuthRefresher        providerrefresh.UserAuthRefresher
+	GlobalRoleBindingsLister v3.GlobalRoleBindingLister
+	GlobalRoleLister         v3.GlobalRoleLister
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -168,4 +179,31 @@ func (h *Handler) refreshAttributes(actionName string, action *types.Action, req
 
 func (h *Handler) userCanRefresh(request *types.APIContext) bool {
 	return request.AccessControl.CanDo(v3.UserGroupVersionKind.Group, v3.UserResource.Name, "create", request, nil, request.Schema) == nil
+}
+
+func (h *Handler) isRestrictedAdmin(apiContext *types.APIContext) bool {
+	ma := gaccess.MemberAccess{
+		Users:     h.UserClient,
+		GrLister:  h.GlobalRoleLister,
+		GrbLister: h.GlobalRoleBindingsLister,
+	}
+	callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
+	isRestrictedAdmin, err := ma.IsRestrictedAdmin(callerID)
+	if err != nil {
+		logrus.Errorf("error checking if resource is restrictedAdmin %v", err)
+	}
+	return isRestrictedAdmin
+}
+
+func (h *Handler) isAdminResource(resourceID string) bool {
+	ma := gaccess.MemberAccess{
+		Users:     h.UserClient,
+		GrLister:  h.GlobalRoleLister,
+		GrbLister: h.GlobalRoleBindingsLister,
+	}
+	isAdminResource, err := ma.IsAdmin(resourceID)
+	if err != nil {
+		logrus.Errorf("error checking if resource is admin %v", err)
+	}
+	return isAdminResource
 }
