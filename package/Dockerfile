@@ -79,10 +79,7 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
     ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz \
     KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
-RUN curl -sOL ${KUSTOMIZE_URL} && \
-    sleep 1 && \
-    tar xzf kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz -C /usr/bin && \
-    rm kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
+RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
 
 # set up helm 2
 RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
