@@ -3,8 +3,7 @@
 echo "-- chart/test --"
 
 # Check for helm
-hash helm >/dev/null 2>&1
-if [[ $? > 0 ]]; then
+if [ -z "$(type -p helm)" ]; then
     echo "helm not found. Helm is required to run tests."
     exit 1
 fi
