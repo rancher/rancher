@@ -3,10 +3,9 @@
 echo "-- chart/validate --"
 
 # Check for helm
-hash helm >/dev/null 2>&1
-if [[ $? > 0 ]]; then
-    echo "helm not found. Helm is required to run tests."
+if [ -z "$(type -p helm_v3)" ]; then
+    echo "helm_v3 not found. Helm is required to run tests."
     exit 1
 fi
 
-helm lint ../../build/chart/rancher
+helm_v3 lint ../../build/chart/rancher
