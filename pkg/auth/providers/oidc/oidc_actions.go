@@ -22,7 +22,7 @@ func (o *OpenIDCProvider) Formatter(apiContext *types.APIContext, resource *type
 }
 
 func (o *OpenIDCProvider) ActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, o.GetName(), o.AuthConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, o.Name, o.AuthConfigs)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (o *OpenIDCProvider) ActionHandler(actionName string, action *types.Action,
 func (o *OpenIDCProvider) ConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
 	//verify body has all required fields
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
-		o.getType()))
+		o.Type))
 	if err != nil {
 		return err
 	}
