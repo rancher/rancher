@@ -25,7 +25,7 @@ RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACH
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
-RUN wget -O - https://storage.googleapis.com/golang/go1.16.4.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local
+RUN curl -sLf https://storage.googleapis.com/golang/go1.16.4.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
     curl -sL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.27.0; \
@@ -52,8 +52,8 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
 RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
 
 # set up helm 2
-RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
-    curl -sLf ${!TILLER_URL} > /usr/bin/rancher-tiller && \
+RUN curl -sLf ${!HELM_URL_V2} -o /usr/bin/rancher-helm && \
+    curl -sLf ${!TILLER_URL} -o /usr/bin/rancher-tiller && \
     chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
     ln -s /usr/bin/rancher-helm /usr/bin/helm && \
     ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
@@ -66,7 +66,7 @@ RUN mkdir /usr/tmp && \
     mv /usr/tmp/helm /usr/bin/helm_v3 && \
     chmod +x /usr/bin/kustomize
 
-RUN curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
+RUN curl -sLf ${!K3S_URL} -o /usr/bin/k3s && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd && \
     chmod +x /usr/bin/k3s && \
     mkdir -p /go/src/github.com/rancher/rancher/.kube && \
@@ -74,13 +74,13 @@ RUN curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
 
 RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt
 
-RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
+RUN curl -sLf ${!DOCKER_URL} -o /usr/bin/docker && chmod +x /usr/bin/docker
 
 ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_${ARCH}
-RUN wget -O - ${YQ_URL} > /usr/bin/yq && chmod +x /usr/bin/yq
+RUN curl -sLf ${YQ_URL} -o /usr/bin/yq && chmod +x /usr/bin/yq
 
 ENV KUBECTL_URL=https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/${ARCH}/kubectl
-RUN wget -O - ${KUBECTL_URL} > /usr/bin/kubectl && chmod +x /usr/bin/kubectl
+RUN curl -sLf ${KUBECTL_URL} -o /usr/bin/kubectl && chmod +x /usr/bin/kubectl
 
 RUN apt-get update && \
     apt-get install -y tox python3.8 python3-dev python3.8-dev libffi-dev libssl-dev
