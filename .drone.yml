@@ -800,7 +800,7 @@ steps:
         - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
       context: package/windows
       custom_dns: 1.1.1.1
-      dockerfile: package/windows/Dockerfile.agent.20H2
+      dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
       repo: rancher/rancher-agent

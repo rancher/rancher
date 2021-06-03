@@ -65,14 +65,15 @@ RUN $URL = 'https://dl.k8s.io/v1.19.7/kubernetes-client-windows-amd64.tar.gz'; \
     Write-Host 'Complete.'
 # Need to support loglevel & kube-prompt
 
-FROM mcr.microsoft.com/powershell:nanoserver-${SERVERCORE_VERSION}
-USER ContainerAdministrator
-COPY --from=builder /Windows/System32/certoc.exe /Windows/System32/netapi32.dll /Windows/System32/
-COPY --from=builder /wins.exe /docker.exe /kubernetes/client/bin/kubectl.exe /Windows/
+# Move for PATH to work
+RUN Copy-Item -Path /wins.exe -Destination /Windows/
+RUN Copy-Item -Path /docker.exe -Destination /Windows/
+RUN Copy-Item -Path /kubernetes/client/bin/kubectl.exe -Destination /Windows/
+
 ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR C:\\etc\\kubernetes\\ssl\\certs
 COPY agent.exe *.ps1 *.psm1 /etc/rancher/
-ENTRYPOINT ["pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/etc/rancher/entrypoint.ps1"]
+ENTRYPOINT ["powershell", "-NoLogo", "-NonInteractive", "-File", "c:/etc/rancher/entrypoint.ps1"]
