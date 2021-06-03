@@ -24,4 +24,8 @@ rules:
   - apiGroups: [ "admissionregistration.k8s.io" ]
     resources: [ "validatingwebhookconfigurations" ]
     verbs: [ "get", "list", "delete" ]
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    verbs:     ["use"]
+    resourceNames: [{{ include "rancher.fullname" . }}-post-delete ]
 {{- end }}
