@@ -17,6 +17,10 @@ var (
 		ChartName:        "fleet-crd",
 	}
 	fleetChart = chartDef{
+		ReleaseNamespace: "cattle-fleet-system",
+		ChartName:        "fleet",
+	}
+	fleetUninstallChart = chartDef{
 		ReleaseNamespace: "fleet-system",
 		ChartName:        "fleet",
 	}
@@ -50,6 +54,10 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		setting.Name != settings.CACerts.Name &&
 		setting.Name != settings.SystemDefaultRegistry.Name {
 		return setting, nil
+	}
+
+	if err := h.manager.Uninstall(fleetUninstallChart.ReleaseNamespace, fleetUninstallChart.ChartName); err != nil {
+		return nil, err
 	}
 
 	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), nil)

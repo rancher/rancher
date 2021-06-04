@@ -11,7 +11,7 @@ initial_system_namespaces = set(["kube-node-lease",
                                  "kube-public",
                                  "cattle-global-data",
                                  "cattle-global-nt",
-                                 "fleet-system"])
+                                 "cattle-fleet-system"])
 loggingNamespace = "cattle-logging"
 
 
