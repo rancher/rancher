@@ -8,11 +8,15 @@ const (
 	AKSClusterConfigSpecFieldBaseURL                     = "baseUrl"
 	AKSClusterConfigSpecFieldClusterName                 = "clusterName"
 	AKSClusterConfigSpecFieldDNSPrefix                   = "dnsPrefix"
+	AKSClusterConfigSpecFieldHTTPApplicationRouting      = "httpApplicationRouting"
 	AKSClusterConfigSpecFieldImported                    = "imported"
 	AKSClusterConfigSpecFieldKubernetesVersion           = "kubernetesVersion"
 	AKSClusterConfigSpecFieldLinuxAdminUsername          = "linuxAdminUsername"
 	AKSClusterConfigSpecFieldLinuxSSHPublicKey           = "sshPublicKey"
 	AKSClusterConfigSpecFieldLoadBalancerSKU             = "loadBalancerSku"
+	AKSClusterConfigSpecFieldLogAnalyticsWorkspaceGroup  = "logAnalyticsWorkspaceGroup"
+	AKSClusterConfigSpecFieldLogAnalyticsWorkspaceName   = "logAnalyticsWorkspaceName"
+	AKSClusterConfigSpecFieldMonitoring                  = "monitoring"
 	AKSClusterConfigSpecFieldNetworkDNSServiceIP         = "dnsServiceIp"
 	AKSClusterConfigSpecFieldNetworkDockerBridgeCIDR     = "dockerBridgeCidr"
 	AKSClusterConfigSpecFieldNetworkPlugin               = "networkPlugin"
@@ -27,8 +31,6 @@ const (
 	AKSClusterConfigSpecFieldTags                        = "tags"
 	AKSClusterConfigSpecFieldVirtualNetwork              = "virtualNetwork"
 	AKSClusterConfigSpecFieldVirtualNetworkResourceGroup = "virtualNetworkResourceGroup"
-	AKSClusterConfigSpecFieldWindowsAdminPassword        = "windowsAdminPassword"
-	AKSClusterConfigSpecFieldWindowsAdminUsername        = "windowsAdminUsername"
 )
 
 type AKSClusterConfigSpec struct {
@@ -38,11 +40,15 @@ type AKSClusterConfigSpec struct {
 	BaseURL                     *string           `json:"baseUrl,omitempty" yaml:"baseUrl,omitempty"`
 	ClusterName                 string            `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
 	DNSPrefix                   *string           `json:"dnsPrefix,omitempty" yaml:"dnsPrefix,omitempty"`
+	HTTPApplicationRouting      *bool             `json:"httpApplicationRouting,omitempty" yaml:"httpApplicationRouting,omitempty"`
 	Imported                    bool              `json:"imported,omitempty" yaml:"imported,omitempty"`
 	KubernetesVersion           *string           `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	LinuxAdminUsername          *string           `json:"linuxAdminUsername,omitempty" yaml:"linuxAdminUsername,omitempty"`
 	LinuxSSHPublicKey           *string           `json:"sshPublicKey,omitempty" yaml:"sshPublicKey,omitempty"`
 	LoadBalancerSKU             *string           `json:"loadBalancerSku,omitempty" yaml:"loadBalancerSku,omitempty"`
+	LogAnalyticsWorkspaceGroup  string            `json:"logAnalyticsWorkspaceGroup,omitempty" yaml:"logAnalyticsWorkspaceGroup,omitempty"`
+	LogAnalyticsWorkspaceName   string            `json:"logAnalyticsWorkspaceName,omitempty" yaml:"logAnalyticsWorkspaceName,omitempty"`
+	Monitoring                  *bool             `json:"monitoring,omitempty" yaml:"monitoring,omitempty"`
 	NetworkDNSServiceIP         *string           `json:"dnsServiceIp,omitempty" yaml:"dnsServiceIp,omitempty"`
 	NetworkDockerBridgeCIDR     *string           `json:"dockerBridgeCidr,omitempty" yaml:"dockerBridgeCidr,omitempty"`
 	NetworkPlugin               *string           `json:"networkPlugin,omitempty" yaml:"networkPlugin,omitempty"`
@@ -57,6 +63,4 @@ type AKSClusterConfigSpec struct {
 	Tags                        map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
 	VirtualNetwork              *string           `json:"virtualNetwork,omitempty" yaml:"virtualNetwork,omitempty"`
 	VirtualNetworkResourceGroup *string           `json:"virtualNetworkResourceGroup,omitempty" yaml:"virtualNetworkResourceGroup,omitempty"`
-	WindowsAdminPassword        *string           `json:"windowsAdminPassword,omitempty" yaml:"windowsAdminPassword,omitempty"`
-	WindowsAdminUsername        *string           `json:"windowsAdminUsername,omitempty" yaml:"windowsAdminUsername,omitempty"`
 }

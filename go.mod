@@ -95,7 +95,7 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.15.0
-	github.com/rancher/aks-operator v1.0.1-rc6
+	github.com/rancher/aks-operator v1.0.1-rc8
 	github.com/rancher/apiserver v0.0.0-20210519053359-f943376c4b42
 	github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430
 	github.com/rancher/dynamiclistener v0.2.1-0.20201110045217-9b1b7d3132e8
@@ -133,7 +133,7 @@ require (
 	github.com/yvasiyarov/go-metrics v0.0.0-20150112132944-c25f46c4b940 // indirect
 	github.com/yvasiyarov/gorelic v0.0.7 // indirect
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 // indirect
-	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
+	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/net v0.0.0-20210315170653-34ac3e1c2000
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
