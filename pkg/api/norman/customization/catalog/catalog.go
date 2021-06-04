@@ -9,7 +9,6 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
-	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -116,7 +115,7 @@ func (a ActionHandler) ExportYamlHandler(apiContext *types.APIContext, next type
 	case "exportyaml":
 		catalog, err := a.CatalogClient.Get(apiContext.ID, metav1.GetOptions{})
 		if err != nil {
-			return rpctypes.ErrGRPCStopped
+			return err
 		}
 		topkey := compose.Config{}
 		topkey.Version = "v3"

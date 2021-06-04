@@ -52,7 +52,6 @@ require (
 	github.com/aws/aws-sdk-go v1.36.7
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/coreos/go-semver v0.3.0
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
@@ -77,7 +76,7 @@ require (
 	github.com/mattn/go-colorable v0.1.2
 	github.com/mattn/go-runewidth v0.0.6 // indirect
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
-	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
+	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible
