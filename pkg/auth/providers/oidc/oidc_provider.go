@@ -317,6 +317,7 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 	if err := common.CreateOrUpdateSecrets(o.Secrets, convert.ToString(config.ClientSecret), field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
+	config.ClientSecret = common.GetName(config.Type, field)
 
 	logrus.Debugf("[generic oidc] updating config")
 	_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
