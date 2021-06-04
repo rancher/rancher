@@ -395,12 +395,6 @@ func (e *gkeOperatorController) recordAppliedSpec(cluster *mgmtv3.Cluster) (*mgm
 	return e.ClusterClient.Update(cluster)
 }
 
-// deployGKEOperator looks for the rancher-gke-operator app in the cattle-system namespace, if not found it is deployed.
-// If it is found but is outdated, the latest version is installed.
-func (e *gkeOperatorController) deployGKEOperator() error {
-	return e.DeployOperator(gkeOperator, gkeOperatorTemplate, gkeShortName)
-}
-
 // generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.
 // This function is called if the cluster has only privateEndpoint enabled and not publicly available.
 // If Rancher is able to communicate with the cluster through its API endpoint even though it is private, then this function will retrieve

@@ -6,8 +6,11 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 var (
@@ -44,11 +47,13 @@ type chartDef struct {
 
 type handler struct {
 	manager *system.Manager
+	secrets v1.SecretCache
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
 	h := &handler{
 		manager: wContext.SystemChartsManager,
+		secrets: wContext.Core.Secret().Cache(),
 	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "cluster-provisioning-operator", h.onClusterChange)
@@ -91,11 +96,17 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		},
 	}
 
+	additionalCA, err := getAdditionalCA(h.secrets)
+	if err != nil {
+		return cluster, err
+	}
+
 	chartValues := map[string]interface{}{
-		"global":     systemGlobalRegistry,
-		"httpProxy":  os.Getenv("HTTP_PROXY"),
-		"httpsProxy": os.Getenv("HTTPS_PROXY"),
-		"noProxy":    os.Getenv("NO_PROXY"),
+		"global":               systemGlobalRegistry,
+		"httpProxy":            os.Getenv("HTTP_PROXY"),
+		"httpsProxy":           os.Getenv("HTTPS_PROXY"),
+		"noProxy":              os.Getenv("NO_PROXY"),
+		"additionalTrustedCAs": additionalCA,
 	}
 
 	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, minVersion, chartValues, true); err != nil {
@@ -103,4 +114,17 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 	}
 
 	return cluster, nil
+}
+
+func getAdditionalCA(secretsCache v1.SecretCache) ([]byte, error) {
+	secret, err := secretsCache.Get(namespace.System, "tls-ca-additional")
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if secret == nil {
+		return nil, nil
+	}
+
+	return secret.Data["ca-additional.pem"], nil
 }

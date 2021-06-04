@@ -464,12 +464,6 @@ func (e *eksOperatorController) recordAppliedSpec(cluster *mgmtv3.Cluster) (*mgm
 	return e.ClusterClient.Update(cluster)
 }
 
-// deployEKSOperator looks for the rancher-eks-operator app in the cattle-system namespace, if not found it is deployed.
-// If it is found but is outdated, the latest version is installed.
-func (e *eksOperatorController) deployEKSOperator() error {
-	return e.DeployOperator(eksOperator, eksOperatorTemplate, eksShortName)
-}
-
 // generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.
 // This function is called if the cluster has only privateEndpoint enabled and not publicly available.
 // If Rancher is able to communicate with the cluster through its API endpoint even though it is private, then this function will retrieve
