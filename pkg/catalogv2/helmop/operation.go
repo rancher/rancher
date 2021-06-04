@@ -162,6 +162,11 @@ func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, 
 		Director: func(req *http.Request) {
 			req.URL = logURL
 			req.Host = logURL.Host
+			for key := range req.Header {
+				if strings.HasPrefix(key, "Impersonate-Extra-") {
+					delete(req.Header, key)
+				}
+			}
 			delete(req.Header, "Impersonate-Group")
 			delete(req.Header, "Impersonate-User")
 			delete(req.Header, "Authorization")
