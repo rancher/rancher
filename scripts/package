@@ -18,6 +18,7 @@ cd $(dirname $0)/../package
 cp ../bin/rancher.yaml ../bin/rancher-namespace.yaml ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 
 IMAGE=${REPO}/rancher:${TAG}
+INSTALLER_IMAGE=${REPO}/system-agent-installer-rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
 RUNTIME_IMAGE=${REPO}/rancher-runtime:${TAG}
 
@@ -30,6 +31,7 @@ docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMA
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 if [ "${ARCH}" == amd64 ]; then
     docker build -t ${RUNTIME_IMAGE} -f Dockerfile.runtime .
+    docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${INSTALLER_IMAGE} -f Dockerfile.installer .
 fi
 
 mkdir -p ../dist
