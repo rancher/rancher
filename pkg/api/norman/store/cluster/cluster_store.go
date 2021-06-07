@@ -700,21 +700,20 @@ func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
 
 func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	enableNetworkPolicy := values.GetValueN(data, "enableNetworkPolicy")
-	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
-
 	if enableNetworkPolicy == nil && create {
 		// setting default values for new clusters if value not passed
 		values.PutValue(data, false, "enableNetworkPolicy")
 	} else if value := convert.ToBool(enableNetworkPolicy); value {
-		if rkeConfig == nil {
+		rke2Config := values.GetValueN(data, "rke2Config")
+		k3sConfig := values.GetValueN(data, "k3sConfig")
+		if rke2Config != nil || k3sConfig != nil {
 			if create {
 				values.PutValue(data, false, "enableNetworkPolicy")
 				return nil
 			}
-			return fmt.Errorf("enableNetworkPolicy should be false for non-RKE clusters")
+			return fmt.Errorf("enableNetworkPolicy should be false for k3s or rke2 clusters")
 		}
 	}
-
 	return nil
 }
 
