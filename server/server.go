@@ -58,7 +58,10 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 	root.UseEncodedPath()
 	root.Use(responsewriter.ContentTypeOptions)
 
-	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy, scaledContext)
+	rawAuthedAPIs, err := newAuthed(tokenAPI, managementAPI, k8sProxy, scaledContext)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	auth := requests.NewAuthenticator(ctx, scaledContext)
 	auth = requests.NewImpersonatingAuth(auth, sar.NewSubjectAccessReview(clusterManager))
@@ -137,7 +140,11 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 	return authMiddleware, root, err
 }
 
-func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler, scaledContext *config.ScaledContext) *mux.Router {
+func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler, scaledContext *config.ScaledContext) (*mux.Router, error) {
+	metaProxy, err := newProxy(scaledContext)
+	if err != nil {
+		return nil, err
+	}
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
 	authed.Use(responsewriter.ContentTypeOptions)
@@ -151,7 +158,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	authed.Path("/meta/aksVirtualNetworks").Handler(capabilities.NewAKSVirtualNetworksHandler())
 	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
-	authed.PathPrefix("/meta/proxy").Handler(newProxy(scaledContext))
+	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/meta").Handler(managementAPI)
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
@@ -159,7 +166,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix(managementSchema.Version.Path).Handler(managementAPI)
 
-	return authed
+	return authed, nil
 }
 
 func connectHandlers(scaledContext *config.ScaledContext) (http.Handler, http.Handler) {
@@ -170,6 +177,6 @@ func connectHandlers(scaledContext *config.ScaledContext) (http.Handler, http.Ha
 	return http.NotFoundHandler(), http.NotFoundHandler()
 }
 
-func newProxy(scaledContext *config.ScaledContext) http.Handler {
+func newProxy(scaledContext *config.ScaledContext) (http.Handler, error) {
 	return httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext)
 }

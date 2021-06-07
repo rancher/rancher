@@ -7,10 +7,16 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/rancher/rancher/pkg/settings"
 	v1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 )
 
 const (
@@ -49,6 +55,7 @@ type proxy struct {
 	prefix             string
 	validHostsSupplier Supplier
 	credentials        v1.SecretInterface
+	authorizer         authorizer.Authorizer
 }
 
 func (p *proxy) isAllowed(host string) bool {
@@ -72,8 +79,20 @@ func (p *proxy) isAllowed(host string) bool {
 	return false
 }
 
-func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledContext) http.Handler {
+func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledContext) (http.Handler, error) {
+	cfg := authorizerfactory.DelegatingAuthorizerConfig{
+		SubjectAccessReviewClient: scaledContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
+		AllowCacheTTL:             time.Second * time.Duration(settings.AuthorizationCacheTTLSeconds.GetInt()),
+		DenyCacheTTL:              time.Second * time.Duration(settings.AuthorizationDenyCacheTTLSeconds.GetInt()),
+	}
+
+	authorizer, err := cfg.New()
+	if err != nil {
+		return nil, err
+	}
+
 	p := proxy{
+		authorizer:         authorizer,
 		prefix:             prefix,
 		validHostsSupplier: validHosts,
 		credentials:        scaledContext.Core.Secrets(""),
@@ -86,7 +105,7 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 			}
 		},
 		ModifyResponse: setModifiedHeaders,
-	}
+	}, nil
 }
 
 func setModifiedHeaders(res *http.Response) error {
@@ -148,6 +167,9 @@ func (p *proxy) proxy(req *http.Request) error {
 		headerCopy[name] = copy
 	}
 
+	origReq := *req
+	secretGetter := p.secretGetter(&origReq)
+
 	req.Host = destURLHostname
 	req.URL = destURL
 	req.Header = headerCopy
@@ -159,7 +181,7 @@ func (p *proxy) proxy(req *http.Request) error {
 		// and generate signature
 		signer := newSigner(cAuth)
 		if signer != nil {
-			return signer.sign(req, p.credentials, cAuth)
+			return signer.sign(req, secretGetter, cAuth)
 		}
 		req.Header.Set(AuthHeader, cAuth)
 	}
@@ -167,6 +189,33 @@ func (p *proxy) proxy(req *http.Request) error {
 	replaceCookies(req)
 
 	return nil
+}
+
+func (p *proxy) secretGetter(req *http.Request) SecretGetter {
+	return func(namespace, name string) (*corev1.Secret, error) {
+		// User is authenticated at this point
+		userID := req.Header.Get("Impersonate-User")
+		if userID == "" {
+			return nil, fmt.Errorf("failed to find user")
+		}
+		user := &user.DefaultInfo{Name: userID}
+		decision, reason, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
+			User:            user,
+			Verb:            "get",
+			Namespace:       namespace,
+			APIVersion:      "v1",
+			Resource:        "secrets",
+			Name:            name,
+			ResourceRequest: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if decision != authorizer.DecisionAllow {
+			return nil, fmt.Errorf("unauthorized %s to %s/%s: %s", user.GetName(), namespace, name, reason)
+		}
+		return p.credentials.Controller().Lister().Get(namespace, name)
+	}
 }
 
 func replaceCookies(req *http.Request) {
