@@ -18,7 +18,7 @@ metadata:
 {{- if eq .Values.tls "external" }}
     nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
 {{- else }}
-  {{- if .Values.ingress.tls.source "google" }}
+  {{- if eq .Values.ingress.tls.source "google" }}
     # needed to disable NEGs from ruining rancher
     kubernetes.io/ingress.class: gce
     # hardcoded name of the managed certificate resource in issuer-google.yaml
