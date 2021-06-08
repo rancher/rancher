@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/url"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
@@ -197,7 +196,7 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			cluster, err = e.generateAndSetServiceAccount(cluster)
 			if err != nil {
 				var statusErr error
-				if strings.Contains(err.Error(), fmt.Sprintf(dialer.WaitForAgentError, cluster.Name)) {
+				if err == dialer.ErrAgentDisconnected {
 					// In this case, the API endpoint is private and rancher is waiting for the import cluster command to be run.
 					cluster, statusErr = e.SetUnknown(cluster, apimgmtv3.ClusterConditionWaiting, "waiting for cluster agent to be deployed")
 					if statusErr == nil {

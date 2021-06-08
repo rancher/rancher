@@ -254,7 +254,9 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		return nil, nil
 	}
 
-	if cluster.DeletionTimestamp != nil {
+	// rke1 custom clusters need cleanup and the cluster delete is being paused by cluster-scoped-gc
+	// allow a rest config since the nodes still exist and we need to start jobs on them for cleanup
+	if cluster.DeletionTimestamp != nil && cluster.Status.Driver != v32.ClusterDriverRKE {
 		return nil, nil
 	}
 

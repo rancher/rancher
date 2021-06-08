@@ -120,6 +120,17 @@ func skipOperatorCluster(action string, cluster *v3.Cluster) bool {
 	}
 }
 
+func isRke1CustomCluster(cluster *v3.Cluster, nodes []*v3.Node) bool {
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
+		for _, n := range nodes {
+			if n.Status.NodeTemplateSpec == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	if skipOperatorCluster("remove", cluster) {
 		return cluster, nil
@@ -129,6 +140,16 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	if skipLocalK3sImported(cluster) ||
 		cluster.Status.Driver == "" {
 		return nil, nil
+	}
+
+	nodes, err := p.NodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return cluster, err
+	}
+
+	if isRke1CustomCluster(cluster, nodes) {
+		logrus.Debugf("Skipping RKE1 Custom Cluster in favor of node-cleanup logic [%s] ", cluster.Name)
+		return cluster, nil
 	}
 
 	for i := 0; i < 4; i++ {
