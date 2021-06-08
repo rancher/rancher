@@ -72,7 +72,8 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 		}
 
 		if nc != nil {
-			logrus.Debugf("Get agent config: %#v", nc)
+			// Logging at trace level as NodeConfig may contain sensitive data
+			logrus.Tracef("Get agent config: %#v", nc)
 			if nc.AgentCheckInterval != 0 {
 				interval = nc.AgentCheckInterval
 			}
