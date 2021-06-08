@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -85,12 +86,50 @@ func (ma *MemberAccess) IsAdmin(callerID string) (bool, error) {
 	return false, nil
 }
 
+func (ma *MemberAccess) IsRestrictedAdmin(callerID string) (bool, error) {
+	u, err := ma.Users.Controller().Lister().Get("", callerID)
+	if err != nil {
+		return false, err
+	}
+	if u == nil {
+		return false, fmt.Errorf("No user found with ID %v", callerID)
+	}
+
+	// Get globalRoleBinding for this user
+	grbs, err := ma.GrbLister.List("", labels.NewSelector())
+	if err != nil {
+		return false, err
+	}
+	for _, grb := range grbs {
+		if grb.UserName == callerID {
+			if grb.GlobalRoleName == rbac.GlobalRestrictedAdmin {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []string, callerID string) error {
 	isAdmin, err := ma.IsAdmin(callerID)
 	if err != nil {
 		return err
 	}
-	if isAdmin {
+	var isRestrictedAdmin, localTargets bool
+	if !isAdmin {
+		isRestrictedAdmin, err = ma.IsRestrictedAdmin(callerID)
+		if err != nil {
+			return err
+		}
+		if isRestrictedAdmin {
+			localTargets, err = hasLocalTargets(targetProjects)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if isAdmin || (isRestrictedAdmin && !localTargets) {
 		for _, t := range targetProjects {
 			if err := ma.checkProjectExists(t); err != nil {
 				return err
@@ -312,6 +351,21 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 	}
 	return nil
+}
+
+func hasLocalTargets(targetProjects []string) (bool, error) {
+	for _, target := range targetProjects {
+		split := strings.SplitN(target, ":", 2)
+		if len(split) != 2 {
+			errMsg := fmt.Sprintf("Invalid project ID: %v", target)
+			return false, httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
+		}
+		clusterName := split[0]
+		if clusterName == "local" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // CheckAccessToUpdateMembers checks if the request is updating members list, and if the caller has permission to do so
