@@ -387,7 +387,7 @@ def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
             'name': 'foo',
             'image': 'rancher/mirrored-library-nginx:1.19.9-alpine',
             'env': [{
-                'key': 'FOO_KEY',
+                'name': 'FOO_KEY',
                 'value': 'FOO_VALUE',
             }]
         }])
@@ -399,7 +399,7 @@ def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
         'name': 'foo',
         'image': 'rancher/mirrored-library-nginx:1.19.9-alpine',
         'env': [{
-            'key': 'BAR_KEY',
+            'name': 'BAR_KEY',
             'value': 'BAR_VALUE',
         }]
     }]
