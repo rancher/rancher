@@ -66,8 +66,10 @@ ingress:
   #   more_set_input_headers "X-Forwarded-Host: {{ .Values.hostname }}";
 
   tls:
-    # options: rancher, letsEncrypt, secret
+    # options: rancher, letsEncrypt, secret, google
     source: rancher
+  # Creates the ability to have a global IP address reserved
+  staticipname: ""
 
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
@@ -119,7 +121,7 @@ systemDefaultRegistry: ""
 useBundledSystemChart: false
 
 # Certmanager version compatibility
-certmanager: 
+certmanager:
   version: ""
 
 # Rancher custom logos persistence
@@ -132,7 +134,7 @@ customLogos:
   volumeKind: persistentVolumeClaim
   ## Use an existing volume. Custom logos should be copied to the volume by the user
   # volumeName: custom-logos
-  ## Just for volumeKind: persistentVolumeClaim 
+  ## Just for volumeKind: persistentVolumeClaim
   ## To disables dynamic provisioning, set storageClass: "" or storageClass: "-"
   # storageClass: "-"
   accessMode: ReadWriteOnce

@@ -1,0 +1,11 @@
+{{- if eq .Values.tls "ingress" -}}
+  {{- if eq .Values.ingress.tls.source "google" -}}
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: rancher-ingress
+spec:
+  domains:
+    - {{ .Values.hostname }}
+  {{- end -}}
+{{- end -}}
