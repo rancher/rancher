@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/rancher/pkg/agent/clean"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/dialer"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubectl"
@@ -48,7 +48,10 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 	defer cancel()
 	err = userClient.K8sClient.CoreV1().Nodes().Delete(
 		ctx, node.Status.NodeName, metav1.DeleteOptions{})
-	if !kerror.IsNotFound(err) && ctx.Err() != context.DeadlineExceeded {
+	if err != nil && !kerror.IsNotFound(err) &&
+		ctx.Err() != context.DeadlineExceeded &&
+		!strings.Contains(err.Error(), dialer.ErrAgentDisconnected.Error()) &&
+		!strings.Contains(err.Error(), "connection refused") {
 		return node, err
 	}
 
@@ -150,6 +153,9 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 }
 
 func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *v1.Job) error {
+	if job == nil {
+		return nil
+	}
 	backoff := wait.Backoff{
 		Duration: 3 * time.Second,
 		Factor:   1,
@@ -200,6 +206,10 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 		LabelSelector: fmt.Sprintf("%s=%s", nodeLabel, node.Name),
 	})
 	if err != nil && !kerror.IsNotFound(err) {
+		if strings.Contains(err.Error(), dialer.ErrAgentDisconnected.Error()) ||
+			strings.Contains(err.Error(), "connection refused") {
+			return nil, nil // can't connect, just continue on with the delete
+		}
 		return nil, err
 	}
 

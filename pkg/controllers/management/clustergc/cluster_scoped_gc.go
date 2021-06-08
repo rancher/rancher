@@ -3,6 +3,7 @@ package clustergc
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
@@ -10,6 +11,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -74,8 +76,12 @@ func (c *gcLifecycle) waitForNodeRemoval(cluster *v3.Cluster) error {
 		return err
 	}
 
-	if len(nodes) != 0 {
-		return generic.ErrSkip
+	for _, n := range nodes {
+		if n.Status.NodeTemplateSpec == nil {
+			logrus.Debugf("[cluster-scoped-gc] cluster %s still has rke1 node %s, checking again to delete in 15s", cluster.Name, n.Name)
+			c.mgmt.Management.Clusters("").Controller().EnqueueAfter(cluster.Namespace, cluster.Name, 15*time.Second)
+			return generic.ErrSkip
+		}
 	}
 
 	return nil
