@@ -57,11 +57,12 @@ kubectl create namespace cattle-system
 
 The Rancher management server is designed to be secure by default and requires SSL/TLS configuration.
 
-There are three recommended options for the source of the certificate used for TLS termination at the Rancher server:
+There are four recommended options for the source of the certificate used for TLS termination at the Rancher server:
 
 - [Rancher-generated TLS certificate](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#4-choose-your-ssl-configuration)
 - [Let’s Encrypt](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#4-choose-your-ssl-configuration)
 - [Bring your own certificate](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#4-choose-your-ssl-configuration)
+- Use a [Google Managed Certificate](https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs) which will be provisioned as part of the ingress.
 
 #### Install cert-manager
 
@@ -79,7 +80,7 @@ helm install rancher rancher-latest/rancher \
 ```
 
 - [Let’s Encrypt](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
-  
+
 ```bash
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
@@ -95,6 +96,15 @@ helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
   --set hostname=rancher.my.org \
   --set ingress.tls.source=secret
+```
+
+- Google Managed Certificate
+
+```bash
+helm install rancher rancher-latest/rancher \
+  --namespace cattle-system \
+  --set hostname=rancher.my.org \
+  --set ingress.tls.source=google
 ```
 
 *If you are using a Private CA signed certificate , add **--set privateCA=true** to the command:`*
@@ -152,7 +162,7 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | Parameter                 | Default Value | Description                                                                                  |
 | ------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
 | `hostname`                | " "           | ***string*** - the Fully Qualified Domain Name for your Rancher Server                       |
-| `ingress.tls.source`      | "rancher"     | ***string*** - Where to get the cert for the ingress. - "***rancher, letsEncrypt, secret***" |
+| `ingress.tls.source`      | "rancher"     | ***string*** - Where to get the cert for the ingress. - "***rancher, letsEncrypt, secret, google***" |
 | `letsEncrypt.email`       | " "           | ***string*** - Your email address                                                            |
 | `letsEncrypt.environment` | "production"  | ***string*** - Valid options: "***staging, production***"                                    |
 | `privateCA`               | false         | ***bool*** - Set to true if your cert is signed by a private CA                              |
@@ -180,6 +190,7 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `ingress.enabled`              | true                                                  | ***bool*** - install ingress resource
 | `ingress.extraAnnotations`     | {}                                                    | ***map*** - additional annotations to customize the ingress                                                                                                                                                  |
 | `ingress.configurationSnippet` | " "                                                   | ***string*** - Add additional Nginx configuration. Can be used for proxy configuration. Note: *Available as of v2.0.15, v2.1.10 and v2.2.4*                                                                  |
+| `ingress.staticipname` | " "                                                   | ***string*** - The name of a static ip in your cloud provider which you have reserved. Sets `kubernetes.io/ingress.global-static-ip-name` if your cloud provider supports it.|
 | `letsEncrypt.ingress.class`    | " "                                                   | ***string*** - optional ingress class for the cert-manager acmesolver ingress that responds to the Let’s *Encrypt ACME challenges*                                                                           |
 | `proxy`                        | " "                                                   | ***string** - HTTP[S] proxy server for Rancher                                                                                                                                                               |
 | `noProxy`                      | "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16" | ***string*** - comma separated list of hostnames or ip address not to use the proxy                                                                                                                          |
