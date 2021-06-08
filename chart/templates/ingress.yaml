@@ -26,7 +26,7 @@ metadata:
   {{- end }}
   {{- if .Values.ingress.tls.staticipname }}
     kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.tls.staticipname }}
-  {{-end }}
+  {{- end }}
   {{- if ne .Values.ingress.tls.source "secret" }}
     {{- $certmanagerVer :=  split "." .Values.certmanager.version -}}
     {{- if or (.Capabilities.APIVersions.Has "certmanager.k8s.io/v1alpha1") (and (gt (len $certmanagerVer._0) 0) (eq (int $certmanagerVer._0) 0) (lt (int $certmanagerVer._1) 11)) }}
