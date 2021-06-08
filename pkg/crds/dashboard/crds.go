@@ -22,7 +22,6 @@ var (
 	bootstrapFleet = map[string]interface{}{
 		"bundles.fleet.cattle.io":  fleetv1alpha1api.Bundle{},
 		"clusters.fleet.cattle.io": fleetv1alpha1api.Cluster{},
-		"gitrepos.fleet.cattle.io": fleetv1alpha1api.GitRepo{},
 	}
 )
 
