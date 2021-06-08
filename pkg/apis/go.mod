@@ -2,7 +2,9 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.14
 
-replace k8s.io/client-go => k8s.io/client-go v0.21.0
+replace (
+	k8s.io/client-go => k8s.io/client-go v0.21.0
+)
 
 require (
 	github.com/pkg/errors v0.9.1
