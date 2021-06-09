@@ -91,12 +91,12 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 
 	k3sUpgradeImages := getK3sUpgradeImages(rancherVersion, data.K3S)
 
-	targetImages, targetImagesAndSources, err := img.GetImages(systemChartPath, chartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
+	targetImages, targetImagesAndSources, err := img.GetImages(systemChartPath, chartPath, rancherVersion, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
 	if err != nil {
 		return err
 	}
 
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(systemChartPath, chartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(systemChartPath, chartPath, rancherVersion, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
 	if err != nil {
 		return err
 	}
@@ -226,8 +226,6 @@ func imagesText(arch string, targetImages []string) error {
 		if err != nil {
 			return err
 		}
-
-		log.Println("Image:", image)
 		fmt.Fprintln(save, image)
 	}
 

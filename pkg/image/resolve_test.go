@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	rketypes "github.com/rancher/rke/types"
@@ -121,7 +122,7 @@ func TestFetchImagesFromCharts(t *testing.T) {
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
 		imagesSet := make(map[string]map[string]bool)
-		err := fetchImagesFromCharts(cs.inputPath, cs.inputOsType, imagesSet)
+		err := fetchImagesFromCharts(cs.inputPath, "", cs.inputOsType, imagesSet)
 		images, imageSources := getImagesAndSourcesLists(imagesSet)
 		assert.Nilf(err, "%s, failed to fetch images from charts", cs.caseName)
 		assert.Subset(images, cs.outputShouldContainImages, cs.caseName)
@@ -249,6 +250,64 @@ func TestConvertMirroredImages(t *testing.T) {
 	}
 }
 
+func TestIsInMinMaxRange(t *testing.T) {
+	assert := assertlib.New(t)
+	values := []struct {
+		want           bool
+		wantErr        bool
+		rancherVersion string
+		min            string
+		max            string
+	}{
+		// Assert true test cases
+		{want: true, rancherVersion: "2.5.7", min: "2.5.6", max: ""},
+		{want: true, rancherVersion: "2.5.7", min: "2.5.6", max: "2.5.8"},
+		{want: true, rancherVersion: "2.5.7", min: "2.5.6", max: "2.6"},
+		{want: true, rancherVersion: "2.5.7", min: "2.5.7-rc99", max: ""},
+		{want: true, rancherVersion: "2.5.7-rc1", min: "2.5.6", max: ""},
+		{want: true, rancherVersion: "2.5.7", min: "2.5.6-rc0", max: "2.5.8"},
+		{want: true, rancherVersion: "2.5.7", min: "2.4.3", max: "2.5.8-rc0"},
+		{want: true, rancherVersion: "2.5.7-rc1", min: "2.5.6", max: "2.5.8-rc99"},
+		{want: true, rancherVersion: "2.5.7-rc1", min: "2.5.6-rc0", max: "2.5.8"},
+		{want: true, rancherVersion: "2.5.7-rc1", min: "2.5.6-rc0", max: "2.5.8-rc99"},
+		{want: true, rancherVersion: "2.5.7-alpha1", min: "2.5.6", max: "2.5.8"},
+		{want: true, rancherVersion: "2.5.7-alpha1", min: "2.5.6-rc0", max: "2.5.8"},
+		{want: true, rancherVersion: "2.5.7-beta1", min: "2.5.6", max: "2.5.8"},
+		{want: true, rancherVersion: "2.5.7-beta1", min: "2.5.6-rc0", max: "2.5.8"},
+		{want: true, rancherVersion: "2.5.7-alpha1", min: "2.5.7-alpha1", max: "2.5.8"},
+		{want: true, rancherVersion: "2.5.7-rc1", min: "2.5.7-alpha1", max: "2.5.8-beta1"},
+		// Assert false test cases
+		{want: false, rancherVersion: "2.5.6", min: "2.5.7", max: ""},
+		{want: false, rancherVersion: "2.5.6", min: "2.5.7", max: "2.5.8"},
+		{want: false, rancherVersion: "2.6", min: "2.5.7", max: "2.5.8"},
+		{want: false, rancherVersion: "2.5.7-rc1", min: "2.5.7", max: "2.5.8"},
+		{want: false, rancherVersion: "2.5.7-rc1", min: "2.5.7", max: "2.5.8-rc99"},
+		{want: false, rancherVersion: "2.5.7-beta1", min: "2.5.7-rc1", max: "2.5.8"},
+		// Assert error test cases
+		{wantErr: true, rancherVersion: "", min: "", max: ""},
+		{wantErr: true, rancherVersion: "2.5.8", min: "", max: ""},
+	}
+	for i, v := range values {
+		rancherSemVer, err := semver.NewVersion(v.rancherVersion)
+		if err != nil && !v.wantErr {
+			t.Fatalf("Error: %s: Test %d: Values: %+v", err, i, v)
+		}
+		got, err := isInMinMaxRange(rancherSemVer, v.min, v.max)
+		if err != nil {
+			if v.wantErr {
+				assert.Errorf(err, "Error: %s: Test %d: Values: %+v", err, i, v)
+			} else {
+				t.Fatalf("Error: %s: Test %d: Values: %+v", err, i, v)
+			}
+		}
+		if v.want {
+			assert.Truef(got, "Test %d: Got: %t Values: %+v", i, got, v)
+		} else {
+			assert.Falsef(got, "Test %d: Got: %t Values: %+v", i, got, v)
+		}
+	}
+}
+
 func TestGetImages(t *testing.T) {
 	systemChartPath := cloneChartRepo(t, testSystemChartRepoURL, testSystemChartBranch, testSystemChartCommit)
 	chartRepoPath := cloneChartRepo(t, testChartRepoURL, testChartBranch, testChartCommit)
@@ -355,7 +414,7 @@ func TestGetImages(t *testing.T) {
 
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
-		images, imageSources, err := GetImages(cs.inputSystemChartPath, cs.inputChartPath, []string{}, cs.inputImagesFromArgs, cs.inputRkeSystemImages, cs.inputOsType)
+		images, imageSources, err := GetImages(cs.inputSystemChartPath, cs.inputChartPath, "", []string{}, cs.inputImagesFromArgs, cs.inputRkeSystemImages, cs.inputOsType)
 		assert.Nilf(err, "%s, failed to get images", cs.caseName)
 		assert.Subset(images, cs.outputShouldContainImages, cs.caseName)
 		for _, nc := range cs.outputShouldNotContainImages {
