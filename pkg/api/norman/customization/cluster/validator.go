@@ -695,7 +695,6 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 	}
 
 	var prevCluster *v3.Cluster
-
 	if request.Method == http.MethodPut {
 		var err error
 		prevCluster, err = v.ClusterLister.Get("", request.ID)
@@ -711,8 +710,11 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 		}
 	}
 
-	createFromImport := request.Method == http.MethodPost && gkeConfig["imported"] == true
+	if err := v.validateGKENetworkPolicy(clusterSpec, prevCluster); err != nil {
+		return err
+	}
 
+	createFromImport := request.Method == http.MethodPost && gkeConfig["imported"] == true
 	if !createFromImport {
 		if err := validateGKEKubernetesVersion(clusterSpec, prevCluster); err != nil {
 			return err
@@ -736,6 +738,29 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 	zone, zoneOk := gkeConfig["zone"]
 	if (!regionOk || region == "") && (!zoneOk || zone == "") {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide region or zone")
+	}
+
+	return nil
+}
+
+// validateGKENetworkPolicy performs validation around setting enableNetworkPolicy on GKE clusters which turns on Project Network Isolation
+func (v *Validator) validateGKENetworkPolicy(clusterSpec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	// determine if network policy is enabled on the GKE cluster by checking the cluster spec and then the upstream spec if the field is nil (unmanaged)
+	var netPolEnabled bool
+	if clusterSpec.GKEConfig != nil && clusterSpec.GKEConfig.NetworkPolicyEnabled != nil {
+		netPolEnabled = *clusterSpec.GKEConfig.NetworkPolicyEnabled
+	} else if prevCluster != nil && prevCluster.Status.GKEStatus.UpstreamSpec != nil && prevCluster.Status.GKEStatus.UpstreamSpec.NetworkPolicyEnabled != nil {
+		netPolEnabled = *prevCluster.Status.GKEStatus.UpstreamSpec.NetworkPolicyEnabled
+	} else {
+		return nil
+	}
+
+	// network policy enabled on the GKE cluster is a prerequisite for PNI
+	if enableNetPol := clusterSpec.EnableNetworkPolicy; enableNetPol != nil && *enableNetPol && !netPolEnabled {
+		return httperror.NewAPIError(
+			httperror.InvalidBodyContent,
+			"Network Policy support must be enabled on GKE cluster in order to enable Project Network Isolation",
+		)
 	}
 
 	return nil
