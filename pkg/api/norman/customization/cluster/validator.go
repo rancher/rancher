@@ -715,7 +715,7 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 		}
 	}
 
-	if err := v.validateGKENetworkPolicy(cluster, clusterSpec, prevCluster); err != nil {
+	if err := v.validateGKENetworkPolicy(clusterSpec, prevCluster); err != nil {
 		return err
 	}
 
@@ -749,7 +749,7 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 }
 
 // validateGKENetworkPolicy performs validation around setting enableNetworkPolicy on GKE clusters which turns on Project Network Isolation
-func (v *Validator) validateGKENetworkPolicy(cluster map[string]interface{}, clusterSpec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+func (v *Validator) validateGKENetworkPolicy(clusterSpec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
 	// determine if network policy is enabled on the GKE cluster by checking the cluster spec and then the upstream spec if the field is nil (unmanaged)
 	var netPolEnabled bool
 	if clusterSpec.GKEConfig != nil && clusterSpec.GKEConfig.NetworkPolicyEnabled != nil {
@@ -761,7 +761,7 @@ func (v *Validator) validateGKENetworkPolicy(cluster map[string]interface{}, clu
 	}
 
 	// network policy enabled on the GKE cluster is a prerequisite for PNI
-	if enableNetPol := cluster["enableNetworkPolicy"]; enableNetPol == true && !netPolEnabled {
+	if enableNetPol := clusterSpec.EnableNetworkPolicy; enableNetPol != nil && *enableNetPol && !netPolEnabled {
 		return httperror.NewAPIError(
 			httperror.InvalidBodyContent,
 			"Network Policy support must be enabled on GKE cluster in order to enable Project Network Isolation",
