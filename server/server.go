@@ -148,6 +148,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
 	authed.Use(responsewriter.ContentTypeOptions)
+	authed.Use(requests.NewHeaderSanitizer)
 	authed.Path("/meta/gkeMachineTypes").Handler(capabilities.NewGKEMachineTypesHandler())
 	authed.Path("/meta/gkeVersions").Handler(capabilities.NewGKEVersionsHandler())
 	authed.Path("/meta/gkeZones").Handler(capabilities.NewGKEZonesHandler())
