@@ -531,10 +531,7 @@ func (m *MCAppManager) delete(appsToDelete []*pv3.App) error {
 			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return g.Wait()
 }
 
 func (m *MCAppManager) updateCondition(mcappToUpdate *v3.MultiClusterApp, setCondition func(mcapp *v3.MultiClusterApp)) (*v3.MultiClusterApp, error) {
@@ -613,7 +610,7 @@ func (m *MCAppManager) createAnswerMap(answers []v32.Answer) (map[string]map[str
 			// Using k8s labels.Merge, since by definition:
 			// Merge combines given maps, and does not check for any conflicts between the maps. In case of conflicts, second map (labels2) wins
 			// And we want project level keys to override keys from global level for that project
-			projectLabels := make(map[string]string)
+			var projectLabels map[string]string
 			if val, ok := answerMap[clusterName]; ok {
 				projectLabels = labels.Merge(val, a.Values)
 			} else {

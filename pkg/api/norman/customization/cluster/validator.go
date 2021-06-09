@@ -80,11 +80,7 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
-	if err := v.validateGKEConfig(request, data, &clusterSpec); err != nil {
-		return err
-	}
-
-	return nil
+	return v.validateGKEConfig(request, data, &clusterSpec)
 }
 
 func (v *Validator) validateScheduledClusterScan(spec *mgmtclient.Cluster) error {
@@ -315,11 +311,7 @@ func (v *Validator) accessTemplate(request *types.APIContext, spec *mgmtclient.C
 	}
 
 	var ctMap map[string]interface{}
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.ClusterTemplateType, clusterTempRev.Spec.ClusterTemplateName, &ctMap); err != nil {
-		return err
-	}
-
-	return nil
+	return access.ByID(request, &mgmtSchema.Version, mgmtclient.ClusterTemplateType, clusterTempRev.Spec.ClusterTemplateName, &ctMap)
 }
 
 // validateGenericEngineConfig allows for additional validation of clusters that depend on Kontainer Engine or Rancher Machine driver

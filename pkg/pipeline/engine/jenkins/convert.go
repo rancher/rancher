@@ -134,8 +134,9 @@ func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Cont
 	m := utils.GetEnvVarMap(c.execution)
 	config.Tag = substituteEnvVar(m, config.Tag)
 
-	registry, repo, tag := utils.SplitImageTag(config.Tag)
+	_, repo, tag := utils.SplitImageTag(config.Tag)
 
+	var registry string
 	if config.PushRemote {
 		registry = config.Registry
 	} else {

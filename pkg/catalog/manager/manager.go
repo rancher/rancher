@@ -205,10 +205,7 @@ func (m *Manager) ValidateChartCompatibility(template *v3.CatalogTemplateVersion
 	if err := m.ValidateRancherVersion(template); err != nil {
 		return err
 	}
-	if err := m.ValidateKubeVersion(template, clusterName); err != nil {
-		return err
-	}
-	return nil
+	return m.ValidateKubeVersion(template, clusterName)
 }
 
 func (m *Manager) ValidateKubeVersion(template *v3.CatalogTemplateVersion, clusterName string) error {

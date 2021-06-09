@@ -405,6 +405,11 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			}
 
 			keyBytes, err := base64.StdEncoding.DecodeString(publicKey)
+			if err != nil {
+				log.Errorf("SAML: base64 DecodeString error %v", err)
+				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				return
+			}
 			pubKey := &rsa.PublicKey{}
 			err = json.Unmarshal(keyBytes, pubKey)
 			if err != nil {

@@ -17,11 +17,7 @@ func Register(settingController managementcontrollers.SettingController) error {
 		settingCache: settingController.Cache(),
 	}
 
-	if err := settings.SetProvider(sp); err != nil {
-		return err
-	}
-
-	return nil
+	return settings.SetProvider(sp)
 }
 
 type settingsProvider struct {

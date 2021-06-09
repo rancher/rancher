@@ -32,23 +32,23 @@ type Group struct {
 	Subgroups []Group `json:"subGroups,omitempty"`
 }
 
-//KClient implements a httpclient for keycloak
-type KClient struct {
+//KeyCloakClient implements a httpclient for keycloak
+type KeyCloakClient struct {
 	httpClient *http.Client
 }
 
-func (k *KClient) newClient(config *v32.OIDCConfig) (KClient, error) {
-	kClient := KClient{}
+func (k *KeyCloakClient) newClient(config *v32.OIDCConfig) (KeyCloakClient, error) {
+	keyCloakClient := KeyCloakClient{}
 	if config.Certificate != "" && config.PrivateKey != "" {
-		err := oidc.GetClientWithCertKey(kClient.httpClient, config.Certificate, config.PrivateKey)
+		err := oidc.GetClientWithCertKey(keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
 		if err != nil {
-			return KClient{}, err
+			return KeyCloakClient{}, err
 		}
 	}
-	return kClient, nil
+	return keyCloakClient, nil
 }
 
-func (k *KClient) searchPrincipals(searchTerm, principalType string, accessToken string, config *v32.OIDCConfig) ([]account, error) {
+func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, accessToken string, config *v32.OIDCConfig) ([]account, error) {
 	var accounts []account
 	sURL, err := getSearchURL(config.Issuer)
 	if err != nil {
@@ -119,7 +119,7 @@ func getSubGroups(group Group) []Group {
 	return groups
 }
 
-func (k *KClient) getFromKeyCloakByID(principalID, accessToken, searchType string, config *v32.OIDCConfig) (account, error) {
+func (k *KeyCloakClient) getFromKeyCloakByID(principalID, accessToken, searchType string, config *v32.OIDCConfig) (account, error) {
 	sURL, err := getSearchURL(config.Issuer)
 	if err != nil {
 		return account{}, nil
@@ -158,8 +158,8 @@ func URLEncoded(str string) string {
 	return u.String()
 }
 
-func (k *KClient) getFromKeyCloak(accessToken, url string, config *v32.OIDCConfig) ([]byte, int, error) {
-	kHTTPClient, err := k.newClient(config)
+func (k *KeyCloakClient) getFromKeyCloak(accessToken, url string, config *v32.OIDCConfig) ([]byte, int, error) {
+	keyCloakHTTPClient, err := k.newClient(config)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
 		return nil, 500, err
@@ -170,7 +170,7 @@ func (k *KClient) getFromKeyCloak(accessToken, url string, config *v32.OIDCConfi
 	}
 	req.Header.Add("Authorization", "token "+accessToken)
 	req.Header.Add("Accept", "application/json")
-	resp, err := kHTTPClient.httpClient.Do(req)
+	resp, err := keyCloakHTTPClient.httpClient.Do(req)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc]: received error from keycloak: %v", err)
 		return nil, resp.StatusCode, err

@@ -90,6 +90,9 @@ func (a ActionHandler) refresh(apiContext *types.APIContext) error {
 
 	setting.Annotations[forceRefreshAnnotation] = strconv.FormatInt(time.Now().Unix(), 10)
 	_, err = a.MetadataHandler.Settings.Update(setting)
+	if err != nil {
+		return err
+	}
 	apiContext.WriteResponse(http.StatusOK, response)
 	return nil
 }

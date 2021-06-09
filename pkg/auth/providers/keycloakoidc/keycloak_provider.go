@@ -26,13 +26,13 @@ const (
 )
 
 type keyCloakOIDCProvider struct {
-	kClient *KClient
+	keyCloakClient *KeyCloakClient
 	oidc.OpenIDCProvider
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	return &keyCloakOIDCProvider{
-		&KClient{
+		&KeyCloakClient{
 			httpClient: &http.Client{},
 		},
 		oidc.OpenIDCProvider{
@@ -67,8 +67,8 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 		}
 		accessToken = token.ProviderInfo["access_token"]
 	}
-	oidc.GetClientWithCertKey(k.kClient.httpClient, config.Certificate, config.PrivateKey)
-	accts, err := k.kClient.searchPrincipals(searchValue, principalType, accessToken, config)
+	oidc.GetClientWithCertKey(k.keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
+	accts, err := k.keyCloakClient.searchPrincipals(searchValue, principalType, accessToken, config)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc] problem searching keycloak: %v", err)
 	}
@@ -133,8 +133,8 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 	if principalType == GroupType {
 		searchType = "groups"
 	}
-	oidc.GetClientWithCertKey(k.kClient.httpClient, config.Certificate, config.PrivateKey)
-	acct, err := k.kClient.getFromKeyCloakByID(externalID, searchType, accessToken, config)
+	oidc.GetClientWithCertKey(k.keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
+	acct, err := k.keyCloakClient.getFromKeyCloakByID(externalID, searchType, accessToken, config)
 	if err != nil {
 		return v3.Principal{}, err
 	}

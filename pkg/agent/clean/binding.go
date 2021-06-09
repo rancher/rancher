@@ -289,7 +289,7 @@ func (bc *bindingsCleanup) dedupeRB(roleBindings []k8srbacv1.RoleBinding) (int, 
 }
 
 func (bc *bindingsCleanup) checkIfDeterministicCRBExists(sampleBinding k8srbacv1.ClusterRoleBinding) (bool, string, error) {
-	var deterministicFound bool = false
+	var deterministicFound bool
 	crbName, err := getDeterministicBindingName(sampleBinding)
 	if err != nil {
 		return deterministicFound, "", err
@@ -302,7 +302,7 @@ func (bc *bindingsCleanup) checkIfDeterministicCRBExists(sampleBinding k8srbacv1
 }
 
 func (bc *bindingsCleanup) checkIfDeterministicRBExists(sampleBinding k8srbacv1.RoleBinding) (bool, string, error) {
-	var deterministicFound bool = false
+	var deterministicFound bool
 	rbName, err := getDeterministicBindingName(sampleBinding)
 	if err != nil {
 		return deterministicFound, "", err

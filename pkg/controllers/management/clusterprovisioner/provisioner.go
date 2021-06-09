@@ -876,7 +876,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*apimgmtv3.ClusterSpec, erro
 		return nil, err
 	}
 
-	newSpec, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
+	_, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -885,7 +885,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*apimgmtv3.ClusterSpec, erro
 		return nil, nil
 	}
 
-	newSpec, _, err = p.getConfig(true, cluster.Spec, driverName, cluster.Name)
+	newSpec, _, err := p.getConfig(true, cluster.Spec, driverName, cluster.Name)
 
 	return newSpec, err
 }

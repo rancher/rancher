@@ -154,10 +154,7 @@ func (l *Syncer) addPipelineSetting(settingName string, value string, obj *v3.Pr
 }
 
 func (l *Syncer) ensureSystemAccount(obj *v3.Project) error {
-	if err := l.systemAccountManager.GetOrCreateProjectSystemAccount(ref.Ref(obj)); err != nil {
-		return err
-	}
-	return nil
+	return l.systemAccountManager.GetOrCreateProjectSystemAccount(ref.Ref(obj))
 }
 
 func (l *Syncer) cleanInternalRegistryEntry(projectID string) error {

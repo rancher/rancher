@@ -41,9 +41,5 @@ func Add(ctx context.Context, wrangler *wrangler.Context, addLocal, removeLocal,
 		return err
 	}
 
-	if err := addUnauthenticatedRoles(wrangler.Apply); err != nil {
-		return err
-	}
-
-	return nil
+	return addUnauthenticatedRoles(wrangler.Apply)
 }
