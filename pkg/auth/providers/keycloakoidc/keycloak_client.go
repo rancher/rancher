@@ -163,6 +163,9 @@ func (k *KeyCloakClient) getFromKeyCloak(accessToken, url string) ([]byte, int, 
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return b, resp.StatusCode, err
+	}
 	switch resp.StatusCode {
 	case 200:
 	case 201:
