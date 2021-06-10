@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
-	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -26,9 +25,6 @@ type userStore struct {
 	mu          sync.Mutex
 	userIndexer cache.Indexer
 	userManager user.Manager
-	users       v3.UserInterface
-	grbLister   v3.GlobalRoleBindingLister
-	grLister    v3.GlobalRoleLister
 }
 
 func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
@@ -37,18 +33,12 @@ func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 		userByUsernameIndex: userByUsername,
 	}
 	userInformer.AddIndexers(userIndexers)
-	users := mgmt.Management.Users("")
-	grbLister := mgmt.Management.GlobalRoleBindings("").Controller().Lister()
-	grLister := mgmt.Management.GlobalRoles("").Controller().Lister()
 
 	store := &userStore{
 		Store:       schema.Store,
 		mu:          sync.Mutex{},
 		userIndexer: userInformer.GetIndexer(),
 		userManager: mgmt.UserManager,
-		users:       users,
-		grbLister:   grbLister,
-		grLister:    grLister,
 	}
 
 	t := &transform.Store{
@@ -204,19 +194,6 @@ func (s *userStore) Update(apiContext *types.APIContext, schema *types.Schema, d
 		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot deactivate yourself")
 	}
 
-	isAdminResource, err := s.isAdminResource(id)
-	if err != nil {
-		return nil, err
-	}
-	if isAdminResource {
-		isRestrictedAdmin, err := s.isRestrictedAdmin(apiContext)
-		if err != nil {
-			return nil, err
-		}
-		if isRestrictedAdmin {
-			return nil, httperror.NewAPIError(httperror.InvalidAction, "you cannot edit this user")
-		}
-	}
 	return s.Store.Update(apiContext, schema, data, id)
 }
 
@@ -230,19 +207,6 @@ func (s *userStore) Delete(apiContext *types.APIContext, schema *types.Schema, i
 		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot delete yourself")
 	}
 
-	isAdminResource, err := s.isAdminResource(id)
-	if err != nil {
-		return nil, err
-	}
-	if isAdminResource {
-		isRestrictedAdmin, err := s.isRestrictedAdmin(apiContext)
-		if err != nil {
-			return nil, err
-		}
-		if isRestrictedAdmin {
-			return nil, httperror.NewAPIError(httperror.InvalidAction, "you cannot delete this user")
-		}
-	}
 	return s.Store.Delete(apiContext, schema, id)
 }
 
@@ -253,23 +217,4 @@ func getUser(apiContext *types.APIContext) (string, error) {
 	}
 
 	return user, nil
-}
-
-func (s *userStore) isRestrictedAdmin(apiContext *types.APIContext) (bool, error) {
-	ma := gaccess.MemberAccess{
-		Users:     s.users,
-		GrLister:  s.grLister,
-		GrbLister: s.grbLister,
-	}
-	callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
-	return ma.IsRestrictedAdmin(callerID)
-}
-
-func (s *userStore) isAdminResource(id string) (bool, error) {
-	ma := gaccess.MemberAccess{
-		Users:     s.users,
-		GrLister:  s.grLister,
-		GrbLister: s.grbLister,
-	}
-	return ma.IsAdmin(id)
 }
