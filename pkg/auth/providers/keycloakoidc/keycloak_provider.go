@@ -78,6 +78,7 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 	accts, err := keyCloakClient.searchPrincipals(searchValue, principalType, accessToken, config)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc] problem searching keycloak: %v", err)
+		return principals, err
 	}
 	for _, acct := range accts {
 		p := k.toPrincipal(acct.Type, acct, &token)
