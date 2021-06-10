@@ -2,14 +2,18 @@ package rancher
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -19,6 +23,7 @@ import (
 	crds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
+	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/tls"
@@ -28,11 +33,18 @@ import (
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/k8scheck"
+	"github.com/rancher/wrangler/pkg/unstructured"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 )
+
+const encryptionConfigUpdate = "provisioner.cattle.io/encrypt-migrated"
 
 type Options struct {
 	ACMEDomains       cli.StringSlice
@@ -80,6 +92,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	restConfig, err = setupAndValidationRESTConfig(ctx, restConfig)
 	if err != nil {
+		return nil, err
+	}
+
+	// Run the encryption migration before any controllers run otherwise the fields will be dropped
+	if err := migrateEncryptionConfig(ctx, restConfig); err != nil {
 		return nil, err
 	}
 
@@ -152,7 +169,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, opts.AuditLevel, opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
-	aggregation := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
+	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
@@ -163,7 +180,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			websocket.NewWebsocketHandler,
 			proxy.RewriteLocalCluster,
 			clusterProxy,
-			aggregation,
+			aggregationMiddleware,
 			additionalAPIPreMCM,
 			wranglerContext.MultiClusterManager.Middleware,
 			authServer.Management,
@@ -259,4 +276,69 @@ func localClusterEnabled(opts *Options) bool {
 		return true
 	}
 	return false
+}
+
+// migrateEncryptionConfig uses the dynamic client to get all clusters and then marshals them through the
+// standard go JSON package using the updated backing structs in RKE that include JSON tags. The k8s JSON
+// tools are strict with casing so the fields would be dropped before getting saved back in the proper casing
+// if any controller touches the cluster first. See https://github.com/rancher/rancher/issues/31385
+func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error {
+	dynamicClient, err := k8dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return err
+	}
+	clusterDynamicClient := dynamicClient.Resource(mgmntv3.ClusterGroupVersionResource)
+
+	clusters, err := clusterDynamicClient.List(ctx, metav1.ListOptions{})
+	if err != nil {
+		if !k8serror.IsNotFound(err) {
+			return err
+		}
+		// IsNotFound error means the CRD type doesn't exist in the cluster, indicating this is the first Rancher startup
+		return nil
+	}
+
+	var allErrors error
+
+	for _, c := range clusters.Items {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			rawDynamicCluster, err := clusterDynamicClient.Get(ctx, c.GetName(), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			annotations := rawDynamicCluster.GetAnnotations()
+			if annotations != nil && annotations[encryptionConfigUpdate] == "true" {
+				return nil
+			}
+
+			clusterBytes, err := rawDynamicCluster.MarshalJSON()
+			if err != nil {
+				return errors.Wrap(err, "error trying to Marshal dynamic cluster")
+			}
+
+			var cluster *v3.Cluster
+
+			if err := json.Unmarshal(clusterBytes, &cluster); err != nil {
+				return errors.Wrap(err, "error trying to Unmarshal dynamicCluster into v3 cluster")
+			}
+
+			if cluster.Annotations == nil {
+				cluster.Annotations = make(map[string]string)
+			}
+			cluster.Annotations[encryptionConfigUpdate] = "true"
+
+			u, err := unstructured.ToUnstructured(cluster)
+			if err != nil {
+				return err
+			}
+
+			_, err = clusterDynamicClient.Update(ctx, u, metav1.UpdateOptions{})
+			return err
+		})
+		if err != nil {
+			allErrors = multierror.Append(err, allErrors)
+		}
+	}
+	return allErrors
 }
