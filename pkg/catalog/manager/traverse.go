@@ -8,7 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"

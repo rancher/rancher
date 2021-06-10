@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/bep/debounce"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/pkg/ticker"

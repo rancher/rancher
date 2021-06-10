@@ -1,9 +1,6 @@
 package utils
 
 import (
-	"regexp"
-
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -11,11 +8,6 @@ import (
 const (
 	CatalogExternalIDFormat = "catalog://?catalog=%s&template=%s&version=%s"
 	SystemLibraryName       = "system-library"
-)
-
-var (
-	controlChars   = regexp.MustCompile("[[:cntrl:]]")
-	controlEncoded = regexp.MustCompile("%[0-1][0-9,a-f,A-F]")
 )
 
 // Config holds libcompose top level configuration
@@ -82,10 +74,3 @@ func Contains(collection []string, key string) bool {
 	return false
 }
 
-func ValidateURL(pathURL string) error {
-	// Don't allow a URL containing control characters, standard or url-encoded
-	if controlChars.FindStringIndex(pathURL) != nil || controlEncoded.FindStringIndex(pathURL) != nil {
-		return errors.New("Invalid characters in url")
-	}
-	return nil
-}

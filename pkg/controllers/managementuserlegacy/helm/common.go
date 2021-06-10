@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"

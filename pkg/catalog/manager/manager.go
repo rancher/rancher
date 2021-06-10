@@ -10,7 +10,7 @@ import (
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"

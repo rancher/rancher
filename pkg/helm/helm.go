@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
+	"github.com/rancher/rancher/pkg/git"
 	"io"
 	"io/ioutil"
 	"net"
@@ -21,7 +22,6 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/rancher/norman/controller"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	mgmtv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nsutil "github.com/rancher/rancher/pkg/namespace"
@@ -95,7 +95,7 @@ func (h *Helm) request(pathURL string) (*http.Response, error) {
 		baseEndpoint = helmURL.ResolveReference(baseEndpoint)
 	}
 
-	if err := catUtil.ValidateURL(baseEndpoint.String()); err != nil {
+	if err := git.ValidateURL(baseEndpoint.String()); err != nil {
 		return nil, err
 	}
 
