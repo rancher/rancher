@@ -2,7 +2,6 @@ package rancher
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -29,6 +28,7 @@ import (
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/k8scheck"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -104,7 +104,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
-		return nil, fmt.Errorf("multi-cluster-management features requires feature fleet=true")
+		logrus.Info("fleet can't be turned off when MCM is enabled. Turning on fleet feature")
+		if err := features.SetFeature(wranglerContext.Mgmt.Feature(), features.Fleet.Name(), true); err != nil {
+			return nil, err
+		}
 	}
 
 	if features.Auth.Enabled() {
