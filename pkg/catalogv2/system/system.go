@@ -123,26 +123,22 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}) {
 }
 
 func (m *Manager) Uninstall(namespace, name string) error {
-	helmcfg := &action.Configuration{}
-	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
-		return err
-	}
-
-	l := action.NewList(helmcfg)
-	l.Filter = "^" + name + "$"
-
-	releases, err := l.Run()
+	uninstall, err := json.Marshal(types.ChartUninstallAction{
+		Timeout: &metav1.Duration{Duration: 5 * time.Minute},
+	})
 	if err != nil {
 		return err
 	}
 
-	if len(releases) == 0 {
-		return nil
+	op, err := m.operation.Uninstall(m.ctx, installUser, namespace, name, bytes.NewBuffer(uninstall))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
 
-	uninstall := action.NewUninstall(helmcfg)
-	_, err = uninstall.Run(name)
-	return err
+	return m.waitPodDone(op)
 }
 
 func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]interface{}) error {

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -239,6 +240,9 @@ func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, m
 	}
 
 	serverURL, cacert := settings.InternalServerURL.Get(), settings.InternalCACerts.Get()
+	if serverURL == "" {
+		return nil, errors.New("server url is missing, can't generate kubeconfig for fleet import cluster")
+	}
 
 	data, err := clientcmd.Write(clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
