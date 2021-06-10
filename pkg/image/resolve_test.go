@@ -355,7 +355,7 @@ func TestGetImages(t *testing.T) {
 
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
-		images, imageSources, err := GetImages(cs.inputSystemChartPath, cs.inputChartPath, []string{}, cs.inputImagesFromArgs, cs.inputRkeSystemImages, cs.inputOsType)
+		images, imageSources, err := GetImages(cs.inputSystemChartPath, cs.inputChartPath, nil, cs.inputImagesFromArgs, cs.inputRkeSystemImages, cs.inputOsType)
 		assert.Nilf(err, "%s, failed to get images", cs.caseName)
 		assert.Subset(images, cs.outputShouldContainImages, cs.caseName)
 		for _, nc := range cs.outputShouldNotContainImages {
