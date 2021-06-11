@@ -367,7 +367,10 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.LinkHandler = handler.ExportYamlHandler
 	schema.Validator = catalog.Validator
-	schema.Store = catalogStore.Wrap(schema.Store)
+	users := managementContext.Management.Users("")
+	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
+	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
 }
 
 func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -379,7 +382,10 @@ func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.ActionHandler = handler.RefreshProjectCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.Validator = catalog.Validator
-	schema.Store = catalogStore.Wrap(schema.Store)
+	users := managementContext.Management.Users("")
+	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
+	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
 }
 
 func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -391,7 +397,10 @@ func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.ActionHandler = handler.RefreshClusterCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.Validator = catalog.Validator
-	schema.Store = catalogStore.Wrap(schema.Store)
+	users := managementContext.Management.Users("")
+	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
+	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas, management *config.ScaledContext) {
@@ -478,6 +487,8 @@ func User(ctx context.Context, schemas *types.Schemas, management *config.Scaled
 		UserClient:               management.Management.Users(""),
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
 		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
+		GlobalRoleBindingsLister: management.Management.GlobalRoleBindings("").Controller().Lister(),
+		GlobalRoleLister:         management.Management.GlobalRoles("").Controller().Lister(),
 	}
 
 	schema.Formatter = handler.UserFormatter

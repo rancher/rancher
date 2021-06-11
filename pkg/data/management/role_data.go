@@ -87,10 +87,22 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	restrictedAdminRole := addUserRules(rb.addRole("Restricted Admin", "restricted-admin"))
 	restrictedAdminRole.
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("users", "userattribute", "groups", "groupmembers").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
+
+	// restricted-admin can edit settings if rancher is bootstrapped with restricted-admin role
+	if settings.RestrictedDefaultAdmin.Get() == "true" {
+		restrictedAdminRole.
+			addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
+	}
 
 	userRole := addUserRules(rb.addRole("User", "user"))
 	userRole.addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch")
