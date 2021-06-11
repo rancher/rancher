@@ -487,10 +487,8 @@ func User(ctx context.Context, schemas *types.Schemas, management *config.Scaled
 		UserClient:               management.Management.Users(""),
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
 		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
-		GlobalRoleBindingsLister: management.Management.GlobalRoleBindings("").Controller().Lister(),
-		GlobalRoleLister:         management.Management.GlobalRoles("").Controller().Lister(),
+		GlobalRoleClient:         management.Management.GlobalRoles(""),
 	}
-
 	schema.Formatter = handler.UserFormatter
 	schema.CollectionFormatter = handler.CollectionFormatter
 	schema.ActionHandler = handler.Actions

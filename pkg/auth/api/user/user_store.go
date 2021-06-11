@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -9,13 +10,17 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/slice"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,12 +28,12 @@ const userByUsernameIndex = "auth.management.cattle.io/user-by-username"
 
 type userStore struct {
 	types.Store
-	mu          sync.Mutex
-	userIndexer cache.Indexer
-	userManager user.Manager
-	users       v3.UserInterface
-	grbLister   v3.GlobalRoleBindingLister
-	grLister    v3.GlobalRoleLister
+	mu                       sync.Mutex
+	userIndexer              cache.Indexer
+	userManager              user.Manager
+	users                    v3.UserInterface
+	globalRoleBindingsClient v3.GlobalRoleBindingInterface
+	globalRolesClient        v3.GlobalRoleInterface
 }
 
 func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
@@ -38,17 +43,17 @@ func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 	}
 	userInformer.AddIndexers(userIndexers)
 	users := mgmt.Management.Users("")
-	grbLister := mgmt.Management.GlobalRoleBindings("").Controller().Lister()
-	grLister := mgmt.Management.GlobalRoles("").Controller().Lister()
+	grbClient := mgmt.Management.GlobalRoleBindings("")
+	grClient := mgmt.Management.GlobalRoles("")
 
 	store := &userStore{
-		Store:       schema.Store,
-		mu:          sync.Mutex{},
-		userIndexer: userInformer.GetIndexer(),
-		userManager: mgmt.UserManager,
-		users:       users,
-		grbLister:   grbLister,
-		grLister:    grLister,
+		Store:                    schema.Store,
+		mu:                       sync.Mutex{},
+		userIndexer:              userInformer.GetIndexer(),
+		userManager:              mgmt.UserManager,
+		users:                    users,
+		globalRoleBindingsClient: grbClient,
+		globalRolesClient:        grClient,
 	}
 
 	t := &transform.Store{
@@ -204,12 +209,13 @@ func (s *userStore) Update(apiContext *types.APIContext, schema *types.Schema, d
 		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot deactivate yourself")
 	}
 
-	isAdminResource, err := s.isAdminResource(id)
+	isAdminResource, err := isAdminResource(id, s.users, s.globalRoleBindingsClient, s.globalRolesClient)
 	if err != nil {
 		return nil, err
 	}
 	if isAdminResource {
-		isRestrictedAdmin, err := s.isRestrictedAdmin(apiContext)
+		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
+		isRestrictedAdmin, err := isRestrictedAdmin(callerID, s.users, s.globalRoleBindingsClient)
 		if err != nil {
 			return nil, err
 		}
@@ -230,12 +236,13 @@ func (s *userStore) Delete(apiContext *types.APIContext, schema *types.Schema, i
 		return nil, httperror.NewAPIError(httperror.InvalidAction, "You cannot delete yourself")
 	}
 
-	isAdminResource, err := s.isAdminResource(id)
+	isAdminResource, err := isAdminResource(id, s.users, s.globalRoleBindingsClient, s.globalRolesClient)
 	if err != nil {
 		return nil, err
 	}
 	if isAdminResource {
-		isRestrictedAdmin, err := s.isRestrictedAdmin(apiContext)
+		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
+		isRestrictedAdmin, err := isRestrictedAdmin(callerID, s.users, s.globalRoleBindingsClient)
 		if err != nil {
 			return nil, err
 		}
@@ -255,21 +262,60 @@ func getUser(apiContext *types.APIContext) (string, error) {
 	return user, nil
 }
 
-func (s *userStore) isRestrictedAdmin(apiContext *types.APIContext) (bool, error) {
-	ma := gaccess.MemberAccess{
-		Users:     s.users,
-		GrLister:  s.grLister,
-		GrbLister: s.grbLister,
+func isRestrictedAdmin(callerID string, users v3.UserInterface, grbClient v3.GlobalRoleBindingInterface) (bool, error) {
+
+	u, err := users.Get(callerID, v1.GetOptions{})
+	if err != nil {
+		return false, err
 	}
-	callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
-	return ma.IsRestrictedAdmin(callerID)
+	if u == nil {
+		return false, fmt.Errorf("No user found with ID %v", callerID)
+	}
+
+	// Get globalRoleBinding for this user
+	grbs, err := grbClient.List(v1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for _, grb := range grbs.Items {
+		if grb.UserName == callerID {
+			if grb.GlobalRoleName == rbac.GlobalRestrictedAdmin {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
-func (s *userStore) isAdminResource(id string) (bool, error) {
-	ma := gaccess.MemberAccess{
-		Users:     s.users,
-		GrLister:  s.grLister,
-		GrbLister: s.grbLister,
+func isAdminResource(resourceID string, users v3.UserInterface, grbClient v3.GlobalRoleBindingInterface, grClient v3.GlobalRoleInterface) (bool, error) {
+	u, err := users.Get(resourceID, v1.GetOptions{})
+	if err != nil {
+		return false, err
 	}
-	return ma.IsAdmin(id)
+	if u == nil {
+		return false, fmt.Errorf("No user found with ID %v", resourceID)
+	}
+	// Get globalRoleBinding for this user
+	grbs, err := grbClient.List(v1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for _, grb := range grbs.Items {
+		if grb.UserName == resourceID {
+			gr, err := grClient.Get(grb.GlobalRoleName, v1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				continue
+			} else if err != nil {
+				return false, err
+			}
+			for _, rule := range gr.Rules {
+				// admin roles have all resources and all verbs allowed
+				if slice.ContainsString(rule.Resources, "*") && slice.ContainsString(rule.APIGroups, "*") && slice.ContainsString(rule.Verbs, "*") {
+					// caller is global admin
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
 }

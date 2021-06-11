@@ -43,8 +43,7 @@ type Handler struct {
 	UserClient               v3.UserInterface
 	GlobalRoleBindingsClient v3.GlobalRoleBindingInterface
 	UserAuthRefresher        providerrefresh.UserAuthRefresher
-	GlobalRoleBindingsLister v3.GlobalRoleBindingLister
-	GlobalRoleLister         v3.GlobalRoleLister
+	GlobalRoleClient         v3.GlobalRoleInterface
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -182,13 +181,8 @@ func (h *Handler) userCanRefresh(request *types.APIContext) bool {
 }
 
 func (h *Handler) isRestrictedAdmin(apiContext *types.APIContext) bool {
-	ma := gaccess.MemberAccess{
-		Users:     h.UserClient,
-		GrLister:  h.GlobalRoleLister,
-		GrbLister: h.GlobalRoleBindingsLister,
-	}
 	callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
-	isRestrictedAdmin, err := ma.IsRestrictedAdmin(callerID)
+	isRestrictedAdmin, err := isRestrictedAdmin(callerID, h.UserClient, h.GlobalRoleBindingsClient)
 	if err != nil {
 		logrus.Errorf("error checking if resource is restrictedAdmin %v", err)
 	}
@@ -196,12 +190,7 @@ func (h *Handler) isRestrictedAdmin(apiContext *types.APIContext) bool {
 }
 
 func (h *Handler) isAdminResource(resourceID string) bool {
-	ma := gaccess.MemberAccess{
-		Users:     h.UserClient,
-		GrLister:  h.GlobalRoleLister,
-		GrbLister: h.GlobalRoleBindingsLister,
-	}
-	isAdminResource, err := ma.IsAdmin(resourceID)
+	isAdminResource, err := isAdminResource(resourceID, h.UserClient, h.GlobalRoleBindingsClient, h.GlobalRoleClient)
 	if err != nil {
 		logrus.Errorf("error checking if resource is admin %v", err)
 	}
