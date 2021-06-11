@@ -2,10 +2,11 @@ package keycloakoidc
 
 import (
 	"context"
-	"strconv"
+	"net/http"
 	"strings"
 
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -46,6 +47,14 @@ func (k *keyCloakOIDCProvider) GetName() string {
 	return Name
 }
 
+func newClient(config *v32.OIDCConfig) (*KeyCloakClient, error) {
+	keyCloakClient := &KeyCloakClient{
+		httpClient: &http.Client{},
+	}
+	err := oidc.GetClientWithCertKey(keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
+	return keyCloakClient, err
+}
+
 func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
@@ -71,7 +80,7 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 		logrus.Errorf("[keycloak oidc] problem searching keycloak: %v", err)
 	}
 	for _, acct := range accts {
-		p := k.toPrincipal(principalType, acct, &token)
+		p := k.toPrincipal(acct.Type, acct, &token)
 		principals = append(principals, p)
 	}
 	return principals, nil
@@ -83,7 +92,7 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 		displayName = acct.Username
 	}
 	princ := v3.Principal{
-		ObjectMeta:  metav1.ObjectMeta{Name: k.GetName() + "_" + principalType + "://" + strconv.Itoa(acct.ID)},
+		ObjectMeta:  metav1.ObjectMeta{Name: k.GetName() + "_" + principalType + "://" + acct.ID},
 		DisplayName: displayName,
 		LoginName:   acct.Username,
 		Provider:    k.GetName(),

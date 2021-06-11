@@ -9,15 +9,14 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/sirupsen/logrus"
 )
 
 //account defines properties an account in keycloak has
 type account struct {
-	ID            int    `json:"id,omitempty"`
+	ID            string `json:"id,omitempty"`
 	Email         string `json:"email,omitempty"`
-	EmailVerified string `json:"emailVerified,omitempty"`
+	EmailVerified bool   `json:"emailVerified,omitempty"`
 	Username      string `json:"username,omitempty"`
 	Enabled       bool   `json:"enabled,omitempty"`
 	Name          string `json:"firstName,omitempty"`
@@ -27,7 +26,7 @@ type account struct {
 
 //Group defines properties a group in keycloak has
 type Group struct {
-	ID        int     `json:"id,omitempty"`
+	ID        string  `json:"id,omitempty"`
 	Name      string  `json:"name,omitempty"`
 	Subgroups []Group `json:"subGroups,omitempty"`
 }
@@ -35,12 +34,6 @@ type Group struct {
 //KeyCloakClient implements a httpclient for keycloak
 type KeyCloakClient struct {
 	httpClient *http.Client
-}
-
-func newClient(config *v32.OIDCConfig) (*KeyCloakClient, error) {
-	keyCloakClient := &KeyCloakClient{}
-	err := oidc.GetClientWithCertKey(keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
-	return keyCloakClient, err
 }
 
 func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, accessToken string, config *v32.OIDCConfig) ([]account, error) {
@@ -161,7 +154,7 @@ func (k *KeyCloakClient) getFromKeyCloak(accessToken, url string) ([]byte, int, 
 	if accessToken == "" {
 		return nil, 500, fmt.Errorf("[keycloak oidc]: GET request failed, missing authorization token")
 	}
-	req.Header.Add("Authorization", "token "+accessToken)
+	req.Header.Add("Authorization", "Bearer "+accessToken)
 	req.Header.Add("Accept", "application/json")
 	resp, err := k.httpClient.Do(req)
 	if err != nil {
@@ -177,5 +170,4 @@ func (k *KeyCloakClient) getFromKeyCloak(accessToken, url string) ([]byte, int, 
 		return b, resp.StatusCode, err
 	}
 	return b, resp.StatusCode, nil
-
 }
