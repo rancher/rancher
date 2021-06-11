@@ -3,6 +3,7 @@ package client
 const (
 	AppSpecType                   = "appSpec"
 	AppSpecFieldAnswers           = "answers"
+	AppSpecFieldAnswersSetString  = "answersSetString"
 	AppSpecFieldAppRevisionID     = "appRevisionId"
 	AppSpecFieldDescription       = "description"
 	AppSpecFieldExternalID        = "externalId"
@@ -18,6 +19,7 @@ const (
 
 type AppSpec struct {
 	Answers           map[string]string `json:"answers,omitempty" yaml:"answers,omitempty"`
+	AnswersSetString  map[string]string `json:"answersSetString,omitempty" yaml:"answersSetString,omitempty"`
 	AppRevisionID     string            `json:"appRevisionId,omitempty" yaml:"appRevisionId,omitempty"`
 	Description       string            `json:"description,omitempty" yaml:"description,omitempty"`
 	ExternalID        string            `json:"externalId,omitempty" yaml:"externalId,omitempty"`

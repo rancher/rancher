@@ -157,38 +157,24 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort := monitoring.ClusterPrometheusEndpoint()
 	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
 	optionalAppAnswers := map[string]string{
-		"grafana.persistence.enabled": "false",
-
+		"grafana.persistence.enabled":    "false",
 		"prometheus.persistence.enabled": "false",
-
-		"prometheus.sync.mode": "federate",
+		"prometheus.sync.mode":           "federate",
 	}
-
 	mustAppAnswers := map[string]string{
-		"operator.enabled": "false",
-
-		"exporter-coredns.enabled": "false",
-
+		"operator.enabled":                         "false",
+		"exporter-coredns.enabled":                 "false",
 		"exporter-kube-controller-manager.enabled": "false",
-
-		"exporter-kube-dns.enabled": "false",
-
-		"exporter-kube-scheduler.enabled": "false",
-
-		"exporter-kube-state.enabled": "false",
-
-		"exporter-kubelets.enabled": "false",
-
-		"exporter-kubernetes.enabled": "false",
-
-		"exporter-node.enabled": "false",
-
-		"exporter-fluentd.enabled": "false",
-
-		"grafana.enabled":  "true",
-		"grafana.level":    "project",
-		"grafana.apiGroup": monitoring.APIVersion.Group,
-
+		"exporter-kube-dns.enabled":                "false",
+		"exporter-kube-scheduler.enabled":          "false",
+		"exporter-kube-state.enabled":              "false",
+		"exporter-kubelets.enabled":                "false",
+		"exporter-kubernetes.enabled":              "false",
+		"exporter-node.enabled":                    "false",
+		"exporter-fluentd.enabled":                 "false",
+		"grafana.enabled":                          "true",
+		"grafana.level":                            "project",
+		"grafana.apiGroup":                         monitoring.APIVersion.Group,
 		"prometheus.enabled":                       "true",
 		"prometheus.level":                         "project",
 		"prometheus.apiGroup":                      monitoring.APIVersion.Group,
@@ -199,7 +185,14 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.cluster.alertManagerNamespace": clusterAlertManagerSvcNamespaces,
 	}
 
-	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, project.Annotations, ph.app.catalogTemplateLister, ph.catalogManager, ph.clusterName)
+	appAnswers, appAnswersSetString, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(
+		optionalAppAnswers,
+		map[string]string{},
+		project.Annotations,
+		ph.app.catalogTemplateLister,
+		ph.catalogManager,
+		ph.clusterName,
+	)
 	if err != nil {
 		return err
 	}
@@ -207,6 +200,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	// cannot overwrite mustAppAnswers
 	for mustKey, mustVal := range mustAppAnswers {
 		appAnswers[mustKey] = mustVal
+		delete(appAnswersSetString, mustKey)
 	}
 
 	// complete sync target & path
@@ -231,11 +225,12 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 			Namespace:   appDeployProjectID,
 		},
 		Spec: v33.AppSpec{
-			Answers:         appAnswers,
-			Description:     "Rancher Project Monitoring",
-			ExternalID:      appCatalogID,
-			ProjectName:     appProjectName,
-			TargetNamespace: appTargetNamespace,
+			Answers:          appAnswers,
+			AnswersSetString: appAnswersSetString,
+			Description:      "Rancher Project Monitoring",
+			ExternalID:       appCatalogID,
+			ProjectName:      appProjectName,
+			TargetNamespace:  appTargetNamespace,
 		},
 	}
 

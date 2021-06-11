@@ -281,53 +281,33 @@ func (ch *clusterHandler) getExporterEndpoint() (map[string][]string, error) {
 func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProjectName string, cluster *mgmtv3.Cluster, etcdTLSConfig []*etcdTLSConfig, systemComponentMap map[string][]string) (map[string]string, error) {
 	_, appDeployProjectID := ref.Parse(appProjectName)
 	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
-
 	optionalAppAnswers := map[string]string{
-		"exporter-kube-state.enabled": "true",
-
-		"exporter-kubelets.enabled": "true",
-
-		"exporter-kubernetes.enabled": "true",
-
-		"exporter-node.enabled": "true",
-
-		"exporter-fluentd.enabled": "true",
-
-		"grafana.persistence.enabled": "false",
-
+		"exporter-kube-state.enabled":    "true",
+		"exporter-kubelets.enabled":      "true",
+		"exporter-kubernetes.enabled":    "true",
+		"exporter-node.enabled":          "true",
+		"exporter-fluentd.enabled":       "true",
+		"grafana.persistence.enabled":    "false",
 		"prometheus.persistence.enabled": "false",
 	}
-
 	mustAppAnswers := map[string]string{
-		"enabled": "false",
-
+		"enabled":                   "false",
 		"exporter-coredns.apiGroup": monitoring.APIVersion.Group,
-
 		"exporter-kube-controller-manager.enabled":  "false",
 		"exporter-kube-controller-manager.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-dns.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-etcd.enabled":  "false",
-		"exporter-kube-etcd.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-scheduler.enabled":  "false",
-		"exporter-kube-scheduler.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-state.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kubelets.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kubernetes.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-node.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-fluentd.apiGroup": monitoring.APIVersion.Group,
-
-		"grafana.enabled":            "true",
-		"grafana.apiGroup":           monitoring.APIVersion.Group,
-		"grafana.serviceAccountName": appName,
-
+		"exporter-kube-dns.apiGroup":                monitoring.APIVersion.Group,
+		"exporter-kube-etcd.enabled":                "false",
+		"exporter-kube-etcd.apiGroup":               monitoring.APIVersion.Group,
+		"exporter-kube-scheduler.enabled":           "false",
+		"exporter-kube-scheduler.apiGroup":          monitoring.APIVersion.Group,
+		"exporter-kube-state.apiGroup":              monitoring.APIVersion.Group,
+		"exporter-kubelets.apiGroup":                monitoring.APIVersion.Group,
+		"exporter-kubernetes.apiGroup":              monitoring.APIVersion.Group,
+		"exporter-node.apiGroup":                    monitoring.APIVersion.Group,
+		"exporter-fluentd.apiGroup":                 monitoring.APIVersion.Group,
+		"grafana.enabled":                           "true",
+		"grafana.apiGroup":                          monitoring.APIVersion.Group,
+		"grafana.serviceAccountName":                appName,
 		"prometheus.enabled":                        "true",
 		"prometheus.apiGroup":                       monitoring.APIVersion.Group,
 		"prometheus.externalLabels.prometheus_from": cluster.Spec.DisplayName,
@@ -348,7 +328,14 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.ruleSelector.matchExpressions[0].values[1]":                             monitoring.CattleMonitoringPrometheusRuleLabelValue,
 	}
 
-	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, cluster.Annotations, ch.app.catalogTemplateLister, ch.cattleCatalogManager, ch.clusterName)
+	appAnswers, appAnswersSetString, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(
+		optionalAppAnswers,
+		map[string]string{},
+		cluster.Annotations,
+		ch.app.catalogTemplateLister,
+		ch.cattleCatalogManager,
+		ch.clusterName,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -356,6 +343,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	// cannot overwrite mustAppAnswers
 	for mustKey, mustVal := range mustAppAnswers {
 		appAnswers[mustKey] = mustVal
+		delete(appAnswersSetString, mustKey)
 	}
 
 	if systemComponentMap != nil {
@@ -416,11 +404,12 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 			Namespace:   appDeployProjectID,
 		},
 		Spec: v33.AppSpec{
-			Answers:         appAnswers,
-			Description:     "Rancher Cluster Monitoring",
-			ExternalID:      appCatalogID,
-			ProjectName:     appProjectName,
-			TargetNamespace: appTargetNamespace,
+			Answers:          appAnswers,
+			AnswersSetString: appAnswersSetString,
+			Description:      "Rancher Cluster Monitoring",
+			ExternalID:       appCatalogID,
+			ProjectName:      appProjectName,
+			TargetNamespace:  appTargetNamespace,
 		},
 	}
 
