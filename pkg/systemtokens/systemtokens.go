@@ -77,7 +77,7 @@ func (t *systemTokens) createOrUpdateSystemToken(tokenName, description, kind, u
 					tokens.TokenKindLabel: kind,
 				},
 			},
-			TTLMillis:    86400000, // 24 hours, token purge daemon will cleanup
+			TTLMillis:    3600000, // 1 hour, token purge daemon will cleanup
 			Description:  description,
 			UserID:       userName,
 			AuthProvider: "local",

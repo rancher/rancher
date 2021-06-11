@@ -14,21 +14,30 @@ func Register(ctx context.Context, features managementv3.FeatureController) {
 	features.OnChange(ctx, "features-restart-handler", sync)
 }
 
-func sync(key string, obj *v3.Feature) (*v3.Feature, error) {
+func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
-	val := obj.Status.Default
-	if obj.Spec.Value != nil {
-		val = *obj.Spec.Value
-	}
-
+	val := getEffectiveValue(obj)
 	if err := ReconcileFeatures(obj, val); err != nil {
 		logrus.Fatalf("%v", err)
 	}
 
 	return obj, nil
+}
+
+// getEffectiveValue considers a feature's default, value, and locked value to determine
+// its effective value.
+func getEffectiveValue(obj *v3.Feature) bool {
+	val := obj.Status.Default
+	if obj.Spec.Value != nil {
+		val = *obj.Spec.Value
+	}
+	if obj.Status.LockedValue != nil {
+		val = *obj.Status.LockedValue
+	}
+	return val
 }
 
 // ReconcileFeatures returns an error if the feature value in memory does
