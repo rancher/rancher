@@ -20,7 +20,7 @@ import (
 
 var (
 	ErrNotHelmRelease = errors.New("not helm release")
-	magicGzip         = []byte{0x1f, 0x8b, 0x08}
+	MagicGzip         = []byte{0x1f, 0x8b, 0x08}
 )
 
 type IsNamespaced func(gvk schema.GroupVersionKind) bool

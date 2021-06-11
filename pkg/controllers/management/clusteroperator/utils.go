@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/condition"
 	apiprojv3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	utils2 "github.com/rancher/rancher/pkg/app"
+	"github.com/rancher/rancher/pkg/app/compression"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -208,7 +209,11 @@ func (e *OperatorController) generateValuesYaml() (string, error) {
 		return "", err
 	}
 
-	return string(valuesYaml), nil
+	compressedValuesYaml, err := compression.CompressValuesYaml(valuesYaml)
+	if err != nil {
+		return "", err
+	}
+	return compressedValuesYaml, nil
 }
 
 // RecordCAAndAPIEndpoint reads the cluster config's secret once available. The CA cert and API endpoint are then copied to the cluster status.

@@ -18,6 +18,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/app/compression"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -230,8 +231,11 @@ func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[strin
 	// A user-supplied values.yaml will override the default values.yaml
 	if app.Spec.ValuesYaml != "" {
 		custom := "custom-values.yaml"
-		valuesYaml := filepath.Join(tempDir.FullPath, custom)
-		if err := ioutil.WriteFile(valuesYaml, []byte(app.Spec.ValuesYaml), 0755); err != nil {
+		valuesYaml, err := compression.DecompressValuesYaml(app.Spec.ValuesYaml)
+		if err != nil {
+			return nil, err
+		}
+		if err := ioutil.WriteFile(filepath.Join(tempDir.FullPath, custom), valuesYaml, 0755); err != nil {
 			return values, err
 		}
 		values = append(values, "--values", filepath.Join(tempDir.InJailPath, custom))

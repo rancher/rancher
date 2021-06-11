@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/app/compression"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	clusterv3 "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	projectv3 "github.com/rancher/rancher/pkg/client/generated/project/v3"
@@ -168,7 +169,11 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			}
 		}
 		if valuesYaml != nil {
-			obj.Spec.ValuesYaml = convert.ToString(valuesYaml)
+			// We convert to a byte slice since we know that the object is YAML string.
+			obj.Spec.ValuesYaml, err = compression.CompressValuesYaml([]byte(convert.ToString(valuesYaml)))
+			if err != nil {
+				return err
+			}
 		} else {
 			obj.Spec.ValuesYaml = ""
 		}
