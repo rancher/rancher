@@ -11,6 +11,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	controlChars   = regexp.MustCompile("[[:cntrl:]]")
+	controlEncoded = regexp.MustCompile("%[0-1][0-9,a-f,A-F]")
+)
+
 func Clone(path, url, branch string) error {
 	if err := ValidateURL(url); err != nil {
 		return err
@@ -82,11 +87,6 @@ func CloneWithDepth(path, url, branch string, depth int) error {
 	}
 	return runcmd("git", "clone", "-b", branch, "--single-branch", fmt.Sprintf("--depth=%v", depth), url, path)
 }
-
-var (
-	controlChars   = regexp.MustCompile("[[:cntrl:]]")
-	controlEncoded = regexp.MustCompile("%[0-1][0-9,a-f,A-F]")
-)
 
 func ValidateURL(pathURL string) error {
 	// Don't allow a URL containing control characters, standard or url-encoded

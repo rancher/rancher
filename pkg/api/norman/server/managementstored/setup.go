@@ -780,8 +780,9 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		MetadataHandler:       metadataHandler,
 	}
 	lh := kontainerdriver.ListHandler{
-		SysImageLister: management.Management.RkeK8sSystemImages("").Controller().Lister(),
-		SysImages:      management.Management.RkeK8sSystemImages(""),
+		SysImageLister:  management.Management.RkeK8sSystemImages("").Controller().Lister(),
+		SysImages:       management.Management.RkeK8sSystemImages(""),
+		ConfigMapLister: management.Core.ConfigMaps("").Controller().Lister(),
 	}
 	if features.Legacy.Enabled() {
 		lh.CatalogLister = management.Management.Catalogs("").Controller().Lister()

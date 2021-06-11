@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -74,3 +76,6 @@ func Contains(collection []string, key string) bool {
 	return false
 }
 
+func GetCatalogImageCacheName(catalogName string) string {
+	return fmt.Sprintf("%s-catalog-image-list", catalogName)
+}

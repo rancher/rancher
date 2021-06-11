@@ -6,7 +6,6 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/rancher/rancher/pkg/git"
 	"io"
 	"io/ioutil"
 	"net"
@@ -20,6 +19,7 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/git"
 
 	"github.com/rancher/norman/controller"
 	mgmtv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"

@@ -12,9 +12,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	libhelm "github.com/rancher/rancher/pkg/helm"
 	util "github.com/rancher/rancher/pkg/cluster"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	libhelm "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	img "github.com/rancher/rke/types/image"
@@ -28,10 +29,20 @@ type chart struct {
 	version string
 }
 
+const imageListDelimiter = "\n"
 const (
 	Linux OSType = iota
 	Windows
 )
+
+var osTypeImageListName map[OSType]string
+
+func init() {
+	osTypeImageListName = map[OSType]string{
+		Windows: "windows-rancher-images",
+		Linux:   "rancher-images",
+	}
+}
 
 func Resolve(image string) string {
 	return ResolveWithCluster(image, nil)
@@ -340,4 +351,28 @@ func getSourcesList(imageSources map[string]bool) string {
 	}
 	sort.Strings(sources)
 	return strings.Join(sources, ",")
+}
+
+func CreateCatalogImageListConfigMap(cm *v1.ConfigMap, catalog *v3.Catalog) (err error) {
+	var windowsImages []string
+	var linuxImages []string
+
+	catalogHash := libhelm.CatalogSHA256Hash(catalog)
+	catalogChartPath := filepath.Join(libhelm.CatalogCache, catalogHash)
+
+	windowsImages, _, err = GetImages(catalogChartPath, "", nil, []string{}, nil, Windows)
+	linuxImages, _, err = GetImages(catalogChartPath, "", nil, []string{}, nil, Linux)
+
+	cm.Data = make(map[string]string, 2)
+	cm.Data[osTypeImageListName[Windows]] = strings.Join(windowsImages, imageListDelimiter)
+	cm.Data[osTypeImageListName[Linux]] = strings.Join(linuxImages, imageListDelimiter)
+
+	return
+}
+
+func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) (windowsImageList, linuxImageList []string, err error) {
+	windowsImageList = strings.Split(cm.Data[osTypeImageListName[Windows]], imageListDelimiter)
+	linuxImageList = strings.Split(cm.Data[osTypeImageListName[Linux]], imageListDelimiter)
+
+	return
 }

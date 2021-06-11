@@ -3,18 +3,19 @@ package kontainerdriver
 import (
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rancher/rancher/pkg/namespace"
 
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	helmlib "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -37,9 +38,10 @@ type ActionHandler struct {
 }
 
 type ListHandler struct {
-	SysImageLister v3.RkeK8sSystemImageLister
-	SysImages      v3.RkeK8sSystemImageInterface
-	CatalogLister  v3.CatalogLister
+	SysImageLister  v3.RkeK8sSystemImageLister
+	SysImages       v3.RkeK8sSystemImageInterface
+	CatalogLister   v3.CatalogLister
+	ConfigMapLister v1.ConfigMapLister
 }
 
 func (a ActionHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -110,7 +112,7 @@ func (a ActionHandler) setDriverActiveStatus(apiContext *types.APIContext, statu
 	return err
 }
 
-func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) (err error) {
 	k8sCurr := strings.Split(settings.KubernetesVersionsCurrent.Get(), ",")
 	rkeSysImages := map[string]rketypes.RKESystemImages{}
 	if apiContext.ID != linuxImages && apiContext.ID != windowsImages {
@@ -154,30 +156,40 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		rkeSysImages[k8sVersion] = *rkeSysImgCopy
 	}
 
-	// get system charts path
-	systemCatalog, err := lh.CatalogLister.Get("", utils.SystemLibraryName)
+	var catalogImageList *v1.ConfigMap
+	catalogImageList, err = lh.ConfigMapLister.Get(namespace.System, utils.GetCatalogImageCacheName(utils.SystemLibraryName))
 	if err != nil {
-		return httperror.WrapAPIError(err, httperror.ServerError, "error getting system catalog")
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to get image list for system catalog")
 	}
-	systemCatalogHash := helmlib.CatalogSHA256Hash(systemCatalog)
-	systemCatalogChartPath := filepath.Join(helmlib.CatalogCache, systemCatalogHash)
 
-	var targetImages []string
+	var targetRkeSysImages []string
+	var targetSysCatalogImages []string
 	switch apiContext.ID {
 	case linuxImages:
-		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", nil, []string{}, rkeSysImages, image.Linux)
+		targetRkeSysImages, _, err = image.GetImages("", "", nil, []string{}, rkeSysImages, image.Linux)
+		if err != nil {
+			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
+		}
+		_, targetSysCatalogImages, err = image.ParseCatalogImageListConfigMap(catalogImageList)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
 	case windowsImages:
-		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", nil, []string{}, rkeSysImages, image.Windows)
+		targetRkeSysImages, _, err = image.GetImages("", "", nil, []string{}, rkeSysImages, image.Windows)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
 		}
+		targetSysCatalogImages, _, err = image.ParseCatalogImageListConfigMap(catalogImageList)
+		if err != nil {
+			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
+		}
 	}
 
+	var targetImages []string
 	agentImage := settings.AgentImage.Get()
 	targetImages = append(targetImages, img.Mirror(agentImage))
+	targetImages = append(targetImages, targetRkeSysImages...)
+	targetImages = append(targetImages, targetSysCatalogImages...)
 
 	b := []byte(strings.Join(targetImages, "\n"))
 	apiContext.Response.Header().Set("Content-Length", strconv.Itoa(len(b)))
