@@ -38,7 +38,7 @@ get_address()
         echo ""
     # If given address is a network interface on the system, retrieve configured IP on that interface (only the first configured IP is taken)
     elif [ -n "$(find /sys/devices -name $address)" ]; then
-        echo $(ip addr show dev $address | grep -w inet | awk '{print $2}' | cut -f1 -d/ | head -1)
+        echo $(ip addr show dev $address | grep -oP "(?<=inet ).+(?=\/)" | head -1)
     # Loop through cloud provider options to get IP from metadata, if not found return given value
     else
         case $address in
@@ -240,7 +240,7 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     else
         info "Value from $CATTLE_SERVER/v3/settings/cacerts is an x509 certificate"
     fi
-    CATTLE_SERVER_CHECKSUM=$(sha256sum $temp | awk '{print $1}')
+    CATTLE_SERVER_CHECKSUM=$(sha256sum $temp | cut -d' ' -f1)
     if [ $CATTLE_SERVER_CHECKSUM != $CATTLE_CA_CHECKSUM ]; then
         rm -f $temp
         error "Configured cacerts checksum ($CATTLE_SERVER_CHECKSUM) does not match given --ca-checksum ($CATTLE_CA_CHECKSUM)"
