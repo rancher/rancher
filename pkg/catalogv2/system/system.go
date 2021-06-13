@@ -161,8 +161,8 @@ func (m *Manager) install(namespace, name, minVersion string, values map[string]
 		return err
 	}
 
-	// get latest, the ~0-a is a weird syntax to match everything including prereleases build
-	chart, err := index.Get(name, "~0-a")
+	// get latest, the >=0-a is a weird syntax to match everything including prereleases build
+	chart, err := index.Get(name, ">=0-a")
 	if err != nil {
 		return err
 	}
