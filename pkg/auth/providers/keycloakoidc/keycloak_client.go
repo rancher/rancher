@@ -48,12 +48,10 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, acce
 		search := URLEncoded(searchURL)
 
 		b, statusCode, err := k.getFromKeyCloak(accessToken, search)
-		if statusCode == 401 {
-			return nil, nil
-		}
 		if err != nil {
-			return accounts, fmt.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
+			logrus.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
 				statusCode, search, err)
+			return accounts, err
 		}
 		if err := json.Unmarshal(b, &userAccounts); err != nil {
 			logrus.Errorf("[keycloak oidc]: received error unmarshalling search results, err: %v", err)
@@ -70,11 +68,9 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, acce
 		search := URLEncoded(searchURL)
 
 		b, statusCode, err := k.getFromKeyCloak(accessToken, search)
-		if statusCode == 401 {
-			return nil, nil
-		}
 		if err != nil {
-			logrus.Errorf("[keycloak oidc]: GET url %v received error from github, err: %v", search, err)
+			logrus.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
+				statusCode, search, err)
 			return accounts, err
 		}
 		if err := json.Unmarshal(b, &groups); err != nil {
@@ -163,6 +159,9 @@ func (k *KeyCloakClient) getFromKeyCloak(accessToken, url string) ([]byte, int, 
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return b, resp.StatusCode, err
+	}
 	switch resp.StatusCode {
 	case 200:
 	case 201:
