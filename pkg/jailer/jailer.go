@@ -63,16 +63,16 @@ func CreateJail(name string) error {
 
 	cmd := exec.CommandContext(ctx, "/usr/bin/jailer.sh", name)
 	out, err := cmd.CombinedOutput()
+	if len(out) > 0 {
+		logrus.Tracef("CreateJail: output from jail script for [%s]: [%v]", name, string(out))
+	} else {
+		logrus.Tracef("CreateJail: no output from jail script for [%s]", name)
+	}
 	if err != nil {
 		if strings.HasSuffix(err.Error(), "signal: killed") {
 			return errors.WithMessage(err, "error running the jail command: timed out waiting for the script to complete")
 		}
 		return errors.WithMessage(err, "error running the jail command")
-	}
-	if len(out) > 0 {
-		logrus.Debugf("CreateJail: output from jail script for [%s]: [%v]", name, string(out))
-	} else {
-		logrus.Debugf("CreateJail: no output from jail script for [%s]", name)
 	}
 	return nil
 }
