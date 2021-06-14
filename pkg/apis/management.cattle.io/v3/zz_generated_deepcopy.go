@@ -80,6 +80,11 @@ func (in *AKSStatus) DeepCopyInto(out *AKSStatus) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.RBACEnabled != nil {
+		in, out := &in.RBACEnabled, &out.RBACEnabled
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

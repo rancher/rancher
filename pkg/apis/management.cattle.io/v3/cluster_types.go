@@ -364,6 +364,7 @@ type SaveAsTemplateOutput struct {
 type AKSStatus struct {
 	UpstreamSpec          *aksv1.AKSClusterConfigSpec `json:"upstreamSpec"`
 	PrivateRequiresTunnel *bool                       `json:"privateRequiresTunnel"`
+	RBACEnabled           *bool                       `json:"rbacEnabled"`
 }
 
 type EKSStatus struct {
