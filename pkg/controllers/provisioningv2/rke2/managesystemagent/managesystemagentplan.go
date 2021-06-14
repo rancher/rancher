@@ -25,7 +25,7 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 			DefaultNamespace: namespaces.System,
 			RepoName:         "rancher-charts",
 			Chart:            "system-upgrade-controller",
-			Version:          "0.7.001",
+			Version:          "100.0.0",
 			Values: &v1alpha1.GenericMap{
 				Data: map[string]interface{}{
 					"global": map[string]interface{}{
