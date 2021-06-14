@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
@@ -14,12 +12,14 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
+	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -87,6 +87,14 @@ func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
 }
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
+	// add fleet namespace to system project
+	if isFleetNamespace(obj) {
+		systemProjectName, err := n.GetSystemProjectName()
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
+		}
+		obj.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, systemProjectName)
+	}
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
 		return false, err
@@ -131,7 +139,29 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 			}
 		}
 	}
+
 	return nil
+}
+
+func (n *nsLifecycle) GetSystemProjectName() (string, error) {
+	projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[projectpkg.System].AsSelector())
+	if err != nil {
+		return "", err
+	}
+	if len(projects) == 0 {
+		return "", nil
+	}
+	if len(projects) > 1 {
+		return "", fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.m.clusterName, projectpkg.System)
+	}
+	if projects[0] == nil {
+		return "", nil
+	}
+	return projects[0].Name, nil
+}
+
+func isFleetNamespace(ns *v1.Namespace) bool {
+	return ns.Name == "fleet-local" || ns.Name == "fleet-default" || ns.Name == "cattle-fleet-clusters-system" || ns.Labels["fleet.cattle.io/managed"] == "true"
 }
 
 func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
