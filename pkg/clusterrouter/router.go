@@ -14,8 +14,8 @@ type Router struct {
 	serverFactory *factory
 }
 
-func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory, clusterLister v3.ClusterLister) http.Handler {
-	serverFactory := newFactory(localConfig, dialer, lookup, clusterLister)
+func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory, clusterLister v3.ClusterLister, clusterContextGetter ClusterContextGetter) http.Handler {
+	serverFactory := newFactory(localConfig, dialer, lookup, clusterLister, clusterContextGetter)
 	return &Router{
 		serverFactory: serverFactory,
 	}
