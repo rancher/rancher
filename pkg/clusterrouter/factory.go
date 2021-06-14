@@ -7,27 +7,34 @@ import (
 	"github.com/moby/locker"
 	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"k8s.io/client-go/rest"
 )
 
-type factory struct {
-	dialerFactory dialer.Factory
-	clusterLookup ClusterLookup
-	clusterLister v3.ClusterLister
-	clusters      sync.Map
-	serverLock    *locker.Locker
-	servers       sync.Map
-	localConfig   *rest.Config
+type ClusterContextGetter interface {
+	UserContext(string) (*config.UserContext, error)
 }
 
-func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister) *factory {
+type factory struct {
+	dialerFactory        dialer.Factory
+	clusterLookup        ClusterLookup
+	clusterLister        v3.ClusterLister
+	clusters             sync.Map
+	serverLock           *locker.Locker
+	servers              sync.Map
+	localConfig          *rest.Config
+	clusterContextGetter ClusterContextGetter
+}
+
+func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister, clusterContextGetter ClusterContextGetter) *factory {
 	return &factory{
-		dialerFactory: dialer,
-		serverLock:    locker.New(),
-		clusterLookup: lookup,
-		clusterLister: clusterLister,
-		localConfig:   localConfig,
+		dialerFactory:        dialer,
+		serverLock:           locker.New(),
+		clusterLookup:        lookup,
+		clusterLister:        clusterLister,
+		localConfig:          localConfig,
+		clusterContextGetter: clusterContextGetter,
 	}
 }
 
@@ -73,5 +80,9 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *factory) newServer(c *v3.Cluster) (server, error) {
-	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory)
+	clusterContext, err := s.clusterContextGetter.UserContext(c.Name)
+	if err != nil {
+		return nil, err
+	}
+	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory, clusterContext)
 }
