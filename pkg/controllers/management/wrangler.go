@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/feature"
 	"github.com/rancher/rancher/pkg/controllers/management/gke"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
-	"github.com/rancher/rancher/pkg/controllers/management/managerancher"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -28,7 +27,6 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 	}
 
 	feature.Register(ctx, wranglerContext)
-	managerancher.Register(ctx, wranglerContext)
 	clusterconnected.Register(ctx, wranglerContext)
 
 	if features.ProvisioningV2.Enabled() {

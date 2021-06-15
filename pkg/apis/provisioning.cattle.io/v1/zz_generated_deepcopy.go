@@ -118,7 +118,6 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(RKEConfig)
 		(*in).DeepCopyInto(*out)
 	}
-	in.RancherValues.DeepCopyInto(&out.RancherValues)
 	if in.AgentEnvVars != nil {
 		in, out := &in.AgentEnvVars, &out.AgentEnvVars
 		*out = make([]corev1.EnvVar, len(*in))

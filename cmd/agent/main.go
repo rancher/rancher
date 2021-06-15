@@ -24,7 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
-	"github.com/rancher/rancher/pkg/agent/steve"
+	"github.com/rancher/rancher/pkg/agent/rancher"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
@@ -304,7 +304,7 @@ func run(ctx context.Context) error {
 		}
 
 		if isCluster() {
-			err = steve.Run(topContext)
+			err = rancher.Run(topContext)
 			if err != nil {
 				logrus.Fatal(err)
 			}

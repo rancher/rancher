@@ -23,7 +23,6 @@ type ClusterSpec struct {
 
 	ClusterAPIConfig *ClusterAPIConfig `json:"clusterAPIConfig,omitempty"`
 	RKEConfig        *RKEConfig        `json:"rkeConfig,omitempty"`
-	RancherValues    rkev1.GenericMap  `json:"rancherValues,omitempty" wrangler:"nullable"`
 
 	AgentEnvVars                         []corev1.EnvVar `json:"agentEnvVars,omitempty"`
 	DefaultPodSecurityPolicyTemplateName string          `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
