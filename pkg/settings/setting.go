@@ -83,6 +83,7 @@ var (
 	UIOfflinePreferred                = NewSetting("ui-offline-preferred", "dynamic")
 	UIIssues                          = NewSetting("ui-issues", "")
 	UIPL                              = NewSetting("ui-pl", "rancher")
+	UICommunityLinks                  = NewSetting("ui-community-links", "true")
 	UIKubernetesSupportedVersions     = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
 	UIKubernetesDefaultVersion        = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
 	WhitelistDomain                   = NewSetting("whitelist-domain", "forums.rancher.com")
