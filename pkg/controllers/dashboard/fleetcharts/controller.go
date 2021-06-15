@@ -57,9 +57,12 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		return setting, nil
 	}
 
+	h.Lock()
 	if err := h.manager.Uninstall(fleetUninstallChart.ReleaseNamespace, fleetUninstallChart.ChartName); err != nil {
+		h.Unlock()
 		return nil, err
 	}
+	h.Unlock()
 
 	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), nil)
 	if err != nil {
