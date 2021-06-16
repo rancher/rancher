@@ -2,17 +2,18 @@ ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
 FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} as rancher
 
-FROM ubuntu:18.04
+FROM registry.suse.com/suse/sle15:15.3
 ARG ARCH=amd64
 
-RUN rm -f /bin/sh && ln -s /bin/bash /bin/sh
 ENV KUBECTL_VERSION v1.20.7
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends git curl ca-certificates jq iproute2 vim-tiny less bash-completion sysstat acl ssh iptables && \
+# sysstat is left out until systemd dependency is stripped
+RUN zypper -n ar --refresh --priority 100 'https://updates.suse.com/SUSE/Products/SLE-BCI/$releasever_major-SP$releasever_minor/$basearch/product/' SLE_BCI && \
+    zypper -n install --no-recommends curl ca-certificates jq hostname iproute2 vim-small less bash-completion acl openssh-clients tar gzip xz gawk && \
+    zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
+    rpm -e libsolv-tools zypper libzypp container-suseconnect ; \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
-    chmod +x /usr/bin/kubectl && \
-    DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && \
-    DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    chmod +x /usr/bin/kubectl
+
 ENV LOGLEVEL_VERSION v0.1.3
 
 RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
