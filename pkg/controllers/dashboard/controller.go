@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
@@ -39,6 +40,10 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 		if err := fleetcharts.Register(ctx, wrangler); err != nil {
 			return err
 		}
+	}
+
+	if features.ProvisioningV2.Enabled() || features.MCM.Enabled() {
+		clusterregistrationtoken.Register(ctx, wrangler)
 	}
 
 	if features.ProvisioningV2.Enabled() {
