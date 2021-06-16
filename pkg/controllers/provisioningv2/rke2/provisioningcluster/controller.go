@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/lasso/pkg/dynamic"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -42,13 +43,16 @@ type handler struct {
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := handler{
 		dynamic:           clients.Dynamic,
-		dynamicSchema:     clients.Mgmt.DynamicSchema().Cache(),
 		secretCache:       clients.Core.Secret().Cache(),
 		secretClient:      clients.Core.Secret(),
 		clusterCache:      clients.Provisioning.Cluster().Cache(),
 		clusterController: clients.Provisioning.Cluster(),
 		capiClusters:      clients.CAPI.Cluster().Cache(),
 		rkeControlPlane:   clients.RKE.RKEControlPlane().Cache(),
+	}
+
+	if features.MCM.Enabled() {
+		h.dynamicSchema = clients.Mgmt.DynamicSchema().Cache()
 	}
 
 	clients.Dynamic.OnChange(ctx, "rke", matchRKENodeGroup, h.infraWatch)

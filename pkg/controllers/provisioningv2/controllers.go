@@ -42,12 +42,12 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 		rkePlanner := planner2.New(ctx, clients)
 		if features.MCM.Enabled() {
 			dynamicschema.Register(ctx, clients)
+			machineprovision.Register(ctx, clients)
 		}
 		rkecluster.Register(ctx, clients)
 		provisioningcluster.Register(ctx, clients)
 		bootstrap.Register(ctx, clients)
 		machinenodelookup.Register(ctx, clients)
-		machineprovision.Register(ctx, clients)
 		planner.Register(ctx, clients, rkePlanner)
 		planstatus.Register(ctx, clients)
 		unmanaged.Register(ctx, clients)
