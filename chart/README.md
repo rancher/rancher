@@ -79,7 +79,7 @@ helm install rancher rancher-latest/rancher \
 ```
 
 - [Let’s Encrypt](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
-  
+
 ```bash
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
@@ -169,7 +169,7 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `auditLog.hostPath`            | "/var/log/rancher/audit"                              | ***string*** - log file destination on host (only applies when **auditLog.destination** is set to **hostPath**)                                                                                              |
 | `auditLog.level`               | 0                                                     | ***int*** - set the [API Audit Log level](https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing). 0 is off. [0-3]                                                                               |
 | `auditLog.maxAge`              | 1                                                     | ***int*** - maximum number of days to retain old audit log files (only applies when **auditLog.destination** is set to **hostPath**)                                                                         |
-| `auditLog.maxBackups`          | 1                                                     | int - maximum number of audit log files to retain (only applies when **auditLog.destination** is set to **hostPath**)                                                                                        |
+| `auditLog.maxBackup`          | 1                                                     | int - maximum number of audit log files to retain (only applies when **auditLog.destination** is set to **hostPath**)                                                                                        |
 | `auditLog.maxSize`             | 100                                                   | ***int*** - maximum size in megabytes of the audit log file before it gets rotated (only applies when **auditLog.destination** is set to **hostPath**)                                                       |
 | `busyboxImage`                 | "busybox"                                             | ***string*** - Image location for busybox image used to collect audit logs *Note: Available as of v2.2.0*                                                                                                    |
 | `busyboxImagePullPolicy`       | "IfNotPresent"                                        | ***string*** - Override imagePullPolicy for busybox images - *"Always", "Never", "IfNotPresent"*                                                                                                      |
