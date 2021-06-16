@@ -56,9 +56,8 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/store/scoped"
 	settingstore "github.com/rancher/rancher/pkg/api/norman/store/setting"
 	"github.com/rancher/rancher/pkg/api/norman/store/userscope"
+	"github.com/rancher/rancher/pkg/auth/api"
 	authapi "github.com/rancher/rancher/pkg/auth/api"
-	"github.com/rancher/rancher/pkg/auth/api/user"
-	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
@@ -169,7 +168,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 
 	Clusters(schemas, apiContext, clusterManager, k8sProxy)
 	ClusterRoleTemplateBinding(schemas, apiContext)
-	User(ctx, schemas, apiContext)
+	api.User(ctx, schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	Setting(schemas)
 	Feature(schemas, apiContext)
@@ -479,18 +478,6 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 		management.Core.Namespaces(""),
 		management.Management.NodeTemplates("").Controller().Lister())
 	credSchema.Validator = cred.Validator
-}
-
-func User(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.UserType)
-	handler := &user.Handler{
-		UserClient:               management.Management.Users(""),
-		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
-		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
-	}
-	schema.Formatter = handler.UserFormatter
-	schema.CollectionFormatter = handler.CollectionFormatter
-	schema.ActionHandler = handler.Actions
 }
 
 func Preference(schemas *types.Schemas, management *config.ScaledContext) {
