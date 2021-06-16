@@ -38,10 +38,18 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 	}
 
 	// Ignore error
+	_, _ = wrangler.Core.Namespace().Create(&corev1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "local",
+		},
+	})
+
+	// Ignore error
 	_, err := wrangler.Mgmt.Cluster().Create(c)
 	if apierrors.IsAlreadyExists(err) {
 		return nil
 	}
+
 	return err
 }
 
