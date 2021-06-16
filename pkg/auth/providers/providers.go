@@ -205,6 +205,6 @@ func RefetchGroupPrincipals(principalID string, providerName string, secret stri
 	return providers[providerName].RefetchGroupPrincipals(principalID, secret)
 }
 
-func GetUserExtraAttributes(providerName string, token *v3.Token) map[string][]string {
-	return providers[providerName].GetUserExtraAttributes(token)
+func GetUserExtraAttributes(providerName string, userPrincipal v3.Principal) map[string][]string {
+	return providers[providerName].GetUserExtraAttributes(userPrincipal)
 }

@@ -42,6 +42,7 @@ func (h *userAttributeHandler) Sync(key string, userAttribute *managementv3.User
 	}
 	clusterUserAttribute = clusterUserAttribute.DeepCopy()
 	clusterUserAttribute.Groups = groups
+	clusterUserAttribute.Extra = userAttribute.Extra
 	clusterUserAttribute.LastRefresh = userAttribute.LastRefresh
 	clusterUserAttribute.NeedsRefresh = userAttribute.NeedsRefresh
 
@@ -68,5 +69,13 @@ func compareUserAttributeClusterUserAttribute(userAttribute managementv3.UserAtt
 		lastRefresh:  clusterUserAttribute.LastRefresh,
 		needsRefresh: clusterUserAttribute.NeedsRefresh,
 	}
-	return groups, reflect.DeepEqual(current, old)
+	if !reflect.DeepEqual(current, old) {
+		return groups, false
+	}
+
+	if !reflect.DeepEqual(userAttribute.Extra, clusterUserAttribute.Extra) {
+		return groups, false
+	}
+
+	return groups, true
 }

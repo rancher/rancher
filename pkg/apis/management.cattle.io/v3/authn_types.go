@@ -92,6 +92,7 @@ type UserAttribute struct {
 	GroupPrincipals map[string]Principals // the value is a []Principal, but code generator cannot handle slice as a value
 	LastRefresh     string
 	NeedsRefresh    bool
+	Extra           map[string]map[string][]string
 }
 
 type Principals struct {

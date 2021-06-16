@@ -229,9 +229,9 @@ func (p *adProvider) getDNAndScopeFromPrincipalID(principalID string) (string, s
 	return externalID, scope, nil
 }
 
-func (p *adProvider) GetUserExtraAttributes(token *v3.Token) map[string][]string {
+func (p *adProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	extras := make(map[string][]string)
-	extras["principalid"] = []string{token.UserPrincipal.Name}
-	extras["username"] = []string{token.UserPrincipal.LoginName}
+	extras["principalid"] = []string{userPrincipal.Name}
+	extras["username"] = []string{userPrincipal.LoginName}
 	return extras
 }

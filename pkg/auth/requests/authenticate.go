@@ -110,6 +110,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	if token.ClusterName != "" && token.ClusterName != a.clusterRouter(req) {
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
+	logrus.Infof("request token %v", token)
 
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -147,9 +148,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 			groups = append(groups, name)
 		}
 	}
-
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
-
 	if !strings.HasPrefix(token.UserID, "system:") {
 		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
 	}
@@ -158,11 +157,30 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp.User = token.UserID
 	authResp.UserPrincipal = token.UserPrincipal.Name
 	authResp.Groups = groups
-	logrus.Debugf("Auth filter calling provider to get extra info %v", token.AuthProvider)
 
-	extraFromProvider := providers.GetUserExtraAttributes(token.AuthProvider, token)
-	if extraFromProvider != nil {
-		authResp.Extras = extraFromProvider
+	if attribs != nil {
+		if strings.EqualFold(token.AuthProvider, "local") || token.AuthProvider == "" {
+			//gather all extraInfo for all external auth providers present in the userAttributes
+			extraInfo := make(map[string][]string)
+			for provider, extra := range attribs.Extra {
+				if provider != "local" {
+					for key, value := range extra {
+						extraInfo[key] = append(extraInfo[key], value...)
+					}
+				}
+			}
+			authResp.Extras = extraInfo
+		} else {
+			//non-local authProvider is set in token
+			var ok bool
+			authResp.Extras, ok = attribs.Extra[token.AuthProvider]
+			if !ok {
+				extraFromProvider := providers.GetUserExtraAttributes(token.AuthProvider, token.UserPrincipal)
+				if extraFromProvider != nil {
+					authResp.Extras = extraFromProvider
+				}
+			}
+		}
 	}
 	return authResp, nil
 }

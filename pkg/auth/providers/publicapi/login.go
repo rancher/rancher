@@ -211,6 +211,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return *token, tokenValue, responseType, nil
 	}
 
-	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
+	userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description, userExtraInfo)
 	return rToken, unhashedTokenKey, responseType, err
 }
