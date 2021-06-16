@@ -40,7 +40,7 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     wget https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip && \
     unzip awscli-exe-linux-x86_64.zip && \
     ./aws/install && \
-    curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
+    # curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
     cd $WORKSPACE && \
     pip install --upgrade pip && \
     pip install -r requirements_v3api.txt
