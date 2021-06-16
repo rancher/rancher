@@ -56,6 +56,7 @@ ingress:
   # Defaults to true
   # options: true, false
   enabled: true
+  existingSecret: ""
   extraAnnotations:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"

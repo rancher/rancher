@@ -52,6 +52,10 @@ spec:
   tls:
   - hosts:
     - {{ .Values.hostname }}
+    {{- if and .Values.ingress.existingSecret (eq .Values.ingress.tls.source "secret") }}
+    secretName: {{ .Values.ingress.existingSecret }}
+    {{- else }}
     secretName: tls-rancher-ingress
+    {{- end }}
 {{- end }}
 {{- end }}
