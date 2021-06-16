@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/hostedkubernetecharts"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/hostedcluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/mcmagent"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
@@ -36,7 +36,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 	if err := systemcharts.Register(ctx, wrangler); err != nil {
 		return err
 	}
-	hostedkubernetecharts.Register(ctx, wrangler)
+	hostedcluster.Register(ctx, wrangler)
 
 	if features.Fleet.Enabled() {
 		if err := fleetcharts.Register(ctx, wrangler); err != nil {

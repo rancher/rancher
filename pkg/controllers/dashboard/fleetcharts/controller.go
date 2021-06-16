@@ -7,6 +7,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -15,24 +16,19 @@ import (
 )
 
 var (
-	fleetCRDChart = chartDef{
+	fleetCRDChart = chart.Definition{
 		ReleaseNamespace: "cattle-fleet-system",
 		ChartName:        "fleet-crd",
 	}
-	fleetChart = chartDef{
+	fleetChart = chart.Definition{
 		ReleaseNamespace: "cattle-fleet-system",
 		ChartName:        "fleet",
 	}
-	fleetUninstallChart = chartDef{
+	fleetUninstallChart = chart.Definition{
 		ReleaseNamespace: "fleet-system",
 		ChartName:        "fleet",
 	}
 )
-
-type chartDef struct {
-	ReleaseNamespace string
-	ChartName        string
-}
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
 	h := &handler{

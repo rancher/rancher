@@ -1,4 +1,4 @@
-package hostedkubernetecharts
+package hostedcluster
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -14,36 +15,37 @@ import (
 )
 
 var (
-	AksCrdChart = chartDef{
-		ReleaseNamespace: "cattle-system",
-		ChartName:        "rancher-aks-operator-crd",
+	AksCrdChart = chart.Definition{
+		ReleaseNamespace:  "cattle-system",
+		ChartName:         "rancher-aks-operator-crd",
+		MinVersionSetting: settings.AKSOperatorMinVersion,
 	}
-	AksChart = chartDef{
-		ReleaseNamespace: "cattle-system",
-		ChartName:        "rancher-aks-operator",
+	AksChart = chart.Definition{
+		ReleaseNamespace:  "cattle-system",
+		ChartName:         "rancher-aks-operator",
+		MinVersionSetting: settings.AKSOperatorMinVersion,
 	}
-	EksCrdChart = chartDef{
-		ReleaseNamespace: "cattle-system",
-		ChartName:        "rancher-eks-operator-crd",
+	EksCrdChart = chart.Definition{
+		ReleaseNamespace:  "cattle-system",
+		ChartName:         "rancher-eks-operator-crd",
+		MinVersionSetting: settings.EKSOperatorMinVersion,
 	}
-	EksChart = chartDef{
-		ReleaseNamespace: "cattle-system",
-		ChartName:        "rancher-eks-operator",
+	EksChart = chart.Definition{
+		ReleaseNamespace:  "cattle-system",
+		ChartName:         "rancher-eks-operator",
+		MinVersionSetting: settings.EKSOperatorMinVersion,
 	}
-	GkeCrdChart = chartDef{
-		ReleaseNamespace: "cattle-system",
-		ChartName:        "rancher-gke-operator-crd",
+	GkeCrdChart = chart.Definition{
+		ReleaseNamespace:  "cattle-system",
+		ChartName:         "rancher-gke-operator-crd",
+		MinVersionSetting: settings.GKEOperatorMinVersion,
 	}
-	GkeChart = chartDef{
-		ReleaseNamespace: "cattle-system",
-		ChartName:        "rancher-gke-operator",
+	GkeChart = chart.Definition{
+		ReleaseNamespace:  "cattle-system",
+		ChartName:         "rancher-gke-operator",
+		MinVersionSetting: settings.GKEOperatorMinVersion,
 	}
 )
-
-type chartDef struct {
-	ReleaseNamespace string
-	ChartName        string
-}
 
 type handler struct {
 	manager *system.Manager
@@ -66,27 +68,23 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		return cluster, nil
 	}
 
-	var toInstallCrdChart, toInstallChart *chartDef
-	var minVersion string
+	var toInstallCrdChart, toInstallChart *chart.Definition
 	if cluster.Spec.AKSConfig != nil {
 		toInstallCrdChart = &AksCrdChart
 		toInstallChart = &AksChart
-		minVersion = settings.AKSOperatorMinVersion.Get()
 	} else if cluster.Spec.EKSConfig != nil {
 		toInstallCrdChart = &EksCrdChart
 		toInstallChart = &EksChart
-		minVersion = settings.EKSOperatorMinVersion.Get()
 	} else if cluster.Spec.GKEConfig != nil {
 		toInstallCrdChart = &GkeCrdChart
 		toInstallChart = &GkeChart
-		minVersion = settings.GKEOperatorMinVersion.Get()
 	}
 
 	if toInstallCrdChart == nil || toInstallChart == nil {
 		return cluster, nil
 	}
 
-	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, minVersion, nil, true); err != nil {
+	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, toInstallCrdChart.MinVersionSetting.Get(), nil, true); err != nil {
 		return cluster, err
 	}
 
@@ -109,7 +107,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		"additionalTrustedCAs": additionalCA != nil,
 	}
 
-	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, minVersion, chartValues, true); err != nil {
+	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, toInstallChart.MinVersionSetting.Get(), chartValues, true); err != nil {
 		return cluster, err
 	}
 

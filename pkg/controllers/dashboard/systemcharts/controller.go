@@ -6,6 +6,7 @@ import (
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -17,7 +18,7 @@ import (
 )
 
 var (
-	toInstall = []chartDef{
+	toInstall = []chart.Definition{
 		{
 			ReleaseNamespace:  namespaces.System,
 			ChartName:         "rancher-webhook",
@@ -45,16 +46,6 @@ var (
 	}
 	repoName = "rancher-charts"
 )
-
-type chartDef struct {
-	ReleaseNamespace  string
-	ChartName         string
-	MinVersionSetting settings.Setting
-	Values            func() map[string]interface{}
-	Enabled           func() bool
-	Uninstall         bool
-	RemoveNamespace   bool
-}
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
 	h := &handler{
