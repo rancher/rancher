@@ -13,12 +13,12 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-func New(prefs v3.PreferenceCache) http.Handler {
+func New(prefs v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrationTokenCache) http.Handler {
 	router := mux.NewRouter()
 	router.UseEncodedPath()
 
 	router.Handle("/", PreferredIndex(prefs))
-	router.Handle("/cacerts", http.HandlerFunc(cacerts.Handler))
+	router.Handle("/cacerts", cacerts.Handler(clusterRegistrationTokenCache))
 	router.Handle("/asset-manifest.json", ember.ServeAsset())
 	router.Handle("/crossdomain.xml", ember.ServeAsset())
 	router.Handle("/dashboard", http.RedirectHandler("/dashboard/", http.StatusFound))

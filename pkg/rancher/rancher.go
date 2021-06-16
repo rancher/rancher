@@ -145,7 +145,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		AuthMiddleware:             steveauth.ExistingContext,
 		AggregationSecretNamespace: namespace.System,
 		AggregationSecretName:      "steve-aggregation",
-		Next:                       ui.New(wranglerContext.Mgmt.Preference().Cache()),
+		Next:                       ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
 	})
 	if err != nil {
 		return nil, err

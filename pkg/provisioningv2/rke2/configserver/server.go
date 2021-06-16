@@ -94,6 +94,14 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		ca = []byte(pem)
 	}
 
+	if url == "" {
+		_, pem = settings.InternalServerURL.Get(), settings.InternalCACerts.Get()
+		url = fmt.Sprintf("https://%s", req.Host)
+		if strings.TrimSpace(pem) != "" {
+			ca = []byte(pem)
+		}
+	}
+
 	kubeConfig, err := clientcmd.Write(clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"agent": {
