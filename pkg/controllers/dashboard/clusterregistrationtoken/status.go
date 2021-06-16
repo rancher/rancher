@@ -27,7 +27,7 @@ const (
 )
 
 func (h *handler) isRKE2(clusterID string) bool {
-	cluster, err := h.clusters.Get("", clusterID)
+	cluster, err := h.clusters.Get(clusterID)
 	if err != nil {
 		return false
 	}
@@ -63,7 +63,7 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 		return crt.Status, err
 	}
 
-	cluster, err := h.clusters.Get("", clusterID)
+	cluster, err := h.clusters.Get(clusterID)
 	if err != nil {
 		return crt.Status, err
 	}

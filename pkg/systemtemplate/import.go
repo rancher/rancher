@@ -142,6 +142,18 @@ func ForCluster(cluster *v3.Cluster, token string) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+func InternalCAChecksum() string {
+	ca := settings.InternalCACerts.Get()
+	if ca != "" {
+		if !strings.HasSuffix(ca, "\n") {
+			ca += "\n"
+		}
+		digest := sha256.Sum256([]byte(ca))
+		return hex.EncodeToString(digest[:])
+	}
+	return ""
+}
+
 func CAChecksum() string {
 	ca := settings.CACerts.Get()
 	if ca != "" {

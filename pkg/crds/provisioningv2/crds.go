@@ -48,6 +48,9 @@ func provisioning() []crd.CRD {
 				WithColumn("Ready", ".status.ready").
 				WithColumn("Kubeconfig", ".status.clientSecretName")
 		}),
+		newRancherCRD(&v1.ManagedOS{}, func(c crd.CRD) crd.CRD {
+			return c
+		}),
 	}
 }
 

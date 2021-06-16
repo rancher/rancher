@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	"github.com/rancher/rancher/pkg/controllers/management/clustergc"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/clustertemplate"
@@ -49,7 +48,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clusterprovisioner.Register(ctx, management)
 	clusterstats.Register(ctx, management, manager)
 	clusterstatus.Register(ctx, management)
-	clusterregistrationtoken.Register(ctx, management)
 	kontainerdriver.Register(ctx, management)
 	kontainerdrivermetadata.Register(ctx, management)
 	nodedriver.Register(ctx, management)

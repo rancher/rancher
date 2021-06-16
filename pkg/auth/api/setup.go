@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/api/user"
 	"github.com/rancher/rancher/pkg/auth/principals"
+	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -21,6 +22,20 @@ func Setup(ctx context.Context, clusterRouter requests.ClusterRouter, scaledCont
 	principals.Schema(ctx, clusterRouter, scaledContext, schemas)
 	providers.SetupAuthConfig(ctx, scaledContext, schemas)
 	user.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), scaledContext)
+	User(ctx, schemas, scaledContext)
+}
+
+func User(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.UserType)
+	handler := &user.Handler{
+		UserClient:               management.Management.Users(""),
+		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
+		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
+	}
+
+	schema.Formatter = handler.UserFormatter
+	schema.CollectionFormatter = handler.CollectionFormatter
+	schema.ActionHandler = handler.Actions
 }
 
 func NewNormanServer(ctx context.Context, clusterRouter requests.ClusterRouter, scaledContext *config.ScaledContext) (http.Handler, error) {

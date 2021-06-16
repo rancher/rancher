@@ -25,6 +25,7 @@ type RKEControlPlaneSpec struct {
 	KubernetesVersion     string              `json:"kubernetesVersion,omitempty"`
 	ClusterName           string              `json:"clusterName,omitempty" wrangler:"required"`
 	ManagementClusterName string              `json:"managementClusterName,omitempty" wrangler:"required"`
+	UnmanagedConfig       bool                `json:"unmanagedConfig,omitempty"`
 }
 
 type ETCDSnapshotPhase string

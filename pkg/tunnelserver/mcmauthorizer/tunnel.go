@@ -377,6 +377,9 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 
 func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
 	crt := obj.(*v3.ClusterRegistrationToken)
+	if crt.Status.Token == "" {
+		return nil, nil
+	}
 	return []string{crt.Status.Token}, nil
 }
 

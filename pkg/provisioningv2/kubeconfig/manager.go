@@ -200,7 +200,7 @@ func createSHA256Hash(secretKey string) (string, error) {
 	return fmt.Sprintf(hashFormat, Version, encSalt, encKey), nil
 }
 
-func (m *Manager) GetCTRBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) (*v3.ClusterRoleTemplateBinding, error) {
+func (m *Manager) GetCRTBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) (*v3.ClusterRoleTemplateBinding, error) {
 	if status.ClusterName == "" {
 		return nil, fmt.Errorf("management cluster is not assigned to v1.Cluster")
 	}

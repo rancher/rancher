@@ -38,6 +38,12 @@ const (
 	rancherCACertsFile = "/etc/rancher/ssl/cacerts.pem"
 )
 
+type internalAPI struct{}
+
+var (
+	InternalAPI = internalAPI{}
+)
+
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, bindHost string, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 10 * time.Minute
@@ -96,8 +102,9 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		CertName:      "tls-rancher-internal",
 	}
 
+	internalAPICtx := context.WithValue(ctx, InternalAPI, true)
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if err := server.ListenAndServe(ctx, internalPort, 0, handler, serverOptions); err != nil {
+		if err := server.ListenAndServe(internalAPICtx, internalPort, 0, handler, serverOptions); err != nil {
 			if apierrors.IsAlreadyExists(err) {
 				return false, nil
 			}

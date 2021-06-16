@@ -31,6 +31,7 @@ func init() {
 
 type Interface interface {
 	Cluster() ClusterController
+	ManagedOS() ManagedOSController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -45,4 +46,7 @@ type version struct {
 
 func (c *version) Cluster() ClusterController {
 	return NewClusterController(schema.GroupVersionKind{Group: "provisioning.cattle.io", Version: "v1", Kind: "Cluster"}, "clusters", true, c.controllerFactory)
+}
+func (c *version) ManagedOS() ManagedOSController {
+	return NewManagedOSController(schema.GroupVersionKind{Group: "provisioning.cattle.io", Version: "v1", Kind: "ManagedOS"}, "managedoss", true, c.controllerFactory)
 }

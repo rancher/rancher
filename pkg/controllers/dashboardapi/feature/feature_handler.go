@@ -3,6 +3,7 @@ package feature
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
@@ -21,6 +22,7 @@ func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 
 	val := getEffectiveValue(obj)
 	if err := ReconcileFeatures(obj, val); err != nil {
+		time.Sleep(3 * time.Second)
 		logrus.Fatalf("%v", err)
 	}
 
