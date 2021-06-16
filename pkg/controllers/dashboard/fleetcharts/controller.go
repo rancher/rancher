@@ -10,11 +10,13 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/relatedresource"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
 	fleetCRDChart = chartDef{
-		ReleaseNamespace: "fleet-system",
+		ReleaseNamespace: "cattle-fleet-system",
 		ChartName:        "fleet-crd",
 	}
 	fleetChart = chartDef{
@@ -38,6 +40,15 @@ func Register(ctx context.Context, wContext *wrangler.Context) error {
 	}
 
 	wContext.Mgmt.Setting().OnChange(ctx, "fleet-install", h.onSetting)
+	// watch cluster repo `rancher-charts` and enqueue the setting to make sure the latest fleet is installed after catalog refresh
+	relatedresource.WatchClusterScoped(ctx, "bootstrap-fleet-charts", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if name == "rancher-charts" {
+			return []relatedresource.Key{{
+				Name: settings.ServerURL.Name,
+			}}, nil
+		}
+		return nil, nil
+	}, wContext.Mgmt.Setting(), wContext.Catalog.ClusterRepo())
 	return nil
 }
 
@@ -64,7 +75,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 	h.Unlock()
 
-	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), nil)
+	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), nil, true)
 	if err != nil {
 		return setting, err
 	}
@@ -100,5 +111,5 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		fleetChartValues["gitjob"] = gitjobChartValues
 	}
 
-	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, settings.FleetMinVersion.Get(), fleetChartValues)
+	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, settings.FleetMinVersion.Get(), fleetChartValues, true)
 }

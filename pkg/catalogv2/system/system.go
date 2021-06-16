@@ -45,8 +45,9 @@ type desiredKey struct {
 }
 
 type desired struct {
-	key    desiredKey
-	values map[string]interface{}
+	key        desiredKey
+	values     map[string]interface{}
+	forceAdopt bool
 }
 
 type Manager struct {
@@ -93,7 +94,7 @@ func (m *Manager) runSync() {
 		case <-m.ctx.Done():
 			return
 		case <-t.C:
-			m.installCharts(m.desiredCharts)
+			m.installCharts(m.desiredCharts, true)
 		case desired := <-m.sync:
 			v, exists := m.desiredCharts[desired.key]
 			m.desiredCharts[desired.key] = desired.values
@@ -101,16 +102,16 @@ func (m *Manager) runSync() {
 			if !exists || !equality.Semantic.DeepEqual(v, desired.values) {
 				m.installCharts(map[desiredKey]map[string]interface{}{
 					desired.key: desired.values,
-				})
+				}, desired.forceAdopt)
 			}
 		}
 	}
 }
 
-func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}) {
+func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, forceAdopt bool) {
 	for key, values := range charts {
 		for {
-			if err := m.install(key.namespace, key.name, key.minVersion, values); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+			if err := m.install(key.namespace, key.name, key.minVersion, values, forceAdopt); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
 				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.name, err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -141,7 +142,7 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
-func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]interface{}) error {
+func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool) error {
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
@@ -149,13 +150,14 @@ func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]i
 				name:       name,
 				minVersion: minVersion,
 			},
-			values: values,
+			values:     values,
+			forceAdopt: forceAdopt,
 		}
 	}()
 	return nil
 }
 
-func (m *Manager) install(namespace, name, minVersion string, values map[string]interface{}) error {
+func (m *Manager) install(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool) error {
 	index, err := m.content.Index("", "rancher-charts")
 	if err != nil {
 		return err
@@ -200,6 +202,7 @@ func (m *Manager) install(namespace, name, minVersion string, values map[string]
 		Install:    true,
 		MaxHistory: 5,
 		Namespace:  namespace,
+		ForceAdopt: forceAdopt,
 		Charts: []types.ChartUpgrade{
 			{
 				ChartName:   name,
