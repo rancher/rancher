@@ -81,14 +81,19 @@ func Register(
 		h.generateProvisioning,
 		nil)
 
+	clusterCreateApply := clients.Apply.WithCacheTypes(clients.Mgmt.Cluster(),
+		clients.Mgmt.ClusterRegistrationToken(),
+		clients.RBAC.ClusterRoleBinding(),
+		clients.Core.Namespace(),
+		clients.Core.Secret())
+
+	if features.MCM.Enabled() {
+		clusterCreateApply = clusterCreateApply.WithCacheTypes(clients.Mgmt.ClusterRoleTemplateBinding())
+	}
+
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
-		clients.Apply.WithCacheTypes(clients.Mgmt.Cluster(),
-			clients.Mgmt.ClusterRoleTemplateBinding(),
-			clients.Mgmt.ClusterRegistrationToken(),
-			clients.RBAC.ClusterRoleBinding(),
-			clients.Core.Namespace(),
-			clients.Core.Secret()),
+		clusterCreateApply,
 		"Created",
 		"cluster-create",
 		h.generateCluster,

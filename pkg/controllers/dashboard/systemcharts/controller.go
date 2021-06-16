@@ -25,6 +25,9 @@ var (
 					"capi": map[string]interface{}{
 						"enabled": features.EmbeddedClusterAPI.Enabled(),
 					},
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
 				}
 			},
 			Enabled: func() bool {
