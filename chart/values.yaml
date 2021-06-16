@@ -108,10 +108,26 @@ resources: {}
 
 #
 # tls
-#   Where to offload the TLS/SSL encryption
-# - ingress (default)
-# - external
-tls: ingress
+#   enabled - Use secret cert/key for rancher certificate
+#    - false (default)
+#    - true 
+#   offload - Where to offload the TLS/SSL encryption
+#    - ingress (default)
+#    - external
+#    - internal
+tls:
+  enabled: false
+  offload: ingress
+
+#
+# tlsSecrets
+#   tls secret locations
+tlsSecrets:
+  ca:                 tls-ca-volume
+  caAdditional:       tls-ca-additional-volume
+  certificate:        tls-rancher-certificate-volume
+  certificateIngress: tls-rancher-ingress
+  autogen:            tls-rancher
 
 systemDefaultRegistry: ""
 
@@ -119,7 +135,7 @@ systemDefaultRegistry: ""
 useBundledSystemChart: false
 
 # Certmanager version compatibility
-certmanager: 
+certmanager:
   version: ""
 
 # Rancher custom logos persistence
