@@ -106,7 +106,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		"httpProxy":            os.Getenv("HTTP_PROXY"),
 		"httpsProxy":           os.Getenv("HTTPS_PROXY"),
 		"noProxy":              os.Getenv("NO_PROXY"),
-		"additionalTrustedCAs": additionalCA,
+		"additionalTrustedCAs": additionalCA != nil,
 	}
 
 	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, minVersion, chartValues, true); err != nil {
