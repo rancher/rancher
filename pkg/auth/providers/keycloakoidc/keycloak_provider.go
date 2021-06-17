@@ -146,7 +146,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 	if principalType == GroupType {
 		searchType = "groups"
 	}
-	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, searchType, accessToken, config)
+	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, accessToken, searchType, config)
 	if err != nil {
 		return v3.Principal{}, err
 	}
