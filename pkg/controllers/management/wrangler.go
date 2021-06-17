@@ -18,13 +18,11 @@ import (
 )
 
 func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, management *config.ManagementContext, manager *clustermanager.Manager) error {
-	if features.Legacy.Enabled() {
-		k3sbasedupgrade.Register(ctx, wranglerContext, management, manager)
-		aks.Register(ctx, wranglerContext, management)
-		eks.Register(ctx, wranglerContext, management)
-		gke.Register(ctx, wranglerContext, management)
-		clusterupstreamrefresher.Register(ctx, wranglerContext)
-	}
+	k3sbasedupgrade.Register(ctx, wranglerContext, management, manager)
+	aks.Register(ctx, wranglerContext, management)
+	eks.Register(ctx, wranglerContext, management)
+	gke.Register(ctx, wranglerContext, management)
+	clusterupstreamrefresher.Register(ctx, wranglerContext)
 
 	feature.Register(ctx, wranglerContext)
 	clusterconnected.Register(ctx, wranglerContext)

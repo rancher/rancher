@@ -64,10 +64,8 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 		}
 	}
 
-	if features.Legacy.Enabled() {
-		if err := managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter); err != nil {
-			return err
-		}
+	if err := managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter); err != nil {
+		return err
 	}
 
 	return nil

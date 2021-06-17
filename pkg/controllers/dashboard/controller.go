@@ -53,7 +53,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 		}
 	}
 
-	if (features.MCMAgent.Enabled() || features.MCM.Enabled()) && features.Legacy.Enabled() {
+	if features.MCMAgent.Enabled() || features.MCM.Enabled() {
 		err := mcmagent.Register(ctx, wrangler)
 		if err != nil {
 			return err

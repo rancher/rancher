@@ -128,7 +128,6 @@ func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
 		features.RKE2.Name():               false,
 		features.ProvisioningV2.Name():     false,
 		features.EmbeddedClusterAPI.Name(): false,
-		features.Legacy.Name():             features.Legacy.Enabled(),
 		features.MonitoringV1.Name():       cluster.Spec.EnableClusterMonitoring,
 	}
 }
