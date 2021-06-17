@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -78,13 +77,10 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		Settings:             mgmt.Settings(""),
 	}
 
-	if features.Legacy.Enabled() {
-		m.CisConfigLister = mgmt.CisConfigs("").Controller().Lister()
-		m.CisConfig = mgmt.CisConfigs("")
-		m.CisBenchmarkVersionLister = mgmt.CisBenchmarkVersions("").Controller().Lister()
-		m.CisBenchmarkVersion = mgmt.CisBenchmarkVersions("")
-
-	}
+	m.CisConfigLister = mgmt.CisConfigs("").Controller().Lister()
+	m.CisConfig = mgmt.CisConfigs("")
+	m.CisBenchmarkVersionLister = mgmt.CisBenchmarkVersions("").Controller().Lister()
+	m.CisBenchmarkVersion = mgmt.CisBenchmarkVersions("")
 
 	mgmt.Settings("").AddHandler(ctx, "rke-metadata-handler", m.sync)
 	mgmt.Settings("").Controller().Enqueue("", rkeMetadataConfig)

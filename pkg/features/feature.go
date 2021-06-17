@@ -74,8 +74,8 @@ var (
 	Legacy = newFeature(
 		"legacy",
 		"Enable legacy features",
-		true,
 		false,
+		true,
 		true)
 	ProvisioningV2 = newFeature(
 		"provisioningv2",

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/auth/data"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 )
@@ -22,10 +21,8 @@ func Add(ctx context.Context, wrangler *wrangler.Context, management *config.Man
 		return err
 	}
 
-	if features.Legacy.Enabled() {
-		if err := syncCatalogs(management); err != nil {
-			return err
-		}
+	if err := syncCatalogs(management); err != nil {
+		return err
 	}
 
 	if err := addDefaultPodSecurityPolicyTemplates(management); err != nil {
