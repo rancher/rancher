@@ -97,15 +97,25 @@ func (in *ClusterUserAttribute) DeepCopyInto(out *ClusterUserAttribute) {
 	}
 	if in.Extra != nil {
 		in, out := &in.Extra, &out.Extra
-		*out = make(map[string][]string, len(*in))
+		*out = make(map[string]map[string][]string, len(*in))
 		for key, val := range *in {
-			var outVal []string
+			var outVal map[string][]string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
 				in, out := &val, &outVal
-				*out = make([]string, len(*in))
-				copy(*out, *in)
+				*out = make(map[string][]string, len(*in))
+				for key, val := range *in {
+					var outVal []string
+					if val == nil {
+						(*out)[key] = nil
+					} else {
+						in, out := &val, &outVal
+						*out = make([]string, len(*in))
+						copy(*out, *in)
+					}
+					(*out)[key] = outVal
+				}
 			}
 			(*out)[key] = outVal
 		}
