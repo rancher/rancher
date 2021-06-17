@@ -4,10 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/docker/docker/api/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 func GetPrivateRepoURL(cluster *v3.Cluster) string {
@@ -43,9 +43,13 @@ func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegist
 	if privateRegistry == nil || privateRegistry.User == "" || privateRegistry.Password == "" {
 		return "", nil
 	}
-	authConfig := types.AuthConfig{
-		Username: privateRegistry.User,
-		Password: privateRegistry.Password,
+	authConfig := credentialprovider.DockerConfigJSON{
+		Auths: credentialprovider.DockerConfig{
+			privateRegistry.URL: credentialprovider.DockerConfigEntry{
+				Username: privateRegistry.User,
+				Password: privateRegistry.Password,
+			},
+		},
 	}
 	encodedJSON, err := json.Marshal(authConfig)
 	if err != nil {
