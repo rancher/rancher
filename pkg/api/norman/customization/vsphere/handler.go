@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -45,22 +46,25 @@ var fieldNames = map[string]int{
 	"custom-attributes":   CustomFieldsFinder,
 }
 
+var cloudCredentialDataPrefix = "vmwarevspherecredentialConfig-"
 var dataFields = map[string]string{
-	"username": "vmwarevspherecredentialConfig-username",
-	"password": "vmwarevspherecredentialConfig-password",
-	"host":     "vmwarevspherecredentialConfig-vcenter",
-	"port":     "vmwarevspherecredentialConfig-vcenterPort",
+	"username": "username",
+	"password": "password",
+	"host":     "vcenter",
+	"port":     "vcenterPort",
 }
 
 type handler struct {
 	schemas       *types.Schemas
 	secretsLister v1.SecretLister
+	ac            types.AccessControl
 }
 
 func NewVsphereHandler(scaledContext *config.ScaledContext) http.Handler {
 	return &handler{
 		schemas:       scaledContext.Schemas,
 		secretsLister: scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
+		ac:            scaledContext.AccessControl,
 	}
 }
 
@@ -75,9 +79,25 @@ func (v *handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	cc, errcode, err := v.getCloudCredential(req)
-	if err != nil {
-		util.ReturnHTTPError(res, req, errcode.Status, fmt.Sprintf("%s: %s", errcode.Code, err.Error()))
+	var cc *v1.Secret
+	var errcode httperror.ErrorCode
+
+	if id := req.FormValue("cloudCredentialId"); id != "" {
+		cc, errcode, err = v.getCloudCredential(id, req)
+		if err != nil {
+			util.ReturnHTTPError(res, req, errcode.Status, fmt.Sprintf("%s: %s", errcode.Code, err.Error()))
+			return
+		}
+	} else if id := req.FormValue("secretId"); id != "" {
+		cc, errcode, err = v.getSecret(id, req)
+		if err != nil {
+			util.ReturnHTTPError(res, req, errcode.Status, fmt.Sprintf("%s: %s", errcode.Code, err.Error()))
+			return
+		}
+	}
+
+	if cc == nil {
+		util.ReturnHTTPError(res, req, httperror.NotFound.Status, fmt.Sprintf("%s: cloud credential not found", httperror.NotFound.Code))
 		return
 	}
 
@@ -124,14 +144,9 @@ func (v *handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	res.Write(js)
 }
 
-func (v *handler) getCloudCredential(req *http.Request) (*corev1.Secret, httperror.ErrorCode, error) {
-	credID := req.FormValue("cloudCredentialId")
-	if credID == "" {
-		return nil, httperror.InvalidBodyContent, fmt.Errorf("cloudCredentialId required")
-	}
-
+func (v *handler) getCloudCredential(id string, req *http.Request) (*corev1.Secret, httperror.ErrorCode, error) {
 	var accessCred client.CloudCredential //var to check access
-	if err := access.ByID(v.generateAPIContext(req), &schema.Version, client.CloudCredentialType, credID, &accessCred); err != nil {
+	if err := access.ByID(v.generateAPIContext(req), &schema.Version, client.CloudCredentialType, id, &accessCred); err != nil {
 		if apiError, ok := err.(*httperror.APIError); ok {
 			if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
 				return nil, httperror.NotFound, fmt.Errorf("cloud credential not found")
@@ -140,22 +155,48 @@ func (v *handler) getCloudCredential(req *http.Request) (*corev1.Secret, httperr
 		return nil, httperror.NotFound, err
 	}
 
-	ns, name := ref.Parse(credID)
+	ns, name := ref.Parse(id)
 	if ns == "" || name == "" {
-		return nil, httperror.InvalidBodyContent, fmt.Errorf("invalid cloud credential %s", credID)
+		return nil, httperror.InvalidBodyContent, fmt.Errorf("invalid cloud credential %s", id)
 	}
 
 	cc, err := v.secretsLister.Get(namespace.GlobalNamespace, name)
 	if err != nil {
-		return nil, httperror.InvalidBodyContent, fmt.Errorf("error getting cloud cred %s: %v", credID, err)
+		return nil, httperror.InvalidBodyContent, fmt.Errorf("error getting cloud cred %s: %v", id, err)
 	}
 
 	if len(cc.Data) == 0 {
-		return nil, httperror.InvalidBodyContent, fmt.Errorf("empty credential ID data %s", credID)
+		return nil, httperror.InvalidBodyContent, fmt.Errorf("empty credential ID data %s", id)
 	}
 	if !validCloudCredential(cc) {
+		return nil, httperror.InvalidBodyContent, fmt.Errorf("not a valid vsphere credential %s", id)
+	}
 
-		return nil, httperror.InvalidBodyContent, fmt.Errorf("not a valid vsphere credential %s", credID)
+	return cc, httperror.ErrorCode{}, nil
+}
+
+func (v *handler) getSecret(id string, req *http.Request) (*corev1.Secret, httperror.ErrorCode, error) {
+	defaultNamespace := settings.FleetDefaultWorkspaceName.Get()
+
+	secretState := map[string]interface{}{
+		"name":        id,
+		"id":          id,
+		"namespaceId": defaultNamespace,
+	}
+	schema := types.Schema{ID: "secrets"}
+
+	if err := v.ac.CanDo(v1.SecretGroupVersionKind.Group, v1.SecretResource.Name,
+		"get", v.generateAPIContext(req), secretState, &schema); err != nil {
+		return nil, httperror.InvalidBodyContent, fmt.Errorf("not a valid vsphere credential %s", id)
+	}
+
+	cc, err := v.secretsLister.Get(defaultNamespace, id)
+	if err != nil {
+		return nil, httperror.InvalidBodyContent, fmt.Errorf("error getting cloud cred %s: %v", id, err)
+	}
+
+	if !validSecret(cc) {
+		return nil, httperror.InvalidBodyContent, fmt.Errorf("not a valid vsphere credential %s", id)
 	}
 
 	return cc, httperror.ErrorCode{}, nil
@@ -180,6 +221,16 @@ func validFieldName(s string) bool {
 }
 
 func validCloudCredential(cc *corev1.Secret) bool {
+	for _, v := range dataFields {
+		if _, ok := cc.Data[cloudCredentialDataPrefix+v]; !ok {
+			return false
+		}
+		cc.Data[v] = cc.Data[cloudCredentialDataPrefix+v] // move to new secret location
+	}
+	return true
+}
+
+func validSecret(cc *corev1.Secret) bool {
 	for _, v := range dataFields {
 		if _, ok := cc.Data[v]; !ok {
 			return false
