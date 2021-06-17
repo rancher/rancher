@@ -150,6 +150,7 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, obj *rkev1.RKEBootstra
 			Namespace: obj.Namespace,
 			Labels: map[string]string{
 				planner.MachineNameLabel: machine.Name,
+				ClusterNameLabel:         machine.Spec.ClusterName,
 			},
 		},
 		Type: planner.SecretTypeMachinePlan,
