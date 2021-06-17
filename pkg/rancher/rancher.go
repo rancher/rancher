@@ -3,6 +3,7 @@ package rancher
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/hashicorp/go-multierror"
@@ -109,6 +110,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	// Initialize Features as early as possible
 	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
 		return nil, err
+	}
+
+	if err := features.MigrateFeatures(wranglerContext.Mgmt.Feature(), wranglerContext.CRD.CustomResourceDefinition()); err != nil {
+		return nil, fmt.Errorf("migrating features: %w", err)
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
 
