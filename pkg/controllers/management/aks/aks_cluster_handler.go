@@ -83,6 +83,11 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return e.ClusterClient.Update(cluster)
 	}
 
+	cluster, err := e.CheckCrdReady(cluster, "aks")
+	if err != nil {
+		return cluster, err
+	}
+
 	// get aks Cluster Config, if it does not exist, create it
 	aksClusterConfigDynamic, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).Get(context.TODO(), cluster.Name, v1.GetOptions{})
 	if err != nil {

@@ -16,34 +16,28 @@ import (
 
 var (
 	AksCrdChart = chart.Definition{
-		ReleaseNamespace:  "cattle-system",
-		ChartName:         "rancher-aks-operator-crd",
-		MinVersionSetting: settings.AKSOperatorMinVersion,
+		ReleaseNamespace: "cattle-system",
+		ChartName:        "rancher-aks-operator-crd",
 	}
 	AksChart = chart.Definition{
-		ReleaseNamespace:  "cattle-system",
-		ChartName:         "rancher-aks-operator",
-		MinVersionSetting: settings.AKSOperatorMinVersion,
+		ReleaseNamespace: "cattle-system",
+		ChartName:        "rancher-aks-operator",
 	}
 	EksCrdChart = chart.Definition{
-		ReleaseNamespace:  "cattle-system",
-		ChartName:         "rancher-eks-operator-crd",
-		MinVersionSetting: settings.EKSOperatorMinVersion,
+		ReleaseNamespace: "cattle-system",
+		ChartName:        "rancher-eks-operator-crd",
 	}
 	EksChart = chart.Definition{
-		ReleaseNamespace:  "cattle-system",
-		ChartName:         "rancher-eks-operator",
-		MinVersionSetting: settings.EKSOperatorMinVersion,
+		ReleaseNamespace: "cattle-system",
+		ChartName:        "rancher-eks-operator",
 	}
 	GkeCrdChart = chart.Definition{
-		ReleaseNamespace:  "cattle-system",
-		ChartName:         "rancher-gke-operator-crd",
-		MinVersionSetting: settings.GKEOperatorMinVersion,
+		ReleaseNamespace: "cattle-system",
+		ChartName:        "rancher-gke-operator-crd",
 	}
 	GkeChart = chart.Definition{
-		ReleaseNamespace:  "cattle-system",
-		ChartName:         "rancher-gke-operator",
-		MinVersionSetting: settings.GKEOperatorMinVersion,
+		ReleaseNamespace: "cattle-system",
+		ChartName:        "rancher-gke-operator",
 	}
 )
 
@@ -84,7 +78,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		return cluster, nil
 	}
 
-	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, toInstallCrdChart.MinVersionSetting.Get(), nil, true); err != nil {
+	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, "", nil, true); err != nil {
 		return cluster, err
 	}
 
@@ -107,7 +101,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		"additionalTrustedCAs": additionalCA != nil,
 	}
 
-	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, toInstallChart.MinVersionSetting.Get(), chartValues, true); err != nil {
+	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, "", chartValues, true); err != nil {
 		return cluster, err
 	}
 

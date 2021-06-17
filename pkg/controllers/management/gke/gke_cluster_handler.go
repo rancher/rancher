@@ -91,6 +91,11 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		}
 	}
 
+	cluster, err := e.CheckCrdReady(cluster, "gke")
+	if err != nil {
+		return cluster, err
+	}
+
 	// get gke Cluster Config, if it does not exist, create it
 	gkeClusterConfigDynamic, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).Get(context.TODO(), cluster.Name, v1.GetOptions{})
 	if err != nil {

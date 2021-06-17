@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/condition"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -21,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -45,6 +47,7 @@ type OperatorController struct {
 	SystemAccountManager *systemaccount.Manager
 	DynamicClient        dynamic.NamespaceableResourceInterface
 	ClientDialer         typesDialer.Factory
+	Discovery            discovery.DiscoveryInterface
 }
 
 func (e *OperatorController) SetUnknown(cluster *mgmtv3.Cluster, condition condition.Cond, message string) (*mgmtv3.Cluster, error) {
@@ -144,6 +147,22 @@ func (e *OperatorController) RecordCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*m
 	})
 
 	return currentCluster, err
+}
+
+// checkCRDReady checks whether necessary CRD(AKSConfig/EKSConfig/GKEConfig), has been created yet
+func (e *OperatorController) CheckCrdReady(cluster *mgmtv3.Cluster, clusterType string) (*mgmtv3.Cluster, error) {
+	resources, err := e.Discovery.ServerResourcesForGroupVersion(fmt.Sprintf("%s.cattle.io/v1", clusterType))
+	if err != nil && !errors.IsNotFound(err) {
+		return cluster, err
+	}
+	if errors.IsNotFound(err) || len(resources.APIResources) == 0 {
+		cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, fmt.Sprintf("Waiting on %s crd to be initialized", clusterType))
+		if err != nil {
+			return cluster, err
+		}
+		return cluster, fmt.Errorf("waiting %s crd to be initialized, cluster: %v", clusterType, cluster.Name)
+	}
+	return cluster, nil
 }
 
 func GenerateSAToken(restConfig *rest.Config) (string, error) {

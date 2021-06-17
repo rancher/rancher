@@ -72,6 +72,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		SystemAccountManager: systemaccount.NewManager(mgmtCtx),
 		DynamicClient:        eksCCDynamicClient,
 		ClientDialer:         mgmtCtx.Dialer,
+		Discovery:            wContext.K8s.Discovery(),
 	}}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "eks-operator-controller", e.onClusterChange)
@@ -84,6 +85,11 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 	if cluster.Spec.EKSConfig == nil {
 		return cluster, nil
+	}
+
+	cluster, err := e.CheckCrdReady(cluster, "eks")
+	if err != nil {
+		return cluster, err
 	}
 
 	// set driver name
