@@ -31,6 +31,7 @@ import (
 	"github.com/rancher/rancher/pkg/ui"
 	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/pkg/wrangler"
+	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/k8scheck"
@@ -145,12 +146,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
-		Controllers:                wranglerContext.Controllers,
-		AccessSetLookup:            wranglerContext.ASL,
-		AuthMiddleware:             steveauth.ExistingContext,
-		AggregationSecretNamespace: namespace.System,
-		AggregationSecretName:      "steve-aggregation",
-		Next:                       ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
+		Controllers:     wranglerContext.Controllers,
+		AccessSetLookup: wranglerContext.ASL,
+		AuthMiddleware:  steveauth.ExistingContext,
+		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
 	})
 	if err != nil {
 		return nil, err
@@ -245,6 +244,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	r.Wrangler.MultiClusterManager.Wait(ctx)
 
+	r.startAggregation(ctx)
 	go r.Steve.StartAggregation(ctx)
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
@@ -258,6 +258,10 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+func (r *Rancher) startAggregation(ctx context.Context) {
+	aggregation2.Watch(ctx, r.Wrangler.Core.Secret(), namespace.System, "steve-aggregation", r.Handler)
 }
 
 func newMCM(wrangler *wrangler.Context, opts *Options) wrangler.MultiClusterManager {
