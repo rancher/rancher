@@ -1,7 +1,6 @@
 FROM registry.suse.com/suse/sle15:15.3
 
-RUN zypper -n ar --refresh --priority 100 'https://updates.suse.com/SUSE/Products/SLE-BCI/$releasever_major-SP$releasever_minor/$basearch/product/' SLE_BCI && \
-    zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk && \
+RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
     rpm -e libsolv-tools zypper libzypp container-suseconnect ; \
     useradd rancher && \
