@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -536,7 +537,27 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 					UserName:       adminName,
 					GlobalRoleName: adminRole,
 				})
-			if err != nil {
+			if err != nil && !features.MCM.Enabled() {
+				_, crbErr := management.RBAC.ClusterRoleBinding().Create(&rbacv1.ClusterRoleBinding{
+					ObjectMeta: v1.ObjectMeta{
+						GenerateName: "default-admin-",
+						Labels:       defaultAdminLabel,
+					},
+					Subjects: []rbacv1.Subject{{
+						Kind:     "User",
+						APIGroup: rbacv1.GroupName,
+						Name:     adminName,
+					}},
+					RoleRef: rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "cluster-admin",
+					},
+				})
+				if crbErr != nil {
+					logrus.Warnf("Failed to create default admin global role binding: %v", err)
+				}
+			} else if err != nil {
 				logrus.Warnf("Failed to create default admin global role binding: %v", err)
 			} else {
 				logrus.Info("Created default admin user and binding")

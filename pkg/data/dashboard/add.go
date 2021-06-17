@@ -14,7 +14,7 @@ func EarlyData(ctx context.Context, k8s kubernetes.Interface) error {
 }
 
 func Add(ctx context.Context, wrangler *wrangler.Context, addLocal, removeLocal, embedded bool) error {
-	if features.MCM.Enabled() {
+	if !features.MCMAgent.Enabled() {
 		if _, err := management.BootstrapAdmin(wrangler); err != nil {
 			return err
 		}
