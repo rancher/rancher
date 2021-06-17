@@ -27,7 +27,19 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		administrative := convert.ToBool(data[client.RoleTemplateFieldAdministrative])
 		context := convert.ToString(data[client.RoleTemplateFieldContext])
 		if administrative && context != "cluster" {
-			return fmt.Errorf("Only cluster roles can be administrative")
+			return fmt.Errorf("RoleTemplate: Only cluster roles can be administrative")
+		}
+	}
+
+	if rules, ok := data["rules"].([]interface{}); ok && len(rules) > 0 {
+		for _, rule := range rules {
+			r, ok := rule.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("RoleTemplate: Unrecognized PolicyRule format")
+			}
+			if verbs, ok := r["verbs"].([]interface{}); ok && len(verbs) == 0 {
+				return fmt.Errorf("RoleTemplate: PolicyRules should each contain at least one verb")
+			}
 		}
 	}
 
@@ -47,8 +59,16 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 			}
 			delete(data, k)
 		}
-
 	}
+
+	logrus.Debugf("%+v", rt)
+
+	for _, rule := range rt.Rules {
+		if len(rule.Verbs) == 0 {
+			return fmt.Errorf("PolicyRules should contain at least one verb")
+		}
+	}
+
 	return nil
 }
 
