@@ -19,16 +19,15 @@ import (
 )
 
 const (
-	NoPlanPlanStatus         PlanStatus = "NoPlan"
-	NoPlanPlanStatusMessage             = "waiting for plan to be assigned"
-	WaitingPlanStatus        PlanStatus = "Waiting"
-	WaitingPlanStatusMessage            = "waiting for plan to be applied"
-	InSyncPlanStatus         PlanStatus = "InSync"
-	InSyncPlanStatusMessage             = "plan applied"
-	ErrorStatus              PlanStatus = "Error"
+	NoAgentPlanStatus        = "NoAgent"
+	NoAgentPlanStatusMessage = "waiting for agent to check in and apply initial plan"
+	NoPlanPlanStatus         = "NoPlan"
+	WaitingPlanStatus        = "Waiting"
+	WaitingPlanStatusMessage = "waiting for plan to be applied"
+	InSyncPlanStatus         = "InSync"
+	InSyncPlanStatusMessage  = "plan applied"
+	ErrorStatus              = "Error"
 )
-
-type PlanStatus string
 
 type PlanStore struct {
 	secrets      corecontrollers.SecretClient
@@ -94,10 +93,24 @@ func (p *PlanStore) Load(cluster *capi.Cluster) (*plan.Plan, error) {
 	return result, nil
 }
 
-func GetPlanStatusReasonMessage(plan *plan.Node) (corev1.ConditionStatus, PlanStatus, string) {
+func noPlanMessage(machine *capi.Machine) string {
+	if isEtcd(machine) {
+		return "waiting for bootstrap etcd to be available"
+	} else if isControlPlane(machine) {
+		return "waiting for etcd to be available"
+	} else {
+		return "waiting for control plane to be available"
+	}
+}
+
+func GetPlanStatusReasonMessage(machine *capi.Machine, plan *plan.Node) (corev1.ConditionStatus, string, string) {
 	switch {
+	case plan == nil:
+		return corev1.ConditionUnknown, NoPlanPlanStatus, noPlanMessage(machine)
+	case plan.AppliedPlan == nil:
+		return corev1.ConditionUnknown, NoAgentPlanStatus, NoAgentPlanStatusMessage
 	case len(plan.Plan.Instructions) == 0:
-		return corev1.ConditionUnknown, NoPlanPlanStatus, NoPlanPlanStatusMessage
+		return corev1.ConditionUnknown, NoPlanPlanStatus, noPlanMessage(machine)
 	case plan.Plan.Error != "":
 		return corev1.ConditionFalse, ErrorStatus, plan.Plan.Error
 	case plan.InSync:

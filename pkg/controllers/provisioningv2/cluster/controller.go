@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/wrangler/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/rancher/wrangler/pkg/kstatus"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/relatedresource"
@@ -281,13 +282,37 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 		if condition.Cond("Ready").IsTrue(existing) {
 			ready = true
 		}
+		for _, messageCond := range existing.Status.Conditions {
+			if messageCond.Type == "Provisioned" && cluster.Spec.RKEConfig != nil {
+				continue
+			}
+			found := false
+			newCond := genericcondition.GenericCondition{
+				Type:               string(messageCond.Type),
+				Status:             messageCond.Status,
+				LastUpdateTime:     messageCond.LastUpdateTime,
+				LastTransitionTime: messageCond.LastTransitionTime,
+				Reason:             messageCond.Reason,
+				Message:            messageCond.Message,
+			}
+			for i, provCond := range status.Conditions {
+				if provCond.Type != string(messageCond.Type) {
+					continue
+				}
+				found = true
+				status.Conditions[i] = newCond
+			}
+			if !found {
+				status.Conditions = append(status.Conditions, newCond)
+			}
+		}
 	}
 
 	// Never set ready back to false because we will end up deleting the secret
 	status.Ready = status.Ready || ready
 	status.ObservedGeneration = cluster.Generation
 	status.ClusterName = rCluster.Name
-	if ready {
+	if status.Ready {
 		kstatus.SetActive(&status)
 	} else {
 		kstatus.SetTransitioning(&status, "")
