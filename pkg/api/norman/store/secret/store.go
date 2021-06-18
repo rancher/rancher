@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"helm.sh/helm/v3/pkg/release"
+
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
@@ -66,6 +68,21 @@ func NewNamespacedSecretStore(ctx context.Context, clientGetter proxy.ClientGett
 					logrus.Errorf("Error %v parsing cert %v. Will not display correctly in UI", err, data["name"])
 					return data, nil
 				}
+				return data, nil
+			},
+			ListTransformer: func(apiContext *types.APIContext, schema *types.Schema, data []map[string]interface{}, opt *types.QueryOptions) ([]map[string]interface{}, error) {
+				// installations with a large number of helm releases can be slow to list secrets
+				excludeOldHelmReleases := convert.ToBool(apiContext.Query.Get("exclude_old_helm_releases"))
+				if excludeOldHelmReleases {
+					for i := 0; i < len(data); i++ {
+						labels, _ := data[i]["labels"].(map[string]interface{})
+						// only include the latest helm release of a chart
+						if labels["owner"] == "helm" && labels["status"] == string(release.StatusSuperseded) {
+							data[i] = nil
+						}
+					}
+				}
+
 				return data, nil
 			},
 		},
