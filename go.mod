@@ -97,7 +97,7 @@ require (
 	github.com/prometheus/common v0.15.0
 	github.com/rancher/aks-operator v1.0.1-rc9
 	github.com/rancher/apiserver v0.0.0-20210519053359-f943376c4b42
-	github.com/rancher/channelserver v0.5.1-0.20210421200213-5495c5f6e430
+	github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369
 	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
 	github.com/rancher/eks-operator v1.1.1-rc3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210608014113-99e848822739
@@ -115,7 +115,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20210520191028-52f86dce9bd4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3
-	github.com/rancher/wrangler v0.8.1-0.20210521213200-39dd8bf93e9f
+	github.com/rancher/wrangler v0.8.1-0.20210618171953-ab479ee75244
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
