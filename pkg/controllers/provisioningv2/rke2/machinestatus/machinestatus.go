@@ -200,6 +200,8 @@ func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, er
 			if err == nil {
 				if condition.Cond("Ready").IsTrue(mgmtCluster) {
 					h.bootstrapController.Enqueue(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name)
+				} else if planner.IsOnlyEtcd(machine) {
+					message = "waiting for cluster agent to be available on a control plane node"
 				} else {
 					message = "waiting for cluster agent to be available"
 				}

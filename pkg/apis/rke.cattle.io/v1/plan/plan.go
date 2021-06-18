@@ -10,11 +10,19 @@ type Plan struct {
 	Cluster  *capi.Cluster            `json:"cluster,omitempty"`
 }
 
+type ProbeStatus struct {
+	Healthy      bool `json:"healthy,omitempty"`
+	SuccessCount int  `json:"successCount,omitempty"`
+	FailureCount int  `json:"failureCount,omitempty"`
+}
+
 type Node struct {
-	Plan        NodePlan          `json:"plan,omitempty"`
-	AppliedPlan *NodePlan         `json:"appliedPlan,omitempty"`
-	Output      map[string][]byte `json:"-"`
-	InSync      bool              `json:"inSync,omitempty"`
+	Plan        NodePlan               `json:"plan,omitempty"`
+	AppliedPlan *NodePlan              `json:"appliedPlan,omitempty"`
+	Output      map[string][]byte      `json:"-"`
+	InSync      bool                   `json:"inSync,omitempty"`
+	Healthy     bool                   `json:"healthy,omitempty"`
+	ProbeStatus map[string]ProbeStatus `json:"probeStatus,omitempty"`
 }
 
 type Secret struct {
@@ -38,7 +46,8 @@ type File struct {
 }
 
 type NodePlan struct {
-	Files        []File        `json:"files,omitempty"`
-	Instructions []Instruction `json:"instructions,omitempty"`
-	Error        string        `json:"error,omitempty"`
+	Files        []File           `json:"files,omitempty"`
+	Instructions []Instruction    `json:"instructions,omitempty"`
+	Error        string           `json:"error,omitempty"`
+	Probes       map[string]Probe `json:"probes,omitempty"`
 }

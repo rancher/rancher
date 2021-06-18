@@ -568,7 +568,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["server"] = joinServer
 	}
 
-	if isOnlyEtcd(machine) {
+	if IsOnlyEtcd(machine) {
 		config["disable-scheduler"] = true
 		config["disable-apiserver"] = true
 		config["disable-controller-manager"] = true
@@ -863,13 +863,18 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 		}
 	}
 
+	nodePlan, err = p.addProbes(nodePlan, controlPlane, entry.Machine)
+	if err != nil {
+		return nodePlan, err
+	}
+
 	// Add instruction last because it hashes config content
 	nodePlan, err = p.addInstruction(nodePlan, controlPlane, entry.Machine)
 	if err != nil {
 		return nodePlan, err
 	}
 
-	if initNode && isOnlyEtcd(entry.Machine) {
+	if initNode && IsOnlyEtcd(entry.Machine) {
 		nodePlan, err = p.addInitNodeInstruction(nodePlan, controlPlane, entry.Machine)
 		if err != nil {
 			return nodePlan, err
@@ -895,7 +900,7 @@ func isInitNode(machine *capi.Machine) bool {
 }
 
 func IsEtcdOnlyInitNode(machine *capi.Machine) bool {
-	return isInitNode(machine) && isOnlyEtcd(machine)
+	return isInitNode(machine) && IsOnlyEtcd(machine)
 }
 
 func none(_ *capi.Machine) bool {
@@ -906,7 +911,7 @@ func isControlPlane(machine *capi.Machine) bool {
 	return machine.Labels[ControlPlaneRoleLabel] == "true"
 }
 
-func isOnlyEtcd(machine *capi.Machine) bool {
+func IsOnlyEtcd(machine *capi.Machine) bool {
 	return isEtcd(machine) && !isControlPlane(machine)
 }
 
