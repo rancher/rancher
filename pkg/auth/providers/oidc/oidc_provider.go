@@ -94,50 +94,8 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 			return userPrincipal, nil, "", err
 		}
 	}
-	err = o.AddCertKeyToContext(&ctx, config.Certificate, config.PrivateKey)
+	userInfo, oauth2Token, err := o.getUserInfo(&ctx, config, oauthLoginInfo.Code, &claimInfo)
 	if err != nil {
-		return userPrincipal, groupPrincipals, "", err
-	}
-
-	provider, err := oidc.NewProvider(ctx, config.Issuer)
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", err
-	}
-	configScopes := strings.Split(config.Scopes, ",")
-	allScopes := []string{oidc.ScopeOpenID}
-	allScopes = append(allScopes, configScopes...)
-
-	oauthConfig := oauth2.Config{
-		ClientID:     config.ClientID,
-		ClientSecret: config.ClientSecret,
-		Endpoint:     provider.Endpoint(),
-		RedirectURL:  config.RancherURL,
-		Scopes:       allScopes,
-	}
-
-	oauth2Token, err := oauthConfig.Exchange(ctx, oauthLoginInfo.Code, oauth2.SetAuthURLParam("scope", strings.Join(allScopes, " ")))
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", err
-	}
-
-	rawToken, ok := oauth2Token.Extra("id_token").(string)
-	if !ok {
-		rawToken, ok = oauth2Token.Extra("access_token").(string)
-		if !ok {
-			return userPrincipal, groupPrincipals, "", err
-		}
-	}
-	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
-	// parse and verify the id token payload
-	_, err = verifier.Verify(ctx, rawToken)
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", err
-	}
-	userInfo, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Token))
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", err
-	}
-	if err := userInfo.Claims(&claimInfo); err != nil {
 		return userPrincipal, groupPrincipals, "", err
 	}
 
@@ -233,7 +191,26 @@ func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
 }
 
 func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	return nil, errors.New("[generic oidc]: not implemented")
+	var groupPrincipals []v3.Principal
+	var claimInfo claimInfo
+
+	config, err := o.GetOIDCConfig()
+	if err != nil {
+		logrus.Errorf("[generic oidc]: error fetching OIDCConfig: %v", err)
+		return groupPrincipals, err
+	}
+	//do not need userInfo or oauth2Token since we are only processing groups
+	_, _, err = o.getUserInfo(&o.CTX, config, secret, &claimInfo)
+	if err != nil {
+		return groupPrincipals, err
+	}
+	for _, group := range claimInfo.Groups {
+		groupPrincipal := o.groupToPrincipal(group)
+		groupPrincipal.MemberOf = true
+		groupPrincipals = append(groupPrincipals, groupPrincipal)
+
+	}
+	return groupPrincipals, nil
 }
 
 func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -381,4 +358,58 @@ func (o *OpenIDCProvider) GetUserExtraAttributes(token *v3.Token) map[string][]s
 	extras["principalid"] = []string{token.UserPrincipal.Name}
 	extras["username"] = []string{token.UserPrincipal.LoginName}
 	return extras
+}
+
+func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *claimInfo) (*oidc.UserInfo, *oauth2.Token, error) {
+	var userInfo *oidc.UserInfo
+	var oauth2Token *oauth2.Token
+	var err error
+
+	err = o.AddCertKeyToContext(ctx, config.Certificate, config.PrivateKey)
+	if err != nil {
+		return userInfo, oauth2Token, err
+	}
+
+	provider, err := oidc.NewProvider(*ctx, config.Issuer)
+	if err != nil {
+		return userInfo, oauth2Token, err
+	}
+	configScopes := strings.Split(config.Scopes, ",")
+	allScopes := []string{oidc.ScopeOpenID}
+	allScopes = append(allScopes, configScopes...)
+
+	oauthConfig := oauth2.Config{
+		ClientID:     config.ClientID,
+		ClientSecret: config.ClientSecret,
+		Endpoint:     provider.Endpoint(),
+		RedirectURL:  config.RancherURL,
+		Scopes:       allScopes,
+	}
+
+	oauth2Token, err = oauthConfig.Exchange(*ctx, authCode, oauth2.SetAuthURLParam("scope", strings.Join(allScopes, " ")))
+	if err != nil {
+		return userInfo, oauth2Token, err
+	}
+
+	rawToken, ok := oauth2Token.Extra("id_token").(string)
+	if !ok {
+		rawToken, ok = oauth2Token.Extra("access_token").(string)
+		if !ok {
+			return userInfo, oauth2Token, err
+		}
+	}
+	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
+	// parse and verify the id token payload
+	_, err = verifier.Verify(*ctx, rawToken)
+	if err != nil {
+		return userInfo, oauth2Token, err
+	}
+	userInfo, err = provider.UserInfo(*ctx, oauth2.StaticTokenSource(oauth2Token))
+	if err != nil {
+		return userInfo, oauth2Token, err
+	}
+	if err := userInfo.Claims(&claimInfo); err != nil {
+		return userInfo, oauth2Token, err
+	}
+	return userInfo, oauth2Token, nil
 }
