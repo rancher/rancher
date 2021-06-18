@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"sort"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
@@ -22,6 +24,7 @@ const (
 	NoAgentPlanStatus        = "NoAgent"
 	NoAgentPlanStatusMessage = "waiting for agent to check in and apply initial plan"
 	NoPlanPlanStatus         = "NoPlan"
+	UnHealthyProbes          = "UnHealthyProbes"
 	WaitingPlanStatus        = "Waiting"
 	WaitingPlanStatusMessage = "waiting for plan to be applied"
 	InSyncPlanStatus         = "InSync"
@@ -103,6 +106,19 @@ func noPlanMessage(machine *capi.Machine) string {
 	}
 }
 
+func probesMessage(plan *plan.Node) string {
+	var (
+		unhealthy []string
+	)
+	for name, probe := range plan.ProbeStatus {
+		if !probe.Healthy {
+			unhealthy = append(unhealthy, name)
+		}
+	}
+	sort.Strings(unhealthy)
+	return "waiting on probes: " + strings.Join(unhealthy, ", ")
+}
+
 func GetPlanStatusReasonMessage(machine *capi.Machine, plan *plan.Node) (corev1.ConditionStatus, string, string) {
 	switch {
 	case plan == nil:
@@ -113,6 +129,8 @@ func GetPlanStatusReasonMessage(machine *capi.Machine, plan *plan.Node) (corev1.
 		return corev1.ConditionUnknown, NoPlanPlanStatus, noPlanMessage(machine)
 	case plan.Plan.Error != "":
 		return corev1.ConditionFalse, ErrorStatus, plan.Plan.Error
+	case !plan.Healthy:
+		return corev1.ConditionUnknown, UnHealthyProbes, probesMessage(plan)
 	case plan.InSync:
 		return corev1.ConditionTrue, InSyncPlanStatus, InSyncPlanStatusMessage
 	default:
@@ -121,10 +139,25 @@ func GetPlanStatusReasonMessage(machine *capi.Machine, plan *plan.Node) (corev1.
 }
 
 func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
-	result := &plan.Node{}
+	result := &plan.Node{
+		Healthy: true,
+	}
 	planData := secret.Data["plan"]
 	appliedPlanData := secret.Data["appliedPlan"]
 	output := secret.Data["applied-output"]
+	probes := secret.Data["probe-statuses"]
+
+	if len(probes) > 0 {
+		result.ProbeStatus = map[string]plan.ProbeStatus{}
+		if err := json.Unmarshal(probes, &result.ProbeStatus); err != nil {
+			return nil, err
+		}
+		for _, status := range result.ProbeStatus {
+			if !status.Healthy {
+				result.Healthy = false
+			}
+		}
+	}
 
 	if len(planData) > 0 {
 		if err := json.Unmarshal(planData, &result.Plan); err != nil {
@@ -157,7 +190,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		}
 	}
 
-	result.InSync = bytes.Equal(planData, appliedPlanData)
+	result.InSync = result.Healthy && bytes.Equal(planData, appliedPlanData)
 	return result, nil
 }
 
