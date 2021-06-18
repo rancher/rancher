@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machinenodelookup"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineorphan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machinestatus"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/managesystemagent"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/planstatus"
@@ -50,6 +51,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 		machinenodelookup.Register(ctx, clients)
 		planner.Register(ctx, clients, rkePlanner)
 		planstatus.Register(ctx, clients)
+		machinestatus.Register(ctx, clients)
 		unmanaged.Register(ctx, clients)
 		rkecontrolplane.Register(ctx, clients)
 		managesystemagent.Register(ctx, clients)

@@ -203,8 +203,12 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	}
 
 	joinServer, err = p.electInitNode(plan)
-	if err != nil || joinServer == "" {
+	if err != nil {
 		return err
+	} else if joinServer == "" && firstIgnoreError != nil {
+		return ErrWaiting(firstIgnoreError.Error())
+	} else if joinServer == "" {
+		return ErrWaiting("waiting for bootstrap node to be available")
 	}
 
 	err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode,
@@ -358,6 +362,17 @@ func calculateConcurrency(maxUnavailable string, entries []planEntry, exclude ro
 	return int(math.Ceil(max)), unavailable, nil
 }
 
+func detailMessage(machines []string, messages map[string]string) string {
+	if len(machines) != 1 {
+		return ""
+	}
+	message := messages[machines[0]]
+	if message != "" {
+		return ": " + message
+	}
+	return ""
+}
+
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, clusterPlan *plan.Plan,
 	tierName string,
 	required bool,
@@ -368,6 +383,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 		errMachines []string
 		draining    []string
 		uncordoned  []string
+		messages    = map[string]string{}
 	)
 
 	entries := collect(clusterPlan, include)
@@ -390,6 +406,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 		if summary.Transitioning {
 			nonReady = append(nonReady, entry.Machine.Name)
 		}
+		messages[entry.Machine.Name] = strings.Join(summary.Message, ", ")
 
 		plan, err := p.desiredPlan(controlPlane, secret, entry, isInitNode(entry.Machine), joinServer)
 		if err != nil {
@@ -440,28 +457,28 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 	errMachines = atMostThree(errMachines)
 	if len(errMachines) > 0 {
 		// we want these errors to get reported, but not block the process
-		return errIgnore("failing " + tierName + " machine(s) " + strings.Join(errMachines, ","))
+		return errIgnore("failing " + tierName + " machine(s) " + strings.Join(errMachines, ",") + detailMessage(errMachines, messages))
 	}
 
 	outOfSync = atMostThree(outOfSync)
 	if len(outOfSync) > 0 {
-		return ErrWaiting("provisioning " + tierName + " node(s) " + strings.Join(outOfSync, ","))
+		return ErrWaiting("provisioning " + tierName + " node(s) " + strings.Join(outOfSync, ",") + detailMessage(outOfSync, messages))
 	}
 
 	draining = atMostThree(draining)
 	if len(draining) > 0 {
-		return ErrWaiting("draining " + tierName + " node(s) " + strings.Join(outOfSync, ","))
+		return ErrWaiting("draining " + tierName + " node(s) " + strings.Join(draining, ",") + detailMessage(draining, messages))
 	}
 
 	uncordoned = atMostThree(uncordoned)
 	if len(uncordoned) > 0 {
-		return ErrWaiting("uncordoning " + tierName + " node(s) " + strings.Join(outOfSync, ","))
+		return ErrWaiting("uncordoning " + tierName + " node(s) " + strings.Join(uncordoned, ",") + detailMessage(uncordoned, messages))
 	}
 
 	nonReady = atMostThree(nonReady)
 	if len(nonReady) > 0 {
 		// we want these errors to get reported, but not block the process
-		return errIgnore("non-ready " + tierName + " machine(s) " + strings.Join(nonReady, ","))
+		return errIgnore("non-ready " + tierName + " machine(s) " + strings.Join(nonReady, ",") + detailMessage(nonReady, messages))
 	}
 
 	return nil
