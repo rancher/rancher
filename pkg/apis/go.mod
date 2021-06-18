@@ -13,7 +13,7 @@ require (
 	github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133
 	github.com/rancher/rke v1.3.0-rc7
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3
-	github.com/rancher/wrangler v0.8.1-0.20210521213200-39dd8bf93e9f
+	github.com/rancher/wrangler v0.8.1-0.20210618171953-ab479ee75244
 	github.com/sirupsen/logrus v1.7.0
 	k8s.io/api v0.21.0
 	k8s.io/apimachinery v0.21.0
