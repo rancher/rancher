@@ -499,6 +499,24 @@ spec:
     rollingUpdate:
       maxUnavailable: 25%
 {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cattle-cluster-agent
+  namespace: cattle-system
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 444
+    protocol: TCP
+    name: https-internal
+  selector:
+    app: cattle-cluster-agent
 `
 
 var (
