@@ -101,6 +101,15 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		CertNamespace: namespace.System,
 		CertName:      "tls-rancher-internal",
 	}
+	clusterIP, err := getClusterIP(core.Core().V1().Service())
+	if err != nil {
+		return err
+	}
+	if clusterIP != "" {
+		serverOptions.TLSListenerConfig = dynamiclistener.Config{
+			SANs: []string{clusterIP},
+		}
+	}
 
 	internalAPICtx := context.WithValue(ctx, InternalAPI, true)
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
@@ -284,6 +293,20 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 
 	// No certificates mounted or only --no-cacerts used
 	return ca, noCACerts, opts, nil
+}
+
+func getClusterIP(services corev1controllers.ServiceController) (string, error) {
+	service, err := services.Get(namespace.System, "rancher", metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if service.Spec.ClusterIP == "" {
+		return "", fmt.Errorf("waiting on service %s/rancher to be assigned a ClusterIP", namespace.System)
+	}
+	return service.Spec.ClusterIP, nil
 }
 
 func filterCN(cns ...string) []string {
