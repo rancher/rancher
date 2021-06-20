@@ -56,6 +56,13 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
   operator: "Equal"
 {{- end -}}
 
+{{- define "node-tolerations-with-default" -}}
+{{ include "linux-node-tolerations" . | nindent 8 }}
+{{- with .Values.tolerations }}
+{{- toYaml . | nindent 8 }}
+{{- end -}}
+{{- end -}}
+
 {{- define "linux-node-selector-terms" -}}
 {{- $key := "kubernetes.io/os" -}}
 {{- if semverCompare "<1.14-0" .Capabilities.KubeVersion.GitVersion }}
@@ -66,4 +73,19 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
     operator: NotIn
     values:
     - windows
+{{- end -}}
+
+{{- define "required-scheduling-node-selector-terms" -}}
+requiredDuringSchedulingIgnoredDuringExecution:
+           nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
+{{- end -}}
+
+{{- define "node-affinity-with-default" -}}
+{{- if .Values.nodeAffinity }}
+{{- $nodeAffinity := .Values.nodeAffinity | nindent 10 -}}
+{{- $requiredSchedulingNodeSelectorTerms := include "required-scheduling-node-selector-terms" . -}}
+{{- $result := merge $nodeAffinity $requiredSchedulingNodeSelectorTerms }}
+{{- else -}}
+{{- include "required-scheduling-node-selector-terms" . -}}
+{{- end -}}
 {{- end -}}
