@@ -90,6 +90,9 @@ func (a ActionHandler) refresh(apiContext *types.APIContext) error {
 
 	setting.Annotations[forceRefreshAnnotation] = strconv.FormatInt(time.Now().Unix(), 10)
 	_, err = a.MetadataHandler.Settings.Update(setting)
+	if err != nil {
+		return err
+	}
 	apiContext.WriteResponse(http.StatusOK, response)
 	return nil
 }
@@ -162,12 +165,12 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 	var targetImages []string
 	switch apiContext.ID {
 	case linuxImages:
-		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", []string{}, []string{}, rkeSysImages, image.Linux)
+		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", nil, []string{}, rkeSysImages, image.Linux)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
 	case windowsImages:
-		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", []string{}, []string{}, rkeSysImages, image.Windows)
+		targetImages, _, err = image.GetImages(systemCatalogChartPath, "", nil, []string{}, rkeSysImages, image.Windows)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
 		}

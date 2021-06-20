@@ -94,7 +94,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 	}
 	systemUserName := systemUser.Name
 
-	answerMap, err := m.createAnswerMap(mcapp.Spec.Answers)
+	answersMap, err := m.createAnswersMap(mcapp.Spec.Answers)
 	if err != nil {
 		return mcapp, err
 	}
@@ -129,7 +129,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		}
 	}
 
-	resp, err := m.createApps(mcapp, externalID, answerMap, systemUserName, batchSize, toUpdate)
+	resp, err := m.createApps(mcapp, externalID, answersMap, systemUserName, batchSize, toUpdate)
 	if err != nil {
 		return resp.object, err
 	}
@@ -152,7 +152,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 	}
 
 	for i, app := range resp.updateApps {
-		if _, err := m.updateApp(app, answerMap, externalID, resp.projects[i]); err != nil {
+		if _, err := m.updateApp(app, answersMap, externalID, resp.projects[i]); err != nil {
 			return mcapp, err
 		}
 		resp.remaining--
@@ -178,7 +178,7 @@ type Response struct {
 	count      int
 }
 
-func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, answerMap map[string]map[string]string,
+func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, answersMap map[string]scopeAnswers,
 	creatorID string, batchSize int, toUpdate bool) (*Response, error) {
 
 	var mcappToUpdate *v3.MultiClusterApp
@@ -214,7 +214,9 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 			}
 			appUpdated := false
 			if app.Spec.ExternalID == externalID {
-				if reflect.DeepEqual(app.Spec.Answers, getAnswerMap(answerMap, t.ProjectName)) {
+				answers, answersSetString := getScopeAnswers(answersMap, t.ProjectName)
+				if reflect.DeepEqual(app.Spec.Answers, answers) &&
+					reflect.DeepEqual(app.Spec.AnswersSetString, answersSetString) {
 					appUpdated = true
 				}
 			}
@@ -234,7 +236,7 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 			continue
 		}
 		if batchSize > 0 {
-			appName, mcapp, err := m.createApp(mcapp, answerMap, ann, set, projectNS, creatorID, externalID, t.ProjectName)
+			appName, mcapp, err := m.createApp(mcapp, answersMap, ann, set, projectNS, creatorID, externalID, t.ProjectName)
 			if err != nil {
 				return resp, fmt.Errorf("error %v in creating multiclusterapp: %v", err, mcapp)
 			}
@@ -266,9 +268,11 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 	return resp, nil
 }
 
-func (m *MCAppManager) updateApp(app *pv3.App, answerMap map[string]map[string]string, externalID string, projectName string) (*pv3.App, error) {
+func (m *MCAppManager) updateApp(app *pv3.App, answersMap map[string]scopeAnswers, externalID string, projectName string) (*pv3.App, error) {
 	app = app.DeepCopy()
-	app.Spec.Answers = getAnswerMap(answerMap, projectName)
+	answers, answersSetString := getScopeAnswers(answersMap, projectName)
+	app.Spec.Answers = answers
+	app.Spec.AnswersSetString = answersSetString
 	app.Spec.ExternalID = externalID
 	updatedObj, err := m.apps.Update(app)
 	if err != nil && apierrors.IsConflict(err) {
@@ -279,7 +283,9 @@ func (m *MCAppManager) updateApp(app *pv3.App, answerMap map[string]map[string]s
 				return latestObj, err
 			}
 			latestToUpdate := latestObj.DeepCopy()
-			latestToUpdate.Spec.Answers = getAnswerMap(answerMap, projectName)
+			answers, answersSetString := getScopeAnswers(answersMap, projectName)
+			latestToUpdate.Spec.Answers = answers
+			latestToUpdate.Spec.AnswersSetString = answersSetString
 			latestToUpdate.Spec.ExternalID = externalID
 			updated, err := m.apps.Update(latestToUpdate)
 			if err != nil && apierrors.IsConflict(err) {
@@ -377,7 +383,7 @@ func (m *MCAppManager) toUpdate(mcapp *v3.MultiClusterApp) (bool, error) {
 	return true, nil
 }
 
-func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string]map[string]string, ann map[string]string,
+func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answersMap map[string]scopeAnswers, ann map[string]string,
 	set map[string]string, projectNS string, creatorID string, externalID string, projectName string) (string, *v3.MultiClusterApp, error) {
 	nsName := getAppNamespaceName(mcapp.Name, projectNS)
 	app, err := m.appLister.Get(projectNS, nsName)
@@ -385,6 +391,7 @@ func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string
 		if !apierrors.IsNotFound(err) {
 			return "", mcapp, err
 		}
+		answers, answersSetString := getScopeAnswers(answersMap, projectName)
 		toCreate := pv3.App{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        nsName,
@@ -397,7 +404,8 @@ func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string
 				TargetNamespace:     nsName,
 				ExternalID:          externalID,
 				MultiClusterAppName: mcapp.Name,
-				Answers:             getAnswerMap(answerMap, projectName),
+				Answers:             answers,
+				AnswersSetString:    answersSetString,
 				Wait:                mcapp.Spec.Wait,
 				Timeout:             mcapp.Spec.Timeout,
 			},
@@ -409,26 +417,6 @@ func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string
 		}
 	}
 	return app.Name, mcapp, nil
-}
-
-func getAnswerMap(answerMap map[string]map[string]string, projectName string) map[string]string {
-	// find answers for this project, if not found then try finding for the cluster this project belongs to, else finally use the global scoped answer
-	answers := map[string]string{}
-	if len(answerMap) > 0 {
-		if ans, ok := answerMap[projectName]; ok {
-			return ans
-		}
-		// find the answers for the cluster of this project
-		split := strings.SplitN(projectName, ":", 2)
-		clusterName := split[0]
-		if ans, ok := answerMap[clusterName]; ok {
-			return ans
-		}
-		if ans, ok := answerMap[globalScopeAnswersKey]; ok {
-			return ans
-		}
-	}
-	return answers
 }
 
 // deleteApps finds all apps created by this multiclusterapp and deletes them
@@ -531,10 +519,7 @@ func (m *MCAppManager) delete(appsToDelete []*pv3.App) error {
 			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return g.Wait()
 }
 
 func (m *MCAppManager) updateCondition(mcappToUpdate *v3.MultiClusterApp, setCondition func(mcapp *v3.MultiClusterApp)) (*v3.MultiClusterApp, error) {
@@ -577,54 +562,85 @@ func setInstalledDone(mcapp *v3.MultiClusterApp) {
 	v32.MultiClusterAppConditionInstalled.Message(mcapp, "")
 }
 
-func (m *MCAppManager) createAnswerMap(answers []v32.Answer) (map[string]map[string]string, error) {
-	// create a map, where key is the projectID or clusterID, or "global" if neither is provided, and value is the actual answer values
-	// Global scoped answers will have all questions. Project/cluster scoped will only have override keys. So we'll first create a global map,
-	// and then merge with project/cluster map
-	answerMap := make(map[string]map[string]string)
-	globalAnswersMap := make(map[string]string)
-	for _, a := range answers {
-		if a.ProjectName == "" && a.ClusterName == "" {
-			globalAnswersMap = a.Values
-			answerMap[globalScopeAnswersKey] = make(map[string]string)
-			answerMap[globalScopeAnswersKey] = a.Values
+type scopeAnswers struct {
+	answers          map[string]string
+	answersSetString map[string]string
+}
+
+func getScopeAnswers(answersMap map[string]scopeAnswers, projectName string) (map[string]string, map[string]string) {
+	// Find answers for this project, if not found then try finding for the cluster this project belongs to, else finally use the global scoped answers
+	if len(answersMap) > 0 {
+		if a, ok := answersMap[projectName]; ok {
+			return a.answers, a.answersSetString
+		}
+		// Find the answers for the cluster of this project
+		clusterName := strings.SplitN(projectName, ":", 2)[0]
+		if a, ok := answersMap[clusterName]; ok {
+			return a.answers, a.answersSetString
+		}
+		if a, ok := answersMap[globalScopeAnswersKey]; ok {
+			return a.answers, a.answersSetString
 		}
 	}
+	return map[string]string{}, map[string]string{}
+}
 
+func (m *MCAppManager) createAnswersMap(answers []v32.Answer) (map[string]scopeAnswers, error) {
+	// This function creates a map where keys are the scope of the answers (ProjectName, ClusterName, or "global"), and
+	// the values are scopeAnswers structs containing the answers and answersSetString. Global answers apply to all scopes,
+	// whereas project and cluster answers will override the global scope. Therefore we create a global map first and then
+	// merge with the project/cluster map.
+	var globalAnswers scopeAnswers
+	var answersMap = make(map[string]scopeAnswers)
+
+	for _, a := range answers {
+		if a.ProjectName == "" && a.ClusterName == "" {
+			globalAnswers = scopeAnswers{
+				answers:          a.Values,
+				answersSetString: a.ValuesSetString,
+			}
+			answersMap[globalScopeAnswersKey] = scopeAnswers{
+				answers:          a.Values,
+				answersSetString: a.ValuesSetString,
+			}
+		}
+	}
 	for _, a := range answers {
 		if a.ClusterName != "" {
 			// Using k8s labels.Merge, since by definition:
 			// Merge combines given maps, and does not check for any conflicts between the maps. In case of conflicts, second map (labels2) wins
 			// And we want cluster level keys to override keys from global/cluster for that cluster
-			clusterLabels := labels.Merge(globalAnswersMap, a.Values)
-			answerMap[a.ClusterName] = make(map[string]string)
-			answerMap[a.ClusterName] = clusterLabels
+			answersMap[a.ClusterName] = scopeAnswers{
+				answers:          labels.Merge(globalAnswers.answers, a.Values),
+				answersSetString: labels.Merge(globalAnswers.answersSetString, a.ValuesSetString),
+			}
 		}
 	}
-
 	for _, a := range answers {
 		if a.ProjectName != "" {
-			// check if answers for the cluster of this project are provided
+			// Check if answers for the cluster of this project are provided
 			split := strings.SplitN(a.ProjectName, ":", 2)
 			if len(split) != 2 {
-				return answerMap, fmt.Errorf("error in splitting project name: %v", a.ProjectName)
+				return answersMap, fmt.Errorf("error in splitting project name: %v", a.ProjectName)
 			}
 			clusterName := split[0]
 			// Using k8s labels.Merge, since by definition:
 			// Merge combines given maps, and does not check for any conflicts between the maps. In case of conflicts, second map (labels2) wins
 			// And we want project level keys to override keys from global level for that project
-			projectLabels := make(map[string]string)
-			if val, ok := answerMap[clusterName]; ok {
-				projectLabels = labels.Merge(val, a.Values)
+			if clusterAnswers, ok := answersMap[clusterName]; ok {
+				answersMap[a.ProjectName] = scopeAnswers{
+					answers:          labels.Merge(clusterAnswers.answers, a.Values),
+					answersSetString: labels.Merge(clusterAnswers.answersSetString, a.ValuesSetString),
+				}
 			} else {
-				projectLabels = labels.Merge(globalAnswersMap, a.Values)
+				answersMap[a.ProjectName] = scopeAnswers{
+					answers:          labels.Merge(globalAnswers.answers, a.Values),
+					answersSetString: labels.Merge(globalAnswers.answersSetString, a.ValuesSetString),
+				}
 			}
-			answerMap[a.ProjectName] = make(map[string]string)
-			answerMap[a.ProjectName] = projectLabels
 		}
 	}
-
-	return answerMap, nil
+	return answersMap, nil
 }
 
 // getExternalID gets the TemplateVersion.Spec.ExternalID field

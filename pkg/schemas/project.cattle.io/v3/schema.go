@@ -381,6 +381,9 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "spec"},
 		).
 		AddMapperForType(&Version, batchv1beta1.CronJobSpec{},
+			&m.Drop{
+				Field: "suspend",
+			},
 			&m.Embed{
 				Field: "jobTemplate",
 			},
@@ -532,7 +535,6 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.Container{},
 			m.Move{From: "command", To: "entrypoint"},
 			m.Move{From: "args", To: "command"},
-			mapper.EnvironmentMapper{},
 			&m.Embed{Field: "securityContext"},
 			&m.Embed{Field: "lifecycle"},
 		).
@@ -661,6 +663,8 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 					&m.Drop{Field: "publishNotReadyAddresses"},
 					&m.Drop{Field: "sessionAffinity"},
 					&m.Drop{Field: "sessionAffinityConfig"},
+					&m.Drop{Field: "loadBalancerClass"},
+					&m.Drop{Field: "internalTrafficPolicy"},
 				)
 		}
 

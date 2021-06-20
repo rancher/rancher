@@ -70,6 +70,7 @@ type Interface interface {
 	GroupMember() GroupMemberController
 	KontainerDriver() KontainerDriverController
 	LocalProvider() LocalProviderController
+	ManagedChart() ManagedChartController
 	MonitorMetric() MonitorMetricController
 	MultiClusterApp() MultiClusterAppController
 	MultiClusterAppRevision() MultiClusterAppRevisionController
@@ -78,6 +79,7 @@ type Interface interface {
 	NodePool() NodePoolController
 	NodeTemplate() NodeTemplateController
 	Notifier() NotifierController
+	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
 	PodSecurityPolicyTemplate() PodSecurityPolicyTemplateController
 	PodSecurityPolicyTemplateProjectBinding() PodSecurityPolicyTemplateProjectBindingController
@@ -237,6 +239,9 @@ func (c *version) KontainerDriver() KontainerDriverController {
 func (c *version) LocalProvider() LocalProviderController {
 	return NewLocalProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "LocalProvider"}, "localproviders", false, c.controllerFactory)
 }
+func (c *version) ManagedChart() ManagedChartController {
+	return NewManagedChartController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, c.controllerFactory)
+}
 func (c *version) MonitorMetric() MonitorMetricController {
 	return NewMonitorMetricController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MonitorMetric"}, "monitormetrics", true, c.controllerFactory)
 }
@@ -260,6 +265,9 @@ func (c *version) NodeTemplate() NodeTemplateController {
 }
 func (c *version) Notifier() NotifierController {
 	return NewNotifierController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Notifier"}, "notifiers", true, c.controllerFactory)
+}
+func (c *version) OIDCProvider() OIDCProviderController {
+	return NewOIDCProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCProvider"}, "oidcproviders", false, c.controllerFactory)
 }
 func (c *version) OpenLdapProvider() OpenLdapProviderController {
 	return NewOpenLdapProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OpenLdapProvider"}, "openldapproviders", false, c.controllerFactory)

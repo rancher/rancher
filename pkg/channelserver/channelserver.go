@@ -3,30 +3,31 @@ package channelserver
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"os/exec"
+	"net/http"
 	"strconv"
-	"strings"
+	"sync"
 	"time"
 
+	"github.com/rancher/channelserver/pkg/config"
+	"github.com/rancher/channelserver/pkg/model"
+	"github.com/rancher/channelserver/pkg/server"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/schemas"
 	"github.com/sirupsen/logrus"
-	"k8s.io/client-go/util/flowcontrol"
 )
 
 var (
-	prog             = "channelserver"
-	channelserverCmd *exec.Cmd
-	backoff          = flowcontrol.NewBackOff(5*time.Second, 15*time.Minute)
+	configs     map[string]*config.Config
+	configsInit sync.Once
 )
 
-func GetURLAndInterval() (string, string) {
+func GetURLAndInterval() (string, time.Duration) {
 	val := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(settings.RkeMetadataConfig.Get()), &val); err != nil {
 		logrus.Errorf("failed to parse %s value: %v", settings.RkeMetadataConfig.Name, err)
-		return "", ""
+		return "", 0
 	}
 	url := data.Object(val).String("url")
 	minutes, _ := strconv.Atoi(data.Object(val).String("refresh-interval-minutes"))
@@ -34,51 +35,7 @@ func GetURLAndInterval() (string, string) {
 		minutes = 1440
 	}
 
-	return url, (time.Duration(minutes) * time.Minute).String()
-
-}
-
-func run(cmdArgs []string) chan error {
-	done := make(chan error, 1)
-	go func() {
-		defer close(done)
-		url, interval := GetURLAndInterval()
-		cmdArgs = append(cmdArgs, "--url", url,
-			"--url=/var/lib/rancher-data/driver-metadata/data.json",
-			"--refresh-interval", interval,
-			"--channel-server-version", getChannelServerArg(), getChannelServerArg())
-		cmd := exec.Command(prog, cmdArgs...)
-		channelserverCmd = cmd
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		done <- cmd.Run()
-	}()
-	return done
-}
-
-func Start(ctx context.Context, cmdArgs []string) error {
-	if _, err := exec.LookPath(prog); err != nil {
-		logrus.Errorf("Failed to find %s, will not run /v1-release API: %v", prog, err)
-		return nil
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			if err := Shutdown(); err != nil {
-				logrus.Errorf("error terminating channelserver: %v", err)
-			}
-			return ctx.Err()
-		case err := <-run(cmdArgs):
-			logrus.Infof("failed to run channelserver: %v", err)
-		}
-		backoff.Next("next", time.Now())
-		select {
-		case <-time.After(backoff.Get("next")):
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
+	return url, time.Duration(minutes) * time.Minute
 }
 
 // getChannelServerArg will return with an argument to pass to channel server
@@ -92,17 +49,68 @@ func getChannelServerArg() string {
 	return serverVersion
 }
 
-// Shutdown ends the channelserver process and resets backoff
-func Shutdown() error {
-	backoff.Reset("next")
-	if channelserverCmd == nil {
-		return nil
-	}
-	if err := channelserverCmd.Process.Kill(); err != nil {
-		if !strings.Contains(err.Error(), "process already finished") {
-			return err
+type DynamicInterval struct{}
+
+func (d *DynamicInterval) Wait(ctx context.Context) bool {
+	start := time.Now()
+	for {
+		select {
+		case <-time.After(time.Second):
+			_, duration := GetURLAndInterval()
+			if start.Add(duration).Before(time.Now()) {
+				return true
+			}
+			continue
+		case <-ctx.Done():
+			return false
 		}
 	}
-	channelserverCmd = nil
-	return nil
+}
+
+type DynamicSource struct{}
+
+func (d *DynamicSource) URL() string {
+	url, _ := GetURLAndInterval()
+	return url
+}
+
+func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernetesVersion string) model.Release {
+	fallBack := model.Release{
+		AgentArgs:  map[string]schemas.Field{},
+		ServerArgs: map[string]schemas.Field{},
+	}
+	for _, releaseData := range GetReleaseConfigByRuntime(ctx, runtime).ReleasesConfig().Releases {
+		if releaseData.Version == kubernetesVersion {
+			return releaseData
+		}
+		for k, v := range releaseData.ServerArgs {
+			fallBack.ServerArgs[k] = v
+		}
+		for k, v := range releaseData.AgentArgs {
+			fallBack.AgentArgs[k] = v
+		}
+	}
+	return fallBack
+}
+
+func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Config {
+	configsInit.Do(func() {
+		interval := &DynamicInterval{}
+		urls := []config.Source{
+			&DynamicSource{},
+			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
+		}
+		configs = map[string]*config.Config{
+			"k3s":  config.NewConfig(ctx, "k3s", interval, getChannelServerArg(), urls),
+			"rke2": config.NewConfig(ctx, "rke2", interval, getChannelServerArg(), urls),
+		}
+	})
+	return configs[runtime]
+}
+
+func NewHandler(ctx context.Context) http.Handler {
+	return server.NewHandler(map[string]*config.Config{
+		"v1-k3s-release":  GetReleaseConfigByRuntime(ctx, "k3s"),
+		"v1-rke2-release": GetReleaseConfigByRuntime(ctx, "rke2"),
+	})
 }

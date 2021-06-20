@@ -140,6 +140,7 @@ node {
                       string(name: 'RANCHER_EXTERNAL_DB_VERSION', value: "${RANCHER_EXTERNAL_DB_VERSION}"),
                       string(name: 'RANCHER_INSTANCE_CLASS', value: "${RANCHER_INSTANCE_CLASS}"),
                       string(name: 'RANCHER_DB_GROUP_NAME', value: "${RANCHER_DB_GROUP_NAME}"),
+                      string(name: 'AWS_VOLUME_SIZE', value: "${AWS_VOLUME_SIZE}"),
                     ]
                     echo "Params are: ${params}"
                     jobs["test-${i}"] = { build job: 'rancher_v3_import_k3s_ha_cluster', parameters: params }

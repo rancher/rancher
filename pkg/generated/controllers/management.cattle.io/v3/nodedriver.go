@@ -360,6 +360,10 @@ func (a *nodeDriverGeneratingHandler) Remove(key string, obj *v3.NodeDriver) (*v
 }
 
 func (a *nodeDriverGeneratingHandler) Handle(obj *v3.NodeDriver, status v3.NodeDriverStatus) (v3.NodeDriverStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.NodeDriverGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

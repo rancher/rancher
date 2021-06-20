@@ -18,8 +18,8 @@ import (
 
 	rketypes "github.com/rancher/rke/types"
 
-	minio "github.com/minio/minio-go"
-	"github.com/minio/minio-go/pkg/credentials"
+	minio "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
@@ -120,9 +120,9 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 }
 
 func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
-	logrus.Infof("[etcd-backup] Deleting backup %s ", b.Name)
+	logrus.Debugf("[etcd-backup] deleting backup %s ", b.Name)
 	if err := c.etcdRemoveSnapshotWithBackoff(b); err != nil {
-		logrus.Warnf("giving up on deleting backup [%s]: %v", b.Name, err)
+		logrus.Errorf("[etcd-backup] giving up on deleting backup [%s]: %v", b.Name, err)
 	}
 	return b, nil
 }
@@ -135,13 +135,13 @@ func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Durati
 	for range ticker.Context(ctx, interval) {
 		clusters, err := c.clusterLister.List("", labels.NewSelector())
 		if err != nil {
-			logrus.Error(fmt.Errorf("[etcd-backup] clusterBackupSync faild: %v", err))
+			logrus.Error(fmt.Errorf("[etcd-backup] error while listing clusters: %v", err))
 			return err
 		}
 		for _, cluster := range clusters {
-			logrus.Debugf("[etcd-backup] Checking backups for cluster: %s", cluster.Name)
+			logrus.Debugf("[etcd-backup] checking backups for cluster [%s]", cluster.Name)
 			if err := c.doClusterBackupSync(cluster); err != nil && !apierrors.IsConflict(err) {
-				logrus.Error(fmt.Errorf("[etcd-backup] clusterBackupSync faild: %v", err))
+				logrus.Error(fmt.Errorf("[etcd-backup] error while syncing cluster backups for cluster [%s]: %v", cluster.Name, err))
 			}
 		}
 	}
@@ -164,12 +164,12 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 
 	// cluster has no backups, we need to kick a new one.
 	if len(clusterBackups) == 0 {
-		logrus.Infof("[etcd-backup] Cluster [%s] has no backups, creating first backup", cluster.Name)
+		logrus.Debugf("[etcd-backup] cluster [%s] has no backups, creating first backup", cluster.Name)
 		newBackup, err := c.createNewBackup(cluster)
 		if err != nil {
-			return fmt.Errorf("[etcd-backup] Backup create failed:%v", err)
+			return fmt.Errorf("[etcd-backup] error while creating backup for cluster [%s]: %v", cluster.Name, err)
 		}
-		logrus.Infof("[etcd-backup] Cluster [%s] new backup is created: %s", cluster.Name, newBackup.Name)
+		logrus.Debugf("[etcd-backup] cluster [%s] new backup is created: %s", cluster.Name, newBackup.Name)
 		return nil
 	}
 
@@ -188,9 +188,9 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 	if time.Since(getBackupCompletedTime(newestBackup)) > backupIntervalHours {
 		newBackup, err := c.createNewBackup(cluster)
 		if err != nil {
-			return fmt.Errorf("[etcd-backup] Backup create failed:%v", err)
+			return fmt.Errorf("[etcd-backup] error while create new backup for cluster [%s]: %v", cluster.Name, err)
 		}
-		logrus.Infof("[etcd-backup] New backup created: %s", newBackup.Name)
+		logrus.Debugf("[etcd-backup] new backup created: %s", newBackup.Name)
 	}
 
 	// rotate old backups
@@ -228,7 +228,9 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 			}
 			return true, nil
 		})
-
+		if err != nil {
+			return b, err
+		}
 		return b, inErr
 	})
 	if err != nil {
@@ -395,7 +397,6 @@ func GetS3Client(sbc *rketypes.S3BackupConfig, timeout int, dialer dialer.Dialer
 	if sbc == nil {
 		return nil, fmt.Errorf("Can't find S3 backup target configuration")
 	}
-	var s3Client = &minio.Client{}
 	var creds *credentials.Credentials
 	var tr http.RoundTripper = &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
@@ -420,19 +421,20 @@ func GetS3Client(sbc *rketypes.S3BackupConfig, timeout int, dialer dialer.Dialer
 	}
 
 	bucketLookup := getBucketLookupType(endpoint)
-	s3Client, err := minio.NewWithOptions(endpoint, &minio.Options{
+	opt := minio.Options{
 		Creds:        creds,
 		Region:       sbc.Region,
 		Secure:       true,
 		BucketLookup: bucketLookup,
-	})
+		Transport:    tr,
+	}
+	if sbc.CustomCA != "" {
+		opt.Transport = getCustomCATransport(tr, sbc.CustomCA)
+	}
+	s3Client, err := minio.New(endpoint, &opt)
 	if err != nil {
 		return nil, err
 	}
-	if sbc.CustomCA != "" {
-		tr = getCustomCATransport(tr, sbc.CustomCA)
-	}
-	s3Client.SetCustomTransport(tr)
 	return s3Client, nil
 }
 
@@ -484,7 +486,7 @@ func shouldBackup(cluster *v3.Cluster) bool {
 	}
 	if !isBackupSet(cluster.Spec.RancherKubernetesEngineConfig) {
 		// no backend backup config
-		logrus.Debugf("[etcd-backup] No backup config for cluster [%s]", cluster.Name)
+		logrus.Debugf("[etcd-backup] no backup config for cluster [%s]", cluster.Name)
 		return false
 	}
 	// we only work with ready clusters
@@ -493,7 +495,7 @@ func shouldBackup(cluster *v3.Cluster) bool {
 	}
 
 	if !isRecurringBackupEnabled(cluster.Spec.RancherKubernetesEngineConfig) {
-		logrus.Debugf("[etcd-backup] Recurring backup is disabled cluster [%s]", cluster.Name)
+		logrus.Debugf("[etcd-backup] recurring backup is disabled cluster [%s]", cluster.Name)
 		return false
 	}
 	return true

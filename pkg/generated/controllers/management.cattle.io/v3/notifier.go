@@ -360,6 +360,10 @@ func (a *notifierGeneratingHandler) Remove(key string, obj *v3.Notifier) (*v3.No
 }
 
 func (a *notifierGeneratingHandler) Handle(obj *v3.Notifier, status v3.NotifierStatus) (v3.NotifierStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.NotifierGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

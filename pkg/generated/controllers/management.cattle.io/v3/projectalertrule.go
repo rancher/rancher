@@ -360,6 +360,10 @@ func (a *projectAlertRuleGeneratingHandler) Remove(key string, obj *v3.ProjectAl
 }
 
 func (a *projectAlertRuleGeneratingHandler) Handle(obj *v3.ProjectAlertRule, status v3.AlertStatus) (v3.AlertStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ProjectAlertRuleGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

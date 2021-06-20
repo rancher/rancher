@@ -360,6 +360,10 @@ func (a *globalDnsGeneratingHandler) Remove(key string, obj *v3.GlobalDns) (*v3.
 }
 
 func (a *globalDnsGeneratingHandler) Handle(obj *v3.GlobalDns, status v3.GlobalDNSStatus) (v3.GlobalDNSStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.GlobalDnsGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

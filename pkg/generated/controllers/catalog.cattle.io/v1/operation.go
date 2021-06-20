@@ -360,6 +360,10 @@ func (a *operationGeneratingHandler) Remove(key string, obj *v1.Operation) (*v1.
 }
 
 func (a *operationGeneratingHandler) Handle(obj *v1.Operation, status v1.OperationStatus) (v1.OperationStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.OperationGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

@@ -6,6 +6,8 @@ import (
 
 const (
 	ClusterType                                      = "cluster"
+	ClusterFieldAKSConfig                            = "aksConfig"
+	ClusterFieldAKSStatus                            = "aksStatus"
 	ClusterFieldAPIEndpoint                          = "apiEndpoint"
 	ClusterFieldAgentEnvVars                         = "agentEnvVars"
 	ClusterFieldAgentFeatures                        = "agentFeatures"
@@ -76,6 +78,8 @@ const (
 
 type Cluster struct {
 	types.Resource
+	AKSConfig                            *AKSClusterConfigSpec          `json:"aksConfig,omitempty" yaml:"aksConfig,omitempty"`
+	AKSStatus                            *AKSStatus                     `json:"aksStatus,omitempty" yaml:"aksStatus,omitempty"`
 	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
 	AgentEnvVars                         []EnvVar                       `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
 	AgentFeatures                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`

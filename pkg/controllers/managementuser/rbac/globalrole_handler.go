@@ -47,11 +47,7 @@ func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 	crtbIndexers := map[string]cache.IndexFunc{
 		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
 	}
-	if err := crtbInformer.AddIndexers(crtbIndexers); err != nil {
-		return err
-	}
-
-	return nil
+	return crtbInformer.AddIndexers(crtbIndexers)
 }
 
 func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBindingHandlerFunc {

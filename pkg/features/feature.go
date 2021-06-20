@@ -33,11 +33,23 @@ var (
 		"multi-cluster-management",
 		"Multi-cluster provisioning and management of Kubernetes clusters.",
 		true,
-		true,
+		false,
+		true)
+	MCMAgent = newFeature(
+		"multi-cluster-management-agent",
+		"Run downstream controllers for multi-cluster management.",
+		false,
+		false,
 		false)
 	Fleet = newFeature(
 		"fleet",
 		"Install Fleet when starting Rancher",
+		true,
+		false,
+		true)
+	Gitops = newFeature(
+		"continuous-delivery",
+		"Gitops components in fleet",
 		true,
 		false,
 		true)
@@ -51,26 +63,45 @@ var (
 		"embedded-cluster-api",
 		"Enable an embedded instance of cluster-api core controller",
 		true,
-		true,
-		true)
+		false,
+		false)
 	RKE2 = newFeature(
 		"rke2",
 		"Enable provisioning of RKE2",
 		true,
-		true,
+		false,
 		true)
 	Legacy = newFeature(
 		"legacy",
 		"Enable legacy features",
+		false,
+		true,
+		true)
+	ProvisioningV2 = newFeature(
+		"provisioningv2",
+		"Enable cluster-api based provisioning framework",
 		true,
 		false,
 		false)
+	MonitoringV1 = newFeature(
+		"monitoringv1",
+		"Enable support for monitoring v1 in downstream clusters. The legacy feature flag is required to be enabled",
+		true,
+		false,
+		false)
+	TokenHashing = newFeature(
+		"token-hashing",
+		"Enable one way hashing of tokens. Once enabled token hashing can not be disabled",
+		false,
+		true,
+		true)
 )
 
 type Feature struct {
 	name        string
 	description string
-	// val is the effective value- it is equal to default until explicitly changed
+	// val is the effective value- it is equal to default until explicitly changed.
+	// The order of precedence is lockedValue > value > default
 	val bool
 	// default value of feature
 	def bool
@@ -136,8 +167,14 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 				newFeatureState.Status.Description = f.description
 			}
 
-			if newFeatureState, err = featuresClient.Update(newFeatureState); err != nil {
+			newFeatureState, err = featuresClient.Update(newFeatureState)
+			if err != nil {
 				logrus.Errorf("unable to update feature %s in initialize features: %v", f.name, err)
+				continue
+			}
+
+			if newFeatureState.Status.LockedValue != nil {
+				f.Set(*newFeatureState.Status.LockedValue)
 				continue
 			}
 
@@ -152,6 +189,24 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 			f.Set(*featureState.Spec.Value)
 		}
 	}
+}
+
+func SetFeature(featuresClient managementv3.FeatureClient, featureName string, value bool) error {
+	if featuresClient == nil {
+		return nil
+	}
+
+	featureState, err := featuresClient.Get(featureName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	featureState.Spec.Value = &[]bool{value}[0]
+	if _, err = featuresClient.Update(featureState); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // applyArgumentDefaults reads the features arguments and uses their values to overwrite
@@ -227,6 +282,9 @@ func GetFeatureByName(name string) *Feature {
 func IsEnabled(feature *v3.Feature) bool {
 	if feature == nil {
 		return false
+	}
+	if feature.Status.LockedValue != nil {
+		return *feature.Status.LockedValue
 	}
 	if feature.Spec.Value == nil {
 		return feature.Status.Default

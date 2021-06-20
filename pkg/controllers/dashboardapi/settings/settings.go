@@ -17,11 +17,7 @@ func Register(settingController managementcontrollers.SettingController) error {
 		settingCache: settingController.Cache(),
 	}
 
-	if err := settings.SetProvider(sp); err != nil {
-		return err
-	}
-
-	return nil
+	return settings.SetProvider(sp)
 }
 
 type settingsProvider struct {
@@ -103,7 +99,9 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				fallback[newSetting.Name] = newSetting.Value
 			}
 			_, err := s.settings.Create(newSetting)
-			if err != nil {
+			// Rancher will race in an HA setup to try and create the settings
+			// so if it exists just move on.
+			if err != nil && !errors.IsAlreadyExists(err) {
 				return err
 			}
 		} else if err != nil {

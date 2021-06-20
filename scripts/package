@@ -1,17 +1,19 @@
 #!/bin/bash
 set -e
 
-./k3s-images.sh
-
 source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
 SYSTEM_CHART_REPO_DIR=build/system-charts
-SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.5"}
+SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.6"}
 CHART_REPO_DIR=build/charts
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.6"}
 
 cd $(dirname $0)/../package
+
+../scripts/k3s-images.sh
+
+../scripts/create-components-file.sh
 
 cp ../bin/rancher.yaml ../bin/rancher-namespace.yaml ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 
@@ -43,7 +45,7 @@ if [ ! -d build/system-charts ]; then
     git clone --depth=1 --no-tags --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts $SYSTEM_CHART_REPO_DIR
 fi
 
-if [ ! -d build/charts ]; then
+if [ ! -d $CHART_REPO_DIR ]; then
     INDEX_PATH=$CHART_REPO_DIR/index.yaml
     git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
 
@@ -53,11 +55,13 @@ if [ ! -d build/charts ]; then
     # Extract the tarballs in the list, skip extracting CRD charts
     for TGZ_PATH in $LATEST_TGZ_PATHS; do
         TGZ_REL_PATH=$CHART_REPO_DIR/$TGZ_PATH
+        TGZ_EXTRACT_PATH=$(dirname $CHART_REPO_DIR/${TGZ_PATH##released/})
         if [[ $TGZ_PATH == *crd*.tgz ]]; then
             echo "Skipped CRD: $TGZ_REL_PATH"
         else
-            echo "Extract: $TGZ_REL_PATH"
-            tar -xvf $TGZ_REL_PATH -C $(dirname $TGZ_REL_PATH)
+            echo "Extract: $TGZ_REL_PATH to $TGZ_EXTRACT_PATH"
+            mkdir -p $TGZ_EXTRACT_PATH
+            tar -xf $TGZ_REL_PATH -C $TGZ_EXTRACT_PATH
         fi
     done
 
@@ -65,9 +69,10 @@ if [ ! -d build/charts ]; then
     rm -f $INDEX_PATH $CHART_REPO_DIR/assets/index.yaml
 fi
 
-TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE
-
 if [ ${ARCH} == amd64 ]; then
+    # Move this out of ARCH check for local dev on non-amd64 hardware.
+    TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE
+
     # rancherd tarball
     rm -rf build/rancherd/bundle
     mkdir -p build/rancherd/bundle

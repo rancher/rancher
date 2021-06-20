@@ -1,6 +1,7 @@
 package clusteroperator
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/util"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
@@ -26,6 +28,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/yaml"
 )
@@ -51,9 +55,10 @@ type OperatorController struct {
 }
 
 type operatorValues struct {
-	HTTPProxy  string `json:"httpProxy,omitempty"`
-	HTTPSProxy string `json:"httpsProxy,omitempty"`
-	NoProxy    string `json:"noProxy,omitempty"`
+	HTTPProxy    string `json:"httpProxy,omitempty"`
+	HTTPSProxy   string `json:"httpsProxy,omitempty"`
+	NoProxy      string `json:"noProxy,omitempty"`
+	AdditionalCA bool   `json:"additionalTrustedCAs"`
 }
 
 func (e *OperatorController) DeployOperator(operator, operatorTemplate, shortName string) error {
@@ -77,7 +82,7 @@ func (e *OperatorController) DeployOperator(operator, operatorTemplate, shortNam
 	systemProjectID := ref.Ref(systemProject)
 	_, systemProjectName := ref.Parse(systemProjectID)
 
-	valuesYaml, err := generateValuesYaml()
+	valuesYaml, err := e.generateValuesYaml()
 	if err != nil {
 		return err
 	}
@@ -186,11 +191,16 @@ func (e *OperatorController) SetFalse(cluster *mgmtv3.Cluster, condition conditi
 // necessary values to override defaults in values.yaml. If
 // no defaults need to be overwritten, an empty string will
 // be returned.
-func generateValuesYaml() (string, error) {
+func (e *OperatorController) generateValuesYaml() (string, error) {
+	cert, err := getAdditionalCA(e.SecretsCache)
+	if err != nil {
+		return "", err
+	}
 	values := operatorValues{
-		HTTPProxy:  os.Getenv("HTTP_PROXY"),
-		HTTPSProxy: os.Getenv("HTTPS_PROXY"),
-		NoProxy:    os.Getenv("NO_PROXY"),
+		HTTPProxy:    os.Getenv("HTTP_PROXY"),
+		HTTPSProxy:   os.Getenv("HTTPS_PROXY"),
+		NoProxy:      os.Getenv("NO_PROXY"),
+		AdditionalCA: cert != nil,
 	}
 
 	valuesYaml, err := yaml.Marshal(values)
@@ -232,7 +242,10 @@ func (e *OperatorController) RecordCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*m
 	if !strings.HasPrefix(apiEndpoint, "https://") {
 		apiEndpoint = "https://" + apiEndpoint
 	}
-	caCert := string(caSecret.Data["ca"])
+	caCert, err := addAdditionalCA(e.SecretsCache, string(caSecret.Data["ca"]))
+	if err != nil {
+		return cluster, err
+	}
 	if cluster.Status.APIEndpoint == apiEndpoint && cluster.Status.CACert == caCert {
 		return cluster, nil
 	}
@@ -250,4 +263,43 @@ func (e *OperatorController) RecordCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*m
 	})
 
 	return currentCluster, err
+}
+
+func GenerateSAToken(restConfig *rest.Config) (string, error) {
+	clientSet, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return "", fmt.Errorf("error creating clientset: %v", err)
+	}
+
+	return util.GenerateServiceAccountToken(clientSet)
+}
+
+func addAdditionalCA(secretsCache wranglerv1.SecretCache, caCert string) (string, error) {
+	additionalCA, err := getAdditionalCA(secretsCache)
+	if err != nil {
+		return caCert, err
+	}
+	if additionalCA == nil {
+		return caCert, nil
+	}
+
+	caBytes, err := base64.StdEncoding.DecodeString(caCert)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(append(caBytes, additionalCA...)), nil
+}
+
+func getAdditionalCA(secretsCache wranglerv1.SecretCache) ([]byte, error) {
+	secret, err := secretsCache.Get(namespace.System, "tls-ca-additional")
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if secret == nil {
+		return nil, nil
+	}
+
+	return secret.Data["ca-additional.pem"], nil
 }

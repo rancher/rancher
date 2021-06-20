@@ -2,14 +2,19 @@ package rancher
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -19,19 +24,29 @@ import (
 	crds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
+	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/ui"
 	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/pkg/wrangler"
+	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/k8scheck"
+	"github.com/rancher/wrangler/pkg/unstructured"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 )
+
+const encryptionConfigUpdate = "provisioner.cattle.io/encrypt-migrated"
 
 type Options struct {
 	ACMEDomains       cli.StringSlice
@@ -82,11 +97,26 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	// Run the encryption migration before any controllers run otherwise the fields will be dropped
+	if err := migrateEncryptionConfig(ctx, restConfig); err != nil {
+		return nil, err
+	}
+
 	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
 	}
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
+
+	// Initialize Features as early as possible
+	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
+		return nil, err
+	}
+
+	if err := features.MigrateFeatures(wranglerContext.Mgmt.Feature(), wranglerContext.CRD.CustomResourceDefinition()); err != nil {
+		return nil, fmt.Errorf("migrating features: %w", err)
+	}
+	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
 
 	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
 	kontainerdriver.RegisterIndexers(wranglerContext)
@@ -96,8 +126,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	// Initialize Features as early as possible
-	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
+	if features.MCM.Enabled() && !features.Fleet.Enabled() {
+		logrus.Info("fleet can't be turned off when MCM is enabled. Turning on fleet feature")
+		if err := features.SetFeature(wranglerContext.Mgmt.Feature(), features.Fleet.Name(), true); err != nil {
+			return nil, err
+		}
+	}
 
 	if features.Auth.Enabled() {
 		authServer, err = auth.NewServer(ctx, restConfig)
@@ -112,12 +146,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
-		Controllers:                wranglerContext.Controllers,
-		AccessSetLookup:            wranglerContext.ASL,
-		AuthMiddleware:             steveauth.ExistingContext,
-		AggregationSecretNamespace: namespace.System,
-		AggregationSecretName:      "steve-aggregation",
-		Next:                       ui.New(wranglerContext.Mgmt.Preference().Cache()),
+		Controllers:     wranglerContext.Controllers,
+		AccessSetLookup: wranglerContext.ASL,
+		AuthMiddleware:  steveauth.ExistingContext,
+		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
 	})
 	if err != nil {
 		return nil, err
@@ -133,6 +165,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	additionalAPIPreMCM := steveapi.AdditionalAPIsPreMCM(wranglerContext)
 	additionalAPI, err := steveapi.AdditionalAPIs(ctx, wranglerContext, steve)
 	if err != nil {
 		return nil, err
@@ -140,21 +173,23 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, opts.AuditLevel, opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
-	aggregation := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
+	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
 			auditFilter),
 		Handler: responsewriter.Chain{
+			auth.SetXAPICattleAuthHeader,
 			responsewriter.ContentTypeOptions,
 			websocket.NewWebsocketHandler,
 			proxy.RewriteLocalCluster,
 			clusterProxy,
-			aggregation,
+			aggregationMiddleware,
+			additionalAPIPreMCM,
 			wranglerContext.MultiClusterManager.Middleware,
 			authServer.Management,
 			additionalAPI,
-			requests.NewRequireAuthenticatedFilter("/v1/"),
+			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"),
 		}.Handler(steve),
 		Wrangler:   wranglerContext,
 		Steve:      steve,
@@ -177,11 +212,17 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return err
 	}
 
+	if features.MCM.Enabled() {
+		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
+			return err
+		}
+	}
+
 	r.Wrangler.OnLeader(func(ctx context.Context) error {
+		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
+			return err
+		}
 		return r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
-			if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
-				return err
-			}
 			return dashboard.Register(ctx, r.Wrangler)
 		})
 	})
@@ -203,6 +244,8 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	r.Wrangler.MultiClusterManager.Wait(ctx)
 
+	r.startAggregation(ctx)
+	go r.Steve.StartAggregation(ctx)
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
@@ -215,6 +258,10 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+func (r *Rancher) startAggregation(ctx context.Context) {
+	aggregation2.Watch(ctx, r.Wrangler.Core.Secret(), namespace.System, "steve-aggregation", r.Handler)
 }
 
 func newMCM(wrangler *wrangler.Context, opts *Options) wrangler.MultiClusterManager {
@@ -238,4 +285,69 @@ func localClusterEnabled(opts *Options) bool {
 		return true
 	}
 	return false
+}
+
+// migrateEncryptionConfig uses the dynamic client to get all clusters and then marshals them through the
+// standard go JSON package using the updated backing structs in RKE that include JSON tags. The k8s JSON
+// tools are strict with casing so the fields would be dropped before getting saved back in the proper casing
+// if any controller touches the cluster first. See https://github.com/rancher/rancher/issues/31385
+func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error {
+	dynamicClient, err := k8dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return err
+	}
+	clusterDynamicClient := dynamicClient.Resource(mgmntv3.ClusterGroupVersionResource)
+
+	clusters, err := clusterDynamicClient.List(ctx, metav1.ListOptions{})
+	if err != nil {
+		if !k8serror.IsNotFound(err) {
+			return err
+		}
+		// IsNotFound error means the CRD type doesn't exist in the cluster, indicating this is the first Rancher startup
+		return nil
+	}
+
+	var allErrors error
+
+	for _, c := range clusters.Items {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			rawDynamicCluster, err := clusterDynamicClient.Get(ctx, c.GetName(), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			annotations := rawDynamicCluster.GetAnnotations()
+			if annotations != nil && annotations[encryptionConfigUpdate] == "true" {
+				return nil
+			}
+
+			clusterBytes, err := rawDynamicCluster.MarshalJSON()
+			if err != nil {
+				return errors.Wrap(err, "error trying to Marshal dynamic cluster")
+			}
+
+			var cluster *v3.Cluster
+
+			if err := json.Unmarshal(clusterBytes, &cluster); err != nil {
+				return errors.Wrap(err, "error trying to Unmarshal dynamicCluster into v3 cluster")
+			}
+
+			if cluster.Annotations == nil {
+				cluster.Annotations = make(map[string]string)
+			}
+			cluster.Annotations[encryptionConfigUpdate] = "true"
+
+			u, err := unstructured.ToUnstructured(cluster)
+			if err != nil {
+				return err
+			}
+
+			_, err = clusterDynamicClient.Update(ctx, u, metav1.UpdateOptions{})
+			return err
+		})
+		if err != nil {
+			allErrors = multierror.Append(err, allErrors)
+		}
+	}
+	return allErrors
 }

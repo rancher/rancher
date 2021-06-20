@@ -442,7 +442,7 @@ func (csh *cisScanHandler) deleteApp(appInfo *appInfo) error {
 func (csh *cisScanHandler) ensureCleanup(cs *v3.ClusterScan) error {
 	var err error
 
-	// Delete the dameonset
+	// Delete the DaemonSet
 	dss, e := csh.dsLister.List(v32.DefaultNamespaceForCis, labels.Everything())
 	if e != nil {
 		err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error listing ds: %v", e))
@@ -461,8 +461,8 @@ func (csh *cisScanHandler) ensureCleanup(cs *v3.ClusterScan) error {
 	}
 
 	// Delete cms
-	cms, err := csh.cmLister.List(v32.DefaultNamespaceForCis, labels.Everything())
-	if err != nil {
+	cms, e := csh.cmLister.List(v32.DefaultNamespaceForCis, labels.Everything())
+	if e != nil {
 		err = multierror.Append(err, fmt.Errorf("cis: ensureCleanup: error listing cm: %v", e))
 	} else {
 		for _, cm := range cms {

@@ -36,7 +36,7 @@ RANCHER_INSTALL_MODE = os.environ.get("RANCHER_INSTALL_MODE", "INSTALL_K3S_VERSI
 RANCHER_RDS_ENVIRONMENT = os.environ.get("RANCHER_RDS_ENVIRONMENT", "dev")
 RANCHER_RDS_ENGINE_MODE = os.environ.get("RANCHER_RDS_ENGINE_MODE", "provisioned")
 RANCHER_CLUSTER_TYPE = os.environ.get("RANCHER_CLUSTER_TYPE", "external_db")
-RANCHER_VOLUME_SIZE = os.environ.get("RANCHER_VOLUME_SIZE", "20")
+AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "8")
 RANCHER_RHEL_USERNAME = os.environ.get("RANCHER_RHEL_USERNAME")
 RANCHER_RHEL_PASSWORD = os.environ.get("RANCHER_RHEL_PASSWORD")
 
@@ -162,7 +162,7 @@ def create_multiple_control_cluster():
                               'engine_mode': RANCHER_RDS_ENGINE_MODE,
                               'environment': RANCHER_RDS_ENVIRONMENT,
                               'cluster_type': RANCHER_CLUSTER_TYPE,
-                              'volume_size': RANCHER_VOLUME_SIZE})
+                              'volume_size': AWS_VOLUME_SIZE})
     print("Creating cluster")
     tf.init()
     tf.plan(out="plan_server.out")
@@ -187,7 +187,7 @@ def create_multiple_control_cluster():
                                   'username': RANCHER_RHEL_USERNAME,
                                   'password': RANCHER_RHEL_PASSWORD,
                                   'install_mode': RANCHER_INSTALL_MODE,
-                                  'volume_size': RANCHER_VOLUME_SIZE,
+                                  'volume_size': AWS_VOLUME_SIZE,
                                   'worker_flags': RANCHER_K3S_WORKER_FLAGS})
 
         print("Joining worker nodes")

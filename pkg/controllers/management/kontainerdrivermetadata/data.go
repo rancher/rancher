@@ -13,7 +13,6 @@ import (
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/types/convert"
 	setting2 "github.com/rancher/rancher/pkg/api/norman/store/setting"
-	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -91,13 +90,11 @@ func (md *MetadataController) createOrUpdateMetadata(data kdm.Data) error {
 	if err := md.saveAddons(data, localData.K8sVersionedTemplates); err != nil {
 		return err
 	}
-	if features.Legacy.Enabled() {
-		if err := md.saveCisConfigParams(data.CisConfigParams); err != nil {
-			return fmt.Errorf("error saving cisDefaultConfigs: %v", err)
-		}
-		if err := md.saveCisBenchmarkVersions(data.CisBenchmarkVersionInfo); err != nil {
-			return fmt.Errorf("error saving cisBechmarkVersions: %v", err)
-		}
+	if err := md.saveCisConfigParams(data.CisConfigParams); err != nil {
+		return fmt.Errorf("error saving cisDefaultConfigs: %v", err)
+	}
+	if err := md.saveCisBenchmarkVersions(data.CisBenchmarkVersionInfo); err != nil {
+		return fmt.Errorf("error saving cisBechmarkVersions: %v", err)
 	}
 	return nil
 }
@@ -199,10 +196,7 @@ func (md *MetadataController) saveAllServiceOptions(linuxSvcOptions map[string]r
 		return err
 	}
 	// save windows options
-	if err := md.saveServiceOptions(windowsSvcOptions, localWindowsSvcOptions, Windows); err != nil {
-		return err
-	}
-	return nil
+	return md.saveServiceOptions(windowsSvcOptions, localWindowsSvcOptions, Windows)
 }
 
 func (md *MetadataController) saveServiceOptions(k8sVersionServiceOptions map[string]rketypes.KubernetesServicesOptions,
@@ -750,7 +744,7 @@ func getUserSettings(userSettings map[string]string, defaultK8sVersions map[stri
 
 func getDefaultK8sVersion(rancherDefaultK8sVersions map[string]string, k8sCurrVersions []string, rancherVersion string) (string, error) {
 	defaultK8sVersion, ok := rancherDefaultK8sVersions["user"]
-	if defaultK8sVersion != "" {
+	if ok && defaultK8sVersion != "" {
 		found := false
 		for _, k8sVersion := range k8sCurrVersions {
 			if k8sVersion == defaultK8sVersion {

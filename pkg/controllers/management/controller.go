@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	"github.com/rancher/rancher/pkg/controllers/management/clustergc"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/clustertemplate"
@@ -29,11 +28,11 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {
+func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager, wrangler *wrangler.Context) {
 	// auth handlers need to run early to create namespaces that back clusters and projects
 	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
 	auth.RegisterEarly(ctx, management, manager)
@@ -48,7 +47,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clusterprovisioner.Register(ctx, management)
 	clusterstats.Register(ctx, management, manager)
 	clusterstatus.Register(ctx, management)
-	clusterregistrationtoken.Register(ctx, management)
 	kontainerdriver.Register(ctx, management)
 	kontainerdrivermetadata.Register(ctx, management)
 	nodedriver.Register(ctx, management)
@@ -61,20 +59,14 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	nodetemplate.Register(ctx, management)
 	rkeworkerupgrader.Register(ctx, management, manager.ScaledContext)
 	rbac.Register(ctx, management)
-	restrictedadminrbac.Register(ctx, management)
+	restrictedadminrbac.Register(ctx, management, wrangler)
+	managementlegacy.Register(ctx, management, manager)
 
-	if features.Legacy.Enabled() {
-		managementlegacy.Register(ctx, management, manager)
-	}
+	// Ensure caches are available for user controllers, these are used as part of
+	// registration
+	management.Management.ClusterAlertGroups("").Controller()
+	management.Management.ClusterAlertRules("").Controller()
 
 	// Register last
 	auth.RegisterLate(ctx, management)
-
-	if features.Legacy.Enabled() {
-		// Ensure caches are available for user controllers, these are used as part of
-		// registration
-		management.Management.ClusterAlertGroups("").Controller()
-		management.Management.ClusterAlertRules("").Controller()
-	}
-
 }

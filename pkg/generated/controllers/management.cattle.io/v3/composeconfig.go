@@ -360,6 +360,10 @@ func (a *composeConfigGeneratingHandler) Remove(key string, obj *v3.ComposeConfi
 }
 
 func (a *composeConfigGeneratingHandler) Handle(obj *v3.ComposeConfig, status v3.ComposeStatus) (v3.ComposeStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ComposeConfigGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

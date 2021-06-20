@@ -2,6 +2,7 @@ package auth
 
 import (
 	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,6 +53,13 @@ func (n *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 		if _, err := n.tokens.Update(newObj); err != nil {
 			return nil, err
 		}
+	}
+
+	// DO NOT remove until tokenHashing is always
+	// expected. Anything below this will only execute
+	// if tokenHashing is enabled
+	if !features.TokenHashing.Enabled() {
+		return obj, nil
 	}
 
 	if obj.Annotations[tokenUtil.TokenHashed] != "true" {

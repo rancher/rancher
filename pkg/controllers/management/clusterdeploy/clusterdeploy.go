@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
@@ -255,28 +256,26 @@ func getDesiredImage(cluster *v3.Cluster) string {
 	return cluster.Spec.DesiredAgentImage
 }
 
+func (cd *clusterDeploy) getDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+	return map[string]bool{
+		features.MCM.Name():                false,
+		features.MCMAgent.Name():           true,
+		features.Fleet.Name():              false,
+		features.RKE2.Name():               false,
+		features.ProvisioningV2.Name():     false,
+		features.EmbeddedClusterAPI.Name(): false,
+		features.MonitoringV1.Name():       cluster.Spec.EnableClusterMonitoring,
+	}
+}
+
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
 	}
 
-	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
-	desiredAgent := getDesiredImage(cluster)
-	if desiredAgent == "" || desiredAgent == "fixed" {
-		desiredAgent = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-	}
-	logrus.Tracef("clusterDeploy: deployAgent: desiredAgent is [%s] for cluster [%s]", desiredAgent, cluster.Name)
-
-	var desiredAuth string
-	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-		desiredAuth = cluster.Spec.DesiredAuthImage
-		if desiredAuth == "" || desiredAuth == "fixed" {
-			desiredAuth = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
-		}
-	}
-	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
-
-	desiredFeatures := map[string]bool{}
+	desiredAgent := systemtemplate.GetDesiredAgentImage(cluster)
+	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
+	desiredFeatures := systemtemplate.GetDesiredFeatures(cluster)
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 

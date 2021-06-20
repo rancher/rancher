@@ -7,7 +7,10 @@ import (
 
 	"github.com/rancher/apiserver/pkg/handlers"
 	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/rancher/pkg/api/steve/norman"
+	normanv3 "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
@@ -16,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func Register(ctx context.Context, server *steve.Server) error {
+func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Context) error {
 	shell := &shell{
 		cg:           server.ClientFactory,
 		namespace:    "cattle-system",
@@ -29,8 +32,9 @@ func Register(ctx context.Context, server *steve.Server) error {
 	})
 
 	server.SchemaFactory.AddTemplate(schema2.Template{
-		Group: "management.cattle.io",
-		Kind:  "Cluster",
+		Group:     "management.cattle.io",
+		Kind:      "Cluster",
+		Formatter: norman.NewLinksAndActionsFormatter(wrangler.MultiClusterManager, normanv3.Version, "cluster"),
 		Customize: func(schema *types.APISchema) {
 			if schema.LinkHandlers == nil {
 				schema.LinkHandlers = map[string]http.Handler{}

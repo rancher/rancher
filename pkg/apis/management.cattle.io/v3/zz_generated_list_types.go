@@ -689,6 +689,23 @@ func NewLocalProvider(namespace, name string, obj LocalProvider) *LocalProvider 
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ManagedChartList is a list of ManagedChart resources
+type ManagedChartList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ManagedChart `json:"items"`
+}
+
+func NewManagedChart(namespace, name string, obj ManagedChart) *ManagedChart {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ManagedChart").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // MonitorMetricList is a list of MonitorMetric resources
 type MonitorMetricList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -818,6 +835,23 @@ type NotifierList struct {
 
 func NewNotifier(namespace, name string, obj Notifier) *Notifier {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Notifier").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// OIDCProviderList is a list of OIDCProvider resources
+type OIDCProviderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []OIDCProvider `json:"items"`
+}
+
+func NewOIDCProvider(namespace, name string, obj OIDCProvider) *OIDCProvider {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("OIDCProvider").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

@@ -20,8 +20,10 @@ const (
 	ServiceFieldIPAddresses                   = "ipAddresses"
 	ServiceFieldIPFamilies                    = "ipFamilies"
 	ServiceFieldIPFamilyPolicy                = "ipFamilyPolicy"
+	ServiceFieldInternalTrafficPolicy         = "internalTrafficPolicy"
 	ServiceFieldKind                          = "kind"
 	ServiceFieldLabels                        = "labels"
+	ServiceFieldLoadBalancerClass             = "loadBalancerClass"
 	ServiceFieldLoadBalancerIP                = "loadBalancerIP"
 	ServiceFieldLoadBalancerSourceRanges      = "loadBalancerSourceRanges"
 	ServiceFieldName                          = "name"
@@ -61,8 +63,10 @@ type Service struct {
 	IPAddresses                   []string               `json:"ipAddresses,omitempty" yaml:"ipAddresses,omitempty"`
 	IPFamilies                    []string               `json:"ipFamilies,omitempty" yaml:"ipFamilies,omitempty"`
 	IPFamilyPolicy                string                 `json:"ipFamilyPolicy,omitempty" yaml:"ipFamilyPolicy,omitempty"`
+	InternalTrafficPolicy         string                 `json:"internalTrafficPolicy,omitempty" yaml:"internalTrafficPolicy,omitempty"`
 	Kind                          string                 `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LoadBalancerClass             string                 `json:"loadBalancerClass,omitempty" yaml:"loadBalancerClass,omitempty"`
 	LoadBalancerIP                string                 `json:"loadBalancerIP,omitempty" yaml:"loadBalancerIP,omitempty"`
 	LoadBalancerSourceRanges      []string               `json:"loadBalancerSourceRanges,omitempty" yaml:"loadBalancerSourceRanges,omitempty"`
 	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`

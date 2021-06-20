@@ -12,6 +12,7 @@ const (
 	ClusterRegistrationTokenFieldCreated              = "created"
 	ClusterRegistrationTokenFieldCreatorID            = "creatorId"
 	ClusterRegistrationTokenFieldInsecureCommand      = "insecureCommand"
+	ClusterRegistrationTokenFieldInsecureNodeCommand  = "insecureNodeCommand"
 	ClusterRegistrationTokenFieldLabels               = "labels"
 	ClusterRegistrationTokenFieldManifestURL          = "manifestUrl"
 	ClusterRegistrationTokenFieldName                 = "name"
@@ -35,6 +36,7 @@ type ClusterRegistrationToken struct {
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	InsecureCommand      string            `json:"insecureCommand,omitempty" yaml:"insecureCommand,omitempty"`
+	InsecureNodeCommand  string            `json:"insecureNodeCommand,omitempty" yaml:"insecureNodeCommand,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	ManifestURL          string            `json:"manifestUrl,omitempty" yaml:"manifestUrl,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`

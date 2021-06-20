@@ -3,7 +3,7 @@ package helm
 import (
 	"context"
 
-	"github.com/docker/docker/pkg/locker"
+	"github.com/moby/locker"
 	"github.com/rancher/lasso/pkg/client"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/helm"

@@ -258,9 +258,10 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) ([
 	}
 	for _, a := range updateMultiClusterAppTargetsInput.Answers {
 		inputAnswers = append(inputAnswers, v32.Answer{
-			ProjectName: a.ProjectID,
-			ClusterName: a.ClusterID,
-			Values:      a.Values,
+			ProjectName:     a.ProjectID,
+			ClusterName:     a.ClusterID,
+			Values:          a.Values,
+			ValuesSetString: a.ValuesSetString,
 		})
 	}
 	// check if the input includes answers, and if they are only for the input projects

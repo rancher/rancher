@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -53,13 +56,15 @@ type log struct {
 	ResponseHeader    http.Header  `json:"responseHeader,omitempty"`
 	RequestBody       []byte       `json:"requestBody,omitempty"`
 	ResponseBody      []byte       `json:"responseBody,omitempty"`
+	UserLoginName     string       `json:"userLoginName,omitempty"`
 }
 
 var userKey struct{}
 
 type User struct {
-	Name  string   `json:"name,omitempty"`
-	Group []string `json:"group,omitempty"`
+	Name  string              `json:"name,omitempty"`
+	Group []string            `json:"group,omitempty"`
+	Extra map[string][]string `json:"extra,omitempty"`
 	// RequestUser is the --as user
 	RequestUser string `json:"requestUser,omitempty"`
 	// RequestGroups is the --as-group list
@@ -71,7 +76,18 @@ func getUserInfo(req *http.Request) *User {
 	return &User{
 		Name:  user.GetName(),
 		Group: user.GetGroups(),
+		Extra: user.GetExtra(),
 	}
+}
+
+func getUserNameForBasicLogin(body []byte) string {
+	input := &v32.BasicLogin{}
+	err := json.Unmarshal(body, input)
+	if err != nil {
+		logrus.Debugf("error unmarshalling input, cannot add login info to audit log: %v", err)
+		return ""
+	}
+	return input.Username
 }
 
 func FromContext(ctx context.Context) (*User, bool) {
@@ -92,12 +108,23 @@ func newAuditLog(writer *LogWriter, req *http.Request) (*auditLog, error) {
 	}
 
 	contentType := req.Header.Get("Content-Type")
-	if writer.Level >= levelRequest && bodyMethods[req.Method] && contentType == contentTypeJSON {
-		reqBody, err := readBodyWithoutLosingContent(req)
-		if err != nil {
-			return nil, err
+	loginReq := isLoginRequest(req.RequestURI)
+	if writer.Level >= levelRequest || loginReq {
+		if bodyMethods[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
+			reqBody, err := readBodyWithoutLosingContent(req)
+			if err != nil {
+				return nil, err
+			}
+			if loginReq {
+				loginName := getUserNameForBasicLogin(reqBody)
+				if loginName != "" {
+					auditLog.log.UserLoginName = loginName
+				}
+			}
+			if writer.Level >= levelRequest {
+				auditLog.reqBody = reqBody
+			}
 		}
-		auditLog.reqBody = reqBody
 	}
 	return auditLog, nil
 }
@@ -108,6 +135,13 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	a.log.RequestHeader = filterOutHeaders(reqHeaders, sensitiveRequestHeader)
 	a.log.ResponseHeader = filterOutHeaders(resHeaders, sensitiveResponseHeader)
 	a.log.ResponseCode = resCode
+	if a.log.UserLoginName != "" {
+		if a.log.User.Extra == nil {
+			a.log.User.Extra = make(map[string][]string)
+		}
+		a.log.User.Extra["username"] = []string{a.log.UserLoginName}
+		logrus.Debugf("Added username for login request to audit log %v", a.log.UserLoginName)
+	}
 
 	var buffer bytes.Buffer
 	alByte, err := json.Marshal(a.log)
@@ -135,6 +169,10 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	compactBuffer.WriteString("\n")
 	_, err = a.writer.Output.Write(compactBuffer.Bytes())
 	return err
+}
+
+func isLoginRequest(uri string) bool {
+	return strings.Contains(uri, "?action=login")
 }
 
 func readBodyWithoutLosingContent(req *http.Request) ([]byte, error) {

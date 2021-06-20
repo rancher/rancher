@@ -207,34 +207,40 @@ grafana.persistence.accessMode       	| ReadWriteOnce
 grafana.persistence.size             	| 50Gi
 
 */
-func OverwriteAppAnswersAndCatalogID(rawAnswers map[string]string, annotations map[string]string,
-	catalogTemplateLister mgmtv3.CatalogTemplateLister, catalogManager manager.CatalogManager, clusterName string) (map[string]string, string, error) {
-	overwriteAnswers, version := GetOverwroteAppAnswersAndVersion(annotations)
-	for specialKey, value := range overwriteAnswers {
+func OverwriteAppAnswersAndCatalogID(
+	rawAnswers,
+	rawAnswersSetString map[string]string,
+	annotations map[string]string,
+	catalogTemplateLister mgmtv3.CatalogTemplateLister,
+	catalogManager manager.CatalogManager,
+	clusterName string,
+) (map[string]string, map[string]string, string, error) {
+	monitoringInput := GetMonitoringInput(annotations)
+	resolveSpecialAnswersKeys(rawAnswers, monitoringInput.Answers)
+	resolveSpecialAnswersKeys(rawAnswersSetString, monitoringInput.AnswersSetString)
+	catalogID, err := GetMonitoringCatalogID(monitoringInput.Version, catalogTemplateLister, catalogManager, clusterName)
+	return rawAnswers, rawAnswersSetString, catalogID, err
+}
+
+func resolveSpecialAnswersKeys(rawAnswers, answers map[string]string) {
+	for specialKey, value := range answers {
 		if strings.HasPrefix(specialKey, "_tpl-") {
 			trr := tplRegexp.translate(value)
-			for suffixKey, value := range overwriteAnswers {
+			for suffixKey, value := range answers {
 				if strings.HasPrefix(suffixKey, trr.middlePrefix) {
 					for _, prefixKey := range trr.roots {
 						actualKey := fmt.Sprintf("%s.%s", prefixKey, suffixKey)
-
 						rawAnswers[actualKey] = value
 					}
-
-					delete(overwriteAnswers, suffixKey)
+					delete(answers, suffixKey)
 				}
 			}
-
-			delete(overwriteAnswers, specialKey)
+			delete(answers, specialKey)
 		}
 	}
-
-	for key, value := range overwriteAnswers {
+	for key, value := range answers {
 		rawAnswers[key] = value
 	}
-	catalogID, err := GetMonitoringCatalogID(version, catalogTemplateLister, catalogManager, clusterName)
-
-	return rawAnswers, catalogID, err
 }
 
 func GetMonitoringCatalogID(version string, catalogTemplateLister mgmtv3.CatalogTemplateLister, catalogManager manager.CatalogManager, clusterName string) (string, error) {
@@ -288,16 +294,16 @@ func (tr *templateRegexp) translate(value string) *templateRegexpResult {
 	return captures
 }
 
-func GetOverwroteAppAnswersAndVersion(annotations map[string]string) (map[string]string, string) {
+func GetMonitoringInput(annotations map[string]string) v32.MonitoringInput {
 	overwritingAppAnswers := annotations[cattleOverwriteAppAnswersAnnotationKey]
 	if len(overwritingAppAnswers) != 0 {
 		var appOverwriteInput v32.MonitoringInput
 		err := json.Unmarshal([]byte(overwritingAppAnswers), &appOverwriteInput)
 		if err == nil {
-			return appOverwriteInput.Answers, appOverwriteInput.Version
+			return appOverwriteInput
 		}
 		logrus.Errorf("failed to parse app overwrite input from %q, %v", overwritingAppAnswers, err)
 	}
 
-	return map[string]string{}, ""
+	return v32.MonitoringInput{}
 }

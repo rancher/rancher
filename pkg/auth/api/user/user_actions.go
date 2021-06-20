@@ -18,6 +18,7 @@ import (
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpassword")
+
 	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
 		resource.AddAction(apiContext, "refreshauthprovideraccess")
 	}

@@ -46,7 +46,7 @@ func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[stri
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list templates for %v", catalogName)
 	}
-	templateMap := map[string]*v3.CatalogTemplate{}
+	templateMap := make(map[string]*v3.CatalogTemplate)
 	for _, t := range templateList {
 		templateMap[t.Name] = t
 	}

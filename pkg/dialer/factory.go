@@ -2,6 +2,7 @@ package dialer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -28,6 +29,8 @@ const (
 	WaitForAgentError = "waiting for cluster [%s] agent to connect"
 )
 
+var ErrAgentDisconnected = errors.New("cluster agent disconnected")
+
 func NewFactory(apiContext *config.ScaledContext, wrangler *wrangler.Context) (*Factory, error) {
 	return &Factory{
 		clusterLister: apiContext.Management.Clusters("").Controller().Lister(),
@@ -46,6 +49,7 @@ func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		d, err := f.clusterDialer(clusterName, address)
 		if err != nil {
+			logrus.Debugf(WaitForAgentError, clusterName)
 			return nil, err
 		}
 		return d(ctx, network, address)
@@ -69,6 +73,14 @@ func IsPublicCloudDriver(cluster *v3.Cluster) bool {
 
 func HasOnlyPrivateAPIEndpoint(cluster *v3.Cluster) bool {
 	switch cluster.Status.Driver {
+	case v32.ClusterDriverAKS:
+		if cluster.Status.AKSStatus.UpstreamSpec != nil &&
+			cluster.Status.AKSStatus.UpstreamSpec.PrivateCluster != nil &&
+			!*cluster.Status.AKSStatus.UpstreamSpec.PrivateCluster {
+			return false
+		}
+		return cluster.Status.AKSStatus.PrivateRequiresTunnel != nil &&
+			*cluster.Status.AKSStatus.PrivateRequiresTunnel
 	case v32.ClusterDriverEKS:
 		if cluster.Status.EKSStatus.UpstreamSpec != nil &&
 			cluster.Status.EKSStatus.UpstreamSpec.PublicAccess != nil &&
@@ -239,7 +251,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 		time.Sleep(wait.Jitter(5*time.Second, 1))
 	}
 
-	return nil, fmt.Errorf(WaitForAgentError, cluster.Name)
+	return nil, ErrAgentDisconnected
 }
 
 func hostPort(cluster *v3.Cluster) string {

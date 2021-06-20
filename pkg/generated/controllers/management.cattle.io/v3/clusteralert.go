@@ -360,6 +360,10 @@ func (a *clusterAlertGeneratingHandler) Remove(key string, obj *v3.ClusterAlert)
 }
 
 func (a *clusterAlertGeneratingHandler) Handle(obj *v3.ClusterAlert, status v3.AlertStatus) (v3.AlertStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ClusterAlertGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

@@ -49,11 +49,7 @@ var (
 
 func RegisterIndexer(ctx context.Context, apiContext *config.ScaledContext) error {
 	informer := apiContext.Management.Users("").Controller().Informer()
-	if err := informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer}); err != nil {
-		return err
-	}
-
-	return nil
+	return informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
 }
 
 func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager {
@@ -174,7 +170,7 @@ func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
 		lookupUsingClient = true
 	}
 
-	storedToken := &v3.Token{}
+	var storedToken *v3.Token
 	if lookupUsingClient {
 		storedToken, err = m.tokensClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {
@@ -634,7 +630,8 @@ var uaBackoff = wait.Backoff{
 
 func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
 	provider := userPrincipal.Provider
-	if (provider == "github" || provider == "azuread" || provider == "googleoauth") && providerToken != "" {
+	// Providers that use oauth need to create a secret for storing the access token.
+	if (provider == "github" || provider == "azuread" || provider == "googleoauth" || provider == "oidc" || provider == "keycloakoidc") && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
 		if err != nil {
 			return v3.Token{}, "", fmt.Errorf("unable to create secret: %s", err)

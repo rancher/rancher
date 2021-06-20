@@ -360,6 +360,10 @@ func (a *clusterRepoGeneratingHandler) Remove(key string, obj *v1.ClusterRepo) (
 }
 
 func (a *clusterRepoGeneratingHandler) Handle(obj *v1.ClusterRepo, status v1.RepoStatus) (v1.RepoStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ClusterRepoGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

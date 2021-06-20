@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/authn"
 	"github.com/rancher/rancher/pkg/api/norman/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
-	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterscan"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
@@ -57,9 +56,8 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/store/scoped"
 	settingstore "github.com/rancher/rancher/pkg/api/norman/store/setting"
 	"github.com/rancher/rancher/pkg/api/norman/store/userscope"
+	"github.com/rancher/rancher/pkg/auth/api"
 	authapi "github.com/rancher/rancher/pkg/auth/api"
-	"github.com/rancher/rancher/pkg/auth/api/user"
-	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
@@ -67,7 +65,6 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
@@ -120,49 +117,47 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterTemplateRevisionType,
 	)
 
-	if features.Legacy.Enabled() {
-		factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
-			client.CatalogType,
-			client.CatalogTemplateType,
-			client.CatalogTemplateVersionType,
-			client.ClusterAlertType,
-			client.ClusterAlertGroupType,
-			client.ClusterCatalogType,
-			client.ClusterLoggingType,
-			client.ClusterAlertRuleType,
-			client.ClusterMonitorGraphType,
-			client.ClusterScanType,
-			client.ComposeConfigType,
-			client.MultiClusterAppType,
-			client.MultiClusterAppRevisionType,
-			client.MonitorMetricType,
-			client.NotifierType,
-			client.ProjectAlertType,
-			client.ProjectAlertGroupType,
-			client.ProjectCatalogType,
-			client.ProjectLoggingType,
-			client.ProjectAlertRuleType,
-			client.ProjectMonitorGraphType,
-			client.CisConfigType,
-			client.CisBenchmarkVersionType,
-			client.TemplateType,
-			client.TemplateVersionType,
-			client.TemplateContentType,
-			client.GlobalDnsType,
-			client.GlobalDnsProviderType,
-		)
+	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
+		client.CatalogType,
+		client.CatalogTemplateType,
+		client.CatalogTemplateVersionType,
+		client.ClusterAlertType,
+		client.ClusterAlertGroupType,
+		client.ClusterCatalogType,
+		client.ClusterLoggingType,
+		client.ClusterAlertRuleType,
+		client.ClusterMonitorGraphType,
+		client.ClusterScanType,
+		client.ComposeConfigType,
+		client.MultiClusterAppType,
+		client.MultiClusterAppRevisionType,
+		client.MonitorMetricType,
+		client.NotifierType,
+		client.ProjectAlertType,
+		client.ProjectAlertGroupType,
+		client.ProjectCatalogType,
+		client.ProjectLoggingType,
+		client.ProjectAlertRuleType,
+		client.ProjectMonitorGraphType,
+		client.CisConfigType,
+		client.CisBenchmarkVersionType,
+		client.TemplateType,
+		client.TemplateVersionType,
+		client.TemplateContentType,
+		client.GlobalDnsType,
+		client.GlobalDnsProviderType,
+	)
 
-		factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
-			projectclient.AppType,
-			projectclient.AppRevisionType,
-			projectclient.PipelineExecutionType,
-			projectclient.PipelineSettingType,
-			projectclient.PipelineType,
-			projectclient.SourceCodeCredentialType,
-			projectclient.SourceCodeProviderConfigType,
-			projectclient.SourceCodeRepositoryType,
-		)
-	}
+	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
+		projectclient.AppType,
+		projectclient.AppRevisionType,
+		projectclient.PipelineExecutionType,
+		projectclient.PipelineSettingType,
+		projectclient.PipelineType,
+		projectclient.SourceCodeCredentialType,
+		projectclient.SourceCodeProviderConfigType,
+		projectclient.SourceCodeRepositoryType,
+	)
 
 	if err := factory.BatchWait(); err != nil {
 		return err
@@ -170,10 +165,10 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 
 	Clusters(schemas, apiContext, clusterManager, k8sProxy)
 	ClusterRoleTemplateBinding(schemas, apiContext)
-	User(ctx, schemas, apiContext)
+	api.User(ctx, schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	Setting(schemas)
-	Feature(schemas)
+	Feature(schemas, apiContext)
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas, apiContext)
 	Tokens(ctx, schemas, apiContext)
@@ -190,23 +185,21 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	SystemImages(schemas, apiContext)
 	EtcdBackups(schemas, apiContext)
 
-	if features.Legacy.Enabled() {
-		Templates(ctx, schemas, apiContext)
-		TemplateVersion(ctx, schemas, apiContext)
-		Catalog(schemas, apiContext)
-		ProjectCatalog(schemas, apiContext)
-		ClusterCatalog(schemas, apiContext)
-		App(schemas, apiContext, clusterManager)
-		LoggingTypes(schemas, apiContext, clusterManager, k8sProxy)
-		Alert(schemas, apiContext)
-		Pipeline(schemas, apiContext, clusterManager)
-		TemplateContent(schemas)
-		Monitor(schemas, apiContext, clusterManager)
-		MultiClusterApps(schemas, apiContext)
-		GlobalDNSs(schemas, apiContext, localClusterEnabled)
-		GlobalDNSProviders(schemas, apiContext, localClusterEnabled)
-		ClusterScans(schemas, apiContext, clusterManager)
-	}
+	Templates(ctx, schemas, apiContext)
+	TemplateVersion(ctx, schemas, apiContext)
+	Catalog(schemas, apiContext)
+	ProjectCatalog(schemas, apiContext)
+	ClusterCatalog(schemas, apiContext)
+	App(schemas, apiContext, clusterManager)
+	LoggingTypes(schemas, apiContext, clusterManager, k8sProxy)
+	Alert(schemas, apiContext)
+	Pipeline(schemas, apiContext, clusterManager)
+	TemplateContent(schemas)
+	Monitor(schemas, apiContext, clusterManager)
+	MultiClusterApps(schemas, apiContext)
+	GlobalDNSs(schemas, apiContext, localClusterEnabled)
+	GlobalDNSProviders(schemas, apiContext, localClusterEnabled)
+	ClusterScans(schemas, apiContext, clusterManager)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -220,10 +213,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	setupScopedTypes(schemas)
 	setupPasswordTypes(ctx, schemas, apiContext)
 
-	if features.Legacy.Enabled() {
-		multiclusterapp.SetMemberStore(ctx, schemas.Schema(&managementschema.Version, client.MultiClusterAppType), apiContext)
-		GlobalDNSProvidersPwdWrap(schemas, apiContext, localClusterEnabled)
-	}
+	multiclusterapp.SetMemberStore(ctx, schemas.Schema(&managementschema.Version, client.MultiClusterAppType), apiContext)
+	GlobalDNSProvidersPwdWrap(schemas, apiContext, localClusterEnabled)
 
 	return nil
 }
@@ -291,19 +282,17 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		GrLister:                      managementContext.Management.GlobalRoles("").Controller().Lister(),
 	}
 
-	if features.Legacy.Enabled() {
-		handler.ClusterScanClient = managementContext.Management.ClusterScans("")
-		handler.CatalogTemplateVersionLister = managementContext.Management.CatalogTemplateVersions("").Controller().Lister()
-		handler.CisConfigClient = managementContext.Management.CisConfigs("")
-		handler.CisConfigLister = managementContext.Management.CisConfigs("").Controller().Lister()
-		handler.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions("")
-		handler.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions("").Controller().Lister()
+	handler.ClusterScanClient = managementContext.Management.ClusterScans("")
+	handler.CatalogTemplateVersionLister = managementContext.Management.CatalogTemplateVersions("").Controller().Lister()
+	handler.CisConfigClient = managementContext.Management.CisConfigs("")
+	handler.CisConfigLister = managementContext.Management.CisConfigs("").Controller().Lister()
+	handler.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions("")
+	handler.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions("").Controller().Lister()
 
-		clusterValidator.CisConfigClient = managementContext.Management.CisConfigs(namespace.GlobalNamespace)
-		clusterValidator.CisConfigLister = managementContext.Management.CisConfigs(namespace.GlobalNamespace).Controller().Lister()
-		clusterValidator.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace)
-		clusterValidator.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace).Controller().Lister()
-	}
+	clusterValidator.CisConfigClient = managementContext.Management.CisConfigs(namespace.GlobalNamespace)
+	clusterValidator.CisConfigLister = managementContext.Management.CisConfigs(namespace.GlobalNamespace).Controller().Lister()
+	clusterValidator.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace)
+	clusterValidator.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace).Controller().Lister()
 
 	schema.ActionHandler = handler.ClusterActionHandler
 	schema.Validator = clusterValidator.Validator
@@ -368,7 +357,10 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.LinkHandler = handler.ExportYamlHandler
 	schema.Validator = catalog.Validator
-	schema.Store = catalogStore.Wrap(schema.Store)
+	users := managementContext.Management.Users("")
+	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
+	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
 }
 
 func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -380,7 +372,10 @@ func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.ActionHandler = handler.RefreshProjectCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.Validator = catalog.Validator
-	schema.Store = catalogStore.Wrap(schema.Store)
+	users := managementContext.Management.Users("")
+	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
+	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
 }
 
 func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -392,7 +387,10 @@ func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.ActionHandler = handler.RefreshClusterCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.Validator = catalog.Validator
-	schema.Store = catalogStore.Wrap(schema.Store)
+	users := managementContext.Management.Users("")
+	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
+	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas, management *config.ScaledContext) {
@@ -400,8 +398,6 @@ func ClusterRegistrationTokens(schemas *types.Schemas, management *config.Scaled
 	schema.Store = &cluster.RegistrationTokenStore{
 		Store: schema.Store,
 	}
-	tokenFormatter := clusterregistrationtokens.NewFormatter(management)
-	schema.Formatter = tokenFormatter.Formatter
 }
 
 func Tokens(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledContext) {
@@ -473,19 +469,6 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 		management.Core.Namespaces(""),
 		management.Management.NodeTemplates("").Controller().Lister())
 	credSchema.Validator = cred.Validator
-}
-
-func User(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.UserType)
-	handler := &user.Handler{
-		UserClient:               management.Management.Users(""),
-		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
-		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
-	}
-
-	schema.Formatter = handler.UserFormatter
-	schema.CollectionFormatter = handler.CollectionFormatter
-	schema.ActionHandler = handler.Actions
 }
 
 func Preference(schemas *types.Schemas, management *config.ScaledContext) {
@@ -564,9 +547,10 @@ func Setting(schemas *types.Schemas) {
 	schema.Store = settingstore.New(schema.Store)
 }
 
-func Feature(schemas *types.Schemas) {
+func Feature(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.FeatureType)
-	schema.Validator = feature.Validator
+	validator := feature.Validator{FeatureLister: management.Management.Features("").Controller().Lister()}
+	schema.Validator = validator.Validator
 	schema.Formatter = feature.Formatter
 	schema.Store = featStore.New(schema.Store)
 }
@@ -759,12 +743,10 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		Settings:             management.Management.Settings(""),
 	}
 
-	if features.Legacy.Enabled() {
-		metadataHandler.CisConfigLister = management.Management.CisConfigs("").Controller().Lister()
-		metadataHandler.CisConfig = management.Management.CisConfigs("")
-		metadataHandler.CisBenchmarkVersionLister = management.Management.CisBenchmarkVersions("").Controller().Lister()
-		metadataHandler.CisBenchmarkVersion = management.Management.CisBenchmarkVersions("")
-	}
+	metadataHandler.CisConfigLister = management.Management.CisConfigs("").Controller().Lister()
+	metadataHandler.CisConfig = management.Management.CisConfigs("")
+	metadataHandler.CisBenchmarkVersionLister = management.Management.CisBenchmarkVersions("").Controller().Lister()
+	metadataHandler.CisBenchmarkVersion = management.Management.CisBenchmarkVersions("")
 
 	handler := kontainerdriver.ActionHandler{
 		KontainerDrivers:      management.Management.KontainerDrivers(""),
@@ -775,9 +757,7 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		SysImageLister: management.Management.RkeK8sSystemImages("").Controller().Lister(),
 		SysImages:      management.Management.RkeK8sSystemImages(""),
 	}
-	if features.Legacy.Enabled() {
-		lh.CatalogLister = management.Management.Catalogs("").Controller().Lister()
-	}
+	lh.CatalogLister = management.Management.Catalogs("").Controller().Lister()
 	schema.ActionHandler = handler.ActionHandler
 	schema.CollectionFormatter = kontainerdriver.CollectionFormatter
 	schema.Formatter = kontainerdriver.NewFormatter(management)

@@ -51,6 +51,7 @@ var (
 	KubernetesVersionToSystemImages   = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent         = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated      = NewSetting("k8s-versions-deprecated", "")
+	KDMBranch                         = NewSetting("kdm-branch", "dev-v2.6")
 	MachineVersion                    = NewSetting("machine-version", "dev")
 	Namespace                         = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PeerServices                      = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
@@ -60,25 +61,29 @@ var (
 	ServerImage                       = NewSetting("server-image", "rancher/rancher")
 	ServerURL                         = NewSetting("server-url", "")
 	ServerVersion                     = NewSetting("server-version", "dev")
+	SystemAgentVersion                = NewSetting("system-agent-version", "")
 	SystemAgentInstallScript          = NewSetting("system-agent-install-script", "")
 	SystemAgentInstallerImage         = NewSetting("system-agent-installer-image", "docker.io/rancher/system-agent-installer-")
+	SystemAgentUpgradeImage           = NewSetting("system-agent-upgrade-image", "")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
-	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,fleet-system")
+	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system")
 	TelemetryOpt                      = NewSetting("telemetry-opt", "")
 	TokenHashing                      = NewSetting("token-hashing", "true")
 	TLSMinVersion                     = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                        = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
 	UIBanners                         = NewSetting("ui-banners", "{}")
-	UIDefaultLanding                  = NewSetting("ui-default-landing", "")
+	UIBrand                           = NewSetting("ui-brand", "")
+	UIDefaultLanding                  = NewSetting("ui-default-landing", "vue")
 	UIFeedBackForm                    = NewSetting("ui-feedback-form", "")
 	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
 	UIPath                            = NewSetting("ui-path", "/usr/share/rancher/ui")
 	UIDashboardIndex                  = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
 	UIDashboardPath                   = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
-	UIPreferred                       = NewSetting("ui-preferred", "ember")
+	UIPreferred                       = NewSetting("ui-preferred", "vue")
 	UIOfflinePreferred                = NewSetting("ui-offline-preferred", "dynamic")
 	UIIssues                          = NewSetting("ui-issues", "")
 	UIPL                              = NewSetting("ui-pl", "rancher")
+	UICommunityLinks                  = NewSetting("ui-community-links", "true")
 	UIKubernetesSupportedVersions     = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
 	UIKubernetesDefaultVersion        = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
 	WhitelistDomain                   = NewSetting("whitelist-domain", "forums.rancher.com")
@@ -93,19 +98,21 @@ var (
 	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.6")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
+	RKE2ChartDefaultBranch            = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
-	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.6")
+	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.7")
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
-	EKSUpstreamRefreshCron            = NewSetting("eks-refresh-cron", "*/5 * * * *")   // EKSUpstreamRefreshCron is deprecated and will be replaced by EKSUpstreamRefresh
+	AKSUpstreamRefresh                = NewSetting("aks-refresh", "300")
+	EKSUpstreamRefreshCron            = NewSetting("eks-refresh-cron", "*/5 * * * *") // EKSUpstreamRefreshCron is deprecated and will be replaced by EKSUpstreamRefresh
 	EKSUpstreamRefresh                = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                = NewSetting("gke-refresh", "300")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
+	MachineProvisionImage             = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher60")
 
-	FleetMinVersion           = NewSetting("fleet-min-version", "")
-	RancherOperatorMinVersion = NewSetting("rancher-operator-min-version", "")
-	RancherWebhookMinVersion  = NewSetting("rancher-webhook-min-version", "")
+	FleetMinVersion          = NewSetting("fleet-min-version", "")
+	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
 )
 
 func FullShellImage() string {
@@ -225,10 +232,7 @@ func GetEnvKey(key string) string {
 }
 
 func getMetadataConfig() string {
-	branch := os.Getenv("RANCHER_METADATA_BRANCH")
-	if branch == "" {
-		branch = "dev-v2.5"
-	}
+	branch := KDMBranch.Get()
 	data := map[string]interface{}{
 		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
 		"refresh-interval-minutes": "1440",

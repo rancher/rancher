@@ -11,7 +11,7 @@ initial_system_namespaces = set(["kube-node-lease",
                                  "kube-public",
                                  "cattle-global-data",
                                  "cattle-global-nt",
-                                 "fleet-system"])
+                                 "cattle-fleet-system"])
 loggingNamespace = "cattle-logging"
 
 
@@ -54,7 +54,7 @@ def test_system_namespaces_assigned(admin_cc):
     if loggingNamespace in system_namespaces_names:
         system_namespaces_names.remove(loggingNamespace)
 
-    assert system_namespaces_names == initial_system_namespaces
+    assert initial_system_namespaces.issubset(system_namespaces_names)
 
 
 def test_system_project_cant_be_deleted(admin_mc, admin_cc):

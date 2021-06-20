@@ -3,9 +3,11 @@ package gke
 import (
 	"context"
 	"encoding/base64"
+	stderrors "errors"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"time"
@@ -18,7 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/dialer"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/util"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
@@ -197,15 +197,16 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		if cluster.Status.GKEStatus.PrivateRequiresTunnel == nil &&
 			cluster.Status.GKEStatus.UpstreamSpec.PrivateClusterConfig != nil &&
 			cluster.Status.GKEStatus.UpstreamSpec.PrivateClusterConfig.EnablePrivateEndpoint {
+			// In this case, the API endpoint is private and it has not been determined if Rancher must tunnel to communicate with it.
 			// Check to see if we can still use the control plane endpoint even though
 			// the cluster has private-only access
 			serviceToken, mustTunnel, err := e.generateSATokenWithPublicAPI(cluster)
 			if err != nil {
 				return cluster, err
 			}
-			if mustTunnel {
+			if mustTunnel != nil {
 				cluster = cluster.DeepCopy()
-				cluster.Status.GKEStatus.PrivateRequiresTunnel = &mustTunnel
+				cluster.Status.GKEStatus.PrivateRequiresTunnel = mustTunnel
 				cluster.Status.ServiceAccountToken = serviceToken
 				return e.ClusterClient.Update(cluster)
 			}
@@ -215,7 +216,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			cluster, err = e.generateAndSetServiceAccount(cluster)
 			if err != nil {
 				var statusErr error
-				if strings.Contains(err.Error(), fmt.Sprintf(dialer.WaitForAgentError, cluster.Name)) {
+				if err == dialer.ErrAgentDisconnected {
 					// In this case, the API endpoint is private and rancher is waiting for the import cluster command to be run.
 					cluster, statusErr = e.SetUnknown(cluster, apimgmtv3.ClusterConditionWaiting, "waiting for cluster agent to be deployed")
 					if statusErr == nil {
@@ -246,6 +247,18 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster GKE [%s] to update", cluster.Name)
+
+			// If the HealthSyncer runs while upgrading a zonal cluster, the control plane may not be reachable.
+			// This adds additional context to the error message to help explain that this is normal.
+			readyMsg := apimgmtv3.ClusterConditionReady.GetMessage(cluster)
+			helpMsg := ": control plane may be unavailable while it is being upgraded"
+			if apimgmtv3.ClusterConditionReady.IsFalse(cluster) && strings.Contains(readyMsg, "connect: connection refused") && !strings.Contains(readyMsg, helpMsg) {
+				msg := apimgmtv3.ClusterConditionReady.GetMessage(cluster) + helpMsg
+				// return here; ClusterConditionUpdated is most likely already set, and
+				// if not will be set on the next loop
+				return e.SetFalse(cluster, apimgmtv3.ClusterConditionReady, msg)
+			}
+
 			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
 		}
 		logrus.Infof("waiting for cluster GKE [%s] update failure to be resolved", cluster.Name)
@@ -335,17 +348,17 @@ func (e *gkeOperatorController) updateGKEClusterConfig(cluster *mgmtv3.Cluster, 
 
 // generateAndSetServiceAccount uses the API endpoint and CA cert to generate a service account token. The token is then copied to the cluster status.
 func (e *gkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-
-	ctx := context.Background()
-	ts, err := controller.GetTokenSource(ctx, e.SecretsCache, cluster.Spec.GKEConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error getting google credential from credentialContent: %w", err)
-	}
 	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
-	saToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, ts, clusterDialer)
+
+	restConfig, err := e.getRestConfig(cluster, clusterDialer)
+	if err != nil {
+		return cluster, err
+	}
+
+	saToken, err := clusteroperator.GenerateSAToken(restConfig)
 	if err != nil {
 		return cluster, fmt.Errorf("error generating service account token: %w", err)
 	}
@@ -405,36 +418,61 @@ func (e *gkeOperatorController) deployGKEOperator() error {
 	return e.DeployOperator(gkeOperator, gkeOperatorTemplate, gkeShortName)
 }
 
-func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, bool, error) {
-	var publicAccess bool
-
-	ctx := context.Background()
-	ts, err := controller.GetTokenSource(ctx, e.SecretsCache, cluster.Spec.GKEConfig)
-
-	netDialer := net.Dialer{
+// generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.
+// This function is called if the cluster has only privateEndpoint enabled and not publicly available.
+// If Rancher is able to communicate with the cluster through its API endpoint even though it is private, then this function will retrieve
+// a service account token and the *bool returned will refer to a false value (doesn't have to tunnel).
+//
+// If the Rancher server cannot connect to the cluster's API endpoint, then one of the two errors below will happen.
+// In this case, we know that Rancher must use the cluster agent tunnel for communication. This function will return an empty service account token,
+// and the *bool return value will refer to a true value (must tunnel).
+//
+// If an error different from the two below occur, then the *bool return value will be nil, indicating that Rancher was not able to determine if
+// tunneling is required to communicate with the cluster.
+func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Cluster) (string, *bool, error) {
+	restConfig, err := e.getRestConfig(cluster, (&net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
-	}
-	serviceToken, err := generateSAToken(cluster.Status.APIEndpoint, cluster.Status.CACert, ts, netDialer.DialContext)
+	}).DialContext)
 	if err != nil {
+		return "", nil, err
+	}
+	requiresTunnel := new(bool)
+	serviceToken, err := clusteroperator.GenerateSAToken(restConfig)
+	if err != nil {
+		*requiresTunnel = true
 		if strings.Contains(err.Error(), "dial tcp") {
-			return "", true, nil
+			return "", requiresTunnel, nil
 		}
-	} else {
-		publicAccess = false
+
+		// In the existence of a proxy, it may be the case that the following error occurs,
+		// in which case rancher should use the tunnel connection to communicate with the cluster.
+		var urlError *url.Error
+		if stderrors.As(err, &urlError) && urlError.Timeout() {
+			return "", requiresTunnel, nil
+		}
+
+		// Not able to determine if tunneling is required.
+		requiresTunnel = nil
 	}
 
-	return serviceToken, publicAccess, err
+	return serviceToken, requiresTunnel, err
 }
 
-func generateSAToken(endpoint, ca string, ts oauth2.TokenSource, dialer typesDialer.Dialer) (string, error) {
-	decodedCA, err := base64.StdEncoding.DecodeString(ca)
+func (e *gkeOperatorController) getRestConfig(cluster *mgmtv3.Cluster, dialer typesDialer.Dialer) (*rest.Config, error) {
+	ctx := context.Background()
+	ts, err := controller.GetTokenSource(ctx, e.SecretsCache, cluster.Spec.GKEConfig)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	restConfig := &rest.Config{
-		Host: endpoint,
+	decodedCA, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rest.Config{
+		Host: cluster.Status.APIEndpoint,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: decodedCA,
 		},
@@ -445,11 +483,5 @@ func generateSAToken(endpoint, ca string, ts oauth2.TokenSource, dialer typesDia
 			}
 		},
 		Dial: dialer,
-	}
-	clientset, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return "", fmt.Errorf("error creating clientset: %v", err)
-	}
-
-	return util.GenerateServiceAccountToken(clientset)
+	}, nil
 }

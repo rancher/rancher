@@ -12,8 +12,10 @@ import (
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
+	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -31,12 +33,16 @@ type handler struct {
 	Action        string
 	schemas       *types.Schemas
 	secretsLister v1.SecretLister
+	clusterLister v3.ClusterLister
+	ac            types.AccessControl
 }
 
 func NewGKEHandler(scaledContext *config.ScaledContext) http.Handler {
 	return &handler{
 		schemas:       scaledContext.Schemas,
 		secretsLister: scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
+		clusterLister: scaledContext.Management.Clusters("").Controller().Lister(),
+		ac:            scaledContext.AccessControl,
 	}
 }
 
@@ -70,42 +76,42 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	switch resourceType {
 	case "gkeMachineTypes":
 		if serialized, errCode, err = listMachineTypes(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting machine types: %v", err)
+			logrus.Errorf("[gke-handler] error getting machine types: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeNetworks":
 		if serialized, errCode, err = listNetworks(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting networks: %v", err)
+			logrus.Errorf("[gke-handler] error getting networks: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeServiceAccounts":
 		if serialized, errCode, err = listServiceAccounts(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting serviceaccounts: %v", err)
+			logrus.Errorf("[gke-handler] error getting serviceaccounts: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeSubnetworks":
 		if serialized, errCode, err = listSubnetworks(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting subnetworks: %v", err)
+			logrus.Errorf("[gke-handler] error getting subnetworks: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeVersions":
 		if serialized, errCode, err = listVersions(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting versions: %v", err)
+			logrus.Errorf("[gke-handler] error getting versions: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeZones":
 		if serialized, errCode, err = listZones(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting zones: %v", err)
+			logrus.Errorf("[gke-handler] error getting zones: %v", err)
 			handleErr(writer, errCode, err)
 			return
 
@@ -113,14 +119,14 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 		writer.Write(serialized)
 	case "gkeClusters":
 		if serialized, errCode, err = listClusters(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting clusters: %v", err)
+			logrus.Errorf("[gke-handler] error getting clusters: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
 		writer.Write(serialized)
 	case "gkeSharedSubnets":
 		if serialized, errCode, err = listSharedSubnets(req.Context(), capa); err != nil {
-			logrus.Debugf("[gke-handler] error getting shared subnets: %v", err)
+			logrus.Errorf("[gke-handler] error getting shared subnets: %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
@@ -133,30 +139,41 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credID string) (int, error) {
 	ns, name := ref.Parse(credID)
 	if ns == "" || name == "" {
-		logrus.Debugf("[GKE] invalid cloud credential ID %s", credID)
+		logrus.Errorf("[GKE] invalid cloud credential ID %s", credID)
 		return http.StatusBadRequest, fmt.Errorf("invalid cloud credential ID %s", credID)
 	}
 
 	var accessCred client.CloudCredential //var to check access
 	if err := access.ByID(h.generateAPIContext(req), &schema.Version, client.CloudCredentialType, credID, &accessCred); err != nil {
-		if apiError, ok := err.(*httperror.APIError); ok {
-			if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
-				return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
-			}
+		apiError, ok := err.(*httperror.APIError)
+		if !ok {
+			return httperror.NotFound.Status, err
 		}
-		return httperror.NotFound.Status, err
+		if apiError.Code.Status == httperror.NotFound.Status {
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
+		}
+		if apiError.Code.Status != httperror.PermissionDenied.Status {
+			return httperror.InvalidBodyContent.Status, err
+		}
+		var clusterID string
+		if clusterID = req.URL.Query().Get("clusterID"); clusterID == "" {
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
+		}
+		if errCode, err := h.clusterCheck(h.generateAPIContext(req), clusterID, credID); err != nil {
+			return errCode, err
+		}
 	}
 
 	cc, err := h.secretsLister.Get(ns, name)
 	if err != nil {
-		logrus.Debugf("[GKE] error accessing cloud credential %s", credID)
+		logrus.Errorf("[GKE] error accessing cloud credential %s", credID)
 		return httperror.InvalidBodyContent.Status, fmt.Errorf("error accessing cloud credential %s", credID)
 	}
 	cap.Credentials = string(cc.Data["googlecredentialConfig-authEncodedJson"])
 
 	cap.ProjectID = req.URL.Query().Get("projectId")
 	if cap.ProjectID == "" {
-		logrus.Debugf("[GKE] error getting projectId")
+		logrus.Errorf("[GKE] error getting projectId")
 		return http.StatusBadRequest, fmt.Errorf("error getting projectId")
 	}
 
@@ -167,6 +184,31 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	zone := req.URL.Query().Get("zone")
 	if zone != "" {
 		cap.Zone = zone
+	}
+
+	return http.StatusOK, nil
+}
+
+func (h *handler) clusterCheck(apiContext *types.APIContext, clusterID, cloudCredentialID string) (int, error) {
+	clusterInfo := map[string]interface{}{
+		"id": clusterID,
+	}
+
+	clusterSchema := h.schemas.Schema(&mgmtSchema.Version, client.ClusterType)
+	if err := h.ac.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, clusterInfo, clusterSchema); err != nil {
+		return httperror.InvalidBodyContent.Status, fmt.Errorf("cluster not found")
+	}
+
+	cluster, err := h.clusterLister.Get("", clusterID)
+	if err != nil {
+		if httperror.IsNotFound(err) {
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cluster not found")
+		}
+		return httperror.ServerError.Status, err
+	}
+
+	if cluster.Spec.GKEConfig.GoogleCredentialSecret != cloudCredentialID {
+		return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
 	}
 
 	return http.StatusOK, nil

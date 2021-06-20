@@ -23,9 +23,11 @@ import (
 	"github.com/rancher/wrangler/pkg/generated/controllers/core"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -34,6 +36,12 @@ const (
 	rancherCertFile    = "/etc/rancher/ssl/cert.pem"
 	rancherKeyFile     = "/etc/rancher/ssl/key.pem"
 	rancherCACertsFile = "/etc/rancher/ssl/cacerts.pem"
+)
+
+type internalAPI struct{}
+
+var (
+	InternalAPI = internalAPI{}
 )
 
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, bindHost string, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
@@ -58,8 +66,26 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 
 	migrateConfig(ctx, restConfig, opts)
 
-	if err := server.ListenAndServe(ctx, httpsPort, httpPort, handler, opts); err != nil {
-		return err
+	backoff := wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   2,
+		Steps:    3,
+	}
+
+	// Try listen and serve over if there is an already exist error which comes from
+	// creating the ca. Rancher will hit this error during HA startup as all servers
+	// will race to create the ca secret.
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		if err := server.ListenAndServe(ctx, httpsPort, httpPort, handler, opts); err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to ListenAndServe")
 	}
 
 	internalPort := 0
@@ -67,15 +93,36 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		internalPort = httpsPort + 1
 	}
 
-	if err := server.ListenAndServe(ctx, internalPort, 0, handler, &server.ListenOpts{
+	serverOptions := &server.ListenOpts{
 		Storage:       opts.Storage,
 		Secrets:       opts.Secrets,
 		CAName:        "tls-rancher-internal-ca",
 		CANamespace:   namespace.System,
 		CertNamespace: namespace.System,
 		CertName:      "tls-rancher-internal",
-	}); err != nil {
+	}
+	clusterIP, err := getClusterIP(core.Core().V1().Service())
+	if err != nil {
 		return err
+	}
+	if clusterIP != "" {
+		serverOptions.TLSListenerConfig = dynamiclistener.Config{
+			SANs: []string{clusterIP},
+		}
+	}
+
+	internalAPICtx := context.WithValue(ctx, InternalAPI, true)
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		if err := server.ListenAndServe(internalAPICtx, internalPort, 0, handler, serverOptions); err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to ListenAndServe for fleet")
 	}
 
 	if err := core.Start(ctx, 5); err != nil {
@@ -246,6 +293,20 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 
 	// No certificates mounted or only --no-cacerts used
 	return ca, noCACerts, opts, nil
+}
+
+func getClusterIP(services corev1controllers.ServiceController) (string, error) {
+	service, err := services.Get(namespace.System, "rancher", metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if service.Spec.ClusterIP == "" {
+		return "", fmt.Errorf("waiting on service %s/rancher to be assigned a ClusterIP", namespace.System)
+	}
+	return service.Spec.ClusterIP, nil
 }
 
 func filterCN(cns ...string) []string {

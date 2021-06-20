@@ -39,7 +39,7 @@ type NodeConfig struct {
 }
 
 func runProcess(ctx context.Context, name string, p rketypes.Process, start, forceRestart bool) error {
-	c, err := client.NewEnvClient()
+	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func runProcess(ctx context.Context, name string, p rketypes.Process, start, for
 	}
 	config.Labels[RKEContainerNameLabel] = name
 
-	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, name)
+	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	if client.IsErrNotFound(err) {
 		var output io.ReadCloser
 		imagePullOptions := types.ImagePullOptions{}
@@ -145,7 +145,7 @@ func runProcess(ctx context.Context, name string, p rketypes.Process, start, for
 		}
 		defer output.Close()
 		io.Copy(logrus.StandardLogger().Writer(), output)
-		newContainer, err = c.ContainerCreate(ctx, config, hostConfig, nil, name)
+		newContainer, err = c.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	}
 	if err == nil && start {
 		if err := c.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}); err != nil {
@@ -385,7 +385,7 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 	/*
 		the following logic is as same as `docker run --rm`
 	*/
-	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, logLinkerName)
+	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, nil, logLinkerName)
 	if err != nil {
 		return err
 	}

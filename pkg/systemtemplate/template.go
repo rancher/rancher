@@ -114,7 +114,7 @@ metadata:
   name: cattle-cluster-agent
   namespace: cattle-system
   annotations:
-    management.cattle.io/scale-available: "3"
+    management.cattle.io/scale-available: "2"
 spec:
   selector:
     matchLabels:
@@ -125,6 +125,17 @@ spec:
         app: cattle-cluster-agent
     spec:
       affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - cattle-cluster-agent
+              topologyKey: kubernetes.io/hostname
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -183,8 +194,10 @@ spec:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
           env:
+          {{- if ne .Features "" }}
           - name: CATTLE_FEATURES
             value: "{{.Features}}"
+          {{- end }}
           - name: CATTLE_IS_RKE
             value: "{{.IsRKE}}"
           - name: CATTLE_SERVER
@@ -486,6 +499,24 @@ spec:
     rollingUpdate:
       maxUnavailable: 25%
 {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cattle-cluster-agent
+  namespace: cattle-system
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 444
+    protocol: TCP
+    name: https-internal
+  selector:
+    app: cattle-cluster-agent
 `
 
 var (

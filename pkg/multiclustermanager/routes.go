@@ -4,13 +4,11 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/rancher/apiserver/pkg/parse"
-	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
-
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rancher/apiserver/pkg/parse"
 	"github.com/rancher/rancher/pkg/api/norman"
+	"github.com/rancher/rancher/pkg/api/norman/customization/aks"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/norman/customization/gke"
 	"github.com/rancher/rancher/pkg/api/norman/customization/oci"
@@ -28,12 +26,12 @@ import (
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/metrics"
-	"github.com/rancher/rancher/pkg/multiclustermanager/capabilities"
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/telemetry"
+	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
 )
@@ -83,10 +81,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
-	if features.Legacy.Enabled() {
-		unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
-	}
-	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver.NewProxy(ctx))
+	unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
+	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver.NewHandler(ctx))
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
@@ -97,8 +93,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Use(mux.MiddlewareFunc(rbac.NewAccessControlHandler()))
 	authed.Use(requests.NewAuthenticatedFilter)
 
-	authed.Path("/meta/aksVersions").Handler(capabilities.NewAKSVersionsHandler())
-	authed.Path("/meta/aksVirtualNetworks").Handler(capabilities.NewAKSVirtualNetworksHandler())
+	authed.Path("/meta/{resource:aks.+}").Handler(aks.NewAKSHandler(scaledContext))
 	authed.Path("/meta/{resource:gke.+}").Handler(gke.NewGKEHandler(scaledContext))
 	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))

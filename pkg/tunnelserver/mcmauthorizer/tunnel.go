@@ -208,6 +208,7 @@ func (t *Authorizer) authorizeNode(register bool, cluster *v3.Cluster, inNode *c
 		}
 	}
 
+	logrus.Tracef("updateDockerInfo: cluster [%s] node [%s] dockerInfo [%v]", cluster.Name, machine.Name, inNode.DockerInfo)
 	machine, err = t.updateDockerInfo(machine, inNode)
 	return machine, true, err
 }
@@ -376,6 +377,9 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 
 func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
 	crt := obj.(*v3.ClusterRegistrationToken)
+	if crt.Status.Token == "" {
+		return nil, nil
+	}
 	return []string{crt.Status.Token}, nil
 }
 

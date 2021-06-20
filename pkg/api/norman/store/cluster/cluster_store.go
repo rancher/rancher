@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,10 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
 
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
@@ -26,6 +23,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
@@ -43,6 +41,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	rkedefaults "github.com/rancher/rke/cluster"
 	rkeservices "github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -702,25 +701,20 @@ func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
 
 func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	enableNetworkPolicy := values.GetValueN(data, "enableNetworkPolicy")
-	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
-	plugin := convert.ToString(values.GetValueN(convert.ToMapInterface(rkeConfig), "network", "plugin"))
-
 	if enableNetworkPolicy == nil && create {
 		// setting default values for new clusters if value not passed
 		values.PutValue(data, false, "enableNetworkPolicy")
 	} else if value := convert.ToBool(enableNetworkPolicy); value {
-		if rkeConfig == nil {
+		rke2Config := values.GetValueN(data, "rke2Config")
+		k3sConfig := values.GetValueN(data, "k3sConfig")
+		if rke2Config != nil || k3sConfig != nil {
 			if create {
 				values.PutValue(data, false, "enableNetworkPolicy")
 				return nil
 			}
-			return fmt.Errorf("enableNetworkPolicy should be false for non-RKE clusters")
-		}
-		if plugin != "canal" {
-			return fmt.Errorf("plugin %s should have enableNetworkPolicy %v", plugin, !value)
+			return fmt.Errorf("enableNetworkPolicy should be false for k3s or rke2 clusters")
 		}
 	}
-
 	return nil
 }
 
@@ -929,7 +923,7 @@ func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) er
 	if err != nil {
 		return err
 	}
-	exists, err := s3Client.BucketExists(bucket)
+	exists, err := s3Client.BucketExists(context.TODO(), bucket)
 	if err != nil {
 		return fmt.Errorf("Unable to validate S3 backup target configuration: %v", err)
 	}

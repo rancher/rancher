@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-CWD=$(pwd -P)
 cleanup()
 {
     EXIT=$?
@@ -9,33 +8,37 @@ cleanup()
     echo Stopping rancher server
     kill $PID
     wait $PID
-    echo Cleanup DIND
-    TESTS="$CWD/$(dirname $0)/../tests"
-    for dindYML in $(find $TESTS -iname 'dind-*.yml'); do
-        rke remove --dind --force --config $dindYML
-        rm -f $dindYML
-    done
     return $EXIT
 }
 
+cd $(dirname $0)/..
+
 #[ "${ARCH}" == "amd64" ] && RACE=-race
-go test -cover -tags=test .././...
+go test -cover -tags=test ./pkg/...
 
 if [ ${ARCH} == arm64 ]; then
     export ETCD_UNSUPPORTED_ARCH=arm64
 fi
 
 echo Starting rancher server
-$(dirname $0)/run &> /dev/null &
+touch /tmp/rancher.log
+./scripts/run >/tmp/rancher.log 2>&1 &
 PID=$!
 trap cleanup exit
 
+# uncomment to get startup logs. Don't leave them on because it slows drone down too
+# much
+#tail -F /tmp/rancher.log &
+#TPID=$!
 while ! curl -sf http://localhost:8080/ping; do
     sleep 2
 done
+#kill $TPID
 
 echo Running tests
 
-cd $(dirname $0)/../tests/integration
+cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel
+
+#tail -f /tmp/rancher-test.log &

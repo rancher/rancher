@@ -190,6 +190,13 @@ func (in *AppRevisionStatus) DeepCopyInto(out *AppRevisionStatus) {
 			(*out)[key] = val
 		}
 	}
+	if in.AnswersSetString != nil {
+		in, out := &in.AnswersSetString, &out.AnswersSetString
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Files != nil {
 		in, out := &in.Files, &out.Files
 		*out = make(map[string]string, len(*in))
@@ -222,6 +229,13 @@ func (in *AppSpec) DeepCopyInto(out *AppSpec) {
 	}
 	if in.Answers != nil {
 		in, out := &in.Answers, &out.Answers
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.AnswersSetString != nil {
+		in, out := &in.AnswersSetString, &out.AnswersSetString
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
@@ -273,6 +287,13 @@ func (in *AppUpgradeConfig) DeepCopyInto(out *AppUpgradeConfig) {
 	*out = *in
 	if in.Answers != nil {
 		in, out := &in.Answers, &out.Answers
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.AnswersSetString != nil {
+		in, out := &in.AnswersSetString, &out.AnswersSetString
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

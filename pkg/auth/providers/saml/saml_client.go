@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/gorilla/mux"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -395,7 +397,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
 			publicKey := s.clientState.GetState(r, "Rancher_PublicKey")
 
-			token, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR)
+			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR)
 			if err != nil {
 				log.Errorf("SAML: getToken error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -403,6 +405,11 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			}
 
 			keyBytes, err := base64.StdEncoding.DecodeString(publicKey)
+			if err != nil {
+				log.Errorf("SAML: base64 DecodeString error %v", err)
+				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				return
+			}
 			pubKey := &rsa.PublicKey{}
 			err = json.Unmarshal(keyBytes, pubKey)
 			if err != nil {
@@ -414,7 +421,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 				sha256.New(),
 				rand.Reader,
 				pubKey,
-				[]byte(fmt.Sprintf("%s:%s", token.ObjectMeta.Name, token.Token)),
+				[]byte(fmt.Sprintf("%s:%s", token.ObjectMeta.Name, tokenValue)),
 				nil)
 			if err != nil {
 				log.Errorf("SAML: getEncryptedToken error %v", err)
@@ -452,7 +459,12 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 func setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,
 	groupPrincipals []v3.Principal, isSecure bool) error {
-	rToken, unhashedTokenKey, err := tokenMGR.NewLoginToken(userID, userPrincipal, groupPrincipals, "", 0, "")
+	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
+	var ttl int64
+	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
+		ttl = minutes * 60 * 1000
+	}
+	rToken, unhashedTokenKey, err := tokenMGR.NewLoginToken(userID, userPrincipal, groupPrincipals, "", ttl, "")
 	if err != nil {
 		return err
 	}

@@ -360,6 +360,10 @@ func (a *clusterLoggingGeneratingHandler) Remove(key string, obj *v3.ClusterLogg
 }
 
 func (a *clusterLoggingGeneratingHandler) Handle(obj *v3.ClusterLogging, status v3.ClusterLoggingStatus) (v3.ClusterLoggingStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ClusterLoggingGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

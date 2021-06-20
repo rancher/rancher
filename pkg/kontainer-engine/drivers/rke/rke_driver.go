@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	v3 "github.com/rancher/rke/types"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -469,10 +470,13 @@ func (d *Driver) save(info *types.ClusterInfo, stateDir string) *types.ClusterIn
 }
 
 func (d *Driver) cleanup(stateDir string) {
+	logrus.Tracef("cleanup called for stateDir: [%s]", stateDir)
 	if strings.HasSuffix(stateDir, "/cluster.yml") && !strings.Contains(stateDir, "..") {
-		os.Remove(stateDir)
-		os.Remove(kubeConfig(stateDir))
-		os.Remove(filepath.Dir(stateDir))
+		logrus.Debugf("cleanup: going to remove state directory: [%s]", filepath.Dir(stateDir))
+		err := os.RemoveAll(filepath.Dir(stateDir))
+		if err != nil {
+			logrus.Errorf("cleanup: error while deleting directory [%s], %v", filepath.Dir(stateDir), err)
+		}
 	}
 }
 

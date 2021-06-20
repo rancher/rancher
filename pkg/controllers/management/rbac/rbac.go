@@ -51,7 +51,7 @@ func CreateRoleAndRoleBinding(resource, kind, name, namespace, apiVersion, creat
 		return err
 	}
 
-	// Create a roleBinding referring the role with everything access, and containing creator of the resouce, along with
+	// Create a roleBinding referring the role with everything access, and containing creator of the resource, along with
 	// any members that have everything access
 	var ownerAccessSubjects, readOnlyAccessSubjects, memberAccessSubjects []k8srbacv1.Subject
 	ownerAccessSubjects = append(ownerAccessSubjects, k8srbacv1.Subject{Kind: "User", Name: creatorID, APIGroup: rbacv1.GroupName})

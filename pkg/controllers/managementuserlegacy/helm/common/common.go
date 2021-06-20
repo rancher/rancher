@@ -142,7 +142,7 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 	if err != nil {
 		return err
 	}
-	commands := make([]string, 0)
+	var commands []string
 	if IsHelm3(obj.Status.HelmVersion) {
 		err = createKustomizeFiles(tempDirs, obj.Name)
 		if err != nil {
@@ -210,36 +210,44 @@ func getTimeoutArgs(app *v3.App) []string {
 	return timeoutArgs
 }
 
+// Convert answers map into a slice of "k=v" formatted values with escaped commas (Required by Helm)
+func answersMapToValuesSlice(answers, extraArgs map[string]string) []string {
+	var slice []string
+	for k, v := range answers {
+		if _, ok := extraArgs[k]; ok {
+			continue
+		}
+		slice = append(slice, fmt.Sprintf("%s=%s", k, escapeCommas(v)))
+	}
+	for k, v := range extraArgs {
+		slice = append(slice, fmt.Sprintf("%s=%s", k, escapeCommas(v)))
+	}
+	return slice
+}
+
 func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[string]string) ([]string, error) {
-	setValues := []string{}
-	// a user-supplied values file will overridden default values.yaml
+	var values []string
+	// A user-supplied values.yaml will override the default values.yaml
 	if app.Spec.ValuesYaml != "" {
 		custom := "custom-values.yaml"
 		valuesYaml := filepath.Join(tempDir.FullPath, custom)
 		if err := ioutil.WriteFile(valuesYaml, []byte(app.Spec.ValuesYaml), 0755); err != nil {
-			return setValues, err
+			return values, err
 		}
-		setValues = append(setValues, "--values", filepath.Join(tempDir.InJailPath, custom))
+		values = append(values, "--values", filepath.Join(tempDir.InJailPath, custom))
 	}
-	// `--set` values will overridden the user-supplied values.yaml file
+	// Values in --set args will override values in the user-supplied values.yaml
 	if app.Spec.Answers != nil || extraArgs != nil {
-		answers := app.Spec.Answers
-		var values = []string{}
-		for k, v := range answers {
-			if _, ok := extraArgs[k]; ok {
-				continue
-			}
-			// helm will only accept escaped commas in values
-			escapedValue := fmt.Sprintf("%s=%s", k, escapeCommas(v))
-			values = append(values, escapedValue)
-		}
-		for k, v := range extraArgs {
-			escapedValue := fmt.Sprintf("%s=%s", k, escapeCommas(v))
-			values = append(values, escapedValue)
-		}
-		setValues = append(setValues, "--set", strings.Join(values, ","))
+		setValues := answersMapToValuesSlice(app.Spec.Answers, extraArgs)
+		values = append(values, "--set", strings.Join(setValues, ","))
 	}
-	return setValues, nil
+	// Values in --set-string args will override values in --set args because
+	// Helm gives presedence to the right-most set flag
+	if app.Spec.AnswersSetString != nil {
+		setStringValues := answersMapToValuesSlice(app.Spec.AnswersSetString, map[string]string{})
+		values = append(values, "--set-string", strings.Join(setStringValues, ","))
+	}
+	return values, nil
 }
 
 func DeleteCharts(tempDirs *HelmPath, port string, obj *v3.App) error {

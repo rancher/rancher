@@ -13,7 +13,7 @@ import (
 
 const (
 	tokenIndex = "clusterToken"
-	prefix     = "steve-cluster-"
+	Prefix     = "steve-cluster-"
 )
 
 type clusterProxyAuthorizer struct {
@@ -33,15 +33,15 @@ func NewAuthorizer(wrangler *wrangler.Context) remotedialer.Authorizer {
 
 func (a *clusterProxyAuthorizer) Authorize(req *http.Request) (string, bool, error) {
 	auth := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
-	if !strings.HasPrefix(auth, prefix) {
+	if !strings.HasPrefix(auth, Prefix) {
 		return "", false, nil
 	}
-	crts, err := a.tokenCache.GetByIndex(tokenIndex, strings.TrimPrefix(auth, prefix))
+	crts, err := a.tokenCache.GetByIndex(tokenIndex, strings.TrimPrefix(auth, Prefix))
 	if apierror.IsNotFound(err) || len(crts) == 0 {
 		return "", false, nil
 	} else if err != nil {
 		return "", false, err
 	}
 
-	return prefix + crts[0].Namespace, true, nil
+	return Prefix + crts[0].Namespace, true, nil
 }

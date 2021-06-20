@@ -8,7 +8,9 @@
 /.idea
 /cmd/agent/agent
 /package/data.json
+/package/k3s-airgap-images.tar
 /package/rancher
+/package/rancher-namespace.yaml
 /package/rancher.yaml
 /package/agent
 /tests/MANIFEST

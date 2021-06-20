@@ -44,6 +44,9 @@ func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 		&eks.ListNodegroupsInput{
 			ClusterName: aws.String(cluster.Spec.EKSConfig.DisplayName),
 		})
+	if err != nil {
+		return nil, err
+	}
 
 	// gather upstream node groups states
 	var nodeGroupStates []*eks.DescribeNodegroupOutput

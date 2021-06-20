@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +36,21 @@ func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.S
 	return setting, nil
 }
 
+func (h *handler) getClusterIP() (string, error) {
+	serviceName := "rancher"
+	if features.MCMAgent.Enabled() {
+		serviceName = "cattle-cluster-agent"
+	}
+	service, err := h.services.Get(namespace.System, serviceName)
+	if err != nil {
+		return "", err
+	}
+	if service.Spec.ClusterIP == "" {
+		return "", fmt.Errorf("waiting on service %s/%s to be assigned a ClusterIP", namespace.System, serviceName)
+	}
+	return service.Spec.ClusterIP, nil
+}
+
 func (h *handler) getInternalServerAndURL() (string, string, error) {
 	serverURL := settings.ServerURL.Get()
 	ca := settings.CACerts.Get()
@@ -45,12 +61,22 @@ func (h *handler) getInternalServerAndURL() (string, string, error) {
 	}
 	internalCA := string(tlsSecret.Data[corev1.TLSCertKey])
 
-	if dp, err := h.deploymentCache.Get(namespace.System, "rancher"); err == nil && dp.Spec.Replicas != nil && *dp.Spec.Replicas != 0 {
-		return fmt.Sprintf("https://rancher.%s", namespace.System), internalCA, nil
+	clusterIPService := false
+	if features.MCMAgent.Enabled() {
+		if _, err := h.deploymentCache.Get(namespace.System, "cattle-cluster-agent"); err == nil {
+			clusterIPService = true
+		}
+	} else {
+		if dp, err := h.deploymentCache.Get(namespace.System, "rancher"); err == nil && dp.Spec.Replicas != nil && *dp.Spec.Replicas != 0 {
+			clusterIPService = true
+		} else if _, err := h.daemonSetCache.Get(namespace.System, "rancher"); err == nil {
+			clusterIPService = true
+		}
 	}
 
-	if _, err := h.daemonSetCache.Get(namespace.System, "rancher"); err == nil {
-		return fmt.Sprintf("https://rancher.%s", namespace.System), internalCA, nil
+	if clusterIPService {
+		clusterIP, err := h.getClusterIP()
+		return fmt.Sprintf("https://%s", clusterIP), internalCA, err
 	}
 
 	return serverURL, ca, nil

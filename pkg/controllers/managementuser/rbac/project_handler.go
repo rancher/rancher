@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"

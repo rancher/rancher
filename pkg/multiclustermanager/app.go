@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -19,7 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/dialer"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -64,9 +64,9 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 		return nil, nil, nil, err
 	}
 
-	if features.Legacy.Enabled() {
-		scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
-	}
+	scaledContext.Wrangler = wranglerContext
+
+	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
 
 	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
 		return nil, nil, nil, err
@@ -130,13 +130,13 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 
 	go func() {
 		<-ctx.Done()
-		mcm.started()
+		mcm.started(ctx)
 	}()
 
 	return mcm, nil
 }
 
-func (m *mcm) started() {
+func (m *mcm) started(ctx context.Context) {
 	m.startLock.Lock()
 	defer m.startLock.Unlock()
 	select {
@@ -160,6 +160,11 @@ func (m *mcm) Wait(ctx context.Context) {
 	}
 }
 
+func (m *mcm) NormanSchemas() *types.Schemas {
+	<-m.startedChan
+	return m.ScaledContext.Schemas
+}
+
 func (m *mcm) Middleware(next http.Handler) http.Handler {
 	return m.router(next)
 }
@@ -168,8 +173,6 @@ func (m *mcm) Start(ctx context.Context) error {
 	var (
 		management *config.ManagementContext
 	)
-
-	defer m.started()
 
 	if dm := os.Getenv("CATTLE_DEV_MODE"); dm == "" {
 		if err := jailer.CreateJail("driver-jail"); err != nil {
@@ -196,7 +199,7 @@ func (m *mcm) Start(ctx context.Context) error {
 				return errors.Wrap(err, "failed to add management data")
 			}
 
-			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager))
+			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager), m.wranglerContext)
 			if err := managementController.RegisterWrangler(ctx, m.wranglerContext, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager)); err != nil {
 				return errors.Wrap(err, "failed to register wrangler controllers")
 			}
@@ -214,6 +217,7 @@ func (m *mcm) Start(ctx context.Context) error {
 		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
+		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
 		logrus.Infof("Rancher startup complete")
 		return nil
 	})

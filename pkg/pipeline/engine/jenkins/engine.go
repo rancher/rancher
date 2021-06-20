@@ -161,11 +161,11 @@ func (j *Engine) RunPipelineExecution(execution *v3.PipelineExecution) error {
 }
 
 func (j *Engine) preparePipeline(execution *v3.PipelineExecution) error {
+	var registry string
 	for _, stage := range execution.Spec.PipelineConfig.Stages {
 		for _, step := range stage.Steps {
 			if step.PublishImageConfig != nil {
 				//prepare docker credential for publishimage step
-				registry := utils.DefaultRegistry
 				if step.PublishImageConfig.PushRemote && step.PublishImageConfig.Registry != "" {
 					registry = step.PublishImageConfig.Registry
 				} else {
@@ -454,10 +454,7 @@ func (j *Engine) successStep(execution *v3.PipelineExecution, stage int, step in
 		}
 	}
 
-	if err := j.saveStepLogToMinio(execution, stage, step); err != nil {
-		return err
-	}
-	return nil
+	return j.saveStepLogToMinio(execution, stage, step)
 }
 
 func (j *Engine) failStep(execution *v3.PipelineExecution, stage int, step int, jenkinsStage Stage) error {

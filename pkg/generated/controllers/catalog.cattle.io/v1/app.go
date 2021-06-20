@@ -360,6 +360,10 @@ func (a *appGeneratingHandler) Remove(key string, obj *v1.App) (*v1.App, error) 
 }
 
 func (a *appGeneratingHandler) Handle(obj *v1.App, status v1.ReleaseStatus) (v1.ReleaseStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.AppGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

@@ -106,6 +106,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 func skipOperatorCluster(action string, cluster *v3.Cluster) bool {
 	msgFmt := "%s cluster [%s] will be managed by %s-operator-controller, skipping %s"
 	switch {
+	case cluster.Spec.AKSConfig != nil:
+		logrus.Debugf(msgFmt, "AKS", cluster.Name, "aks", action)
+		return true
 	case cluster.Spec.EKSConfig != nil:
 		logrus.Debugf(msgFmt, "EKS", cluster.Name, "eks", action)
 		return true
@@ -117,6 +120,17 @@ func skipOperatorCluster(action string, cluster *v3.Cluster) bool {
 	}
 }
 
+func isRke1CustomCluster(cluster *v3.Cluster, nodes []*v3.Node) bool {
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
+		for _, n := range nodes {
+			if n.Status.NodeTemplateSpec == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	if skipOperatorCluster("remove", cluster) {
 		return cluster, nil
@@ -126,6 +140,16 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	if skipLocalK3sImported(cluster) ||
 		cluster.Status.Driver == "" {
 		return nil, nil
+	}
+
+	nodes, err := p.NodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return cluster, err
+	}
+
+	if isRke1CustomCluster(cluster, nodes) {
+		logrus.Debugf("Skipping RKE1 Custom Cluster in favor of node-cleanup logic [%s] ", cluster.Name)
+		return cluster, nil
 	}
 
 	for i := 0; i < 4; i++ {
@@ -852,7 +876,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*apimgmtv3.ClusterSpec, erro
 		return nil, err
 	}
 
-	newSpec, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
+	_, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -861,7 +885,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*apimgmtv3.ClusterSpec, erro
 		return nil, nil
 	}
 
-	newSpec, _, err = p.getConfig(true, cluster.Spec, driverName, cluster.Name)
+	newSpec, _, err := p.getConfig(true, cluster.Spec, driverName, cluster.Name)
 
 	return newSpec, err
 }

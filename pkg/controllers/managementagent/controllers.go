@@ -22,20 +22,20 @@ import (
 )
 
 func Register(ctx context.Context, cluster *config.UserOnlyContext) error {
-	if features.Legacy.Enabled() {
-		if err := createUserClusterCRDs(ctx, cluster); err != nil {
-			return err
-		}
-	}
-
 	dnsrecord.Register(ctx, cluster)
 	externalservice.Register(ctx, cluster)
 	ingress.Register(ctx, cluster)
 	nslabels.Register(ctx, cluster)
 	targetworkloadservice.Register(ctx, cluster)
 	workload.Register(ctx, cluster)
-	servicemonitor.Register(ctx, cluster)
-	monitoring.RegisterAgent(ctx, cluster)
+
+	if features.MonitoringV1.Enabled() {
+		if err := createUserClusterCRDs(ctx, cluster); err != nil {
+			return err
+		}
+		servicemonitor.Register(ctx, cluster)
+		monitoring.RegisterAgent(ctx, cluster)
+	}
 
 	return nil
 }

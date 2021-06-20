@@ -92,6 +92,15 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	return nil
 }
 
+func copyAnswers(specAnswers map[string]string, answers interface{}) {
+	m, ok := answers.(map[string]interface{})
+	if ok {
+		for k, v := range m {
+			specAnswers[k] = convert.ToString(v)
+		}
+	}
+}
+
 func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var app projectv3.App
 	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &app); err != nil {
@@ -130,21 +139,15 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		}
 
 		answers := actionInput["answers"]
+		answersSetString := actionInput["answersSetString"]
 		forceUpgrade := actionInput["forceUpgrade"]
 		files := actionInput["files"]
 		valuesYaml := actionInput["valuesYaml"]
+		obj.Spec.Answers = make(map[string]string)
+		obj.Spec.AnswersSetString = make(map[string]string)
 
-		if answers != nil {
-			m, ok := answers.(map[string]interface{})
-			if ok {
-				obj.Spec.Answers = make(map[string]string)
-				for k, v := range m {
-					obj.Spec.Answers[k] = convert.ToString(v)
-				}
-			}
-		} else {
-			obj.Spec.Answers = make(map[string]string)
-		}
+		copyAnswers(obj.Spec.Answers, answers)
+		copyAnswers(obj.Spec.AnswersSetString, answersSetString)
 		obj.Spec.ExternalID = externalID
 		if convert.ToBool(forceUpgrade) {
 			v32.AppConditionForceUpgrade.Unknown(obj)
@@ -199,6 +202,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return err
 		}
 		obj.Spec.Answers = appRevision.Status.Answers
+		obj.Spec.AnswersSetString = appRevision.Status.AnswersSetString
 		obj.Spec.ExternalID = appRevision.Status.ExternalID
 		obj.Spec.ValuesYaml = appRevision.Status.ValuesYaml
 		if convert.ToBool(forceUpgrade) {

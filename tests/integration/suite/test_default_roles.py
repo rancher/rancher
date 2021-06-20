@@ -219,8 +219,6 @@ def test_default_system_project_role(admin_mc):
     for project in projects:
         name = project['name']
         if name == "Default" or name == "System":
-            wait_for_condition('InitialRolesPopulated', 'True',
-                               client, project)
             project = client.reload(project)
 
             projectLabel = required_projects[name]
@@ -231,11 +229,6 @@ def test_default_system_project_role(admin_mc):
     assert len(required_projects) == len(created_projects)
 
     for project in created_projects:
-        data_dict = json.loads(project.annotations[
-            CREATOR_ANNOTATION])
-
-        assert set(data_dict['created']) == set(data_dict['required'])
-
         for binding in project.projectRoleTemplateBindings():
             assert binding.roleTemplateId in test_roles
 

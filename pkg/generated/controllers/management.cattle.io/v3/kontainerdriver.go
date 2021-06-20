@@ -360,6 +360,10 @@ func (a *kontainerDriverGeneratingHandler) Remove(key string, obj *v3.KontainerD
 }
 
 func (a *kontainerDriverGeneratingHandler) Handle(obj *v3.KontainerDriver, status v3.KontainerDriverStatus) (v3.KontainerDriverStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.KontainerDriverGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

@@ -3,7 +3,6 @@ package managementuser
 import (
 	"context"
 
-	"github.com/rancher/rancher/pkg/controllers/managementagent"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/certsexpiration"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
@@ -11,11 +10,13 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/pspdelete"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/settings"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
 	"github.com/rancher/rancher/pkg/features"
@@ -40,6 +41,10 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	certsexpiration.Register(ctx, cluster)
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
+	if features.RKE2.Enabled() {
+		snapshotbackpopulate.Register(ctx, cluster)
+		pspdelete.Register(ctx, cluster)
+	}
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()
@@ -52,25 +57,14 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 		clusterauthtoken.Register(ctx, cluster)
 	}
 
-	if clusterRec.Spec.Internal {
-		err := managementagent.Register(ctx, cluster.UserOnlyContext())
-		if err != nil {
-			return err
-		}
-	} else {
+	if !clusterRec.Spec.Internal {
 		err := settings.Register(ctx, cluster)
 		if err != nil {
 			return err
 		}
 	}
 
-	if features.Legacy.Enabled() {
-		if err := managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter)
 }
 
 func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {

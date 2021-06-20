@@ -75,6 +75,7 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
     - windows
 {{- end -}}
 
+
 {{- define "required-scheduling-node-selector-terms" -}}
 requiredDuringSchedulingIgnoredDuringExecution:
            nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
@@ -89,3 +90,14 @@ requiredDuringSchedulingIgnoredDuringExecution:
 {{- include "required-scheduling-node-selector-terms" . -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "system_default_registry" -}}
+{{- if .Values.systemDefaultRegistry -}}
+  {{- if hasSuffix "/" .Values.systemDefaultRegistry -}}
+    {{- printf "%s" .Values.systemDefaultRegistry -}}
+  {{- else -}}
+    {{- printf "%s/" .Values.systemDefaultRegistry -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
