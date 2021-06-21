@@ -171,6 +171,15 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, err
 		}
 
+		if cluster.Status.AKSStatus.RBACEnabled == nil {
+			enabled, ok := status["rbacEnabled"].(bool)
+			if ok {
+				cluster = cluster.DeepCopy()
+				cluster.Status.AKSStatus.RBACEnabled = &enabled
+				return e.ClusterClient.Update(cluster)
+			}
+		}
+
 		if cluster.Status.APIEndpoint == "" {
 			return e.RecordCAAndAPIEndpoint(cluster)
 		}
