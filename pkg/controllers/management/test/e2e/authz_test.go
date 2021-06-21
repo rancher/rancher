@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"gopkg.in/check.v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -405,7 +405,7 @@ func (s *AuthzSuite) SetUpSuite(c *check.C) {
 }
 
 func (s *AuthzSuite) setupCRDs(c *check.C) {
-	crdClient := s.extClient.ApiextensionsV1beta1().CustomResourceDefinitions()
+	crdClient := s.extClient.ApiextensionsV1().CustomResourceDefinitions()
 
 	initialList, err := crdClient.List(context.TODO(), metav1.ListOptions{})
 	c.Assert(err, check.IsNil)
@@ -418,14 +418,14 @@ func (s *AuthzSuite) setupCRDs(c *check.C) {
 	defer crdWatch.Stop()
 
 	setupCRD("roletemplate", "roletemplates", "management.cattle.io", "RoleTemplate", "v3",
-		apiextensionsv1beta1.ClusterScoped, crdClient, crdWatch, c)
+		apiextensionsv1.ClusterScoped, crdClient, crdWatch, c)
 
 	setupCRD("projectroletemplatebinding", "projectroletemplatebindings", "management.cattle.io", "ProjectRoleTemplateBinding", "v3",
-		apiextensionsv1beta1.ClusterScoped, crdClient, crdWatch, c)
+		apiextensionsv1.ClusterScoped, crdClient, crdWatch, c)
 
 	setupCRD("clusterroletemplatebinding", "clusterroletemplatebindings", "management.cattle.io", "ClusterRoleTemplateBinding", "v3",
-		apiextensionsv1beta1.ClusterScoped, crdClient, crdWatch, c)
+		apiextensionsv1.ClusterScoped, crdClient, crdWatch, c)
 
 	setupCRD("podsecuritypolicytemplate", "podsecuritypolicytemplates", "management.cattle.io", "PodSecurityPolicyTemplates", "v3",
-		apiextensionsv1beta1.ClusterScoped, crdClient, crdWatch, c)
+		apiextensionsv1.ClusterScoped, crdClient, crdWatch, c)
 }
