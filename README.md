@@ -43,7 +43,7 @@ Rancher can be deployed in either a single node or multi-node setup.  Please ref
 
 ### Using Rancher
 
-To learn more about using Rancher, please refer to our [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/).
+To learn more about using Rancher, please refer to our [Rancher Documentation](https://rancher.com/docs/rancher/v2.5/en/).
 
 ## Source Code
 
