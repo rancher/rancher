@@ -28,6 +28,7 @@ type handler struct {
 	secrets         corev1controllers.SecretCache
 	settings        mgmtcontrollers.SettingClient
 	apiServices     mgmtcontrollers.APIServiceCache
+	services        corev1controllers.ServiceCache
 }
 
 func Register(ctx context.Context, context *wrangler.Context) {
@@ -38,6 +39,7 @@ func Register(ctx context.Context, context *wrangler.Context) {
 		secrets:         context.Core.Secret().Cache(),
 		settings:        context.Mgmt.Setting(),
 		apiServices:     context.Mgmt.APIService().Cache(),
+		services:        context.Core.Service().Cache(),
 	}
 
 	relatedresource.WatchClusterScoped(ctx, "apiservice-watch-owner",

@@ -4,6 +4,7 @@
 additionalTrustedCAs: false
 
 antiAffinity: preferred
+topologyKey: kubernetes.io/hostname
 
 # Audit Logs https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing/
 # The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
@@ -56,10 +57,8 @@ ingress:
   # Defaults to true
   # options: true, false
   enabled: true
-  extraAnnotations:
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+  includeDefaultExtraAnnotations: true
+  extraAnnotations: {}
 
   # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
   # configurationSnippet: |
@@ -68,6 +67,7 @@ ingress:
   tls:
     # options: rancher, letsEncrypt, secret
     source: rancher
+    secretName: tls-rancher-ingress
 
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.

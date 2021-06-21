@@ -7,12 +7,14 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"io"
+	"sort"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -43,9 +45,25 @@ type context struct {
 	Tolerations           string
 }
 
+var (
+	staticFeatures = features.MCM.Name() + "=false," +
+		features.MCMAgent.Name() + "=true," +
+		features.Fleet.Name() + "=false," +
+		features.RKE2.Name() + "=false," +
+		features.ProvisioningV2.Name() + "=false," +
+		features.EmbeddedClusterAPI.Name() + "=false"
+)
+
 func toFeatureString(features map[string]bool) string {
 	buf := &strings.Builder{}
-	for k, v := range features {
+	var keys []string
+	for k := range features {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		v := features[k]
 		if buf.Len() > 0 {
 			buf.WriteString(",")
 		}
@@ -102,13 +120,37 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	return t.Execute(resp, context)
 }
 
+func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+	return map[string]bool{
+		features.MCM.Name():                false,
+		features.MCMAgent.Name():           true,
+		features.Fleet.Name():              false,
+		features.RKE2.Name():               false,
+		features.ProvisioningV2.Name():     false,
+		features.EmbeddedClusterAPI.Name(): false,
+		features.MonitoringV1.Name():       cluster.Spec.EnableClusterMonitoring,
+	}
+}
+
 func ForCluster(cluster *v3.Cluster, token string) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
 		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
-		cluster, nil, nil)
+		cluster, GetDesiredFeatures(cluster), nil)
 	return buf.Bytes(), err
+}
+
+func InternalCAChecksum() string {
+	ca := settings.InternalCACerts.Get()
+	if ca != "" {
+		if !strings.HasSuffix(ca, "\n") {
+			ca += "\n"
+		}
+		digest := sha256.Sum256([]byte(ca))
+		return hex.EncodeToString(digest[:])
+	}
+	return ""
 }
 
 func CAChecksum() string {

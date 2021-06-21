@@ -38,6 +38,12 @@ const (
 	rancherCACertsFile = "/etc/rancher/ssl/cacerts.pem"
 )
 
+type internalAPI struct{}
+
+var (
+	InternalAPI = internalAPI{}
+)
+
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, bindHost string, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 10 * time.Minute
@@ -95,9 +101,19 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		CertNamespace: namespace.System,
 		CertName:      "tls-rancher-internal",
 	}
+	clusterIP, err := getClusterIP(core.Core().V1().Service())
+	if err != nil {
+		return err
+	}
+	if clusterIP != "" {
+		serverOptions.TLSListenerConfig = dynamiclistener.Config{
+			SANs: []string{clusterIP},
+		}
+	}
 
+	internalAPICtx := context.WithValue(ctx, InternalAPI, true)
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if err := server.ListenAndServe(ctx, internalPort, 0, handler, serverOptions); err != nil {
+		if err := server.ListenAndServe(internalAPICtx, internalPort, 0, handler, serverOptions); err != nil {
 			if apierrors.IsAlreadyExists(err) {
 				return false, nil
 			}
@@ -277,6 +293,20 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 
 	// No certificates mounted or only --no-cacerts used
 	return ca, noCACerts, opts, nil
+}
+
+func getClusterIP(services corev1controllers.ServiceController) (string, error) {
+	service, err := services.Get(namespace.System, "rancher", metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if service.Spec.ClusterIP == "" {
+		return "", fmt.Errorf("waiting on service %s/rancher to be assigned a ClusterIP", namespace.System)
+	}
+	return service.Spec.ClusterIP, nil
 }
 
 func filterCN(cns ...string) []string {

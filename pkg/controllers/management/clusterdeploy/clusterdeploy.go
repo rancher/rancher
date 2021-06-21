@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
@@ -255,6 +256,18 @@ func getDesiredImage(cluster *v3.Cluster) string {
 	return cluster.Spec.DesiredAgentImage
 }
 
+func (cd *clusterDeploy) getDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+	return map[string]bool{
+		features.MCM.Name():                false,
+		features.MCMAgent.Name():           true,
+		features.Fleet.Name():              false,
+		features.RKE2.Name():               false,
+		features.ProvisioningV2.Name():     false,
+		features.EmbeddedClusterAPI.Name(): false,
+		features.MonitoringV1.Name():       cluster.Spec.EnableClusterMonitoring,
+	}
+}
+
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
@@ -262,7 +275,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 
 	desiredAgent := systemtemplate.GetDesiredAgentImage(cluster)
 	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
-	desiredFeatures := map[string]bool{}
+	desiredFeatures := systemtemplate.GetDesiredFeatures(cluster)
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 

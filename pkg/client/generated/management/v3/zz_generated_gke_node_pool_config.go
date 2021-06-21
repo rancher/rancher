@@ -17,6 +17,6 @@ type GKENodePoolConfig struct {
 	InitialNodeCount  *int64                  `json:"initialNodeCount,omitempty" yaml:"initialNodeCount,omitempty"`
 	Management        *GKENodePoolManagement  `json:"management,omitempty" yaml:"management,omitempty"`
 	MaxPodsConstraint *int64                  `json:"maxPodsConstraint,omitempty" yaml:"maxPodsConstraint,omitempty"`
-	Name              string                  `json:"name,omitempty" yaml:"name,omitempty"`
-	Version           string                  `json:"version,omitempty" yaml:"version,omitempty"`
+	Name              *string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	Version           *string                 `json:"version,omitempty" yaml:"version,omitempty"`
 }

@@ -64,13 +64,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 		}
 	}
 
-	if features.Legacy.Enabled() {
-		if err := managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter)
 }
 
 func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {

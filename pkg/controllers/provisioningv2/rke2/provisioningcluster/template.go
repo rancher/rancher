@@ -136,6 +136,10 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 	dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
 	bootstrapName := name.SafeConcatName(cluster.Name, "bootstrap", "template")
 
+	if dynamicSchema == nil {
+		return nil, nil
+	}
+
 	if len(cluster.Spec.RKEConfig.MachinePools) > 0 {
 		result = append(result, &rkev1.RKEBootstrapTemplate{
 			ObjectMeta: metav1.ObjectMeta{

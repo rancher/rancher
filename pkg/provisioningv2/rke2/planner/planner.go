@@ -182,57 +182,49 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		joinServer       string
 	)
 
-	if secret.ServerToken == "" {
-		// This is logic for clusters that are formed outside of Rancher
-		// In this situation you either have nodes with worker role or no role
-		err = p.reconcile(controlPlane, secret, plan, "etcd and control plane", true, noRole, isInitNode,
-			controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
-			controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
-		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-		if err != nil {
-			return err
-		}
-	} else {
-		if err := p.etcdCreate.Create(controlPlane, plan); err != nil {
-			return err
-		}
+	if err := p.etcdCreate.Create(controlPlane, plan); err != nil {
+		return err
+	}
 
-		if err := p.etcdRestore.Restore(controlPlane, plan); err != nil {
-			return err
-		}
+	if err := p.etcdRestore.Restore(controlPlane, plan); err != nil {
+		return err
+	}
 
-		if _, err := p.electInitNode(plan); err != nil {
-			return err
-		}
+	if _, err := p.electInitNode(plan); err != nil {
+		return err
+	}
 
-		err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isInitNode, none,
-			controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, "",
-			controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
-		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-		if err != nil {
-			return err
-		}
+	err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isInitNode, none,
+		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, "",
+		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+	if err != nil {
+		return err
+	}
 
-		joinServer, err = p.electInitNode(plan)
-		if err != nil || joinServer == "" {
-			return err
-		}
+	joinServer, err = p.electInitNode(plan)
+	if err != nil {
+		return err
+	} else if joinServer == "" && firstIgnoreError != nil {
+		return ErrWaiting(firstIgnoreError.Error())
+	} else if joinServer == "" {
+		return ErrWaiting("waiting for bootstrap node to be available")
+	}
 
-		err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode,
-			controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
-			controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
-		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-		if err != nil {
-			return err
-		}
+	err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode,
+		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+	if err != nil {
+		return err
+	}
 
-		err = p.reconcile(controlPlane, secret, plan, "control plane", true, isControlPlane, isInitNode,
-			controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
-			controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
-		firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-		if err != nil {
-			return err
-		}
+	err = p.reconcile(controlPlane, secret, plan, "control plane", true, isControlPlane, isInitNode,
+		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+	if err != nil {
+		return err
 	}
 
 	joinServer = p.getControlPlaneJoinURL(plan)
@@ -370,6 +362,17 @@ func calculateConcurrency(maxUnavailable string, entries []planEntry, exclude ro
 	return int(math.Ceil(max)), unavailable, nil
 }
 
+func detailMessage(machines []string, messages map[string]string) string {
+	if len(machines) != 1 {
+		return ""
+	}
+	message := messages[machines[0]]
+	if message != "" {
+		return ": " + message
+	}
+	return ""
+}
+
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, clusterPlan *plan.Plan,
 	tierName string,
 	required bool,
@@ -380,6 +383,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 		errMachines []string
 		draining    []string
 		uncordoned  []string
+		messages    = map[string]string{}
 	)
 
 	entries := collect(clusterPlan, include)
@@ -402,6 +406,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 		if summary.Transitioning {
 			nonReady = append(nonReady, entry.Machine.Name)
 		}
+		messages[entry.Machine.Name] = strings.Join(summary.Message, ", ")
 
 		plan, err := p.desiredPlan(controlPlane, secret, entry, isInitNode(entry.Machine), joinServer)
 		if err != nil {
@@ -452,28 +457,28 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 	errMachines = atMostThree(errMachines)
 	if len(errMachines) > 0 {
 		// we want these errors to get reported, but not block the process
-		return errIgnore("failing " + tierName + " machine(s) " + strings.Join(errMachines, ","))
+		return errIgnore("failing " + tierName + " machine(s) " + strings.Join(errMachines, ",") + detailMessage(errMachines, messages))
 	}
 
 	outOfSync = atMostThree(outOfSync)
 	if len(outOfSync) > 0 {
-		return ErrWaiting("provisioning " + tierName + " node(s) " + strings.Join(outOfSync, ","))
+		return ErrWaiting("provisioning " + tierName + " node(s) " + strings.Join(outOfSync, ",") + detailMessage(outOfSync, messages))
 	}
 
 	draining = atMostThree(draining)
 	if len(draining) > 0 {
-		return ErrWaiting("draining " + tierName + " node(s) " + strings.Join(outOfSync, ","))
+		return ErrWaiting("draining " + tierName + " node(s) " + strings.Join(draining, ",") + detailMessage(draining, messages))
 	}
 
 	uncordoned = atMostThree(uncordoned)
 	if len(uncordoned) > 0 {
-		return ErrWaiting("uncordoning " + tierName + " node(s) " + strings.Join(outOfSync, ","))
+		return ErrWaiting("uncordoning " + tierName + " node(s) " + strings.Join(uncordoned, ",") + detailMessage(uncordoned, messages))
 	}
 
 	nonReady = atMostThree(nonReady)
 	if len(nonReady) > 0 {
 		// we want these errors to get reported, but not block the process
-		return errIgnore("non-ready " + tierName + " machine(s) " + strings.Join(nonReady, ","))
+		return errIgnore("non-ready " + tierName + " machine(s) " + strings.Join(nonReady, ",") + detailMessage(nonReady, messages))
 	}
 
 	return nil
@@ -563,7 +568,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["server"] = joinServer
 	}
 
-	if isOnlyEtcd(machine) {
+	if IsOnlyEtcd(machine) {
 		config["disable-scheduler"] = true
 		config["disable-apiserver"] = true
 		config["disable-controller-manager"] = true
@@ -830,28 +835,35 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	return nodePlan, nil
 }
 
-func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, entry planEntry, initNode bool, joinServer string) (plan.NodePlan, error) {
-	nodePlan, err := commonNodePlan(p.secretCache, controlPlane, plan.NodePlan{})
-	if err != nil {
-		return nodePlan, err
+func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, entry planEntry, initNode bool, joinServer string) (nodePlan plan.NodePlan, err error) {
+	if !controlPlane.Spec.UnmanagedConfig {
+		nodePlan, err = commonNodePlan(p.secretCache, controlPlane, plan.NodePlan{})
+		if err != nil {
+			return nodePlan, err
+		}
+
+		nodePlan, err = p.addConfigFile(nodePlan, controlPlane, entry.Machine, secret, initNode, joinServer)
+		if err != nil {
+			return nodePlan, err
+		}
+
+		nodePlan, err = p.addManifests(nodePlan, controlPlane, entry.Machine)
+		if err != nil {
+			return nodePlan, err
+		}
+
+		nodePlan, err = p.addChartConfigs(nodePlan, controlPlane, entry.Machine)
+		if err != nil {
+			return nodePlan, err
+		}
+
+		nodePlan, err = p.addOtherFiles(nodePlan, controlPlane, entry.Machine)
+		if err != nil {
+			return nodePlan, err
+		}
 	}
 
-	nodePlan, err = p.addConfigFile(nodePlan, controlPlane, entry.Machine, secret, initNode, joinServer)
-	if err != nil {
-		return nodePlan, err
-	}
-
-	nodePlan, err = p.addManifests(nodePlan, controlPlane, entry.Machine)
-	if err != nil {
-		return nodePlan, err
-	}
-
-	nodePlan, err = p.addChartConfigs(nodePlan, controlPlane, entry.Machine)
-	if err != nil {
-		return nodePlan, err
-	}
-
-	nodePlan, err = p.addOtherFiles(nodePlan, controlPlane, entry.Machine)
+	nodePlan, err = p.addProbes(nodePlan, controlPlane, entry.Machine)
 	if err != nil {
 		return nodePlan, err
 	}
@@ -862,7 +874,7 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 		return nodePlan, err
 	}
 
-	if initNode && isOnlyEtcd(entry.Machine) {
+	if initNode && IsOnlyEtcd(entry.Machine) {
 		nodePlan, err = p.addInitNodeInstruction(nodePlan, controlPlane, entry.Machine)
 		if err != nil {
 			return nodePlan, err
@@ -888,7 +900,7 @@ func isInitNode(machine *capi.Machine) bool {
 }
 
 func IsEtcdOnlyInitNode(machine *capi.Machine) bool {
-	return isInitNode(machine) && isOnlyEtcd(machine)
+	return isInitNode(machine) && IsOnlyEtcd(machine)
 }
 
 func none(_ *capi.Machine) bool {
@@ -899,7 +911,7 @@ func isControlPlane(machine *capi.Machine) bool {
 	return machine.Labels[ControlPlaneRoleLabel] == "true"
 }
 
-func isOnlyEtcd(machine *capi.Machine) bool {
+func IsOnlyEtcd(machine *capi.Machine) bool {
 	return isEtcd(machine) && !isControlPlane(machine)
 }
 
@@ -953,17 +965,7 @@ func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane, fullPlan 
 }
 
 func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, fullPlan *plan.Plan) (string, plan.Secret, error) {
-	hasControlPlaneOrEtcd := false
-	for _, machine := range fullPlan.Machines {
-		if isControlPlane(machine) || isEtcd(machine) {
-			hasControlPlaneOrEtcd = true
-			break
-		}
-	}
-
-	if !hasControlPlaneOrEtcd {
-		// In this situation we are either waiting for control plane/etcd to be created or
-		// this is an externally formed cluster and we don't manage the token
+	if controlPlane.Spec.UnmanagedConfig {
 		return "", plan.Secret{}, nil
 	}
 

@@ -5,6 +5,7 @@ import (
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -34,7 +35,9 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		namespaceCache: clients.Core.Namespace().Cache(),
 	}
 
-	clients.Mgmt.Setting().OnChange(ctx, "default-workspace", h.OnSetting)
+	if features.MCM.Enabled() {
+		clients.Mgmt.Setting().OnChange(ctx, "default-workspace", h.OnSetting)
+	}
 
 	mgmtcontrollers.RegisterFleetWorkspaceGeneratingHandler(ctx,
 		clients.Mgmt.FleetWorkspace(),

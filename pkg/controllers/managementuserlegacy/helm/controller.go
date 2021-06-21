@@ -362,6 +362,7 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	}
 	release.Spec.ProjectName = obj.Spec.ProjectName
 	release.Status.Answers = obj.Spec.Answers
+	release.Status.AnswersSetString = obj.Spec.AnswersSetString
 	release.Status.ExternalID = obj.Spec.ExternalID
 	release.Status.ValuesYaml = obj.Spec.ValuesYaml
 	release.Status.Files = obj.Spec.Files
@@ -413,14 +414,20 @@ func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) (
 
 func isSame(obj *v3.App, revision *v3.AppRevision) bool {
 	if obj.Spec.ExternalID != "" {
-		if revision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(revision.Status.Answers, obj.Spec.Answers) && reflect.DeepEqual(revision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
+		if revision.Status.ExternalID == obj.Spec.ExternalID &&
+			reflect.DeepEqual(revision.Status.Answers, obj.Spec.Answers) &&
+			reflect.DeepEqual(revision.Status.AnswersSetString, obj.Spec.AnswersSetString) &&
+			reflect.DeepEqual(revision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
 			return true
 		}
 		return false
 	}
 
 	if obj.Status.AppliedFiles != nil {
-		if reflect.DeepEqual(obj.Status.AppliedFiles, obj.Spec.Files) && reflect.DeepEqual(revision.Status.Answers, obj.Spec.Answers) && reflect.DeepEqual(revision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
+		if reflect.DeepEqual(obj.Status.AppliedFiles, obj.Spec.Files) &&
+			reflect.DeepEqual(revision.Status.Answers, obj.Spec.Answers) &&
+			reflect.DeepEqual(revision.Status.AnswersSetString, obj.Spec.AnswersSetString) &&
+			reflect.DeepEqual(revision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
 			return true
 		}
 		return false

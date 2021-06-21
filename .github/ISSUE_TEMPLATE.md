@@ -11,6 +11,8 @@ For security issues, please email security@rancher.com instead of posting a publ
 
 **Result:**
 
+**Expected Result:**
+
 
 **Other details that may be helpful:**
 

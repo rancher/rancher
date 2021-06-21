@@ -5,12 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -173,7 +175,7 @@ func (m *Manager) createUserToken(userName string) (string, error) {
 		Token:        tokenValue,
 	}
 
-	if settings.TokenHashing.Get() == "true" {
+	if features.TokenHashing.Enabled() {
 		tokenHash, err := createSHA256Hash(tokenValue)
 		if err != nil {
 			return "", err
@@ -198,7 +200,7 @@ func createSHA256Hash(secretKey string) (string, error) {
 	return fmt.Sprintf(hashFormat, Version, encSalt, encKey), nil
 }
 
-func (m *Manager) GetCTRBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) (*v3.ClusterRoleTemplateBinding, error) {
+func (m *Manager) GetCRTBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) (*v3.ClusterRoleTemplateBinding, error) {
 	if status.ClusterName == "" {
 		return nil, fmt.Errorf("management cluster is not assigned to v1.Cluster")
 	}
@@ -239,6 +241,9 @@ func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, m
 	}
 
 	serverURL, cacert := settings.InternalServerURL.Get(), settings.InternalCACerts.Get()
+	if serverURL == "" {
+		return nil, errors.New("server url is missing, can't generate kubeconfig for fleet import cluster")
+	}
 
 	data, err := clientcmd.Write(clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{

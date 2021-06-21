@@ -23,7 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/metrics"
@@ -82,9 +81,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
-	if features.Legacy.Enabled() {
-		unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
-	}
+	unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver.NewHandler(ctx))
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)

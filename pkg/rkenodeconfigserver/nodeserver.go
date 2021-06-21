@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterregistrationtoken"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 
 	rketypes "github.com/rancher/rke/types"

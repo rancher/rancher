@@ -22,17 +22,19 @@ func (o *OpenIDCProvider) AddCertKeyToContext(ctx *context.Context, certificate,
 }
 
 func GetClientWithCertKey(httpClient *http.Client, certificate, key string) error {
-	keyPair, err := tls.X509KeyPair([]byte(certificate), []byte(key))
-	if err != nil {
-		return err
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM([]byte(certificate))
-	httpClient.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs:      caCertPool,
-			Certificates: []tls.Certificate{keyPair},
-		},
+	if certificate != "" && key != "" {
+		keyPair, err := tls.X509KeyPair([]byte(certificate), []byte(key))
+		if err != nil {
+			return err
+		}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM([]byte(certificate))
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:      caCertPool,
+				Certificates: []tls.Certificate{keyPair},
+			},
+		}
 	}
 	return nil
 }

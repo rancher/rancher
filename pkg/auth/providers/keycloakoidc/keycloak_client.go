@@ -9,15 +9,14 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/sirupsen/logrus"
 )
 
 //account defines properties an account in keycloak has
 type account struct {
-	ID            int    `json:"id,omitempty"`
+	ID            string `json:"id,omitempty"`
 	Email         string `json:"email,omitempty"`
-	EmailVerified string `json:"emailVerified,omitempty"`
+	EmailVerified bool   `json:"emailVerified,omitempty"`
 	Username      string `json:"username,omitempty"`
 	Enabled       bool   `json:"enabled,omitempty"`
 	Name          string `json:"firstName,omitempty"`
@@ -27,7 +26,7 @@ type account struct {
 
 //Group defines properties a group in keycloak has
 type Group struct {
-	ID        int     `json:"id,omitempty"`
+	ID        string  `json:"id,omitempty"`
 	Name      string  `json:"name,omitempty"`
 	Subgroups []Group `json:"subGroups,omitempty"`
 }
@@ -35,17 +34,6 @@ type Group struct {
 //KeyCloakClient implements a httpclient for keycloak
 type KeyCloakClient struct {
 	httpClient *http.Client
-}
-
-func (k *KeyCloakClient) newClient(config *v32.OIDCConfig) (KeyCloakClient, error) {
-	keyCloakClient := KeyCloakClient{}
-	if config.Certificate != "" && config.PrivateKey != "" {
-		err := oidc.GetClientWithCertKey(keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
-		if err != nil {
-			return KeyCloakClient{}, err
-		}
-	}
-	return keyCloakClient, nil
 }
 
 func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, accessToken string, config *v32.OIDCConfig) ([]account, error) {
@@ -59,13 +47,11 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, acce
 		searchURL := fmt.Sprintf("%s/%ss?search=%s", sURL, UserType, searchTerm)
 		search := URLEncoded(searchURL)
 
-		b, statusCode, err := k.getFromKeyCloak(accessToken, search, config)
-		if statusCode == 401 {
-			return nil, nil
-		}
+		b, statusCode, err := k.getFromKeyCloak(accessToken, search)
 		if err != nil {
-			return accounts, fmt.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
+			logrus.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
 				statusCode, search, err)
+			return accounts, err
 		}
 		if err := json.Unmarshal(b, &userAccounts); err != nil {
 			logrus.Errorf("[keycloak oidc]: received error unmarshalling search results, err: %v", err)
@@ -81,12 +67,10 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, acce
 		searchURL := fmt.Sprintf("%s/%ss?search=%s", sURL, GroupType, searchTerm)
 		search := URLEncoded(searchURL)
 
-		b, statusCode, err := k.getFromKeyCloak(accessToken, search, config)
-		if statusCode == 401 {
-			return nil, nil
-		}
+		b, statusCode, err := k.getFromKeyCloak(accessToken, search)
 		if err != nil {
-			logrus.Errorf("[keycloak oidc]: GET url %v received error from github, err: %v", search, err)
+			logrus.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
+				statusCode, search, err)
 			return accounts, err
 		}
 		if err := json.Unmarshal(b, &groups); err != nil {
@@ -126,7 +110,7 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, accessToken, searchTyp
 	}
 	searchURL := fmt.Sprintf("%s/%s/%s", sURL, searchType, principalID)
 	search := URLEncoded(searchURL)
-	b, statusCode, err := k.getFromKeyCloak(accessToken, search, config)
+	b, statusCode, err := k.getFromKeyCloak(accessToken, search)
 	if err != nil {
 		return account{}, fmt.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
 			statusCode, search, err)
@@ -158,24 +142,26 @@ func URLEncoded(str string) string {
 	return u.String()
 }
 
-func (k *KeyCloakClient) getFromKeyCloak(accessToken, url string, config *v32.OIDCConfig) ([]byte, int, error) {
-	keyCloakHTTPClient, err := k.newClient(config)
-	if err != nil {
-		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
-		return nil, 500, err
-	}
+func (k *KeyCloakClient) getFromKeyCloak(accessToken, url string) ([]byte, int, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, 500, err
 	}
-	req.Header.Add("Authorization", "token "+accessToken)
+	if accessToken == "" {
+		return nil, 500, fmt.Errorf("[keycloak oidc]: GET request failed, missing authorization token")
+	}
+	req.Header.Add("Authorization", "Bearer "+accessToken)
 	req.Header.Add("Accept", "application/json")
-	resp, err := keyCloakHTTPClient.httpClient.Do(req)
+	resp, err := k.httpClient.Do(req)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc]: received error from keycloak: %v", err)
 		return nil, resp.StatusCode, err
 	}
+	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return b, resp.StatusCode, err
+	}
 	switch resp.StatusCode {
 	case 200:
 	case 201:

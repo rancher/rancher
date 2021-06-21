@@ -2,7 +2,6 @@ package wait
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -71,15 +70,6 @@ func retryWatch(ctx context.Context, watchFunc watchFunc, cb func(obj runtime.Ob
 }
 
 func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb func(obj runtime.Object) (bool, error)) (err error) {
-	var last interface{} = obj
-
-	defer func() {
-		if err != nil {
-			data, _ := json.Marshal(last)
-			err = fmt.Errorf("wait failed on %s: %w", data, err)
-		}
-	}()
-
 	if done, err := cb(obj); err != nil || done {
 		return err
 	}
@@ -96,7 +86,6 @@ func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb fun
 			TimeoutSeconds:  &defaults.WatchTimeoutSeconds,
 		})
 	}, func(obj runtime.Object) (bool, error) {
-		last = obj
 		return cb(obj)
 	})
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -18,10 +19,12 @@ import (
 	"github.com/rancher/wrangler/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/rancher/wrangler/pkg/kstatus"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/rancher/wrangler/pkg/yaml"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -79,13 +82,19 @@ func Register(
 		h.generateProvisioning,
 		nil)
 
+	clusterCreateApply := clients.Apply.WithCacheTypes(clients.Mgmt.Cluster(),
+		clients.Mgmt.ClusterRegistrationToken(),
+		clients.RBAC.ClusterRoleBinding(),
+		clients.Core.Namespace(),
+		clients.Core.Secret())
+
+	if features.MCM.Enabled() {
+		clusterCreateApply = clusterCreateApply.WithCacheTypes(clients.Mgmt.ClusterRoleTemplateBinding())
+	}
+
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
-		clients.Apply.WithCacheTypes(clients.Mgmt.Cluster(),
-			clients.Mgmt.ClusterRoleTemplateBinding(),
-			clients.Mgmt.ClusterRegistrationToken(),
-			clients.Core.Namespace(),
-			clients.Core.Secret()),
+		clusterCreateApply,
 		"Created",
 		"cluster-create",
 		h.generateCluster,
@@ -273,13 +282,37 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 		if condition.Cond("Ready").IsTrue(existing) {
 			ready = true
 		}
+		for _, messageCond := range existing.Status.Conditions {
+			if messageCond.Type == "Provisioned" && cluster.Spec.RKEConfig != nil {
+				continue
+			}
+			found := false
+			newCond := genericcondition.GenericCondition{
+				Type:               string(messageCond.Type),
+				Status:             messageCond.Status,
+				LastUpdateTime:     messageCond.LastUpdateTime,
+				LastTransitionTime: messageCond.LastTransitionTime,
+				Reason:             messageCond.Reason,
+				Message:            messageCond.Message,
+			}
+			for i, provCond := range status.Conditions {
+				if provCond.Type != string(messageCond.Type) {
+					continue
+				}
+				found = true
+				status.Conditions[i] = newCond
+			}
+			if !found {
+				status.Conditions = append(status.Conditions, newCond)
+			}
+		}
 	}
 
 	// Never set ready back to false because we will end up deleting the secret
 	status.Ready = status.Ready || ready
 	status.ObservedGeneration = cluster.Generation
 	status.ClusterName = rCluster.Name
-	if ready {
+	if status.Ready {
 		kstatus.SetActive(&status)
 	} else {
 		kstatus.SetTransitioning(&status, "")
@@ -296,11 +329,32 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 			}
 			status.ClientSecretName = secret.Name
 
-			ctrb, err := h.kubeconfigManager.GetCTRBForAdmin(cluster, status)
-			if err != nil {
-				return nil, status, err
+			if features.MCM.Enabled() {
+				crtb, err := h.kubeconfigManager.GetCRTBForAdmin(cluster, status)
+				if err != nil {
+					return nil, status, err
+				}
+				objs = append(objs, crtb)
+			} else if cluster.Namespace == "fleet-local" && cluster.Name == "local" {
+				user, err := h.kubeconfigManager.EnsureUser(cluster.Namespace, cluster.Name)
+				if err != nil {
+					return objs, status, err
+				}
+				objs = append(objs, &rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fleet-local-cluster-admin",
+					},
+					Subjects: []rbacv1.Subject{{
+						Kind:     "User",
+						APIGroup: rbacv1.GroupName,
+						Name:     user,
+					}},
+					RoleRef: rbacv1.RoleRef{
+						Kind: "ClusterRole",
+						Name: "cluster-admin",
+					},
+				})
 			}
-			objs = append(objs, ctrb)
 		}
 	}
 

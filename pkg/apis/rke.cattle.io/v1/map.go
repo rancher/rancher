@@ -20,6 +20,7 @@ func (in *GenericMap) UnmarshalJSON(data []byte) error {
 }
 
 func (in *GenericMap) DeepCopyInto(out *GenericMap) {
+	out.Data = map[string]interface{}{}
 	if err := convert.ToObj(in.Data, &out.Data); err != nil {
 		panic(err)
 	}

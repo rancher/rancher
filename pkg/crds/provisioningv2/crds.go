@@ -48,6 +48,9 @@ func provisioning() []crd.CRD {
 				WithColumn("Ready", ".status.ready").
 				WithColumn("Kubeconfig", ".status.clientSecretName")
 		}),
+		newRancherCRD(&v1.ManagedOS{}, func(c crd.CRD) crd.CRD {
+			return c
+		}),
 	}
 }
 
@@ -69,6 +72,9 @@ func rke2() []crd.CRD {
 				WithColumn("Kubeconfig", ".status.clientSecretName")
 		}),
 		newRKECRD(&rkev1.RKECluster{}, func(c crd.CRD) crd.CRD {
+			c.Labels = map[string]string{
+				"cluster.x-k8s.io/v1alpha4": "v1",
+			}
 			return clusterIndexed(c)
 		}),
 		newRKECRD(&rkev1.RKEControlPlane{}, func(c crd.CRD) crd.CRD {

@@ -27,6 +27,11 @@ metadata:
     {{- end }}
   {{- end }}
 {{- end }}
+{{- if .Values.ingress.includeDefaultExtraAnnotations }}
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+{{- end }}
 {{- if .Values.ingress.extraAnnotations }}
 {{ toYaml .Values.ingress.extraAnnotations | indent 4 }}
 {{- end }}
@@ -52,6 +57,6 @@ spec:
   tls:
   - hosts:
     - {{ .Values.hostname }}
-    secretName: tls-rancher-ingress
+    secretName: {{ .Values.ingress.tls.secretName }}
 {{- end }}
 {{- end }}

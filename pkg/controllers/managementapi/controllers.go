@@ -18,7 +18,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/monitoring"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -27,9 +26,7 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 		return err
 	}
 
-	if features.Legacy.Enabled() {
-		catalog.Register(ctx, scaledContext)
-	}
+	catalog.Register(ctx, scaledContext)
 	dynamicschema.Register(ctx, scaledContext, server.Schemas)
 	whitelistproxyNodeDriver.Register(ctx, scaledContext)
 	whitelistproxyKontainerDriver.Register(ctx, scaledContext)

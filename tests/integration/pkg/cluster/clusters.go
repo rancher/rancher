@@ -1,7 +1,9 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -13,6 +15,7 @@ import (
 	"github.com/rancher/rancher/tests/integration/pkg/registry"
 	"github.com/rancher/rancher/tests/integration/pkg/wait"
 	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -76,25 +79,31 @@ func Machines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*ca
 	})
 }
 
-func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
-	err := wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
+func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisioningv1api.Cluster, err error) {
+	defer func() {
+		if err != nil {
+			c, newErr := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+			if newErr != nil {
+				logrus.Errorf("failed to get cluster %s/%s to print error: %v", c.Namespace, c.Name, err)
+				return
+			}
+
+			machines, newErr := Machines(clients, c)
+			if newErr != nil {
+				logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
+			}
+
+			data, _ := json.Marshal(map[string]interface{}{
+				"cluster":  c,
+				"machines": machines,
+			})
+			err = fmt.Errorf("wait failed on %s: %w", data, err)
+		}
+	}()
+
+	err = wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
 		c = obj.(*provisioningv1api.Cluster)
 		return c.Status.ClusterName != "", nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	mgmtCluster, err := clients.Mgmt.Cluster().Get(c.Status.ClusterName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	err = wait.Object(clients.Ctx, func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-		return clients.Mgmt.Cluster().Watch(opts)
-	}, mgmtCluster, func(obj runtime.Object) (bool, error) {
-		mgmtCluster = obj.(*v3.Cluster)
-		return condition.Cond("Ready").IsTrue(mgmtCluster), nil
 	})
 	if err != nil {
 		return nil, err
@@ -123,6 +132,21 @@ func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (*provision
 		}
 	}
 
+	mgmtCluster, err := clients.Mgmt.Cluster().Get(c.Status.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	err = wait.Object(clients.Ctx, func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+		return clients.Mgmt.Cluster().Watch(opts)
+	}, mgmtCluster, func(obj runtime.Object) (bool, error) {
+		mgmtCluster = obj.(*v3.Cluster)
+		return condition.Cond("Ready").IsTrue(mgmtCluster), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -141,7 +165,7 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 			time.Sleep(time.Second)
 			continue
 		}
-		return tokens.Items[0].Status.InsecureNodeCommand, nil
+		return strings.Replace(tokens.Items[0].Status.InsecureNodeCommand, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
 	}
 
 	return "", fmt.Errorf("timeout getting custom command")

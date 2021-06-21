@@ -66,7 +66,7 @@ var (
 	SystemAgentInstallerImage         = NewSetting("system-agent-installer-image", "docker.io/rancher/system-agent-installer-")
 	SystemAgentUpgradeImage           = NewSetting("system-agent-upgrade-image", "")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
-	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,fleet-system")
+	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system")
 	TelemetryOpt                      = NewSetting("telemetry-opt", "")
 	TokenHashing                      = NewSetting("token-hashing", "true")
 	TLSMinVersion                     = NewSetting("tls-min-version", "1.2")
@@ -83,6 +83,7 @@ var (
 	UIOfflinePreferred                = NewSetting("ui-offline-preferred", "dynamic")
 	UIIssues                          = NewSetting("ui-issues", "")
 	UIPL                              = NewSetting("ui-pl", "rancher")
+	UICommunityLinks                  = NewSetting("ui-community-links", "true")
 	UIKubernetesSupportedVersions     = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
 	UIKubernetesDefaultVersion        = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
 	WhitelistDomain                   = NewSetting("whitelist-domain", "forums.rancher.com")
@@ -99,7 +100,7 @@ var (
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch            = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
-	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.6")
+	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.7")
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin

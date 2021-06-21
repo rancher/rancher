@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httputil"
+	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/settings"
@@ -69,6 +70,11 @@ func (s *shell) proxyRequest(rw http.ResponseWriter, req *http.Request, pod *v1.
 		Director: func(req *http.Request) {
 			req.URL = attachURL
 			req.Host = attachURL.Host
+			for key := range req.Header {
+				if strings.HasPrefix(key, "Impersonate-Extra-") {
+					delete(req.Header, key)
+				}
+			}
 			delete(req.Header, "Impersonate-Group")
 			delete(req.Header, "Impersonate-User")
 			delete(req.Header, "Authorization")

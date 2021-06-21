@@ -52,6 +52,7 @@ type ChartUpgradeAction struct {
 	Namespace                string           `json:"namespace,omitempty"`
 	CleanupOnFail            bool             `json:"cleanupOnFail,omitempty"`
 	Charts                   []ChartUpgrade   `json:"charts,omitempty"`
+	ForceAdopt               bool             `json:"forceAdopt,omitempty"`
 }
 
 type ChartUpgrade struct {
