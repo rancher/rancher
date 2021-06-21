@@ -734,6 +734,10 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 		return err
 	}
 
+	if err := validateGKEPrivateClusterConfig(clusterSpec); err != nil {
+		return err
+	}
+
 	region, regionOk := gkeConfig["region"]
 	zone, zoneOk := gkeConfig["zone"]
 	if (!regionOk || region == "") && (!zoneOk || zone == "") {
@@ -883,6 +887,13 @@ func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 			continue
 		}
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
+	}
+	return nil
+}
+
+func validateGKEPrivateClusterConfig(spec *v32.ClusterSpec) error {
+	if spec.GKEConfig.PrivateClusterConfig != nil && spec.GKEConfig.PrivateClusterConfig.EnablePrivateEndpoint && !spec.GKEConfig.PrivateClusterConfig.EnablePrivateNodes {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("private endpoint requires private nodes"))
 	}
 	return nil
 }
