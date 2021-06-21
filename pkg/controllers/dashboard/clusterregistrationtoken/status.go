@@ -47,15 +47,19 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 	}
 
 	crtStatus := crt.Status.DeepCopy()
+	crtStatus.Token = token
 
 	url, err := getURL(token, clusterID)
 	if err != nil {
 		return crt.Status, err
 	}
 
+	if url == "" {
+		return *crtStatus, nil
+	}
+
 	crtStatus.InsecureCommand = fmt.Sprintf(insecureCommandFormat, url)
 	crtStatus.Command = fmt.Sprintf(commandFormat, url)
-	crtStatus.Token = token
 	crtStatus.ManifestURL = url
 
 	rootURL, err := getRootURL()
@@ -219,11 +223,11 @@ func getRootURL() (string, error) {
 }
 
 func getURL(token, clusterID string) (string, error) {
-	path := "/v3/import/" + token + "_" + clusterID + ".yaml"
 	serverURL := settings.ServerURL.Get()
 	if serverURL == "" {
-		return "", fmt.Errorf("server-url setting is not set")
+		return "", nil
 	}
+	path := "/v3/import/" + token + "_" + clusterID + ".yaml"
 	u, err := url.Parse(serverURL)
 	if err != nil {
 		return "", err
