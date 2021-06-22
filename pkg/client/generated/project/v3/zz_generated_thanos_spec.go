@@ -15,6 +15,7 @@ const (
 	ThanosSpecFieldSHA                     = "sha"
 	ThanosSpecFieldTag                     = "tag"
 	ThanosSpecFieldTracingConfig           = "tracingConfig"
+	ThanosSpecFieldTracingConfigFile       = "tracingConfigFile"
 	ThanosSpecFieldVersion                 = "version"
 )
 
@@ -32,5 +33,6 @@ type ThanosSpec struct {
 	SHA                     string                `json:"sha,omitempty" yaml:"sha,omitempty"`
 	Tag                     string                `json:"tag,omitempty" yaml:"tag,omitempty"`
 	TracingConfig           *SecretKeySelector    `json:"tracingConfig,omitempty" yaml:"tracingConfig,omitempty"`
+	TracingConfigFile       string                `json:"tracingConfigFile,omitempty" yaml:"tracingConfigFile,omitempty"`
 	Version                 string                `json:"version,omitempty" yaml:"version,omitempty"`
 }
