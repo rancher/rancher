@@ -3,13 +3,13 @@ apiVersion: apps/v1
 metadata:
   name: {{ template "rancher.fullname" . }}
   annotations:
-{{- if (eq (int .Values.replicas) -1) }}
-    management.cattle.io/scale-available: "3"
+{{- if (lt (int .Values.replicas) 0) }}
+    management.cattle.io/scale-available: "{{ sub 0 (int .Values.replicas)}}"
 {{- end  }}
   labels:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
-{{- if (ne (int .Values.replicas) -1) }}
+{{- if (gt (int .Values.replicas) 0) }}
   replicas: {{ .Values.replicas }}
 {{- end  }}
   selector:
