@@ -31,7 +31,7 @@ const (
 	GoogleDriver       = "google"
 )
 
-var driverData = map[string]map[string][]string{
+var DriverData = map[string]map[string][]string{
 	Amazonec2driver:    {"publicCredentialFields": []string{"accessKey"}, "privateCredentialFields": []string{"secretKey"}},
 	Azuredriver:        {"publicCredentialFields": []string{"clientId", "subscriptionId"}, "privateCredentialFields": []string{"clientSecret"}},
 	DigitalOceandriver: {"privateCredentialFields": []string{"accessToken"}},
@@ -135,7 +135,7 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, act
 			annotations[k] = v
 		}
 	}
-	for key, fields := range driverData[name] {
+	for key, fields := range DriverData[name] {
 		annotations[key] = strings.Join(fields, ",")
 	}
 	defaults := []string{}
