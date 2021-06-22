@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -44,12 +45,16 @@ const (
 	clusterRegToken   = "clusterRegToken"
 	JoinURLAnnotation = "rke.cattle.io/join-url"
 
-	InitNodeLabel         = "rke.cattle.io/init-node"
-	EtcdRoleLabel         = "rke.cattle.io/etcd-role"
-	WorkerRoleLabel       = "rke.cattle.io/worker-role"
-	ControlPlaneRoleLabel = "rke.cattle.io/control-plane-role"
-	MachineUIDLabel       = "rke.cattle.io/machine"
-	capiMachineLabel      = "cluster.x-k8s.io/cluster-name"
+	NodeNameLabel              = "rke.cattle.io/node-name"
+	InitNodeLabel              = "rke.cattle.io/init-node"
+	InitNodeMachineIDLabel     = "rke.cattle.io/init-node-machine-id"
+	InitNodeMachineIDDoneLabel = "rke.cattle.io/init-node-machine-id-done"
+	EtcdRoleLabel              = "rke.cattle.io/etcd-role"
+	WorkerRoleLabel            = "rke.cattle.io/worker-role"
+	ControlPlaneRoleLabel      = "rke.cattle.io/control-plane-role"
+	MachineUIDLabel            = "rke.cattle.io/machine"
+	MachineIDLabel             = "rke.cattle.io/machine-id"
+	capiMachineLabel           = "cluster.x-k8s.io/cluster-name"
 
 	MachineNameLabel      = "rke.cattle.io/machine-name"
 	MachineNamespaceLabel = "rke.cattle.io/machine-namespace"
@@ -107,6 +112,7 @@ type roleFilter func(machine *capi.Machine) bool
 type Planner struct {
 	ctx                           context.Context
 	store                         *PlanStore
+	rkeControlPlanes              rkecontrollers.RKEControlPlaneClient
 	secretClient                  corecontrollers.SecretClient
 	secretCache                   corecontrollers.SecretCache
 	machines                      capicontrollers.MachineClient
@@ -135,6 +141,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		clusterRegistrationTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		capiClusters:                  clients.CAPI.Cluster().Cache(),
 		managementClusters:            clients.Mgmt.Cluster().Cache(),
+		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
 		kubeconfig:                    kubeconfig.New(clients),
 		etcdRestore:                   newETCDRestore(clients, store),
 		etcdCreate:                    newETCDCreate(clients, store),
@@ -190,7 +197,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	if _, err := p.electInitNode(plan); err != nil {
+	if _, err := p.electInitNode(controlPlane, plan); err != nil {
 		return err
 	}
 
@@ -202,13 +209,13 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	joinServer, err = p.electInitNode(plan)
+	joinServer, err = p.electInitNode(controlPlane, plan)
 	if err != nil {
 		return err
 	} else if joinServer == "" && firstIgnoreError != nil {
-		return ErrWaiting(firstIgnoreError.Error())
+		return ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
 	} else if joinServer == "" {
-		return ErrWaiting("waiting for bootstrap node to be available")
+		return ErrWaiting("waiting for join url to be available on bootstrap node")
 	}
 
 	err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode,
@@ -265,7 +272,11 @@ func (p *Planner) clearInitNodeMark(machine *capi.Machine) error {
 	machine = machine.DeepCopy()
 	delete(machine.Labels, InitNodeLabel)
 	_, err := p.machines.Update(machine)
-	return err
+	if err != nil {
+		return err
+	}
+	// We've changed state, so let the caches sync up again
+	return generic.ErrSkip
 }
 
 func (p *Planner) setInitNodeMark(machine *capi.Machine) (*capi.Machine, error) {
@@ -277,7 +288,11 @@ func (p *Planner) setInitNodeMark(machine *capi.Machine) (*capi.Machine, error) 
 		machine.Labels = map[string]string{}
 	}
 	machine.Labels[InitNodeLabel] = "true"
-	return p.machines.Update(machine)
+	if _, err := p.machines.Update(machine); err != nil {
+		return nil, err
+	}
+	// We've changed state, so let the caches sync up again
+	return nil, generic.ErrSkip
 }
 
 func (p *Planner) getControlPlaneJoinURL(plan *plan.Plan) string {
@@ -291,7 +306,30 @@ func (p *Planner) getControlPlaneJoinURL(plan *plan.Plan) string {
 	return ""
 }
 
-func (p *Planner) electInitNode(plan *plan.Plan) (string, error) {
+func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (string, error) {
+	// fixedMachineID is used when bootstrapping the local rancherd cluster to ensure the exact machine
+	// gets picked for the init-not
+	fixedMachineID := rkeControlPlane.Labels[InitNodeMachineIDLabel]
+	if fixedMachineID != "" && rkeControlPlane.Labels[InitNodeMachineIDDoneLabel] == "" {
+		entries := collect(plan, func(machine *capi.Machine) bool {
+			return machine.Labels[MachineIDLabel] == fixedMachineID
+		})
+		if len(entries) != 1 {
+			return "", nil
+		}
+		_, err := p.setInitNodeMark(entries[0].Machine)
+		if err != nil {
+			return "", err
+		}
+		rkeControlPlane = rkeControlPlane.DeepCopy()
+		rkeControlPlane.Labels[InitNodeMachineIDDoneLabel] = "true"
+		_, err = p.rkeControlPlanes.Update(rkeControlPlane)
+		if err != nil {
+			return "", err
+		}
+		return entries[0].Machine.Annotations[JoinURLAnnotation], nil
+	}
+
 	entries := collect(plan, isEtcd)
 	joinURL := ""
 	initNodeFound := false
@@ -574,6 +612,10 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["disable-controller-manager"] = true
 	} else if isOnlyControlPlane(machine) {
 		config["disable-etcd"] = true
+	}
+
+	if nodeName := machine.Labels[NodeNameLabel]; nodeName != "" {
+		config["node-name"] = nodeName
 	}
 }
 

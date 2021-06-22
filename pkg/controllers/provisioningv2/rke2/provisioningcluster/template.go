@@ -296,6 +296,9 @@ func rkeControlPlane(cluster *rancherv1.Cluster) *rkev1.RKEControlPlane {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				planner.InitNodeMachineIDLabel: cluster.Labels[planner.InitNodeMachineIDLabel],
+			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
 			RKEClusterSpecCommon:  *cluster.Spec.RKEConfig.RKEClusterSpecCommon.DeepCopy(),

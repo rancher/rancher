@@ -159,6 +159,9 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 	if data.Bool("role-worker") {
 		labels[planner.WorkerRoleLabel] = "true"
 	}
+	if val := data.String("node-name"); val != "" {
+		labels[planner.NodeNameLabel] = val
+	}
 
 	labels["rke.cattle.io/machine-id"] = data.String("id")
 

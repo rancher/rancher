@@ -8,6 +8,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/rancher/tests/integration/pkg/namespace"
@@ -16,6 +17,7 @@ import (
 	"github.com/rancher/rancher/tests/integration/pkg/wait"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -93,9 +95,22 @@ func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisi
 				logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
 			}
 
+			var plans []*corev1.Secret
+			for _, machine := range machines.Items {
+				if machine.Spec.Bootstrap.ConfigRef == nil {
+					continue
+				}
+				secretName := planner.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name)
+				secret, err := clients.Core.Secret().Get(machine.Namespace, secretName, metav1.GetOptions{})
+				if err == nil {
+					plans = append(plans, secret)
+				}
+			}
+
 			data, _ := json.Marshal(map[string]interface{}{
 				"cluster":  c,
 				"machines": machines,
+				"plans":    plans,
 			})
 			err = fmt.Errorf("wait failed on %s: %w", data, err)
 		}
@@ -106,7 +121,7 @@ func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisi
 		return c.Status.ClusterName != "", nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("mgmt cluster not assigned: %w", err)
 	}
 
 	err = wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
@@ -114,7 +129,7 @@ func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisi
 		return c.Status.Ready, nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("prov cluster is not ready: %w", err)
 	}
 
 	machines, err := Machines(clients, c)
@@ -128,7 +143,7 @@ func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisi
 			return machine.Status.NodeRef != nil, nil
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("noderef not assigned to %s/%s: %w", machine.Namespace, machine.Name, err)
 		}
 	}
 
@@ -144,7 +159,7 @@ func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisi
 		return condition.Cond("Ready").IsTrue(mgmtCluster), nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("mgmt cluster is not ready: %w", err)
 	}
 
 	return c, nil

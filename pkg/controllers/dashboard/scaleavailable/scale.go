@@ -7,8 +7,10 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	appscontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/relatedresource"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
@@ -26,7 +28,27 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 		node:        wrangler.Core.Node().Cache(),
 		deployments: wrangler.Apps.Deployment(),
 	}
+	deploymentCache := wrangler.Apps.Deployment().Cache()
 	wrangler.Apps.Deployment().OnChange(ctx, "scale-available", h.OnChange)
+	deploymentCache.AddIndexer(availableAnnotation, func(obj *appsv1.Deployment) ([]string, error) {
+		if val := obj.Annotations[availableAnnotation]; val != "" {
+			return []string{availableAnnotation}, nil
+		}
+		return nil, nil
+	})
+	relatedresource.Watch(ctx, "scale-available-trigger", func(namespace, name string, obj runtime.Object) (result []relatedresource.Key, _ error) {
+		deps, err := deploymentCache.GetByIndex(availableAnnotation, availableAnnotation)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range deps {
+			result = append(result, relatedresource.Key{
+				Namespace: obj.Namespace,
+				Name:      obj.Name,
+			})
+		}
+		return result, nil
+	}, wrangler.Apps.Deployment(), wrangler.Core.Node())
 }
 
 func (h *handler) OnChange(key string, deployment *appsv1.Deployment) (*appsv1.Deployment, error) {
