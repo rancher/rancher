@@ -272,7 +272,11 @@ func (p *Planner) clearInitNodeMark(machine *capi.Machine) error {
 	machine = machine.DeepCopy()
 	delete(machine.Labels, InitNodeLabel)
 	_, err := p.machines.Update(machine)
-	return err
+	if err != nil {
+		return err
+	}
+	// We've changed state, so let the caches sync up again
+	return generic.ErrSkip
 }
 
 func (p *Planner) setInitNodeMark(machine *capi.Machine) (*capi.Machine, error) {
@@ -284,7 +288,11 @@ func (p *Planner) setInitNodeMark(machine *capi.Machine) (*capi.Machine, error) 
 		machine.Labels = map[string]string{}
 	}
 	machine.Labels[InitNodeLabel] = "true"
-	return p.machines.Update(machine)
+	if _, err := p.machines.Update(machine); err != nil {
+		return nil, err
+	}
+	// We've changed state, so let the caches sync up again
+	return nil, generic.ErrSkip
 }
 
 func (p *Planner) getControlPlaneJoinURL(plan *plan.Plan) string {
@@ -319,6 +327,7 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 		if err != nil {
 			return "", err
 		}
+		return entries[0].Machine.Annotations[JoinURLAnnotation], nil
 	}
 
 	entries := collect(plan, isEtcd)
