@@ -168,7 +168,10 @@ func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, er
 	}
 
 	secret, err := h.secrets.Get(machine.Namespace, planner.PlanSecretFromBootstrapName(rkeBootstrap.Name))
-	if err != nil {
+	if apierror.IsNotFound(err) {
+		// When the secret exists this handler will be triggered, so don't error
+		return machine, nil
+	} else if err != nil {
 		return machine, err
 	}
 
