@@ -35,13 +35,9 @@ const (
 	Windows
 )
 
-var osTypeImageListName map[OSType]string
-
-func init() {
-	osTypeImageListName = map[OSType]string{
-		Windows: "windows-rancher-images",
-		Linux:   "rancher-images",
-	}
+var osTypeImageListName = map[OSType]string{
+	Windows: "windows-rancher-images",
+	Linux:   "rancher-images",
 }
 
 func Resolve(image string) string {
@@ -361,7 +357,14 @@ func CreateCatalogImageListConfigMap(cm *v1.ConfigMap, catalog *v3.Catalog) (err
 	catalogChartPath := filepath.Join(libhelm.CatalogCache, catalogHash)
 
 	windowsImages, _, err = GetImages(catalogChartPath, "", nil, []string{}, nil, Windows)
+	if err != nil {
+		return
+	}
+
 	linuxImages, _, err = GetImages(catalogChartPath, "", nil, []string{}, nil, Linux)
+	if err != nil {
+		return
+	}
 
 	cm.Data = make(map[string]string, 2)
 	cm.Data[osTypeImageListName[Windows]] = strings.Join(windowsImages, imageListDelimiter)
@@ -370,7 +373,7 @@ func CreateCatalogImageListConfigMap(cm *v1.ConfigMap, catalog *v3.Catalog) (err
 	return
 }
 
-func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) (windowsImageList, linuxImageList []string, err error) {
+func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) (windowsImageList, linuxImageList []string) {
 	windowsImageList = strings.Split(cm.Data[osTypeImageListName[Windows]], imageListDelimiter)
 	linuxImageList = strings.Split(cm.Data[osTypeImageListName[Linux]], imageListDelimiter)
 

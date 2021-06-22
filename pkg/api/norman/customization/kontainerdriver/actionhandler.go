@@ -162,15 +162,12 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to get image list for system catalog")
 	}
 
+	_, targetSysCatalogImages := image.ParseCatalogImageListConfigMap(catalogImageList)
+
 	var targetRkeSysImages []string
-	var targetSysCatalogImages []string
 	switch apiContext.ID {
 	case linuxImages:
 		targetRkeSysImages, _, err = image.GetImages("", "", nil, []string{}, rkeSysImages, image.Linux)
-		if err != nil {
-			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
-		}
-		_, targetSysCatalogImages, err = image.ParseCatalogImageListConfigMap(catalogImageList)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
@@ -178,10 +175,6 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		targetRkeSysImages, _, err = image.GetImages("", "", nil, []string{}, rkeSysImages, image.Windows)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
-		}
-		targetSysCatalogImages, _, err = image.ParseCatalogImageListConfigMap(catalogImageList)
-		if err != nil {
-			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
 	}
 
