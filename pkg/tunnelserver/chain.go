@@ -4,10 +4,16 @@ import (
 	"net/http"
 
 	"github.com/rancher/remotedialer"
+	"github.com/sirupsen/logrus"
 )
 
 type Authorizers struct {
 	chain []remotedialer.Authorizer
+}
+
+func ErrorWriter(rw http.ResponseWriter, req *http.Request, code int, err error) {
+	logrus.Errorf("Failed to handling tunnel request from %s: response %d: %v", req.RemoteAddr, code, err)
+	remotedialer.DefaultErrorWriter(rw, req, code, err)
 }
 
 func (a *Authorizers) Authorize(req *http.Request) (clientKey string, authed bool, err error) {
