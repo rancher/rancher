@@ -213,9 +213,9 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	if err != nil {
 		return err
 	} else if joinServer == "" && firstIgnoreError != nil {
-		return ErrWaiting(firstIgnoreError.Error())
+		return ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
 	} else if joinServer == "" {
-		return ErrWaiting("waiting for bootstrap node to be available")
+		return ErrWaiting("waiting for join url to be available on bootstrap node")
 	}
 
 	err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode,
