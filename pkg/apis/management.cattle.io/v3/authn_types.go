@@ -92,7 +92,7 @@ type UserAttribute struct {
 	GroupPrincipals map[string]Principals // the value is a []Principal, but code generator cannot handle slice as a value
 	LastRefresh     string
 	NeedsRefresh    bool
-	Extra           map[string]map[string][]string
+	ExtraByProvider map[string]map[string][]string // extra information for the user to print in audit logs, stored per authProvider. example: map[openldap:map[principalid:[openldap_user://uid=testuser1,ou=dev,dc=us-west-2,dc=compute,dc=internal]]]
 }
 
 type Principals struct {

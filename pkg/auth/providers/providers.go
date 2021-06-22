@@ -31,7 +31,7 @@ var (
 	LocalProvider          = "local"
 	providersByType        = make(map[string]common.AuthProvider)
 	confMu                 sync.Mutex
-	userExtraAttributesMap = map[string]bool{"principalid": true, "username": true}
+	userExtraAttributesMap = map[string]bool{common.UserAttributePrincipalID: true, common.UserAttributeUserName: true}
 )
 
 func GetProvider(providerName string) (common.AuthProvider, error) {

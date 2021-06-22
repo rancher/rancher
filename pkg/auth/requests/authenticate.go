@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -110,7 +111,6 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	if token.ClusterName != "" && token.ClusterName != a.clusterRouter(req) {
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
-	logrus.Infof("request token %v", token)
 
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -157,32 +157,43 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp.User = token.UserID
 	authResp.UserPrincipal = token.UserPrincipal.Name
 	authResp.Groups = groups
+	authResp.Extras = getUserExtraInfo(token, u, attribs)
+	logrus.Debugf("Extras returned %v", authResp.Extras)
 
-	if attribs != nil {
-		if strings.EqualFold(token.AuthProvider, "local") || token.AuthProvider == "" {
+	return authResp, nil
+}
+
+func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) map[string][]string {
+	extraInfo := make(map[string][]string)
+
+	if attribs != nil && attribs.ExtraByProvider != nil && len(attribs.ExtraByProvider) != 0 {
+		if token.AuthProvider == "local" || token.AuthProvider == "" {
 			//gather all extraInfo for all external auth providers present in the userAttributes
-			extraInfo := make(map[string][]string)
-			for provider, extra := range attribs.Extra {
-				if provider != "local" {
-					for key, value := range extra {
-						extraInfo[key] = append(extraInfo[key], value...)
-					}
+			for _, extra := range attribs.ExtraByProvider {
+				for key, value := range extra {
+					extraInfo[key] = append(extraInfo[key], value...)
 				}
 			}
-			authResp.Extras = extraInfo
-		} else {
-			//non-local authProvider is set in token
-			var ok bool
-			authResp.Extras, ok = attribs.Extra[token.AuthProvider]
-			if !ok {
-				extraFromProvider := providers.GetUserExtraAttributes(token.AuthProvider, token.UserPrincipal)
-				if extraFromProvider != nil {
-					authResp.Extras = extraFromProvider
-				}
-			}
+			return extraInfo
+		}
+		//authProvider is set in token
+		if extraInfo, ok := attribs.ExtraByProvider[token.AuthProvider]; ok {
+			return extraInfo
 		}
 	}
-	return authResp, nil
+
+	extraInfo = providers.GetUserExtraAttributes(token.AuthProvider, token.UserPrincipal)
+	//if principalid is not set in extra, read from user
+	if extraInfo != nil {
+		if len(extraInfo[common.UserAttributePrincipalID]) == 0 {
+			extraInfo[common.UserAttributePrincipalID] = u.PrincipalIDs
+		}
+		if len(extraInfo[common.UserAttributeUserName]) == 0 {
+			extraInfo[common.UserAttributeUserName] = []string{u.DisplayName}
+		}
+	}
+
+	return extraInfo
 }
 
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {

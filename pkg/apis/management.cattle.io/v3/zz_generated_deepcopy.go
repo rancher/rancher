@@ -10179,8 +10179,8 @@ func (in *UserAttribute) DeepCopyInto(out *UserAttribute) {
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
+	if in.ExtraByProvider != nil {
+		in, out := &in.ExtraByProvider, &out.ExtraByProvider
 		*out = make(map[string]map[string][]string, len(*in))
 		for key, val := range *in {
 			var outVal map[string][]string

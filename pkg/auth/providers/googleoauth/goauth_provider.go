@@ -430,7 +430,11 @@ func (g *googleOauthProvider) getDirectoryService(ctx context.Context, userEmail
 
 func (g *googleOauthProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	extras := make(map[string][]string)
-	extras["principalid"] = []string{userPrincipal.Name}
-	extras["username"] = []string{userPrincipal.LoginName}
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
 	return extras
 }

@@ -397,7 +397,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
 			publicKey := s.clientState.GetState(r, "Rancher_PublicKey")
 
-			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR)
+			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, userPrincipal.Provider, responseType, s.userMGR, userPrincipal)
 			if err != nil {
 				log.Errorf("SAML: getToken error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)

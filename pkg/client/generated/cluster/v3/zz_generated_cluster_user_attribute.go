@@ -6,7 +6,7 @@ const (
 	ClusterUserAttributeFieldCreated         = "created"
 	ClusterUserAttributeFieldCreatorID       = "creatorId"
 	ClusterUserAttributeFieldEnabled         = "enabled"
-	ClusterUserAttributeFieldExtra           = "extra"
+	ClusterUserAttributeFieldExtraByProvider = "extraByProvider"
 	ClusterUserAttributeFieldGroups          = "groups"
 	ClusterUserAttributeFieldLabels          = "labels"
 	ClusterUserAttributeFieldLastRefresh     = "lastRefresh"
@@ -23,7 +23,7 @@ type ClusterUserAttribute struct {
 	Created         string                         `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Enabled         bool                           `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	Extra           map[string]map[string][]string `json:"extra,omitempty" yaml:"extra,omitempty"`
+	ExtraByProvider map[string]map[string][]string `json:"extraByProvider,omitempty" yaml:"extraByProvider,omitempty"`
 	Groups          []string                       `json:"groups,omitempty" yaml:"groups,omitempty"`
 	Labels          map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LastRefresh     string                         `json:"lastRefresh,omitempty" yaml:"lastRefresh,omitempty"`

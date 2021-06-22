@@ -5,7 +5,7 @@ const (
 	UserAttributeFieldAnnotations     = "annotations"
 	UserAttributeFieldCreated         = "created"
 	UserAttributeFieldCreatorID       = "creatorId"
-	UserAttributeFieldExtra           = "extra"
+	UserAttributeFieldExtraByProvider = "extraByProvider"
 	UserAttributeFieldGroupPrincipals = "groupPrincipals"
 	UserAttributeFieldLabels          = "labels"
 	UserAttributeFieldLastRefresh     = "lastRefresh"
@@ -21,7 +21,7 @@ type UserAttribute struct {
 	Annotations     map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created         string                         `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Extra           map[string]map[string][]string `json:"extra,omitempty" yaml:"extra,omitempty"`
+	ExtraByProvider map[string]map[string][]string `json:"extraByProvider,omitempty" yaml:"extraByProvider,omitempty"`
 	GroupPrincipals map[string]Principal           `json:"groupPrincipals,omitempty" yaml:"groupPrincipals,omitempty"`
 	Labels          map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LastRefresh     string                         `json:"lastRefresh,omitempty" yaml:"lastRefresh,omitempty"`

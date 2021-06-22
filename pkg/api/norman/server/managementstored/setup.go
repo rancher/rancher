@@ -58,6 +58,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/api"
 	authapi "github.com/rancher/rancher/pkg/auth/api"
+	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
@@ -163,7 +164,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		return err
 	}
 
-	Clusters(schemas, apiContext, clusterManager, k8sProxy)
+	Clusters(ctx, schemas, apiContext, clusterManager, k8sProxy)
 	ClusterRoleTemplateBinding(schemas, apiContext)
 	api.User(ctx, schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
@@ -249,7 +250,7 @@ func setupScopedTypes(schemas *types.Schemas) {
 	}
 }
 
-func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
+func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	clusterFormatter := ccluster.NewFormatter(schemas, managementContext)
 	schema.Formatter = clusterFormatter.Formatter
@@ -270,6 +271,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		ClusterTemplateRevisionClient: managementContext.Management.ClusterTemplateRevisions(""),
 		SubjectAccessReviewClient:     managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
 		TokenClient:                   managementContext.Management.Tokens(""),
+		Auth:                          requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, managementContext),
 	}
 
 	clusterValidator := ccluster.Validator{
