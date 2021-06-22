@@ -48,6 +48,9 @@ steps:
   - name: docker
     path: /var/run/docker.sock
   when:
+    instance:
+      include:
+      - drone-publish.rancher.io
     event:
     - push
     - pull_request
