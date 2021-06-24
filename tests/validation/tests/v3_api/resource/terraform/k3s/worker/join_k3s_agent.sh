@@ -13,6 +13,16 @@ then
    echo -e "${7}" >> /etc/rancher/k3s/config.yaml
    cat /etc/rancher/k3s/config.yaml
 fi
+if [[ -n "${7}" ]] && [[ "${7}" == *"protect-kernel-defaults"* ]]
+then
+  cat /tmp/cis_workerconfig.yaml >> /etc/rancher/k3s/config.yaml
+  echo -e "vm.panic_on_oom=0" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "vm.overcommit_memory=1" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.panic=10" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.panic_on_oops=1" >>/etc/sysctl.d/90-kubelet.conf
+  sysctl -p /etc/sysctl.d/90-kubelet.conf
+  systemctl restart systemd-sysctl
+fi
 
 if [ ${1} = "rhel" ]
 then
@@ -29,4 +39,3 @@ else
     curl -sfL https://get.k3s.io | sh -s - agent --node-external-ip=${6}
 fi
 sleep 20
-

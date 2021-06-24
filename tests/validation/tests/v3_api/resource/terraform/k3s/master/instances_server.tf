@@ -81,6 +81,16 @@ resource "aws_instance" "master" {
   }
 
   provisioner "file" {
+    source = "cis_masterconfig.yaml"
+    destination = "/tmp/cis_masterconfig.yaml"
+  }
+
+  provisioner "file" {
+    source = "policy.yaml"
+    destination = "/tmp/policy.yaml"
+  }
+
+  provisioner "file" {
     source = "nginx-ingress.yaml"
     destination = "/tmp/nginx-ingress.yaml"
   }
@@ -153,6 +163,16 @@ resource "aws_instance" "master2-ha" {
     source               = "join_k3s_master.sh"
     destination          = "/tmp/join_k3s_master.sh"
   }
+
+  provisioner "file" {
+    source = "cis_masterconfig.yaml"
+    destination = "/tmp/cis_masterconfig.yaml"
+  }
+  provisioner "file" {
+    source = "policy.yaml"
+    destination = "/tmp/policy.yaml"
+  }
+
   provisioner "remote-exec" {
     inline = [
       "chmod +x /tmp/join_k3s_master.sh",
