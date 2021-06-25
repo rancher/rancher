@@ -3,16 +3,20 @@ package snapshotbackpopulate
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 
+	"github.com/rancher/lasso/pkg/cache"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -28,16 +32,38 @@ type handler struct {
 	clusters     provisioningcontrollers.ClusterClient
 }
 
-func Register(ctx context.Context, userContext *config.UserContext) {
+func Register(ctx context.Context, userContext *config.UserContext) error {
 	h := handler{
 		clusterName:  userContext.ClusterName,
 		clusterCache: userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
 		clusters:     userContext.Management.Wrangler.Provisioning.Cluster(),
 	}
-	userContext.Core.ConfigMaps("kube-system").AddHandler(ctx, "snapshotbackpopulate", h.OnChange)
+
+	// We want to watch two specific objects, not all config maps.  So we setup a custom controller
+	// to just watch those names.
+	clientFactory, err := client.NewSharedClientFactory(&userContext.RESTConfig, nil)
+	if err != nil {
+		return err
+	}
+
+	for secretName := range snapshotNames {
+		cacheFactory := cache.NewSharedCachedFactory(clientFactory, &cache.SharedCacheFactoryOptions{
+			DefaultNamespace: "kube-system",
+			DefaultTweakList: func(options *metav1.ListOptions) {
+				options.FieldSelector = fmt.Sprintf("metadata.name=%s", secretName)
+			},
+		})
+		controllerFactory := controller.NewSharedControllerFactory(cacheFactory, nil)
+
+		controller := corecontrollers.New(controllerFactory)
+		controller.ConfigMap().OnChange(ctx, "snapshotbackpopulate", h.OnChange)
+		go controllerFactory.Start(ctx, 1)
+	}
+
+	return nil
 }
 
-func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Object, error) {
+func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 	if configMap == nil {
 		return nil, nil
 	}
