@@ -65,7 +65,7 @@ func (t *Target) ObjClusterName() string {
 type Answer struct {
 	ProjectName     string            `json:"projectName,omitempty" norman:"type=reference[project]"`
 	ClusterName     string            `json:"clusterName,omitempty" norman:"type=reference[cluster]"`
-	Values          map[string]string `json:"values,omitempty" norman:"required"`
+	Values          map[string]string `json:"values,omitempty"`
 	ValuesSetString map[string]string `json:"valuesSetString,omitempty"`
 }
 
