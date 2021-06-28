@@ -76,28 +76,16 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, nil
 	}
 
-	if err := e.deployAKSOperator(); err != nil {
-		failedToDeployAKSOperatorErr := "failed to deploy aks-operator: %v"
-		var conditionErr error
-		if cluster.Spec.AKSConfig.Imported {
-			cluster, conditionErr = e.SetFalse(cluster, apimgmtv3.ClusterConditionPending, fmt.Sprintf(failedToDeployAKSOperatorErr, err))
-			if conditionErr != nil {
-				return cluster, conditionErr
-			}
-		} else {
-			cluster, conditionErr = e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, fmt.Sprintf(failedToDeployAKSOperatorErr, err))
-			if conditionErr != nil {
-				return cluster, conditionErr
-			}
-		}
-		return cluster, err
-	}
-
 	// set driver name
 	if cluster.Status.Driver == "" {
 		cluster = cluster.DeepCopy()
 		cluster.Status.Driver = apimgmtv3.ClusterDriverAKS
 		return e.ClusterClient.Update(cluster)
+	}
+
+	cluster, err := e.CheckCrdReady(cluster, "aks")
+	if err != nil {
+		return cluster, err
 	}
 
 	// get aks Cluster Config, if it does not exist, create it
@@ -387,12 +375,6 @@ func (e *aksOperatorController) recordAppliedSpec(cluster *mgmtv3.Cluster) (*mgm
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.AKSConfig = cluster.Spec.AKSConfig
 	return e.ClusterClient.Update(cluster)
-}
-
-// deployAKSOperator looks for the rancher-aks-operator app in the cattle-system namespace, if not found it is deployed.
-// If it is found but is outdated, the latest version is installed.
-func (e *aksOperatorController) deployAKSOperator() error {
-	return e.DeployOperator(aksOperator, aksOperatorTemplate, aksShortName)
 }
 
 // generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.

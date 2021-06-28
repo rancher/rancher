@@ -72,6 +72,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		SystemAccountManager: systemaccount.NewManager(mgmtCtx),
 		DynamicClient:        eksCCDynamicClient,
 		ClientDialer:         mgmtCtx.Dialer,
+		Discovery:            wContext.K8s.Discovery(),
 	}}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "eks-operator-controller", e.onClusterChange)
@@ -86,20 +87,8 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, nil
 	}
 
-	if err := e.deployEKSOperator(); err != nil {
-		failedToDeployEKSOperatorErr := "failed to deploy eks-operator: %v"
-		var conditionErr error
-		if cluster.Spec.EKSConfig.Imported {
-			cluster, conditionErr = e.SetFalse(cluster, apimgmtv3.ClusterConditionPending, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
-			if conditionErr != nil {
-				return cluster, conditionErr
-			}
-		} else {
-			cluster, conditionErr = e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, fmt.Sprintf(failedToDeployEKSOperatorErr, err))
-			if conditionErr != nil {
-				return cluster, conditionErr
-			}
-		}
+	cluster, err := e.CheckCrdReady(cluster, "eks")
+	if err != nil {
 		return cluster, err
 	}
 
@@ -479,12 +468,6 @@ func (e *eksOperatorController) recordAppliedSpec(cluster *mgmtv3.Cluster) (*mgm
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.EKSConfig = cluster.Spec.EKSConfig
 	return e.ClusterClient.Update(cluster)
-}
-
-// deployEKSOperator looks for the rancher-eks-operator app in the cattle-system namespace, if not found it is deployed.
-// If it is found but is outdated, the latest version is installed.
-func (e *eksOperatorController) deployEKSOperator() error {
-	return e.DeployOperator(eksOperator, eksOperatorTemplate, eksShortName)
 }
 
 // generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.

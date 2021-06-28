@@ -47,12 +47,12 @@ type ChartUpgradeAction struct {
 	DisableHooks             bool             `json:"noHooks,omitempty"`
 	DisableOpenAPIValidation bool             `json:"disableOpenAPIValidation,omitempty"`
 	Force                    bool             `json:"force,omitempty"`
+	ForceAdopt               bool             `json:"forceAdopt,omitempty"`
 	MaxHistory               int              `json:"historyMax,omitempty"`
 	Install                  bool             `json:"install,omitempty"`
 	Namespace                string           `json:"namespace,omitempty"`
 	CleanupOnFail            bool             `json:"cleanupOnFail,omitempty"`
 	Charts                   []ChartUpgrade   `json:"charts,omitempty"`
-	ForceAdopt               bool             `json:"forceAdopt,omitempty"`
 }
 
 type ChartUpgrade struct {
