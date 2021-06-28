@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -116,7 +117,13 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 	if !allowed {
 		return userPrincipal, groupPrincipals, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
 	}
-	return userPrincipal, groupPrincipals, oauth2Token.AccessToken, nil
+	// save entire oauthToken because it contains refresh_token and token expiry time
+	// will use with oauth2.Client and with TokenSource to ensure auto refresh of tokens occurs for api calls
+	oauthToken, err := json.Marshal(oauth2Token)
+	if err != nil {
+		return userPrincipal, groupPrincipals, "", err
+	}
+	return userPrincipal, groupPrincipals, string(oauthToken), nil
 }
 
 func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, token v3.Token) ([]v3.Principal, error) {
@@ -141,7 +148,7 @@ func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, to
 func (o *OpenIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	var p v3.Principal
 
-	// parsing id to get the external id and type. Exaple oidc_<user|group>://<user sub | group name>
+	// parsing id to get the external id and type. Example oidc_<user|group>://<user sub | group name>
 	var externalID string
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
@@ -374,21 +381,12 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
-	configScopes := strings.Split(config.Scopes, ",")
-	allScopes := []string{oidc.ScopeOpenID}
-	allScopes = append(allScopes, configScopes...)
-
-	oauthConfig := oauth2.Config{
-		ClientID:     config.ClientID,
-		ClientSecret: config.ClientSecret,
-		Endpoint:     provider.Endpoint(),
-		RedirectURL:  config.RancherURL,
-		Scopes:       allScopes,
-	}
-
-	oauth2Token, err = oauthConfig.Exchange(*ctx, authCode, oauth2.SetAuthURLParam("scope", strings.Join(allScopes, " ")))
-	if err != nil {
-		return userInfo, oauth2Token, err
+	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
+	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
+		oauth2Token, err = oauthConfig.Exchange(*ctx, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
+		if err != nil {
+			return userInfo, oauth2Token, err
+		}
 	}
 
 	rawToken, ok := oauth2Token.Extra("id_token").(string)
@@ -404,7 +402,7 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
-	userInfo, err = provider.UserInfo(*ctx, oauth2.StaticTokenSource(oauth2Token))
+	userInfo, err = provider.UserInfo(*ctx, oauthConfig.TokenSource(*ctx, oauth2Token))
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
@@ -412,4 +410,18 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 		return userInfo, oauth2Token, err
 	}
 	return userInfo, oauth2Token, nil
+}
+
+func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
+	configScopes := strings.Split(config.Scopes, ",")
+	allScopes := []string{oidc.ScopeOpenID}
+	allScopes = append(allScopes, configScopes...)
+
+	return oauth2.Config{
+		ClientID:     config.ClientID,
+		ClientSecret: config.ClientSecret,
+		Endpoint:     endpoint,
+		RedirectURL:  config.RancherURL,
+		Scopes:       allScopes,
+	}
 }
