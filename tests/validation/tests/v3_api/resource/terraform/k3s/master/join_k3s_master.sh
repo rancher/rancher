@@ -15,6 +15,19 @@ then
    cat /etc/rancher/k3s/config.yaml
 fi
 
+if [[ -n "${10}" ]] && [[ "${10}" == *"protect-kernel-defaults"* ]]
+then
+  cat /tmp/cis_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
+  echo -e "vm.panic_on_oom=0" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "vm.overcommit_memory=1" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.panic=10" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.panic_on_oops=1" >>/etc/sysctl.d/90-kubelet.conf
+  sysctl -p /etc/sysctl.d/90-kubelet.conf
+  systemctl restart systemd-sysctl
+  mkdir -p /var/lib/rancher/k3s/server/manifests
+  cat /tmp/policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
+fi
+
 if [ "${1}" = "rhel" ]
 then
    subscription-manager register --auto-attach --username="${11}" --password="${12}"

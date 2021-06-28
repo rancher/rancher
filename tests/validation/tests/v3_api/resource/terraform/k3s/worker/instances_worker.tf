@@ -26,6 +26,12 @@ resource "aws_instance" "worker" {
     source = "join_k3s_agent.sh"
     destination = "/tmp/join_k3s_agent.sh"
   }
+  provisioner "file" {
+    source = "cis_workerconfig.yaml"
+    destination = "/tmp/cis_workerconfig.yaml"
+  }
+
+
   provisioner "remote-exec" {
     inline = [
       "chmod +x /tmp/join_k3s_agent.sh",
