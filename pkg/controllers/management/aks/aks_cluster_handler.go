@@ -66,6 +66,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		SystemAccountManager: systemaccount.NewManager(mgmtCtx),
 		DynamicClient:        aksCCDynamicClient,
 		ClientDialer:         mgmtCtx.Dialer,
+		Discovery:            wContext.K8s.Discovery(),
 	}}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "aks-operator-controller", e.onClusterChange)
