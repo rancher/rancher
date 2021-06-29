@@ -673,8 +673,8 @@ github.com/rancher/lasso v0.0.0-20210408231703-9ddd9378d08d/go.mod h1:OhBBBO1pBw
 github.com/rancher/norman v0.0.0-20200517050325-f53cae161640/go.mod h1:92rz/7QN7DOeLQZlJY/8aFBOmF085igIVguR0wpxLas=
 github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133 h1:X1Tn2q3iDekvqajJCbY2QYkEUJ51rJC9BuxS3os6nX4=
 github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
-github.com/rancher/rke v1.3.0-rc7 h1:tOVjRnOJJ3934kQVO6POUzv7+yMwVwmYO6iZ9PsiWCM=
-github.com/rancher/rke v1.3.0-rc7/go.mod h1:8teMbZiv6i0IwNzsIjmaqbLIDEBZmvFv1j+1P7uUgyY=
+github.com/rancher/rke v1.3.0-rc8 h1:PuUJZSD3dfObL10FHZgr4FSKu9DkiGS2D7nyhkZ6PAY=
+github.com/rancher/rke v1.3.0-rc8/go.mod h1:8teMbZiv6i0IwNzsIjmaqbLIDEBZmvFv1j+1P7uUgyY=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3 h1:Ja/AEVsfVaVQvQ/5bl1uSWNzpnrsigrXnwCPB/8bDSM=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210424054953-634d28b7def3/go.mod h1:Ja346o44aTPWADc/5Jm93+KgctT6KtftuOosgz0F2AM=
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
