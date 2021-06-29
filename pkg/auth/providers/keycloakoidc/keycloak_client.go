@@ -10,6 +10,7 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 //account defines properties an account in keycloak has
@@ -165,6 +166,8 @@ func (k *KeyCloakClient) getFromKeyCloak(accessToken, url string) ([]byte, int, 
 	switch resp.StatusCode {
 	case 200:
 	case 201:
+	case 403:
+		return b, resp.StatusCode, apierrors.NewUnauthorized(resp.Status)
 	default:
 		return b, resp.StatusCode, err
 	}
