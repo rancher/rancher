@@ -20,6 +20,8 @@ package fake
 
 import (
 	clientset "github.com/rancher/rancher/pkg/generated/clientset/versioned"
+	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
+	fakeprovisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1/fake"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	fakeupgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,6 +77,11 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 }
 
 var _ clientset.Interface = &Clientset{}
+
+// ProvisioningV1 retrieves the ProvisioningV1Client
+func (c *Clientset) ProvisioningV1() provisioningv1.ProvisioningV1Interface {
+	return &fakeprovisioningv1.FakeProvisioningV1{Fake: &c.Fake}
+}
 
 // UpgradeV1 retrieves the UpgradeV1Client
 func (c *Clientset) UpgradeV1() upgradev1.UpgradeV1Interface {
