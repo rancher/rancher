@@ -21,6 +21,7 @@ package versioned
 import (
 	"fmt"
 
+	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -29,6 +30,7 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	ProvisioningV1() provisioningv1.ProvisioningV1Interface
 	UpgradeV1() upgradev1.UpgradeV1Interface
 }
 
@@ -36,7 +38,13 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	upgradeV1 *upgradev1.UpgradeV1Client
+	provisioningV1 *provisioningv1.ProvisioningV1Client
+	upgradeV1      *upgradev1.UpgradeV1Client
+}
+
+// ProvisioningV1 retrieves the ProvisioningV1Client
+func (c *Clientset) ProvisioningV1() provisioningv1.ProvisioningV1Interface {
+	return c.provisioningV1
 }
 
 // UpgradeV1 retrieves the UpgradeV1Client
@@ -65,6 +73,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
+	cs.provisioningV1, err = provisioningv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.upgradeV1, err = upgradev1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -81,6 +93,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
+	cs.provisioningV1 = provisioningv1.NewForConfigOrDie(c)
 	cs.upgradeV1 = upgradev1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -90,6 +103,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.provisioningV1 = provisioningv1.New(c)
 	cs.upgradeV1 = upgradev1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)

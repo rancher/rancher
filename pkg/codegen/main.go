@@ -90,7 +90,8 @@ func main() {
 				Types: []interface{}{
 					"./pkg/apis/provisioning.cattle.io/v1",
 				},
-				GenerateTypes: true,
+				GenerateTypes:   true,
+				GenerateClients: true,
 			},
 			"fleet.cattle.io": {
 				Types: []interface{}{
