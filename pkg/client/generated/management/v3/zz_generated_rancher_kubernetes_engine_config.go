@@ -11,7 +11,7 @@ const (
 	RancherKubernetesEngineConfigFieldCloudProvider       = "cloudProvider"
 	RancherKubernetesEngineConfigFieldClusterName         = "clusterName"
 	RancherKubernetesEngineConfigFieldDNS                 = "dns"
-	RancherKubernetesEngineConfigFieldEnableCRIDockerd    = "enableCRIDockerd"
+	RancherKubernetesEngineConfigFieldEnableCRIDockerd    = "enableCriDockerd"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
 	RancherKubernetesEngineConfigFieldIngress             = "ingress"
 	RancherKubernetesEngineConfigFieldMonitoring          = "monitoring"
@@ -41,7 +41,7 @@ type RancherKubernetesEngineConfig struct {
 	CloudProvider       *CloudProvider       `json:"cloudProvider,omitempty" yaml:"cloudProvider,omitempty"`
 	ClusterName         string               `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
 	DNS                 *DNSConfig           `json:"dns,omitempty" yaml:"dns,omitempty"`
-	EnableCRIDockerd    *bool                `json:"enableCRIDockerd,omitempty" yaml:"enableCRIDockerd,omitempty"`
+	EnableCRIDockerd    *bool                `json:"enableCriDockerd,omitempty" yaml:"enableCriDockerd,omitempty"`
 	IgnoreDockerVersion *bool                `json:"ignoreDockerVersion,omitempty" yaml:"ignoreDockerVersion,omitempty"`
 	Ingress             *IngressConfig       `json:"ingress,omitempty" yaml:"ingress,omitempty"`
 	Monitoring          *MonitoringConfig    `json:"monitoring,omitempty" yaml:"monitoring,omitempty"`
