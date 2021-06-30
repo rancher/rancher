@@ -3,6 +3,7 @@ package aggregation
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"sort"
 	"sync"
 	"time"
@@ -15,6 +16,10 @@ import (
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/rest"
+)
+
+var (
+	clusterPrefixRegexp = regexp.MustCompile(`^/k8s/clusters/[^/]+`)
 )
 
 type aggregationHandler struct {
@@ -62,10 +67,10 @@ func (h *aggregationHandler) setEntries(routes []routeEntry) {
 	mux := mux.NewRouter()
 	for _, entry := range routes {
 		if entry.prefix != "" {
-			mux.PathPrefix(entry.prefix).Handler(h.makeHandler(entry.uuid, entry.prefix))
+			mux.PathPrefix(entry.prefix).Handler(h.makeHandler(entry.uuid))
 		}
 		if entry.path != "" {
-			mux.Path(entry.path).Handler(h.makeHandler(entry.uuid, entry.path))
+			mux.Path(entry.path).Handler(h.makeHandler(entry.uuid))
 		}
 	}
 
@@ -78,7 +83,7 @@ func keyFromUUID(uuid string) string {
 	return "steve-" + uuid
 }
 
-func (h *aggregationHandler) makeHandler(uuid, prefix string) http.Handler {
+func (h *aggregationHandler) makeHandler(uuid string) http.Handler {
 	key := keyFromUUID(uuid)
 	cfg := &rest.Config{
 		Host:      "http://" + key,
@@ -96,11 +101,14 @@ func (h *aggregationHandler) makeHandler(uuid, prefix string) http.Handler {
 			}
 		}
 		if !h.remote.HasSession(key) {
-			http.Error(rw, "Handler disconnected, prefix="+prefix, http.StatusServiceUnavailable)
+			http.Error(rw, "Handler disconnected", http.StatusServiceUnavailable)
 			return
 		}
 
-		req.Header.Set("X-API-URL-Prefix", prefix)
+		if prefix := clusterPrefixRegexp.FindString(req.URL.Path); prefix != "" {
+			req.Header.Set("X-API-URL-Prefix", prefix)
+		}
+
 		next.ServeHTTP(rw, req)
 	})
 }
