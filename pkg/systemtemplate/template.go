@@ -225,6 +225,11 @@ spec:
         secret:
           secretName: cattle-credentials-{{.TokenKey}}
           defaultMode: 320
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
 {{ if .IsRKE }}
 
 ---
@@ -322,7 +327,7 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 25%
+      maxUnavailable: 50%
 
 {{- end }}
 
@@ -420,7 +425,7 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 25%
+      maxUnavailable: 50%
 {{- end }}
 
 {{- if .AuthImage}}

@@ -312,7 +312,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			logrus.Tracef("clusterDeploy: deployAgent: applying agent YAML for cluster [%s], try #%d: %v", cluster.Name, i+1, string(output))
 			output, err = kubectl.Apply(yaml, kubeConfig)
 			if err == nil {
-				logrus.Tracef("clusterDeploy: deployAgent: successfully applied agent YAML for cluster [%s], try #%d", cluster.Name, i+1)
+				logrus.Debugf("clusterDeploy: deployAgent: successfully applied agent YAML for cluster [%s], try #%d", cluster.Name, i+1)
 				break
 			}
 			logrus.Debugf("clusterDeploy: deployAgent: error while applying agent YAML for cluster [%s], try #%d", cluster.Name, i+1)
@@ -344,6 +344,22 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 				}
 				logrus.Debugf("Ignored '%s' error during delete cattle-node-agent DaemonSet", dsNotFoundError)
 			}
+		} else if strings.ToLower(settings.AgentRolloutWait.Get()) == "true" {
+			// Check for agent daemonset rollout if parameter is set and driverv32.ClusterDriverRKE
+			timeout := settings.AgentRolloutTimeout.Get()
+			_, err = time.ParseDuration(timeout)
+			if err != nil {
+				logrus.Warnf("[deployAgent] agent-rollout-timeout setting must be in Duration format. Using default: 300s")
+				timeout = "300s"
+			}
+			logrus.Debugf("clusterDeploy: deployAgent: waiting rollout agent daemonset for cluster [%s]", cluster.Name)
+			output, err := kubectl.RolloutStatusWithNamespace("cattle-system", "ds/cattle-node-agent", timeout, kubeConfig)
+			if err != nil {
+				logrus.Debugf("clusterDeploy: deployAgent: timeout waiting rollout agent daemonset for cluster [%s]: %v", cluster.Name, err)
+				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Timeout waiting rollout agent daemonset")
+			}
+			logrus.Debugf("clusterDeploy: deployAgent: successfully rollout agent daemonset for cluster [%s]", cluster.Name)
+			v32.ClusterConditionAgentDeployed.Message(cluster, "Successfully rollout agent daemonset")
 		}
 		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
