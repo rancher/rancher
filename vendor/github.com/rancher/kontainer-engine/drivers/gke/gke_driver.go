@@ -554,6 +554,10 @@ func (s *state) validate() error {
 		return fmt.Errorf("minNodeCount in the NodePool must be >= 1 and <= maxNodeCount")
 	}
 
+	if s.PrivateClusterConfig != nil && s.PrivateClusterConfig.EnablePrivateEndpoint && !s.PrivateClusterConfig.EnablePrivateNodes {
+		return fmt.Errorf("private endpoint requires private nodes")
+	}
+
 	return nil
 }
 
@@ -746,7 +750,9 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 		request.Cluster.MasterAuthorizedNetworksConfig = state.MasterAuthorizedNetworksConfig
 	}
 
-	request.Cluster.PrivateClusterConfig = state.PrivateClusterConfig
+	if state.PrivateClusterConfig != nil && state.PrivateClusterConfig.EnablePrivateNodes {
+		request.Cluster.PrivateClusterConfig = state.PrivateClusterConfig
+	}
 	request.Cluster.IpAllocationPolicy = state.IPAllocationPolicy
 	if request.Cluster.IpAllocationPolicy.UseIpAliases == true &&
 		request.Cluster.IpAllocationPolicy.ClusterIpv4CidrBlock != "" {
