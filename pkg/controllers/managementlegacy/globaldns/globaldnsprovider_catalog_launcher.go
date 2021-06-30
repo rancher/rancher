@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -63,7 +64,7 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 //sync is called periodically and on real updates
 func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDnsProvider) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
-		return nil, nil
+		return nil, n.deleteExternalDNSApp(key)
 	}
 	metaAccessor, err := meta.Accessor(obj)
 	if err != nil {
@@ -213,17 +214,38 @@ func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDnsProvider
 
 func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDnsProvider, answers map[string]string) (runtime.Object, error) {
 	//check if provider already running for this GlobalDNSProvider.
-	existingApp, err := n.getProviderIfAlreadyRunning(obj)
+	existingApp, err := n.getProviderIfAlreadyRunning(obj.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	if existingApp != nil {
+		var shouldUpdate bool
+		var appToUpdate *pv3.App
+
 		//check if answers should be updated
 		if answersDiffer(existingApp.Spec.Answers, answers) {
-			appToupdate := existingApp.DeepCopy()
-			updateAnswers(appToupdate.Spec.Answers, answers)
-			_, err = n.Apps.Update(appToupdate)
+			appToUpdate = existingApp.DeepCopy()
+			updateAnswers(appToUpdate.Spec.Answers, answers)
+			shouldUpdate = true
+		}
+
+		//check if ownerRef to GlobalDnsProvider is present; drop if yes
+		if len(existingApp.OwnerReferences) > 0 {
+			for _, ref := range existingApp.OwnerReferences {
+				if ref.UID == obj.UID {
+					if appToUpdate == nil {
+						appToUpdate = existingApp.DeepCopy()
+					}
+					removeOwnerRef(appToUpdate, ref)
+					shouldUpdate = true
+					break
+				}
+			}
+		}
+
+		if shouldUpdate {
+			_, err = n.Apps.Update(appToUpdate)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return nil, err
 			}
@@ -239,26 +261,15 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDnsPr
 			return nil, err
 		}
 
-		//set ownerRef to the dnsProvider CR
-		controller := true
-		ownerRef := []metav1.OwnerReference{{
-			Name:       obj.Name,
-			APIVersion: obj.APIVersion,
-			UID:        obj.UID,
-			Kind:       obj.Kind,
-			Controller: &controller,
-		}}
-
 		creator, err := n.userManager.EnsureUser(fmt.Sprintf("system://%s", localClusterName), "System account for Cluster "+localClusterName)
 		if err != nil {
 			return nil, err
 		}
 		toCreate := pv3.App{
 			ObjectMeta: metav1.ObjectMeta{
-				Annotations:     map[string]string{cattleCreatorIDAnnotationKey: creator.Name},
-				Name:            fmt.Sprintf("%s-%s", "systemapp", obj.Name),
-				Namespace:       sysProject,
-				OwnerReferences: ownerRef,
+				Annotations: map[string]string{cattleCreatorIDAnnotationKey: creator.Name},
+				Name:        fmt.Sprintf("%s-%s", "systemapp", obj.Name),
+				Namespace:   sysProject,
 			},
 			Spec: v32.AppSpec{
 				ProjectName:     localClusterName + ":" + sysProject,
@@ -276,17 +287,36 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDnsPr
 	return nil, nil
 }
 
-func (n *ProviderCatalogLauncher) getProviderIfAlreadyRunning(obj *v3.GlobalDnsProvider) (*pv3.App, error) {
+func (n *ProviderCatalogLauncher) deleteExternalDNSApp(key string) error {
+	_, globalDNSproviderName, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	//check if provider already running for this GlobalDNSProvider.
+	existingApp, err := n.getProviderIfAlreadyRunning(globalDNSproviderName)
+	if err != nil {
+		return err
+	}
+	if existingApp != nil {
+		//delete this app since GlobalDNSProvider is deleted
+		if err := n.Apps.DeleteNamespaced(existingApp.Namespace, existingApp.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (n *ProviderCatalogLauncher) getProviderIfAlreadyRunning(globalDNSProviderName string) (*pv3.App, error) {
 	sysProject, err := n.getSystemProjectID()
 	if err != nil {
 		return nil, err
 	}
-	existingApp, err := n.appLister.Get(sysProject, fmt.Sprintf("%s-%s", "systemapp", obj.Name))
+	existingApp, err := n.appLister.Get(sysProject, fmt.Sprintf("%s-%s", "systemapp", globalDNSProviderName))
 
 	if (err != nil && k8serrors.IsNotFound(err)) || existingApp == nil {
 		return nil, nil
 	} else if err != nil && !k8serrors.IsNotFound(err) {
-		logrus.Errorf("GlobaldnsProviderCatalogLauncher: Error listing external-dns %v app %v", obj.Name, err)
+		logrus.Errorf("GlobaldnsProviderCatalogLauncher: Error listing external-dns %v app %v", globalDNSProviderName, err)
 		return nil, err
 	}
 
@@ -335,4 +365,14 @@ func updateAnswers(appAnswers map[string]string, newAnswers map[string]string) {
 	for key, value := range newAnswers {
 		appAnswers[key] = value
 	}
+}
+
+func removeOwnerRef(app *pv3.App, refToRemove metav1.OwnerReference) {
+	var newRef []metav1.OwnerReference
+	for _, ref := range app.OwnerReferences {
+		if ref.Name != refToRemove.Name && ref.UID != refToRemove.UID {
+			newRef = append(newRef, ref)
+		}
+	}
+	app.OwnerReferences = newRef
 }
