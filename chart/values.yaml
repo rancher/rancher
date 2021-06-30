@@ -6,6 +6,24 @@ additionalTrustedCAs: false
 antiAffinity: preferred
 topologyKey: kubernetes.io/hostname
 
+# Set how rancher pods should be scheduled
+nodeSelector: {}
+
+tolerations: []
+# - key: "example-key"
+#   operator: "Exists"
+#   effect: "NoSchedule"
+
+nodeAffinity: {}
+  # requiredDuringSchedulingIgnoredDuringExecution:
+  #   nodeSelectorTerms:
+  #   - matchExpressions:
+  #     - key: kubernetes.io/e2e-az-name
+  #       operator: In
+  #       values:
+  #       - e2e-az1
+  #       - e2e-az2
+
 # Audit Logs https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing/
 # The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
 # https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing/
@@ -152,3 +170,4 @@ postDelete:
   timeout: 120
   # by default, the job will fail if it fail to uninstall any of the apps
   ignoreTimeoutError: false
+  

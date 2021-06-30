@@ -36,6 +36,8 @@ spec:
 {{ toYaml .Values.imagePullSecrets | indent 6 }}
 {{- end }}
       affinity:
+        nodeAffinity:
+          {{ include "node-affinity-with-default" . }}
         podAntiAffinity:
 {{- if eq .Values.antiAffinity "required" }}
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -58,10 +60,12 @@ spec:
                   - {{ template "rancher.fullname" . }}
               topologyKey: {{ .Values.topologyKey | default "kubernetes.io/hostname" }}
 {{- end }}
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
-      tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        {{ include "node-tolerations-with-default" . }}
       containers:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
