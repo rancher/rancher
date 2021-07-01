@@ -39,6 +39,8 @@ def test_workload_image_change_private_registry(admin_pc):
             'image': 'testuser/testimage',
         }])
 
+    print(workload.imagePullSecrets)
+
     assert workload.name == name
     assert len(workload.imagePullSecrets) == 1
     for secret in workload.imagePullSecrets:
@@ -54,7 +56,6 @@ def test_workload_image_change_private_registry(admin_pc):
     for container in workload.containers:
         assert container['image'] == 'quay.io/testuser/testimage'
 
-    print(workload.imagePullSecrets)
     assert len(workload.imagePullSecrets) == 1
 
     assert workload.imagePullSecrets[0]['name'] == registry2_name
