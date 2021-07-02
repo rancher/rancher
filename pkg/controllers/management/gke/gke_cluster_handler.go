@@ -70,6 +70,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		SystemAccountManager: systemaccount.NewManager(mgmtCtx),
 		DynamicClient:        gkeCCDynamicClient,
 		ClientDialer:         mgmtCtx.Dialer,
+		Discovery:            wContext.K8s.Discovery(),
 	}}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "gke-operator-controller", e.onClusterChange)
