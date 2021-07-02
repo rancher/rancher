@@ -1,4 +1,4 @@
-package image
+package image_test
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	. "github.com/rancher/rancher/pkg/image"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/rke/types/kdm"
 	assertlib "github.com/stretchr/testify/assert"
@@ -121,7 +122,7 @@ func TestFetchImagesFromCharts(t *testing.T) {
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
 		imagesSet := make(map[string]map[string]bool)
-		err := fetchImagesFromCharts(cs.inputPath, cs.inputOsType, imagesSet)
+		err := FetchImagesFromCharts(cs.inputPath, cs.inputOsType, imagesSet)
 		images, imageSources := getImagesAndSourcesLists(imagesSet)
 		assert.Nilf(err, "%s, failed to fetch images from charts", cs.caseName)
 		assert.Subset(images, cs.outputShouldContainImages, cs.caseName)
@@ -200,7 +201,7 @@ func TestFetchImagesFromSystem(t *testing.T) {
 
 	for _, cs := range testCases {
 		imagesSet := make(map[string]map[string]bool)
-		err := fetchImagesFromSystem(cs.inputRkeSystemImages, cs.inputOsType, imagesSet)
+		err := FetchImagesFromSystem(cs.inputRkeSystemImages, cs.inputOsType, imagesSet)
 		images, imageSources := getImagesAndSourcesLists(imagesSet)
 		assert.Nilf(err, "%s, failed to fetch images from system images", cs.caseName)
 		assert.Subset(images, cs.outputShouldContainImages, cs.caseName)
@@ -244,7 +245,7 @@ func TestConvertMirroredImages(t *testing.T) {
 	assert := assertlib.New(t)
 	for _, cs := range testCases {
 		imagesSet := cs.inputRawImages
-		convertMirroredImages(imagesSet)
+		ConvertMirroredImages(imagesSet)
 		assert.Equal(cs.outputImagesShouldEqual, imagesSet)
 	}
 }
@@ -268,7 +269,7 @@ func TestGetImages(t *testing.T) {
 		"rancher/fluentd:v0.1.16 rancher-logging:0.1.2",
 	}
 	imagesSet := make(map[string]map[string]bool)
-	setRequirementImages(Linux, imagesSet)
+	SetRequirementImages(Linux, imagesSet)
 	imagesToAdd, _ := getImagesAndSourcesLists(imagesSet)
 	sourcesToAdd := getImageSourcesList(imagesSet)
 	linuxRKEImage := selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS
@@ -284,7 +285,7 @@ func TestGetImages(t *testing.T) {
 		"rancher/prom-alertmanager:v0.17.0 rancher-monitoring:0.0.4",
 	)
 	imagesSet = make(map[string]map[string]bool)
-	setRequirementImages(Windows, imagesSet)
+	SetRequirementImages(Windows, imagesSet)
 	imagesToAdd, _ = getImagesAndSourcesLists(imagesSet)
 	sourcesToAdd = getImageSourcesList(imagesSet)
 	windowsRKEImage := selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer

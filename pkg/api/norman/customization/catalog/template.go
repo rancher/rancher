@@ -9,9 +9,9 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 )
 

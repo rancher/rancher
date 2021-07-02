@@ -10,12 +10,13 @@ import (
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,8 @@ type Manager struct {
 	appRevisionClient     projectv3.AppRevisionInterface
 	lastUpdateTime        time.Time
 	bundledMode           bool
+	ConfigMap             corev1.ConfigMapInterface
+	ConfigMapLister       corev1.ConfigMapLister
 }
 
 type CatalogManager interface {
@@ -49,7 +52,7 @@ type CatalogManager interface {
 	GetSystemAppCatalogID(templateVersionID, clusterName string) (string, error)
 }
 
-func New(management managementv3.Interface, project projectv3.Interface) *Manager {
+func New(management managementv3.Interface, project projectv3.Interface, core corev1.Interface) *Manager {
 	var bundledMode bool
 	if strings.ToLower(settings.SystemCatalog.Get()) == "bundled" {
 		bundledMode = true
@@ -69,6 +72,8 @@ func New(management managementv3.Interface, project projectv3.Interface) *Manage
 		ClusterCatalogLister:  management.ClusterCatalogs("").Controller().Lister(),
 		appRevisionClient:     project.AppRevisions(""),
 		bundledMode:           bundledMode,
+		ConfigMap:             core.ConfigMaps(""),
+		ConfigMapLister:       core.ConfigMaps("").Controller().Lister(),
 	}
 }
 

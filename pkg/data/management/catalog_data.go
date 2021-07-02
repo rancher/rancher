@@ -10,9 +10,9 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
-	"github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
