@@ -357,9 +357,10 @@ type CloudCredential struct {
 }
 
 type CloudCredentialSpec struct {
-	DisplayName        string              `json:"displayName"`
-	Description        string              `json:"description,omitempty"`
-	S3CredentialConfig *S3CredentialConfig `json:"s3credentialConfig,omitempty"`
+	DisplayName                  string                        `json:"displayName"`
+	Description                  string                        `json:"description,omitempty"`
+	S3CredentialConfig           *S3CredentialConfig           `json:"s3credentialConfig,omitempty"`
+	DigitalOceanCredentialConfig *DigitalOceanCredentialConfig `json:"digitaloceancredentialConfig,omitempty"`
 }
 
 type S3CredentialConfig struct {
@@ -371,4 +372,8 @@ type S3CredentialConfig struct {
 	DefaultSkipSSLVerify string
 	DefaultBucket        string
 	DefaultFolder        string
+}
+
+type DigitalOceanCredentialConfig struct {
+	AccessToken string `norman:"required,type=password"`
 }
