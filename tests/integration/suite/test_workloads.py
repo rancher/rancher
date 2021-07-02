@@ -39,7 +39,7 @@ def test_workload_image_change_private_registry(admin_pc):
             'image': 'testuser/testimage',
         }])
 
-    print(workload.imagePullSecrets)
+    print(json.dumps(workload.imagePullSecrets))
 
     assert workload.name == name
     assert len(workload.imagePullSecrets) == 1
