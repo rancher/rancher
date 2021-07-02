@@ -47,7 +47,9 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	for key, extras := range userInfo.GetExtra() {
 		for _, s := range extras {
-			req.Header.Add("Impersonate-Extra-"+key, s)
+			if s != "" {
+				req.Header.Add("Impersonate-Extra-"+key, s)
+			}
 		}
 	}
 
