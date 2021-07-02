@@ -9,4 +9,9 @@ if [[ $? > 0 ]]; then
     exit 1
 fi
 
-helm lint ../../build/chart/rancher
+if which helm_v3 >/dev/null 2>&1
+then
+    helm_v3 lint ../../build/chart/rancher
+else
+    helm lint ../../build/chart/rancher
+fi

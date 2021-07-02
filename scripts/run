@@ -15,4 +15,5 @@ cd build/testdata
 export KUBECONFIG=
 export CATTLE_DEV_MODE=yes
 export CATTLE_SERVER_URL="https://$(ip route get 8.8.8.8 | awk '{print $7}'):8443"
+export CATTLE_BOOTSTRAP_PASSWORD="admin"
 exec ../../$CMD
