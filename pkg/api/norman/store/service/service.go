@@ -33,6 +33,15 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			data["clusterIp"] = ""
 		}
 	}
+	if schema.ID == "service" {
+		logrus.Tracef("Service: Create: data.kind [%v], data.clusterIp [%v]", data["kind"], data["clusterIp"])
+		if data["kind"] == "ClusterIP" && data["clusterIp"] == nil {
+			if data["ipFamilyPolicy"] == nil {
+				logrus.Debugf("Setting ipFamilyPolicy to SingleStack for service name [%s] service kind [%s]", data["name"], data["kind"])
+				data["ipFamilyPolicy"] = "SingleStack"
+			}
+		}
+	}
 	formatData(schema, data)
 	err := p.validateNonSpecialIP(schema, data)
 	if err != nil {
