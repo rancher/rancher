@@ -2,9 +2,10 @@ package keycloakoidc
 
 import (
 	"context"
-	"net/http"
+	"encoding/json"
 	"strings"
 
+	gooidc "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -47,35 +49,45 @@ func (k *keyCloakOIDCProvider) GetName() string {
 	return Name
 }
 
-func newClient(config *v32.OIDCConfig) (*KeyCloakClient, error) {
-	keyCloakClient := &KeyCloakClient{
-		httpClient: &http.Client{},
+func newClient(config *v32.OIDCConfig, token *oauth2.Token) (*KeyCloakClient, error) {
+	ctx := context.Background()
+	provider, err := gooidc.NewProvider(ctx, config.Issuer)
+	if err != nil {
+		return nil, err
 	}
-	err := oidc.GetClientWithCertKey(keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
+	oauthConfig := oidc.ConfigToOauthConfig(provider.Endpoint(), config)
+	keyCloakClient := &KeyCloakClient{
+		httpClient: oauthConfig.Client(ctx, token),
+	}
+	err = oidc.GetClientWithCertKey(keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
 	return keyCloakClient, err
 }
 
 func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
+	var oauthToken *oauth2.Token
 	var err error
 
 	config, err := k.GetOIDCConfig()
 	if err != nil {
 		return principals, err
 	}
-	keyCloakClient, err := newClient(config)
-	if err != nil {
-		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
+	storedOauthToken, err := k.TokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
+	if err := json.Unmarshal([]byte(storedOauthToken), &oauthToken); err != nil {
 		return principals, err
 	}
-	accessToken, err := k.TokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
-		accessToken = token.ProviderInfo["access_token"]
+		oauthToken.AccessToken = token.ProviderInfo["access_token"]
 	}
-	accts, err := keyCloakClient.searchPrincipals(searchValue, principalType, accessToken, config)
+	keyCloakClient, err := newClient(config, oauthToken)
+	if err != nil {
+		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
+		return principals, err
+	}
+	accts, err := keyCloakClient.searchPrincipals(searchValue, principalType, config)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc] problem searching keycloak: %v", err)
 		return principals, err
@@ -115,21 +127,27 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 }
 
 func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+	var oauthToken *oauth2.Token
+
 	config, err := k.GetOIDCConfig()
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	keyCloakClient, err := newClient(config)
-	if err != nil {
-		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
+	storedOauthToken, err := k.TokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
+	if err := json.Unmarshal([]byte(storedOauthToken), &oauthToken); err != nil {
 		return v3.Principal{}, err
 	}
-	accessToken, err := k.TokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return v3.Principal{}, err
 		}
-		accessToken = token.ProviderInfo["access_token"]
+		oauthToken.AccessToken = token.ProviderInfo["access_token"]
+	}
+
+	keyCloakClient, err := newClient(config, oauthToken)
+	if err != nil {
+		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
+		return v3.Principal{}, err
 	}
 	var externalID string
 	parts := strings.SplitN(principalID, ":", 2)
@@ -146,7 +164,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 	if principalType == GroupType {
 		searchType = "groups"
 	}
-	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, accessToken, searchType, config)
+	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, searchType, config)
 	if err != nil {
 		return v3.Principal{}, err
 	}
