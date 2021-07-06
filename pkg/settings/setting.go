@@ -66,7 +66,7 @@ var (
 	SystemAgentInstallerImage         = NewSetting("system-agent-installer-image", "docker.io/rancher/system-agent-installer-")
 	SystemAgentUpgradeImage           = NewSetting("system-agent-upgrade-image", "")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
-	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system")
+	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system,calico-system,tigera-operator")
 	TelemetryOpt                      = NewSetting("telemetry-opt", "")
 	TokenHashing                      = NewSetting("token-hashing", "true")
 	TLSMinVersion                     = NewSetting("tls-min-version", "1.2")
