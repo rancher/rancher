@@ -146,7 +146,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, opts.AuditLevel, opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
-	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
+	auditFilter, err := audit.NewAuditLogMiddleware(auditLogWriter)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(

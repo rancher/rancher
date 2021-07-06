@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/pborman/uuid"
@@ -16,6 +18,7 @@ import (
 
 const (
 	contentTypeJSON = "application/json"
+	redacted        = "[redacted]"
 )
 
 const (
@@ -35,9 +38,10 @@ var (
 )
 
 type auditLog struct {
-	log     *log
-	writer  *LogWriter
-	reqBody []byte
+	log                *log
+	writer             *LogWriter
+	reqBody            []byte
+	keysToConcealRegex *regexp.Regexp
 }
 
 type log struct {
@@ -79,7 +83,7 @@ func FromContext(ctx context.Context) (*User, bool) {
 	return u, ok
 }
 
-func newAuditLog(writer *LogWriter, req *http.Request) (*auditLog, error) {
+func newAuditLog(writer *LogWriter, req *http.Request, keysToConcealRegex *regexp.Regexp) (*auditLog, error) {
 	auditLog := &auditLog{
 		writer: writer,
 		log: &log{
@@ -89,6 +93,7 @@ func newAuditLog(writer *LogWriter, req *http.Request) (*auditLog, error) {
 			RemoteAddr:       req.RemoteAddr,
 			RequestTimestamp: time.Now().Format(time.RFC3339),
 		},
+		keysToConcealRegex: keysToConcealRegex,
 	}
 
 	contentType := req.Header.Get("Content-Type")
@@ -118,11 +123,11 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	buffer.Write(bytes.TrimSuffix(alByte, []byte("}")))
 	if a.writer.Level >= levelRequest && len(a.reqBody) > 0 {
 		buffer.WriteString(`,"requestBody":`)
-		buffer.Write(bytes.TrimSuffix(a.reqBody, []byte("\n")))
+		buffer.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, a.reqBody), []byte("\n")))
 	}
 	if a.writer.Level >= levelRequestResponse && resHeaders.Get("Content-Type") == contentTypeJSON && len(resBody) > 0 {
 		buffer.WriteString(`,"responseBody":`)
-		buffer.Write(bytes.TrimSuffix(resBody, []byte("\n")))
+		buffer.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, resBody), []byte("\n")))
 	}
 	buffer.WriteString("}")
 
@@ -169,4 +174,58 @@ func isExist(array []string, key string) bool {
 		}
 	}
 	return false
+}
+
+func (a *auditLog) concealSensitiveData(requestURI string, body []byte) []byte {
+	var m map[string]interface{}
+	if err := json.Unmarshal(body, &m); err != nil {
+		return body
+	}
+
+	var changed bool
+	// Conceal values of secret data.
+	if strings.Contains(requestURI, "secrets") {
+		dataKey := "data"
+		data, _ := m[dataKey].(map[string]interface{})
+		if data == nil {
+			dataKey = "stringData"
+			data, _ = m[dataKey].(map[string]interface{})
+		}
+
+		for key := range data {
+			data[key] = redacted
+		}
+		if data != nil {
+			changed = true
+			m[dataKey] = data
+		}
+	}
+
+	// Conceal values for data considered sensitive: passwords, tokens, etc.
+	if !a.concealMap(m) && !changed {
+		return body
+	}
+
+	newBody, err := json.Marshal(m)
+	if err != nil {
+		return body
+	}
+	return newBody
+}
+
+func (a *auditLog) concealMap(m map[string]interface{}) bool {
+	var changed bool
+	for key := range m {
+		if _, ok := m[key].(string); ok {
+			if a.keysToConcealRegex.MatchString(key) {
+				changed = true
+				m[key] = redacted
+			}
+		} else if nested, ok := m[key].(map[string]interface{}); ok && a.concealMap(nested) {
+			changed = true
+			m[key] = nested
+		}
+	}
+
+	return changed
 }
