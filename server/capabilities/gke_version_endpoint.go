@@ -29,9 +29,15 @@ func (g *GKEVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 	}
 
 	zone := body.Zone
-	if zone == "" {
+	region := body.Region
+	if zone == "" && region == "" {
 		writer.WriteHeader(http.StatusBadRequest)
-		handleErr(writer, fmt.Errorf("invalid zone"))
+		handleErr(writer, fmt.Errorf("invalid zone or region"))
+		return
+	}
+	if zone != "" && region != "" {
+		writer.WriteHeader(http.StatusBadRequest)
+		handleErr(writer, fmt.Errorf("only one of region or zone can be provided"))
 		return
 	}
 
@@ -43,7 +49,15 @@ func (g *GKEVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	result, err := client.Projects.Zones.GetServerconfig(body.ProjectID, zone).Do()
+	var location string
+	if region != "" {
+		location = region
+	} else {
+		location = zone
+	}
+	parent := "projects/" + body.ProjectID + "/locations/" + location
+
+	result, err := client.Projects.Locations.GetServerConfig(parent).Do()
 
 	postCheck(writer, result, err)
 }
