@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -26,12 +27,75 @@ import (
 )
 
 const (
-	base            = 32768
-	end             = 61000
-	tillerName      = "rancher-tiller"
-	HelmV2          = "rancher-helm"
-	HelmV3          = "helm_v3"
-	forceUpgradeStr = "--force"
+	base                    = 32768
+	end                     = 61000
+	tillerName              = "rancher-tiller"
+	HelmV2                  = "rancher-helm"
+	HelmV3                  = "helm_v3"
+	forceUpgradeStr         = "--force"
+	appLabel                = "io.cattle.field/appId"
+	kustomizeTransformFile  = "common-labels.yaml"
+	kustomizeTransformSpecs = `
+apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: common-labels
+labels:
+  {{.}}
+fieldSpecs:
+- path: metadata/labels
+  create: true
+- path: spec/selector
+  create: true
+  version: v1
+  kind: ReplicationController
+- path: spec/template/metadata/labels
+  create: true
+  version: v1
+  kind: ReplicationController
+- path: spec/selector/matchLabels
+  create: true
+  kind: Deployment
+- path: spec/template/metadata/labels
+  create: true
+  kind: Deployment
+- path: spec/selector/matchLabels
+  create: true
+  kind: ReplicaSet
+- path: spec/template/metadata/labels
+  create: true
+  kind: ReplicaSet
+- path: spec/selector/matchLabels
+  create: true
+  kind: DaemonSet
+- path: spec/template/metadata/labels
+  create: true
+  kind: DaemonSet
+- path: spec/selector/matchLabels
+  create: true
+  group: apps
+  kind: StatefulSet
+- path: spec/template/metadata/labels
+  create: true
+  group: apps
+  kind: StatefulSet
+- path: spec/volumeClaimTemplates[]/metadata/labels
+  create: true
+  group: apps
+  kind: StatefulSet
+- path: spec/template/metadata/labels
+  create: true
+  group: batch
+  kind: Job
+- path: spec/jobTemplate/metadata/labels
+  create: true
+  group: batch
+  kind: CronJob
+- path: spec/jobTemplate/spec/template/metadata/labels
+  create: true
+  group: batch
+  kind: CronJob
+`
 )
 
 type HelmPath struct {
@@ -53,15 +117,10 @@ type HelmPath struct {
 	KustomizeInJail string
 }
 
-//Labels that need added for kustomization
-type Label struct {
-	AppLabel string `json:"io.cattle.field/appId"`
-}
-
 //Marshal kustomization settings into YAML
 type Kustomization struct {
-	CommonLabel Label    `json:"commonLabels"`
-	Resources   []string `json:"resources"`
+	Resources    []string `json:"resources"`
+	Transformers []string `json:"transformers"`
 }
 
 func ParseExternalID(externalID string) (string, string, error) {
@@ -287,9 +346,13 @@ func escapeCommas(value string) string {
 // generates the kustomization yaml that is used by the helm 3 post rendered to
 // add the app labels needed to track the workloads with the app deployment
 func createKustomizeFiles(tempDirs *HelmPath, labelValue string) error {
-	var resources []string
-	resources = append(resources, "all.yaml")
-	k := Kustomization{Label{labelValue}, resources}
+	err := createKustomizeTransformFile(tempDirs, labelValue)
+	if err != nil {
+		return err
+	}
+	resources := []string{"all.yaml"}
+	transformers := []string{kustomizeTransformFile}
+	k := Kustomization{resources, transformers}
 	y, err := yaml.Marshal(k)
 	if err != nil {
 		return err
@@ -314,6 +377,30 @@ func createKustomizeFiles(tempDirs *HelmPath, labelValue string) error {
 		}
 		logrus.Debugf("successfully linked kustomize.sh to %s", kpath)
 	}
+	return nil
+}
+
+// generates the kustomization transformers yaml from tmpl that is used by the helm 3 post rendered to
+// add the app labels needed to track the workloads with the app deployment
+// this is required to avoid the app labels being added on k8s objects selectors
+func createKustomizeTransformFile(tempDirs *HelmPath, value string) error {
+	ktValue := appLabel + ": " + value
+	tmpl := template.New("KustomizeTransform")
+	tmpl, err := tmpl.Parse(kustomizeTransformSpecs)
+	if err != nil {
+		return err
+	}
+	result := &bytes.Buffer{}
+	err = tmpl.Execute(result, ktValue)
+	if err != nil {
+		return err
+	}
+	ktPath := filepath.Join(tempDirs.FullPath, "/"+kustomizeTransformFile)
+	err = ioutil.WriteFile(ktPath, result.Bytes(), 0644)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("successfully created %s in %s", kustomizeTransformFile, ktPath)
 	return nil
 }
 
