@@ -504,8 +504,8 @@ github.com/prometheus/procfs v0.2.0 h1:wH4vA7pcjKuZzjF7lM8awk4fnuJO6idemZXoKnULU
 github.com/prometheus/procfs v0.2.0/go.mod h1:lV6e/gmhEcM9IjHGsFOCxxuZ+z1YqCvr4OA4YeYWdaU=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
-github.com/rancher/eks-operator v1.0.9 h1:5w50dL0AsR0+lMqs6AehlOkQr/a5BTaQEP77cBS2Qgs=
-github.com/rancher/eks-operator v1.0.9/go.mod h1:a8P4ayqagpQPyCVAUd+MpqJpobusyzinawD5krWlsUk=
+github.com/rancher/eks-operator v1.0.9-rc1 h1:/7tf9/3U/mK0hOxdOFJav/91bElT4WtdTpsyIWJblpQ=
+github.com/rancher/eks-operator v1.0.9-rc1/go.mod h1:ILmmjLMulC83o7Fp2t4841CetDr4AM8FVhz/AOPIsJg=
 github.com/rancher/gke-operator v1.1.1-rc5 h1:tAiFGmhcqyB9fXd37wRX1mrhlQ+H7xlV/iKqekj7Z40=
 github.com/rancher/gke-operator v1.1.1-rc5/go.mod h1:sO79ki/wksclGtziLqarrvRx8+l15+BPisFHHMjrIe0=
 github.com/rancher/lasso v0.0.0-20200427171700-e0509f89f319/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
