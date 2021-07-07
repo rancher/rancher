@@ -139,8 +139,14 @@ func listServiceAccounts(ctx context.Context, cap *Capabilities) ([]byte, int, e
 }
 
 func listVersions(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
-	if cap.ProjectID == "" || cap.Zone == "" {
-		return nil, http.StatusBadRequest, fmt.Errorf("projectId and zone are required")
+	if cap.Region == "" && cap.Zone == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("either region or zone is required")
+	}
+	if cap.Region != "" && cap.Zone != "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("only one of region or zone can be provided")
+	}
+	if cap.ProjectID == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("projectId is required")
 	}
 
 	client, err := getContainerServiceClient(ctx, cap.Credentials)
@@ -148,7 +154,14 @@ func listVersions(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	result, err := client.Projects.Zones.GetServerconfig(cap.ProjectID, cap.Zone).Do()
+	var location string
+	if cap.Region != "" {
+		location = cap.Region
+	} else {
+		location = cap.Zone
+	}
+	parent := "projects/" + cap.ProjectID + "/locations/" + location
+	result, err := client.Projects.Locations.GetServerConfig(parent).Do()
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
