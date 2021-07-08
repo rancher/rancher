@@ -15,6 +15,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+const (
+	// Do not increase to 2.X.99. When we cut an RC the image exporter for airgap uses this version
+	// to find out which charts should be checked for images. Some charts have a rancher version with `<= 2.X.99-0`
+	// which will evaluate to false when compared against 2.X.99 and result in images missing from rancher-images.txt
+	RancherVersionDev = "2.6.98"
+)
+
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
 	settings       = map[string]Setting{}
@@ -282,4 +289,12 @@ func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
 	}
 
 	return envVars
+}
+
+func GetRancherVersion() string {
+	rancherVersion := ServerVersion.Get()
+	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
+		return RancherVersionDev
+	}
+	return strings.TrimPrefix(rancherVersion, "v")
 }
