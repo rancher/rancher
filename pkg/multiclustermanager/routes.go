@@ -89,6 +89,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	// Authenticated routes
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
+	authed.Use(requests.NewHeaderSanitizer)
 	authed.Use(mux.MiddlewareFunc(auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))))
 	authed.Use(mux.MiddlewareFunc(rbac.NewAccessControlHandler()))
 	authed.Use(requests.NewAuthenticatedFilter)
