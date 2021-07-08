@@ -54,10 +54,10 @@ func GetImages(systemChartsPath, featureChartsPath string, externalImages map[st
 	if err := fetchImages(systemCharts, imagesSet); err != nil {
 		return nil, nil, errors.Wrap(err, "failed to fetch images from system-charts")
 	}
-	// featureCharts := FeatureCharts{featureChartsPath, osType}
-	// if err := fetchImages(featureCharts, imagesSet); err != nil {
-	// 	return nil, nil, errors.Wrap(err, "failed to fetch images from feature-charts")
-	// }
+	featureCharts := FeatureCharts{featureChartsPath, osType}
+	if err := fetchImages(featureCharts, imagesSet); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to fetch images from feature-charts")
+	}
 
 	// fetch images from system images
 	if err := fetchImagesFromSystem(rkeSystemImages, osType, imagesSet); err != nil {

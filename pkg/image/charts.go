@@ -1,6 +1,8 @@
 package image
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,6 +19,11 @@ import (
 	libhelm "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/settings"
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	RancherVersionAnnotationKey = "catalog.cattle.io/rancher-version"
+	CrdChartNameSuffix          = "-crd"
 )
 
 type ResolveCharts interface {
@@ -36,6 +43,11 @@ type ChartVersion struct {
 }
 
 type SystemCharts struct {
+	repoPath string
+	osType   OSType
+}
+
+type FeatureCharts struct {
 	repoPath string
 	osType   OSType
 }
@@ -154,6 +166,78 @@ func (sc SystemCharts) pickImagesFromAllValues(imagesSet map[string]map[string]b
 			}
 			chartNameAndVersion := fmt.Sprintf("%s:%s", v.Name, v.Version)
 			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, sc.osType); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Load a feature chart's index and get all the charts
+func (fc FeatureCharts) getChartVersionsFromIndex() (ChartVersions, error) {
+	if fc.repoPath == "" {
+		return nil, nil
+	}
+	indexPath := filepath.Join(fc.repoPath, "index.yaml")
+	index, err := repo.LoadIndexFile(indexPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(index.Entries) <= 0 {
+		return nil, errors.New("no entries in index file")
+	}
+	// Convert repo.ChartValues to ChartVersion wrapper type
+	var versions ChartVersions
+	for _, entries := range index.Entries {
+		for _, v := range entries {
+			// Skip crd charts
+			if strings.HasSuffix(v.Name, CrdChartNameSuffix) {
+				continue
+			}
+			versions = append(versions, &ChartVersion{
+				ChartVersion: v,
+			})
+		}
+	}
+	return versions, nil
+}
+
+// Filter a feature chart based on whether the rancher version satisfies the rancher version constraint set
+// in its rancher version annotation
+func (fc FeatureCharts) filterFunc(version ChartVersion) (bool, error) {
+	constraintStr, ok := version.Annotations[RancherVersionAnnotationKey]
+	if !ok {
+		// Log a warning when a chart doesn't have the rancher-version annotation, but return true so that images are exported.
+		logrus.Warnf("feature chart: %s:%s does not have the %q annotation set", version.Name, version.Version, RancherVersionAnnotationKey)
+		return true, nil
+	}
+	rancherVersion := settings.GetRancherVersion()
+	isInRange, err := isRancherVersionInConstraintRange(rancherVersion, constraintStr)
+	if err != nil {
+		return false, err
+	}
+	return isInRange, nil
+}
+
+// Find images in all the values files in a slice of feature charts
+func (fc FeatureCharts) pickImagesFromAllValues(imagesSet map[string]map[string]bool, versions ChartVersions) error {
+	for _, v := range versions {
+		tgzPath := filepath.Join(fc.repoPath, v.URLs[0])
+		versionTgz, err := os.Open(tgzPath)
+		if err != nil {
+			return err
+		}
+		defer versionTgz.Close()
+		// Find values.yaml files in tgz
+		valuesSlice, err := getDecodedValuesFromTgz(versionTgz, fc.repoPath)
+		if err != nil {
+			logrus.Info(err)
+			continue
+		}
+		chartNameAndVersion := fmt.Sprintf("%s:%s", v.Name, v.Version)
+		for _, values := range valuesSlice {
+			// Walk values.yaml and add images to set
+			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, fc.osType); err != nil {
 				return err
 			}
 		}
@@ -294,6 +378,35 @@ func decodeValues(path string) (map[interface{}]interface{}, error) {
 		return nil, err
 	}
 	return values, nil
+}
+
+// Decode all values files from a chart's tarball
+func getDecodedValuesFromTgz(r io.Reader, repoPath string) ([]map[interface{}]interface{}, error) {
+	var valuesSlice []map[interface{}]interface{}
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	defer gzr.Close()
+	tr := tar.NewReader(gzr)
+	for {
+		header, err := tr.Next()
+		switch {
+		case err == io.EOF:
+			return valuesSlice, nil
+			// return any other error
+		case err != nil:
+			return nil, err
+		case header.Typeflag == tar.TypeReg && isValuesFile(header.Name):
+			var values map[interface{}]interface{}
+			if err := decodeYAML(tr, &values); err != nil {
+				return nil, err
+			}
+			valuesSlice = append(valuesSlice, values)
+		default:
+			continue
+		}
+	}
 }
 
 // Decode a yaml file
