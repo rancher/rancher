@@ -13,6 +13,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	RancherVersionDev = "2.6.99"
+)
+
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
 	settings       = map[string]Setting{}
@@ -252,4 +256,12 @@ func GetSettingByID(id string) string {
 		return s.Default
 	}
 	return provider.Get(id)
+}
+
+func GetRancherVersion() string {
+	rancherVersion := ServerVersion.Get()
+	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
+		return RancherVersionDev
+	}
+	return strings.TrimPrefix(rancherVersion, "v")
 }
