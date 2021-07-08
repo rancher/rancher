@@ -2,151 +2,309 @@ package image
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/repo"
 
 	libhelm "github.com/rancher/rancher/pkg/helm"
+	"github.com/rancher/rancher/pkg/settings"
 	"gopkg.in/yaml.v2"
 )
 
-type chart struct {
-	dir     string
-	version string
+type ResolveCharts interface {
+	getChartVersionsFromIndex() (ChartVersions, error)
+	filterFunc(version ChartVersion) (bool, error)
+	pickImagesFromAllValues(imagesSet map[string]map[string]bool, versions ChartVersions) error
 }
 
-func fetchImagesFromCharts(path string, osType OSType, imagesSet map[string]map[string]bool) error {
-	chartVersion, err := getChartAndVersion(path)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get chart and version from %q", path)
-	}
+// Wrapper type for libhelm.ChartVersions and repo.ChartVersions
+type ChartVersions []*ChartVersion
 
-	err = filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return pickImagesFromValuesYAML(imagesSet, chartVersion, path, p, info, osType)
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to pick images from values.yaml")
-	}
+// Wrapper type for libhelm.ChartVersion and repo.ChartVersion
+type ChartVersion struct {
+	*repo.ChartVersion
+	Dir        string   `json:"-" yaml:"-"`
+	LocalFiles []string `json:"-" yaml:"-"`
+}
 
+type SystemCharts struct {
+	repoPath string
+	osType   OSType
+}
+
+type Questions struct {
+	RancherMinVersion string `yaml:"rancher_min_version"`
+	RancherMaxVersion string `yaml:"rancher_max_version"`
+}
+
+// Fetch all images from a charts repository and filter them based on whether
+// the rancher version satisfies each chart's rancher version constraint
+func fetchImages(rc ResolveCharts, imagesSet map[string]map[string]bool) error {
+	versions, err := rc.getChartVersionsFromIndex()
+	if err != nil {
+		return errors.Wrapf(err, "failed to get index")
+	}
+	filteredVersions, err := filterChartVersions(rc, versions)
+	if err != nil {
+		return errors.Wrapf(err, "failed to filter chart versions")
+	}
+	err = rc.pickImagesFromAllValues(imagesSet, filteredVersions)
+	if err != nil {
+		return errors.Wrap(err, "failed to pick images from values file")
+	}
 	return nil
 }
 
-func getChartAndVersion(path string) (map[string]chart, error) {
-	rtn := map[string]chart{}
+// Filter chartVersions based on whether the rancher version satisfies each chart's
+// rancher version constraint
+func filterChartVersions(rc ResolveCharts, versions ChartVersions) (ChartVersions, error) {
+	var filteredVersions ChartVersions
+	for _, v := range versions {
+		addToFiltered, err := rc.filterFunc(*v)
+		if err != nil {
+			logrus.Info(err)
+			continue
+		}
+		if addToFiltered {
+			filteredVersions = append(filteredVersions, v)
+		}
+	}
+	return filteredVersions, nil
+}
+
+// Load a system chart's virtual index and get all the charts
+func (sc SystemCharts) getChartVersionsFromIndex() (ChartVersions, error) {
+	if sc.repoPath == "" {
+		return nil, nil
+	}
 	helm := libhelm.Helm{
-		LocalPath: path,
-		IconPath:  path,
+		LocalPath: sc.repoPath,
+		IconPath:  sc.repoPath,
 		Hash:      "",
 	}
-	index, err := helm.LoadIndex()
+	virtualIndex, err := helm.LoadIndex()
 	if err != nil {
 		return nil, err
 	}
-	for k, versions := range index.IndexFile.Entries {
-		// because versions is sorted in reverse order, the first one will be the latest version
-		if len(versions) > 0 {
-			newestVersionedChart := versions[0]
-			rtn[k] = chart{
-				dir:     newestVersionedChart.Dir,
-				version: newestVersionedChart.Version}
+	// Convert libhelm.ChartVersion to ChartVersion wrapper type
+	var versions ChartVersions
+	for _, entries := range virtualIndex.IndexFile.Entries {
+		for _, v := range entries {
+			versions = append(versions, &ChartVersion{
+				ChartVersion: &repo.ChartVersion{
+					Metadata: &chart.Metadata{
+						Name:    v.Name,
+						Version: v.Version,
+					},
+				},
+				Dir:        v.Dir,
+				LocalFiles: v.LocalFiles,
+			})
 		}
 	}
-
-	return rtn, nil
+	return versions, nil
 }
 
-func pickImagesFromValuesYAML(imagesSet map[string]map[string]bool, charts map[string]chart, basePath, path string, info os.FileInfo, osType OSType) error {
-	if info.Name() != "values.yaml" {
-		return nil
+// Filter a system chart based on whether the rancher version satisfies the
+// rancher version constraint set in its questions file
+func (sc SystemCharts) filterFunc(version ChartVersion) (bool, error) {
+	questionsPath := getQuestionsPath(version.LocalFiles)
+	if questionsPath == "" {
+		// Log a warning and export images when a chart doesn't have a questions file
+		logrus.Warnf("system chart: %s does not have a questions file", version.Name)
+		return true, nil
 	}
-	relPath, err := filepath.Rel(basePath, path)
+	questions, err := decodeQuestions(questionsPath)
 	if err != nil {
-		return err
+		return false, err
 	}
-	var chartNameAndVersion string
-	for name, chart := range charts {
-		if strings.HasPrefix(relPath, chart.dir) {
-			chartNameAndVersion = fmt.Sprintf("%s:%s", name, chart.version)
-			break
+	constraintStr := minMaxToConstraintStr(questions.RancherMinVersion, questions.RancherMaxVersion)
+	if constraintStr == "" {
+		// Log a warning and export images when a chart doesn't have rancher version constraints in its questions file
+		logrus.Warnf("system chart: %s does not have a rancher_min_version or rancher_max_version constraint defined in its questions file", version.Name)
+		return true, nil
+	}
+	rancherVersion := settings.GetRancherVersion()
+	isInRange, err := isRancherVersionInConstraintRange(rancherVersion, constraintStr)
+	if err != nil {
+		return false, err
+	}
+	return isInRange, nil
+}
+
+// Find images in all the values files in a slice of system charts
+func (sc SystemCharts) pickImagesFromAllValues(imagesSet map[string]map[string]bool, versions ChartVersions) error {
+	for _, v := range versions {
+		for _, file := range v.LocalFiles {
+			if !isValuesFile(file) {
+				continue
+			}
+			values, err := decodeValues(file)
+			if err != nil {
+				return err
+			}
+			chartNameAndVersion := fmt.Sprintf("%s:%s", v.Name, v.Version)
+			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, sc.osType); err != nil {
+				return err
+			}
 		}
 	}
-	if chartNameAndVersion == "" {
-		// path does not belong to a given chart
-		return nil
-	}
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	dataInterface := map[interface{}]interface{}{}
-	if err := yaml.Unmarshal(data, &dataInterface); err != nil {
-		return err
-	}
+	return nil
+}
 
-	walkthroughMap(dataInterface, func(inputMap map[interface{}]interface{}) {
-		generateImages(chartNameAndVersion, inputMap, imagesSet, osType)
+// Walk a values map to find images and add them to the images set
+func pickImagesFromValuesMap(imagesSet map[string]map[string]bool, values map[interface{}]interface{}, chartNameAndVersion string, osType OSType) error {
+	walkMap(values, func(inputMap map[interface{}]interface{}) {
+		repository, ok := inputMap["repository"].(string)
+		if !ok {
+			return
+		}
+		tag, ok := inputMap["tag"].(string)
+		if !ok {
+			return
+		}
+		imageName := fmt.Sprintf("%s:%v", repository, tag)
+		// By default, images are added to the generic images list ("linux"). For Windows and multi-OS
+		// images to be considered, they must use a comma-delineated list (e.g. "os: windows",
+		// "os: windows,linux", and "os: linux,windows").
+		if osList, ok := inputMap["os"].(string); ok {
+			for _, os := range strings.Split(osList, ",") {
+				switch strings.TrimSpace(strings.ToLower(os)) {
+				case "windows":
+					if osType == Windows {
+						addSourceToImage(imagesSet, imageName, chartNameAndVersion)
+						return
+					}
+				case "linux":
+					if osType == Linux {
+						addSourceToImage(imagesSet, imageName, chartNameAndVersion)
+						return
+					}
+				}
+			}
+		} else {
+			if inputMap["os"] != nil {
+				errors.Errorf("Field 'os:' for image %s contains neither a string nor nil", imageName)
+			}
+			if osType == Linux {
+				addSourceToImage(imagesSet, imageName, chartNameAndVersion)
+			}
+		}
 	})
 	return nil
 }
 
-func generateImages(chartNameAndVersion string, inputMap map[interface{}]interface{}, output map[string]map[string]bool, osType OSType) {
-	r, repoOk := inputMap["repository"]
-	t, tagOk := inputMap["tag"]
-	if !repoOk || !tagOk {
-		return
-	}
-	repo, repoOk := r.(string)
-	if !repoOk {
-		return
-	}
-
-	imageName := fmt.Sprintf("%s:%v", repo, t)
-
-	// By default, images are added to the generic images list ("linux"). For Windows and multi-OS
-	// images to be considered, they must use a comma-delineated list (e.g. "os: windows",
-	// "os: windows,linux", and "os: linux,windows").
-	if osList, ok := inputMap["os"].(string); ok {
-		for _, os := range strings.Split(osList, ",") {
-			switch strings.TrimSpace(strings.ToLower(os)) {
-			case "windows":
-				if osType == Windows {
-					addSourceToImage(output, imageName, chartNameAndVersion)
-					return
-				}
-			case "linux":
-				if osType == Linux {
-					addSourceToImage(output, imageName, chartNameAndVersion)
-					return
-				}
-			}
-		}
-	} else {
-		if inputMap["os"] != nil {
-			panic(fmt.Sprintf("Field 'os:' for image %s contains neither a string nor nil", imageName))
-		}
-		if osType == Linux {
-			addSourceToImage(output, imageName, chartNameAndVersion)
-		}
-	}
-}
-
-func walkthroughMap(data interface{}, walkFunc func(map[interface{}]interface{})) {
+// Walk a map and execute the given walk function for each node
+func walkMap(data interface{}, walkFunc func(map[interface{}]interface{})) {
 	if inputMap, isMap := data.(map[interface{}]interface{}); isMap {
 		// Run the walkFunc on the root node and each child node
 		walkFunc(inputMap)
 		for _, value := range inputMap {
-			walkthroughMap(value, walkFunc)
+			walkMap(value, walkFunc)
 		}
 	} else if inputList, isList := data.([]interface{}); isList {
 		// Run the walkFunc on each element in the root node, ignoring the root itself
 		for _, elem := range inputList {
-			walkthroughMap(elem, walkFunc)
+			walkMap(elem, walkFunc)
 		}
 	}
+}
+
+// Convert min and max rancher version strings to a constraint string
+func minMaxToConstraintStr(min, max string) string {
+	if min != "" && max != "" {
+		return fmt.Sprintf("%s - %s", min, max)
+	}
+	if min != "" {
+		return fmt.Sprintf(">= %s", min)
+	}
+	if max != "" {
+		return fmt.Sprintf("<= %s", max)
+	}
+	return ""
+}
+
+// Check if the rancher version satisfies the given constraint range (E.g ">=2.5.0 <=2.6")
+func isRancherVersionInConstraintRange(rancherVersion, constraintStr string) (bool, error) {
+	if constraintStr == "" {
+		return false, errors.Errorf("Invalid constraint string: \"%s\"", constraintStr)
+	}
+	rancherSemVer, err := semver.NewVersion(rancherVersion)
+	if err != nil {
+		return false, err
+	}
+	// Removing the pre-release because the semver package will not consider a rancherVersion with a
+	// pre-releases unless the versions in the constraintStr has pre-releases as well.
+	// For example: rancherVersion "2.5.7-rc1" and constraint "2.5.6 - 2.5.8" will return false because
+	// there is no pre-release in the constraint "2.5.6 - 2.5.8" (This behavior is intentional).
+	rancherSemVerNoPreRelease, err := rancherSemVer.SetPrerelease("")
+	if err != nil {
+		return false, err
+	}
+	constraint, err := semver.NewConstraint(constraintStr)
+	if err != nil {
+		return false, err
+	}
+	return constraint.Check(&rancherSemVerNoPreRelease), nil
+}
+
+// Get the path to a chart's questions file if it has one
+func getQuestionsPath(versionLocalFiles []string) string {
+	for _, file := range versionLocalFiles {
+		basename := filepath.Base(file)
+		if basename == "questions.yaml" || basename == "questions.yml" {
+			return file
+		}
+	}
+	return ""
+}
+
+// Decode a questions file
+func decodeQuestions(path string) (Questions, error) {
+	var questions Questions
+	file, err := os.Open(path)
+	if err != nil {
+		return Questions{}, err
+	}
+	defer file.Close()
+	if err := decodeYAML(file, &questions); err != nil {
+		return Questions{}, err
+	}
+	return questions, nil
+}
+
+// Decode a values file
+func decodeValues(path string) (map[interface{}]interface{}, error) {
+	var values map[interface{}]interface{}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	if err := decodeYAML(file, &values); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
+// Decode a yaml file
+func decodeYAML(r io.Reader, target interface{}) error {
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(data, target)
+}
+
+func isValuesFile(path string) bool {
+	basename := filepath.Base(path)
+	return basename == "values.yaml" || basename == "values.yml"
 }

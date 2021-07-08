@@ -47,27 +47,21 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	return image
 }
 
-func GetImages(systemChartPath, chartPath string, externalImages map[string][]string, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, []string, error) {
-	// fetch images from system charts
+func GetImages(systemChartsPath, featureChartsPath string, externalImages map[string][]string, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, []string, error) {
 	imagesSet := make(map[string]map[string]bool)
-	if systemChartPath != "" {
-		if err := fetchImagesFromCharts(systemChartPath, osType, imagesSet); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to fetch images from system charts")
-		}
-	}
-
 	// fetch images from charts
-	if chartPath != "" {
-		if err := fetchImagesFromCharts(chartPath, osType, imagesSet); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
-		}
+	systemCharts := SystemCharts{systemChartsPath, osType}
+	if err := fetchImages(systemCharts, imagesSet); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to fetch images from system-charts")
 	}
+	// featureCharts := FeatureCharts{featureChartsPath, osType}
+	// if err := fetchImages(featureCharts, imagesSet); err != nil {
+	// 	return nil, nil, errors.Wrap(err, "failed to fetch images from feature-charts")
+	// }
 
 	// fetch images from system images
-	if len(rkeSystemImages) > 0 {
-		if err := fetchImagesFromSystem(rkeSystemImages, osType, imagesSet); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to fetch images from system images")
-		}
+	if err := fetchImagesFromSystem(rkeSystemImages, osType, imagesSet); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to fetch images from system images")
 	}
 
 	setRequirementImages(osType, imagesSet)
