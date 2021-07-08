@@ -7,6 +7,9 @@ import (
 )
 
 func fetchImagesFromSystem(rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType, imagesSet map[string]map[string]bool) error {
+	if len(rkeSystemImages) <= 0 {
+		return nil
+	}
 	collectionImagesList := []interface{}{
 		rkeSystemImages,
 	}
