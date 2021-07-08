@@ -923,9 +923,8 @@ func (state state) hasHTTPApplicationRoutingSupport() bool {
 
 func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, client *operationalinsights.WorkspacesClient, state state) (workspaceID string, err error) {
 	// Please keep in sync with
-	// https://github.com/Azure/azure-cli/blob/release/src/azure-cli/azure/cli/command_modules/acs/custom.py#L1996
-
-	locationToOmsRegionCodeMap := map[string]string{
+	// https://github.com/Azure/azure-cli/blob/release/src/azure-cli/azure/cli/command_modules/acs/custom.py
+	var locationToOmsRegionCodeMap = map[string]string{
 		"australiasoutheast": "ASE",
 		"australiaeast":      "EAU",
 		"australiacentral":   "CAU",
@@ -948,18 +947,32 @@ func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, c
 		"westeurope":         "WEU",
 		"westus":             "WUS",
 		"westus2":            "WUS2",
+		"brazilsouth":        "CQ",
+		"brazilsoutheast":    "BRSE",
+		"norwayeast":         "NOE",
+		"southafricanorth":   "JNB",
+		"northcentralus":     "NCUS",
+		"uaenorth":           "DXB",
+		"germanywestcentral": "DEWC",
+		"ukwest":             "WUK",
+		"switzerlandnorth":   "CHN",
+		"switzerlandwest":    "CHW",
+		"uaecentral":         "AUH",
 		// mapping for azure china cloud
 		"chinaeast":   "EAST2",
 		"chinaeast2":  "EAST2",
 		"chinanorth":  "EAST2",
 		"chinanorth2": "EAST2",
 	}
-	regionToOmsRegionMap := map[string]string{
+
+	// Please keep in sync with
+	// https://github.com/Azure/azure-cli/blob/release/src/azure-cli/azure/cli/command_modules/acs/custom.py
+	var regionToOmsRegionMap = map[string]string{
 		"australiacentral":   "australiacentral",
 		"australiacentral2":  "australiacentral",
 		"australiaeast":      "australiaeast",
 		"australiasoutheast": "australiasoutheast",
-		"brazilsouth":        "southcentralus",
+		"brazilsouth":        "brazilsouth",
 		"canadacentral":      "canadacentral",
 		"canadaeast":         "canadacentral",
 		"centralus":          "centralus",
@@ -973,20 +986,30 @@ func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, c
 		"japanwest":          "japaneast",
 		"koreacentral":       "koreacentral",
 		"koreasouth":         "koreacentral",
-		"northcentralus":     "eastus",
+		"northcentralus":     "northcentralus",
 		"northeurope":        "northeurope",
-		"southafricanorth":   "westeurope",
-		"southafricawest":    "westeurope",
+		"southafricanorth":   "southafricanorth",
+		"southafricawest":    "southafricanorth",
 		"southcentralus":     "southcentralus",
 		"southeastasia":      "southeastasia",
 		"southindia":         "centralindia",
 		"uksouth":            "uksouth",
-		"ukwest":             "uksouth",
+		"ukwest":             "ukwest",
 		"westcentralus":      "eastus",
 		"westeurope":         "westeurope",
 		"westindia":          "centralindia",
 		"westus":             "westus",
 		"westus2":            "westus2",
+		"norwayeast":         "norwayeast",
+		"norwaywest":         "norwayeast",
+		"switzerlandnorth":   "switzerlandnorth",
+		"switzerlandwest":    "switzerlandwest",
+		"uaenorth":           "uaenorth",
+		"germanywestcentral": "germanywestcentral",
+		"germanynorth":       "germanywestcentral",
+		"uaecentral":         "uaecentral",
+		"eastus2euap":        "eastus2euap",
+		"brazilsoutheast":    "brazilsoutheast",
 		// mapping for azure china cloud
 		"chinaeast":   "chinaeast2",
 		"chinaeast2":  "chinaeast2",
