@@ -13,6 +13,7 @@ import (
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/types/image"
 	"github.com/rancher/rke/types/kdm"
 )
@@ -60,12 +61,10 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 		return fmt.Errorf("no tag %s", tag)
 	}
 	rancherVersion := tag
-	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") {
-		rancherVersion = kd.RancherVersionDev
+	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
+		rancherVersion = settings.RancherVersionDev
 	}
-	if strings.HasPrefix(rancherVersion, "v") {
-		rancherVersion = rancherVersion[1:]
-	}
+	rancherVersion = strings.TrimPrefix(rancherVersion, "v")
 
 	// already downloaded in dapper
 	b, err := ioutil.ReadFile(filepath.Join("data.json"))
