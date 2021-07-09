@@ -22,6 +22,7 @@ const (
 	PrometheusFieldDescription                        = "description"
 	PrometheusFieldDisableCompaction                  = "disableCompaction"
 	PrometheusFieldEnableAdminAPI                     = "enableAdminAPI"
+	PrometheusFieldEnableFeatures                     = "enableFeatures"
 	PrometheusFieldEnforcedNamespaceLabel             = "enforcedNamespaceLabel"
 	PrometheusFieldEnforcedSampleLimit                = "enforcedSampleLimit"
 	PrometheusFieldEnforcedTargetLimit                = "enforcedTargetLimit"
@@ -106,6 +107,7 @@ type Prometheus struct {
 	Description                        string                             `json:"description,omitempty" yaml:"description,omitempty"`
 	DisableCompaction                  bool                               `json:"disableCompaction,omitempty" yaml:"disableCompaction,omitempty"`
 	EnableAdminAPI                     bool                               `json:"enableAdminAPI,omitempty" yaml:"enableAdminAPI,omitempty"`
+	EnableFeatures                     []string                           `json:"enableFeatures,omitempty" yaml:"enableFeatures,omitempty"`
 	EnforcedNamespaceLabel             string                             `json:"enforcedNamespaceLabel,omitempty" yaml:"enforcedNamespaceLabel,omitempty"`
 	EnforcedSampleLimit                *int64                             `json:"enforcedSampleLimit,omitempty" yaml:"enforcedSampleLimit,omitempty"`
 	EnforcedTargetLimit                *int64                             `json:"enforcedTargetLimit,omitempty" yaml:"enforcedTargetLimit,omitempty"`
