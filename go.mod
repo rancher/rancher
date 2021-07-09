@@ -82,7 +82,7 @@ require (
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.44.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.48.0
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.10.0
