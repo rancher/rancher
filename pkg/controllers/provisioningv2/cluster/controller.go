@@ -256,12 +256,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		newCluster.Annotations[k] = v
 	}
 
-	userName, err := h.kubeconfigManager.EnsureUser(cluster.Namespace, cluster.Name)
-	if err != nil {
-		return nil, status, err
-	}
-
-	newCluster.Annotations[creatorIDAnn] = userName
+	delete(cluster.Annotations, creatorIDAnn)
 
 	normalizedCluster, err := NormalizeCluster(newCluster)
 	if err != nil {
