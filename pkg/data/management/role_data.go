@@ -536,13 +536,13 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			if serverURL == "" {
 				ip, err := net.ChooseHostInterface()
 				if err == nil {
-					serverURL = ip.String()
+					serverURL = "https://" + ip.String()
 				}
 			}
 			if serverURL == "" {
-				serverURL = "localhost"
+				serverURL = "https://" + "localhost"
 			}
-			logrus.Infof("Default username/password created, use https://%s/dashboard/?setup=%s to setup password", serverURL, bootstrapPassword)
+			logrus.Infof("Default username/password created, use %s/dashboard/?setup=%s to setup password", serverURL, bootstrapPassword)
 		}
 		adminName = admin.Name
 
