@@ -413,15 +413,18 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 }
 
 func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
-	configScopes := strings.Split(config.Scopes, ",")
-	allScopes := []string{oidc.ScopeOpenID}
-	allScopes = append(allScopes, configScopes...)
+	hasOIDCScope := strings.Contains(config.Scopes, oidc.ScopeOpenID)
+	// scopes must be space separated in string when passed into the api
+	configScopes := strings.Split(config.Scopes, " ")
+	if !hasOIDCScope {
+		configScopes = append(configScopes, oidc.ScopeOpenID)
+	}
 
 	return oauth2.Config{
 		ClientID:     config.ClientID,
 		ClientSecret: config.ClientSecret,
 		Endpoint:     endpoint,
 		RedirectURL:  config.RancherURL,
-		Scopes:       allScopes,
+		Scopes:       configScopes,
 	}
 }
