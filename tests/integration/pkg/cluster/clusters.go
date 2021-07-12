@@ -139,7 +139,7 @@ func WaitFor(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisi
 
 	for _, machine := range machines.Items {
 		err = wait.Object(clients.Ctx, clients.CAPI.Machine().Watch, &machine, func(obj runtime.Object) (bool, error) {
-			machine := obj.(*capi.Machine)
+			machine = *obj.(*capi.Machine)
 			return machine.Status.NodeRef != nil, nil
 		})
 		if err != nil {

@@ -26,7 +26,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			Namespace: namespace,
 			Name:      name,
 		}}, nil
-	}, clients.RKE.RKEControlPlane(), clients.Provisioning.Cluster())
+	}, clients.RKE.RKEControlPlane(), clients.Mgmt.Cluster())
 }
 
 type handler struct {

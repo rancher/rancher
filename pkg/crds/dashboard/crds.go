@@ -147,7 +147,7 @@ func fleetBootstrap(crds []crd.CRD, cfg *rest.Config) ([]crd.CRD, error) {
 			},
 			Annotations: map[string]string{
 				"meta.helm.sh/release-name":      "fleet-crd",
-				"meta.helm.sh/release-namespace": "fleet-system",
+				"meta.helm.sh/release-namespace": "cattle-fleet-system",
 			},
 		})
 	}
