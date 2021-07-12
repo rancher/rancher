@@ -19,6 +19,7 @@ const (
 	Azuredriver        = "azure"
 	DigitalOceandriver = "digitalocean"
 	ExoscaleDriver     = "exoscale"
+	HarvesterDriver    = "harvester"
 	Linodedriver       = "linode"
 	OCIDriver          = "oci"
 	OTCDriver          = "otc"
@@ -36,6 +37,7 @@ var DriverData = map[string]map[string][]string{
 	Azuredriver:        {"publicCredentialFields": []string{"clientId", "subscriptionId", "tenantId"}, "privateCredentialFields": []string{"clientSecret"}, "optionalCredentialFields": []string{"tenantId"}},
 	DigitalOceandriver: {"privateCredentialFields": []string{"accessToken"}},
 	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
+	HarvesterDriver:    {"publicCredentialFields": []string{"clusterType", "clusterId"}, "privateCredentialFields": []string{"kubeconfigContent"}, "optionalCredentialFields": []string{"clusterId"}},
 	Linodedriver:       {"privateCredentialFields": []string{"token"}, "passwordFields": []string{"rootPass"}},
 	OCIDriver:          {"publicCredentialFields": []string{"tenancyId", "userId", "fingerprint"}, "privateCredentialFields": []string{"privateKeyContents"}, "passwordFields": []string{"privateKeyPassphrase"}},
 	OTCDriver:          {"privateCredentialFields": []string{"accessKeySecret"}},
@@ -49,7 +51,8 @@ var DriverData = map[string]map[string][]string{
 }
 
 var driverDefaults = map[string]map[string]string{
-	Vmwaredriver: {"vcenterPort": "443"},
+	HarvesterDriver: {"clusterType": "imported"},
+	Vmwaredriver:    {"vcenterPort": "443"},
 }
 
 type machineDriverCompare struct {
@@ -91,6 +94,9 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 	if err := addMachineDriver(GoogleDriver, "local://", "", "", nil, false, true, true, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver(HarvesterDriver, "https://harvester-node-driver.s3.amazonaws.com/driver/v0.2.0/docker-machine-driver-harvester-amd64.tar.gz", "", "fdd3428737a15ae28b976476b5b1a4d7d21d9cf9b4c6d9c77cc82e29660f1814", []string{"harvester-node-driver.s3.amazonaws.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
