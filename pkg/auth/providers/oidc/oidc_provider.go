@@ -372,7 +372,7 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	var oauth2Token *oauth2.Token
 	var err error
 
-	updatedContext, err := o.AddCertKeyToContext(ctx, config.Certificate, config.PrivateKey)
+	updatedContext, err := AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}

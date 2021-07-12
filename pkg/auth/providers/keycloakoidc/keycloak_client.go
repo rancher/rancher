@@ -130,6 +130,9 @@ func getSubGroups(group Group) []Group {
 func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, config *v32.OIDCConfig) (account, error) {
 	var searchResult account
 
+	if principalID == "" {
+		return account{}, fmt.Errorf("[keycloak oidc]: cannot perfom search with empty principalID")
+	}
 	sURL, err := getSearchURL(config.Issuer)
 	if err != nil {
 		return account{}, nil
