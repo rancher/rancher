@@ -161,11 +161,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
 	principalType := parts[1]
-	searchType := "users"
-	if principalType == GroupType {
-		searchType = "groups"
-	}
-	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, searchType, config)
+	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, principalType, config)
 	if err != nil {
 		return v3.Principal{}, err
 	}
