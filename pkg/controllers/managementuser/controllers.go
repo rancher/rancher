@@ -42,7 +42,9 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
 	if features.RKE2.Enabled() {
-		snapshotbackpopulate.Register(ctx, cluster)
+		if err := snapshotbackpopulate.Register(ctx, cluster); err != nil {
+			return err
+		}
 		pspdelete.Register(ctx, cluster)
 	}
 
