@@ -65,6 +65,7 @@ func (h *aggregationHandler) next(notFound http.Handler) http.Handler {
 
 func (h *aggregationHandler) setEntries(routes []routeEntry) {
 	mux := mux.NewRouter()
+	mux.UseEncodedPath()
 	for _, entry := range routes {
 		if entry.prefix != "" {
 			mux.PathPrefix(entry.prefix).Handler(h.makeHandler(entry.uuid))
