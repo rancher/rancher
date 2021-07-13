@@ -22,6 +22,7 @@ type virtualNetworksResponseBody struct {
 	Name          string   `json:"name"`
 	ResourceGroup string   `json:"resourceGroup"`
 	Subnets       []subnet `json:"subnets"`
+	Location      string   `json:"location"`
 }
 
 type subnet struct {
@@ -172,6 +173,9 @@ func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, e
 		var batch []virtualNetworksResponseBody
 
 		for _, azureNetwork := range networkList.Values() {
+			if cap.ResourceLocation != "" && to.String(azureNetwork.Location) != cap.ResourceLocation {
+				continue
+			}
 			var subnets []subnet
 
 			if azureNetwork.Subnets != nil {
@@ -203,6 +207,7 @@ func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, e
 				Name:          to.String(azureNetwork.Name),
 				ResourceGroup: match[1],
 				Subnets:       subnets,
+				Location:      to.String(azureNetwork.Location),
 			})
 		}
 
