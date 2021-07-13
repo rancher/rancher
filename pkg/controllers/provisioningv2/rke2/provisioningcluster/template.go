@@ -198,11 +198,19 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			infraRef = *machinePool.NodeConfig
 		}
 
+		machineDeploymentLabels := map[string]string{}
+		for k, v := range machinePool.Labels {
+			machineDeploymentLabels[k] = v
+		}
+		for k, v := range machinePool.MachineDeploymentLabels {
+			machineDeploymentLabels[k] = v
+		}
+
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   cluster.Namespace,
 				Name:        machinePoolName,
-				Labels:      machinePool.MachineDeploymentLabels,
+				Labels:      machineDeploymentLabels,
 				Annotations: machinePool.MachineDeploymentAnnotations,
 			},
 			Spec: capi.MachineDeploymentSpec{
