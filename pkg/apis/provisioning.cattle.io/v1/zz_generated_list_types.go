@@ -40,20 +40,3 @@ func NewCluster(namespace, name string, obj Cluster) *Cluster {
 	obj.Namespace = namespace
 	return &obj
 }
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ManagedOSList is a list of ManagedOS resources
-type ManagedOSList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ManagedOS `json:"items"`
-}
-
-func NewManagedOS(namespace, name string, obj ManagedOS) *ManagedOS {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ManagedOS").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
