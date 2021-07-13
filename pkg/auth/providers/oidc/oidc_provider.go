@@ -372,18 +372,18 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	var oauth2Token *oauth2.Token
 	var err error
 
-	err = o.AddCertKeyToContext(ctx, config.Certificate, config.PrivateKey)
+	updatedContext, err := AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
 
-	provider, err := oidc.NewProvider(*ctx, config.Issuer)
+	provider, err := oidc.NewProvider(updatedContext, config.Issuer)
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
 	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
-		oauth2Token, err = oauthConfig.Exchange(*ctx, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
+		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
 		if err != nil {
 			return userInfo, oauth2Token, err
 		}
@@ -398,11 +398,11 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	}
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 	// parse and verify the id token payload
-	_, err = verifier.Verify(*ctx, rawToken)
+	_, err = verifier.Verify(updatedContext, rawToken)
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
-	userInfo, err = provider.UserInfo(*ctx, oauthConfig.TokenSource(*ctx, oauth2Token))
+	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, oauth2Token))
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
@@ -413,15 +413,18 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 }
 
 func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
-	configScopes := strings.Split(config.Scopes, ",")
-	allScopes := []string{oidc.ScopeOpenID}
-	allScopes = append(allScopes, configScopes...)
+	hasOIDCScope := strings.Contains(config.Scopes, oidc.ScopeOpenID)
+	// scopes must be space separated in string when passed into the api
+	configScopes := strings.Split(config.Scopes, " ")
+	if !hasOIDCScope {
+		configScopes = append(configScopes, oidc.ScopeOpenID)
+	}
 
 	return oauth2.Config{
 		ClientID:     config.ClientID,
 		ClientSecret: config.ClientSecret,
 		Endpoint:     endpoint,
 		RedirectURL:  config.RancherURL,
-		Scopes:       allScopes,
+		Scopes:       configScopes,
 	}
 }

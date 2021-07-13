@@ -9,16 +9,16 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 )
 
-func (o *OpenIDCProvider) AddCertKeyToContext(ctx *context.Context, certificate, key string) error {
+func AddCertKeyToContext(ctx context.Context, certificate, key string) (context.Context, error) {
 	if certificate != "" && key != "" {
-		var certKeyClient http.Client
-		err := GetClientWithCertKey(&certKeyClient, certificate, key)
+		certKeyClient := &http.Client{}
+		err := GetClientWithCertKey(certKeyClient, certificate, key)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		oidc.ClientContext(*ctx, &certKeyClient)
+		return oidc.ClientContext(ctx, certKeyClient), nil
 	}
-	return nil
+	return ctx, nil
 }
 
 func GetClientWithCertKey(httpClient *http.Client, certificate, key string) error {

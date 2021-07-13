@@ -50,7 +50,10 @@ func (k *keyCloakOIDCProvider) GetName() string {
 }
 
 func newClient(config *v32.OIDCConfig, token *oauth2.Token) (*KeyCloakClient, error) {
-	ctx := context.Background()
+	ctx, err := oidc.AddCertKeyToContext(context.Background(), config.Certificate, config.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
 	provider, err := gooidc.NewProvider(ctx, config.Issuer)
 	if err != nil {
 		return nil, err
@@ -59,7 +62,6 @@ func newClient(config *v32.OIDCConfig, token *oauth2.Token) (*KeyCloakClient, er
 	keyCloakClient := &KeyCloakClient{
 		httpClient: oauthConfig.Client(ctx, token),
 	}
-	err = oidc.GetClientWithCertKey(keyCloakClient.httpClient, config.Certificate, config.PrivateKey)
 	return keyCloakClient, err
 }
 
@@ -161,11 +163,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
 	principalType := parts[1]
-	searchType := "users"
-	if principalType == GroupType {
-		searchType = "groups"
-	}
-	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, searchType, config)
+	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, principalType, config)
 	if err != nil {
 		return v3.Principal{}, err
 	}
