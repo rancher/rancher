@@ -95,7 +95,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 		})
 	}
 
-	resources, err := ToResources(installer(len(cluster.Spec.RKEConfig.NodeConfig) == 0, secretName))
+	resources, err := ToResources(installer(len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0, secretName))
 	if err != nil {
 		return nil, status, err
 	}

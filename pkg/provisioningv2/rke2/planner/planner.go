@@ -573,7 +573,11 @@ func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPl
 }
 
 func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) error {
-	for _, opts := range controlPlane.Spec.NodeConfig {
+	for k, v := range controlPlane.Spec.MachineGlobalConfig.Data {
+		config[k] = v
+	}
+
+	for _, opts := range controlPlane.Spec.MachineSelectorConfig {
 		sel, err := metav1.LabelSelectorAsSelector(opts.MachineLabelSelector)
 		if err != nil {
 			return err
@@ -584,10 +588,6 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 			}
 			break
 		}
-	}
-
-	for k, v := range controlPlane.Spec.ControlPlaneConfig.Data {
-		config[k] = v
 	}
 
 	filterConfigData(config, controlPlane, machine)

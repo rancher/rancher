@@ -597,9 +597,9 @@ func (in *RKEClusterSpecCommon) DeepCopyInto(out *RKEClusterSpecCommon) {
 	out.LocalClusterAuthEndpoint = in.LocalClusterAuthEndpoint
 	in.UpgradeStrategy.DeepCopyInto(&out.UpgradeStrategy)
 	in.ChartValues.DeepCopyInto(&out.ChartValues)
-	in.ControlPlaneConfig.DeepCopyInto(&out.ControlPlaneConfig)
-	if in.NodeConfig != nil {
-		in, out := &in.NodeConfig, &out.NodeConfig
+	in.MachineGlobalConfig.DeepCopyInto(&out.MachineGlobalConfig)
+	if in.MachineSelectorConfig != nil {
+		in, out := &in.MachineSelectorConfig, &out.MachineSelectorConfig
 		*out = make([]RKESystemConfig, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
