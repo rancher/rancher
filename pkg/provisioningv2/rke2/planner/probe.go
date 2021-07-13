@@ -74,7 +74,7 @@ func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
 	if runtime != RuntimeRKE2 {
 		return false
 	}
-	cni := convert.ToString(controlPlane.Spec.ControlPlaneConfig.Data["cni"])
+	cni := convert.ToString(controlPlane.Spec.MachineGlobalConfig.Data["cni"])
 	return cni == "" ||
 		cni == "calico" ||
 		cni == "calico+multus"

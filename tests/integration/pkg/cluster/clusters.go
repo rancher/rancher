@@ -43,11 +43,11 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 	}
 
 	if cluster.Spec.RKEConfig != nil {
-		if cluster.Spec.RKEConfig.ControlPlaneConfig.Data == nil {
-			cluster.Spec.RKEConfig.ControlPlaneConfig.Data = map[string]interface{}{}
+		if cluster.Spec.RKEConfig.MachineGlobalConfig.Data == nil {
+			cluster.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{}
 		}
 		for k, v := range defaults.CommonClusterConfig {
-			cluster.Spec.RKEConfig.ControlPlaneConfig.Data[k] = v
+			cluster.Spec.RKEConfig.MachineGlobalConfig.Data[k] = v
 		}
 
 		for i, np := range cluster.Spec.RKEConfig.MachinePools {

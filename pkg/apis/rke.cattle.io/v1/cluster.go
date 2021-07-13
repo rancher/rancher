@@ -25,8 +25,8 @@ type RKEClusterSpecCommon struct {
 	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
 	UpgradeStrategy          ClusterUpgradeStrategy   `json:"upgradeStrategy,omitempty"`
 	ChartValues              GenericMap               `json:"chartValues,omitempty" wrangler:"nullable"`
-	ControlPlaneConfig       GenericMap               `json:"controlPlaneConfig,omitempty" wrangler:"nullable"`
-	NodeConfig               []RKESystemConfig        `json:"workerConfig,omitempty"`
+	MachineGlobalConfig      GenericMap               `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
+	MachineSelectorConfig    []RKESystemConfig        `json:"machineSelectorConfig,omitempty"`
 	AdditionalManifest       string                   `json:"additionalManifest,omitempty"`
 	Registries               *Registry                `json:"registries,omitempty"`
 	ETCD                     *ETCD                    `json:"etcd,omitempty"`
