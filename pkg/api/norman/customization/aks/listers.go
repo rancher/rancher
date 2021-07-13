@@ -226,6 +226,7 @@ type clustersResponseBody struct {
 	ResourceGroup string `json:"resourceGroup"`
 	ClusterName   string `json:"clusterName"`
 	RBACEnabled   bool   `json:"rbacEnabled"`
+	Location      string `json:"location"`
 }
 
 func listClusters(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
@@ -246,6 +247,7 @@ func listClusters(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 			tmpCluster := clustersResponseBody{
 				ClusterName: to.String(cluster.Name),
 				RBACEnabled: to.Bool(cluster.EnableRBAC),
+				Location:    to.String(cluster.Location),
 			}
 			if cluster.ID != nil {
 				match := matchResourceGroup.FindStringSubmatch(to.String(cluster.ID))
