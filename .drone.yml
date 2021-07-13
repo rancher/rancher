@@ -195,25 +195,6 @@ steps:
     event:
     - push
 
-- name: bin-publish
-  image: plugins/gcs
-  settings:
-    acl:
-    - allUsers:READER
-    cache_control: "public,no-cache,proxy-revalidate"
-    source: bin/rancherd
-    target: releases.rancher.com/rancherd/${DRONE_BRANCH}/rancherd
-    token:
-      from_secret: google_auth_key
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
-
-
 - name: docker-publish
   image: plugins/docker
   settings:
@@ -305,7 +286,6 @@ steps:
     - sha256
     files:
     - "bin/rancher-*"
-    - "bin/rancherd-*"
     prerelease: true
     title: "Pre-release ${DRONE_TAG}"
     note: ./bin/rancher-components.txt
@@ -326,7 +306,6 @@ steps:
     - sha256
     files:
     - "bin/rancher-*"
-    - "bin/rancherd-*"
   when:
     event:
     - tag
