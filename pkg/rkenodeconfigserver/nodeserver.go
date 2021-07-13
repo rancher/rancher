@@ -96,14 +96,15 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	var nodeConfig *rkeworker.NodeConfig
 	if IsNonWorker(client.Node.Status.NodeConfig.Role) {
 		nodeConfig, err = n.nonWorkerConfig(req.Context(), client.Cluster, client.Node)
 	} else {
-		if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
-			rw.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
 		if client.NodeVersion != 0 {
 			logrus.Debugf("cluster [%s] worker-upgrade: received node-version [%v] for node [%s]", client.Cluster.Name,
 				client.NodeVersion, client.Node.Name)
