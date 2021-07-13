@@ -39,7 +39,7 @@ func doWatch(ctx context.Context, watchFunc watchFunc, cb func(obj runtime.Objec
 	for {
 		select {
 		case <-ctx.Done():
-			return false, fmt.Errorf("timeout waiting condition")
+			return false, fmt.Errorf("timeout waiting condition: %w", ctx.Err())
 		case event, open := <-result.ResultChan():
 			if !open {
 				return false, nil
@@ -81,11 +81,8 @@ func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb fun
 
 	return retryWatch(ctx, func() (watch.Interface, error) {
 		return watchFunc(meta.GetNamespace(), metav1.ListOptions{
-			FieldSelector:   "metadata.name=" + meta.GetName(),
-			ResourceVersion: meta.GetResourceVersion(),
-			TimeoutSeconds:  &defaults.WatchTimeoutSeconds,
+			FieldSelector:  "metadata.name=" + meta.GetName(),
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 		})
-	}, func(obj runtime.Object) (bool, error) {
-		return cb(obj)
-	})
+	}, cb)
 }
