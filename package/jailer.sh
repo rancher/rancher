@@ -11,7 +11,7 @@ fi
 
 # Build the jail directory structure
 mkdir -p /opt/jail/$NAME/dev
-mkdir -p /opt/jail/$NAME/etc/ssl/certs
+mkdir -p /opt/jail/$NAME/etc/ssl
 mkdir -p /opt/jail/$NAME/usr/bin
 mkdir -p /opt/jail/$NAME/management-state/node/nodes
 mkdir -p /opt/jail/$NAME/var/lib/rancher/management-state/bin
@@ -27,7 +27,7 @@ fi
 
 cp -r /lib /opt/jail/$NAME
 cp -r /usr/lib /opt/jail/$NAME/usr
-cp /var/lib/ca-certificates/ca-bundle.pem /opt/jail/$NAME/etc/ssl/certs
+cp /var/lib/ca-certificates/ca-bundle.pem /opt/jail/$NAME/etc/ssl
 cp /etc/resolv.conf /opt/jail/$NAME/etc/
 cp /etc/passwd /opt/jail/$NAME/etc/
 cp /etc/hosts /opt/jail/$NAME/etc/
@@ -44,11 +44,11 @@ if [ -d /var/lib/rancher/management-state/bin ] && [ "$(ls -A /var/lib/rancher/m
 fi
 
 if [[ -f /etc/ssl/certs/ca-additional.pem ]]; then
-  cp /etc/ssl/certs/ca-additional.pem /opt/jail/$NAME/etc/ssl/certs
+  cp /etc/ssl/certs/ca-additional.pem /opt/jail/$NAME/etc/ssl
 fi
 
 if [[ -f /etc/rancher/ssl/cacerts.pem ]]; then
-  cp /etc/rancher/ssl/cacerts.pem /opt/jail/$NAME/etc/ssl/certs
+  cp /etc/rancher/ssl/cacerts.pem /opt/jail/$NAME/etc/ssl
 fi
 
 # Hard link driver binaries

@@ -6,4 +6,7 @@ if [ ! -e /run/secrets/kubernetes.io/serviceaccount ] && [ ! -e /dev/kmsg ]; the
     exit 1
 fi
 rm -f /var/lib/rancher/k3s/server/cred/node-passwd
+if [ -x "$(command -v update-ca-certificates)" ]; then
+  update-ca-certificates
+fi
 exec tini -- rancher --http-listen-port=80 --https-listen-port=443 --audit-log-path=${AUDIT_LOG_PATH} --audit-level=${AUDIT_LEVEL} --audit-log-maxage=${AUDIT_LOG_MAXAGE} --audit-log-maxbackup=${AUDIT_LOG_MAXBACKUP} --audit-log-maxsize=${AUDIT_LOG_MAXSIZE} "${@}"
