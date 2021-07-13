@@ -32,10 +32,6 @@ func (c *FakeProvisioningV1) Clusters(namespace string) v1.ClusterInterface {
 	return &FakeClusters{c, namespace}
 }
 
-func (c *FakeProvisioningV1) ManagedOSs(namespace string) v1.ManagedOSInterface {
-	return &FakeManagedOSs{c, namespace}
-}
-
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeProvisioningV1) RESTClient() rest.Interface {

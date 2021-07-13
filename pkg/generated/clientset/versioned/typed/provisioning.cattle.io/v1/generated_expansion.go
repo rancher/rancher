@@ -19,5 +19,3 @@ limitations under the License.
 package v1
 
 type ClusterExpansion interface{}
-
-type ManagedOSExpansion interface{}

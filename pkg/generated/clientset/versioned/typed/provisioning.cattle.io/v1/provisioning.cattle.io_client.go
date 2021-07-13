@@ -27,7 +27,6 @@ import (
 type ProvisioningV1Interface interface {
 	RESTClient() rest.Interface
 	ClustersGetter
-	ManagedOSsGetter
 }
 
 // ProvisioningV1Client is used to interact with features provided by the provisioning.cattle.io group.
@@ -37,10 +36,6 @@ type ProvisioningV1Client struct {
 
 func (c *ProvisioningV1Client) Clusters(namespace string) ClusterInterface {
 	return newClusters(c, namespace)
-}
-
-func (c *ProvisioningV1Client) ManagedOSs(namespace string) ManagedOSInterface {
-	return newManagedOSs(c, namespace)
 }
 
 // NewForConfig creates a new ProvisioningV1Client for the given config.

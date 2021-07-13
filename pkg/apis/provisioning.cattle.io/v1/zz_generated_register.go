@@ -28,8 +28,7 @@ import (
 )
 
 var (
-	ClusterResourceName   = "clusters"
-	ManagedOSResourceName = "managedoses"
+	ClusterResourceName = "clusters"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -55,8 +54,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Cluster{},
 		&ClusterList{},
-		&ManagedOS{},
-		&ManagedOSList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
