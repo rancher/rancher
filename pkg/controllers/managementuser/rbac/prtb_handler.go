@@ -103,6 +103,10 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		}
 	}
 
+	if err := p.m.ensureServiceAccountImpersonator(binding.UserName, binding.GroupName); err != nil {
+		return errors.Wrapf(err, "couldn't ensure service account impersonator")
+	}
+
 	return p.reconcileProjectAccessToGlobalResources(binding, roles)
 }
 
@@ -129,6 +133,10 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 				}
 			}
 		}
+	}
+
+	if err := p.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
+		return errors.Wrap(err, "error deleting service account impersonator")
 	}
 
 	return p.reconcileProjectAccessToGlobalResourcesForDelete(binding)
