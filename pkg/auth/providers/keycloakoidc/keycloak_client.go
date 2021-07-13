@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 //account defines properties an account in keycloak has
@@ -204,7 +204,9 @@ func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, int, error) {
 	case 200:
 	case 201:
 	case 403:
-		return b, resp.StatusCode, apierrors.NewUnauthorized(resp.Status)
+		return b, resp.StatusCode, httperror.NewAPIError(httperror.PermissionDenied, "access denied")
+	case 401:
+		return b, resp.StatusCode, httperror.NewAPIError(httperror.Unauthorized, "invalid token")
 	default:
 		return b, resp.StatusCode, err
 	}
