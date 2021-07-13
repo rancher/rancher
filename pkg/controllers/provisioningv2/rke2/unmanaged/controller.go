@@ -172,6 +172,9 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 			continue
 		}
 		labelsMap[k] = v
+		if _, ok := labels[k]; !ok {
+			labels[k] = v
+		}
 	}
 
 	if len(labelsMap) > 0 {
@@ -225,6 +228,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      machineName,
 				Namespace: capiCluster.Namespace,
+				Labels:    labels,
 			},
 		},
 		&capi.Machine{
