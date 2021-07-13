@@ -7,7 +7,7 @@ var (
 	SomeRKEVersion      = "v1.21.1-rc2+rke2r1"
 	SomeK3SVersion      = "v1.21.1+k3s1"
 	SomeK8sVersion      = SomeK3SVersion
-	WatchTimeoutSeconds = int64(180 * 10)
+	WatchTimeoutSeconds = int64(60 * 10)
 	CommonClusterConfig = map[string]interface{}{
 		"service-cidr": "10.45.0.0/16",
 		"cluster-cidr": "10.44.0.0/16",
