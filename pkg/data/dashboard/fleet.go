@@ -76,7 +76,8 @@ func ensureWebhookAPIService(apiservices mngtv3.APIServiceClient) error {
 		}
 	} else {
 		if !reflect.DeepEqual(existing.Spec, apiService.Spec) {
-			if _, err := apiservices.Update(apiService); err != nil {
+			existing.Spec = apiService.Spec
+			if _, err := apiservices.Update(existing); err != nil {
 				return err
 			}
 		}
