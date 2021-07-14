@@ -16,6 +16,7 @@ replace (
 	google.golang.org/grpc => google.golang.org/grpc v1.29.1 // etcd depends on google.golang.org/grpc/naming which was removed in grpc v1.30.0
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.5.4-rancher.1
 
+	github.com/rancher/machine => github.com/kinarashah/machine 381d79b2fd1ad0d8069ba5f9e833c65ce8de9d90
 	k8s.io/api => k8s.io/api v0.21.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.21.0
