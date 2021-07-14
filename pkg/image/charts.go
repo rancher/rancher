@@ -26,39 +26,29 @@ const (
 	CrdChartNameSuffix          = "-crd"
 )
 
-type ResolveCharts interface {
-	getChartVersionsFromIndex() (ChartVersions, error)
-	filterFunc(version ChartVersion) (bool, error)
-	pickImagesFromAllValues(imagesSet map[string]map[string]bool, versions ChartVersions) error
-}
-
-// Wrapper type for libhelm.ChartVersions and repo.ChartVersions
-type ChartVersions []*ChartVersion
-
-// Wrapper type for libhelm.ChartVersion and repo.ChartVersion
+// ChartVersion is a wrapper type for libhelm.ChartVersion and repo.ChartVersion
 type ChartVersion struct {
 	*repo.ChartVersion
 	Dir        string   `json:"-" yaml:"-"`
 	LocalFiles []string `json:"-" yaml:"-"`
 }
 
-type SystemCharts struct {
-	repoPath string
-	osType   OSType
+type ChartVersions []*ChartVersion
+
+// ResolveCharts is the interface that wraps the methods for basic operations on charts repositories.
+//
+// getChartVersionsFromIndex loads the repository's index and returns all chart entries.
+// filterFunc filters charts based on whether the rancher server version satisfies a given chart's rancher version constraint.
+// When a chart doesn't have a constraint set, it should be added to the list of filtered charts to check it for images.
+// pickImagesFromAllValues iterates through a to find values files, walk them to find images, and add them to a images set.
+type ResolveCharts interface {
+	getChartVersionsFromIndex() (ChartVersions, error)
+	filterFunc(version ChartVersion) (bool, error)
+	pickImagesFromAllValues(imagesSet map[string]map[string]bool, versions ChartVersions) error
 }
 
-type FeatureCharts struct {
-	repoPath string
-	osType   OSType
-}
-
-type Questions struct {
-	RancherMinVersion string `yaml:"rancher_min_version"`
-	RancherMaxVersion string `yaml:"rancher_max_version"`
-}
-
-// Fetch all images from a charts repository and filter them based on whether
-// the rancher version satisfies each chart's rancher version constraint
+// fetchImages loads rc's index to get all chart entries, filters the charts using rc's filterFunc, and then
+// iterates though the slice of filtered charts to find images in their values files and add them to imagesSet.
 func fetchImages(rc ResolveCharts, imagesSet map[string]map[string]bool) error {
 	versions, err := rc.getChartVersionsFromIndex()
 	if err != nil {
@@ -75,8 +65,7 @@ func fetchImages(rc ResolveCharts, imagesSet map[string]map[string]bool) error {
 	return nil
 }
 
-// Filter chartVersions based on whether the rancher version satisfies each chart's
-// rancher version constraint
+// filterChartVersions takes in a slice of charts, and returns a slice of charts filtered by rc's filterFunc
 func filterChartVersions(rc ResolveCharts, versions ChartVersions) (ChartVersions, error) {
 	var filteredVersions ChartVersions
 	for _, v := range versions {
@@ -92,7 +81,19 @@ func filterChartVersions(rc ResolveCharts, versions ChartVersions) (ChartVersion
 	return filteredVersions, nil
 }
 
-// Load a system chart's virtual index and get all the charts
+// SystemCharts implements getChartVersionsFromIndex, filterFunc, and pickImagesFromAllValues of an underlying ResolveCharts.
+// It is used to fetch images of a given OS type, from charts in a system charts repository located at repoPath.
+type SystemCharts struct {
+	repoPath string
+	osType   OSType
+}
+
+type Questions struct {
+	RancherMinVersion string `yaml:"rancher_min_version"`
+	RancherMaxVersion string `yaml:"rancher_max_version"`
+}
+
+// getChartVersionsFromIndex loads a virtual index created from the repository's directory, and returns all chart entries.
 func (sc SystemCharts) getChartVersionsFromIndex() (ChartVersions, error) {
 	if sc.repoPath == "" {
 		return nil, nil
@@ -125,8 +126,8 @@ func (sc SystemCharts) getChartVersionsFromIndex() (ChartVersions, error) {
 	return versions, nil
 }
 
-// Filter a system chart based on whether the rancher version satisfies the
-// rancher version constraint set in its questions file
+// filterFunc filters charts based on whether the rancher server version satisfies the constraint set in the chart's questions file.
+// When a chart doens't have a constraint set, it is added to the list of filtered charts to check it for images.
 func (sc SystemCharts) filterFunc(version ChartVersion) (bool, error) {
 	questionsPath := getQuestionsPath(version.LocalFiles)
 	if questionsPath == "" {
@@ -135,7 +136,7 @@ func (sc SystemCharts) filterFunc(version ChartVersion) (bool, error) {
 		return true, nil
 	}
 	questionsPath = filepath.Join(sc.repoPath, questionsPath)
-	questions, err := decodeQuestions(questionsPath)
+	questions, err := decodeQuestionsFile(questionsPath)
 	if err != nil {
 		return false, err
 	}
@@ -153,14 +154,14 @@ func (sc SystemCharts) filterFunc(version ChartVersion) (bool, error) {
 	return isInRange, nil
 }
 
-// Find images in all the values files in a slice of system charts
+// pickImagesFromAllValues iterates through a slice of charts to find images in their values files and add them to imagesSet.
 func (sc SystemCharts) pickImagesFromAllValues(imagesSet map[string]map[string]bool, versions ChartVersions) error {
 	for _, v := range versions {
 		for _, file := range v.LocalFiles {
 			if !isValuesFile(file) {
 				continue
 			}
-			values, err := decodeValues(file)
+			values, err := decodeValuesFile(file)
 			if err != nil {
 				return err
 			}
@@ -173,7 +174,14 @@ func (sc SystemCharts) pickImagesFromAllValues(imagesSet map[string]map[string]b
 	return nil
 }
 
-// Load a feature chart's index and get all the charts
+// FeatureCharts implements getChartVersionsFromIndex, filterFunc, and filterFunc of an underlying ResolveCharts, and
+// It is used to fetch images of a given OS type, from charts in a feature charts repository located at repoPath.
+type FeatureCharts struct {
+	repoPath string
+	osType   OSType
+}
+
+// getChartVersionsFromIndex loads the repository's index file, and returns all chart entries.
 func (fc FeatureCharts) getChartVersionsFromIndex() (ChartVersions, error) {
 	if fc.repoPath == "" {
 		return nil, nil
@@ -202,8 +210,8 @@ func (fc FeatureCharts) getChartVersionsFromIndex() (ChartVersions, error) {
 	return versions, nil
 }
 
-// Filter a feature chart based on whether the rancher version satisfies the rancher version constraint set
-// in its rancher version annotation
+// filterFunc filters charts based on whether the rancher server version satisfies the constraint set in the chart's rancher version annotation.
+// When a chart doesn't have the annotation set, it is added to the list of filtered charts to check it for images.
 func (fc FeatureCharts) filterFunc(version ChartVersion) (bool, error) {
 	constraintStr, ok := version.Annotations[RancherVersionAnnotationKey]
 	if !ok {
@@ -219,7 +227,7 @@ func (fc FeatureCharts) filterFunc(version ChartVersion) (bool, error) {
 	return isInRange, nil
 }
 
-// Find images in all the values files in a slice of feature charts
+// pickImagesFromAllValues iterates through a slice of filtered charts, reads their tarball to find images in their values files, and add them to imagesSet.
 func (fc FeatureCharts) pickImagesFromAllValues(imagesSet map[string]map[string]bool, versions ChartVersions) error {
 	for _, v := range versions {
 		tgzPath := filepath.Join(fc.repoPath, v.URLs[0])
@@ -245,7 +253,7 @@ func (fc FeatureCharts) pickImagesFromAllValues(imagesSet map[string]map[string]
 	return nil
 }
 
-// Walk a values map to find images and add them to the images set
+// pickImagesFromValuesMap walks a values map to find images of a given OS type and adds them to imagesSet.
 func pickImagesFromValuesMap(imagesSet map[string]map[string]bool, values map[interface{}]interface{}, chartNameAndVersion string, osType OSType) error {
 	walkMap(values, func(inputMap map[interface{}]interface{}) {
 		repository, ok := inputMap["repository"].(string)
@@ -287,7 +295,7 @@ func pickImagesFromValuesMap(imagesSet map[string]map[string]bool, values map[in
 	return nil
 }
 
-// Walk a map and execute the given walk function for each node
+// walkMap walks a map and executes the given walk function for each node.
 func walkMap(data interface{}, walkFunc func(map[interface{}]interface{})) {
 	if inputMap, isMap := data.(map[interface{}]interface{}); isMap {
 		// Run the walkFunc on the root node and each child node
@@ -303,7 +311,7 @@ func walkMap(data interface{}, walkFunc func(map[interface{}]interface{})) {
 	}
 }
 
-// Convert min and max rancher version strings to a constraint string
+// minMaxToConstraintStr converts min and max rancher version strings into a constraint string.
 func minMaxToConstraintStr(min, max string) string {
 	if min != "" && max != "" {
 		return fmt.Sprintf("%s - %s", min, max)
@@ -317,7 +325,7 @@ func minMaxToConstraintStr(min, max string) string {
 	return ""
 }
 
-// Check if the rancher version satisfies the given constraint range (E.g ">=2.5.0 <=2.6")
+// isRancherVersionInConstraintRange returns true if the rancher server version satisfies a given constraint (E.g ">=2.5.0 <=2.6"), false otherwise.
 func isRancherVersionInConstraintRange(rancherVersion, constraintStr string) (bool, error) {
 	if constraintStr == "" {
 		return false, errors.Errorf("Invalid constraint string: \"%s\"", constraintStr)
@@ -341,7 +349,7 @@ func isRancherVersionInConstraintRange(rancherVersion, constraintStr string) (bo
 	return constraint.Check(&rancherSemVerNoPreRelease), nil
 }
 
-// Get the path to a chart's questions file if it has one
+// getQuestionsPath iterates through chart's a slice of local files and returns a path to its questions file if one exists.
 func getQuestionsPath(versionLocalFiles []string) string {
 	for _, file := range versionLocalFiles {
 		basename := filepath.Base(file)
@@ -352,35 +360,33 @@ func getQuestionsPath(versionLocalFiles []string) string {
 	return ""
 }
 
-// Decode a questions file
-func decodeQuestions(path string) (Questions, error) {
+func decodeQuestionsFile(path string) (Questions, error) {
 	var questions Questions
 	file, err := os.Open(path)
 	if err != nil {
 		return Questions{}, err
 	}
 	defer file.Close()
-	if err := decodeYAML(file, &questions); err != nil {
+	if err := decodeYAMLFile(file, &questions); err != nil {
 		return Questions{}, err
 	}
 	return questions, nil
 }
 
-// Decode a values file
-func decodeValues(path string) (map[interface{}]interface{}, error) {
+func decodeValuesFile(path string) (map[interface{}]interface{}, error) {
 	var values map[interface{}]interface{}
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
-	if err := decodeYAML(file, &values); err != nil {
+	if err := decodeYAMLFile(file, &values); err != nil {
 		return nil, err
 	}
 	return values, nil
 }
 
-// Decode all values files from a chart's tarball
+// getDecodedValuesFromTgz reads r to find values.yaml files and returns a slice of decoded values.yaml files.
 func getDecodedValuesFromTgz(r io.Reader, repoPath string) ([]map[interface{}]interface{}, error) {
 	var valuesSlice []map[interface{}]interface{}
 	gzr, err := gzip.NewReader(r)
@@ -399,7 +405,7 @@ func getDecodedValuesFromTgz(r io.Reader, repoPath string) ([]map[interface{}]in
 			return nil, err
 		case header.Typeflag == tar.TypeReg && isValuesFile(header.Name):
 			var values map[interface{}]interface{}
-			if err := decodeYAML(tr, &values); err != nil {
+			if err := decodeYAMLFile(tr, &values); err != nil {
 				return nil, err
 			}
 			valuesSlice = append(valuesSlice, values)
@@ -409,8 +415,7 @@ func getDecodedValuesFromTgz(r io.Reader, repoPath string) ([]map[interface{}]in
 	}
 }
 
-// Decode a yaml file
-func decodeYAML(r io.Reader, target interface{}) error {
+func decodeYAMLFile(r io.Reader, target interface{}) error {
 	data, err := ioutil.ReadAll(r)
 	if err != nil {
 		return err
