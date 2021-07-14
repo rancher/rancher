@@ -89,7 +89,7 @@ require (
 	github.com/rancher/apiserver v0.0.0-20210209001659-a17289640582
 	github.com/rancher/dynamiclistener v0.2.1-0.20200910203214-85f32491cb09
 	github.com/rancher/eks-operator v1.0.6
-	github.com/rancher/gke-operator v1.0.2
+	github.com/rancher/gke-operator v1.0.3
 	github.com/rancher/kubernetes-provider-detector v0.1.2
 	github.com/rancher/lasso v0.0.0-20210525230756-26f0072e833e
 	github.com/rancher/machine v0.15.0-rancher25
