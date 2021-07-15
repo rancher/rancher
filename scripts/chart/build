@@ -13,7 +13,7 @@ rm -rf build/chart/rancher
 cp -rf ${1} build/chart/rancher
 
 sed -i -e "s/%VERSION%/${CHART_VERSION}/g" build/chart/rancher/Chart.yaml
-sed -i -e "s/%APP_VERSION%/${VERSION}/g" build/chart/rancher/Chart.yaml
+sed -i -e "s/%APP_VERSION%/${APP_VERSION}/g" build/chart/rancher/Chart.yaml
 
 # get the value of shell-image, such as rancher/shell:v0.1.6, from the file pkg/settings/setting.go
 post_delete_base=$(grep -i shell-image pkg/settings/setting.go | cut -d "," -f 2 | sed -e 's/"//g' | sed -e 's/)//g' | sed -e 's/ //g') || ""
