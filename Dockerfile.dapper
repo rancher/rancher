@@ -86,7 +86,7 @@ RUN curl -sLf ${KUBECTL_URL} -o /usr/bin/kubectl && chmod +x /usr/bin/kubectl
 RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel
 
 ENV HELM_HOME /root/.helm
-ENV DAPPER_ENV REPO TAG DRONE_TAG SYSTEM_CHART_DEFAULT_BRANCH
+ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_COMMIT DRONE_BRANCH SYSTEM_CHART_DEFAULT_BRANCH
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
 ENV DAPPER_OUTPUT ./bin ./dist
 ENV DAPPER_DOCKER_SOCKET true
