@@ -95,7 +95,7 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.15.0
-	github.com/rancher/aks-operator v1.0.1-rc14
+	github.com/rancher/aks-operator v1.0.1-rc17
 	github.com/rancher/apiserver v0.0.0-20210716201731-fcd925c99ba8
 	github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369
 	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
