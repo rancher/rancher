@@ -2084,14 +2084,39 @@ def readDataFile(data_dir, name):
         return f.read()
 
 
-def set_url_password_token(rancher_url, server_url=None):
+def set_url_password_token(rancher_url, server_url=None, version="oldUI"):
     """Returns a ManagementContext for the default global admin user."""
     auth_url = \
-        rancher_url + "/v3-public/localproviders/local?action=login"
+        rancher_url + "/v3-public/localProviders/local?action=login"
+    rpassword = 'admin'
+    print(auth_url)
+    if version.find("master") > -1 or version.find("2.6" > -1):
+        rpassword = ADMIN_PASSWORD
+        print("on 2.6 or later")
     r = requests.post(auth_url, json={
         'username': 'admin',
-        'password': 'admin',
+        'password': rpassword,
         'responseType': 'json',
+    }, verify=False)
+    print(r.json())
+    token = r.json()['token']
+    print(token)
+    # Change admin password
+    client = rancher.Client(url=rancher_url + "/v3",
+                            token=token, verify=False)
+    admin_user = client.list_user(username="admin").data
+    admin_user[0].setpassword(newPassword=ADMIN_PASSWORD)
+    
+    return token
+
+
+def set_master_url_password_token(rancher_url, server_url=None):
+    """Returns a ManagementContext for the default global admin user."""
+    auth_url = \
+        rancher_url + "/v3/users?action=changepassword"
+    r = requests.post(auth_url, json={
+        'currentPassword': ADMIN_PASSWORD,
+        'newPassword': ADMIN_PASSWORD,
     }, verify=False)
     print(r.json())
     token = r.json()['token']
