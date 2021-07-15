@@ -1,9 +1,11 @@
 import pytest
 import time
 import urllib
+import re
 
 from .common import CATTLE_TEST_URL
 from .common import USER_TOKEN
+from .common import DNS_REGEX
 from .common import create_connection
 from .common import create_kubeconfig
 from .common import create_project_and_ns
@@ -91,7 +93,11 @@ def create_example_pipeline():
 
 
 def pipeline_view_logs():
-    url_base = 'wss://' + CATTLE_TEST_URL[7:] + \
+    # using a regex to get the dns from the CATTLE_TEST_URL
+    search_result = re.search(DNS_REGEX, CATTLE_TEST_URL)
+    dns = search_result.group(2)
+
+    url_base = 'wss://' + dns + \
                '/v3/projects/' + pipeline_details["project"].id + \
                '/pipelineExecutions/' + pipeline_details["pipeline_run"].id + \
                '/log?'
