@@ -27,6 +27,8 @@ var (
 	fleetUninstallChart = chart.Definition{
 		ReleaseNamespace: "fleet-system",
 		ChartName:        "fleet",
+		// Do not remove "fleet-system" after migration to "cattle-fleet-system".
+		RemoveNamespace: false,
 	}
 )
 
