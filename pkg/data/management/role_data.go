@@ -444,27 +444,28 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 func addUserRules(role *roleBuilder) *roleBuilder {
 	role.
+		addRule().apiGroups("").resources("secrets").verbs("create").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions", "catalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("create").
-		addRule().apiGroups("").resources("secrets").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplaterevisions").verbs("create").
-		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch").
+		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
+		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create")
 
 	return role
 }
