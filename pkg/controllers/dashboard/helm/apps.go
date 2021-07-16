@@ -152,6 +152,11 @@ func (a *appHandler) OnConfigMapChange(key string, configMap *corev1.ConfigMap) 
 		return nil, generic.ErrSkip
 	}
 
+	if spec.HelmMajorVersion == 2 {
+		// no longer support helm 2
+		return configMap, a.apply.WithOwner(configMap).ApplyObjects()
+	}
+
 	return configMap, a.apply.WithOwner(configMap).ApplyObjects(&v1.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      spec.Name,

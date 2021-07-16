@@ -94,7 +94,7 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 		Values:           toMap(release.Namespace, release.Name, release.GetConfig().GetRaw()),
 		Version:          int(release.Version),
 		Namespace:        release.Namespace,
-		HelmMajorVersion: 3,
+		HelmMajorVersion: 2,
 	}
 
 	for _, m := range release.GetChart().GetMetadata().GetMaintainers() {
