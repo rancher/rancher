@@ -20,14 +20,18 @@ var (
 	}
 )
 
-func InstallScript(token string, envVars []corev1.EnvVar) ([]byte, error) {
+func InstallScript(token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
 	data, err := installScript()
 	if err != nil {
 		return nil, err
 	}
 	binaryURL := ""
-	if settings.SystemAgentVersion.Get() != "" && settings.ServerURL.Get() != "" {
-		binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
+	if settings.SystemAgentVersion.Get() != "" {
+		if settings.ServerURL.Get() != "" {
+			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
+		} else if defaultHost != "" {
+			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
+		}
 	}
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {

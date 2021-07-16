@@ -8,7 +8,7 @@ import (
 
 func InstallHandler() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		content, err := installer.InstallScript("", nil)
+		content, err := installer.InstallScript("", nil, req.Host)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
