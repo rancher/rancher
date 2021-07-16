@@ -62,6 +62,9 @@ const (
 	LabelsAnnotation = "rke.cattle.io/labels"
 	TaintsAnnotation = "rke.cattle.io/taints"
 
+	AddressAnnotation         = "rke.cattle.io/address"
+	InternalAddressAnnotation = "rke.cattle.io/internal-address"
+
 	SecretTypeMachinePlan = "rke.cattle.io/machine-plan"
 
 	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
@@ -765,6 +768,16 @@ func addToken(config map[string]interface{}, machine *capi.Machine, secret plan.
 	}
 }
 
+func addAddresses(config map[string]interface{}, machine *capi.Machine) {
+	if data := machine.Annotations[AddressAnnotation]; data != "" {
+		config["node-external-ip"] = data
+	}
+
+	if data := machine.Annotations[InternalAddressAnnotation]; data != "" {
+		config["node-ip"] = data
+	}
+}
+
 func addLabels(config map[string]interface{}, machine *capi.Machine) error {
 	var labels []string
 	if data := machine.Annotations[LabelsAnnotation]; data != "" {
@@ -841,6 +854,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	addRoleConfig(config, controlPlane, machine, initNode, joinServer)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, machine)
 	addToken(config, machine, secret)
+	addAddresses(config, machine)
 
 	if err := addLabels(config, machine); err != nil {
 		return nodePlan, err
