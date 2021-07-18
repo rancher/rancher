@@ -1,6 +1,7 @@
 package healthsyncer
 
 import (
+	"strings"
 	"time"
 
 	"context"
@@ -23,7 +24,8 @@ import (
 )
 
 const (
-	syncInterval = 15 * time.Second
+	syncInterval            = 15 * time.Second
+	managedK8SAnnotationKey = "lifecycle.cattle.io/ignorecslist"
 )
 
 type ClusterControllerLifecycle interface {
@@ -73,6 +75,15 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	if err != nil {
 		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
 	}
+
+	// ignoring component status health for managed k8s offerings.
+	ok, ignoreList := managedk8s(cluster)
+	if ok {
+		patchCSList(cses, ignoreList)
+	}
+
+	logrus.Debug(cses)
+
 	cluster.Status.ComponentStatuses = []v3.ClusterComponentStatus{}
 	for _, cs := range cses.Items {
 		clusterCS := convertToClusterComponentStatus(&cs)
@@ -134,4 +145,23 @@ func convertToClusterComponentStatus(cs *v1.ComponentStatus) *v3.ClusterComponen
 		Name:       cs.Name,
 		Conditions: cs.Conditions,
 	}
+}
+
+func managedk8s(cluster *v3.Cluster) (ok bool, ignoreList string) {
+	if ignoreList, ok = cluster.Annotations[managedK8SAnnotationKey]; ok {
+		if len(ignoreList) == 0 {
+			return false, ignoreList
+		}
+	}
+	return ok, ignoreList
+}
+
+func patchCSList(cses *corev1.ComponentStatusList, ignoreList string) {
+	patchedComponentStatus := []v1.ComponentStatus{}
+	for _, v := range cses.Items {
+		if !strings.Contains(ignoreList, v.Name) {
+			patchedComponentStatus = append(patchedComponentStatus, v)
+		}
+	}
+	cses.Items = patchedComponentStatus
 }
