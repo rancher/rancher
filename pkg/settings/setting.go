@@ -20,6 +20,8 @@ var (
 	InjectDefaults string
 
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
+	AgentRolloutTimeout               = NewSetting("agent-rollout-timeout", "300s")
+	AgentRolloutWait                  = NewSetting("agent-rollout-wait", "true")
 	AuthImage                         = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthTokenMaxTTLMinutes            = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
 	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
