@@ -17,3 +17,15 @@ func InstallHandler() http.Handler {
 		rw.Write(content)
 	})
 }
+
+func WindowsInstallHandler() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		content, err := installer.WindowsInstallScript("", nil, req.Host)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		rw.Header().Set("Content-Type", "text/plain")
+		rw.Write(content)
+	})
+}

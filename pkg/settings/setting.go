@@ -65,6 +65,7 @@ var (
 	ServerVersion                     = NewSetting("server-version", "dev")
 	SystemAgentVersion                = NewSetting("system-agent-version", "")
 	SystemAgentInstallScript          = NewSetting("system-agent-install-script", "")
+	WindowsAgentInstallScript         = NewSetting("windows-agent-install-script", "")
 	SystemAgentInstallerImage         = NewSetting("system-agent-installer-image", "docker.io/rancher/system-agent-installer-")
 	SystemAgentUpgradeImage           = NewSetting("system-agent-upgrade-image", "")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
