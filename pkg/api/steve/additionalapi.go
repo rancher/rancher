@@ -24,6 +24,7 @@ func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Hand
 		mux.UseEncodedPath()
 		mux.Handle("/v3/connect/agent", configserver.New(config))
 		mux.Handle("/system-agent-install.sh", server.InstallHandler())
+		mux.Handle("/windows-agent-install.ps1", server.WindowsInstallHandler())
 		return func(next http.Handler) http.Handler {
 			mux.NotFoundHandler = next
 			return mux

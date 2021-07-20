@@ -14,9 +14,14 @@ import (
 
 var (
 	defaultSystemAgentInstallScript = "https://raw.githubusercontent.com/rancher/system-agent/main/install.sh"
-	localAgentInstallScripts        = []string{
+	// TODO: fix this URL
+	defaultWindowsAgentInstallScript = "https://raw.githubusercontent.com/rancher/system-agent/main/install.ps1"
+	localAgentInstallScripts         = []string{
 		"/usr/share/rancher/ui/assets/system-agent-install.sh",
 		"./system-agent-install.sh",
+	}
+	localWindowsAgentInstallScripts = []string{
+		"./windows-agent-install.ps1",
 	}
 )
 
@@ -75,6 +80,54 @@ func installScript() ([]byte, error) {
 
 	if url == "" {
 		url = defaultSystemAgentInstallScript
+	}
+
+	resp, httpErr := http.Get(url)
+	if httpErr != nil {
+		return nil, httpErr
+	}
+	defer resp.Body.Close()
+
+	return ioutil.ReadAll(resp.Body)
+}
+
+func WindowsInstallScript(token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+	data, err := windowsInstallScript()
+	if err != nil {
+		return nil, err
+	}
+
+	return []byte(fmt.Sprintf(`
+function Install() {
+	%s
+}
+Install
+
+$config = @'
+server: "%s"
+token: "%s"
+node-label:
+  - "cattle.io/os:windows"
+'
+Set-Content -Path "/etc/rancher/rke2/config.yaml" -Value $config
+
+rke2.exe agent service --add 
+`, data, settings.ServerURL.Get(), token)), nil
+}
+
+func windowsInstallScript() ([]byte, error) {
+	url := settings.WindowsAgentInstallScript.Get()
+	if url == "" {
+		for _, localWindowsInstallScript := range localWindowsAgentInstallScripts {
+			script, err := ioutil.ReadFile(localWindowsInstallScript)
+			if !os.IsNotExist(err) {
+				return script, err
+			}
+		}
+	}
+
+	if url == "" {
+		url = defaultWindowsAgentInstallScript
 	}
 
 	resp, httpErr := http.Get(url)

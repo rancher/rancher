@@ -5,9 +5,10 @@ import (
 	"net/url"
 	"strings"
 
+	util "github.com/rancher/rancher/pkg/cluster"
+
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -20,7 +21,8 @@ const (
 	insecureCommandFormat         = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat             = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
 	shareMntCommandFormat         = "agent --node-name %s --server %s --token %s%s --no-register --only-write-certs"
-	rke2NodeCommandFormat         = "curl -fL %s | sudo %s sh -s - --server %s --token %s%s"
+	rke2NodeCommandFormat         = "curl -fL %s | sudo %s sh -s - --server %s --token %s%s --label cattle.io/os:linux"
+	rke2WindowsNodeCommandFormat  = "iwr %s -OutFile install.ps1; ./install.ps1 -Server %s -Token %s%s -Label 'cattle.io/os:windows'"
 	rke2InsecureNodeCommandFormat = "curl --insecure -fL %s | sudo %s sh -s - --server %s --token %s%s"
 	loginCommandFormat            = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat      = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
@@ -97,19 +99,27 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 			ca)
 	}
 	// for windows
-	var agentImageDockerEnv string
-	if util.GetPrivateRepoURL(cluster) != "" {
-		// patch the AGENT_IMAGE env
-		agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
+	if h.isRKE2(clusterID) {
+		crtStatus.WindowsNodeCommand = fmt.Sprintf(rke2WindowsNodeCommandFormat,
+			rootURL+"/windows-system-agent-install.sh",
+			AgentEnvVars(cluster, false),
+			rootURL,
+			token,
+			ca)
+	} else {
+		var agentImageDockerEnv string
+		if util.GetPrivateRepoURL(cluster) != "" {
+			// patch the AGENT_IMAGE env
+			agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
+		}
+		crtStatus.WindowsNodeCommand = fmt.Sprintf(windowsNodeCommandFormat,
+			agentImageDockerEnv,
+			agentImage,
+			rootURL,
+			token,
+			ca,
+			getWindowsPrefixPathArg(cluster.Spec.RancherKubernetesEngineConfig))
 	}
-	crtStatus.WindowsNodeCommand = fmt.Sprintf(windowsNodeCommandFormat,
-		agentImageDockerEnv,
-		agentImage,
-		rootURL,
-		token,
-		ca,
-		getWindowsPrefixPathArg(cluster.Spec.RancherKubernetesEngineConfig))
-
 	return *crtStatus, nil
 }
 
