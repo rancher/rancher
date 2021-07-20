@@ -29,8 +29,8 @@ fi
 source_tag=$1
 destination_tag=$2
 
-if [[ ! $destination_tag =~ ^(stable|latest)$ ]]; then
-  echo "Docker tag needs to be stable or latest, not ${destination_tag}"
+if [[ ! $destination_tag =~ ^(stable|latest|donotuse)$ ]]; then
+  echo "Docker tag needs to be stable or latest (or donotuse for testing), not ${destination_tag}"
   exit 1
 fi
 
