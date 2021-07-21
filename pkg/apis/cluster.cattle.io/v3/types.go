@@ -14,11 +14,11 @@ type ClusterUserAttribute struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Groups       []string            `json:"groups,omitempty"`
-	LastRefresh  string              `json:"lastRefresh,omitempty"`
-	NeedsRefresh bool                `json:"needsRefresh"`
-	Enabled      bool                `json:"enabled"`
-	Extra        map[string][]string `json:"extra,omitempty"`
+	Groups          []string                       `json:"groups,omitempty"`
+	LastRefresh     string                         `json:"lastRefresh,omitempty"`
+	NeedsRefresh    bool                           `json:"needsRefresh"`
+	Enabled         bool                           `json:"enabled"`
+	ExtraByProvider map[string]map[string][]string `json:"extraByProvider,omitempty"`
 }
 
 // +genclient

@@ -103,7 +103,7 @@ func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]inte
 	return tokenData, nil
 }
 
-func GetKubeConfigToken(userName, responseType string, userMGR user.Manager) (*v3.Token, string, error) {
+func GetKubeConfigToken(userName, authProvider, responseType string, userMGR user.Manager, userPrincipal v3.Principal) (*v3.Token, string, error) {
 	// create kubeconfig expiring tokens if responseType=kubeconfig in login action vs login tokens for responseType=json
 	clusterID := ""
 	responseSplit := strings.SplitN(responseType, "_", 2)
@@ -117,7 +117,7 @@ func GetKubeConfigToken(userName, responseType string, userMGR user.Manager) (*v
 		name = fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID)
 	}
 
-	token, tokenVal, err := userMGR.GetKubeconfigToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName)
+	token, tokenVal, err := userMGR.GetKubeconfigToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName, authProvider, userPrincipal)
 	if err != nil {
 		return nil, "", err
 	}

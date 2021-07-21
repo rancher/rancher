@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -35,6 +36,7 @@ type ActionHandler struct {
 	CisConfigClient               v3.CisConfigInterface
 	CisConfigLister               v3.CisConfigLister
 	TokenClient                   v3.TokenInterface
+	Auth                          requests.Authenticator
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -121,15 +123,42 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-
-	token, err := a.UserMgr.EnsureClusterToken(clusterID, tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
+	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	if err != nil {
+		return "", err
+	}
+	input := user.TokenInput{
+		TokenName:     tokenNamePrefix,
+		Description:   "Kubeconfig token",
+		Kind:          "kubeconfig",
+		UserName:      userName,
+		AuthProvider:  authToken.AuthProvider,
+		TTL:           nil,
+		Randomize:     true,
+		UserPrincipal: authToken.UserPrincipal,
+	}
+	token, err := a.UserMgr.EnsureClusterToken(clusterID, input)
 	return token, err
 }
 
 func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
+	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	if err != nil {
+		return "", err
+	}
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-	token, err := a.UserMgr.EnsureToken(tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
+	input := user.TokenInput{
+		TokenName:     tokenNamePrefix,
+		Description:   "Kubeconfig token",
+		Kind:          "kubeconfig",
+		UserName:      userName,
+		AuthProvider:  authToken.AuthProvider,
+		TTL:           nil,
+		Randomize:     true,
+		UserPrincipal: authToken.UserPrincipal,
+	}
+	token, err := a.UserMgr.EnsureToken(input)
 	return token, err
 }
 

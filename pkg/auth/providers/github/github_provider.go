@@ -409,9 +409,13 @@ func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPr
 	return allowed, nil
 }
 
-func (g *ghProvider) GetUserExtraAttributes(token *v3.Token) map[string][]string {
+func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	extras := make(map[string][]string)
-	extras["principalid"] = []string{token.UserPrincipal.Name}
-	extras["username"] = []string{token.UserPrincipal.LoginName}
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
 	return extras
 }
