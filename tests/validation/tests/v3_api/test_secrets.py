@@ -716,8 +716,12 @@ def create_and_validate_workload_with_secret_as_volume(p_client, secret, ns,
 
     secretName = secret['name']
 
+    if HARDENED_CLUSTER:
+        mode = 0o644
+    else:
+        mode = 0o400
     volumes = [{"type": "volume", "name": "vol1",
-                "secret": {"type": "secretVolumeSource", "defaultMode": 256,
+                "secret": {"type": "secretVolumeSource", "defaultMode": mode,
                            "secretName": secretName,
                            "optional": False, "items": "NULL"}}]
 
