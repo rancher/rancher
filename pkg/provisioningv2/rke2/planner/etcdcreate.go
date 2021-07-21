@@ -108,6 +108,10 @@ func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *r
 }
 
 func (e *etcdCreate) Create(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
+	if !Provisioned.IsTrue(controlPlane) && controlPlane.Status.ETCDSnapshotCreatePhase == "" {
+		return nil
+	}
+
 	if controlPlane.Spec.ETCDSnapshotCreate == nil {
 		return e.resetEtcdCreateState(controlPlane)
 	}

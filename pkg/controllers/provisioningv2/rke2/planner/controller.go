@@ -9,16 +9,11 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
-)
-
-const (
-	Provisioned = condition.Cond("Provisioned")
 )
 
 type handler struct {
@@ -57,12 +52,12 @@ func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEContr
 	var errWaiting planner.ErrWaiting
 	if errors.As(err, &errWaiting) {
 		logrus.Infof("rkecluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
-		Provisioned.SetStatus(&status, "Unknown")
-		Provisioned.Message(&status, err.Error())
-		Provisioned.Reason(&status, "Waiting")
+		planner.Provisioned.SetStatus(&status, "Unknown")
+		planner.Provisioned.Message(&status, err.Error())
+		planner.Provisioned.Reason(&status, "Waiting")
 		return status, nil
 	}
 
-	Provisioned.SetError(&status, "", err)
+	planner.Provisioned.SetError(&status, "", err)
 	return status, err
 }
