@@ -223,6 +223,19 @@ def test_monitoring_project_monitoring():
 
 # ------------------ RBAC for Project Monitoring ------------------
 @if_test_rbac
+def test_rbac_restricted_admin_control_project_monitoring():
+    # restricted admin can enable and disable monitoring in any project
+    user_token = rbac_get_user_token_by_role(RESTRICTED_ADMIN)
+    user_client = get_client_for_token(user_token)
+    project = user_client.reload(rbac_get_project())
+
+    if project["enableProjectMonitoring"] is True:
+        assert "disableMonitoring" in project.actions.keys()
+        disable_project_monitoring(project, user_token)
+    validate_project_monitoring(project, user_token)
+
+
+@if_test_rbac
 def test_rbac_cluster_owner_control_project_monitoring():
     # cluster owner can enable and disable monitoring in any project
     user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
@@ -329,6 +342,18 @@ def test_rbac_project_read_only_project_graph_2():
 
 
 @if_test_rbac
+def test_rbac_restricted_admin_project_graph():
+    # rsetricted admin can see graphs in all projects
+    token = rbac_get_user_token_by_role(RESTRICTED_ADMIN)
+    project1 = rbac_get_project()
+    wl1 = rbac_get_workload()
+    check_permission_project_graph(project1, wl1, token, True)
+    project2 = rbac_get_unshared_project()
+    wl2 = rbac_get_unshared_workload()
+    check_permission_project_graph(project2, wl2, token, True)
+
+
+@if_test_rbac
 def test_rbac_cluster_owner_project_graph():
     # cluster owner can see graphs in all projects
     token = rbac_get_user_token_by_role(CLUSTER_OWNER)
@@ -390,6 +415,14 @@ def test_rbac_project_read_only_cluster_graphs():
     token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
     cluster = namespace["cluster"]
     check_permission_cluster_graph(cluster, token, False)
+
+
+@if_test_rbac
+def test_rbac_restricted_admin_cluster_graphs():
+    # restricted admin can see cluster graph
+    token = rbac_get_user_token_by_role(RESTRICTED_ADMIN)
+    cluster = namespace["cluster"]
+    check_permission_cluster_graph(cluster, token, True)
 
 
 @if_test_rbac

@@ -5,6 +5,7 @@ from rancher import ApiError
 from lib.aws import AmazonWebServices
 from .common import CLUSTER_MEMBER, configure_cis_requirements
 from .common import CLUSTER_OWNER
+from .common import RESTRICTED_ADMIN
 from .common import CIS_SCAN_PROFILE
 from .common import cluster_cleanup
 from .common import get_user_client
@@ -288,9 +289,10 @@ def test_cis_scan_edit_cluster():
 
 
 @if_test_rbac
-def test_rbac_run_scan_cluster_owner():
+@pytest.mark.parametrize("role", [CLUSTER_OWNER, RESTRICTED_ADMIN])
+def test_rbac_run_scan_1(role):
     client, cluster = get_user_client_and_cluster()
-    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    user_token = rbac_get_user_token_by_role(role)
     # run a permissive scan run
     scan_detail = run_scan(cluster, user_token)
     report_link = scan_detail["links"]["report"]
@@ -307,30 +309,11 @@ def test_rbac_run_scan_cluster_owner():
 
 
 @if_test_rbac
-def test_rbac_run_scan_cluster_member():
+@pytest.mark.parametrize("role", [CLUSTER_MEMBER, PROJECT_MEMBER,
+                                  PROJECT_OWNER, PROJECT_READ_ONLY])
+def test_rbac_run_scan_2(role):
     client, cluster = get_user_client_and_cluster()
-    user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
-    run_scan(cluster, user_token, can_run_scan=False)
-
-
-@if_test_rbac
-def test_rbac_run_scan_project_owner():
-    client, cluster = get_user_client_and_cluster()
-    user_token = rbac_get_user_token_by_role(PROJECT_OWNER)
-    run_scan(cluster, user_token, can_run_scan=False)
-
-
-@if_test_rbac
-def test_rbac_run_scan_project_member():
-    client, cluster = get_user_client_and_cluster()
-    user_token = rbac_get_user_token_by_role(PROJECT_MEMBER)
-    run_scan(cluster, user_token, can_run_scan=False)
-
-
-@if_test_rbac
-def test_rbac_run_scan_project_read_only():
-    client, cluster = get_user_client_and_cluster()
-    user_token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    user_token = rbac_get_user_token_by_role(role)
     run_scan(cluster, user_token, can_run_scan=False)
 
 
