@@ -52,6 +52,7 @@ type claimInfo struct {
 	Email             string   `json:"email"`
 	EmailVerified     bool     `json:"email_verified"`
 	Groups            []string `json:"groups"`
+	FullGroupPath     []string `json:"full_group_path"`
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -99,16 +100,10 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", err
 	}
-
 	userPrincipal = o.userToPrincipal(userInfo, claimInfo)
 	userPrincipal.Me = true
+	groupPrincipals = o.getGroupsFromClaimInfo(claimInfo)
 
-	for _, group := range claimInfo.Groups {
-		groupPrincipal := o.groupToPrincipal(group)
-		groupPrincipal.MemberOf = true
-		groupPrincipals = append(groupPrincipals, groupPrincipal)
-
-	}
 	logrus.Debugf("[generic oidc] loginuser: Checking user's access to Rancher")
 	allowed, err := o.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
 	if err != nil {
@@ -211,13 +206,7 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 	if err != nil {
 		return groupPrincipals, err
 	}
-	for _, group := range claimInfo.Groups {
-		groupPrincipal := o.groupToPrincipal(group)
-		groupPrincipal.MemberOf = true
-		groupPrincipals = append(groupPrincipals, groupPrincipal)
-
-	}
-	return groupPrincipals, nil
+	return o.getGroupsFromClaimInfo(claimInfo), nil
 }
 
 func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -339,7 +328,6 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 		}
 		storedOidcConfig.PrivateKey = value
 	}
-
 	if storedOidcConfig.ClientSecret != "" {
 		data, err := common.ReadFromSecretData(o.Secrets, storedOidcConfig.ClientSecret)
 		if err != nil {
@@ -382,25 +370,16 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 		return userInfo, oauth2Token, err
 	}
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
+	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
 		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
 		if err != nil {
 			return userInfo, oauth2Token, err
 		}
-	}
-
-	rawToken, ok := oauth2Token.Extra("id_token").(string)
-	if !ok {
-		rawToken, ok = oauth2Token.Extra("access_token").(string)
-		if !ok {
+		_, err = verifier.Verify(updatedContext, oauth2Token.AccessToken)
+		if err != nil {
 			return userInfo, oauth2Token, err
 		}
-	}
-	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
-	// parse and verify the id token payload
-	_, err = verifier.Verify(updatedContext, rawToken)
-	if err != nil {
-		return userInfo, oauth2Token, err
 	}
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, oauth2Token))
 	if err != nil {
@@ -413,18 +392,47 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 }
 
 func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
+	var finalScopes []string
 	hasOIDCScope := strings.Contains(config.Scopes, oidc.ScopeOpenID)
 	// scopes must be space separated in string when passed into the api
 	configScopes := strings.Split(config.Scopes, " ")
 	if !hasOIDCScope {
 		configScopes = append(configScopes, oidc.ScopeOpenID)
 	}
-
+	for _, scope := range configScopes {
+		if scope != "" {
+			finalScopes = append(finalScopes, scope)
+		}
+	}
 	return oauth2.Config{
 		ClientID:     config.ClientID,
 		ClientSecret: config.ClientSecret,
 		Endpoint:     endpoint,
 		RedirectURL:  config.RancherURL,
-		Scopes:       configScopes,
+		Scopes:       finalScopes,
 	}
+}
+
+func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo claimInfo) []v3.Principal {
+	var groupPrincipals []v3.Principal
+
+	if claimInfo.FullGroupPath != nil {
+		for _, groupPath := range claimInfo.FullGroupPath {
+			groupsFromPath := strings.Split(groupPath, "/")
+			for _, group := range groupsFromPath {
+				if group != "" {
+					groupPrincipal := o.groupToPrincipal(group)
+					groupPrincipal.MemberOf = true
+					groupPrincipals = append(groupPrincipals, groupPrincipal)
+				}
+			}
+		}
+	} else {
+		for _, group := range claimInfo.Groups {
+			groupPrincipal := o.groupToPrincipal(group)
+			groupPrincipal.MemberOf = true
+			groupPrincipals = append(groupPrincipals, groupPrincipal)
+		}
+	}
+	return groupPrincipals
 }
