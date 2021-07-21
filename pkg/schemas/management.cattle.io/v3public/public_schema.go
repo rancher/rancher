@@ -197,12 +197,11 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.BaseType = "authProvider"
 			schema.ResourceActions = map[string]types.Action{
 				"login": {
-					Input:  "keyCloakOidcLogin",
+					Input:  "keyCloakOIDCLogin",
 					Output: "token",
 				},
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
-		}).
-		MustImport(&PublicVersion, v3.OIDCLogin{})
+		})
 }

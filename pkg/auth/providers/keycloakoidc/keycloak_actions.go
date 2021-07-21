@@ -1,4 +1,4 @@
-package oidc
+package keycloakoidc
 
 import (
 	"encoding/json"
@@ -15,14 +15,14 @@ import (
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 )
 
-func (o *OpenIDCProvider) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (k *keyCloakOIDCProvider) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	common.AddCommonActions(apiContext, resource)
 	resource.AddAction(apiContext, "configureTest")
 	resource.AddAction(apiContext, "testAndApply")
 }
 
-func (o *OpenIDCProvider) ActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, o.Name, o.AuthConfigs)
+func (k *keyCloakOIDCProvider) ActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+	handled, err := common.HandleCommonAction(actionName, action, request, k.Name, k.AuthConfigs)
 	if err != nil {
 		return err
 	}
@@ -31,31 +31,31 @@ func (o *OpenIDCProvider) ActionHandler(actionName string, action *types.Action,
 	}
 
 	if actionName == "configureTest" {
-		return o.ConfigureTest(actionName, action, request)
+		return k.ConfigureTest(actionName, action, request)
 	} else if actionName == "testAndApply" {
-		return o.TestAndApply(actionName, action, request)
+		return k.TestAndApply(actionName, action, request)
 	}
 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (o *OpenIDCProvider) ConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (k *keyCloakOIDCProvider) ConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
 	//verify body has all required fields
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
-		o.Type))
+		k.Type))
 	if err != nil {
 		return err
 	}
 
 	data := map[string]interface{}{
-		"redirectUrl": o.GetRedirectURL(input),
+		"redirectUrl": k.GetRedirectURL(input),
 		"type":        "OIDCTestOutput",
 	}
 	request.WriteResponse(http.StatusOK, data)
 	return nil
 }
 
-func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (k *keyCloakOIDCProvider) TestAndApply(actionName string, action *types.Action, request *types.APIContext) error {
 	var oidcConfig v32.OIDCConfig
 	oidcConfigApplyInput := &v32.OIDCApplyInput{}
 
@@ -82,7 +82,7 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 	oidcConfig.Issuer = issuerURL.String()
 
 	//call provider
-	userPrincipal, groupPrincipals, providerToken, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
+	userPrincipal, groupPrincipals, providerToken, err := k.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err
@@ -90,15 +90,15 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 		return errors.Wrap(err, "[generic oidc]: server error while authenticating")
 	}
 
-	user, err := o.UserMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := k.UserMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
 	if err != nil {
 		return err
 	}
 
-	err = o.SaveOIDCConfig(&oidcConfig)
+	err = k.SaveOIDCConfig(&oidcConfig)
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save azure config: %v", err))
 	}
 
-	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)
+	return k.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)
 }

@@ -43,7 +43,7 @@ type OpenIDCProvider struct {
 	TokenMGR    *tokens.Manager
 }
 
-type claimInfo struct {
+type ClaimInfo struct {
 	Subject           string   `json:"sub"`
 	Name              string   `json:"name"`
 	PreferredUsername string   `json:preferred_username`
@@ -52,6 +52,7 @@ type claimInfo struct {
 	Email             string   `json:"email"`
 	EmailVerified     bool     `json:"email_verified"`
 	Groups            []string `json:"groups"`
+	PathGroups        []string `json:"fullPathGroups"`
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -86,7 +87,7 @@ func (o *OpenIDCProvider) AuthenticateUser(ctx context.Context, input interface{
 func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OIDCLogin, config *v32.OIDCConfig) (v3.Principal, []v3.Principal, string, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
-	var claimInfo claimInfo
+	var claimInfo ClaimInfo
 	var err error
 
 	if config == nil {
@@ -95,20 +96,14 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 			return userPrincipal, nil, "", err
 		}
 	}
-	userInfo, oauth2Token, err := o.getUserInfo(&ctx, config, oauthLoginInfo.Code, &claimInfo)
+	userInfo, oauth2Token, _, err := o.GetUserInfo(&ctx, config, oauthLoginInfo.Code, &claimInfo)
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", err
 	}
-
-	userPrincipal = o.userToPrincipal(userInfo, claimInfo)
+	userPrincipal = o.UserToPrincipal(userInfo, claimInfo)
 	userPrincipal.Me = true
+	groupPrincipals = o.getGroupsFromClaimInfo(claimInfo)
 
-	for _, group := range claimInfo.Groups {
-		groupPrincipal := o.groupToPrincipal(group)
-		groupPrincipal.MemberOf = true
-		groupPrincipals = append(groupPrincipals, groupPrincipal)
-
-	}
 	logrus.Debugf("[generic oidc] loginuser: Checking user's access to Rancher")
 	allowed, err := o.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
 	if err != nil {
@@ -176,7 +171,7 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.P
 			Provider:      o.Name,
 		}
 	} else {
-		p = o.groupToPrincipal(externalID)
+		p = o.GroupToPrincipal(externalID)
 	}
 	p = o.toPrincipalFromToken(principalType, p, &token)
 	return p, nil
@@ -184,11 +179,11 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.P
 
 func (o *OpenIDCProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
-	p[publicclient.OIDCProviderFieldRedirectURL] = o.getRedirectURL(authConfig)
+	p[publicclient.OIDCProviderFieldRedirectURL] = o.GetRedirectURL(authConfig)
 	return p, nil
 }
 
-func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
+func (o *OpenIDCProvider) GetRedirectURL(config map[string]interface{}) string {
 	return fmt.Sprintf(
 		"%s?client_id=%s&response_type=code&redirect_uri=%s",
 		config["authEndpoint"],
@@ -199,7 +194,7 @@ func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
 
 func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
 	var groupPrincipals []v3.Principal
-	var claimInfo claimInfo
+	var claimInfo ClaimInfo
 
 	config, err := o.GetOIDCConfig()
 	if err != nil {
@@ -207,17 +202,11 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 		return groupPrincipals, err
 	}
 	//do not need userInfo or oauth2Token since we are only processing groups
-	_, _, err = o.getUserInfo(&o.CTX, config, secret, &claimInfo)
+	_, _, _, err = o.GetUserInfo(&o.CTX, config, secret, &claimInfo)
 	if err != nil {
 		return groupPrincipals, err
 	}
-	for _, group := range claimInfo.Groups {
-		groupPrincipal := o.groupToPrincipal(group)
-		groupPrincipal.MemberOf = true
-		groupPrincipals = append(groupPrincipals, groupPrincipal)
-
-	}
-	return groupPrincipals, nil
+	return o.getGroupsFromClaimInfo(claimInfo), nil
 }
 
 func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -233,7 +222,7 @@ func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, gr
 	return allowed, nil
 }
 
-func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo claimInfo) v3.Principal {
+func (o *OpenIDCProvider) UserToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo) v3.Principal {
 	displayName := claimInfo.Name
 	if displayName == "" {
 		displayName = userInfo.Email
@@ -249,7 +238,7 @@ func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo cla
 	return p
 }
 
-func (o *OpenIDCProvider) groupToPrincipal(groupName string) v3.Principal {
+func (o *OpenIDCProvider) GroupToPrincipal(groupName string) v3.Principal {
 	p := v3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + GroupType + "://" + groupName},
 		DisplayName:   groupName,
@@ -279,7 +268,7 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	return princ
 }
 
-func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
+func (o *OpenIDCProvider) SaveOIDCConfig(config *v32.OIDCConfig) error {
 	storedOidcConfig, err := o.GetOIDCConfig()
 	if err != nil {
 		return err
@@ -302,6 +291,15 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 		return err
 	}
 	config.ClientSecret = common.GetName(config.Type, secretField)
+
+	if config.AdminAccountPassword != "" {
+		secretInfo := convert.ToString(config.AdminAccountPassword)
+		serviceAccountField := strings.ToLower(client.OIDCConfigFieldAdminAccountPassword)
+		if err := common.CreateOrUpdateSecrets(o.Secrets, secretInfo, serviceAccountField, strings.ToLower(config.Type)); err != nil {
+			return err
+		}
+		config.AdminAccountPassword = common.GetName(config.Type, serviceAccountField)
+	}
 
 	logrus.Debugf("[generic oidc] updating config")
 	_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -339,7 +337,6 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 		}
 		storedOidcConfig.PrivateKey = value
 	}
-
 	if storedOidcConfig.ClientSecret != "" {
 		data, err := common.ReadFromSecretData(o.Secrets, storedOidcConfig.ClientSecret)
 		if err != nil {
@@ -348,6 +345,14 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 		for _, v := range data {
 			storedOidcConfig.ClientSecret = string(v)
 		}
+	}
+	if storedOidcConfig.AdminAccountPassword != "" {
+		value, err := common.ReadFromSecret(o.Secrets, storedOidcConfig.AdminAccountPassword,
+			strings.ToLower(client.OIDCConfigFieldAdminAccountPassword))
+		if err != nil {
+			return nil, err
+		}
+		storedOidcConfig.AdminAccountPassword = value
 	}
 
 	return storedOidcConfig, nil
@@ -367,25 +372,32 @@ func (o *OpenIDCProvider) GetUserExtraAttributes(token *v3.Token) map[string][]s
 	return extras
 }
 
-func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *claimInfo) (*oidc.UserInfo, *oauth2.Token, error) {
+func (o *OpenIDCProvider) GetUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo) (*oidc.UserInfo, *oauth2.Token, *oauth2.Token, error) {
 	var userInfo *oidc.UserInfo
 	var oauth2Token *oauth2.Token
+	var adminOauthToken *oauth2.Token
 	var err error
 
 	updatedContext, err := AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
 	if err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, adminOauthToken, err
 	}
 
 	provider, err := oidc.NewProvider(updatedContext, config.Issuer)
 	if err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, adminOauthToken, err
 	}
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
 	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
 		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
 		if err != nil {
-			return userInfo, oauth2Token, err
+			return userInfo, oauth2Token, adminOauthToken, err
+		}
+	}
+	if config.AdminAccountPassword != "" && config.AdminAccountUsername != "" {
+		adminOauthToken, err = oauthConfig.PasswordCredentialsToken(updatedContext, config.AdminAccountUsername, config.AdminAccountPassword)
+		if err != nil {
+			return userInfo, oauth2Token, adminOauthToken, err
 		}
 	}
 
@@ -393,23 +405,23 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	if !ok {
 		rawToken, ok = oauth2Token.Extra("access_token").(string)
 		if !ok {
-			return userInfo, oauth2Token, err
+			return userInfo, oauth2Token, adminOauthToken, err
 		}
 	}
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 	// parse and verify the id token payload
 	_, err = verifier.Verify(updatedContext, rawToken)
 	if err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, adminOauthToken, err
 	}
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, oauth2Token))
 	if err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, adminOauthToken, err
 	}
 	if err := userInfo.Claims(&claimInfo); err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, adminOauthToken, err
 	}
-	return userInfo, oauth2Token, nil
+	return userInfo, oauth2Token, adminOauthToken, nil
 }
 
 func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
@@ -427,4 +439,28 @@ func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth
 		RedirectURL:  config.RancherURL,
 		Scopes:       configScopes,
 	}
+}
+
+func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Principal {
+	var groupPrincipals []v3.Principal
+
+	if claimInfo.PathGroups != nil {
+		for _, groupPath := range claimInfo.PathGroups {
+			groupsFromPath := strings.Split(groupPath, "/")
+			for _, group := range groupsFromPath {
+				if group != "" {
+					groupPrincipal := o.GroupToPrincipal(group)
+					groupPrincipal.MemberOf = true
+					groupPrincipals = append(groupPrincipals, groupPrincipal)
+				}
+			}
+		}
+	} else {
+		for _, group := range claimInfo.Groups {
+			groupPrincipal := o.GroupToPrincipal(group)
+			groupPrincipal.MemberOf = true
+			groupPrincipals = append(groupPrincipals, groupPrincipal)
+		}
+	}
+	return groupPrincipals
 }

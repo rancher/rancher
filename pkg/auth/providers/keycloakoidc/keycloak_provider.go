@@ -3,10 +3,13 @@ package keycloakoidc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	gooidc "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
@@ -49,6 +52,11 @@ func (k *keyCloakOIDCProvider) GetName() string {
 	return Name
 }
 
+func (k *keyCloakOIDCProvider) CustomizeSchema(schema *types.Schema) {
+	schema.ActionHandler = k.ActionHandler
+	schema.Formatter = k.Formatter
+}
+
 func newClient(config *v32.OIDCConfig, token *oauth2.Token) (*KeyCloakClient, error) {
 	ctx, err := oidc.AddCertKeyToContext(context.Background(), config.Certificate, config.PrivateKey)
 	if err != nil {
@@ -63,6 +71,76 @@ func newClient(config *v32.OIDCConfig, token *oauth2.Token) (*KeyCloakClient, er
 		httpClient: oauthConfig.Client(ctx, token),
 	}
 	return keyCloakClient, err
+}
+
+func (k *keyCloakOIDCProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+	login, ok := input.(*v32.OIDCLogin)
+	if !ok {
+		return v3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
+	}
+	return k.LoginUser(ctx, login, nil)
+}
+
+func (k *keyCloakOIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OIDCLogin, config *v32.OIDCConfig) (v3.Principal, []v3.Principal, string, error) {
+	var userPrincipal v3.Principal
+	var groupPrincipals []v3.Principal
+	var claimInfo oidc.ClaimInfo
+	var err error
+
+	if config == nil {
+		config, err = k.GetOIDCConfig()
+		if err != nil {
+			return userPrincipal, groupPrincipals, "", err
+		}
+	}
+	userInfo, oauth2Token, adminToken, err := k.GetUserInfo(&ctx, config, oauthLoginInfo.Code, &claimInfo)
+	if err != nil {
+		return userPrincipal, groupPrincipals, "", err
+	}
+	userPrincipal = k.UserToPrincipal(userInfo, claimInfo)
+	userPrincipal.Me = true
+
+	groupPrincipals, err = k.getUsersGroups(userInfo.Subject, adminToken, config, claimInfo)
+	if err != nil {
+		return userPrincipal, groupPrincipals, "", err
+	}
+
+	logrus.Debugf("[generic oidc] loginuser: Checking user's access to Rancher")
+	allowed, err := k.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
+	if err != nil {
+		return userPrincipal, groupPrincipals, "", err
+	}
+	if !allowed {
+		return userPrincipal, groupPrincipals, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+	}
+	// save entire oauthToken because it contains refresh_token and token expiry time
+	// will use with oauth2.Client and with TokenSource to ensure auto refresh of tokens occurs for api calls
+	oauthToken, err := json.Marshal(oauth2Token)
+	if err != nil {
+		return userPrincipal, groupPrincipals, "", err
+	}
+	return userPrincipal, groupPrincipals, string(oauthToken), nil
+}
+
+func (k *keyCloakOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+	var groupPrincipals []v3.Principal
+	var claimInfo oidc.ClaimInfo
+
+	config, err := k.GetOIDCConfig()
+	if err != nil {
+		logrus.Errorf("[generic oidc]: error fetching OIDCConfig: %v", err)
+		return groupPrincipals, err
+	}
+	//do not need userInfo or oauth2Token since we are only processing groups
+	userInfo, _, adminToken, err := k.GetUserInfo(&k.CTX, config, secret, &claimInfo)
+	if err != nil {
+		return groupPrincipals, err
+	}
+	groupPrincipals, err = k.getUsersGroups(userInfo.Subject, adminToken, config, claimInfo)
+	if err != nil {
+		return groupPrincipals, err
+	}
+	return groupPrincipals, nil
 }
 
 func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token v3.Token) ([]v3.Principal, error) {
@@ -169,4 +247,33 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 	}
 	princ := k.toPrincipal(principalType, acct, &token)
 	return princ, err
+}
+
+// this method returns all group principals, including parent groups for a given user
+func (k *keyCloakOIDCProvider) getUsersGroups(userSubjectID string, adminToken *oauth2.Token, config *v32.OIDCConfig, claimInfo oidc.ClaimInfo) ([]v3.Principal, error) {
+	var groupPrincipals []v3.Principal
+
+	if adminToken != nil {
+		keyCloakClient, err := newClient(config, adminToken)
+		if err != nil {
+			logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
+			return groupPrincipals, err
+		}
+		userAndParentGroups, err := keyCloakClient.getGroupPrincipalsFromUser(userSubjectID, config)
+		if err != nil {
+			return groupPrincipals, err
+		}
+		for _, group := range userAndParentGroups {
+			groupPrincipal := k.GroupToPrincipal(group.Name)
+			groupPrincipal.MemberOf = true
+			groupPrincipals = append(groupPrincipals, groupPrincipal)
+		}
+	} else {
+		for _, group := range claimInfo.Groups {
+			groupPrincipal := k.GroupToPrincipal(group)
+			groupPrincipal.MemberOf = true
+			groupPrincipals = append(groupPrincipals, groupPrincipal)
+		}
+	}
+	return groupPrincipals, nil
 }

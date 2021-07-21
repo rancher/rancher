@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 //account defines properties an account in keycloak has
@@ -29,6 +30,7 @@ type account struct {
 type Group struct {
 	ID        string  `json:"id,omitempty"`
 	Name      string  `json:"name,omitempty"`
+	Path      string  `json:"path,omitempty"`
 	Subgroups []Group `json:"subGroups,omitempty"`
 }
 
@@ -165,6 +167,45 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 	return account{}, nil
 }
 
+func (k *KeyCloakClient) getGroupPrincipalsFromUser(principalID string, config *v32.OIDCConfig) ([]account, error) {
+	var groups []Group
+	var accounts []account
+
+	if principalID == "" {
+		return accounts, fmt.Errorf("[keycloak oidc]: cannot perfom search with empty principalID")
+	}
+	sURL, err := getSearchURL(config.Issuer)
+	if err != nil {
+		return accounts, nil
+	}
+	searchURL := fmt.Sprintf("%s/users/%s/groups", sURL, principalID)
+	search := URLEncoded(searchURL)
+	b, statusCode, err := k.getFromKeyCloak(search)
+	if err != nil {
+		return accounts, fmt.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
+			statusCode, search, err)
+	}
+	if err := json.Unmarshal(b, &groups); err != nil {
+		logrus.Errorf("[keycloak oidc]: received error unmarshalling search results, err: %v", err)
+		return accounts, err
+	}
+	for _, group := range groups {
+		accounts = append(accounts, account{ID: group.ID, Name: group.Name, Type: GroupType})
+		if group.Path != fmt.Sprintf("/%s", group.Name) {
+			//removing group that is assigned to user from path to reduce duplicate principals being added
+			remainingPath := strings.Trim(group.Path, group.Name)
+			//groups with slashes in the name will not be supported
+			remainingGroups := strings.Split(remainingPath, "/")
+			for _, rg := range remainingGroups {
+				if rg != "" {
+					accounts = append(accounts, account{Name: rg, Type: GroupType})
+				}
+			}
+		}
+	}
+	return accounts, nil
+}
+
 func getSearchURL(issuer string) (string, error) {
 	splitIssuer := strings.SplitAfter(issuer, "/auth/")
 	return fmt.Sprintf(
@@ -207,6 +248,8 @@ func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, int, error) {
 		return b, resp.StatusCode, httperror.NewAPIError(httperror.PermissionDenied, "access denied")
 	case 401:
 		return b, resp.StatusCode, httperror.NewAPIError(httperror.Unauthorized, "invalid token")
+	case 400:
+		return b, resp.StatusCode, apierrors.NewBadRequest(err.Error())
 	default:
 		return b, resp.StatusCode, err
 	}
