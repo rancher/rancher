@@ -30,6 +30,7 @@ spec:
         app: {{ template "rancher.fullname" . }}
         release: {{ .Release.Name }}
     spec:
+      priorityClassName: {{ .Values.priorityClassName }}
       serviceAccountName: {{ template "rancher.fullname" . }}
 {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
