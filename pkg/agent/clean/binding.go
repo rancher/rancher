@@ -144,6 +144,7 @@ func (bc *bindingsCleanup) clean() error {
 }
 
 func (bc *bindingsCleanup) cleanCRTB(newLabel bool, crtbs []apiv3.ClusterRoleTemplateBinding) error {
+	logrus.Debugf("Cleaning up duplicates for %v CRTBs", len(crtbs))
 	var objectMetas []metav1.ObjectMeta
 	for _, crtb := range crtbs {
 		objectMetas = append(objectMetas, crtb.ObjectMeta)
@@ -153,6 +154,7 @@ func (bc *bindingsCleanup) cleanCRTB(newLabel bool, crtbs []apiv3.ClusterRoleTem
 }
 
 func (bc *bindingsCleanup) cleanPRTB(newLabel bool, prtbs []apiv3.ProjectRoleTemplateBinding) error {
+	logrus.Debugf("Cleaning up duplicates for %v PRTBs", len(prtbs))
 	var objectMetas []metav1.ObjectMeta
 	for _, prtb := range prtbs {
 		objectMetas = append(objectMetas, prtb.ObjectMeta)
@@ -171,29 +173,31 @@ func (bc *bindingsCleanup) cleanObjectDuplicates(bindingType string, newLabel bo
 	for _, meta := range objMetas {
 		labels := createLabelSelectors(newLabel, meta, bindingType)
 		for _, label := range labels {
+			logrus.Debugf("%v %v label:%v, Checking CRB/RB duplicates...", bindingUpper, meta.Name, label)
+
 			var CRBduplicates, RBDupes int
 
 			crbs, err := bc.clusterRoleBindings.List(metav1.ListOptions{LabelSelector: label})
 			if err != nil {
-				multierror.Append(returnErr, err)
+				returnErr = multierror.Append(returnErr, err)
 			}
 
 			if len(crbs.Items) > 1 {
 				CRBduplicates += len(crbs.Items) - 1
 				if err := bc.dedupeCRB(crbs.Items); err != nil {
-					multierror.Append(returnErr, err)
+					returnErr = multierror.Append(returnErr, err)
 				}
 			}
 
 			roleBindings, err := bc.roleBindings.List("", metav1.ListOptions{LabelSelector: label})
 			if err != nil {
-				multierror.Append(returnErr, err)
+				returnErr = multierror.Append(returnErr, err)
 			}
 
 			if len(roleBindings.Items) > 1 {
 				roleDuplicates, err := bc.dedupeRB(roleBindings.Items)
 				if err != nil {
-					multierror.Append(returnErr, err)
+					returnErr = multierror.Append(returnErr, err)
 				}
 				RBDupes += roleDuplicates
 			}
@@ -201,6 +205,8 @@ func (bc *bindingsCleanup) cleanObjectDuplicates(bindingType string, newLabel bo
 				totalCRBDupes += CRBduplicates
 				totalRoleDupes += RBDupes
 				logrus.Infof("%v %v label:%v Duplicates: CRB:%v RB:%v", bindingUpper, meta.Name, label, CRBduplicates, RBDupes)
+			} else {
+				logrus.Debugf("%v %v label:%v, No CRB/RB duplicates found", bindingUpper, meta.Name, label)
 			}
 		}
 	}
