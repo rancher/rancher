@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-ingress
+  namespace: ns-ing31
+  labels:
+    k8s-app: test-ingress
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    k8s-app: test-ingress
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-ingress
+  namespace: ns-ing31
+  labels:
+    app: nginx
+    k8s-app: test-ingress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: test-ingress
+  template:
+    metadata:
+      labels:
+        k8s-app: test-ingress
+    spec:
+      containers:
+      - name: testcontainer
+        image: sangeetha/mytestcontainer
+        ports:
+        - containerPort: 80
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+  namespace: ns-ing31
+spec:
+  rules:
+  - host: foo.bar.com
+    http:
+      paths:
+      - path: /name.html
+        backend:
+          serviceName: test-ingress
+          servicePort: 80
