@@ -1,3 +1,4 @@
+import os
 from .common import TEST_IMAGE
 from .common import TEST_IMAGE_NGINX
 from .common import TEST_IMAGE_OS_BASE
@@ -6,9 +7,7 @@ from .common import get_user_client
 from .common import random_test_name
 from .test_rke_cluster_provisioning import create_custom_host_from_nodes
 from .test_rke_cluster_provisioning import HOST_NAME
-
 from lib.aws import AmazonWebServices, AWS_DEFAULT_AMI, AWS_DEFAULT_USER
-
 
 def provision_windows_nodes():
     node_roles_linux = [["controlplane"], ["etcd"], ["worker"]]
@@ -26,9 +25,6 @@ def provision_windows_nodes():
     nodes = linux_nodes + win_nodes
     node_roles = node_roles_linux + node_roles_windows
 
-    for node in win_nodes:
-        pull_images(node)
-
     return nodes, node_roles
 
 
@@ -39,7 +35,8 @@ def test_windows_provisioning_vxlan():
                                                    random_cluster_name=True,
                                                    windows=True,
                                                    windows_flannel_backend='vxlan')
-
+    for node in nodes:
+        pull_images(node)                                                   
     cluster_cleanup(get_user_client(), cluster, nodes)
 
 
@@ -53,7 +50,8 @@ def test_windows_provisioning_gw_host():
                                                    random_cluster_name=True,
                                                    windows=True,
                                                    windows_flannel_backend='host-gw')
-
+    for node in nodes:
+        pull_images(node)
     cluster_cleanup(get_user_client(), cluster, nodes)
 
 

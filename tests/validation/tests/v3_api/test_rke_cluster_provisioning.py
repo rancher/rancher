@@ -16,6 +16,7 @@ AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
 engine_install_url = "https://releases.rancher.com/install-docker/20.10.sh"
+CLOUDPROVIDER_ENABLED = ast.literal_eval(os.environ.get('RANCHER_CLOUD_PROVIDER', "False"))
 
 rke_config = {
     "addonJobTimeout": 30,
@@ -297,6 +298,12 @@ if K8S_VERSION != "":
 
 rke_config_windows_host_gw_aws_provider = rke_config_windows_host_gw.copy()
 rke_config_windows_host_gw_aws_provider["cloudProvider"] = {"name": "aws",
+                                            "type": "cloudProvider",
+                                            "awsCloudProvider":
+                                            {"type": "awsCloudProvider"}}
+
+rke_config_windows_vxlan_aws_provider = rke_config_windows.copy()
+rke_config_windows_vxlan_aws_provider["cloudProvider"] = {"name": "aws",
                                             "type": "cloudProvider",
                                             "awsCloudProvider":
                                             {"type": "awsCloudProvider"}}
@@ -1139,15 +1146,20 @@ def create_and_validate_custom_host(node_roles, random_cluster_name=False,
 def create_custom_host_from_nodes(nodes, node_roles,
                                   random_cluster_name=False, windows=False,
                                   windows_flannel_backend='vxlan',
-                                  version=K8S_VERSION):
+                                  version=K8S_VERSION, 
+                                  cloudprovider=CLOUDPROVIDER_ENABLED):
     client = get_user_client()
     cluster_name = random_name() if random_cluster_name \
         else evaluate_clustername()
 
     if windows:
-        if windows_flannel_backend == "host-gw":
+        if windows_flannel_backend == "host-gw" and cloudprovider:
             config = rke_config_windows_host_gw_aws_provider
-        else:
+        elif windows_flannel_backend == "host-gw":
+            config = rke_config_windows_host_gw
+        elif cloudprovider:
+            config = rke_config_windows_vxlan_aws_provider
+        else: 
             config = rke_config_windows
 
     else:
