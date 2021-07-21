@@ -178,3 +178,50 @@ func TestCustomUniqueRoles(t *testing.T) {
 	assert.Equal(t, etcd, 3)
 	assert.Equal(t, controlPlane, 1)
 }
+
+func TestCustomAddressesProvided(t *testing.T) {
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		Spec: provisioningv1.ClusterSpec{
+			RKEConfig: &provisioningv1.RKEConfig{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command, err := cluster.CustomCommand(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, command)
+
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --address 123.45.67.89 --internal-address 10.42.0.99")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitFor(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, machines.Items, 1)
+	assert.Equal(t, machines.Items[0].Labels[planner.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[planner.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[planner.EtcdRoleLabel], "true")
+
+	assert.Equal(t, machines.Items[0].Annotations[planner.AddressAnnotation], "123.45.67.89")
+	assert.Equal(t, machines.Items[0].Annotations[planner.InternalAddressAnnotation], "10.42.0.99")
+}
