@@ -1084,6 +1084,9 @@ def node_template_ec2_with_provider():
     )
     amazonec2Config = {
         "instanceType": "t3a.medium",
+        "CreditSpecification": {
+            "CPUCredits": "standard"
+        },
         "region": AWS_REGION,
         "rootSize": "16",
         "securityGroup": [AWS_SG],
