@@ -1,0 +1,17 @@
+FROM golang:1.16
+
+# Configure Go
+ENV GOPATH /go
+ENV PATH ${PATH}:/go/bin
+
+ENV WORKSPACE ${GOPATH}/src/github.com/rancher/rancher
+
+WORKDIR $WORKSPACE/tests/go-validation
+
+COPY [".", "$WORKSPACE"]
+
+RUN cd $WORKSPACE/tests/go-validation && \
+    go get gotest.tools/gotestsum && \
+    go mod download
+
+RUN CGO_ENABLED=0
