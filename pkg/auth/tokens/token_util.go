@@ -131,7 +131,7 @@ func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error)
 	if storedToken.ObjectMeta.Name != tokenName {
 		return 422, invalidAuthTokenErr
 	}
-	if features.TokenHashing.Enabled() {
+	if storedToken.Annotations != nil && storedToken.Annotations[TokenHashed] == "true" {
 		if err := VerifySHA256Hash(storedToken.Token, tokenKey); err != nil {
 			logrus.Errorf("VerifySHA256Hash failed with error: %v", err)
 			return 422, invalidAuthTokenErr
