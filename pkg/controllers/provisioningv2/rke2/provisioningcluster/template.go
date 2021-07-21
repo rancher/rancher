@@ -263,6 +263,20 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			machineDeployment.Spec.Template.Labels[planner.WorkerRoleLabel] = "true"
 		}
 
+		if machinePool.EtcdRole && !machinePool.WorkerRole {
+			machinePool.Taints = append(machinePool.Taints, corev1.Taint{
+				Key:    "node-role.kubernetes.io/etcd",
+				Effect: corev1.TaintEffectNoExecute,
+			})
+		}
+
+		if machinePool.ControlPlaneRole && !machinePool.WorkerRole {
+			machinePool.Taints = append(machinePool.Taints, corev1.Taint{
+				Key:    "node-role.kubernetes.io/control-plane",
+				Effect: corev1.TaintEffectNoSchedule,
+			})
+		}
+
 		if len(machinePool.Labels) > 0 {
 			if err := assign(machineDeployment.Spec.Template.Annotations, planner.LabelsAnnotation, machinePool.Labels); err != nil {
 				return nil, err
