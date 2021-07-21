@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 //account defines properties an account in keycloak has
@@ -50,10 +49,9 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, conf
 		searchURL := fmt.Sprintf("%s/%ss?search=%s", sURL, UserType, searchTerm)
 		search := URLEncoded(searchURL)
 
-		b, statusCode, err := k.getFromKeyCloak(search)
+		b, err := k.getFromKeyCloak(search)
 		if err != nil {
-			logrus.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
-				statusCode, search, err)
+			logrus.Errorf("[keycloak oidc]: GET request failed. url: %s, err: %s", search, err)
 			return accounts, err
 		}
 		if err := json.Unmarshal(b, &userAccounts); err != nil {
@@ -85,10 +83,9 @@ func (k *KeyCloakClient) groupSearch(searchTerm string, sURL string) ([]account,
 	searchURL := fmt.Sprintf("%s/%ss?search=%s", sURL, GroupType, searchTerm)
 	search := URLEncoded(searchURL)
 
-	b, statusCode, err := k.getFromKeyCloak(search)
+	b, err := k.getFromKeyCloak(search)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
-			statusCode, search, err)
+		logrus.Errorf("[keycloak oidc]: GET request failed. url: %s, err: %s", search, err)
 		return accounts, err
 	}
 	if err := json.Unmarshal(b, &groups); err != nil {
@@ -143,10 +140,9 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 	if principalType == UserType {
 		searchURL := fmt.Sprintf("%s/%ss/%s", sURL, principalType, principalID)
 		search := URLEncoded(searchURL)
-		b, statusCode, err := k.getFromKeyCloak(search)
+		b, err := k.getFromKeyCloak(search)
 		if err != nil {
-			return account{}, fmt.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
-				statusCode, search, err)
+			return account{}, fmt.Errorf("[keycloak oidc]: GET request failed. url: %s, err: %s", search, err)
 		}
 		if err := json.Unmarshal(b, &searchResult); err != nil {
 			logrus.Errorf("[keycloak oidc]: received error unmarshalling search results, err: %v", err)
@@ -180,10 +176,9 @@ func (k *KeyCloakClient) getGroupPrincipalsFromUser(principalID string, config *
 	}
 	searchURL := fmt.Sprintf("%s/users/%s/groups", sURL, principalID)
 	search := URLEncoded(searchURL)
-	b, statusCode, err := k.getFromKeyCloak(search)
+	b, err := k.getFromKeyCloak(search)
 	if err != nil {
-		return accounts, fmt.Errorf("[keycloak oidc]: GET request failed, got status code: %d. url: %s, err: %s",
-			statusCode, search, err)
+		return accounts, fmt.Errorf("[keycloak oidc]: GET request failed. url: %s, err: %s", search, err)
 	}
 	if err := json.Unmarshal(b, &groups); err != nil {
 		logrus.Errorf("[keycloak oidc]: received error unmarshalling search results, err: %v", err)
@@ -225,33 +220,31 @@ func URLEncoded(str string) string {
 	return u.String()
 }
 
-func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, int, error) {
+func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, 500, err
+		return nil, err
 	}
 	req.Header.Add("Accept", "application/json")
 	resp, err := k.httpClient.Do(req)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc]: received error from keycloak: %v", err)
-		return nil, resp.StatusCode, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return b, resp.StatusCode, err
+		return b, err
 	}
 	switch resp.StatusCode {
 	case 200:
 	case 201:
 	case 403:
-		return b, resp.StatusCode, httperror.NewAPIError(httperror.PermissionDenied, "access denied")
+		return b, httperror.NewAPIError(httperror.PermissionDenied, "access denied")
 	case 401:
-		return b, resp.StatusCode, httperror.NewAPIError(httperror.Unauthorized, "invalid token")
-	case 400:
-		return b, resp.StatusCode, apierrors.NewBadRequest(err.Error())
+		return b, httperror.NewAPIError(httperror.Unauthorized, "invalid token")
 	default:
-		return b, resp.StatusCode, err
+		return b, err
 	}
-	return b, resp.StatusCode, nil
+	return b, nil
 }
