@@ -74,6 +74,12 @@ function Get-Address
         "packetpublic" {
             return $(curl.exe -s "https://metadata.packet.net/2009-04-04/meta-data/public-ipv4")
         }
+        "scwprivate" {
+            return $(curl.exe -s http://169.254.42.42/conf | Where-Object {$_ -match '^PRIVATE_IP='} | Select-Object -First 1 | ForEach-Object {($_ -replace '^PRIVATE_IP=','').Trim()})
+        }
+        "scwpublic" {
+            return $(curl.exe -s http://169.254.42.42/conf | Where-Object {$_ -match '^PUBLIC_IP_ADDRESS='} | Select-Object -First 1 | ForEach-Object {($_ -replace '^PUBLIC_IP_ADDRESS=','').Trim()})
+        }
         "ipify" {
             return $(curl.exe -s "https://api.ipify.org")
         }
