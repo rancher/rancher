@@ -146,12 +146,6 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 		}
 		oauthToken.AccessToken = token.ProviderInfo["access_token"]
 	}
-
-	keyCloakClient, err := newClient(config, oauthToken)
-	if err != nil {
-		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
-		return v3.Principal{}, err
-	}
 	var externalID string
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
@@ -163,6 +157,11 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
 	principalType := parts[1]
+	keyCloakClient, err := newClient(config, oauthToken)
+	if err != nil {
+		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
+		return v3.Principal{}, err
+	}
 	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, principalType, config)
 	if err != nil {
 		return v3.Principal{}, err
