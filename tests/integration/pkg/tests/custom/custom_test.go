@@ -1,6 +1,7 @@
 package custom
 
 import (
+	"encoding/json"
 	"testing"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -34,7 +35,7 @@ func TestCustomOneNode(t *testing.T) {
 
 	assert.NotEmpty(t, command)
 
-	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane")
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,6 +55,13 @@ func TestCustomOneNode(t *testing.T) {
 	assert.Equal(t, machines.Items[0].Labels[planner.ControlPlaneRoleLabel], "true")
 	assert.Equal(t, machines.Items[0].Labels[planner.EtcdRoleLabel], "true")
 	assert.Len(t, machines.Items[0].Status.Addresses, 2)
+
+	assert.NotEmpty(t, machines.Items[0].Annotations[planner.LabelsAnnotation])
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(machines.Items[0].Annotations[planner.LabelsAnnotation]), &labels); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, labels, map[string]string{"foo": "bar", "ball": "life"})
 }
 
 func TestCustomThreeNode(t *testing.T) {
@@ -80,7 +88,7 @@ func TestCustomThreeNode(t *testing.T) {
 	assert.NotEmpty(t, command)
 
 	for i := 0; i < 3; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane")
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,6 +109,13 @@ func TestCustomThreeNode(t *testing.T) {
 		assert.Equal(t, m.Labels[planner.WorkerRoleLabel], "true")
 		assert.Equal(t, m.Labels[planner.ControlPlaneRoleLabel], "true")
 		assert.Equal(t, m.Labels[planner.EtcdRoleLabel], "true")
+
+		assert.NotEmpty(t, m.Annotations[planner.LabelsAnnotation])
+		var labels map[string]string
+		if err := json.Unmarshal([]byte(m.Annotations[planner.LabelsAnnotation]), &labels); err != nil {
+			t.Error(err)
+		}
+		assert.Equal(t, labels, map[string]string{"rancher": "awesome"})
 	}
 }
 
