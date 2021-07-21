@@ -76,6 +76,7 @@ func (s *yamlLinkHandler) LinkHandler(apiContext *types.APIContext, next types.R
 			req.SetHeader(k, v...)
 		}
 		req.SetHeader("Accept", "*/*")
+		req.SetHeader("Accept-Encoding", "identity")
 
 		r, err := req.Do(apiContext.Request.Context()).Get()
 		if err != nil {
