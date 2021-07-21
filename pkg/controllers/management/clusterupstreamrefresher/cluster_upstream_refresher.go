@@ -29,6 +29,7 @@ const (
 
 type clusterRefreshController struct {
 	secretsCache        wranglerv1.SecretCache
+	secretClient        wranglerv1.SecretClient
 	clusterClient       v3.ClusterClient
 	clusterCache        v3.ClusterCache
 	clusterEnqueueAfter func(name string, duration time.Duration)
@@ -44,6 +45,7 @@ type clusterConfig struct {
 func Register(ctx context.Context, wContext *wrangler.Context) {
 	c := clusterRefreshController{
 		secretsCache:        wContext.Core.Secret().Cache(),
+		secretClient:        wContext.Core.Secret(),
 		clusterClient:       wContext.Mgmt.Cluster(),
 		clusterCache:        wContext.Mgmt.Cluster().Cache(),
 		clusterEnqueueAfter: wContext.Mgmt.Cluster().EnqueueAfter,
@@ -152,7 +154,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	// If upstreamSpec is nil then the syncing failed for some reason. This is reported to the user, and this function returns at the end of this if-statement.
 	// If upstreamSpec is non-nil then the syncing occurred as expected, but the node groups have health issues that are reported to the user.
 	// In this second case, the message is set on the Updated condition, but execution continues because the sync was successful.
-	upstreamConfig, err := getComparableUpstreamSpec(c.secretsCache, cluster)
+	upstreamConfig, err := getComparableUpstreamSpec(c.secretsCache, c.secretClient, cluster)
 	if err != nil {
 		var syncFailed string
 		if upstreamConfig == nil {
@@ -274,13 +276,13 @@ func (c *clusterRefreshController) updateCluster(cluster *mgmtv3.Cluster) (*mgmt
 	return c.clusterClient.Update(cluster)
 }
 
-func getComparableUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.Cluster) (*clusterConfig, error) {
+func getComparableUpstreamSpec(secretsCache wranglerv1.SecretCache, secretClient wranglerv1.SecretClient, cluster *mgmtv3.Cluster) (*clusterConfig, error) {
 	clusterCfg := &clusterConfig{}
 
 	// for other cloud drivers, please edit HERE
 	switch cluster.Status.Driver {
 	case apimgmtv3.ClusterDriverAKS:
-		aksConfig, err := BuildAKSUpstreamSpec(secretsCache, cluster)
+		aksConfig, err := BuildAKSUpstreamSpec(secretsCache, secretClient, cluster)
 		clusterCfg.aksConfig = aksConfig
 		return clusterCfg, err
 	case apimgmtv3.ClusterDriverEKS:

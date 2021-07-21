@@ -9,9 +9,9 @@ import (
 	wranglerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 )
 
-func BuildAKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.Cluster) (*aksv1.AKSClusterConfigSpec, error) {
+func BuildAKSUpstreamSpec(secretsCache wranglerv1.SecretCache, secretClient wranglerv1.SecretClient, cluster *mgmtv3.Cluster) (*aksv1.AKSClusterConfigSpec, error) {
 	ctx := context.Background()
-	upstreamSpec, err := akscontroller.BuildUpstreamClusterState(ctx, secretsCache, cluster.Spec.AKSConfig)
+	upstreamSpec, err := akscontroller.BuildUpstreamClusterState(ctx, secretsCache, secretClient, cluster.Spec.AKSConfig)
 	if err != nil {
 		return nil, err
 	}

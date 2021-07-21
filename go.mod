@@ -95,7 +95,7 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.15.0
-	github.com/rancher/aks-operator v1.0.1-rc17
+	github.com/rancher/aks-operator v1.0.1-rc18
 	github.com/rancher/apiserver v0.0.0-20210727155917-6a723678dd3d
 	github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369
 	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
@@ -147,9 +147,9 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.5.4
-	k8s.io/api v0.21.0
+	k8s.io/api v0.21.2
 	k8s.io/apiextensions-apiserver v0.21.0
-	k8s.io/apimachinery v0.21.0
+	k8s.io/apimachinery v0.21.2
 	k8s.io/apiserver v0.21.0
 	k8s.io/cli-runtime v0.21.0
 	k8s.io/client-go v12.0.0+incompatible
