@@ -345,6 +345,7 @@ def test_cis_complaint():
         name=evaluate_clustername(),
         driver="rancherKubernetesEngine",
         rancherKubernetesEngineConfig=rke_config_cis,
+        enableNetworkPolicy=True,
         defaultPodSecurityPolicyTemplateId=POD_SECURITY_POLICY_TEMPLATE)
     assert cluster.state == "provisioning"
     configure_cis_requirements(aws_nodes,
