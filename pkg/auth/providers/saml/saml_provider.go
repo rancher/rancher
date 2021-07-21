@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
@@ -68,7 +69,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 
 	if samlp.hasLdapGroupSearch() {
-		samlp.ldapProvider = ldap.Configure(ctx, mgmtCtx, userMGR, tokenMGR, name)
+		remoteConfig := ldap.NewRemoteConfig(mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient())
+		// TODO Is there a config source where it would be sensible to put expireAfter?
+		expireAfter := time.Minute * 5
+		cachedConfig := ldap.NewCachedConfig(remoteConfig, expireAfter)
+		samlp.ldapProvider = ldap.Configure(ctx, mgmtCtx, userMGR, tokenMGR, name, cachedConfig)
 	}
 
 	SamlProviders[name] = samlp
