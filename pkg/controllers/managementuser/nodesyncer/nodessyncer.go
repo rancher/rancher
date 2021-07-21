@@ -715,6 +715,19 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node,
 	for name, quantity := range limits {
 		machine.Status.Limits[name] = quantity
 	}
+
+	for name := range machine.Status.Requested {
+		if _, ok := requests[name]; !ok {
+			machine.Status.Requested[name] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+		}
+	}
+
+	for name := range machine.Status.Limits {
+		if _, ok := limits[name]; !ok {
+			machine.Status.Limits[name] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+		}
+	}
+
 	machine.Status.NodeLabels = node.Labels
 	determineNodeRoles(machine)
 	machine.Status.NodeAnnotations = node.Annotations
