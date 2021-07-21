@@ -105,7 +105,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.3
 	github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08
 	github.com/rancher/lasso/controller-runtime v0.0.0-20210608205930-775fcaf2f523
-	github.com/rancher/machine v0.15.0-rancher60
+	github.com/rancher/machine v0.15.0-rancher62
 	github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -125,7 +125,7 @@ require (
 	github.com/urfave/cli v1.22.2
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
-	github.com/vmware/govmomi v0.23.2-0.20201015235820-81318771d0e0
+	github.com/vmware/govmomi v0.26.0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
