@@ -56,7 +56,9 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 		lock: sync.RWMutex{},
 	}
 
-	// have two go routines running. One is to run telemetry if setting is true, one is to kill telemetry if setting is false
+	// Have two go routines running:
+	// One to run telemetry if setting is true or license setting is not empty
+	// One to kill telemetry if setting is false and license setting is empty
 	go func() {
 		t := time.NewTicker(time.Second * 5)
 		go func() {
@@ -65,7 +67,7 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 		}()
 		defer t.Stop()
 		for range t.C {
-			if settings.TelemetryOpt.Get() == "in" && isLeader(management) {
+			if (settings.TelemetryOpt.Get() == "in" || settings.ServerLicense.Get() != "") && isLeader(management) {
 				if !p.running {
 					var token string
 					var e error
@@ -102,7 +104,7 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 
 	go func() {
 		for range ticker.Context(ctx, time.Second*5) {
-			if settings.TelemetryOpt.Get() != "in" || !isLeader(management) {
+			if (settings.TelemetryOpt.Get() != "in" && settings.ServerLicense.Get() == "") || !isLeader(management) {
 				if p.getRunningState() {
 					p.kill()
 					p.setRunningState(false)
