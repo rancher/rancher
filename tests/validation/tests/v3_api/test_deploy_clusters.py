@@ -3,12 +3,15 @@ from .test_aks_cluster import get_aks_version, create_and_validate_aks_cluster
 from .test_eks_cluster import EKS_K8S_VERSIONS, create_and_validate_eks_cluster
 from .test_gke_cluster import get_gke_config, \
     create_and_validate_gke_cluster, get_gke_version_credentials
-from .test_rke_cluster_provisioning import create_and_validate_custom_host
+from .test_rke_cluster_provisioning import create_and_validate_custom_host, \
+    K8S_VERSION, create_custom_host_from_nodes
 from .test_import_cluster import create_and_validate_import_cluster
+from .test_windows_cluster import create_windows_cluster, pull_images
 
 env_details = "env.RANCHER_CLUSTER_NAMES='"
 cluster_details = {"rke": {}, "rke_import": {},
-                   "eks": {}, "aks": {}, "gke": {}}
+                   "eks": {}, "aks": {}, "gke": {},
+                   "windows": {}}
 
 if_not_auto_deploy_rke = pytest.mark.skipif(
     ast.literal_eval(
@@ -35,6 +38,11 @@ if_not_auto_deploy_rke_import = pytest.mark.skipif(
         os.environ.get(
             'RANCHER_TEST_DEPLOY_RKE_IMPORT', "False")) is False,
     reason='auto deploy RKE import tests are skipped')
+if_not_auto_deploy_windows_rke = pytest.mark.skipif(
+    ast.literal_eval(
+        os.environ.get(
+            'RANCHER_TEST_DEPLOY_WINDOWS_RKE', "False")) is False,
+    reason='auto deploy RKE windows tests are skipped')
 
 
 @if_not_auto_deploy_rke
@@ -67,6 +75,42 @@ def test_deploy_rke():
         cluster_details["rke"][cluster.name] = k8s_version
 
 
+@if_not_auto_deploy_windows_rke 
+def test_deploy_windows():
+    print("Deploying Windows Clusters")
+    global env_details
+    global cluster_details
+
+    default_k8s_versions = K8S_VERSION.split(",")
+    # Create clusters
+    for k8s_version in default_k8s_versions:
+        if env_details != "env.RANCHER_CLUSTER_NAMES='":
+            env_details += ","
+        print("Deploying Windows Cluster using kubernetes version {}".format(
+            k8s_version))
+        
+        # deploy VXLAN windows cluster
+        cluster, nodes, win_nodes = create_windows_cluster(k8s_version)
+        for node in win_nodes:
+            pull_images(node)
+        
+        env_details += cluster.name
+        print("Successfully deployed {} with kubernetes version {}".format(
+            cluster.name, k8s_version))
+        cluster_details["windows"][cluster.name] = k8s_version
+        if env_details != "env.RANCHER_CLUSTER_NAMES='":
+            env_details += ","
+        # deploy Host GW windows cluster
+        cluster, nodes, win_nodes = create_windows_cluster(k8s_version, "host-gw")
+        for node in win_nodes:
+            pull_images(node)
+
+        env_details += cluster.name
+        print("Successfully deployed {} with kubernetes version {}".format(
+            cluster.name, k8s_version))
+        cluster_details["windows"][cluster.name] = k8s_version
+
+ 
 @if_not_auto_deploy_rke_import
 def test_deploy_rke_import():
     print("Deploying RKE import Clusters")

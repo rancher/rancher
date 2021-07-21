@@ -1145,6 +1145,7 @@ def create_custom_host_from_nodes(nodes, node_roles,
         else evaluate_clustername()
 
     if windows:
+        cluster_name=random_clustername("windows")
         if windows_flannel_backend == "host-gw":
             config = rke_config_windows_host_gw_aws_provider
         else:
