@@ -109,17 +109,19 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	username := localInput.Username
 	pwd := localInput.Password
 
+	authFailedError := httperror.NewAPIError(httperror.Unauthorized, "authentication failed")
 	user, err := l.getUser(username)
-
 	if err != nil {
 		// If the user don't exist the password is evaluated
 		// to avoid user enumeration via timing attack (time based side-channel).
 		bcrypt.CompareHashAndPassword(l.invalidHash, []byte(pwd))
-		return v3.Principal{}, nil, "", err
+		logrus.Debugf("Get User [%s] failed during Authentication: %v", username, err)
+		return v3.Principal{}, nil, "", authFailedError
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(pwd)); err != nil {
-		return v3.Principal{}, nil, "", httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+		logrus.Debugf("Authentication failed for User [%s]: %v", username, err)
+		return v3.Principal{}, nil, "", authFailedError
 	}
 
 	principalID := getLocalPrincipalID(user)
