@@ -36,7 +36,10 @@ func Register(ctx context.Context, wrangler *wrangler.Context) error {
 	if err := systemcharts.Register(ctx, wrangler); err != nil {
 		return err
 	}
-	hostedcluster.Register(ctx, wrangler)
+
+	if features.MCM.Enabled() {
+		hostedcluster.Register(ctx, wrangler)
+	}
 
 	if features.Fleet.Enabled() {
 		if err := fleetcharts.Register(ctx, wrangler); err != nil {
