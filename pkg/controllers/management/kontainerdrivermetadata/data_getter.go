@@ -2,14 +2,12 @@ package kontainerdrivermetadata
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/rancher/rke/types/kdm"
 
 	mVersion "github.com/mcuadros/go-version"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
@@ -203,15 +201,4 @@ func newVersionInfo() *VersionInfo {
 		RKESystemImages:           map[string]rketypes.RKESystemImages{},
 		KubernetesServicesOptions: map[string]rketypes.KubernetesServicesOptions{},
 	}
-}
-
-func GetRancherVersion() string {
-	rancherVersion := settings.ServerVersion.Get()
-	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
-		return RancherVersionDev
-	}
-	if strings.HasPrefix(rancherVersion, "v") {
-		return rancherVersion[1:]
-	}
-	return rancherVersion
 }

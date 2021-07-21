@@ -50,6 +50,7 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.11-0.20210111195520-9fc88b15294e
 	github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e
 	github.com/DataDog/zstd v1.4.5 // indirect
+	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect

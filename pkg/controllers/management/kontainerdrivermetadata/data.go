@@ -33,7 +33,6 @@ const (
 
 const (
 	APIVersion           = "management.cattle.io/v3"
-	RancherVersionDev    = "2.6.99"
 	DataJSONLocation     = "/var/lib/rancher-data/driver-metadata/data.json"
 	sendRKELabel         = "io.cattle.rke_store"
 	svcOptionLinuxKey    = "service-option-linux-key"
@@ -131,7 +130,7 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 	DefaultK8sVersions map[string]string) error {
 	maxVersionForMajorK8sVersion := map[string]string{}
 	deprecatedMap := map[string]bool{}
-	rancherVersion := GetRancherVersion()
+	rancherVersion := settings.GetRancherVersion()
 	var maxIgnore []string
 	for k8sVersion, systemImages := range K8sVersionRKESystemImages {
 		rancherVersionInfo, minorOk := K8sVersionInfo[k8sVersion]
