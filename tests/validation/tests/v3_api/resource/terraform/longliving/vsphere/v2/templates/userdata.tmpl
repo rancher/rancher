@@ -1,0 +1,8 @@
+#cloud-config
+users:
+  - name: rancher
+    ssh-authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCwBuZHhnUObThQM5Htm2LQdR4KDwpCMiz02OvPzkFQuMrAVMkE5l/IMG6HksiAjYfbrYlSTJb2DN2y3oiUyeTygrzMBYlgusLeGKDKJdYwDHfzdoQXlKdYMH10r+lfH86E5a4kPB2Vs25FC0NcpbOLuJ8O5cY/vd5tKIjY5Mepc6BQ5Ogg9CbiovRj988m0mmdeuoaonb8HgyXnsIKgYSldTfzd2Kq00FG4hOZ7hoQeWdPODsJNZUWRTVZHXd5EbSGwCNJ5hHJQlYBtIE0rclt/7GIg7a9N7FTgKuHMywf15075Dy4i26yug3kwKT/mUqhnS0PQtsXLmSvx/8lroXggJVamUqnxyxyIsCtnNkb2ixwVOnT1zj7fgXsLdJEtHckPcozIw9WK3tmiW3/2hhnAKxtYMv55kspotKXOpTUEKp1NpIzCDGj/j8ucaYiBRPya+yiJSoU7KffL71wE2VTtz5seEfQy5GTuWJQeRmYrTCIW59onpZc0zTfgyCvUJk= bdepesa@Brandons-Rancher-MBP.local
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash

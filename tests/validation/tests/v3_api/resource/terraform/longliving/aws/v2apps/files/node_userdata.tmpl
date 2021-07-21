@@ -1,0 +1,7 @@
+#cloud-config
+%{ if length(ssh_keys) > 0 }
+ssh_authorized_keys:
+%{ for ssh_key in ssh_keys }
+- ${ssh_key}
+%{ endfor }
+%{ endif }
