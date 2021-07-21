@@ -495,8 +495,12 @@ func flatStringSlice(slices ...[]string) []string {
 }
 
 func selectFirstEntry(rkeSystemImages map[string]rketypes.RKESystemImages) rketypes.RKESystemImages {
+	sortedRkeSystemImages := make([]rketypes.RKESystemImages, 0, len(rkeSystemImages))
 	for _, rkeSystemImage := range rkeSystemImages {
-		return rkeSystemImage
+		sortedRkeSystemImages = append(sortedRkeSystemImages, rkeSystemImage)
+	}
+	if len(sortedRkeSystemImages) > 0 {
+		return sortedRkeSystemImages[0]
 	}
 	return rketypes.RKESystemImages{}
 }
