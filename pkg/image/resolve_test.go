@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -495,12 +496,13 @@ func flatStringSlice(slices ...[]string) []string {
 }
 
 func selectFirstEntry(rkeSystemImages map[string]rketypes.RKESystemImages) rketypes.RKESystemImages {
-	sortedRkeSystemImages := make([]rketypes.RKESystemImages, 0, len(rkeSystemImages))
-	for _, rkeSystemImage := range rkeSystemImages {
-		sortedRkeSystemImages = append(sortedRkeSystemImages, rkeSystemImage)
+	k8sVersions := make([]string, 0, len(rkeSystemImages))
+	for version := range rkeSystemImages {
+		k8sVersions = append(k8sVersions, version)
 	}
-	if len(sortedRkeSystemImages) > 0 {
-		return sortedRkeSystemImages[0]
+	sort.Strings(k8sVersions)
+	if len(k8sVersions) > 0 {
+		return rkeSystemImages[k8sVersions[0]]
 	}
 	return rketypes.RKESystemImages{}
 }
