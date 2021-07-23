@@ -8,7 +8,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
+	provisioningv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -42,42 +45,44 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 
 	prtb := &prtbLifecycle{
 		mgr: &manager{
-			mgmt:          management,
-			projectLister: management.Management.Projects("").Controller().Lister(),
-			crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-			crbClient:     management.RBAC.ClusterRoleBindings(""),
-			crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
-			rLister:       management.RBAC.Roles("").Controller().Lister(),
-			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
-			rbClient:      management.RBAC.RoleBindings(""),
-			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
-			userLister:    management.Management.Users("").Controller().Lister(),
-			rbIndexer:     rbInformer.GetIndexer(),
-			crbIndexer:    crbInformer.GetIndexer(),
-			userMGR:       management.UserManager,
-			controller:    ptrbMGMTController,
-			prtbs:         management.Management.ProjectRoleTemplateBindings(""),
+			mgmt:              management,
+			projectLister:     management.Management.Projects("").Controller().Lister(),
+			crbLister:         management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+			crbClient:         management.RBAC.ClusterRoleBindings(""),
+			crLister:          management.RBAC.ClusterRoles("").Controller().Lister(),
+			rLister:           management.RBAC.Roles("").Controller().Lister(),
+			rbLister:          management.RBAC.RoleBindings("").Controller().Lister(),
+			rbClient:          management.RBAC.RoleBindings(""),
+			rtLister:          management.Management.RoleTemplates("").Controller().Lister(),
+			userLister:        management.Management.Users("").Controller().Lister(),
+			rbIndexer:         rbInformer.GetIndexer(),
+			crbIndexer:        crbInformer.GetIndexer(),
+			userMGR:           management.UserManager,
+			controller:        ptrbMGMTController,
+			prtbs:             management.Management.ProjectRoleTemplateBindings(""),
+			provisioningCache: management.Wrangler.Provisioning.Cluster().Cache(),
 		},
 		projectLister: management.Management.Projects("").Controller().Lister(),
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
 	}
 	crtb := &crtbLifecycle{
 		mgr: &manager{
-			mgmt:          management,
-			projectLister: management.Management.Projects("").Controller().Lister(),
-			crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-			crbClient:     management.RBAC.ClusterRoleBindings(""),
-			crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
-			rLister:       management.RBAC.Roles("").Controller().Lister(),
-			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
-			rbClient:      management.RBAC.RoleBindings(""),
-			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
-			userLister:    management.Management.Users("").Controller().Lister(),
-			rbIndexer:     rbInformer.GetIndexer(),
-			crbIndexer:    crbInformer.GetIndexer(),
-			userMGR:       management.UserManager,
-			controller:    ctrbMGMTController,
-			crtbs:         management.Management.ClusterRoleTemplateBindings(""),
+			mgmt:              management,
+			projectLister:     management.Management.Projects("").Controller().Lister(),
+			crbLister:         management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+			crbClient:         management.RBAC.ClusterRoleBindings(""),
+			crLister:          management.RBAC.ClusterRoles("").Controller().Lister(),
+			rLister:           management.RBAC.Roles("").Controller().Lister(),
+			rbLister:          management.RBAC.RoleBindings("").Controller().Lister(),
+			rbClient:          management.RBAC.RoleBindings(""),
+			rtLister:          management.Management.RoleTemplates("").Controller().Lister(),
+			userLister:        management.Management.Users("").Controller().Lister(),
+			rbIndexer:         rbInformer.GetIndexer(),
+			crbIndexer:        crbInformer.GetIndexer(),
+			userMGR:           management.UserManager,
+			controller:        ctrbMGMTController,
+			crtbs:             management.Management.ClusterRoleTemplateBindings(""),
+			provisioningCache: management.Wrangler.Provisioning.Cluster().Cache(),
 		},
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
 	}
@@ -85,31 +90,43 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 }
 
 type manager struct {
-	projectLister  v3.ProjectLister
-	crLister       typesrbacv1.ClusterRoleLister
-	rLister        typesrbacv1.RoleLister
-	rbLister       typesrbacv1.RoleBindingLister
-	rbClient       typesrbacv1.RoleBindingInterface
-	crbLister      typesrbacv1.ClusterRoleBindingLister
-	crbClient      typesrbacv1.ClusterRoleBindingInterface
-	rtLister       v3.RoleTemplateLister
-	nsLister       v13.NamespaceLister
-	userLister     v3.UserLister
-	rbIndexer      cache.Indexer
-	crbIndexer     cache.Indexer
-	mgmt           *config.ManagementContext
-	userMGR        user.Manager
-	controller     string
-	clusterManager *clustermanager.Manager
-	crtbs          v3.ClusterRoleTemplateBindingInterface
-	prtbs          v3.ProjectRoleTemplateBindingInterface
+	projectLister     v3.ProjectLister
+	crLister          typesrbacv1.ClusterRoleLister
+	rLister           typesrbacv1.RoleLister
+	rbLister          typesrbacv1.RoleBindingLister
+	rbClient          typesrbacv1.RoleBindingInterface
+	crbLister         typesrbacv1.ClusterRoleBindingLister
+	crbClient         typesrbacv1.ClusterRoleBindingInterface
+	rtLister          v3.RoleTemplateLister
+	nsLister          v13.NamespaceLister
+	userLister        v3.UserLister
+	rbIndexer         cache.Indexer
+	crbIndexer        cache.Indexer
+	mgmt              *config.ManagementContext
+	userMGR           user.Manager
+	controller        string
+	clusterManager    *clustermanager.Manager
+	crtbs             v3.ClusterRoleTemplateBindingInterface
+	prtbs             v3.ProjectRoleTemplateBindingInterface
+	provisioningCache provisioningv1.ClusterCache
 }
 
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
 // that gives the subject access to the the cluster custom resource itself
 // This is painfully similar to ensureProjectMemberBinding, but making one function that handles both is overly complex
 func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, cluster *v3.Cluster, makeOwner bool, subject v1.Subject) error {
-	if err := m.createClusterMembershipRole(roleName, cluster, makeOwner); err != nil {
+	// Get the provisioning cluster, all v3 clusters have a twin provisioning cluster
+	pClusters, err := m.provisioningCache.GetByIndex(clusterindex.ClusterV1ByClusterV3Reference, cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	// Not having the twin means we just have to wait longer
+	if len(pClusters) == 0 {
+		return errors.Errorf("cannot create cluster membership bindings, provisioning cluster not found for cluster %v", cluster.Name)
+	}
+
+	if err := m.createClusterMembershipRole(roleName, pClusters[0].Name, cluster, makeOwner); err != nil {
 		return err
 	}
 
@@ -277,47 +294,144 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 
 // Creates a role that lets the bound subject see (if they are an ordinary member) the project or cluster in the mgmt api
 // (or CRUD the project/cluster if they are an owner)
-func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Cluster, makeOwner bool) error {
-	if cr, _ := m.crLister.Get("", roleName); cr == nil {
-		return m.createMembershipRole(clusterResource, roleName, makeOwner, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
+func (m *manager) createClusterMembershipRole(roleName, provisioningClusterName string, cluster *v3.Cluster, makeOwner bool) error {
+	// Create the rules first, they are needed for both create and update scenarios
+	rules, err := buildRules(clusterResource, provisioningClusterName, makeOwner, cluster)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	cr, err := m.crLister.Get("", roleName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		objectMeta, err := buildObjectMeta(roleName, cluster)
+		if err != nil {
+			return err
+		}
+
+		toCreate := &v1.ClusterRole{
+			ObjectMeta: objectMeta,
+			Rules:      rules,
+		}
+
+		logrus.Infof("[%v] Creating clusterRole %v", m.controller, roleName)
+
+		// ClusterRole doesn't exist, need to create it
+		if _, err = m.mgmt.RBAC.ClusterRoles("").Create(toCreate); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		return nil
+	}
+
+	// Validate the rules, this covers upgrading rancher and making changes to the rules
+	if reflect.DeepEqual(cr.Rules, rules) {
+		return nil
+	}
+
+	cr = cr.DeepCopy()
+	cr.Rules = rules
+
+	logrus.Infof("[%v] Updating clusterRole %v", m.controller, roleName)
+	_, err = m.mgmt.RBAC.ClusterRoles("").Update(cr)
+	return err
 }
 
 // Creates a role that lets the bound subject see (if they are an ordinary member) the project in the mgmt api
 // (or CRUD the project if they are an owner)
 func (m *manager) createProjectMembershipRole(roleName, namespace string, project *v3.Project, makeOwner bool) error {
-	if cr, _ := m.rLister.Get(namespace, roleName); cr == nil {
-		return m.createMembershipRole(projectResource, roleName, makeOwner, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
+	// Create the rules first, they are needed for both create and update scenarios
+	rules, err := buildRules(projectResource, "", makeOwner, project)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	role, err := m.rLister.Get(namespace, roleName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		objectMeta, err := buildObjectMeta(roleName, project)
+		if err != nil {
+			return err
+		}
+
+		toCreate := &v1.Role{
+			ObjectMeta: objectMeta,
+			Rules:      rules,
+		}
+
+		logrus.Infof("[%v] Creating role %v", m.controller, roleName)
+
+		// Role doesn't exist, need to create it
+		if _, err = m.mgmt.RBAC.Roles(namespace).Create(toCreate); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		return nil
+	}
+
+	// Validate the rules, this covers upgrading rancher and making changes to the rules
+	if reflect.DeepEqual(role.Rules, rules) {
+		return nil
+	}
+
+	role = role.DeepCopy()
+	role.Rules = rules
+
+	logrus.Infof("[%v] Updating role %v", m.controller, roleName)
+	_, err = m.mgmt.RBAC.Roles(namespace).Update(role)
+	return err
 }
 
-func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
+func buildRules(resourceType, provisioningClusterName string, makeOwner bool, ownerObject interface{}) ([]v1.PolicyRule, error) {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	typeMeta, err := meta.TypeAccessor(ownerObject)
-	if err != nil {
-		return err
+
+	var verbs []string
+	if makeOwner {
+		verbs = []string{"*"}
+	} else {
+		verbs = []string{"get"}
 	}
+
 	rules := []v1.PolicyRule{
 		{
 			APIGroups:     []string{"management.cattle.io"},
 			Resources:     []string{resourceType},
 			ResourceNames: []string{metaObj.GetName()},
-			Verbs:         []string{"get"},
+			Verbs:         verbs,
 		},
 	}
 
-	if makeOwner {
-		rules[0].Verbs = []string{"*"}
-	} else {
-		rules[0].Verbs = []string{"get"}
+	if resourceType == clusterResource {
+		// Clusters are mirrored between management clusters and provisioning clusters, this grants
+		// the same permissions to the provisioning cluster so user can access it.
+		provisioningClusterRule := v1.PolicyRule{
+			APIGroups:     []string{provisioning.GroupName},
+			Resources:     []string{clusterResource},
+			ResourceNames: []string{provisioningClusterName},
+			Verbs:         verbs,
+		}
+		rules = append(rules, provisioningClusterRule)
 	}
-	logrus.Infof("[%v] Creating role/clusterRole %v", m.controller, roleName)
-	var toCreate runtime.Object
+	return rules, nil
+}
+
+func buildObjectMeta(roleName string, ownerObject interface{}) (metav1.ObjectMeta, error) {
+	metaObj, err := meta.Accessor(ownerObject)
+	if err != nil {
+		return metav1.ObjectMeta{}, err
+	}
+	typeMeta, err := meta.TypeAccessor(ownerObject)
+	if err != nil {
+		return metav1.ObjectMeta{}, err
+	}
+
 	objectMeta := metav1.ObjectMeta{
 		Name: roleName,
 		OwnerReferences: []metav1.OwnerReference{
@@ -329,19 +443,7 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 			},
 		},
 	}
-	if clusterRole {
-		toCreate = &v1.ClusterRole{
-			ObjectMeta: objectMeta,
-			Rules:      rules,
-		}
-	} else {
-		toCreate = &v1.Role{
-			ObjectMeta: objectMeta,
-			Rules:      rules,
-		}
-	}
-	_, err = client.Create(toCreate)
-	return err
+	return objectMeta, nil
 }
 
 // The CRTB has been deleted or modified, either delete or update the membership binding so that the subject
