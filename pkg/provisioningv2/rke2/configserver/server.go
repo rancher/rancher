@@ -7,14 +7,19 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,6 +93,15 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	switch req.URL.Path {
+	case "/v3/connect/config-yaml":
+		r.connectConfigYaml(planSecret, secret.Namespace, rw, req)
+	case "/v3/connect/agent":
+		r.connectAgent(planSecret, secret, rw, req)
+	}
+}
+
+func (r *RKE2ConfigServer) connectAgent(planSecret string, secret *v1.Secret, rw http.ResponseWriter, req *http.Request) {
 	var ca []byte
 	url, pem := settings.ServerURL.Get(), settings.CACerts.Get()
 	if strings.TrimSpace(pem) != "" {
@@ -137,6 +151,49 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	})
 }
 
+func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWriter, req *http.Request) {
+	mpSecret, err := r.getMachinePlanSecret(ns, name)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	config := make(map[string]interface{})
+	if err := json.Unmarshal(mpSecret.Data[rolePlan], &config); err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if _, ok := config["files"]; !ok {
+		http.Error(rw, "no files in the plan", http.StatusInternalServerError)
+		return
+	}
+
+	var content string
+	for _, f := range config["files"].([]interface{}) {
+		f := f.(map[string]interface{})
+		if path, ok := f["path"].(string); ok && path == fmt.Sprintf(planner.ConfigYamlFileName, "rke2") {
+			if _, ok := f["content"]; ok {
+				content = f["content"].(string)
+			}
+		}
+	}
+
+	if content == "" {
+		http.Error(rw, "no config content", http.StatusInternalServerError)
+		return
+	}
+
+	jsonContent, err := base64.RawStdEncoding.DecodeString(content)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write(jsonContent)
+}
+
 func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, error) {
 	machineID := req.Header.Get(machineIDHeader)
 	if machineID == "" {
@@ -170,7 +227,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}
 
 	for _, planSA := range planSAs {
-		planSecret, secret, err := r.getSecret(machineName, planSA)
+		planSecret, secret, err := r.getServiceAccountSecret(machineName, planSA)
 		if err != nil || planSecret != "" {
 			return planSecret, secret, err
 		}
@@ -190,7 +247,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 
 	for event := range resp.ResultChan() {
 		if planSA, ok := event.Object.(*corev1.ServiceAccount); ok {
-			planSecret, secret, err := r.getSecret(machineName, planSA)
+			planSecret, secret, err := r.getServiceAccountSecret(machineName, planSA)
 			if err != nil || planSecret != "" {
 				return planSecret, secret, err
 			}
@@ -238,7 +295,7 @@ func (r *RKE2ConfigServer) isOwnedByMachine(machineName string, sa *corev1.Servi
 	return false, nil
 }
 
-func (r *RKE2ConfigServer) getSecret(machineName string, planSA *corev1.ServiceAccount) (string, *corev1.Secret, error) {
+func (r *RKE2ConfigServer) getServiceAccountSecret(machineName string, planSA *corev1.ServiceAccount) (string, *corev1.Secret, error) {
 	if planSA.Labels[machineNameLabel] != machineName ||
 		planSA.Labels[roleLabel] != rolePlan ||
 		planSA.Labels[planSecret] == "" {
@@ -255,4 +312,23 @@ func (r *RKE2ConfigServer) getSecret(machineName string, planSA *corev1.ServiceA
 
 	secret, err := r.secretsCache.Get(planSA.Namespace, planSA.Secrets[0].Name)
 	return planSA.Labels[planSecret], secret, err
+}
+
+func (r *RKE2ConfigServer) getMachinePlanSecret(name, ns string) (secret *v1.Secret, err error) {
+	for i := 0; i < 10; i++ {
+		secret, err = r.secretsCache.Get(name, ns)
+		if err != nil {
+			logrus.Debugf("error waiting for machine plan secret, sleeping 1s and trying again: %s", err)
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+
+		if len(secret.Data) == 0 || string(secret.Data[rolePlan]) == "" {
+			logrus.Debugf("machine plan secret data is empty waiting on planner controller, sleeping 1s and trying again: %s", err)
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+	}
+
+	return
 }

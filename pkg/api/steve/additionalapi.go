@@ -19,10 +19,12 @@ import (
 )
 
 func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Handler {
+	connectHandler := configserver.New(config)
 	if features.RKE2.Enabled() {
 		mux := gmux.NewRouter()
 		mux.UseEncodedPath()
-		mux.Handle("/v3/connect/agent", configserver.New(config))
+		mux.Handle("/v3/connect/agent", connectHandler)
+		mux.Handle("/v3/connect/config-yaml", connectHandler)
 		mux.Handle("/system-agent-install.sh", server.InstallHandler())
 		mux.Handle("/windows-agent-install.ps1", server.WindowsInstallHandler())
 		return func(next http.Handler) http.Handler {

@@ -65,6 +65,7 @@ const (
 	SecretTypeMachinePlan = "rke.cattle.io/machine-plan"
 
 	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
+	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 )
 
 var (
@@ -871,7 +872,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
-		Path:    fmt.Sprintf("/etc/rancher/%s/config.yaml.d/50-rancher.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    fmt.Sprintf(ConfigYamlFileName, GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
 	return nodePlan, nil
