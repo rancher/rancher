@@ -12,19 +12,21 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/configserver"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/server"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
 )
 
 func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Handler {
+	connectHandler := configserver.New(config)
 	if features.RKE2.Enabled() {
 		mux := gmux.NewRouter()
 		mux.UseEncodedPath()
-		mux.Handle("/v3/connect/agent", configserver.New(config))
-		mux.Handle("/system-agent-install.sh", server.InstallHandler())
-		mux.Handle("/windows-agent-install.ps1", server.WindowsInstallHandler())
+		mux.Handle(configserver.ConnectAgent, connectHandler)
+		mux.Handle(configserver.ConnectConfigYamlPath, connectHandler)
+		mux.Handle(installer.SystemAgentInstallPath, installer.Handler)
+		mux.Handle(installer.WindowsRke2InstallPath, installer.Handler)
 		return func(next http.Handler) http.Handler {
 			mux.NotFoundHandler = next
 			return mux

@@ -66,8 +66,8 @@ const (
 	SecretTypeMachinePlan = "rke.cattle.io/machine-plan"
 
 	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
-
-	Provisioned = condition.Cond("Provisioned")
+	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
+	Provisioned          = condition.Cond("Provisioned")
 )
 
 var (
@@ -804,7 +804,9 @@ func addTaints(config map[string]interface{}, machine *capi.Machine) error {
 	}
 
 	for _, taint := range taints {
-		taintString = append(taintString, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
+		if taint.Key != "" && taint.Value != "" && taint.Effect != "" {
+			taintString = append(taintString, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
+		}
 	}
 
 	sort.Strings(taintString)
@@ -874,7 +876,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
-		Path:    fmt.Sprintf("/etc/rancher/%s/config.yaml.d/50-rancher.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    fmt.Sprintf(ConfigYamlFileName, GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
 	return nodePlan, nil

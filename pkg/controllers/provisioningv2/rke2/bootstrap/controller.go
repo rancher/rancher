@@ -109,7 +109,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		}
 
 		hash := sha256.Sum256(secret.Data["token"])
-		data, err := installer.InstallScript(base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+		data, err := installer.LinuxInstallScript(base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
 		if err != nil {
 			return nil, err
 		}
