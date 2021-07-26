@@ -61,7 +61,7 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 
 	if err := json.NewDecoder(request.Request.Body).Decode(oidcConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
-			fmt.Sprintf("[generic oidc] testAndApply: Failed to parse body: %v", err))
+			fmt.Sprintf("[generic oidc] testAndApply: failed to parse body: %v", err))
 	}
 
 	oidcConfig = oidcConfigApplyInput.OIDCConfig
@@ -82,14 +82,22 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 	oidcConfig.Issuer = issuerURL.String()
 
 	//call provider
-	userPrincipal, groupPrincipals, providerToken, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
+	userPrincipal, groupPrincipals, providerToken, claimInfo, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err
 		}
 		return errors.Wrap(err, "[generic oidc]: server error while authenticating")
 	}
-
+	//setting a bool for group search flag
+	//this only needs updated when an auth provider is enabled or edited
+	if claimInfo.Groups == nil && claimInfo.FullGroupPath == nil {
+		falseBool := false
+		oidcConfig.GroupSearchEnabled = &falseBool
+	} else {
+		trueBool := true
+		oidcConfig.GroupSearchEnabled = &trueBool
+	}
 	user, err := o.UserMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
 	if err != nil {
 		return err
@@ -97,7 +105,7 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 
 	err = o.saveOIDCConfig(&oidcConfig)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save azure config: %v", err))
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[generic oidc]: failed to save oidc config: %v", err))
 	}
 
 	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)

@@ -86,12 +86,12 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 	}
 	keyCloakClient, err := newClient(config, oauthToken)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
+		logrus.Errorf("[keycloak oidc] SsearchPrincipals: error creating new http client: %v", err)
 		return principals, err
 	}
 	accts, err := keyCloakClient.searchPrincipals(searchValue, principalType, config)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc] problem searching keycloak: %v", err)
+		logrus.Errorf("[keycloak oidc] SearchPrincipals: problem searching keycloak: %v", err)
 		return principals, err
 	}
 	for _, acct := range accts {
@@ -159,7 +159,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 	principalType := parts[1]
 	keyCloakClient, err := newClient(config, oauthToken)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc]: error creating new http client: %v", err)
+		logrus.Errorf("[keycloak oidc] GetPrincipal: error creating new http client: %v", err)
 		return v3.Principal{}, err
 	}
 	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, principalType, config)

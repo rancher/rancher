@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -50,11 +51,11 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, conf
 
 		b, err := k.getFromKeyCloak(search)
 		if err != nil {
-			logrus.Errorf("[keycloak oidc]: GET request failed. url: %s, err: %s", search, err)
+			logrus.Errorf("[keycloak oidc] searchPrincipals: GET request failed. url: %s, err: %s", search, err)
 			return accounts, err
 		}
 		if err := json.Unmarshal(b, &userAccounts); err != nil {
-			logrus.Errorf("[keycloak oidc]: received error unmarshalling search results, err: %v", err)
+			logrus.Errorf("[keycloak oidc] searchPrincipals: received error unmarshalling search results, err: %v", err)
 			return accounts, err
 		}
 		for _, u := range userAccounts {
@@ -62,15 +63,15 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, conf
 			accounts = append(accounts, u)
 		}
 	}
-	if principalType == "" || principalType == GroupType {
+	//checking the GroupSearchEnabled flag to ensure group principals are not returned if group mappers
+	//are not enabled. If group mappers are not enabled, it doesn't make sense to return groups as
+	//principals that could be authorized.
+	if (principalType == "" || principalType == GroupType) && *config.GroupSearchEnabled == true {
 		groupAccounts, err := k.groupSearch(searchTerm, sURL)
 		if err != nil {
 			return accounts, err
 		}
 		accounts = append(accounts, groupAccounts...)
-	}
-	if err != nil {
-		return accounts, nil
 	}
 	return accounts, nil
 }
@@ -84,11 +85,11 @@ func (k *KeyCloakClient) groupSearch(searchTerm string, sURL string) ([]account,
 
 	b, err := k.getFromKeyCloak(search)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc]: GET request failed. url: %s, err: %s", search, err)
+		logrus.Errorf("[keycloak oidc] groupSearch: GET request failed. url: %s, err: %s", search, err)
 		return accounts, err
 	}
-	if err := json.Unmarshal(b, &groups); err != nil {
-		logrus.Errorf("[keycloak oidc]: received error unmarshalling search results, err: %v", err)
+	if err = json.Unmarshal(b, &groups); err != nil {
+		logrus.Errorf("[keycloak oidc] groupSearch: received error unmarshalling search results, err: %v", err)
 		return accounts, err
 	}
 	for _, g := range groups {
@@ -129,11 +130,11 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 	var searchResult account
 
 	if principalID == "" {
-		return account{}, fmt.Errorf("[keycloak oidc]: cannot perfom search with empty principalID")
+		return searchResult, errors.Errorf("invalid id %v", principalID)
 	}
 	sURL, err := getSearchURL(config.Issuer)
 	if err != nil {
-		return account{}, nil
+		return searchResult, nil
 	}
 	// this will use the keycloak search endpoint with an id
 	if principalType == UserType {
@@ -141,10 +142,11 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 		search := URLEncoded(searchURL)
 		b, err := k.getFromKeyCloak(search)
 		if err != nil {
-			return account{}, fmt.Errorf("[keycloak oidc]: GET request failed. url: %s, err: %s", search, err)
+			logrus.Errorf("[keycloak oidc] getFromKeyCloakByID: GET request failed. url: %s, err: %s", search, err)
+			return searchResult, err
 		}
 		if err := json.Unmarshal(b, &searchResult); err != nil {
-			logrus.Errorf("[keycloak oidc]: received error unmarshalling search results, err: %v", err)
+			logrus.Errorf("[keycloak oidc] getFromKeyCloakByID: received error unmarshalling search results, err: %v", err)
 			return searchResult, err
 		}
 	} else {
@@ -154,12 +156,12 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 		// group name. group names are unique in keycloak.
 		accounts, err := k.groupSearch(principalID, sURL)
 		if err != nil {
-			return account{}, err
+			return searchResult, err
 		}
 		searchResult = filterByGroupName(principalID, accounts)
 		return searchResult, nil
 	}
-	return account{}, nil
+	return searchResult, nil
 }
 
 func getSearchURL(issuer string) (string, error) {
@@ -175,7 +177,7 @@ func getSearchURL(issuer string) (string, error) {
 func URLEncoded(str string) string {
 	u, err := url.Parse(str)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc]: Error encoding the url: %s, error: %v", str, err)
+		logrus.Errorf("[keycloak oidc] URLEncoded: Error encoding the url: %s, error: %v", str, err)
 		return str
 	}
 	return u.String()
@@ -189,7 +191,7 @@ func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, error) {
 	req.Header.Add("Accept", "application/json")
 	resp, err := k.httpClient.Do(req)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc]: received error from keycloak: %v", err)
+		logrus.Errorf("[keycloak oidc] getFromKeyCloak: received error from keycloak: %v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
