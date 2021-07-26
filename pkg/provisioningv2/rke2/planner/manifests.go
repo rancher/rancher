@@ -16,7 +16,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 		return nil, nil
 	}
 
-	clusterAgent, err := p.getClusterAgent(controlPlane, GetRuntime(controlPlane.Spec.KubernetesVersion))
+	clusterAgent, err := p.getClusterAgent(controlPlane, GetRuntime(controlPlane.Spec.KubernetesVersion), machine)
 	if err != nil {
 		return nil, err
 	}
@@ -32,8 +32,8 @@ func isDefaultTrueEnabled(b *bool) bool {
 	return b == nil || *b
 }
 
-func (p *Planner) getClusterAgent(controlPlane *rkev1.RKEControlPlane, runtime string) (plan.File, error) {
-	data, err := p.loadClusterAgent(controlPlane)
+func (p *Planner) getClusterAgent(controlPlane *rkev1.RKEControlPlane, runtime string, machine *capi.Machine) (plan.File, error) {
+	data, err := p.loadClusterAgent(controlPlane, machine)
 	if err != nil {
 		return plan.File{}, err
 	}
