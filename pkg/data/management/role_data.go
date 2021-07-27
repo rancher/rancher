@@ -508,15 +508,27 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 
 	if len(users.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
-		var passwordGenerated bool
+		var showPassword, mustChangePassword bool
+
 		bootstrapPassword := os.Getenv("CATTLE_BOOTSTRAP_PASSWORD")
 		if bootstrapPassword == "" {
-			passwordGenerated = true
+			// Default: Generate a password and show it
+			showPassword = true
+			mustChangePassword = true
 			bootstrapPassword, err = randomtoken.Generate()
 			if err != nil {
 				return "", err
 			}
+		} else if bootstrapPassword == "admin" {
+			// Legacy: User has explicitly set the bootstrap password back to admin
+			showPassword = false
+			mustChangePassword = true
+		} else {
+			// User provided bootstrap password
+			showPassword = false
+			mustChangePassword = false
 		}
+
 		hash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
 		admin, err := management.Mgmt.User().Create(&v3.User{
 			ObjectMeta: v1.ObjectMeta{
@@ -526,7 +538,7 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			DisplayName:        "Default Admin",
 			Username:           "admin",
 			Password:           string(hash),
-			MustChangePassword: true,
+			MustChangePassword: mustChangePassword,
 		})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return "", errors.Wrap(err, "can not ensure admin user exists")
@@ -546,9 +558,21 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 				serverURL = "https://" + "localhost"
 			}
 
-			if passwordGenerated {
-				logrus.Infof("Default username/password created, use %s/dashboard/?setup=%s to setup password", serverURL, bootstrapPassword)
+			logrus.Infof("")
+			logrus.Infof("-----------------------------------------")
+			logrus.Infof("Welcome to Rancher")
+			if showPassword {
+				logrus.Infof("A bootstrap password has been generated for your admin user.")
+				logrus.Infof("")
+				logrus.Infof("Bootstrap Password: %s", bootstrapPassword)
+				logrus.Infof("")
+				logrus.Infof("Use %s/dashboard/?setup=%s to complete setup in the UI", serverURL, bootstrapPassword)
+			} else {
+				logrus.Infof("")
+				logrus.Infof("Use %s/dashboard/ to complete setup in the UI", serverURL)
 			}
+			logrus.Infof("-----------------------------------------")
+			logrus.Infof("")
 		}
 		adminName = admin.Name
 
