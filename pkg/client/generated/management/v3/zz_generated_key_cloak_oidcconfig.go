@@ -12,6 +12,7 @@ const (
 	KeyCloakOIDCConfigFieldCreated             = "created"
 	KeyCloakOIDCConfigFieldCreatorID           = "creatorId"
 	KeyCloakOIDCConfigFieldEnabled             = "enabled"
+	KeyCloakOIDCConfigFieldGroupSearchEnabled  = "groupSearchEnabled"
 	KeyCloakOIDCConfigFieldIssuer              = "issuer"
 	KeyCloakOIDCConfigFieldLabels              = "labels"
 	KeyCloakOIDCConfigFieldName                = "name"
@@ -35,6 +36,7 @@ type KeyCloakOIDCConfig struct {
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	GroupSearchEnabled  *bool             `json:"groupSearchEnabled,omitempty" yaml:"groupSearchEnabled,omitempty"`
 	Issuer              string            `json:"issuer,omitempty" yaml:"issuer,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
