@@ -7,62 +7,63 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (h *handler) OnCRBT(key string, crbt *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crbt == nil || (crbt.UserName == "" && crbt.GroupName == "") || crbt.RoleTemplateName == "" {
+func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	if crtb == nil || (crtb.UserName == "" && crtb.GroupName == "") || crtb.RoleTemplateName == "" {
 		return nil, nil
 	}
 
-	rt, err := h.roleTemplates.Get(crbt.RoleTemplateName)
+	rt, err := h.roleTemplates.Get(crtb.RoleTemplateName)
 	if err != nil {
-		return crbt, err
+		return crtb, err
 	}
 
 	indexed, err := h.isClusterIndexed(rt)
 	if err != nil || !indexed {
-		return crbt, err
+		return crtb, err
 	}
 
-	clusters, err := h.clusters.GetByIndex(byClusterName, crbt.ClusterName)
+	clusters, err := h.clusters.GetByIndex(byClusterName, crtb.ClusterName)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(clusters) == 0 {
-		return crbt, nil
+		return crtb, nil
 	}
 
 	cluster := clusters[0]
 
+	// The roleBinding name format: crt-<cluster name>-<roleTemplate name>-<crtb name>
+	// Example: crt-cluster1-cluster-member-crtb-aaaaa
 	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.SafeConcatName(roleTemplateRoleName(crbt.RoleTemplateName, cluster.Name), crbt.RoleTemplateName),
+			Name:      name.SafeConcatName(roleTemplateRoleName(crtb.RoleTemplateName, cluster.Name), crtb.Name),
 			Namespace: cluster.Namespace,
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "Role",
-			Name:     roleTemplateRoleName(crbt.RoleTemplateName, cluster.Name),
+			Name:     roleTemplateRoleName(crtb.RoleTemplateName, cluster.Name),
 		},
 	}
-	if crbt.UserName != "" {
+	if crtb.UserName != "" {
 		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
 			Kind:     "User",
 			APIGroup: rbacv1.GroupName,
-			Name:     crbt.UserName,
+			Name:     crtb.UserName,
 		})
 	}
-	if crbt.GroupName != "" {
+	if crtb.GroupName != "" {
 		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
 			Kind:     "Group",
 			APIGroup: rbacv1.GroupName,
-			Name:     crbt.GroupName,
+			Name:     crtb.GroupName,
 		})
 	}
 
-	return crbt, h.roleBindingApply.
-		WithOwner(crbt).
+	return crtb, h.roleBindingApply.
+		WithOwner(crtb).
 		WithListerNamespace(cluster.Namespace).
-		WithSetOwnerReference(true, true).
 		ApplyObjects(roleBinding)
 }
 
