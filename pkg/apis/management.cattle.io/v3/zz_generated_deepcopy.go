@@ -6837,6 +6837,11 @@ func (in *OIDCApplyInput) DeepCopy() *OIDCApplyInput {
 func (in *OIDCConfig) DeepCopyInto(out *OIDCConfig) {
 	*out = *in
 	in.AuthConfig.DeepCopyInto(&out.AuthConfig)
+	if in.GroupSearchEnabled != nil {
+		in, out := &in.GroupSearchEnabled, &out.GroupSearchEnabled
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
