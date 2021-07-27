@@ -508,8 +508,10 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 
 	if len(users.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
+		var passwordGenerated bool
 		bootstrapPassword := os.Getenv("CATTLE_BOOTSTRAP_PASSWORD")
 		if bootstrapPassword == "" {
+			passwordGenerated = true
 			bootstrapPassword, err = randomtoken.Generate()
 			if err != nil {
 				return "", err
@@ -543,7 +545,10 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			if serverURL == "" {
 				serverURL = "https://" + "localhost"
 			}
-			logrus.Infof("Default username/password created, use %s/dashboard/?setup=%s to setup password", serverURL, bootstrapPassword)
+
+			if passwordGenerated {
+				logrus.Infof("Default username/password created, use %s/dashboard/?setup=%s to setup password", serverURL, bootstrapPassword)
+			}
 		}
 		adminName = admin.Name
 
