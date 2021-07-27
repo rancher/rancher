@@ -132,12 +132,12 @@ func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
 	}
 }
 
-func ForCluster(cluster *v3.Cluster, token string) ([]byte, error) {
+func ForCluster(cluster *v3.Cluster, token string, taints []corev1.Taint) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
 		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
-		cluster, GetDesiredFeatures(cluster), nil)
+		cluster, GetDesiredFeatures(cluster), taints)
 	return buf.Bytes(), err
 }
 
