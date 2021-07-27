@@ -67,6 +67,7 @@ func Register(ctx context.Context, wContext *wrangler.Context) error {
 		apps:         wContext.Project.App(),
 		projectCache: wContext.Mgmt.Project().Cache(),
 		secrets:      wContext.Core.Secret().Cache(),
+		appCache:     wContext.Project.App().Cache(),
 	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "cluster-provisioning-operator", h.onClusterChange)

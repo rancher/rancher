@@ -70,19 +70,21 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 			return err
 		}
 
-		tokenName, tokenValue := tokens.SplitTokenParts(tokenKey)
-		// a lister is not used here because the token was recently created, therefore the lister would likely miss
-		token, err := a.TokenClient.Get(tokenName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		clusterAuthToken, err := common.NewClusterAuthToken(token, tokenValue)
-		if err != nil {
-			return err
-		}
+		if tokenKey != "" {
+			tokenName, tokenValue := tokens.SplitTokenParts(tokenKey)
+			// a lister is not used here because the token was recently created, therefore the lister would likely miss
+			token, err := a.TokenClient.Get(tokenName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			clusterAuthToken, err := common.NewClusterAuthToken(token, tokenValue)
+			if err != nil {
+				return err
+			}
 
-		if _, err = clusterClient.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
-			return err
+			if _, err = clusterClient.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
+				return err
+			}
 		}
 
 		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, nodes, apiContext.ID, host, tokenKey)

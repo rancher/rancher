@@ -15,7 +15,7 @@ variable "node_count" {
 
 variable "vm_size" {
   description = "VM Size for the nodes in the cluster"
-  default = "Standard_D2_v2"
+  default = "Standard_D3_v2"
 }
 
 variable "disk_capacity" {

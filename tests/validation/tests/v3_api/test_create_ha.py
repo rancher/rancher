@@ -1,4 +1,5 @@
 from python_terraform import * # NOQA
+from pkg_resources import packaging
 
 from .common import *  # NOQA
 from .test_boto_create_eks import get_eks_kubeconfig
@@ -115,6 +116,8 @@ def test_install_rancher_ha(precheck_certificate_options):
         assert False, "check the logs in console for details"
 
     print_kubeconfig()
+    if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
+        check_rke_ingress_rollout()
     if cm_install:
         install_cert_manager()
     add_repo_create_namespace()
@@ -397,6 +400,27 @@ def set_url_and_password(rancher_url, server_url=None):
 def create_rke_cluster(config_path):
     rke_cmd = "rke --version && rke up --config " + config_path
     run_command_with_stderr(rke_cmd)
+
+
+def check_rke_ingress_rollout():
+    rke_version = run_command_with_stderr('rke -v | cut -d " " -f 3')
+    rke_version = ''.join(rke_version.decode('utf-8').split())
+    print("RKE VERSION: " + rke_version)
+    k8s_version = run_command_with_stderr(export_cmd + " && " +
+                                          'kubectl version --short | grep -i server | cut -d " " -f 3')
+    k8s_version = ''.join(k8s_version.decode('utf-8').split())
+    print("KUBERNETES VERSION: " + k8s_version)
+    if packaging.version.parse(rke_version) > packaging.version.parse("v1.2"):
+        if packaging.version.parse(k8s_version) >= packaging.version.parse("v1.21"):
+            run_command_with_stderr(
+                export_cmd + " && " +
+                "kubectl -n ingress-nginx rollout status ds/nginx-ingress-controller")
+            run_command_with_stderr(
+                export_cmd + " && " +
+                "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-create")
+            run_command_with_stderr(
+                export_cmd + " && " +
+                "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-patch")
 
 
 def print_kubeconfig():

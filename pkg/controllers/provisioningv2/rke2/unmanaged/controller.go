@@ -166,7 +166,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 	labels["rke.cattle.io/machine-id"] = data.String("id")
 
 	labelsMap := map[string]string{}
-	for _, str := range strings.Split(data.String("label"), ",") {
+	for _, str := range strings.Split(data.String("labels"), ",") {
 		k, v := kv.Split(str, "=")
 		if k == "" {
 			continue

@@ -3,6 +3,7 @@ package tokens
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 
 type DummyIndexer struct {
 	cache.Store
+
+	hashedEnabled bool
 }
 
 type TestCase struct {
@@ -31,33 +34,40 @@ var (
 	tokenHashed string
 )
 
+type TestManager struct {
+	assert       *assert.Assertions
+	tokenManager Manager
+	apiCtx       *types.APIContext
+	testCases    []TestCase
+}
+
 // TestTokenStreamTransformer validates that the function properly filters data in websocket
 func TestTokenStreamTransformer(t *testing.T) {
-	features.TokenHashing.Set(true)
+	features.TokenHashing.Set(false)
 
-	assert := assert.New(t)
-
-	tokenManager := Manager{
-		tokenIndexer: &DummyIndexer{
-			&cache.FakeCustomStore{},
+	testManager := TestManager{
+		assert: assert.New(t),
+		tokenManager: Manager{
+			tokenIndexer: &DummyIndexer{
+				Store: &cache.FakeCustomStore{},
+			},
 		},
-	}
-
-	apiCtx := &types.APIContext{
-		Request: &http.Request{},
+		apiCtx: &types.APIContext{
+			Request: &http.Request{},
+		},
 	}
 
 	var err error
 	token, err = randomtoken.Generate()
 	if err != nil {
-		assert.FailNow(fmt.Sprintf("unable to generate token for token stream transformer test: %v", err))
+		testManager.assert.FailNow(fmt.Sprintf("unable to generate token for token stream transformer test: %v", err))
 	}
 	tokenHashed, err = CreateSHA256Hash(token)
 	if err != nil {
-		assert.FailNow(fmt.Sprintf("unable to hash token for token stream transformer test: %v", err))
+		testManager.assert.FailNow(fmt.Sprintf("unable to hash token for token stream transformer test: %v", err))
 	}
 
-	testCases := []TestCase{
+	testManager.testCases = []TestCase{
 		{
 			token:   "testname:" + token,
 			userID:  "testuser",
@@ -96,20 +106,32 @@ func TestTokenStreamTransformer(t *testing.T) {
 		},
 	}
 
-	for index, testCase := range testCases {
+	testManager.runTestCases(false)
+	testManager.runTestCases(true)
+}
+
+func (t *TestManager) runTestCases(hashingEnabled bool) {
+	features.TokenHashing.Set(hashingEnabled)
+	t.tokenManager = Manager{
+		tokenIndexer: &DummyIndexer{
+			Store: &cache.FakeCustomStore{},
+			hashedEnabled: hashingEnabled,
+		},
+	}
+	for index, testCase := range t.testCases {
 		failureMessage := fmt.Sprintf("test case #%d failed", index)
 
 		dataStream := make(chan map[string]interface{}, 1)
 		dataReceived := make(chan bool, 1)
 
-		apiCtx.Request.Header = map[string][]string{"Authorization": {fmt.Sprintf("Bearer %s", testCase.token)}}
+		t.apiCtx.Request.Header = map[string][]string{"Authorization": {fmt.Sprintf("Bearer %s", testCase.token)}}
 
-		df, err := tokenManager.TokenStreamTransformer(apiCtx, nil, dataStream, nil)
+		df, err := t.tokenManager.TokenStreamTransformer(t.apiCtx, nil, dataStream, nil)
 		if testCase.err == "" {
-			assert.Nil(err, failureMessage)
+			t.assert.Nil(err, failureMessage)
 		} else {
-			assert.NotNil(err, failureMessage)
-			assert.Contains(err.Error(), testCase.err, failureMessage)
+			t.assert.NotNil(err, failureMessage)
+			t.assert.Contains(err.Error(), testCase.err, failureMessage)
 		}
 
 		ticker := time.NewTicker(1 * time.Second)
@@ -117,7 +139,7 @@ func TestTokenStreamTransformer(t *testing.T) {
 
 		// test data is received when data stream contains matching userID
 		dataStream <- map[string]interface{}{"labels": map[string]interface{}{UserIDLabel: testCase.userID}}
-		assert.Equal(<-dataReceived, testCase.receive)
+		t.assert.Equal(<-dataReceived, testCase.receive)
 		close(dataStream)
 		ticker.Stop()
 	}
@@ -146,14 +168,19 @@ func (d *DummyIndexer) ListIndexFuncValues(indexName string) []string {
 }
 
 func (d *DummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
-	return []interface{}{
-		&v3.Token{
-			Token: tokenHashed,
-			ObjectMeta: v1.ObjectMeta{
-				Name: "testname",
-			},
-			UserID: "testuser",
+	token := &v3.Token{
+		Token: token,
+		ObjectMeta: v1.ObjectMeta{
+			Name: "testname",
 		},
+		UserID: "testuser",
+	}
+	if d.hashedEnabled {
+		token.Annotations = map[string]string{TokenHashed: strconv.FormatBool(d.hashedEnabled)}
+		token.Token = tokenHashed
+	}
+	return []interface{}{
+		token,
 	}, nil
 }
 
@@ -163,4 +190,8 @@ func (d *DummyIndexer) GetIndexers() cache.Indexers {
 
 func (d *DummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
 	return nil
+}
+
+func (d *DummyIndexer) SetTokenHashed(enabled bool) {
+	d.hashedEnabled = enabled
 }
