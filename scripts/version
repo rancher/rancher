@@ -27,9 +27,9 @@ fi
 if [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
     CHART_VERSION="${GIT_TAG}"
 elif [[ "$DIRTY" ]]; then
-    CHART_VERSION="${LAST_TAG}${DIRTY}.${COMMIT}"
+    CHART_VERSION="${LAST_TAG}${DIRTY}.commit-${COMMIT}"
 else
-    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.${COMMIT}.${COMMIT_BRANCH}"
+    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.commit-${COMMIT}.${COMMIT_BRANCH}"
 fi
 
 # Drop the v prefix for Chart Version to follow existing pattern.
