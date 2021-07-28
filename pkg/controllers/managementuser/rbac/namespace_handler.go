@@ -517,7 +517,9 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		if err == nil {
 			break
 		}
-		logrus.Warnf("error updating ns %v status: %v", ns.Name, err)
+		if !apierrors.IsConflict(err) {
+			logrus.Warnf("error updating ns %v status: %v", ns.Name, err)
+		}
 	}
 
 }
