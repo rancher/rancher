@@ -455,7 +455,8 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 				if _, ok := desiredRBs[bindingName]; !ok {
 					desiredRBs[bindingName] = &v1.RoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
-							Name: bindingName,
+							Name:      bindingName,
+							Namespace: namespace,
 							OwnerReferences: []metav1.OwnerReference{
 								{
 									APIVersion: bindingTypeMeta.GetAPIVersion(),
@@ -527,7 +528,8 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 				if _, ok := desiredRBs[bindingName]; !ok {
 					desiredRBs[bindingName] = &v1.RoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
-							Name: bindingName,
+							Name:      bindingName,
+							Namespace: projectNamespace,
 							Labels: map[string]string{
 								bindingKey: CrtbInProjectBindingOwner,
 							},
@@ -588,7 +590,8 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 				if _, ok := desiredRBs[bindingName]; !ok {
 					desiredRBs[bindingName] = &v1.RoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
-							Name: bindingName,
+							Name:      bindingName,
+							Namespace: clusterNamespace,
 							Labels: map[string]string{
 								bindingKey: PrtbInClusterBindingOwner,
 							},
