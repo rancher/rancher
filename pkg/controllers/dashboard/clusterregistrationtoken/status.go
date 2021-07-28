@@ -10,6 +10,7 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	rketypes "github.com/rancher/rke/types"
@@ -19,8 +20,8 @@ const (
 	commandFormat                 = "kubectl apply -f %s"
 	insecureCommandFormat         = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat             = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
-	shareMntCommandFormat         = "agent --node-name %s --server %s --token %s%s --no-register --only-write-certs"
-	rke2NodeCommandFormat         = "curl -fL %s | sudo %s sh -s - --server %s --token %s%s"
+	rke2NodeCommandFormat         = "curl -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
+	rke2WindowsNodeCommandFormat  = "iwr %s -OutFile install.ps1; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s"
 	rke2InsecureNodeCommandFormat = "curl --insecure -fL %s | sudo %s sh -s - --server %s --token %s%s"
 	loginCommandFormat            = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat      = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
@@ -36,8 +37,10 @@ func (h *handler) isRKE2(clusterID string) bool {
 
 func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRegistrationTokenStatus, error) {
 	ca := systemtemplate.CAChecksum()
+	caWindows := ""
 	if ca != "" {
 		ca = " --ca-checksum " + ca
+		caWindows = " -CaChecksum " + ca
 	}
 
 	token := crt.Status.Token
@@ -76,13 +79,13 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 	if h.isRKE2(clusterID) {
 		// for linux
 		crtStatus.NodeCommand = fmt.Sprintf(rke2NodeCommandFormat,
-			rootURL+"/system-agent-install.sh",
+			rootURL+installer.SystemAgentInstallPath,
 			AgentEnvVars(cluster, false),
 			rootURL,
 			token,
 			ca)
 		crtStatus.InsecureNodeCommand = fmt.Sprintf(rke2InsecureNodeCommandFormat,
-			rootURL+"/system-agent-install.sh",
+			rootURL+installer.SystemAgentInstallPath,
 			AgentEnvVars(cluster, false),
 			rootURL,
 			token,
@@ -97,19 +100,26 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 			ca)
 	}
 	// for windows
-	var agentImageDockerEnv string
-	if util.GetPrivateRepoURL(cluster) != "" {
-		// patch the AGENT_IMAGE env
-		agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
+	if h.isRKE2(clusterID) {
+		crtStatus.WindowsNodeCommand = fmt.Sprintf(rke2WindowsNodeCommandFormat,
+			rootURL+installer.WindowsRke2InstallPath,
+			rootURL,
+			token,
+			caWindows)
+	} else {
+		var agentImageDockerEnv string
+		if util.GetPrivateRepoURL(cluster) != "" {
+			// patch the AGENT_IMAGE env
+			agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
+		}
+		crtStatus.WindowsNodeCommand = fmt.Sprintf(windowsNodeCommandFormat,
+			agentImageDockerEnv,
+			agentImage,
+			rootURL,
+			token,
+			ca,
+			getWindowsPrefixPathArg(cluster.Spec.RancherKubernetesEngineConfig))
 	}
-	crtStatus.WindowsNodeCommand = fmt.Sprintf(windowsNodeCommandFormat,
-		agentImageDockerEnv,
-		agentImage,
-		rootURL,
-		token,
-		ca,
-		getWindowsPrefixPathArg(cluster.Spec.RancherKubernetesEngineConfig))
-
 	return *crtStatus, nil
 }
 
