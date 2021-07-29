@@ -187,6 +187,8 @@ def test_istio_custom_answers(skipif_unsupported_istio_version,
         daemonset_list=expected_daemonsets)
 
 
+
+
 # This is split out separately from test_istio_custom_answers because
 # certmanager creates its own crds outside of istio
 @pytest.mark.skip(reason="To be removed, no support from 1.7.000")
@@ -944,10 +946,49 @@ def auth_cluster_access(request):
     return group, users, noauth_user
 
 
+def enable_monitoring_istio(client, c_client, p_client,cluster,project,additional_answers={}):
+    global ISTIO_EXTERNAL_ID
+    monitoring_answers = copy.deepcopy(C_MONITORING_ANSWERS)
+    monitoring_answers["prometheus.persistence.enabled"] = "false"
+    monitoring_answers["grafana.persistence.enabled"] = "false"
+
+    if cluster["enableClusterMonitoring"] is False:
+        client.action(cluster, "enableMonitoring",
+                      answers=monitoring_answers)
+
+    monitoring_ns = "cattle-prometheus"
+
+    istio_versions = list(client.list_template(
+        id=ISTIO_TEMPLATE_ID).data[0].versionLinks.keys())
+    istio_version = istio_versions[len(istio_versions) - 1]
+
+
+
+    if ISTIO_VERSION != "":
+        istio_version = ISTIO_VERSION
+    ISTIO_EXTERNAL_ID += istio_version
+
+    answers = {"global.rancher.clusterId": project.clusterId, **additional_answers}
+    DEFAULT_ANSWERS.update(answers)
+
+    if cluster["istioEnabled"] is False:
+        verify_admission_webhook()
+
+        ns = create_ns(c_client, cluster, project, 'istio-system')
+        app = create_and_verify_istio_app(p_client, ns, project)
+    else:
+        app = p_client.list_app(name='cluster-istio').data[0]
+        ns = c_client.list_namespace(name='istio-system').data[0]
+        update_istio_app(DEFAULT_ANSWERS, USER_TOKEN,
+                         app=app, ns=ns, project=project)
+
+    return {"ns":ns, "istio_version":istio_version, "app":app, "project":project, "istio_enabled":True,"monitoring_ns":monitoring_ns}
+
+
+
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
     global DEFAULT_ANSWERS
-    global ISTIO_EXTERNAL_ID
     client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
 
@@ -965,34 +1006,9 @@ def create_project_client(request):
     p_client = get_project_client_for_token(p, USER_TOKEN)
     c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
 
-    istio_versions = list(client.list_template(
-        id=ISTIO_TEMPLATE_ID).data[0].versionLinks.keys())
-    istio_version = istio_versions[len(istio_versions) - 1]
 
-    if ISTIO_VERSION != "":
-        istio_version = ISTIO_VERSION
-    ISTIO_EXTERNAL_ID += istio_version
-    answers = {"global.rancher.clusterId": p.clusterId}
-    DEFAULT_ANSWERS.update(answers)
 
-    monitoring_answers = copy.deepcopy(C_MONITORING_ANSWERS)
-    monitoring_answers["prometheus.persistence.enabled"] = "false"
-    monitoring_answers["grafana.persistence.enabled"] = "false"
-
-    if cluster["enableClusterMonitoring"] is False:
-        client.action(cluster, "enableMonitoring",
-                      answers=monitoring_answers)
-
-    if cluster["istioEnabled"] is False:
-        verify_admission_webhook()
-
-        ns = create_ns(c_client, cluster, p, 'istio-system')
-        app = create_and_verify_istio_app(p_client, ns, p)
-    else:
-        app = p_client.list_app(name='cluster-istio').data[0]
-        ns = c_client.list_namespace(name='istio-system').data[0]
-        update_istio_app(DEFAULT_ANSWERS, USER_TOKEN,
-                         app=app, ns=ns, project=p)
+    istio_ = enable_monitoring_istio(client,c_client,p_client,cluster,p)
 
     istio_project, app_ns = create_project_and_ns(
         USER_TOKEN, cluster,
@@ -1003,7 +1019,7 @@ def create_project_client(request):
     app_client = get_project_client_for_token(istio_project, USER_TOKEN)
 
     istio_gateway_wl = p_client.by_id_workload('deployment:' +
-                                               ns.name +
+                                               istio_["ns"].name +
                                                ':istio-ingressgateway')
     assert istio_gateway_wl is not None
     endpoints = istio_gateway_wl['publicEndpoints'][0]
@@ -1012,10 +1028,11 @@ def create_project_client(request):
     namespace["gateway_url"] = gateway_url
     namespace["app_ns"] = app_ns
     namespace["app_client"] = app_client
-    namespace["system_ns"] = ns
+    namespace["system_ns"] = istio_["ns"]
     namespace["system_project"] = p
-    namespace["istio_version"] = istio_version
-    namespace["istio_app"] = app
+    namespace["istio_version"] = istio_["istio_version"]
+    namespace["istio_app"] = istio_["app"]
+
 
     def fin():
         client = get_user_client()
