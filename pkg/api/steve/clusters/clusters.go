@@ -8,12 +8,15 @@ import (
 	"github.com/rancher/apiserver/pkg/handlers"
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/api/steve/norman"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	normanv3 "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
+	"github.com/rancher/wrangler/pkg/schemas"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,12 +28,25 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 		namespace:    "cattle-system",
 		impersonator: podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
 	}
+	sc, err := config.NewScaledContext(*wrangler.RESTConfig, nil)
+	if err != nil {
+		return err
+	}
+
+	userManager, err := common.NewUserManagerNoBindings(sc)
+	if err != nil {
+		return err
+	}
+	kubeconfig := kubeconfigDownload{
+		userMgr: userManager,
+	}
 
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
 	server.ClusterCache.OnChange(ctx, func(gvk schema.GroupVersionKind, key string, obj, oldObj runtime.Object) error {
 		return shell.impersonator.PurgeOldRoles(gvk, key, obj)
 	})
 
+	server.BaseSchemas.MustImportAndCustomize(GenerateKubeconfigOutput{}, nil)
 	server.SchemaFactory.AddTemplate(schema2.Template{
 		Group:     "management.cattle.io",
 		Kind:      "Cluster",
@@ -40,7 +56,16 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 				schema.LinkHandlers = map[string]http.Handler{}
 			}
 			schema.LinkHandlers["shell"] = shell
-
+			if schema.ActionHandlers == nil {
+				schema.ActionHandlers = map[string]http.Handler{}
+			}
+			schema.ActionHandlers["generateKubeconfig"] = kubeconfig
+			if schema.ResourceActions == nil {
+				schema.ResourceActions = map[string]schemas.Action{}
+			}
+			schema.ResourceActions["generateKubeconfig"] = schemas.Action{
+				Output: "generateKubeconfigOutput",
+			}
 			schema.ByIDHandler = func(request *types.APIRequest) (types.APIObject, error) {
 				// By pass authorization for local shell because the user might not have
 				// GET granted for local cluster
