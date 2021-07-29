@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/gorilla/mux"
+	"github.com/rancher/aks-operator/pkg/aks"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -20,6 +22,12 @@ import (
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	tenantIDAnnotation          = "cluster.management.cattle.io/azure-tenant-id"
+	tenantIDTimestampAnnotation = "cluster.management.cattle.io/azure-tenant-id-created-at"
+	tenantIDTimeout             = time.Hour
 )
 
 type Capabilities struct {
@@ -38,6 +46,7 @@ type handler struct {
 	secretsLister v1.SecretLister
 	clusterLister v3.ClusterLister
 	ac            types.AccessControl
+	secretClient  v1.SecretInterface
 }
 
 func NewAKSHandler(scaledContext *config.ScaledContext) http.Handler {
@@ -46,6 +55,7 @@ func NewAKSHandler(scaledContext *config.ScaledContext) http.Handler {
 		secretsLister: scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
 		clusterLister: scaledContext.Management.Clusters("").Controller().Lister(),
 		ac:            scaledContext.AccessControl,
+		secretClient:  scaledContext.Core.Secrets(namespace.GlobalNamespace),
 	}
 }
 
@@ -153,6 +163,13 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	cap.SubscriptionID = string(cc.Data["azurecredentialConfig-subscriptionId"])
 	cap.ClientID = string(cc.Data["azurecredentialConfig-clientId"])
 	cap.ClientSecret = string(cc.Data["azurecredentialConfig-clientSecret"])
+
+	if cap.TenantID == "" {
+		cap.TenantID, err = aks.GetCachedTenantID(h.secretClient, cap.SubscriptionID, cc)
+		if err != nil {
+			return httperror.ServerError.Status, err
+		}
+	}
 
 	cap.BaseURL = req.URL.Query().Get("baseUrl")
 	if cap.BaseURL == "" {

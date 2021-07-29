@@ -9,11 +9,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/rancher/aks-operator/controller"
 	aksv1 "github.com/rancher/aks-operator/pkg/apis/aks.cattle.io/v1"
-	"github.com/rancher/machine/drivers/azure/azureutil"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
@@ -26,7 +24,6 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -43,7 +40,6 @@ const (
 	aksOperator         = "rancher-aks-operator"
 	aksShortName        = "AKS"
 	enqueueTime         = time.Second * 5
-	findTenantIDTimeout = time.Second * 5
 )
 
 type aksOperatorController struct {
@@ -79,31 +75,6 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "aks-operator-controller", e.onClusterChange)
-	wContext.Core.Secret().OnChange(ctx, "aks-cloud-credential", e.onCloudCredentialChange)
-}
-
-func (e *aksOperatorController) onCloudCredentialChange(key string, cred *corev1.Secret) (*corev1.Secret, error) {
-	// credential doesn't exist or is deleting
-	if cred == nil || cred.DeletionTimestamp != nil {
-		return cred, nil
-	}
-	// credential is not for azure
-	subscriptionID, ok := cred.Data["azurecredentialConfig-subscriptionId"]
-	if !ok {
-		return cred, nil
-	}
-	// credential already has tenant ID
-	tenantIDBytes, ok := cred.Data["azurecredentialConfig-tenantId"]
-	if ok && string(tenantIDBytes) != "" {
-		return cred, nil
-	}
-	tenantID, err := azureutil.FindTenantID(context.Background(), azure.PublicCloud, string(subscriptionID))
-	if err != nil {
-		return cred, err
-	}
-	cred = cred.DeepCopy()
-	cred.Data["azurecredentialConfig-tenantId"] = []byte(tenantID)
-	return e.secretClient.Update(cred)
 }
 
 func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
@@ -294,7 +265,7 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 func (e *aksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
-	upstreamSpec, err := clusterupstreamrefresher.BuildAKSUpstreamSpec(e.SecretsCache, cluster)
+	upstreamSpec, err := clusterupstreamrefresher.BuildAKSUpstreamSpec(e.SecretsCache, e.secretClient, cluster)
 	if err != nil {
 		return cluster, err
 	}
@@ -458,7 +429,7 @@ func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 
 func (e *aksOperatorController) getRestConfig(cluster *mgmtv3.Cluster) (*rest.Config, error) {
 	ctx := context.Background()
-	restConfig, err := controller.GetClusterKubeConfig(ctx, e.SecretsCache, cluster.Spec.AKSConfig)
+	restConfig, err := controller.GetClusterKubeConfig(ctx, e.SecretsCache, e.secretClient, cluster.Spec.AKSConfig)
 	if err != nil {
 		return nil, err
 	}
