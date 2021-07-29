@@ -33,6 +33,9 @@ trap cleanup exit
 while ! curl -sf http://localhost:8080/ping; do
     sleep 2
 done
+while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
+    sleep 2
+done
 #kill $TPID
 
 echo Running tests
