@@ -13,10 +13,10 @@ import (
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/data"
-	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/kv"
 	corev1 "k8s.io/api/core/v1"
@@ -191,32 +191,13 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 		annotations[planner.LabelsAnnotation] = string(data)
 	}
 
-	var taints []corev1.Taint
-	for _, taint := range convert.ToStringSlice(data["taints"]) {
-		for _, taint := range strings.Split(taint, ",") {
-			parts := strings.Split(taint, ":")
-			switch len(parts) {
-			case 1:
-				taints = append(taints, corev1.Taint{
-					Key: parts[0],
-				})
-			case 2:
-				taints = append(taints, corev1.Taint{
-					Key:   parts[0],
-					Value: parts[1],
-				})
-			case 3:
-				taints = append(taints, corev1.Taint{
-					Key:    parts[0],
-					Value:  parts[1],
-					Effect: corev1.TaintEffect(parts[2]),
-				})
-			}
-		}
+	var coreTaints []corev1.Taint
+	for _, taint := range data.StringSlice("taints") {
+		coreTaints = append(coreTaints, taints.GetTaintsFromStrings(strings.Split(taint, ","))...)
 	}
 
-	if len(taints) > 0 {
-		data, err := json.Marshal(taints)
+	if len(coreTaints) > 0 {
+		data, err := json.Marshal(coreTaints)
 		if err != nil {
 			return nil, err
 		}
