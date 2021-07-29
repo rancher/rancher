@@ -156,7 +156,7 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 	if err != nil {
 		return nil, err
 	}
-	dialer := h.dialerFactory("steve-cluster-" + host)
+	dialer := h.dialerFactory("stv-cluster-" + host)
 	return dialer(ctx, network, "127.0.0.1:6080")
 }
 

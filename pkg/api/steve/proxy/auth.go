@@ -13,7 +13,7 @@ import (
 
 const (
 	tokenIndex = "clusterToken"
-	Prefix     = "steve-cluster-"
+	Prefix     = "stv-cluster-"
 )
 
 type clusterProxyAuthorizer struct {

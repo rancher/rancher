@@ -264,7 +264,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 }
 
 func (r *Rancher) startAggregation(ctx context.Context) {
-	aggregation2.Watch(ctx, r.Wrangler.Core.Secret(), namespace.System, "steve-aggregation", r.Handler)
+	aggregation2.Watch(ctx, r.Wrangler.Core.Secret(), namespace.System, "stv-aggregation", r.Handler)
 }
 
 func newMCM(wrangler *wrangler.Context, opts *Options) wrangler.MultiClusterManager {

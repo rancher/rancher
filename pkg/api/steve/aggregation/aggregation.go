@@ -81,7 +81,7 @@ func (h *aggregationHandler) setEntries(routes []routeEntry) {
 }
 
 func keyFromUUID(uuid string) string {
-	return "steve-" + uuid
+	return "stv-" + uuid
 }
 
 func (h *aggregationHandler) makeHandler(uuid string) http.Handler {
