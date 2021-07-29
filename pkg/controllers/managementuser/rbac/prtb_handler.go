@@ -24,6 +24,9 @@ import (
 const owner = "owner-user"
 
 var globalResourcesNeededInProjects = map[string][]string{
+	"navlinks": {
+		"ui.cattle.io",
+	},
 	"persistentvolumes": {
 		"",
 		"core",
