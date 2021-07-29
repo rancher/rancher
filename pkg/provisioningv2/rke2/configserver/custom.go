@@ -35,13 +35,7 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string,
 		return "", "", err
 	}
 
-	data := map[string]interface{}{}
-	for k, v := range req.Header {
-		if strings.HasPrefix(k, headerPrefix) {
-			data[strings.ToLower(strings.TrimPrefix(k, headerPrefix))] = v
-		}
-	}
-	data["id"] = machineID
+	data := dataFromHeaders(req)
 
 	if len(tokens) == 0 {
 		return "", "", nil
@@ -116,4 +110,15 @@ func (r *RKE2ConfigServer) waitReady(secret *corev1.Secret) (*corev1.Secret, err
 func machineRequestSecretName(name string) string {
 	hash := sha256.Sum256([]byte(name))
 	return "custom-" + hex.EncodeToString(hash[:])[:12]
+}
+
+func dataFromHeaders(req *http.Request) map[string]interface{} {
+	data := make(map[string]interface{})
+	for k, v := range req.Header {
+		if strings.HasPrefix(k, headerPrefix) {
+			data[strings.ToLower(strings.TrimPrefix(k, headerPrefix))] = v
+		}
+	}
+
+	return data
 }

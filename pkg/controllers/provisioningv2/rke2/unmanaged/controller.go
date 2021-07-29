@@ -162,6 +162,12 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 	if val := data.String("node-name"); val != "" {
 		labels[planner.NodeNameLabel] = val
 	}
+	if address := data.String("address"); address != "" {
+		annotations[planner.AddressAnnotation] = address
+	}
+	if internalAddress := data.String("internal-address"); internalAddress != "" {
+		annotations[planner.InternalAddressAnnotation] = internalAddress
+	}
 
 	labels["rke.cattle.io/machine-id"] = data.String("id")
 
