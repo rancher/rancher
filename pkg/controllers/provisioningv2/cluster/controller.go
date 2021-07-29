@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	mgmtNameRegexp = regexp.MustCompile("c-[a-z0-9]{5}|local")
+	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
 )
 
 type handler struct {
