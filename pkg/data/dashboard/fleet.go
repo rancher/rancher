@@ -59,7 +59,7 @@ func ensureWebhookAPIService(apiservices mngtv3.APIServiceClient) error {
 		},
 
 		Spec: v3.APIServiceSpec{
-			SecretName:      "steve-aggregation",
+			SecretName:      "stv-aggregation",
 			SecretNamespace: "cattle-fleet-system",
 			Paths: []string{
 				"/fleet/webhook",

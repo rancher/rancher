@@ -60,7 +60,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 	}
 
 	var (
-		secretName = "steve-aggregation"
+		secretName = "stv-aggregation"
 		result     []runtime.Object
 	)
 
