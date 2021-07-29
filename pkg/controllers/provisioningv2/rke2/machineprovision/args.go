@@ -23,9 +23,12 @@ import (
 var (
 	regExHyphen     = regexp.MustCompile("([a-z])([A-Z])")
 	envNameOverride = map[string]string{
-		"amazonec2": "AWS",
-		"rackspace": "OS",
-		"openstack": "OS",
+		"amazonec2":       "AWS",
+		"rackspace":       "OS",
+		"openstack":       "OS",
+		"vmwarevsphere":   "VSPHERE",
+		"vmwarefusion":    "FUSION",
+		"vmwarevcloudair": "VCLOUDAIR",
 	}
 )
 
