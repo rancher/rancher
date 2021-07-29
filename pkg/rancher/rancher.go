@@ -225,9 +225,12 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
-		return r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
-			return dashboard.Register(ctx, r.Wrangler)
-		})
+
+		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error { return dashboard.Register(ctx, r.Wrangler) }); err != nil {
+			return err
+		}
+
+		return forceUpgradeLogout(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Token(), "v2.6.0")
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {
