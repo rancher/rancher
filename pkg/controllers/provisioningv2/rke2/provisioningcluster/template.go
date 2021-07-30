@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/lasso/pkg/dynamic"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/wrangler/pkg/data"
@@ -108,7 +109,7 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	}
 
 	if secretName != "" {
-		_, err := secrets.Get(cluster.Namespace, secretName)
+		_, err := machineprovision.GetCloudCredentialSecret(secrets, cluster.Namespace, secretName)
 		if err != nil {
 			return nil, err
 		}

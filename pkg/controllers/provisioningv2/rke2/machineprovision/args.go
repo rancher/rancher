@@ -7,10 +7,13 @@ import (
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	namespace2 "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
 	name2 "github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -84,6 +87,7 @@ func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, da
 	}
 
 	for k, v := range secrets {
+		_, k = kv.RSplit(k, "-")
 		envName := envNameOverride[driver]
 		if envName == "" {
 			envName = driver
@@ -181,7 +185,7 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool
 	}
 
 	if cloudCredentialSecretName != "" {
-		secret, err := h.secrets.Get(meta.GetNamespace(), cloudCredentialSecretName)
+		secret, err := GetCloudCredentialSecret(h.secrets, meta.GetNamespace(), cloudCredentialSecretName)
 		if err != nil {
 			return "", "", nil, err
 		}
@@ -197,6 +201,14 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool
 	}
 
 	return bootstrapName, cloudCredentialSecretName, result, nil
+}
+
+func GetCloudCredentialSecret(secrets corecontrollers.SecretCache, namespace, name string) (*corev1.Secret, error) {
+	globalNS, globalName := kv.Split(name, ":")
+	if globalName != "" && globalNS == namespace2.GlobalNamespace {
+		return secrets.Get(globalNS, globalName)
+	}
+	return secrets.Get(namespace, name)
 }
 
 func toArgs(driverName string, args map[string]interface{}) (cmd []string) {
