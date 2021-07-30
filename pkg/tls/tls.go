@@ -320,12 +320,10 @@ func filterCN(cns ...string) []string {
 		return cns
 	}
 	host := u.Hostname()
-	for _, cn := range cns {
-		if cn == host {
-			return []string{host}
-		}
+	if host != "" {
+		return []string{host}
 	}
-	return nil
+	return cns
 }
 
 func fileExists(path string) bool {
