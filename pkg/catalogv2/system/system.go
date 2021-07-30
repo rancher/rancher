@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/action"
 	release2 "helm.sh/helm/v3/pkg/release"
@@ -94,21 +95,24 @@ func (m *Manager) runSync() {
 		case <-m.ctx.Done():
 			return
 		case <-t.C:
-			m.installCharts(m.desiredCharts, true)
+			_ = m.installCharts(m.desiredCharts, true)
 		case desired := <-m.sync:
 			v, exists := m.desiredCharts[desired.key]
-			m.desiredCharts[desired.key] = desired.values
 			// newly requested or changed
 			if !exists || !equality.Semantic.DeepEqual(v, desired.values) {
-				m.installCharts(map[desiredKey]map[string]interface{}{
+				err := m.installCharts(map[desiredKey]map[string]interface{}{
 					desired.key: desired.values,
 				}, desired.forceAdopt)
+				if err == nil {
+					m.desiredCharts[desired.key] = desired.values
+				}
 			}
 		}
 	}
 }
 
-func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, forceAdopt bool) {
+func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, forceAdopt bool) error {
+	var errs []error
 	for key, values := range charts {
 		for {
 			if err := m.install(key.namespace, key.name, key.minVersion, values, forceAdopt); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
@@ -117,10 +121,12 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, fo
 				continue
 			} else if err != nil {
 				logrus.Errorf("Failed to install system chart %s: %v", key.name, err)
+				errs = append(errs, err)
 			}
 			break
 		}
 	}
+	return merr.NewErrors(errs...)
 }
 
 func (m *Manager) Uninstall(namespace, name string) error {
@@ -343,6 +349,10 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, desir
 			min, err := semver.NewVersion(minVersion)
 			if err != nil {
 				return false, "", nil, err
+			}
+			if desired.LessThan(min) {
+				logrus.Errorf("available chart version (%s) for %s is less than the min version (%s) ", desired, name, min)
+				return false, "", nil, repo.ErrNoChartName
 			}
 			if min.LessThan(ver) || min.Equal(ver) {
 				// If the current deployed version is greater or equal than the min version but configuration has changed, return false and upgrade with the current version
