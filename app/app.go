@@ -257,6 +257,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
 		providerrefresh.StartRefreshDaemon(ctx, r.ScaledContext, management, cronTime, maxAge)
 		cleanupOrphanedSystemUsers(ctx, management)
+		go cleanupOrphanBindings(r.ScaledContext, r.WranglerContext)
 		logrus.Infof("Rancher startup complete")
 
 		<-ctx.Done()

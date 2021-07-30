@@ -554,7 +554,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 						ObjectMeta: metav1.ObjectMeta{
 							Name: bindingName,
 							Labels: map[string]string{
-								string(binding.UID): prtbInClusterBindingOwner,
+								string(binding.UID): PrtbInClusterBindingOwner,
 							},
 						},
 						Subjects: []v1.Subject{subject},
@@ -574,7 +574,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	}
 
 	currentRBs := map[string]*v1.RoleBinding{}
-	set := labels.Set(map[string]string{string(binding.UID): prtbInClusterBindingOwner})
+	set := labels.Set(map[string]string{string(binding.UID): PrtbInClusterBindingOwner})
 	current, err := m.rbLister.List(clusterNamespace, set.AsSelector())
 	if err != nil {
 		return err
