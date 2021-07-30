@@ -13,6 +13,7 @@ import (
 
 const (
 	globalUnrestrictedAnnotation = "psp.rke2.io/global-unrestricted"
+	globalRestrictedAnnotation   = "psp.rke2.io/global-restricted"
 )
 
 type handler struct {
@@ -31,12 +32,17 @@ func Register(ctx context.Context, context *config.UserContext) {
 	context.Policy.PodSecurityPolicies("").AddHandler(ctx, "psp-delete", h.sync)
 }
 
+func has(data map[string]string, key string) bool {
+	_, ok := data[key]
+	return ok
+}
+
 func (h *handler) sync(key string, obj *v1beta1.PodSecurityPolicy) (runtime.Object, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
-	if _, ok := obj.Annotations[globalUnrestrictedAnnotation]; !ok {
+	if !has(obj.Annotations, globalUnrestrictedAnnotation) && !has(obj.Annotations, globalRestrictedAnnotation) {
 		return obj, nil
 	}
 
