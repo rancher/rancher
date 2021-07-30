@@ -141,6 +141,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("*").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("*").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRoleTemplate("Cluster Member", "cluster-member", "cluster", false, false, false).
@@ -165,7 +166,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("clusters").resourceNames("local").verbs("get").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("get", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("get", "watch").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("get", "watch")
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("get", "watch").
+		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch")
 
 	rb.addRoleTemplate("Create Projects", "projects-create", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
@@ -187,14 +189,16 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("").resources("nodes").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustermonitorgraphs").verbs("get", "list", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("*").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("*")
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("*")
 
 	rb.addRoleTemplate("View Nodes", "nodes-view", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("nodes", "nodepools").verbs("get", "list", "watch").
 		addRule().apiGroups("").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clustermonitorgraphs").verbs("get", "list", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("get", "watch").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("get", "watch")
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("get", "watch").
+		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch")
 
 	rb.addRoleTemplate("Manage Storage", "storage-manage", "cluster", false, false, false).
 		addRule().apiGroups("").resources("persistentvolumes").verbs("*").
