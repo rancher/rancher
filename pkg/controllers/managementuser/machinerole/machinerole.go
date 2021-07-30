@@ -47,7 +47,7 @@ func (h *handler) WorkerLabelSync(key string, node *corev1.Node) (runtime.Object
 	}
 	var nodeCopy *corev1.Node
 	if val, exists := machine.Labels["rke.cattle.io/worker-role"]; exists && val == "true" {
-		nodeCopy := node.DeepCopy()
+		nodeCopy = node.DeepCopy()
 		nodeCopy.Labels["node-role.kubernetes.io/worker"] = "true"
 	}
 	if nodeCopy == nil {
