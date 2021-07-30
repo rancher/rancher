@@ -124,6 +124,7 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 				"namespace": cluster.Namespace,
 			},
 			"spec": map[string]interface{}{
+				"clusterName": cluster.Name,
 				"template": map[string]interface{}{
 					"spec": map[string]interface{}(machinePoolData),
 				},

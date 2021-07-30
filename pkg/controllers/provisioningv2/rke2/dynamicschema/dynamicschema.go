@@ -95,6 +95,9 @@ func addMachineTemplateSchema(name string, specSchema, statusSchema *schemas.Sch
 			"template": {
 				Type: templateTemplateSpecSchemaID,
 			},
+			"clusterName": {
+				Type: "string",
+			},
 		},
 	})
 	if err != nil {
