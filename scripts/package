@@ -8,6 +8,7 @@ SYSTEM_CHART_REPO_DIR=build/system-charts
 SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.6"}
 CHART_REPO_DIR=build/charts
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.6"}
+CVES_DOWNLOAD_URL=https://raw.githubusercontent.com/rancher/image-scanning/main/docs/_data/cves-v2.6.csv
 
 cd $(dirname $0)/../package
 
@@ -72,6 +73,9 @@ fi
 if [ ${ARCH} == amd64 ]; then
     # Move this out of ARCH check for local dev on non-amd64 hardware.
     TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE
+
+    # CVEs CSV
+    curl -sL ${CVES_DOWNLOAD_URL} -o ${TAG}_CVE_SCAN_RESULTS.csv
 
     # rancherd tarball
     rm -rf build/rancherd/bundle
