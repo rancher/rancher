@@ -10,6 +10,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
+	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -207,8 +208,18 @@ func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(bind
 		return err
 	}
 	for _, rb := range rbs {
-		sub := rb.Subjects
-		if sub[0].Name == binding.UserName {
+		var removeBinding bool
+		sub := rb.Subjects[0]
+		if sub.Kind == rbacv1.GroupKind && sub.Name == binding.GroupName {
+			removeBinding = true
+		}
+		if sub.Kind == rbacv1.GroupKind && sub.Name == binding.GroupPrincipalName {
+			removeBinding = true
+		}
+		if sub.Kind == rbacv1.UserKind && sub.Name == binding.UserName {
+			removeBinding = true
+		}
+		if removeBinding {
 			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for prtb %v", ptrbMGMTController, rb.Name, clusterName, binding.Name)
 			if err := p.mgr.mgmt.RBAC.RoleBindings(clusterName).Delete(rb.Name, &v1.DeleteOptions{}); err != nil {
 				return err
