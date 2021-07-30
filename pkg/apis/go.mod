@@ -12,7 +12,7 @@ require (
 	github.com/rancher/gke-operator v1.1.1-rc10
 	github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133
 	github.com/rancher/rke v1.3.0-rc9
-	github.com/rancher/wrangler v0.8.3
+	github.com/rancher/wrangler v0.8.4-0.20210729214659-5e75fca61cb2
 	github.com/sirupsen/logrus v1.7.0
 	k8s.io/api v0.21.2
 	k8s.io/apimachinery v0.21.2
