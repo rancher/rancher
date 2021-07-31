@@ -759,10 +759,15 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, d
 		v = *spec.GenericEngineConfig
 	}
 
-	if driverName == apimgmtv3.ClusterDriverRKE && reconcileRKE {
-		nodes, err := p.reconcileRKENodes(clusterName)
-		if err != nil {
-			return nil, nil, err
+	if driverName == apimgmtv3.ClusterDriverRKE && spec.RancherKubernetesEngineConfig != nil {
+		spec.RancherKubernetesEngineConfig = spec.RancherKubernetesEngineConfig.DeepCopy()
+
+		if reconcileRKE {
+			nodes, err := p.reconcileRKENodes(clusterName)
+			if err != nil {
+				return nil, nil, err
+			}
+			spec.RancherKubernetesEngineConfig.Nodes = nodes
 		}
 
 		systemImages, err := p.getSystemImages(spec)
@@ -770,11 +775,7 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, d
 			return nil, nil, err
 		}
 
-		rkeCopy := *spec.RancherKubernetesEngineConfig
-		spec.RancherKubernetesEngineConfig = &rkeCopy
-		spec.RancherKubernetesEngineConfig.Nodes = nodes
 		spec.RancherKubernetesEngineConfig.SystemImages = *systemImages
-
 		data, _ := convert.EncodeToMap(spec)
 		v, _ = data[RKEDriverKey]
 	}
