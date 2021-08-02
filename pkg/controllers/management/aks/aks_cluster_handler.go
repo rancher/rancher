@@ -2,6 +2,7 @@ package aks
 
 import (
 	"context"
+	"encoding/base64"
 	stderrors "errors"
 	"fmt"
 	"net"
@@ -433,5 +434,13 @@ func (e *aksOperatorController) getRestConfig(cluster *mgmtv3.Cluster) (*rest.Co
 	if err != nil {
 		return nil, err
 	}
+
+	// Get the CACert from the cluster because it will have any additional CAs added to Rancher.
+	certFromCluster, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
+	if err != nil {
+		return nil, err
+	}
+
+	restConfig.CAData = certFromCluster
 	return restConfig, nil
 }
