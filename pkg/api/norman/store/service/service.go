@@ -35,7 +35,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 	// Check for unset ipFamilyPolicy, for headless services this defaults to dual stack but will not function if the cluster does not have dual stack properly configured (IPv6 CIDRs)
 	// If its not explicitly configured in the request, we default to SingleStack
-	if schema.ID == "service" {
+	if schema.ID == "service" || schema.ID == "dnsRecord" {
 		logrus.Tracef("Service: Create: data [%v]", data)
 		if val, ok := data["kind"]; ok {
 			if val == "ClusterIP" {
