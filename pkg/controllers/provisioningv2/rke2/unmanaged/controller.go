@@ -61,34 +61,21 @@ type handler struct {
 	apply            apply.Apply
 }
 
-func (h *handler) findMachine(cluster *capi.Cluster, machineName, machineID string) error {
-	_, errNotFound := h.machineCache.Get(cluster.Namespace, machineName)
-	if errNotFound == nil {
-		return nil
-	} else if !apierror.IsNotFound(errNotFound) {
-		return errNotFound
+func (h *handler) findMachine(cluster *capi.Cluster, machineName, machineID string) (string, error) {
+	_, err := h.machineCache.Get(cluster.Namespace, machineName)
+	if apierror.IsNotFound(err) {
+		machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
+			"rke.cattle.io/machine-id": machineID,
+		}))
+		if len(machines) != 1 || err != nil || machines[0].Spec.ClusterName != cluster.Name {
+			return "", err
+		}
+		return machines[0].Name, nil
+	} else if err != nil {
+		return "", err
 	}
 
-	if machineID == "" {
-		return errNotFound
-	}
-
-	machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
-		"rke.cattle.io/machine-id": machineID,
-	}))
-	if err != nil {
-		return err
-	}
-
-	if len(machines) == 0 {
-		return errNotFound
-	}
-
-	if machines[0].Spec.ClusterName == cluster.Name {
-		return nil
-	}
-
-	return errNotFound
+	return machineName, nil
 }
 
 func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
@@ -115,22 +102,24 @@ func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Sec
 		return secret, err
 	}
 
-	err = h.findMachine(capiCluster, secret.Name, data.String("id"))
-	if apierror.IsNotFound(err) {
-		err = h.createMachine(capiCluster, secret, data)
-	}
+	machineName, err := h.findMachine(capiCluster, secret.Name, data.String("id"))
 	if err != nil {
-		return secret, err
+		return nil, err
+	} else if machineName == "" {
+		machineName = secret.Name
+		if err = h.createMachine(capiCluster, secret, data); err != nil {
+			return nil, err
+		}
 	}
 
 	if secret.Labels[planner.MachineNamespaceLabel] != capiCluster.Namespace ||
-		secret.Labels[planner.MachineNameLabel] != secret.Name {
+		secret.Labels[planner.MachineNameLabel] != machineName {
 		secret = secret.DeepCopy()
 		if secret.Labels == nil {
 			secret.Labels = map[string]string{}
 		}
 		secret.Labels[planner.MachineNamespaceLabel] = capiCluster.Namespace
-		secret.Labels[planner.MachineNameLabel] = secret.Name
+		secret.Labels[planner.MachineNameLabel] = machineName
 
 		return h.secrets.Update(secret)
 	}
