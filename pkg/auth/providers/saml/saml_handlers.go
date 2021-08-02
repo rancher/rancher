@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/crewjam/saml"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	log "github.com/sirupsen/logrus"
 )
 
