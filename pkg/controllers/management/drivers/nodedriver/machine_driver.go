@@ -252,6 +252,17 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v32.Field) (*v3.NodeDriver, error) {
 	name := credentialConfigSchemaName(obj.Spec.DisplayName)
 	credSchema, err := m.schemaLister.Get("", name)
+
+	if name == "amazonec2credentialconfig" {
+		credFields["defaultRegion"] = v32.Field{
+			Type:         "string",
+			Description:  "AWS Default Region",
+			DynamicField: true,
+			Create:       true,
+			Update:       true,
+		}
+	}
+
 	if err != nil {
 		if errors.IsNotFound(err) {
 			credentialSchema := &v3.DynamicSchema{
