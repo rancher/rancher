@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -12,9 +13,12 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/sirupsen/logrus"
@@ -52,30 +56,35 @@ type desired struct {
 }
 
 type Manager struct {
-	ctx              context.Context
-	operation        *helmop.Operations
-	content          *content.Manager
-	restClientGetter genericclioptions.RESTClientGetter
-	pods             corecontrollers.PodClient
-	desiredCharts    map[desiredKey]map[string]interface{}
-	sync             chan desired
-	syncLock         sync.Mutex
+	ctx                   context.Context
+	operation             *helmop.Operations
+	content               *content.Manager
+	restClientGetter      genericclioptions.RESTClientGetter
+	pods                  corecontrollers.PodClient
+	desiredCharts         map[desiredKey]map[string]interface{}
+	sync                  chan desired
+	syncLock              sync.Mutex
+	refreshIntervalChange chan struct{}
+	settings              mgmtcontrollers.SettingController
 }
 
 func NewManager(ctx context.Context,
 	restClientGetter genericclioptions.RESTClientGetter,
 	contentManager *content.Manager,
 	ops *helmop.Operations,
-	pods corecontrollers.PodClient) (*Manager, error) {
+	pods corecontrollers.PodClient,
+	settings mgmtcontrollers.SettingController) (*Manager, error) {
 
 	m := &Manager{
-		ctx:              ctx,
-		operation:        ops,
-		content:          contentManager,
-		restClientGetter: restClientGetter,
-		pods:             pods,
-		sync:             make(chan desired, 10),
-		desiredCharts:    map[desiredKey]map[string]interface{}{},
+		ctx:                   ctx,
+		operation:             ops,
+		content:               contentManager,
+		restClientGetter:      restClientGetter,
+		pods:                  pods,
+		sync:                  make(chan desired, 10),
+		desiredCharts:         map[desiredKey]map[string]interface{}{},
+		refreshIntervalChange: make(chan struct{}, 1),
+		settings:              settings,
 	}
 
 	return m, nil
@@ -84,14 +93,27 @@ func NewManager(ctx context.Context,
 func (m *Manager) Start(ctx context.Context) {
 	m.ctx = ctx
 	go m.runSync()
+
+	m.settings.OnChange(ctx, "system-feature-chart-refresh", m.onSetting)
+}
+
+func (m *Manager) onSetting(key string, obj *v3.Setting) (*v3.Setting, error) {
+	if key != settings.SystemFeatureChartRefreshSeconds.Name {
+		return obj, nil
+	}
+
+	m.refreshIntervalChange <- struct{}{}
+	return obj, nil
 }
 
 func (m *Manager) runSync() {
-	t := time.NewTicker(15 * time.Minute)
+	t := time.NewTicker(getIntervalOrDefault(settings.SystemFeatureChartRefreshSeconds.Get()))
 	defer t.Stop()
 
 	for {
 		select {
+		case <-m.refreshIntervalChange:
+			t = time.NewTicker(getIntervalOrDefault(settings.SystemFeatureChartRefreshSeconds.Get()))
 		case <-m.ctx.Done():
 			return
 		case <-t.C:
@@ -109,6 +131,14 @@ func (m *Manager) runSync() {
 			}
 		}
 	}
+}
+
+func getIntervalOrDefault(interval string) time.Duration {
+	i, err := strconv.Atoi(interval)
+	if err != nil {
+		return 900 * time.Second
+	}
+	return time.Duration(i) * time.Second
 }
 
 func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, forceAdopt bool) error {
@@ -170,6 +200,14 @@ func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]i
 		}
 	}()
 	return nil
+}
+
+func (m *Manager) Remove(namespace, name, minVersion string) {
+	delete(m.desiredCharts, desiredKey{
+		namespace:  namespace,
+		name:       name,
+		minVersion: minVersion,
+	})
 }
 
 func (m *Manager) install(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool) error {

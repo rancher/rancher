@@ -279,7 +279,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		RESTMapper:      restMapper,
 	}
 
-	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, steveControllers.Core.Pod())
+	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, steveControllers.Core.Pod(), mgmt.Management().V3().Setting())
 	if err != nil {
 		return nil, err
 	}
