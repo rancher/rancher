@@ -6,7 +6,10 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
+	namespaces "github.com/rancher/rancher/pkg/namespace"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/kv"
 )
 
 type s3Args struct {
@@ -84,20 +87,26 @@ func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name, r
 		return result, nil
 	}
 
-	secret, err := secretCache.Get(namespace, name)
+	secret, err := machineprovision.GetCloudCredentialSecret(secretCache, namespace, name)
 	if err != nil {
 		return result, fmt.Errorf("failed to lookup etcdSnapshotCloudCredentialName: %w", err)
 	}
-	if secret.Type != "provisioning.cattle.io/cloud-credential" {
+	if secret.Type != "provisioning.cattle.io/cloud-credential" && secret.Namespace != namespaces.GlobalNamespace {
 		return result, fmt.Errorf("expected secret of type provisioning.cattle.io/cloud-credential, got [%s]", secret.Type)
 	}
 
+	data := map[string][]byte{}
+	for k, v := range secret.Data {
+		_, k = kv.RSplit(k, "-")
+		data[k] = v
+	}
+
 	if region == "" {
-		region = string(secret.Data["defaultRegion"])
+		region = string(data["defaultRegion"])
 	}
 	return s3Credential{
-		AccessKey: string(secret.Data["accessKey"]),
-		SecretKey: string(secret.Data["secretKey"]),
+		AccessKey: string(data["accessKey"]),
+		SecretKey: string(data["secretKey"]),
 		Region:    region,
 	}, nil
 }
