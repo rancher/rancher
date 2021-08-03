@@ -8,7 +8,7 @@ import (
 )
 
 func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crtb == nil || (crtb.UserName == "" && crtb.GroupName == "") || crtb.RoleTemplateName == "" {
+	if crtb == nil || crtb.DeletionTimestamp != nil || (crtb.UserName == "" && crtb.GroupName == "") || crtb.RoleTemplateName == "" {
 		return nil, nil
 	}
 
