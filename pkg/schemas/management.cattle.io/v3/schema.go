@@ -100,6 +100,7 @@ func credTypes(schemas *types.Schemas) *types.Schemas {
 			&m.DisplayName{},
 			&mapper.CredentialMapper{},
 			&m.AnnotationField{Field: "name"},
+			&m.AnnotationField{Field: "description"},
 			&m.Drop{Field: "namespaceId"}).
 		MustImport(&Version, v3.CloudCredential{})
 }
