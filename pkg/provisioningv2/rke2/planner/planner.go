@@ -588,11 +588,10 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		if err != nil {
 			return err
 		}
-		if sel.Matches(labels.Set(machine.Labels)) {
+		if opts.MachineLabelSelector == nil || sel.Matches(labels.Set(machine.Labels)) {
 			for k, v := range opts.Config.Data {
 				config[k] = v
 			}
-			break
 		}
 	}
 
