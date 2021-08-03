@@ -381,6 +381,13 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 			return userInfo, oauth2Token, err
 		}
 	}
+	// Valid will return false if access token is expired
+	if !oauth2Token.Valid() {
+		// since token is not valid, the TokenSource func will attempt to refresh the access token
+		// if the refresh token has not expired
+		logrus.Debugf("[generic oidc] saveOIDCConfig: attempting to refresh access token")
+	}
+	logrus.Debugf("[generic oidc] saveOIDCConfig: getting user info")
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, oauth2Token))
 	if err != nil {
 		return userInfo, oauth2Token, err
