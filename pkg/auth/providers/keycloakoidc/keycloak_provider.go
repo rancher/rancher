@@ -59,6 +59,12 @@ func newClient(config *v32.OIDCConfig, token *oauth2.Token) (*KeyCloakClient, er
 		return nil, err
 	}
 	oauthConfig := oidc.ConfigToOauthConfig(provider.Endpoint(), config)
+	// Valid will return false if access token is expired
+	if !token.Valid() {
+		// since token is not valid, the TokenSource func used in the Client func will attempt to refresh the access token
+		// if the refresh token has not expired
+		logrus.Debugf("[keycloak oidc] newClient: attempting to refresh access token")
+	}
 	keyCloakClient := &KeyCloakClient{
 		httpClient: oauthConfig.Client(ctx, token),
 	}
