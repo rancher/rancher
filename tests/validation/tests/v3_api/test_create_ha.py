@@ -525,3 +525,13 @@ def precheck_upgrade_options():
         raise pytest.skip('Kubeconfig is not found for upgrade!')
     if RANCHER_HA_HOSTNAME == '' or RANCHER_HA_HOSTNAME is None:
         raise pytest.skip('Hostname is not found for upgrade!')
+
+
+@pytest.fixture(scope='module')
+def precheck_job_configuration():
+    """
+    Perform some basic validation on job input parameters and raise an error if anything problematic is found.
+    """
+    if '-' in RANCHER_HOSTNAME_PREFIX:
+        raise ValueError("Hyphen found in hostname prefix, not allowed")
+

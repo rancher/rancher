@@ -204,10 +204,6 @@ if_test_group_rbac = pytest.mark.skipif(
 test_run_id = "test" + str(random.randint(10000, 99999))
 RANCHER_HOSTNAME_PREFIX = os.environ.get("RANCHER_HOSTNAME_PREFIX",
                                          test_run_id).lower()
-
-if '-' in RANCHER_HOSTNAME_PREFIX:
-    raise Exception("Invalid char found in hostname prefix")
-
 CERT_MANAGER_VERSION = os.environ.get("RANCHER_CERT_MANAGER_VERSION", "v1.0.1")
 # -----------------------------------------------------------------------------
 
