@@ -16,6 +16,8 @@ type ETCDSnapshotCreate struct {
 	Name     string          `json:"name,omitempty"`
 	NodeName string          `json:"nodeName,omitempty"`
 	S3       *ETCDSnapshotS3 `json:"s3,omitempty"`
+	// Changing the Generation is the only thing required to initiate a snapshot creation.
+	Generation int `json:"generation,omitempty"`
 }
 
 type ETCDSnapshot struct {
