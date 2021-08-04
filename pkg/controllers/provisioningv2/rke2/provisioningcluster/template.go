@@ -280,6 +280,9 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		}
 
 		if len(machinePool.Labels) > 0 {
+			for k, v := range machinePool.Labels {
+				machineDeployment.Spec.Template.Labels[k] = v
+			}
 			if err := assign(machineDeployment.Spec.Template.Annotations, planner.LabelsAnnotation, machinePool.Labels); err != nil {
 				return nil, err
 			}
