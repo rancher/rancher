@@ -62,7 +62,7 @@ def test_remove_rancher_ha():
     delete_resource_in_AWS_by_prefix(resource_prefix)
 
 
-def test_install_rancher_ha(precheck_certificate_options):
+def test_install_rancher_ha(precheck_install_job_configuration, precheck_certificate_options):
     cm_install = True
     extra_settings = []
     if "byo-" in RANCHER_HA_CERT_OPTION:
@@ -527,11 +527,21 @@ def precheck_upgrade_options():
         raise pytest.skip('Hostname is not found for upgrade!')
 
 
-@pytest.fixture(scope='module')
-def precheck_job_configuration():
+@pytest.fixture(scope='function')
+def precheck_install_job_configuration():
     """
-    Perform some basic validation on job input parameters and raise an error if anything problematic is found.
+    Perform some basic validation on test input parameters and raise an error if anything problematic is found.
+
+    Note: Pytest fixtures are intended to produce constructs that are used in the course of testing and
+    torn down when test execution completes. A smart IDE will actually notice that the fixtures
+    are not used within the tests themselves and give a warning,
+    e.g. "Parameter 'precheck_certificate_options' value is not used"
+
+    The precheck pattern demonstrated here, if not applied judiciously, could result in eventual scalability
+    issues maintaining test suites.
+
+    Consider making these prechecks into normal functions that are explicitly executed from within the tests.
     """
     if '-' in RANCHER_HOSTNAME_PREFIX:
-        raise ValueError("Hyphen found in hostname prefix, not allowed")
+        raise ValueError("Hyphen found in RANCHER_HOSTNAME_PREFIX, not allowed")
 
