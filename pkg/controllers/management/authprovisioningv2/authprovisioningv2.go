@@ -61,7 +61,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 
 	h.dynamic.AddIndexer(clusterIndexed, h.gvkMatcher, indexByCluster)
 	h.dynamic.OnChange(ctx, "auth-prov-v2-trigger", h.gvkMatcher, h.OnClusterObjectChanged)
-	clients.Mgmt.RoleTemplate().OnChange(ctx, "auth-prov-v2", h.OnChange)
+	clients.Mgmt.RoleTemplate().OnChange(ctx, "auth-prov-v2-roletemplate", h.OnChange)
 	clients.Mgmt.ClusterRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-crtb", h.OnCRTB)
 	clients.CRD.CustomResourceDefinition().OnChange(ctx, "auth-prov-v2-crd", h.OnCRD)
 	clients.Provisioning.Cluster().Cache().AddIndexer(byClusterName, func(obj *v1.Cluster) ([]string, error) {
