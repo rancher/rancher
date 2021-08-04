@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-11-01/containerservice"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/rancher/norman/api/access"
@@ -362,6 +363,10 @@ func (v *Validator) validateAKSConfig(request *types.APIContext, cluster map[str
 		}
 	}
 
+	if err := v.validateAKSNetworkPolicy(clusterSpec, prevCluster); err != nil {
+		return err
+	}
+
 	createFromImport := request.Method == http.MethodPost && aksConfig["imported"] == true
 
 	if !createFromImport {
@@ -482,6 +487,29 @@ func validateAKSClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for AKS cluster [%s] "+msgSuffix, name))
 	}
+	return nil
+}
+
+// validateAKSNetworkPolicy performs validation around setting enableNetworkPolicy on AKS clusters which turns on Project Network Isolation
+func (v *Validator) validateAKSNetworkPolicy(clusterSpec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	// determine if network policy is enabled on the AKS cluster by checking the cluster spec and then the upstream spec if the field is nil (unmanaged)
+	var networkPolicy string
+	if clusterSpec.AKSConfig != nil && clusterSpec.AKSConfig.NetworkPolicy != nil {
+		networkPolicy = *clusterSpec.AKSConfig.NetworkPolicy
+	} else if prevCluster != nil && prevCluster.Status.AKSStatus.UpstreamSpec != nil && prevCluster.Status.AKSStatus.UpstreamSpec.NetworkPolicy != nil {
+		networkPolicy = *prevCluster.Status.AKSStatus.UpstreamSpec.NetworkPolicy
+	} else {
+		return nil
+	}
+
+	// network policy enabled on the AKS cluster is a prerequisite for PNI
+	if to.Bool(clusterSpec.EnableNetworkPolicy) && networkPolicy != string(containerservice.NetworkPolicyAzure) && networkPolicy != string(containerservice.NetworkPolicyCalico) {
+		return httperror.NewAPIError(
+			httperror.InvalidBodyContent,
+			"Network Policy support must be enabled on AKS cluster in order to enable Project Network Isolation",
+		)
+	}
+
 	return nil
 }
 
@@ -760,7 +788,7 @@ func (v *Validator) validateGKENetworkPolicy(clusterSpec *v32.ClusterSpec, prevC
 	}
 
 	// network policy enabled on the GKE cluster is a prerequisite for PNI
-	if enableNetPol := clusterSpec.EnableNetworkPolicy; enableNetPol != nil && *enableNetPol && !netPolEnabled {
+	if to.Bool(clusterSpec.EnableNetworkPolicy) && !netPolEnabled {
 		return httperror.NewAPIError(
 			httperror.InvalidBodyContent,
 			"Network Policy support must be enabled on GKE cluster in order to enable Project Network Isolation",
