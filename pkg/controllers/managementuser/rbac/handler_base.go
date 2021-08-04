@@ -92,6 +92,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		clusterLister:       workload.Management.Management.Clusters("").Controller().Lister(),
 		projectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
 		userLister:          workload.Management.Management.Users("").Controller().Lister(),
+		userAttributeLister: workload.Management.Management.UserAttributes("").Controller().Lister(),
 		crtbs:               workload.Management.Management.ClusterRoleTemplateBindings(""),
 		prtbs:               workload.Management.Management.ProjectRoleTemplateBindings(""),
 		clusterName:         workload.ClusterName,
@@ -139,6 +140,7 @@ type manager struct {
 	clusterLister       v3.ClusterLister
 	projectLister       v3.ProjectLister
 	userLister          v3.UserLister
+	userAttributeLister v3.UserAttributeLister
 	crtbs               v3.ClusterRoleTemplateBindingInterface
 	prtbs               v3.ProjectRoleTemplateBindingInterface
 	clusterName         string
