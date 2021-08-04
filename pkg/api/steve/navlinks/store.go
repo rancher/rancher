@@ -27,7 +27,7 @@ func hasAccess(apiOp *types.APIRequest, result types.APIObject) bool {
 	}
 
 	serviceNamespace, serviceName := data.String("namespace"), data.String("name")
-	return apiOp.AccessControl.CanDo(apiOp, "/service/proxy", "get", serviceNamespace, serviceName) == nil
+	return apiOp.AccessControl.CanDo(apiOp, "/services/proxy", "get", serviceNamespace, serviceName) == nil
 }
 
 func (e *store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.APIObjectList, error) {
