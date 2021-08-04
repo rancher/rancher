@@ -1,0 +1,366 @@
+apiVersion: v1
+items:
+- apiVersion: management.cattle.io/v3
+  kind: Cluster
+  metadata:
+    annotations:
+      authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
+      field.cattle.io/creatorId: user-tzzzj
+      lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
+      lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
+      lifecycle.cattle.io/create.cluster-scoped-gc: "true"
+      lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
+      objectset.rio.cattle.io/applied: H4sIAAAAAAAA/5RSzU4bMRB+lWrOuzRRCJCVekCoB1SVIhW154k93gzxjlfj2USA8u6Vkw0NrYrUo+fn+5nPL4A9/yDNnAQa6FCwpY7EzhyaRTrj9HEzgwrWLB4auIlDNlKooCNDj4bQvACKJEPjJLk8A1P0JwBOCS3pbQEYMmltz8/Pj1BBWj6Ss0x2ppxOFrhMugNVvd+md6bTVkjrdrOGBnpNGy5mWNpTC9PqwxcW/+m3/vfRBDuCprhGxdonp+Rr9x/LuUdXEEIkstpTwCEa7CrY2+EkD9xRNux6aGSIsYKIS4r7+/0LfYV5BQ3QfIJh5i/nYRYWMwqTC7eYnl/hfBomVws/uaT5hXdzLGyjD1d3dVi45WJ6Pinl3JPbB9eS2G2HLX3bkCr7MgwVoOQtaRGzq2AUf5/8d3KDsj3dp8ju6YG6PqLR3YFjEKVsys7IQ9nKTrm3w8c6FFjJX79Svi0Ptjqtcu4jPt29HwMJLiONmV5HUmNpoQkYM/3R/ZqELenf/TuybdL1wdIxi31qP5Ou9zGOKt5GWQF3fVIjf5MkcFvOuR6WdHxBuTOLkQrGV86YHMaj4MFWn8X3icXK9kGPH2d3FWxZfNrme6VASv74d8f+7lcAAAD//xF80sa8AwAA
+      objectset.rio.cattle.io/id: cluster-create
+      objectset.rio.cattle.io/owner-gvk: provisioning.cattle.io/v1, Kind=Cluster
+      objectset.rio.cattle.io/owner-name: kinara-docred-cluster
+      objectset.rio.cattle.io/owner-namespace: fleet-default
+      provisioner.cattle.io/ke-driver-update: updated
+    creationTimestamp: "2021-07-30T15:53:35Z"
+    finalizers:
+    - controller.cattle.io/cluster-agent-controller-cleanup
+    - controller.cattle.io/cluster-scoped-gc
+    - controller.cattle.io/cluster-provisioner-controller
+    - controller.cattle.io/mgmt-cluster-rbac-remove
+    - wrangler.cattle.io/mgmt-cluster-remove
+    generation: 21
+    labels:
+      objectset.rio.cattle.io/hash: e50af3d75f3f93ef06c9148a51f089d07e56dc5a
+    name: c-m-f9cb9140
+    resourceVersion: "4842"
+    uid: eb1b0e2e-2b5c-440e-af15-167bafd1f02c
+  spec:
+    agentImageOverride: ""
+    answers: {}
+    defaultPodSecurityPolicyTemplateName: unrestricted
+    description: ""
+    desiredAgentImage: ""
+    desiredAuthImage: ""
+    displayName: kinara-docred-cluster
+    enableClusterAlerting: false
+    enableClusterMonitoring: false
+    enableNetworkPolicy: null
+    fleetWorkspaceName: fleet-default
+    importedConfig:
+      kubeConfig: ""
+    internal: false
+    localClusterAuthEndpoint:
+      enabled: false
+    rke2Config:
+      kubernetesVersion: v1.21.3+rke2r1
+      rke2upgradeStrategy:
+        serverConcurrency: 1
+        workerConcurrency: 1
+    windowsPreferedCluster: false
+  status:
+    agentFeatures:
+      embedded-cluster-api: false
+      fleet: false
+      monitoringv1: false
+      multi-cluster-management: false
+      multi-cluster-management-agent: true
+      provisioningv2: false
+      rke2: false
+    agentImage: rancher/rancher-agent:master-head
+    aksStatus:
+      privateRequiresTunnel: null
+      rbacEnabled: null
+      upstreamSpec: null
+    allocatable:
+      cpu: "2"
+      memory: 4030664Ki
+      pods: "110"
+    apiEndpoint: https://10.43.0.1:443
+    appliedEnableNetworkPolicy: false
+    appliedPodSecurityPolicyTemplateId: unrestricted
+    appliedSpec:
+      agentImageOverride: ""
+      answers: {}
+      description: ""
+      desiredAgentImage: ""
+      desiredAuthImage: ""
+      displayName: ""
+      enableClusterAlerting: false
+      enableClusterMonitoring: false
+      enableNetworkPolicy: null
+      internal: false
+      localClusterAuthEndpoint:
+        enabled: false
+      windowsPreferedCluster: false
+    authImage: ""
+    caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJlVENDQVIrZ0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQWtNU0l3SUFZRFZRUUREQmx5YTJVeUxYTmwKY25abGNpMWpZVUF4TmpJM05qWXdORGs0TUI0WERUSXhNRGN6TURFMU5UUTFPRm9YRFRNeE1EY3lPREUxTlRRMQpPRm93SkRFaU1DQUdBMVVFQXd3WmNtdGxNaTF6WlhKMlpYSXRZMkZBTVRZeU56WTJNRFE1T0RCWk1CTUdCeXFHClNNNDlBZ0VHQ0NxR1NNNDlBd0VIQTBJQUJQeXlKMVB3QVVXbmZRVDdPTVlPaklCeGc4NWRUUXhsOXEvRU5LOTEKM2E2UnVaQTdseEs1YytsLzM3dG5LbHVMWlFFZ0psUEJJSG9Sb3RBR0RMdjMrYkNqUWpCQU1BNEdBMVVkRHdFQgovd1FFQXdJQ3BEQVBCZ05WSFJNQkFmOEVCVEFEQVFIL01CMEdBMVVkRGdRV0JCUmlmZkhMWXNlb3RxWDVRNXovCm1uUXBJNHZ6SURBS0JnZ3Foa2pPUFFRREFnTklBREJGQWlFQTlFbGFKNmlUVXR1ZnRNMVFzLzN5Yng4S0hsNnIKWk5rSWJlVDFYclhaR0hRQ0lEQWNUSWFFc1pSUDN4UVB2SmNFNkNDSjZpSnYva2Z6YTYwVDEwcU8xckRqCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    capabilities:
+      loadBalancerCapabilities: {}
+    capacity:
+      cpu: "2"
+      memory: 4030664Ki
+      pods: "110"
+    componentStatuses:
+    - conditions:
+      - message: ok
+        status: "True"
+        type: Healthy
+      name: controller-manager
+    - conditions:
+      - message: '{"health":"true"}'
+        status: "True"
+        type: Healthy
+      name: etcd-0
+    - conditions:
+      - message: ok
+        status: "True"
+        type: Healthy
+      name: scheduler
+    conditions:
+    - lastUpdateTime: "2021-07-30T08:53:35-07:00"
+      status: "True"
+      type: BackingNamespaceCreated
+    - lastUpdateTime: "2021-07-30T08:53:36-07:00"
+      status: "True"
+      type: DefaultProjectCreated
+    - lastUpdateTime: "2021-07-30T08:53:36-07:00"
+      status: "True"
+      type: SystemProjectCreated
+    - lastUpdateTime: "2021-07-30T08:53:36-07:00"
+      status: "True"
+      type: InitialRolesPopulated
+    - lastUpdateTime: "2021-07-30T08:53:36-07:00"
+      status: "True"
+      type: CreatorMadeOwner
+    - lastUpdateTime: "2021-07-30T08:57:44-07:00"
+      status: "True"
+      type: Pending
+    - lastUpdateTime: "2021-07-30T08:58:09-07:00"
+      status: "True"
+      type: Provisioned
+    - lastUpdateTime: "2021-07-30T08:58:30-07:00"
+      status: "True"
+      type: Waiting
+    - lastUpdateTime: "2021-07-30T08:53:37-07:00"
+      status: "True"
+      type: NoDiskPressure
+    - lastUpdateTime: "2021-07-30T08:53:37-07:00"
+      status: "True"
+      type: NoMemoryPressure
+    - lastUpdateTime: "2021-07-30T15:53:49Z"
+      status: "False"
+      type: Connected
+    - lastUpdateTime: "2021-07-30T08:57:50-07:00"
+      status: "True"
+      type: GlobalAdminsSynced
+    - lastUpdateTime: "2021-07-30T08:57:52-07:00"
+      status: "False"
+      type: AlertingEnabled
+    - lastUpdateTime: "2021-07-30T08:58:00-07:00"
+      status: "True"
+      type: Ready
+    - lastUpdateTime: "2021-07-30T08:58:02-07:00"
+      status: "True"
+      type: SystemAccountCreated
+    - lastUpdateTime: "2021-07-30T08:58:07-07:00"
+      status: "True"
+      type: AgentDeployed
+    - lastUpdateTime: "2021-07-30T08:58:14-07:00"
+      status: "True"
+      type: Updated
+    - lastUpdateTime: "2021-07-30T08:58:15-07:00"
+      status: "False"
+      type: PrometheusOperatorDeployed
+    driver: rke2
+    eksStatus:
+      managedLaunchTemplateID: ""
+      managedLaunchTemplateVersions: null
+      privateRequiresTunnel: null
+      securityGroups: null
+      subnets: null
+      upstreamSpec: null
+      virtualNetwork: ""
+    gkeStatus:
+      privateRequiresTunnel: null
+      upstreamSpec: null
+    limits:
+      cpu: 100m
+      memory: 128Mi
+      pods: "0"
+    provider: rke2
+    requested:
+      cpu: 1200m
+      memory: 218Mi
+      pods: "14"
+    serviceAccountToken: eyJhbGciOiJSUzI1NiIsImtpZCI6ImJGN19RUFJId3kzTENpbExwNWRya3kzSWtLMTFwWllLRVVPeExFRnJSWkkifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJjYXR0bGUtc3lzdGVtIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImNhdHRsZS10b2tlbi1qa3ptMiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJjYXR0bGUiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJkZTdhNTExMi0xYzBiLTQ2YmUtODVjMS02ZDM4YWVlZmUxNGYiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6Y2F0dGxlLXN5c3RlbTpjYXR0bGUifQ.ZoU-opGVAKx2WABAzfqryIdegcJ-al8p81cWiDwyUhEZ7SIsryWcfRqbQIak03yLaI-CpdOrzm-Q0c2v3pRFpBtCI7_D2JTmc5yGVdJOvbg11-WLlkKCanhKYoJ0MjnSHkTHiLsMbyJOzLY5x9QLOckBHQOJbJIHNLd9pIkuHt4h_c-m-JX-VzUGYiI11p1_E4xVBxjHh3G2-tRODtdeAtl3aFdFH5HOYqp2WSI8JmNgCQ-2ye-_SasrI7_RY7aUUo6rNkeDnGUul7CiiBjphmgRM0t6Yd0MoKvzeJuM6rkFDplW_TAxJ1Cv-nsPzQaaDyPg6sdvzHiqfj9MLxbDIw
+    version:
+      buildDate: "2021-07-21T16:49:24Z"
+      compiler: gc
+      gitCommit: ca643a4d1f7bfe34773c74f79527be4afd95bf39
+      gitTreeState: clean
+      gitVersion: v1.21.3+rke2r1
+      goVersion: go1.16.6b7
+      major: "1"
+      minor: "21"
+      platform: linux/amd64
+- apiVersion: management.cattle.io/v3
+  kind: Cluster
+  metadata:
+    annotations:
+      authz.management.cattle.io/creator-role-bindings: '{"created":[],"required":["cluster-owner"]}'
+      lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
+      lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
+      lifecycle.cattle.io/create.cluster-scoped-gc: "true"
+      lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
+      provisioner.cattle.io/ke-driver-update: updated
+    creationTimestamp: "2021-07-30T15:51:46Z"
+    finalizers:
+    - controller.cattle.io/cluster-agent-controller-cleanup
+    - controller.cattle.io/cluster-scoped-gc
+    - controller.cattle.io/cluster-provisioner-controller
+    - controller.cattle.io/mgmt-cluster-rbac-remove
+    - wrangler.cattle.io/mgmt-cluster-remove
+    generation: 17
+    name: local
+    resourceVersion: "5066"
+    uid: 7cfe3c80-8731-4ea5-8b4b-0da73b243112
+  spec:
+    agentImageOverride: ""
+    answers: {}
+    description: ""
+    desiredAgentImage: ""
+    desiredAuthImage: ""
+    displayName: local
+    dockerRootDir: /var/lib/docker
+    enableClusterAlerting: false
+    enableClusterMonitoring: false
+    enableNetworkPolicy: null
+    fleetWorkspaceName: fleet-local
+    internal: true
+    k3sConfig:
+      k3supgradeStrategy:
+        serverConcurrency: 1
+        workerConcurrency: 1
+      kubernetesVersion: v1.21.2+k3s1
+    localClusterAuthEndpoint:
+      enabled: false
+    windowsPreferedCluster: false
+  status:
+    agentImage: ""
+    aksStatus:
+      privateRequiresTunnel: null
+      rbacEnabled: null
+      upstreamSpec: null
+    allocatable:
+      cpu: "12"
+      memory: 5313156Ki
+      pods: "110"
+    appliedEnableNetworkPolicy: false
+    appliedPodSecurityPolicyTemplateId: ""
+    appliedSpec:
+      agentImageOverride: ""
+      answers: {}
+      description: ""
+      desiredAgentImage: ""
+      desiredAuthImage: ""
+      displayName: ""
+      enableClusterAlerting: false
+      enableClusterMonitoring: false
+      enableNetworkPolicy: null
+      internal: false
+      localClusterAuthEndpoint:
+        enabled: false
+      windowsPreferedCluster: false
+    authImage: ""
+    capabilities:
+      loadBalancerCapabilities: {}
+    capacity:
+      cpu: "12"
+      memory: 5313156Ki
+      pods: "110"
+    componentStatuses:
+    - conditions:
+      - message: ok
+        status: "True"
+        type: Healthy
+      name: controller-manager
+    - conditions:
+      - message: ok
+        status: "True"
+        type: Healthy
+      name: scheduler
+    conditions:
+    - status: "True"
+      type: Ready
+    - lastUpdateTime: "2021-07-30T08:51:50-07:00"
+      status: "True"
+      type: BackingNamespaceCreated
+    - lastUpdateTime: "2021-07-30T08:51:50-07:00"
+      status: "True"
+      type: DefaultProjectCreated
+    - lastUpdateTime: "2021-07-30T08:51:51-07:00"
+      status: "True"
+      type: SystemProjectCreated
+    - lastUpdateTime: "2021-07-30T08:51:53-07:00"
+      status: "True"
+      type: CreatorMadeOwner
+    - lastUpdateTime: "2021-07-30T08:51:56-07:00"
+      status: "True"
+      type: Pending
+    - lastUpdateTime: "2021-07-30T08:51:59-07:00"
+      status: "True"
+      type: Provisioned
+    - lastUpdateTime: "2021-07-30T08:52:11-07:00"
+      status: "True"
+      type: Waiting
+    - lastUpdateTime: "2021-07-30T08:51:56-07:00"
+      status: "True"
+      type: NoDiskPressure
+    - lastUpdateTime: "2021-07-30T08:51:56-07:00"
+      status: "True"
+      type: NoMemoryPressure
+    - lastUpdateTime: "2021-07-30T08:51:58-07:00"
+      status: "False"
+      type: AlertingEnabled
+    - lastUpdateTime: "2021-07-30T08:51:59-07:00"
+      status: "True"
+      type: SystemAccountCreated
+    - lastUpdateTime: "2021-07-30T08:52:00-07:00"
+      status: "False"
+      type: PrometheusOperatorDeployed
+    - lastUpdateTime: "2021-07-30T08:52:00-07:00"
+      status: "True"
+      type: Updated
+    - lastUpdateTime: "2021-07-30T08:52:01-07:00"
+      status: "True"
+      type: GlobalAdminsSynced
+    driver: k3s
+    eksStatus:
+      managedLaunchTemplateID: ""
+      managedLaunchTemplateVersions: null
+      privateRequiresTunnel: null
+      securityGroups: null
+      subnets: null
+      upstreamSpec: null
+      virtualNetwork: ""
+    gkeStatus:
+      privateRequiresTunnel: null
+      upstreamSpec: null
+    limits:
+      cpu: "0"
+      memory: 170Mi
+      pods: "0"
+    provider: k3s
+    requested:
+      cpu: 100m
+      memory: 70Mi
+      pods: "9"
+    version:
+      buildDate: "2021-06-21T20:52:44Z"
+      compiler: gc
+      gitCommit: 5a67e8dc473f8945e8e181f6f0b0dbbc387f6fca
+      gitTreeState: clean
+      gitVersion: v1.21.2+k3s1
+      goVersion: go1.16.4
+      major: "1"
+      minor: "21"
+      platform: linux/amd64
+kind: List
+metadata:
+  resourceVersion: ""
+  selfLink: ""
