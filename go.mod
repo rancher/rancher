@@ -10,7 +10,7 @@ replace (
 
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	google.golang.org/grpc => google.golang.org/grpc v1.29.1 // etcd depends on google.golang.org/grpc/naming which was removed in grpc v1.30.0
@@ -62,7 +62,6 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.6+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -73,7 +72,8 @@ require (
 	github.com/garyburd/redigo v1.6.2 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v0.4.0
-	github.com/golang/protobuf v1.4.3
+	github.com/golang-jwt/jwt v3.2.1+incompatible
+	github.com/golang/protobuf v1.5.0
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
 	github.com/gorilla/mux v1.8.0
@@ -119,7 +119,7 @@ require (
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
-	github.com/sirupsen/logrus v1.7.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
