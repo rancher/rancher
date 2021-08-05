@@ -75,7 +75,8 @@ if [ ${ARCH} == amd64 ]; then
     TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE
 
     # CVEs CSV
-    curl -sL ${CVES_DOWNLOAD_URL} -o ${TAG}_CVE_SCAN_RESULTS.csv
+    echo "Fetching scan results..."
+    curl -sL ${CVES_DOWNLOAD_URL} -o rancher-${TAG}-SCAN-RESULTS.csv
 
     # rancherd tarball
     rm -rf build/rancherd/bundle
