@@ -62,7 +62,7 @@ func TestCustomOneNode(t *testing.T) {
 	if err := json.Unmarshal([]byte(machines.Items[0].Annotations[planner.LabelsAnnotation]), &labels); err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, labels, map[string]string{"foo": "bar", "ball": "life"})
+	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
 }
 
 func TestCustomThreeNode(t *testing.T) {
@@ -116,7 +116,7 @@ func TestCustomThreeNode(t *testing.T) {
 		if err := json.Unmarshal([]byte(m.Annotations[planner.LabelsAnnotation]), &labels); err != nil {
 			t.Error(err)
 		}
-		assert.Equal(t, labels, map[string]string{"rancher": "awesome"})
+		assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "rancher": "awesome"})
 	}
 }
 
@@ -252,7 +252,7 @@ func TestCustomThreeNodeWithTaints(t *testing.T) {
 		if err := json.Unmarshal([]byte(m.Annotations[planner.LabelsAnnotation]), &labels); err != nil {
 			t.Error(err)
 		}
-		assert.Equal(t, labels, map[string]string{"rancher": "awesome"})
+		assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "rancher": "awesome"})
 
 		if len(m.Annotations[planner.TaintsAnnotation]) != 0 {
 			// Only one node should have the taint
