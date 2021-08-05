@@ -145,7 +145,7 @@ postDelete:
     repository: %POST_DELETE_IMAGE_NAME%
     tag: %POST_DELETE_IMAGE_TAG%
   namespaceList:
-    - fleet-system
+    - cattle-fleet-system
     - cattle-system
     - rancher-operator-system
   # Number of seconds to wait for an app to be uninstalled
