@@ -37,11 +37,12 @@ func (h *handler) isRKE2(clusterID string) bool {
 }
 
 func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRegistrationTokenStatus, error) {
-	ca := systemtemplate.CAChecksum()
+	checksum := systemtemplate.CAChecksum()
+	ca := ""
 	caWindows := ""
-	if ca != "" {
-		ca = " --ca-checksum " + ca
-		caWindows = " -CaChecksum " + ca
+	if checksum != "" {
+		ca = " --ca-checksum " + checksum
+		caWindows = " -CaChecksum " + checksum
 	}
 
 	token := crt.Status.Token
