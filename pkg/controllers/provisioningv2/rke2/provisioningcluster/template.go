@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,6 +75,45 @@ func pruneBySchema(kind string, data map[string]interface{}, dynamicSchema mgmtc
 	return nil
 }
 
+func takeOwnership(dynamic *dynamic.Controller, cluster *rancherv1.Cluster, nodeConfig runtime.Object) error {
+	m, err := meta.Accessor(nodeConfig)
+	if err != nil {
+		return err
+	}
+
+	for _, owner := range m.GetOwnerReferences() {
+		if owner.Kind == "Cluster" && owner.APIVersion == "provisioning.cattle.io/v1" {
+			if owner.Name != cluster.Name {
+				return fmt.Errorf("can not use %s/%s [%v] because it is already owned by cluster %s",
+					m.GetNamespace(), m.GetName(), nodeConfig.GetObjectKind().GroupVersionKind(), owner.Name)
+			}
+			return nil
+		}
+		if owner.Controller != nil && *owner.Controller {
+			return fmt.Errorf("can not use %s/%s [%v] because it is already owned by %s %s",
+				m.GetNamespace(), m.GetName(), nodeConfig.GetObjectKind().GroupVersionKind(), owner.Kind, owner.Name)
+		}
+	}
+
+	// Take ownership
+
+	nodeConfig = nodeConfig.DeepCopyObject()
+	m, err = meta.Accessor(nodeConfig)
+	if err != nil {
+		return err
+	}
+	m.SetOwnerReferences(append(m.GetOwnerReferences(), metav1.OwnerReference{
+		APIVersion:         "provisioning.cattle.io/v1",
+		Kind:               "Cluster",
+		Name:               cluster.Name,
+		UID:                cluster.UID,
+		Controller:         &[]bool{true}[0],
+		BlockOwnerDeletion: &[]bool{true}[0],
+	}))
+	_, err = dynamic.Update(nodeConfig)
+	return err
+}
+
 func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machinePool rancherv1.RKEMachinePool,
 	dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (*unstructured.Unstructured, error) {
 	apiVersion := machinePool.NodeConfig.APIVersion
@@ -85,6 +125,10 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	gvk := schema.FromAPIVersionAndKind(apiVersion, kind)
 	nodeConfig, err := dynamic.Get(gvk, cluster.Namespace, machinePool.NodeConfig.Name)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := takeOwnership(dynamic, cluster, nodeConfig); err != nil {
 		return nil, err
 	}
 
