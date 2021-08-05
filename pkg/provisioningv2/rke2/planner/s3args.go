@@ -7,7 +7,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
-	namespaces "github.com/rancher/rancher/pkg/namespace"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/kv"
 )
@@ -90,9 +89,6 @@ func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name, r
 	secret, err := machineprovision.GetCloudCredentialSecret(secretCache, namespace, name)
 	if err != nil {
 		return result, fmt.Errorf("failed to lookup etcdSnapshotCloudCredentialName: %w", err)
-	}
-	if secret.Type != "provisioning.cattle.io/cloud-credential" && secret.Namespace != namespaces.GlobalNamespace {
-		return result, fmt.Errorf("expected secret of type provisioning.cattle.io/cloud-credential, got [%s]", secret.Type)
 	}
 
 	data := map[string][]byte{}
