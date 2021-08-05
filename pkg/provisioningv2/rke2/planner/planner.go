@@ -151,6 +151,10 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		kubeconfig:                    kubeconfig.New(clients),
 		etcdRestore:                   newETCDRestore(clients, store),
 		etcdCreate:                    newETCDCreate(clients, store),
+		etcdArgs: s3Args{
+			prefix:      "etcd-",
+			secretCache: clients.Core.Secret().Cache(),
+		},
 	}
 }
 
