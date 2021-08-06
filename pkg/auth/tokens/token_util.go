@@ -105,11 +105,7 @@ func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]inte
 
 func GetKubeConfigToken(userName, responseType string, userMGR user.Manager) (*v3.Token, string, error) {
 	// create kubeconfig expiring tokens if responseType=kubeconfig in login action vs login tokens for responseType=json
-	clusterID := ""
-	responseSplit := strings.SplitN(responseType, "_", 2)
-	if len(responseSplit) == 2 {
-		clusterID = responseSplit[1]
-	}
+	clusterID := extractClusterIDFromResponseType(responseType)
 
 	logrus.Debugf("getKubeConfigToken: responseType %s", responseType)
 	name := "kubeconfig-" + userName
@@ -123,6 +119,14 @@ func GetKubeConfigToken(userName, responseType string, userMGR user.Manager) (*v
 	}
 
 	return token, tokenVal, nil
+}
+
+func extractClusterIDFromResponseType(responseType string) string {
+	responseSplit := strings.SplitN(responseType, "_", 2)
+	if len(responseSplit) != 2 {
+		return ""
+	}
+	return responseSplit[1]
 }
 
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid

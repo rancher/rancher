@@ -1,6 +1,7 @@
 package clusterauthtoken
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 
@@ -30,11 +31,14 @@ type tokenHandler struct {
 }
 
 func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
+	// clusterAuthToken is no longer created here because it requires the rawValue of the
+	// original token and the token could be hashed. Now, clusterAuthToken is created in
+	// the API layer right after token creation.
 	if _, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name); err != nil {
 		if !errors.IsNotFound(err) {
 			return h.Updated(token)
 		}
-		return token, err
+		return token, fmt.Errorf("clusterAuthToken for token [%s] has not been created yet", token.Name)
 	}
 	return token, nil
 }
