@@ -321,6 +321,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CachedDiscovery:         cache,
 		RESTMapper:              restMapper,
 		leadership:              leadership,
+		PeerManager:             peerManager,
 		RESTClientGetter:        restClientGetter,
 		CatalogContentManager:   content,
 		HelmOperations:          helmop,
