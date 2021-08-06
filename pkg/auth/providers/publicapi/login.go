@@ -8,31 +8,32 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
-
-	"github.com/rancher/rancher/pkg/auth/providers/oidc"
-
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
+	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -41,14 +42,18 @@ const (
 
 func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHandler {
 	return &loginHandler{
-		userMGR:  mgmt.UserManager,
-		tokenMGR: tokens.NewManager(ctx, mgmt),
+		scaledContext: mgmt,
+		userMGR:       mgmt.UserManager,
+		tokenMGR:      tokens.NewManager(ctx, mgmt),
+		clusterLister: mgmt.Management.Clusters("").Controller().Lister(),
 	}
 }
 
 type loginHandler struct {
-	userMGR  user.Manager
-	tokenMGR *tokens.Manager
+	scaledContext *config.ScaledContext
+	userMGR       user.Manager
+	tokenMGR      *tokens.Manager
+	clusterLister v3.ClusterLister
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
@@ -208,9 +213,68 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
+
+		if err := h.createClusterAuthTokenIfNeeded(token, tokenValue); err != nil {
+			logrus.Infof("Failed to create cluster auth token for cluster [%s], cluster auth endpoint may fail: %v", token.ClusterName, err)
+		}
 		return *token, tokenValue, responseType, nil
 	}
 
 	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
 	return rToken, unhashedTokenKey, responseType, err
+}
+
+// createClusterAuthTokenIfNeeded checks if local cluster auth endpoint is enabled. If it is, a cluster auth token
+// is enabled.
+func (h *loginHandler) createClusterAuthTokenIfNeeded(token *v3.Token, tokenValue string) error {
+	clusterID := token.ClusterName
+	if clusterID == "" {
+		// Cluster ID being empty is likely because cluster auth endpoint is not being used.
+		// Custer auth token is not necessary in the aforementioned scenario.
+		return nil
+	}
+	cluster, err := h.clusterLister.Get("", clusterID)
+	if err != nil {
+		return err
+	}
+
+	if !cluster.Spec.LocalClusterAuthEndpoint.Enabled {
+		return nil
+	}
+	clusterConfig, err := clustermanager.ToRESTConfig(cluster, h.scaledContext)
+	if err != nil {
+		return err
+	}
+
+	clusterContext, err := config.NewUserContext(h.scaledContext, *clusterConfig, clusterID)
+	if err != nil {
+		return err
+	}
+
+	clusterAuthToken, err := common.NewClusterAuthToken(token, tokenValue)
+	if err != nil {
+		return err
+	}
+
+	_, err = clusterContext.Cluster.ClusterAuthTokens("").Controller().Lister().Get("cattle-system", clusterAuthToken.Name)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	if err == nil {
+		err = clusterContext.Cluster.ClusterAuthTokens("cattle-system").Delete(clusterAuthToken.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+
+	if _, err = clusterContext.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
+		return err
+	}
+
+	return nil
 }
