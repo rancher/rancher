@@ -446,13 +446,19 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 			"--name", name,
 			"--s3-backup=true",
 			"--s3-endpoint=" + s3Backend.Endpoint,
-			"--s3-accessKey=" + s3Backend.AccessKey,
-			"--s3-secretKey=" + s3Backend.SecretKey,
 			"--s3-bucketName=" + s3Backend.BucketName,
 			"--s3-region=" + s3Backend.Region,
 		},
 		Image: etcdSnapshotImage,
 		Env:   es.ExtraEnv,
+	}
+	// Base64 encoding S3 accessKey and secretKey before add them as env variables
+	if len(s3Backend.AccessKey) > 0 || len(s3Backend.SecretKey) > 0 {
+		env := []string{
+			"S3_ACCESS_KEY=" + base64.StdEncoding.EncodeToString([]byte(s3Backend.AccessKey)),
+			"S3_SECRET_KEY=" + base64.StdEncoding.EncodeToString([]byte(s3Backend.SecretKey)),
+		}
+		imageCfg.Env = append(imageCfg.Env, env...)
 	}
 	s3Logline := fmt.Sprintf("[etcd] Snapshot [%s] will be downloaded on host [%s] from S3 compatible backend at [%s] from bucket [%s] using accesskey [%s]", name, etcdHost.Address, s3Backend.Endpoint, s3Backend.BucketName, s3Backend.AccessKey)
 	if s3Backend.Region != "" {
@@ -578,10 +584,16 @@ func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map
 		s3cmd := []string{
 			"--s3-backup",
 			"--s3-endpoint=" + es.BackupConfig.S3BackupConfig.Endpoint,
-			"--s3-accessKey=" + es.BackupConfig.S3BackupConfig.AccessKey,
-			"--s3-secretKey=" + es.BackupConfig.S3BackupConfig.SecretKey,
 			"--s3-bucketName=" + es.BackupConfig.S3BackupConfig.BucketName,
 			"--s3-region=" + es.BackupConfig.S3BackupConfig.Region,
+		}
+		// Base64 encoding S3 accessKey and secretKey before add them as env variables
+		if len(es.BackupConfig.S3BackupConfig.AccessKey) > 0 || len(es.BackupConfig.S3BackupConfig.SecretKey) > 0 {
+			env := []string{
+				"S3_ACCESS_KEY=" + base64.StdEncoding.EncodeToString([]byte(es.BackupConfig.S3BackupConfig.AccessKey)),
+				"S3_SECRET_KEY=" + base64.StdEncoding.EncodeToString([]byte(es.BackupConfig.S3BackupConfig.SecretKey)),
+			}
+			imageCfg.Env = append(imageCfg.Env, env...)
 		}
 		if es.BackupConfig.S3BackupConfig.CustomCA != "" {
 			caStr := base64.StdEncoding.EncodeToString([]byte(es.BackupConfig.S3BackupConfig.CustomCA))
@@ -668,11 +680,17 @@ func configS3BackupImgCmd(ctx context.Context, imageCfg *container.Config, bc *v
 		cmd = append(cmd, []string{
 			"--s3-backup=true",
 			"--s3-endpoint=" + bc.S3BackupConfig.Endpoint,
-			"--s3-accessKey=" + bc.S3BackupConfig.AccessKey,
-			"--s3-secretKey=" + bc.S3BackupConfig.SecretKey,
 			"--s3-bucketName=" + bc.S3BackupConfig.BucketName,
 			"--s3-region=" + bc.S3BackupConfig.Region,
 		}...)
+		// Base64 encoding S3 accessKey and secretKey before add them as env variables
+		if len(bc.S3BackupConfig.AccessKey) > 0 || len(bc.S3BackupConfig.SecretKey) > 0 {
+			env := []string{
+				"S3_ACCESS_KEY=" + base64.StdEncoding.EncodeToString([]byte(bc.S3BackupConfig.AccessKey)),
+				"S3_SECRET_KEY=" + base64.StdEncoding.EncodeToString([]byte(bc.S3BackupConfig.SecretKey)),
+			}
+			imageCfg.Env = append(imageCfg.Env, env...)
+		}
 		s3Logline := fmt.Sprintf("[etcd] Snapshots configured to S3 compatible backend at [%s] to bucket [%s] using accesskey [%s]", bc.S3BackupConfig.Endpoint, bc.S3BackupConfig.BucketName, bc.S3BackupConfig.AccessKey)
 		if bc.S3BackupConfig.Region != "" {
 			s3Logline += fmt.Sprintf(" and using region [%s]", bc.S3BackupConfig.Region)
