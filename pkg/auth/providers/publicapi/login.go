@@ -3,10 +3,12 @@ package publicapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -34,6 +36,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -215,7 +218,8 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		}
 
 		if err := h.createClusterAuthTokenIfNeeded(token, tokenValue); err != nil {
-			logrus.Infof("Failed to create cluster auth token for cluster [%s], cluster auth endpoint may fail: %v", token.ClusterName, err)
+			return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError,
+				fmt.Sprintf("Failed to create cluster auth token for cluster [%s], cluster auth endpoint may fail: %v", token.ClusterName, err))
 		}
 		return *token, tokenValue, responseType, nil
 	}
@@ -225,7 +229,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 }
 
 // createClusterAuthTokenIfNeeded checks if local cluster auth endpoint is enabled. If it is, a cluster auth token
-// is enabled.
+// is created.
 func (h *loginHandler) createClusterAuthTokenIfNeeded(token *v3.Token, tokenValue string) error {
 	clusterID := token.ClusterName
 	if clusterID == "" {
@@ -272,9 +276,22 @@ func (h *loginHandler) createClusterAuthTokenIfNeeded(token *v3.Token, tokenValu
 		}
 	}
 
-	if _, err = clusterContext.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
-		return err
+	var backoff = wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    7,
 	}
 
-	return nil
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		if _, err := clusterContext.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
+			if errors.IsAlreadyExists(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+
+	return err
 }
