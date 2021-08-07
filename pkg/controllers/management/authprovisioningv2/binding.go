@@ -1,8 +1,11 @@
 package authprovisioningv2
 
 import (
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,6 +31,12 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 	}
 
 	if len(clusters) == 0 {
+		// When no provisioning cluster is found, enqueue the CRTB to wait for
+		// the provisioning cluster to be created. If we don't try again
+		// permissions for the provisioning objects won't be created until an
+		// update to the CRTB happens again.
+		logrus.Debugf("[auth-prov-v2-crtb] No provisioning cluster found for cluster %v, enqueuing CRTB %v ", crtb.ClusterName, crtb.Name)
+		h.clusterRoleTemplateBindingController.EnqueueAfter(crtb.Namespace, crtb.Name, 5*time.Second)
 		return crtb, nil
 	}
 
