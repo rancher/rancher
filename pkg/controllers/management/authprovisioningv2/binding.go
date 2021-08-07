@@ -4,6 +4,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -55,20 +56,13 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 			Name:     roleTemplateRoleName(crtb.RoleTemplateName, cluster.Name),
 		},
 	}
-	if crtb.UserName != "" {
-		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
-			Kind:     "User",
-			APIGroup: rbacv1.GroupName,
-			Name:     crtb.UserName,
-		})
+
+	subject, err := rbac.BuildSubjectFromRTB(crtb)
+	if err != nil {
+		return nil, err
 	}
-	if crtb.GroupName != "" {
-		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
-			Kind:     "Group",
-			APIGroup: rbacv1.GroupName,
-			Name:     crtb.GroupName,
-		})
-	}
+
+	roleBinding.Subjects = []rbacv1.Subject{subject}
 
 	return crtb, h.roleBindingApply.
 		WithOwner(crtb).
