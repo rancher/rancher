@@ -14,6 +14,7 @@ import (
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -104,14 +105,17 @@ func Register(
 	)
 
 	clients.Mgmt.Cluster().OnChange(ctx, "cluster-watch", h.createToken)
-	clusterCache := clients.Provisioning.Cluster().Cache()
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 
-	clusterCache.AddIndexer(ByCluster, byClusterIndex)
-
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
 	clients.Provisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
+}
+
+func RegisterIndexers(context *config.ScaledContext) {
+	if features.RKE2.Enabled() {
+		context.Wrangler.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
+	}
 }
 
 func byClusterIndex(obj *v1.Cluster) ([]string, error) {
