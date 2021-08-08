@@ -28,11 +28,12 @@ import (
 )
 
 const (
-	bootstrappedRole       = "authz.management.cattle.io/bootstrapped-role"
-	bootstrapAdminConfig   = "admincreated"
-	cattleNamespace        = "cattle-system"
-	defaultAdminLabelKey   = "authz.management.cattle.io/bootstrapping"
-	defaultAdminLabelValue = "admin-user"
+	bootstrappedRole            = "authz.management.cattle.io/bootstrapped-role"
+	bootstrapAdminConfig        = "admincreated"
+	cattleNamespace             = "cattle-system"
+	defaultAdminLabelKey        = "authz.management.cattle.io/bootstrapping"
+	defaultAdminLabelValue      = "admin-user"
+	bootstrapPasswordSecretName = "bootstrap-secret"
 )
 
 var (
@@ -531,6 +532,30 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			// User provided bootstrap password
 			showPassword = false
 			mustChangePassword = false
+		}
+
+		// get the existing secret, ignore if not found
+		var bootstrapPasswordSecret *corev1.Secret
+		bootstrapPasswordSecret, err = management.K8s.CoreV1().Secrets(cattleNamespace).Get(context.TODO(), bootstrapPasswordSecretName, v1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return "", err
+		}
+
+		// persist the secret
+		bootstrapPasswordSecret.StringData = map[string]string{"bootstrapPassword": bootstrapPassword}
+		if bootstrapPasswordSecret.ObjectMeta.GetResourceVersion() != "" {
+			_, err = management.K8s.CoreV1().Secrets(cattleNamespace).Update(context.TODO(), bootstrapPasswordSecret, v1.UpdateOptions{})
+		} else {
+			// initialize the secret
+			bootstrapPasswordSecret.ObjectMeta = v1.ObjectMeta{
+				Name:      bootstrapPasswordSecretName,
+				Namespace: cattleNamespace,
+			}
+			_, err = management.K8s.CoreV1().Secrets(cattleNamespace).Create(context.TODO(), bootstrapPasswordSecret, v1.CreateOptions{})
+		}
+
+		if err != nil {
+			return "", err
 		}
 
 		hash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
