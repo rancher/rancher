@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
@@ -84,16 +85,20 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 	}
 	clusterName := parts[0]
 	rtbNsAndName := pkgrbac.GetRTBLabel(obj.ObjectMeta)
-	err := p.mgr.reconcileProjectMembershipBindingForDelete(clusterName, "", rtbNsAndName)
-	if err != nil {
-		return nil, err
-	}
-	err = p.mgr.reconcileClusterMembershipBindingForDelete("", rtbNsAndName)
-	if err != nil {
+	if err := p.mgr.reconcileProjectMembershipBindingForDelete(clusterName, "", rtbNsAndName); err != nil {
 		return nil, err
 	}
 
-	err = p.removeMGMTProjectScopedPrivilegesInClusterNamespace(obj, clusterName)
+	if err := p.mgr.reconcileClusterMembershipBindingForDelete("", rtbNsAndName); err != nil {
+		return nil, err
+	}
+
+	if err := p.removeMGMTProjectScopedPrivilegesInClusterNamespace(obj, clusterName); err != nil {
+		return nil, err
+	}
+
+	err := p.mgr.removeAuthV2Permissions(authprovisioningv2.PRTBRoleBindingID, obj)
+
 	return nil, err
 }
 
