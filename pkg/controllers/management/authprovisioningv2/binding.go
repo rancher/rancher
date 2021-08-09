@@ -11,9 +11,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const CRTBRoleBindingID = "auth-prov-v2-crtb-rolebinding"
+
 func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crtb == nil || crtb.DeletionTimestamp != nil || (crtb.UserName == "" && crtb.GroupName == "") || crtb.RoleTemplateName == "" {
-		return nil, nil
+	if crtb == nil || crtb.DeletionTimestamp != nil || crtb.RoleTemplateName == "" || crtb.ClusterName == "" {
+		return crtb, nil
 	}
 
 	rt, err := h.roleTemplates.Get(crtb.RoleTemplateName)
@@ -37,7 +39,7 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 		// permissions for the provisioning objects won't be created until an
 		// update to the CRTB happens again.
 		logrus.Debugf("[auth-prov-v2-crtb] No provisioning cluster found for cluster %v, enqueuing CRTB %v ", crtb.ClusterName, crtb.Name)
-		h.clusterRoleTemplateBindingController.EnqueueAfter(crtb.Namespace, crtb.Name, 5*time.Second)
+		h.clusterRoleTemplateBindingController.EnqueueAfter(crtb.Namespace, crtb.Name, 10*time.Second)
 		return crtb, nil
 	}
 
@@ -65,8 +67,9 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 	roleBinding.Subjects = []rbacv1.Subject{subject}
 
 	return crtb, h.roleBindingApply.
-		WithOwner(crtb).
 		WithListerNamespace(cluster.Namespace).
+		WithSetID(CRTBRoleBindingID).
+		WithOwner(crtb).
 		ApplyObjects(roleBinding)
 }
 

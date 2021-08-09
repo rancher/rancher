@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
@@ -15,6 +16,7 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -419,6 +421,32 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 	}
 
 	return nil
+}
+
+// removeAuthV2Permissions finds any roleBindings based off the owner annotation from the incoming owner.
+// This is similar to an ownerReference but this is used across namespaces which ownerReferences does not support.
+func (m *manager) removeAuthV2Permissions(setID string, owner runtime.Object) error {
+	// Get the selector for the dependent roleBindings
+	selector, err := apply.GetSelectorFromOwner(setID, owner)
+	if err != nil {
+		return err
+	}
+
+	roleBindings, err := m.rbLister.List("", selector)
+	if err != nil {
+		return err
+	}
+
+	var returnErr error
+	for _, binding := range roleBindings {
+		err := m.rbClient.DeleteNamespaced(binding.Namespace, binding.Name, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			// Combine all errors so we try our best to delete everything in the first run
+			returnErr = multierror.Append(returnErr, err)
+		}
+	}
+
+	return returnErr
 }
 
 // Certain resources (projects, machines, prtbs, crtbs, clusterevents, etc) exist in the mangement plane but are scoped to clusters or

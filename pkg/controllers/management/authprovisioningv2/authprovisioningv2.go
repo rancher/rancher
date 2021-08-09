@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	apiextcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -23,9 +24,12 @@ const (
 
 type handler struct {
 	roleLocker                           locker.Locker
+	roleCache                            rbacv1.RoleCache
+	roleController                       rbacv1.RoleController
 	roleTemplateController               mgmtcontrollers.RoleTemplateController
 	clusterRoleTemplateBindings          mgmtcontrollers.ClusterRoleTemplateBindingCache
 	clusterRoleTemplateBindingController mgmtcontrollers.ClusterRoleTemplateBindingController
+	projectRoleTemplateBindingController mgmtcontrollers.ProjectRoleTemplateBindingController
 	roleTemplates                        mgmtcontrollers.RoleTemplateCache
 	clusters                             provisioningcontrollers.ClusterCache
 	crdCache                             apiextcontrollers.CustomResourceDefinitionCache
@@ -39,9 +43,12 @@ type handler struct {
 
 func Register(ctx context.Context, clients *wrangler.Context) error {
 	h := &handler{
+		roleCache:                            clients.RBAC.Role().Cache(),
+		roleController:                       clients.RBAC.Role(),
 		roleTemplateController:               clients.Mgmt.RoleTemplate(),
 		clusterRoleTemplateBindings:          clients.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		clusterRoleTemplateBindingController: clients.Mgmt.ClusterRoleTemplateBinding(),
+		projectRoleTemplateBindingController: clients.Mgmt.ProjectRoleTemplateBinding(),
 		roleTemplates:                        clients.Mgmt.RoleTemplate().Cache(),
 		clusters:                             clients.Provisioning.Cluster().Cache(),
 		crdCache:                             clients.CRD.CustomResourceDefinition().Cache(),
@@ -63,6 +70,8 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	h.dynamic.OnChange(ctx, "auth-prov-v2-trigger", h.gvkMatcher, h.OnClusterObjectChanged)
 	clients.Mgmt.RoleTemplate().OnChange(ctx, "auth-prov-v2-roletemplate", h.OnChange)
 	clients.Mgmt.ClusterRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-crtb", h.OnCRTB)
+	clients.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-prtb", h.OnPRTB)
+	clients.Provisioning.Cluster().OnChange(ctx, "auth-prov-v2-cluster", h.OnCluster)
 	clients.CRD.CustomResourceDefinition().OnChange(ctx, "auth-prov-v2-crd", h.OnCRD)
 	clients.Provisioning.Cluster().Cache().AddIndexer(byClusterName, func(obj *v1.Cluster) ([]string, error) {
 		return []string{obj.Status.ClusterName}, nil
