@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
@@ -101,12 +100,7 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, err
 	}
 
-	secret, err := h.kubeconfigManager.GetKubeConfig(rancherCluster, rancherCluster.Status)
-	if err != nil {
-		return bootstrap, err
-	}
-
-	config, err := clientcmd.RESTConfigFromKubeConfig(secret.Data["value"])
+	config, err := h.kubeconfigManager.GetRESTConfig(rancherCluster, rancherCluster.Status)
 	if err != nil {
 		return bootstrap, err
 	}
