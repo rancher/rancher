@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/monitoring"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -54,5 +55,9 @@ func registerIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 	if err := podsecuritypolicy.RegisterIndexers(ctx, scaledContext); err != nil {
 		return err
 	}
-	return podsecuritypolicy2.RegisterIndexers(ctx, scaledContext)
+	if err := podsecuritypolicy2.RegisterIndexers(ctx, scaledContext); err != nil {
+		return err
+	}
+	cluster.RegisterIndexers(scaledContext)
+	return nil
 }
