@@ -1,12 +1,14 @@
 import base64
 from rancher import ApiError
 import pytest
+from packaging import version
 
 from .common import *  # NOQA
 
 CLUSTER_NAME = os.environ.get("CLUSTER_NAME", "")
 
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
+rancher_version_26 = False
 
 
 def test_secret_create_all_ns():
@@ -611,6 +613,7 @@ def rbac_secret_list(p_client):
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
+    global rancher_version_26
     client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
     p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsecret")
@@ -622,6 +625,13 @@ def create_project_client(request):
     namespace["cluster"] = cluster
     namespace["project"] = p
     namespace["c_client"] = c_client
+    rancher_version = get_setting_value_by_name('server-version')
+
+    #Checks if rancher version is greater than v26
+
+    if rancher_version.startswith('v'):
+        if version.parse(rancher_version[:4]) > version.parse('v2.5') or rancher_version.startswith("master"):
+            rancher_version_26 = True
 
     def fin():
         client = get_user_client()
@@ -738,14 +748,26 @@ def create_and_validate_workload_with_secret_as_env_variable(p_client, secret,
     # Create Workload with secret as env variable
     secretName = secret['name']
 
-    environmentdata = [{
-        "source": "secret",
-        "sourceKey": None,
-        "sourceName": secretName
-    }]
+    #Checking if rancher version is 26 and above.
+
+    if rancher_version_26:
+        env_str = "envFrom"
+        environmentdata = [{
+            "secretRef" : {
+               "name": secretName,
+                "optional":False
+            }
+        }]
+    else:
+        env_str = "environmentFrom"
+        environmentdata = [{
+            "source": "secret",
+            "sourceKey": None,
+            "sourceName": secretName
+        }]
     con = [{"name": "test",
             "image": TEST_IMAGE,
-            "environmentFrom": environmentdata}]
+            env_str: environmentdata}]
 
     workload = p_client.create_workload(name=name,
                                         containers=con,
