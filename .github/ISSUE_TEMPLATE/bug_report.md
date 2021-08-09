@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-If this is a UI issue, please file an issue at https://github.com/rancher/dashboard/
+**If this is a UI issue, please file an issue at https://github.com/rancher/dashboard/**
 
 **Rancher Server Setup**
 - Rancher version:
