@@ -21,9 +21,17 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var (
+	started bool
+)
+
 func Run(ctx context.Context) error {
 	if err := setupSteveAggregation(); err != nil {
 		return err
+	}
+
+	if started {
+		return nil
 	}
 
 	if !features.MCMAgent.Enabled() {
@@ -46,7 +54,11 @@ func Run(ctx context.Context) error {
 	}
 
 	core.Core().V1().Service().OnChange(ctx, "rancher-installed", h.OnChange)
-	return core.Start(ctx, 1)
+	if err := core.Start(ctx, 1); err != nil {
+		return err
+	}
+	started = true
+	return nil
 }
 
 type handler struct {
