@@ -6,12 +6,10 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/sirupsen/logrus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,7 +90,7 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 		return nil, err
 	}
 
-	err := c.removeAuthV2Permissions(obj)
+	err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, obj)
 	return nil, err
 }
 
@@ -204,32 +202,6 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 		}
 	}
 	return nil
-}
-
-// removeAuthV2Permissions finds any roleBindings based off the owner annotation from the incoming binding.
-// This is similar to an ownerReference but this is used across namespaces which ownerReferences does not support.
-func (c *crtbLifecycle) removeAuthV2Permissions(binding *v3.ClusterRoleTemplateBinding) error {
-	// Get the selector for the dependent roleBindings
-	selector, err := apply.GetSelectorFromOwner("", binding)
-	if err != nil {
-		return err
-	}
-
-	roleBindings, err := c.mgr.rbLister.List("", selector)
-	if err != nil {
-		return err
-	}
-
-	var returnErr error
-	for _, binding := range roleBindings {
-		err := c.mgr.rbClient.DeleteNamespaced(binding.Namespace, binding.Name, &metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			// Combine all errors so we try our best to delete everything in the first run
-			returnErr = multierror.Append(returnErr, err)
-		}
-	}
-
-	return returnErr
 }
 
 func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) error {
