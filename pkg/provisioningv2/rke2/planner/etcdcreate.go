@@ -99,7 +99,6 @@ func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *r
 		Files: s3Files,
 		Instructions: []plan.Instruction{{
 			Name:    "create",
-			Image:   getInstallerImage(controlPlane),
 			Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
 			Env:     s3Env,
 			Args:    append(args, s3Args...),

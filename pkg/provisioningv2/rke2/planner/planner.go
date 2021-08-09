@@ -747,7 +747,6 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 func (p *Planner) addInitNodeInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
 	nodePlan.Instructions = append(nodePlan.Instructions, plan.Instruction{
 		Name:       "capture-address",
-		Image:      getInstallerImage(controlPlane),
 		Command:    "sh",
 		SaveOutput: true,
 		Args: []string{
