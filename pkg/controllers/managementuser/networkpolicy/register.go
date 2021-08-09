@@ -16,7 +16,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	projectLister := cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
 	projects := cluster.Management.Management.Projects(cluster.ClusterName)
 	clusterLister := cluster.Management.Management.Clusters("").Controller().Lister()
-	clusters := cluster.Management.Management.Clusters("")
+	mgmtClusters := cluster.Management.Management.Clusters("")
 
 	nodeLister := cluster.Core.Nodes("").Controller().Lister()
 	nsLister := cluster.Core.Namespaces("").Controller().Lister()
@@ -29,7 +29,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	npLister := cluster.Networking.NetworkPolicies("").Controller().Lister()
 	npClient := cluster.Networking
 
-	npmgr := &netpolMgr{nsLister, nodeLister, pods, projects,
+	npmgr := &netpolMgr{clusterLister, nsLister, nodeLister, pods, projects,
 		npLister, npClient, projectLister, cluster.ClusterName}
 	ps := &projectSyncer{pnpLister, pnps, projects, clusterLister, cluster.ClusterName}
 	nss := &nsSyncer{npmgr, clusterLister, serviceLister, podLister,
@@ -39,9 +39,9 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	serviceHandler := &serviceHandler{npmgr, clusterLister, cluster.ClusterName}
 	nodeHandler := &nodeHandler{npmgr, clusterLister, cluster.ClusterName}
 	clusterHandler := &clusterHandler{cluster, pnpLister, podLister,
-		serviceLister, projectLister, clusters, pnps, npmgr, cluster.ClusterName}
+		serviceLister, projectLister, mgmtClusters, pnps, npmgr, cluster.ClusterName}
 
-	clusterNetAnnHandler := &clusterNetAnnHandler{clusters, cluster.ClusterName}
+	clusterNetAnnHandler := &clusterNetAnnHandler{mgmtClusters, cluster.ClusterName}
 
 	projects.Controller().AddClusterScopedHandler(ctx, "projectSyncer", cluster.ClusterName, ps.Sync)
 	pnps.AddClusterScopedHandler(ctx, "projectNetworkPolicySyncer", cluster.ClusterName, pnpsyncer.Sync)
@@ -50,7 +50,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	services.AddHandler(ctx, "serviceHandler", serviceHandler.Sync)
 
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "nodeHandler", nodeHandler.Sync)
-	clusters.AddHandler(ctx, "clusterHandler", clusterHandler.Sync)
+	mgmtClusters.AddHandler(ctx, "clusterHandler", clusterHandler.Sync)
 
-	clusters.AddHandler(ctx, "clusterNetAnnHandler", clusterNetAnnHandler.Sync)
+	mgmtClusters.AddHandler(ctx, "clusterNetAnnHandler", clusterNetAnnHandler.Sync)
 }
