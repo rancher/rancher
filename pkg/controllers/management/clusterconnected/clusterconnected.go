@@ -2,6 +2,8 @@ package clusterconnected
 
 import (
 	"context"
+	"io/ioutil"
+	"net/http"
 	"time"
 
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
@@ -57,12 +59,38 @@ func (c *checker) check() error {
 	return nil
 }
 
+func (c *checker) hasSession(cluster *v3.Cluster) bool {
+	clientKey := proxy.Prefix + cluster.Name
+	hasSession := c.tunnelServer.HasSession(clientKey)
+	if !hasSession {
+		return false
+	}
+
+	dialer := c.tunnelServer.Dialer(clientKey)
+	transport := &http.Transport{
+		DialContext: dialer,
+	}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{
+		Transport: transport,
+	}
+	resp, err := client.Get("http://not-used/ping")
+	if err != nil {
+		return false
+	}
+	defer func() {
+		ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+	}()
+	return resp.StatusCode == http.StatusOK
+}
+
 func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
 	}
 
-	hasSession := c.tunnelServer.HasSession(proxy.Prefix + cluster.Name)
+	hasSession := c.hasSession(cluster)
 	// The simpler condition of hasSession == Connected.IsTrue(cluster) is not
 	// used because it treat a non-existent conditions as False
 	if hasSession && Connected.IsTrue(cluster) {
