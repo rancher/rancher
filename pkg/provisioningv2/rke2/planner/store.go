@@ -65,7 +65,7 @@ func (p *PlanStore) Load(cluster *capi.Cluster) (*plan.Plan, error) {
 	}
 
 	machines, err := p.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
-		capiMachineLabel: cluster.Name,
+		CapiMachineLabel: cluster.Name,
 	}))
 	if err != nil {
 		return nil, err
