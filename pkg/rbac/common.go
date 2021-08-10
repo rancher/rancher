@@ -7,8 +7,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
+	k8srbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -198,4 +200,49 @@ func getBindingHash(namespace string, role rbacv1.RoleRef, subject rbacv1.Subjec
 	hasher.Write([]byte(input.String()))
 	digest := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))
 	return strings.ToLower(digest[:10])
+}
+
+// RulesFromTemplate gets all rules from the template and all referenced templates
+func RulesFromTemplate(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.RoleTemplateCache, rt *v3.RoleTemplate) ([]rbacv1.PolicyRule, error) {
+	var rules []rbacv1.PolicyRule
+	var err error
+	templatesSeen := make(map[string]bool)
+
+	// Kickoff gathering rules
+	rules, err = gatherRules(clusterRoles, roleTemplates, rt, rules, templatesSeen)
+	if err != nil {
+		return rules, err
+	}
+	return rules, nil
+}
+
+// gatherRules appends the rules from current template and does a recursive call to get all inherited roles referenced
+func gatherRules(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.RoleTemplateCache, rt *v3.RoleTemplate, rules []rbacv1.PolicyRule, seen map[string]bool) ([]rbacv1.PolicyRule, error) {
+	seen[rt.Name] = true
+
+	if rt.External && rt.Context == "cluster" {
+		cr, err := clusterRoles.Get(rt.Name)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, cr.Rules...)
+	}
+
+	rules = append(rules, rt.Rules...)
+
+	for _, r := range rt.RoleTemplateNames {
+		// If we have already seen the roleTemplate, skip it
+		if seen[r] {
+			continue
+		}
+		next, err := roleTemplates.Get(r)
+		if err != nil {
+			return nil, err
+		}
+		rules, err = gatherRules(clusterRoles, roleTemplates, next, rules, seen)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return rules, nil
 }
