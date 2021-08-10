@@ -18,7 +18,7 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 		return crtb, nil
 	}
 
-	rt, err := h.roleTemplates.Get(crtb.RoleTemplateName)
+	rt, err := h.roleTemplatesCache.Get(crtb.RoleTemplateName)
 	if err != nil {
 		return crtb, err
 	}
@@ -74,7 +74,11 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 }
 
 func (h *handler) isClusterIndexed(rt *v3.RoleTemplate) (bool, error) {
-	for _, rule := range rt.Rules {
+	rules, err := rbac.RulesFromTemplate(h.clusterRoleCache, h.roleTemplatesCache, rt)
+	if err != nil {
+		return false, err
+	}
+	for _, rule := range rules {
 		if len(rule.NonResourceURLs) > 0 || len(rule.ResourceNames) > 0 {
 			continue
 		}
