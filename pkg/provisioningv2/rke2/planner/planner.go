@@ -55,7 +55,7 @@ const (
 	ControlPlaneRoleLabel      = "rke.cattle.io/control-plane-role"
 	MachineUIDLabel            = "rke.cattle.io/machine"
 	MachineIDLabel             = "rke.cattle.io/machine-id"
-	capiMachineLabel           = "cluster.x-k8s.io/cluster-name"
+	CapiMachineLabel           = "cluster.x-k8s.io/cluster-name"
 
 	MachineNameLabel      = "rke.cattle.io/machine-name"
 	MachineNamespaceLabel = "rke.cattle.io/machine-namespace"
