@@ -12,6 +12,7 @@ import (
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -24,21 +25,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
 const (
 	machineRequestType = "rke.cattle.io/machine-request"
+	capiClusterLabel   = "cluster.x-k8s.io/cluster-name"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := handler{
-		unmanagedMachine: clients.RKE.CustomMachine(),
-		mgmtClusterCache: clients.Mgmt.Cluster().Cache(),
-		clusterCache:     clients.Provisioning.Cluster().Cache(),
-		capiClusterCache: clients.CAPI.Cluster().Cache(),
-		machineCache:     clients.CAPI.Machine().Cache(),
-		secrets:          clients.Core.Secret(),
+		kubeconfigManager: kubeconfig.New(clients),
+		unmanagedMachine:  clients.RKE.CustomMachine(),
+		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
+		clusterCache:      clients.Provisioning.Cluster().Cache(),
+		capiClusterCache:  clients.CAPI.Cluster().Cache(),
+		machineCache:      clients.CAPI.Machine().Cache(),
+		machineClient:     clients.CAPI.Machine(),
+		secrets:           clients.Core.Secret(),
 		apply: clients.Apply.WithSetID("unmanaged-machine").
 			WithCacheTypes(
 				clients.Mgmt.Cluster(),
@@ -47,18 +52,22 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 				clients.CAPI.Machine(),
 				clients.RKE.RKEBootstrap()),
 	}
-	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-machine", h.onUnmanagedMachineChange)
+	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-machine", h.onUnmanagedMachineHealth)
+	clients.RKE.CustomMachine().OnRemove(ctx, "unmanaged-machine", h.onUnmanagedMachineOnRemove)
+	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-health", h.onUnmanagedMachineChange)
 	clients.Core.Secret().OnChange(ctx, "unmanaged-machine", h.onSecretChange)
 }
 
 type handler struct {
-	unmanagedMachine rkecontroller.CustomMachineClient
-	mgmtClusterCache mgmtcontroller.ClusterCache
-	capiClusterCache capicontrollers.ClusterCache
-	machineCache     capicontrollers.MachineCache
-	clusterCache     rocontrollers.ClusterCache
-	secrets          corecontrollers.SecretClient
-	apply            apply.Apply
+	kubeconfigManager *kubeconfig.Manager
+	unmanagedMachine  rkecontroller.CustomMachineController
+	mgmtClusterCache  mgmtcontroller.ClusterCache
+	capiClusterCache  capicontrollers.ClusterCache
+	machineCache      capicontrollers.MachineCache
+	machineClient     capicontrollers.MachineClient
+	clusterCache      rocontrollers.ClusterCache
+	secrets           corecontrollers.SecretClient
+	apply             apply.Apply
 }
 
 func (h *handler) findMachine(cluster *capi.Cluster, machineName, machineID string) (string, error) {
@@ -250,6 +259,111 @@ func (h *handler) getCAPICluster(secret *corev1.Secret) (*capi.Cluster, error) {
 	}
 
 	return h.capiClusterCache.Get(rClusters[0].Namespace, rClusters[0].Name)
+}
+
+func (h *handler) getMachine(customMachine *rkev1.CustomMachine) (*capi.Machine, error) {
+	var (
+		machine *capi.Machine
+		err     error
+	)
+
+	for _, owner := range customMachine.OwnerReferences {
+		if owner.Kind == "Machine" {
+			machine, err = h.machineCache.Get(customMachine.Namespace, owner.Name)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	return machine, nil
+}
+
+func (h *handler) onUnmanagedMachineHealth(key string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
+	if customMachine == nil {
+		return nil, nil
+	}
+
+	if customMachine.Spec.ProviderID == "" || !customMachine.Status.Ready {
+		return customMachine, nil
+	}
+
+	machine, err := h.getMachine(customMachine)
+	if err != nil || machine == nil {
+		return customMachine, err
+	}
+
+	cluster, err := h.clusterCache.Get(machine.Namespace, machine.Spec.ClusterName)
+	if err != nil {
+		return customMachine, err
+	}
+
+	h.unmanagedMachine.EnqueueAfter(customMachine.Namespace, customMachine.Name, 15*time.Second)
+
+	if machine.Status.NodeRef == nil {
+		return customMachine, nil
+	}
+
+	restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
+	if err != nil {
+		return customMachine, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return customMachine, err
+	}
+
+	_, err = clientset.CoreV1().Nodes().Get(context.Background(), machine.Status.NodeRef.Name, metav1.GetOptions{})
+	if apierror.IsNotFound(err) {
+		err = h.machineClient.Delete(machine.Namespace, machine.Name, nil)
+		return customMachine, err
+	}
+
+	return customMachine, nil
+}
+
+func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
+	clusterName := customMachine.Labels[capiClusterLabel]
+	if clusterName == "" {
+		return customMachine, nil
+	}
+
+	cluster, err := h.clusterCache.Get(customMachine.Namespace, clusterName)
+	if apierror.IsNotFound(err) {
+		return customMachine, nil
+	} else if err != nil {
+		return customMachine, err
+	}
+
+	if !cluster.DeletionTimestamp.IsZero() {
+		return customMachine, nil
+	}
+
+	machine, err := h.getMachine(customMachine)
+	if err != nil || machine == nil {
+		return customMachine, err
+	}
+
+	if machine.Status.NodeRef == nil {
+		return customMachine, nil
+	}
+
+	restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
+	if err != nil {
+		return customMachine, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return customMachine, err
+	}
+	err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
+	if apierror.IsNotFound(err) {
+		return customMachine, nil
+	}
+	return customMachine, err
 }
 
 func (h *handler) onUnmanagedMachineChange(key string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
