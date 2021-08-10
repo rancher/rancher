@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -284,6 +285,15 @@ func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, m
 	}
 
 	return secret.Data, nil
+}
+
+func (m *Manager) GetRESTConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*rest.Config, error) {
+	secret, err := m.GetKubeConfig(cluster, status)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientcmd.RESTConfigFromKubeConfig(secret.Data["value"])
 }
 
 func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*corev1.Secret, error) {
