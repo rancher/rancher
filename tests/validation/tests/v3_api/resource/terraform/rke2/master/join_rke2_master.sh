@@ -10,20 +10,20 @@ tls-san:
   - ${2}
 server: https://${3}:9345
 token:  "${4}"
-cloud-provider-name: "aws"
+node-external-ip: ${6}
 node-name: "${hostname}"
 EOF
 
-if [ ! -z "${8}" ] && [[ "${8}" == *":"* ]]
+if [ ! -z "${9}" ] && [[ "${9}" == *":"* ]]
 then
-   echo "${8}"
-   echo -e "${8}" >> /etc/rancher/rke2/config.yaml
+   echo "${9}"
+   echo -e "${9}" >> /etc/rancher/rke2/config.yaml
    cat /etc/rancher/rke2/config.yaml
 fi
 
 if [[ ${1} == *"rhel"* ]]
 then
-   subscription-manager register --auto-attach --username=${9} --password=${10}
+   subscription-manager register --auto-attach --username=${10} --password=${11}
    subscription-manager repos --enable=rhel-7-server-extras-rpms
 fi
 
@@ -40,16 +40,16 @@ then
   sudo systemctl reload NetworkManager
 fi
 
-if [ ${7} = "rke2" ]
+if [ ${8} = "rke2" ]
 then
-   if [ ${6} != "null" ]
+   if [ ${7} != "null" ]
    then
-       curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5}  INSTALL_RKE2_CHANNEL=${6} sh -
+       curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5}  INSTALL_RKE2_CHANNEL=${7} sh -
    else
        curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5} sh -
    fi
    sleep 10
-   if [ ! -z "${8}" ] && [[ "${8}" == *"cis"* ]]
+   if [ ! -z "${9}" ] && [[ "${9}" == *"cis"* ]]
    then
        if [[ ${1} == *"rhel"* ]] || [[ ${1} == *"centos"* ]]
        then
