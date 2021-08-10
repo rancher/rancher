@@ -113,7 +113,6 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 			ensureInstalledInstruction(controlPlane),
 			{
 				Name:    "restore",
-				Image:   getInstallerImage(controlPlane),
 				Env:     s3Env,
 				Args:    append(args, s3Args...),
 				Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
@@ -123,13 +122,11 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 }
 
 func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
-	image := getInstallerImage(controlPlane)
 	return commonNodePlan(e.secrets, controlPlane, plan.NodePlan{
 		Instructions: []plan.Instruction{
 			ensureInstalledInstruction(controlPlane),
 			{
 				Name:    "shutdown",
-				Image:   image,
 				Command: "systemctl",
 				Args: []string{
 					"stop", GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
@@ -137,7 +134,6 @@ func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePl
 			},
 			{
 				Name:    "shutdown",
-				Image:   image,
 				Command: fmt.Sprintf("%s-killall.sh", GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
 			},
 		},
