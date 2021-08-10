@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
@@ -35,6 +36,7 @@ const (
 	roleLabel             = "rke.cattle.io/service-account-role"
 	roleBootstrap         = "bootstrap"
 	rolePlan              = "plan"
+	ConnectClusterInfo    = "/v3/connect/cluster-info"
 	ConnectConfigYamlPath = "/v3/connect/config-yaml"
 	ConnectAgent          = "/v3/connect/agent"
 )
@@ -44,15 +46,16 @@ var (
 )
 
 type RKE2ConfigServer struct {
-	clusterTokenCache    mgmtcontroller.ClusterRegistrationTokenCache
-	serviceAccountsCache corecontrollers.ServiceAccountCache
-	serviceAccounts      corecontrollers.ServiceAccountClient
-	secretsCache         corecontrollers.SecretCache
-	secrets              corecontrollers.SecretClient
-	settings             mgmtcontroller.SettingCache
-	machineCache         capicontrollers.MachineCache
-	machines             capicontrollers.MachineClient
-	bootstrapCache       rkecontroller.RKEBootstrapCache
+	clusterTokenCache        mgmtcontroller.ClusterRegistrationTokenCache
+	serviceAccountsCache     corecontrollers.ServiceAccountCache
+	serviceAccounts          corecontrollers.ServiceAccountClient
+	secretsCache             corecontrollers.SecretCache
+	secrets                  corecontrollers.SecretClient
+	settings                 mgmtcontroller.SettingCache
+	machineCache             capicontrollers.MachineCache
+	machines                 capicontrollers.MachineClient
+	bootstrapCache           rkecontroller.RKEBootstrapCache
+	provisioningClusterCache provisioningcontrollers.ClusterCache
 }
 
 func New(clients *wrangler.Context) *RKE2ConfigServer {
@@ -70,14 +73,15 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		})
 
 	return &RKE2ConfigServer{
-		serviceAccountsCache: clients.Core.ServiceAccount().Cache(),
-		serviceAccounts:      clients.Core.ServiceAccount(),
-		secretsCache:         clients.Core.Secret().Cache(),
-		secrets:              clients.Core.Secret(),
-		clusterTokenCache:    clients.Mgmt.ClusterRegistrationToken().Cache(),
-		machineCache:         clients.CAPI.Machine().Cache(),
-		machines:             clients.CAPI.Machine(),
-		bootstrapCache:       clients.RKE.RKEBootstrap().Cache(),
+		serviceAccountsCache:     clients.Core.ServiceAccount().Cache(),
+		serviceAccounts:          clients.Core.ServiceAccount(),
+		secretsCache:             clients.Core.Secret().Cache(),
+		secrets:                  clients.Core.Secret(),
+		clusterTokenCache:        clients.Mgmt.ClusterRegistrationToken().Cache(),
+		machineCache:             clients.CAPI.Machine().Cache(),
+		machines:                 clients.CAPI.Machine(),
+		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
+		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
 	}
 }
 
@@ -99,6 +103,8 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		r.connectConfigYaml(planSecret, secret.Namespace, rw, req)
 	case ConnectAgent:
 		r.connectAgent(planSecret, secret, rw, req)
+	case ConnectClusterInfo:
+		r.connectClusterInfo(planSecret, secret, rw, req)
 	}
 }
 
@@ -193,6 +199,67 @@ func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWr
 
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Write(jsonContent)
+}
+
+func (r *RKE2ConfigServer) connectClusterInfo(planSecret string, secret *v1.Secret, rw http.ResponseWriter, req *http.Request) {
+	headers := dataFromHeaders(req)
+
+	// expecting -H "X-Cattle-Field: kubernetesversion" -H "X-Cattle-Field: name"
+	fields, ok := headers["field"]
+	if !ok {
+		http.Error(rw, "no field headers", http.StatusInternalServerError)
+		return
+	}
+
+	castedFields, ok := fields.([]string)
+	if !ok || len(castedFields) == 0 {
+		http.Error(rw, "no field headers", http.StatusInternalServerError)
+		return
+	}
+
+	var info = make(map[string]string)
+	for _, f := range castedFields {
+		switch strings.ToLower(f) {
+		case "kubernetesversion":
+			k8sv, err := r.infoKubernetesVersion(req.Header.Get(machineIDHeader), secret.Namespace)
+			if err != nil {
+				http.Error(rw, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			info[f] = k8sv
+		}
+	}
+
+	jsonContent, err := json.Marshal(info)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write(jsonContent)
+}
+
+func (r *RKE2ConfigServer) infoKubernetesVersion(machineID, ns string) (string, error) {
+	if machineID == "" {
+		return "", nil
+	}
+	machine, err := r.findMachineByID(machineID, ns)
+	if err != nil {
+		return "", err
+	}
+
+	clusterName, ok := machine.Labels[planner.CapiMachineLabel]
+	if !ok {
+		return "", fmt.Errorf("unable to find cluster name for machine")
+	}
+
+	cluster, err := r.provisioningClusterCache.Get(ns, clusterName)
+	if err != nil {
+		return "", err
+	}
+
+	return cluster.Spec.KubernetesVersion, nil
 }
 
 func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, error) {

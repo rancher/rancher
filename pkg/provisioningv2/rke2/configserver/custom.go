@@ -11,6 +11,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
 const (
@@ -58,6 +60,21 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string,
 	machineNamespace, machineName := secret.Labels[machineNamespaceLabel], secret.Labels[machineNameLabel]
 	_ = r.secrets.Delete(secret.Namespace, secret.Name, nil)
 	return machineNamespace, machineName, nil
+}
+
+func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*v1alpha4.Machine, error) {
+	machines, err := r.machineCache.List(ns, labels.SelectorFromSet(map[string]string{
+		machineIDLabel: machineID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(machines) != 1 {
+		return nil, fmt.Errorf("unable to find machine %s, found %d machine(s)", machineID, len(machines))
+	}
+
+	return machines[0], nil
 }
 
 func (r *RKE2ConfigServer) createSecret(namespace, name string, data map[string]interface{}) (*corev1.Secret, error) {
