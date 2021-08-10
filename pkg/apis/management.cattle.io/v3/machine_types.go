@@ -357,6 +357,7 @@ type CloudCredential struct {
 }
 
 type CloudCredentialSpec struct {
-	DisplayName string `json:"displayName"`
-	Description string `json:"description,omitempty"`
+	DisplayName        string `json:"displayName"`
+	Description        string `json:"description,omitempty"`
+	S3CredentialConfig string `json:"s3credentialConfig,omitempty" norman:"type=s3credentialconfig"`
 }
