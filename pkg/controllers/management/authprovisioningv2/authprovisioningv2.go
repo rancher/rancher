@@ -26,11 +26,12 @@ type handler struct {
 	roleLocker                           locker.Locker
 	roleCache                            rbacv1.RoleCache
 	roleController                       rbacv1.RoleController
+	clusterRoleCache                     rbacv1.ClusterRoleCache
 	roleTemplateController               mgmtcontrollers.RoleTemplateController
 	clusterRoleTemplateBindings          mgmtcontrollers.ClusterRoleTemplateBindingCache
 	clusterRoleTemplateBindingController mgmtcontrollers.ClusterRoleTemplateBindingController
 	projectRoleTemplateBindingController mgmtcontrollers.ProjectRoleTemplateBindingController
-	roleTemplates                        mgmtcontrollers.RoleTemplateCache
+	roleTemplatesCache                   mgmtcontrollers.RoleTemplateCache
 	clusters                             provisioningcontrollers.ClusterCache
 	crdCache                             apiextcontrollers.CustomResourceDefinitionCache
 	dynamic                              *dynamic.Controller
@@ -45,11 +46,12 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	h := &handler{
 		roleCache:                            clients.RBAC.Role().Cache(),
 		roleController:                       clients.RBAC.Role(),
+		clusterRoleCache:                     clients.RBAC.ClusterRole().Cache(),
 		roleTemplateController:               clients.Mgmt.RoleTemplate(),
 		clusterRoleTemplateBindings:          clients.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		clusterRoleTemplateBindingController: clients.Mgmt.ClusterRoleTemplateBinding(),
 		projectRoleTemplateBindingController: clients.Mgmt.ProjectRoleTemplateBinding(),
-		roleTemplates:                        clients.Mgmt.RoleTemplate().Cache(),
+		roleTemplatesCache:                   clients.Mgmt.RoleTemplate().Cache(),
 		clusters:                             clients.Provisioning.Cluster().Cache(),
 		crdCache:                             clients.CRD.CustomResourceDefinition().Cache(),
 		dynamic:                              clients.Dynamic,

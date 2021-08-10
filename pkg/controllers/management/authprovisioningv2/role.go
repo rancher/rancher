@@ -7,6 +7,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/rbac"
 	apiextcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	"github.com/rancher/wrangler/pkg/name"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -132,7 +133,7 @@ func (h *handler) OnChange(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, e
 			return rt, err
 		}
 
-		rts, err := h.roleTemplates.List(labels.Everything())
+		rts, err := h.roleTemplatesCache.List(labels.Everything())
 		if err != nil {
 			return rt, err
 		}
@@ -155,7 +156,12 @@ func (h *handler) objects(rt *v3.RoleTemplate, enqueue bool, cluster *v1.Cluster
 		return nil
 	}
 
-	for _, rule := range rt.Rules {
+	rules, err := rbac.RulesFromTemplate(h.clusterRoleCache, h.roleTemplatesCache, rt)
+	if err != nil {
+		return err
+	}
+
+	for _, rule := range rules {
 		if len(rule.NonResourceURLs) > 0 || len(rule.ResourceNames) > 0 {
 			continue
 		}
@@ -268,7 +274,7 @@ func (h *handler) createRoleForCluster(rt *v3.RoleTemplate, matches []match, clu
 
 	return h.apply.
 		WithListerNamespace(role.Namespace).
-		WithSetID("auth-prov-v2-roletemplate").
+		WithSetID("auth-prov-v2-roletemplate" + "-" + cluster.Name).
 		WithOwner(rt).
 		ApplyObjects(&role)
 }
