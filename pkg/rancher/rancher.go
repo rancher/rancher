@@ -27,6 +27,7 @@ import (
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/ui"
 	"github.com/rancher/rancher/pkg/websocket"
@@ -146,6 +147,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
+		ServerVersion:   settings.ServerVersion.Get(),
 		Controllers:     wranglerContext.Controllers,
 		AccessSetLookup: wranglerContext.ASL,
 		AuthMiddleware:  steveauth.ExistingContext,
