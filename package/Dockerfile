@@ -1,8 +1,7 @@
 FROM registry.suse.com/suse/sle15:15.3
 
-RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk && \
+RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
-    rpm -e libsolv-tools zypper libzypp container-suseconnect ; \
     useradd rancher && \
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
