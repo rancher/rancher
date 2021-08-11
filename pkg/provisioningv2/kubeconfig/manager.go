@@ -222,7 +222,7 @@ func (m *Manager) GetCRTBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) 
 func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, managementClusterName string) (map[string][]byte, error) {
 	secret, err := m.secretCache.Get(clusterNamespace, secretName)
 	if err == nil {
-		if secret.Data == nil || secret.Data["token"] == nil || secret.Annotations["objectset.rio.cattle.io/owner-gvk"] != "provisioning.cattle.io/v1, Kind=Cluster" {
+		if secret.Data == nil || secret.Data["token"] == nil {
 			// Check if we require a new secret based on the token value and annotation(s). We delete the old secret since it may contain
 			// annotations, owner references, etc. that are out of date. We will then continue to create the new secret.
 			if err := m.secrets.Delete(clusterNamespace, secretName, &metav1.DeleteOptions{}); err != nil && !apierror.IsNotFound(err) {
