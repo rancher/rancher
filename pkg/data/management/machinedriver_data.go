@@ -94,6 +94,36 @@ func addS3Generic(management *config.ManagementContext) error {
 					Create:      true,
 					Update:      true,
 				},
+				"defaultEndpoint": {
+					Type:        "string",
+					Description: "S3 Default Endpoint",
+					Create:      true,
+					Update:      true,
+				},
+				"defaultEndpointCA": {
+					Type:        "string",
+					Description: "S3 Default EndpointCA",
+					Create:      true,
+					Update:      true,
+				},
+				"defaultSkipSSLVerify": {
+					Type:        "boolean",
+					Description: "S3 Default SkipSSLVerify",
+					Create:      true,
+					Update:      true,
+				},
+				"defaultBucket": {
+					Type:        "string",
+					Description: "S3 Default Bucket",
+					Create:      true,
+					Update:      true,
+				},
+				"defaultFolder": {
+					Type:        "string",
+					Description: "S3 Default Folder",
+					Create:      true,
+					Update:      true,
+				},
 			},
 		},
 	})
