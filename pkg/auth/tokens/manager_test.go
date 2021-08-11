@@ -114,7 +114,7 @@ func (t *TestManager) runTestCases(hashingEnabled bool) {
 	features.TokenHashing.Set(hashingEnabled)
 	t.tokenManager = Manager{
 		tokenIndexer: &DummyIndexer{
-			Store: &cache.FakeCustomStore{},
+			Store:         &cache.FakeCustomStore{},
 			hashedEnabled: hashingEnabled,
 		},
 	}

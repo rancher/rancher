@@ -6,5 +6,3 @@ var FetchImagesFromCharts = fetchImagesFromCharts
 var FetchImagesFromSystem = fetchImagesFromSystem
 var ConvertMirroredImages = convertMirroredImages
 var SetRequirementImages = setRequirementImages
-
-

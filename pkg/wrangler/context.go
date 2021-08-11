@@ -209,6 +209,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
+	ctlg, err := catalog.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	apps, err := apps.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
@@ -279,7 +284,8 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		RESTMapper:      restMapper,
 	}
 
-	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, steveControllers.Core.Pod(), mgmt.Management().V3().Setting())
+	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, steveControllers.Core.Pod(),
+		mgmt.Management().V3().Setting(), ctlg.Catalog().V1().ClusterRepo())
 	if err != nil {
 		return nil, err
 	}
