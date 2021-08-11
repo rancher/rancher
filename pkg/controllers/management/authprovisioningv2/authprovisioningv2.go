@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/wrangler/pkg/apply"
 	apiextcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/gvk"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -40,9 +41,16 @@ type handler struct {
 	resourcesLock                        sync.RWMutex
 	apply                                apply.Apply
 	roleBindingApply                     apply.Apply
+	provisioningClusterGVK               schema.GroupVersionKind
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) error {
+	clusterGVK, err := gvk.Get(&v1.Cluster{})
+	if err != nil {
+		// this is a build issue if it happens
+		panic(err)
+	}
+
 	h := &handler{
 		roleCache:                            clients.RBAC.Role().Cache(),
 		roleController:                       clients.RBAC.Role(),
@@ -61,7 +69,8 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 		roleBindingApply: clients.Apply.WithCacheTypes(
 			clients.Mgmt.ClusterRoleTemplateBinding(),
 			clients.RBAC.RoleBinding()),
-		resources: map[schema.GroupVersionKind]resourceMatch{},
+		resources:              map[schema.GroupVersionKind]resourceMatch{},
+		provisioningClusterGVK: clusterGVK,
 	}
 
 	if err := h.initializeCRDs(clients.CRD.CustomResourceDefinition()); err != nil {
