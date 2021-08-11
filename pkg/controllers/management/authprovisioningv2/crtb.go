@@ -1,6 +1,7 @@
 package authprovisioningv2
 
 import (
+	"reflect"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -9,23 +10,16 @@ import (
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const CRTBRoleBindingID = "auth-prov-v2-crtb-rolebinding"
 
+// OnCRTB create a "membership" binding that gives the subject access to the the cluster custom resource itself
+// along with granting any clusterIndexed permissions based on the roleTemplate
 func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if crtb == nil || crtb.DeletionTimestamp != nil || crtb.RoleTemplateName == "" || crtb.ClusterName == "" {
 		return crtb, nil
-	}
-
-	rt, err := h.roleTemplatesCache.Get(crtb.RoleTemplateName)
-	if err != nil {
-		return crtb, err
-	}
-
-	indexed, err := h.isClusterIndexed(rt)
-	if err != nil || !indexed {
-		return crtb, err
 	}
 
 	clusters, err := h.clusters.GetByIndex(byClusterName, crtb.ClusterName)
@@ -45,18 +39,14 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 
 	cluster := clusters[0]
 
-	// The roleBinding name format: crt-<cluster name>-<roleTemplate name>-<crtb name>
-	// Example: crt-cluster1-cluster-member-crtb-aaaaa
-	roleBinding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.SafeConcatName(roleTemplateRoleName(crtb.RoleTemplateName, cluster.Name), crtb.Name),
-			Namespace: cluster.Namespace,
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "Role",
-			Name:     roleTemplateRoleName(crtb.RoleTemplateName, cluster.Name),
-		},
+	rt, err := h.roleTemplatesCache.Get(crtb.RoleTemplateName)
+	if err != nil {
+		return crtb, err
+	}
+
+	clusterIndexed, provisioningCluster, err := h.isClusterIndexed(rt)
+	if err != nil {
+		return crtb, err
 	}
 
 	subject, err := rbac.BuildSubjectFromRTB(crtb)
@@ -64,31 +54,89 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 		return nil, err
 	}
 
-	roleBinding.Subjects = []rbacv1.Subject{subject}
+	var bindings []runtime.Object
+
+	// Based on the rules in the roleTemplate we need to decide if an additional role binding
+	// needs to be created in order to give the subject of the CRTB permissions to view
+	// the provisioning cluster. The additional binding is added as oppose to editing the
+	// the existing role because not all CRTBs grant clusterIndexed permissions.This will also
+	// make troubleshooting permissions assigned to a user easier and makes tying a role
+	// back to a roleTemplate easier.
+	// clusterIndexed and provisioningCluster are both true: One binding is created for the original CRTB
+	// because the roleTemplate already grants permissions to the provisioning cluster.
+	// clusterIndexed and provisioningCluster are both false: One binding is created which grants
+	// permissions to view the provisioning cluster as the roleTemplate does not grant any clusterIndexed items.
+	// clusterIndexed is true and provisioningCluster is false: Two bindings are created, one
+	// for the original CRTB and a 2nd one for viewing the provisioning cluster since the original
+	// roleTemplate does not grant permission for the provisioning cluster.
+	if clusterIndexed {
+		// The roleBinding name format: crt-<cluster name>-<roleTemplate name>-<crtb name>
+		// Example: crt-cluster1-cluster-member-crtb-aaaaa
+		roleBinding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name.SafeConcatName(roleTemplateRoleName(crtb.RoleTemplateName, cluster.Name), crtb.Name),
+				Namespace: cluster.Namespace,
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "Role",
+				Name:     roleTemplateRoleName(crtb.RoleTemplateName, cluster.Name),
+			},
+			Subjects: []rbacv1.Subject{subject},
+		}
+		bindings = append(bindings, roleBinding)
+	}
+
+	if !provisioningCluster {
+		// The roleBinding name format: r-cluster-<cluster name>-view-<prtb name>
+		// Example: r-cluster1-view-prtb-foo
+		roleBinding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name.SafeConcatName(clusterViewName(cluster), crtb.Name),
+				Namespace: cluster.Namespace,
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "Role",
+				Name:     clusterViewName(cluster),
+			},
+			Subjects: []rbacv1.Subject{subject},
+		}
+		bindings = append(bindings, roleBinding)
+	}
 
 	return crtb, h.roleBindingApply.
 		WithListerNamespace(cluster.Namespace).
 		WithSetID(CRTBRoleBindingID).
 		WithOwner(crtb).
-		ApplyObjects(roleBinding)
+		ApplyObjects(bindings...)
 }
 
-func (h *handler) isClusterIndexed(rt *v3.RoleTemplate) (bool, error) {
+func (h *handler) isClusterIndexed(rt *v3.RoleTemplate) (bool, bool, error) {
+	var clusterIndexed, provisioningCluster bool
+
 	rules, err := rbac.RulesFromTemplate(h.clusterRoleCache, h.roleTemplatesCache, rt)
 	if err != nil {
-		return false, err
+		return clusterIndexed, provisioningCluster, err
 	}
+
 	for _, rule := range rules {
 		if len(rule.NonResourceURLs) > 0 || len(rule.ResourceNames) > 0 {
 			continue
 		}
 		matches, err := h.getMatchingClusterIndexedTypes(rule)
 		if err != nil {
-			return false, err
+			return clusterIndexed, provisioningCluster, err
 		}
 		if len(matches) > 0 {
-			return true, nil
+			clusterIndexed = true
+			for _, match := range matches {
+				if reflect.DeepEqual(match.GVK, h.provisioningClusterGVK) {
+					return clusterIndexed, true, nil
+				}
+			}
 		}
+
 	}
-	return false, nil
+	return clusterIndexed, provisioningCluster, nil
 }
