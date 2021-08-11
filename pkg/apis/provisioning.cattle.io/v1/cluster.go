@@ -28,6 +28,8 @@ type ClusterSpec struct {
 	DefaultPodSecurityPolicyTemplateName string          `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	EnableNetworkPolicy                  *bool           `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
+
+	RedeploySystemAgentGeneration int64 `json:"redeploySystemAgentGeneration,omitempty"`
 }
 
 type ClusterStatus struct {
