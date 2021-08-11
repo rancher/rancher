@@ -58,9 +58,6 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
 
 {{- define "linux-node-selector-terms" -}}
 {{- $key := "kubernetes.io/os" -}}
-{{- if semverCompare "<1.14-0" .Capabilities.KubeVersion.GitVersion }}
-{{- $key := "beta.kubernetes.io/os" -}}
-{{- end -}}
 - matchExpressions:
   - key: {{ $key }}
     operator: NotIn
