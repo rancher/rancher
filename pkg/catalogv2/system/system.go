@@ -16,6 +16,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
+	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/settings"
@@ -66,6 +67,8 @@ type Manager struct {
 	syncLock              sync.Mutex
 	refreshIntervalChange chan struct{}
 	settings              mgmtcontrollers.SettingController
+	trigger               chan struct{}
+	clusterRepos          catalogcontrollers.ClusterRepoController
 }
 
 func NewManager(ctx context.Context,
@@ -73,7 +76,8 @@ func NewManager(ctx context.Context,
 	contentManager *content.Manager,
 	ops *helmop.Operations,
 	pods corecontrollers.PodClient,
-	settings mgmtcontrollers.SettingController) (*Manager, error) {
+	settings mgmtcontrollers.SettingController,
+	clusterRepos catalogcontrollers.ClusterRepoController) (*Manager, error) {
 
 	m := &Manager{
 		ctx:                   ctx,
@@ -85,6 +89,8 @@ func NewManager(ctx context.Context,
 		desiredCharts:         map[desiredKey]map[string]interface{}{},
 		refreshIntervalChange: make(chan struct{}, 1),
 		settings:              settings,
+		trigger:               make(chan struct{}, 1),
+		clusterRepos:          clusterRepos,
 	}
 
 	return m, nil
@@ -95,6 +101,7 @@ func (m *Manager) Start(ctx context.Context) {
 	go m.runSync()
 
 	m.settings.OnChange(ctx, "system-feature-chart-refresh", m.onSetting)
+	m.clusterRepos.OnChange(ctx, "catalog-refresh-trigger", m.onTrigger)
 }
 
 func (m *Manager) onSetting(key string, obj *v3.Setting) (*v3.Setting, error) {
@@ -103,6 +110,17 @@ func (m *Manager) onSetting(key string, obj *v3.Setting) (*v3.Setting, error) {
 	}
 
 	m.refreshIntervalChange <- struct{}{}
+	return obj, nil
+}
+
+func (m *Manager) onTrigger(_ string, obj *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
+	// We only want to trigger on "rancher-charts" in order to ensure that required charts, such as
+	// Fleet, are up-to-date upon Rancher startup or upgrade.
+	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "rancher-charts" {
+		return obj, nil
+	}
+
+	m.trigger <- struct{}{}
 	return obj, nil
 }
 
@@ -116,6 +134,8 @@ func (m *Manager) runSync() {
 			t = time.NewTicker(getIntervalOrDefault(settings.SystemFeatureChartRefreshSeconds.Get()))
 		case <-m.ctx.Done():
 			return
+		case <-m.trigger:
+			_ = m.installCharts(m.desiredCharts, true)
 		case <-t.C:
 			_ = m.installCharts(m.desiredCharts, true)
 		case desired := <-m.sync:
