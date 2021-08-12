@@ -15,6 +15,7 @@ var (
 	toCopy = map[string]bool{
 		settings.SystemDefaultRegistry.Name: true,
 		settings.InstallUUID.Name:           true,
+		settings.IngressIPDomain.Name:       true,
 	}
 )
 
