@@ -20,6 +20,13 @@ type ETCDSnapshotCreate struct {
 	Generation int `json:"generation,omitempty"`
 }
 
+type ETCDSnapshotRestore struct {
+	ETCDSnapshot
+
+	// Changing the Generation is the only thing required to initiate a snapshot creation.
+	Generation int `json:"generation,omitempty"`
+}
+
 type ETCDSnapshot struct {
 	Name      string          `json:"name,omitempty"`
 	NodeName  string          `json:"nodeName,omitempty"`

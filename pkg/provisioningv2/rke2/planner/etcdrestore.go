@@ -32,7 +32,7 @@ func newETCDRestore(clients *wrangler.Context, store *PlanStore) *etcdRestore {
 	}
 }
 
-func (e *etcdRestore) setState(controlPlane *rkev1.RKEControlPlane, status *rkev1.ETCDSnapshot, phase rkev1.ETCDSnapshotPhase) error {
+func (e *etcdRestore) setState(controlPlane *rkev1.RKEControlPlane, status *rkev1.ETCDSnapshotRestore, phase rkev1.ETCDSnapshotPhase) error {
 	controlPlane = controlPlane.DeepCopy()
 	controlPlane.Status.ETCDSnapshotRestorePhase = phase
 	controlPlane.Status.ETCDSnapshotRestore = status
@@ -85,7 +85,7 @@ func ensureInstalledInstruction(controlPlane *rkev1.RKEControlPlane) plan.Instru
 	}
 }
 
-func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot) (plan.NodePlan, error) {
+func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshotRestore) (plan.NodePlan, error) {
 	args := []string{
 		"server",
 		"--cluster-reset",
