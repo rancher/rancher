@@ -161,18 +161,18 @@ func (v *handler) getCloudCredential(id string, req *http.Request) (*corev1.Secr
 	}
 
 	cc, err := v.secretsLister.Get(namespace.GlobalNamespace, name)
-	if err != nil {
+	if err != nil || cc == nil {
 		return nil, httperror.InvalidBodyContent, fmt.Errorf("error getting cloud cred %s: %v", id, err)
 	}
 
-	if len(cc.Data) == 0 {
+	if cc.Data == nil || len(cc.Data) == 0 {
 		return nil, httperror.InvalidBodyContent, fmt.Errorf("empty credential ID data %s", id)
 	}
 	if !validCloudCredential(cc) {
 		return nil, httperror.InvalidBodyContent, fmt.Errorf("not a valid vsphere credential %s", id)
 	}
 
-	return cc, httperror.ErrorCode{}, nil
+	return moveData(cc), httperror.ErrorCode{}, nil
 }
 
 func (v *handler) getSecret(id string, req *http.Request) (*corev1.Secret, httperror.ErrorCode, error) {
@@ -191,8 +191,12 @@ func (v *handler) getSecret(id string, req *http.Request) (*corev1.Secret, httpe
 	}
 
 	cc, err := v.secretsLister.Get(defaultNamespace, id)
-	if err != nil {
+	if err != nil || cc == nil {
 		return nil, httperror.InvalidBodyContent, fmt.Errorf("error getting cloud cred %s: %v", id, err)
+	}
+
+	if cc.Data == nil || len(cc.Data) == 0 {
+		return nil, httperror.InvalidBodyContent, fmt.Errorf("empty secret ID data %s", id)
 	}
 
 	if !validSecret(cc) {
@@ -225,9 +229,22 @@ func validCloudCredential(cc *corev1.Secret) bool {
 		if _, ok := cc.Data[cloudCredentialDataPrefix+v]; !ok {
 			return false
 		}
-		cc.Data[v] = cc.Data[cloudCredentialDataPrefix+v] // move to new secret location
 	}
+
 	return true
+}
+
+// takes an old cloud credential and moves the data to the new secret location
+func moveData(cc *corev1.Secret) *corev1.Secret {
+	copy := cc.DeepCopy()
+	for _, v := range dataFields {
+		n, ok := cc.Data[cloudCredentialDataPrefix+v]
+		if !ok {
+			continue
+		}
+		copy.Data[v] = n
+	}
+	return copy
 }
 
 func validSecret(cc *corev1.Secret) bool {
