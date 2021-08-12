@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -34,15 +35,16 @@ import (
 )
 
 type handler struct {
-	ctx             context.Context
-	apply           apply.Apply
-	jobs            batchcontrollers.JobCache
-	pods            corecontrollers.PodCache
-	secrets         corecontrollers.SecretCache
-	machines        capicontrollers.MachineCache
-	namespaces      corecontrollers.NamespaceCache
-	nodeDriverCache mgmtcontrollers.NodeDriverCache
-	dynamic         *dynamic.Controller
+	ctx                 context.Context
+	apply               apply.Apply
+	jobs                batchcontrollers.JobCache
+	pods                corecontrollers.PodCache
+	secrets             corecontrollers.SecretCache
+	machines            capicontrollers.MachineCache
+	namespaces          corecontrollers.NamespaceCache
+	nodeDriverCache     mgmtcontrollers.NodeDriverCache
+	dynamic             *dynamic.Controller
+	rancherClusterCache ranchercontrollers.ClusterCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -55,13 +57,14 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 				clients.RBAC.RoleBinding(),
 				clients.RBAC.Role(),
 				clients.Batch.Job()),
-		pods:            clients.Core.Pod().Cache(),
-		jobs:            clients.Batch.Job().Cache(),
-		secrets:         clients.Core.Secret().Cache(),
-		machines:        clients.CAPI.Machine().Cache(),
-		nodeDriverCache: clients.Mgmt.NodeDriver().Cache(),
-		namespaces:      clients.Core.Namespace().Cache(),
-		dynamic:         clients.Dynamic,
+		pods:                clients.Core.Pod().Cache(),
+		jobs:                clients.Batch.Job().Cache(),
+		secrets:             clients.Core.Secret().Cache(),
+		machines:            clients.CAPI.Machine().Cache(),
+		nodeDriverCache:     clients.Mgmt.NodeDriver().Cache(),
+		namespaces:          clients.Core.Namespace().Cache(),
+		dynamic:             clients.Dynamic,
+		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
 	}
 
 	removeHandler := generic.NewRemoveHandler("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)
