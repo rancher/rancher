@@ -357,7 +357,18 @@ type CloudCredential struct {
 }
 
 type CloudCredentialSpec struct {
-	DisplayName        string `json:"displayName"`
-	Description        string `json:"description,omitempty"`
-	S3CredentialConfig string `json:"s3credentialConfig,omitempty" norman:"type=s3credentialconfig"`
+	DisplayName        string              `json:"displayName"`
+	Description        string              `json:"description,omitempty"`
+	S3CredentialConfig *S3CredentialConfig `json:"s3credentialConfig,omitempty"`
+}
+
+type S3CredentialConfig struct {
+	AccessKey            string `norman:"required"`
+	SecretKey            string `norman:"required,type=password"`
+	DefaultRegion        string
+	DefaultEndpoint      string
+	DefaultEndpointCA    string
+	DefaultSkipSSLVerify string
+	DefaultBucket        string
+	DefaultFolder        string
 }

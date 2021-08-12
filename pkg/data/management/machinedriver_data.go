@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
-
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -67,76 +65,7 @@ type machineDriverCompare struct {
 	annotations        map[string]string
 }
 
-func addS3Generic(management *config.ManagementContext) error {
-	_, err := management.Management.DynamicSchemas("").Create(&v3.DynamicSchema{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "s3credentialconfig",
-		},
-		Spec: v32.DynamicSchemaSpec{
-			ResourceFields: map[string]v32.Field{
-				"accessKey": {
-					Type:        "string",
-					Description: "S3 Access Key",
-					Create:      true,
-					Required:    true,
-					Update:      true,
-				},
-				"secretKey": {
-					Type:        "password",
-					Description: "S3 Secret Key",
-					Create:      true,
-					Required:    true,
-					Update:      true,
-				},
-				"defaultRegion": {
-					Type:        "string",
-					Description: "S3 Default Region",
-					Create:      true,
-					Update:      true,
-				},
-				"defaultEndpoint": {
-					Type:        "string",
-					Description: "S3 Default Endpoint",
-					Create:      true,
-					Update:      true,
-				},
-				"defaultEndpointCA": {
-					Type:        "string",
-					Description: "S3 Default EndpointCA",
-					Create:      true,
-					Update:      true,
-				},
-				"defaultSkipSSLVerify": {
-					Type:        "boolean",
-					Description: "S3 Default SkipSSLVerify",
-					Create:      true,
-					Update:      true,
-				},
-				"defaultBucket": {
-					Type:        "string",
-					Description: "S3 Default Bucket",
-					Create:      true,
-					Update:      true,
-				},
-				"defaultFolder": {
-					Type:        "string",
-					Description: "S3 Default Folder",
-					Create:      true,
-					Update:      true,
-				},
-			},
-		},
-	})
-	if apierror.IsAlreadyExists(err) {
-		return nil
-	}
-	return err
-}
-
 func addMachineDrivers(management *config.ManagementContext) error {
-	if err := addS3Generic(management); err != nil {
-		return err
-	}
 	if err := addMachineDriver("pinganyunecs", "https://drivers.rancher.cn/node-driver-pinganyun/0.3.0/docker-machine-driver-pinganyunecs-linux.tgz", "https://drivers.rancher.cn/node-driver-pinganyun/0.3.0/component.js", "f84ccec11c2c1970d76d30150916933efe8ca49fe4c422c8954fc37f71273bb5", []string{"drivers.rancher.cn"}, false, false, false, management); err != nil {
 		return err
 	}
