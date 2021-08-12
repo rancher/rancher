@@ -1,6 +1,8 @@
 package navlinks
 
 import (
+	"fmt"
+
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 )
@@ -26,7 +28,17 @@ func hasAccess(apiOp *types.APIRequest, result types.APIObject) bool {
 		return true
 	}
 
-	serviceNamespace, serviceName := data.String("namespace"), data.String("name")
+	scheme := data.String("scheme")
+	if scheme == "" {
+		scheme = "http"
+	}
+	port := data.String("port")
+	if port == "" {
+		port = "80"
+	}
+
+	serviceNamespace := data.String("namespace")
+	serviceName := fmt.Sprintf("%s:%s:%s", scheme, data.String("name"), port)
 	return apiOp.AccessControl.CanDo(apiOp, "/services/proxy", "get", serviceNamespace, serviceName) == nil
 }
 
