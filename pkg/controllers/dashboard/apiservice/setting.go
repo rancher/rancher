@@ -10,6 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const RancherServiceName = "rancher"
+
 func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.Setting, error) {
 	if key != settings.ServerURL.Name {
 		return setting, nil
@@ -37,7 +39,7 @@ func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.S
 }
 
 func (h *handler) getClusterIP() (string, error) {
-	serviceName := "rancher"
+	serviceName := RancherServiceName
 	if features.MCMAgent.Enabled() {
 		serviceName = "cattle-cluster-agent"
 	}
@@ -67,11 +69,15 @@ func (h *handler) getInternalServerAndURL() (string, string, error) {
 			clusterIPService = true
 		}
 	} else {
-		if dp, err := h.deploymentCache.Get(namespace.System, "rancher"); err == nil && dp.Spec.Replicas != nil && *dp.Spec.Replicas != 0 {
+		if dp, err := h.deploymentCache.Get(namespace.System, RancherServiceName); err == nil && dp.Spec.Replicas != nil && *dp.Spec.Replicas != 0 {
 			clusterIPService = true
-		} else if _, err := h.daemonSetCache.Get(namespace.System, "rancher"); err == nil {
+		} else if _, err := h.daemonSetCache.Get(namespace.System, RancherServiceName); err == nil {
 			clusterIPService = true
 		}
+	}
+
+	if h.embedded {
+		clusterIPService = true
 	}
 
 	if clusterIPService {

@@ -29,9 +29,10 @@ type handler struct {
 	settings        mgmtcontrollers.SettingClient
 	apiServices     mgmtcontrollers.APIServiceCache
 	services        corev1controllers.ServiceCache
+	embedded        bool
 }
 
-func Register(ctx context.Context, context *wrangler.Context) {
+func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
 	h := &handler{
 		serviceAccounts: context.Core.ServiceAccount().Cache(),
 		deploymentCache: context.Apps.Deployment().Cache(),
@@ -40,6 +41,7 @@ func Register(ctx context.Context, context *wrangler.Context) {
 		settings:        context.Mgmt.Setting(),
 		apiServices:     context.Mgmt.APIService().Cache(),
 		services:        context.Core.Service().Cache(),
+		embedded:        embedded,
 	}
 
 	relatedresource.WatchClusterScoped(ctx, "apiservice-watch-owner",
