@@ -2,8 +2,6 @@ package cluster
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"regexp"
 
 	"github.com/rancher/norman/types/convert"
@@ -23,6 +21,7 @@ import (
 	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/rancher/wrangler/pkg/kstatus"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/rancher/wrangler/pkg/yaml"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -225,9 +224,12 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, sp
 	return h.createNewCluster(cluster, status, spec)
 }
 
-func mgmtClusterName(clusterNamespace, clusterName string) string {
-	hash := sha256.Sum256([]byte(clusterNamespace + "/" + clusterName))
-	return name.SafeConcatName("c", "m", hex.EncodeToString(hash[:])[:8])
+func mgmtClusterName() (string, error) {
+	rand, err := randomtoken.Generate()
+	if err != nil {
+		return "", err
+	}
+	return name.SafeConcatName("c", "m", rand[:8]), nil
 }
 
 func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
@@ -249,11 +251,19 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 
 	newCluster := &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        mgmtClusterName(cluster.Namespace, cluster.Name),
+			Name:        cluster.Status.ClusterName,
 			Labels:      cluster.Labels,
 			Annotations: map[string]string{},
 		},
 		Spec: spec,
+	}
+
+	if newCluster.Name == "" {
+		mgmtName, err := mgmtClusterName()
+		if err != nil {
+			return nil, status, err
+		}
+		newCluster.Name = mgmtName
 	}
 
 	for k, v := range cluster.Annotations {
