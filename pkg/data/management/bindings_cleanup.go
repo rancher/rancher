@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -23,10 +24,13 @@ func CleanupDuplicateBindings(scaledContext *config.ScaledContext, wContext *wra
 		// config map already exists, check if the cleanup key is found
 		if _, ok := adminConfig.Data["DedupeBindingsDone"]; ok {
 			//cleanup has been run already, nothing to do here
-			logrus.Info("bindings cleanup already ran before, not calling again")
+			logrus.Info("Bindings cleanup already ran before, not calling again")
 			return
 		}
-		// run cleanup
+		// run cleanup after delay to give other controllers a chance to create CRTBs/PRTBs and ease the load on the API at startup
+		const delayMinutes = 3
+		logrus.Infof("Bindings cleanup needed, waiting %v minutes before starting...", delayMinutes)
+		time.Sleep(time.Minute * delayMinutes)
 		logrus.Info("Calling Duplicate CRB and RB cleanup")
 		err = clean.Bindings(&scaledContext.RESTConfig)
 		if err != nil {
