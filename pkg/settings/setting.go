@@ -41,7 +41,7 @@ var (
 	GithubProxyAPIURL                 = NewSetting("github-proxy-api-url", "https://api.github.com")
 	HelmVersion                       = NewSetting("helm-version", "dev")
 	HelmMaxHistory                    = NewSetting("helm-max-history", "10")
-	IngressIPDomain                   = NewSetting("ingress-ip-domain", "xip.io")
+	IngressIPDomain                   = NewSetting("ingress-ip-domain", "sslip.io")
 	InstallUUID                       = NewSetting("install-uuid", "")
 	JailerTimeout                     = NewSetting("jailer-timeout", "60")
 	KubeconfigGenerateToken           = NewSetting("kubeconfig-generate-token", "true")
