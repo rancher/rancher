@@ -64,51 +64,68 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 		return nil, err
 	}
 
-	// ensure the system catalog image cache exists
-	var systemCatalogImageCache *v1.ConfigMap
 	if catalog.Name == utils.SystemLibraryName {
-		var systemCatalogImageCacheCreated bool
-		systemCatalogImageCacheName := utils.GetCatalogImageCacheName(catalog.Name)
-		systemCatalogImageCache, err = m.ConfigMapLister.Get(namespace.System, systemCatalogImageCacheName)
-
-		// if the cache does not exist generate it
-		if err != nil && errors.IsNotFound(err) {
-			logrus.Debug("system catalog image cache configmap not found")
-
-			systemCatalogImageCache = &v1.ConfigMap{}
-			systemCatalogImageCache.Name = systemCatalogImageCacheName
-			systemCatalogImageCache.Namespace = namespace.System
-			err = image.CreateCatalogImageListConfigMap(systemCatalogImageCache, catalog)
-			if err != nil {
-				return nil, err
-			}
-
-			systemCatalogImageCache, err = m.ConfigMap.Create(systemCatalogImageCache)
-			if err != nil && !errors.IsAlreadyExists(err) {
-				return nil, err
-			}
-			systemCatalogImageCacheCreated = true
-			logrus.Debug("system catalog image cache configmap created")
-
-		} else {
-			return nil, err
-		}
-
-		// if the cache exists and is out of date update it
-		if !isUpToDate(commit, catalog) || systemCatalogImageCacheCreated {
-			err = image.CreateCatalogImageListConfigMap(systemCatalogImageCache, catalog)
-			if err != nil {
-				return nil, err
-			}
-
-			// update
-			_, err = m.ConfigMap.Update(systemCatalogImageCache)
-			if err != nil {
-				return nil, err
-			}
-			logrus.Debug("system catalog image cache updated")
-		}
+		// ensure the system catalog image cache exists
+		forceUpdate := !isUpToDate(commit, catalog)
+		return nil, CreateOrUpdateSystemCatalogImageCache(catalog, m.ConfigMap, m.ConfigMapLister, false, forceUpdate)
 	}
 
 	return nil, nil
+}
+
+func CreateOrUpdateSystemCatalogImageCache(systemCatalog *v3.Catalog, configMapInterface v1.ConfigMapInterface, configMapLister v1.ConfigMapLister, bundledMode bool, forceUpdate bool) (err error) {
+	var catalogChartPath string
+	catalogChartPath, err = utils.GetCatalogChartPath(systemCatalog, bundledMode)
+	if err != nil {
+		return err
+	}
+
+	var systemCatalogImageCache *v1.ConfigMap
+	var systemCatalogImageCacheCreated bool
+
+	systemCatalogImageCacheName := utils.GetCatalogImageCacheName(systemCatalog.Name)
+	systemCatalogImageCache, err = configMapLister.Get(namespace.System, systemCatalogImageCacheName)
+
+	// if the cache does not exist generate it
+	if err != nil && errors.IsNotFound(err) {
+		logrus.Debug("system catalog image cache configmap not found")
+
+		systemCatalogImageCache = &v1.ConfigMap{}
+		systemCatalogImageCache.Name = systemCatalogImageCacheName
+		systemCatalogImageCache.Namespace = namespace.System
+
+		err = image.AddImagesToImageListConfigMap(systemCatalogImageCache, catalogChartPath)
+		if err != nil {
+			return
+		}
+
+		systemCatalogImageCache, err = configMapInterface.Create(systemCatalogImageCache)
+		if err != nil && !errors.IsAlreadyExists(err) {
+			return
+		}
+		systemCatalogImageCacheCreated = true
+		logrus.Debug("system catalog image cache configmap created")
+
+	} else if err != nil {
+		return
+	}
+
+	// if the cache exists and is out of date update it
+	if forceUpdate || systemCatalogImageCacheCreated {
+		if err != nil {
+			return err
+		}
+		err = image.AddImagesToImageListConfigMap(systemCatalogImageCache, catalogChartPath)
+		if err != nil {
+			return
+		}
+
+		_, err = configMapInterface.Update(systemCatalogImageCache)
+		if err != nil {
+			return
+		}
+		logrus.Debug("system catalog image cache updated")
+	}
+
+	return
 }
