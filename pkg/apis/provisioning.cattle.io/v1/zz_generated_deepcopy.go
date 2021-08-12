@@ -198,7 +198,7 @@ func (in *RKEConfig) DeepCopyInto(out *RKEConfig) {
 	}
 	if in.ETCDSnapshotRestore != nil {
 		in, out := &in.ETCDSnapshotRestore, &out.ETCDSnapshotRestore
-		*out = new(rkecattleiov1.ETCDSnapshot)
+		*out = new(rkecattleiov1.ETCDSnapshotRestore)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.MachinePools != nil {
