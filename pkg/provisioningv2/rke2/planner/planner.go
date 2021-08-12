@@ -579,6 +579,9 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) {
 	if GetRuntime(controlPlane.Spec.KubernetesVersion) == RuntimeRKE2 {
 		config["cni"] = "calico"
+		if settings.SystemDefaultRegistry.Get() != "" {
+			config["system-default-registry"] = settings.SystemDefaultRegistry.Get()
+		}
 	}
 }
 
