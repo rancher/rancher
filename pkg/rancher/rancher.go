@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
 	crds "github.com/rancher/rancher/pkg/crds/dashboard"
@@ -39,9 +40,13 @@ import (
 	"github.com/rancher/wrangler/pkg/unstructured"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	v1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/net"
 	k8dynamic "k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
@@ -107,6 +112,17 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if err != nil {
 		return nil, err
 	}
+
+	if err := dashboarddata.EarlyData(ctx, wranglerContext.K8s); err != nil {
+		return nil, err
+	}
+
+	if opts.Embedded {
+		if err := setupRancherService(ctx, restConfig, opts.HTTPSListenPort); err != nil {
+			return nil, err
+		}
+	}
+
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 
 	// Initialize Features as early as possible
@@ -205,10 +221,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
-	if err := dashboarddata.EarlyData(ctx, r.Wrangler.K8s); err != nil {
-		return err
-	}
-
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
@@ -228,7 +240,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error { return dashboard.Register(ctx, r.Wrangler) }); err != nil {
+		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error { return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded) }); err != nil {
 			return err
 		}
 
@@ -293,6 +305,138 @@ func localClusterEnabled(opts *Options) bool {
 		return true
 	}
 	return false
+}
+
+// setupRancherService will ensure that a Rancher service with a custom endpoint exists that will be used
+// to access Rancher
+func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsListenPort int) error {
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("error setting up kubernetes clientset while setting up rancher service: %w", err)
+	}
+
+	service := v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      apiservice.RancherServiceName,
+			Namespace: namespace.System,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Protocol:   v1.ProtocolTCP,
+					Port:       443,
+					TargetPort: intstr.FromInt(httpsListenPort + 1),
+				},
+			},
+		},
+	}
+
+	refreshService := false
+
+	s, err := clientset.CoreV1().Services(namespace.System).Get(ctx, apiservice.RancherServiceName, metav1.GetOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			refreshService = true
+		} else {
+			return fmt.Errorf("error looking for rancher service: %w", err)
+		}
+	} else {
+		s = s.DeepCopy()
+		if s.Spec.String() != service.Spec.String() {
+			refreshService = true
+		}
+	}
+
+	if refreshService {
+		logrus.Debugf("setupRancherService refreshing service")
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if s, err := clientset.CoreV1().Services(namespace.System).Get(ctx, apiservice.RancherServiceName, metav1.GetOptions{}); err != nil {
+				if k8serror.IsNotFound(err) {
+					if _, err := clientset.CoreV1().Services(namespace.System).Create(ctx, &service, metav1.CreateOptions{}); err != nil {
+						return err
+					}
+				} else {
+					return err
+				}
+			} else {
+				s = s.DeepCopy()
+				s.Spec.Ports = service.Spec.Ports
+				if _, err := clientset.CoreV1().Services(namespace.System).Update(ctx, s, metav1.UpdateOptions{}); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("setupRancherService error refreshing service: %w", err)
+		}
+	}
+
+	ip, err := net.ChooseHostInterface()
+	if err != nil {
+		return fmt.Errorf("setupRancherService error getting host IP while setting up rancher service: %w", err)
+	}
+
+	endpoint := v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      apiservice.RancherServiceName,
+			Namespace: namespace.System,
+		},
+		Subsets: []v1.EndpointSubset{
+			{
+				Addresses: []v1.EndpointAddress{
+					{
+						IP: ip.String(),
+					},
+				},
+				Ports: []v1.EndpointPort{
+					{
+						Port: int32(httpsListenPort + 1),
+					},
+				},
+			},
+		},
+	}
+
+	refreshEndpoint := false
+	e, err := clientset.CoreV1().Endpoints(namespace.System).Get(ctx, apiservice.RancherServiceName, metav1.GetOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			refreshEndpoint = true
+		} else {
+			return fmt.Errorf("error looking for rancher endpoint while setting up rancher service: %w", err)
+		}
+	} else {
+		e = e.DeepCopy()
+		if e.Subsets[0].String() != endpoint.Subsets[0].String() && len(e.Subsets) != 1 {
+			logrus.Debugf("setupRancherService subsets did not match, refreshing endpoint (%s vs %s)", e.Subsets[0].String(), endpoint.String())
+			refreshEndpoint = true
+		}
+	}
+
+	if refreshEndpoint {
+		logrus.Debugf("setupRancherService refreshing endpoint")
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if e, err := clientset.CoreV1().Endpoints(namespace.System).Get(ctx, apiservice.RancherServiceName, metav1.GetOptions{}); err != nil {
+				if k8serror.IsNotFound(err) {
+					if _, err := clientset.CoreV1().Endpoints(namespace.System).Create(ctx, &endpoint, metav1.CreateOptions{}); err != nil {
+						return err
+					}
+				} else {
+					return err
+				}
+			} else {
+				e = e.DeepCopy()
+				e.Subsets = endpoint.Subsets
+				if _, err := clientset.CoreV1().Endpoints(namespace.System).Update(ctx, e, metav1.UpdateOptions{}); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("setupRancherService error refreshing endpoint: %w", err)
+		}
+	}
+	return nil
 }
 
 // migrateEncryptionConfig uses the dynamic client to get all clusters and then marshals them through the
