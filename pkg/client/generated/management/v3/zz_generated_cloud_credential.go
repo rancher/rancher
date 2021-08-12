@@ -5,29 +5,31 @@ import (
 )
 
 const (
-	CloudCredentialType                 = "cloudCredential"
-	CloudCredentialFieldAnnotations     = "annotations"
-	CloudCredentialFieldCreated         = "created"
-	CloudCredentialFieldCreatorID       = "creatorId"
-	CloudCredentialFieldDescription     = "description"
-	CloudCredentialFieldLabels          = "labels"
-	CloudCredentialFieldName            = "name"
-	CloudCredentialFieldOwnerReferences = "ownerReferences"
-	CloudCredentialFieldRemoved         = "removed"
-	CloudCredentialFieldUUID            = "uuid"
+	CloudCredentialType                    = "cloudCredential"
+	CloudCredentialFieldAnnotations        = "annotations"
+	CloudCredentialFieldCreated            = "created"
+	CloudCredentialFieldCreatorID          = "creatorId"
+	CloudCredentialFieldDescription        = "description"
+	CloudCredentialFieldLabels             = "labels"
+	CloudCredentialFieldName               = "name"
+	CloudCredentialFieldOwnerReferences    = "ownerReferences"
+	CloudCredentialFieldRemoved            = "removed"
+	CloudCredentialFieldS3CredentialConfig = "s3credentialConfig"
+	CloudCredentialFieldUUID               = "uuid"
 )
 
 type CloudCredential struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations        map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created            string              `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID          string              `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description        string              `json:"description,omitempty" yaml:"description,omitempty"`
+	Labels             map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name               string              `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences    []OwnerReference    `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed            string              `json:"removed,omitempty" yaml:"removed,omitempty"`
+	S3CredentialConfig *S3CredentialConfig `json:"s3credentialConfig,omitempty" yaml:"s3credentialConfig,omitempty"`
+	UUID               string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
 type CloudCredentialCollection struct {

@@ -58,8 +58,8 @@ type RKEMachinePoolRollingUpdate struct {
 type RKEConfig struct {
 	rkev1.RKEClusterSpecCommon
 
-	ETCDSnapshotCreate  *rkev1.ETCDSnapshotCreate `json:"etcdSnapshotCreate,omitempty"`
-	ETCDSnapshotRestore *rkev1.ETCDSnapshot       `json:"etcdSnapshotRestore,omitempty"`
-	MachinePools        []RKEMachinePool          `json:"machinePools,omitempty"`
-	InfrastructureRef   *corev1.ObjectReference   `json:"infrastructureRef,omitempty"`
+	ETCDSnapshotCreate  *rkev1.ETCDSnapshotCreate  `json:"etcdSnapshotCreate,omitempty"`
+	ETCDSnapshotRestore *rkev1.ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
+	MachinePools        []RKEMachinePool           `json:"machinePools,omitempty"`
+	InfrastructureRef   *corev1.ObjectReference    `json:"infrastructureRef,omitempty"`
 }
