@@ -1035,8 +1035,8 @@ github.com/rancher/rke v1.3.0-rc15 h1:o6ONqH/s3aJW97N0mvekOAyGX8UAwZ8yPY8jN93ctY
 github.com/rancher/rke v1.3.0-rc15/go.mod h1:HAdRKAo7OI5YvFSSP40ezrad1pXA7IuJgAW7S5PYg6Y=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20210810230939-e9222c6ccffa h1:D3YukwYj9ZTil1Ho3RnKD/apLiuyd8SXklkDmCcqyBo=
-github.com/rancher/steve v0.0.0-20210810230939-e9222c6ccffa/go.mod h1:A/bihZIJhWQMEh3Q8GmR/BEChAuekfh7Novbl1IntDg=
+github.com/rancher/steve v0.0.0-20210813183757-d9512c366d0f h1:ajzIYu08BnCfrFPrBQkqzbHU9MO9RH/gO16g9M79AHc=
+github.com/rancher/steve v0.0.0-20210813183757-d9512c366d0f/go.mod h1:A/bihZIJhWQMEh3Q8GmR/BEChAuekfh7Novbl1IntDg=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007/go.mod h1:Ja346o44aTPWADc/5Jm93+KgctT6KtftuOosgz0F2AM=
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
