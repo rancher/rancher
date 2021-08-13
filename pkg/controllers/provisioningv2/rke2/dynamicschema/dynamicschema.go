@@ -21,7 +21,7 @@ import (
 
 const (
 	machineAPIGroup       = "rke-machine.cattle.io"
-	machineConfigAPIGroup = "rke-machine-config.cattle.io"
+	MachineConfigAPIGroup = "rke-machine-config.cattle.io"
 )
 
 type handler struct {
@@ -265,7 +265,7 @@ func (h *handler) OnChange(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus)
 		}
 
 		if nodeConfigID == id {
-			crd.GVK.Group = machineConfigAPIGroup
+			crd.GVK.Group = MachineConfigAPIGroup
 		}
 
 		crdObj, err := crd.ToCustomResourceDefinition()
