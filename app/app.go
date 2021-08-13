@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/steve"
 	"github.com/rancher/rancher/pkg/steve/pkg/clusterapi"
+	"github.com/rancher/rancher/pkg/steve/pkg/disallow"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/tunnelserver"
@@ -324,6 +325,7 @@ func localClusterEnabled(cfg Config) bool {
 
 func newSteve(ctx context.Context, rancher *Rancher) (http.Handler, error) {
 	clusterapiServer := &clusterapi.Server{}
+	disallowServer := &disallow.Server{}
 	cfg := steveserver.Server{
 		AccessSetLookup: rancher.AccessSetLookup,
 		Controllers:     rancher.WranglerContext.Controllers,
@@ -335,6 +337,7 @@ func newSteve(ctx context.Context, rancher *Rancher) (http.Handler, error) {
 				return steve.Setup(server, rancher.WranglerContext, localClusterEnabled(rancher.Config), rancher.Handler)
 			},
 			clusterapiServer.Setup,
+			disallowServer.Setup,
 		},
 	}
 

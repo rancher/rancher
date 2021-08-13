@@ -1,11 +1,12 @@
 package disallow
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/attributes"
 	schema2 "github.com/rancher/steve/pkg/schema"
+	"github.com/rancher/steve/pkg/schemaserver/types"
 	steve "github.com/rancher/steve/pkg/server"
 )
 
@@ -32,12 +33,18 @@ var (
 	}
 )
 
-func Register(server *steve.Server) {
-	server.SchemaFactory.AddTemplate(schema2.Template{
+type Server struct {
+	ctx context.Context
+}
+
+func (s *Server) Setup(ctx context.Context, server *steve.Server) error {
+	s.ctx = ctx
+	server.SchemaTemplates = append(server.SchemaTemplates, schema2.Template{
 		Customize: func(schema *types.APISchema) {
 			gr := attributes.GR(schema)
 			if gr.Group == "management.cattle.io" || gr.Group == "project.cattle.io" {
 				attributes.AddDisallowMethods(schema,
+					http.MethodPost,
 					http.MethodPatch,
 					http.MethodDelete)
 				if !allowPut[gr.Resource] {
@@ -52,4 +59,5 @@ func Register(server *steve.Server) {
 			}
 		},
 	})
+	return nil
 }
