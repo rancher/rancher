@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/dynamicschema"
 	"github.com/rancher/wrangler/pkg/data"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,19 +30,32 @@ func getObjectClusterNames(obj runtime.Object) ([]string, error) {
 		return []string{o.Name}, nil
 	}
 
-	data, err := data.Convert(obj)
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk.Group == dynamicschema.MachineConfigAPIGroup {
+		objMeta, err := meta.Accessor(obj)
+		// If there is an error, skip this block
+		if err == nil {
+			for _, owner := range objMeta.GetOwnerReferences() {
+				if owner.APIVersion == "provisioning.cattle.io/v1" && owner.Kind == "Cluster" {
+					return []string{owner.Name}, nil
+				}
+			}
+		}
+	}
+
+	objData, err := data.Convert(obj)
 	if err != nil {
 		return nil, err
 	}
-	clusterName := data.String("spec", "clusterName")
+	clusterName := objData.String("spec", "clusterName")
 	if clusterName != "" {
 		return []string{clusterName}, nil
 	}
 
 	var result []string
-	targets := data.Slice("spec", "target")
+	targets := objData.Slice("spec", "target")
 	if len(targets) == 1 {
-		clusterName := data.String("clusterName")
+		clusterName := objData.String("clusterName")
 		if clusterName != "" {
 			result = append(result, clusterName)
 		}
