@@ -12,7 +12,10 @@ assignees: ''
 **Rancher Server Setup**
 - Rancher version:
 - Installation option (Docker install/Helm Chart):
-   - If Helm Chart, Kubernetes Cluster and version (RKE1, RKE2, k3s, EKS, etc):
+   - If Helm Chart, Kubernetes Info:
+         Cluster Type (RKE1, RKE2, k3s, EKS, etc):
+         Node Setup:
+         Version:
 - Proxy/Cert Details:
 
 **Information about the Cluster**
