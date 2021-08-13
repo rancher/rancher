@@ -7,6 +7,7 @@ import (
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,9 +40,21 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 		}
 	}
 
-	// we only want to migrate if the previous installation was earlier than the migration version
+	// we do not migrate in development environments
+	if rancherversion.Version == "dev" {
+		return nil
+	}
+
+	// if no last migration is found we always run force logout
 	if lastMigration, ok := cm.Data[rancherVersionKey]; ok {
-		if lastMigration == "dev" || version.Compare(migrationVersion, lastMigration, "<=") {
+
+		// if a valid sem ver is found we only migrate if the version is less than the target version
+		if semver.IsValid(lastMigration) && semver.IsValid(rancherversion.Version) && version.Compare(migrationVersion, lastMigration, "<=") {
+			return nil
+		}
+
+		// if an unknown format is given we migrate any time the current version does not equal the last migration
+		if lastMigration == rancherversion.Version {
 			return nil
 		}
 	}
