@@ -19,13 +19,13 @@ import (
 	"github.com/rancher/wrangler/pkg/needacert"
 )
 
-func Register(ctx context.Context, wrangler *wrangler.Context) error {
+func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) error {
 	helm.Register(ctx, wrangler)
 	kubernetesprovider.Register(ctx,
 		wrangler.Mgmt.Cluster(),
 		wrangler.K8s,
 		wrangler.MultiClusterManager)
-	apiservice.Register(ctx, wrangler)
+	apiservice.Register(ctx, wrangler, embedded)
 	needacert.Register(ctx,
 		wrangler.Core.Secret(),
 		wrangler.Core.Service(),
