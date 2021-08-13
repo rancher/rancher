@@ -281,11 +281,11 @@ func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, error) {
 	i := impersonation.New(user, r.clusterContext)
 
-	err := i.SetUpImpersonation()
+	sa, err := i.SetUpImpersonation()
 	if err != nil {
 		return "", fmt.Errorf("error setting up impersonation for user %s: %w", user.GetUID(), err)
 	}
-	saToken, err := i.GetToken()
+	saToken, err := i.GetToken(sa)
 	if err != nil {
 		return "", fmt.Errorf("error getting service account token: %w", err)
 	}
