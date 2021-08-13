@@ -341,7 +341,6 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 			return fmt.Errorf("error looking for rancher service: %w", err)
 		}
 	} else {
-		s = s.DeepCopy()
 		if s.Spec.String() != service.Spec.String() {
 			refreshService = true
 		}
@@ -359,7 +358,6 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 					return err
 				}
 			} else {
-				s = s.DeepCopy()
 				s.Spec.Ports = service.Spec.Ports
 				if _, err := clientset.CoreV1().Services(namespace.System).Update(ctx, s, metav1.UpdateOptions{}); err != nil {
 					return err
@@ -406,7 +404,6 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 			return fmt.Errorf("error looking for rancher endpoint while setting up rancher service: %w", err)
 		}
 	} else {
-		e = e.DeepCopy()
 		if e.Subsets[0].String() != endpoint.Subsets[0].String() && len(e.Subsets) != 1 {
 			logrus.Debugf("setupRancherService subsets did not match, refreshing endpoint (%s vs %s)", e.Subsets[0].String(), endpoint.String())
 			refreshEndpoint = true
@@ -425,7 +422,6 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 					return err
 				}
 			} else {
-				e = e.DeepCopy()
 				e.Subsets = endpoint.Subsets
 				if _, err := clientset.CoreV1().Endpoints(namespace.System).Update(ctx, e, metav1.UpdateOptions{}); err != nil {
 					return err
