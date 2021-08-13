@@ -255,6 +255,9 @@ func (h *handler) getInfraMachineState(capiMachine *capi.Machine) (status corev1
 	gvk := schema.FromAPIVersionAndKind(capiMachine.Spec.InfrastructureRef.APIVersion, capiMachine.Spec.InfrastructureRef.Kind)
 	machine, err := h.dynamic.Get(gvk, capiMachine.Namespace, capiMachine.Spec.InfrastructureRef.Name)
 	if apierror.IsNotFound(err) {
+		if capiMachine.DeletionTimestamp != nil {
+			return corev1.ConditionUnknown, "MachineDeleted", "machine is being deleted", "", nil
+		}
 		return corev1.ConditionUnknown, "NoMachineDefined", "waiting for machine to be defined", "", nil
 	} else if err != nil {
 		return "", "", "", "", err
