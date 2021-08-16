@@ -2,7 +2,6 @@ package v1
 
 import (
 	"github.com/rancher/wrangler/pkg/genericcondition"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -16,10 +15,15 @@ type RKEControlPlane struct {
 	Status            RKEControlPlaneStatus `json:"status,omitempty"`
 }
 
+type EnvVar struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
 type RKEControlPlaneSpec struct {
 	RKEClusterSpecCommon
 
-	AgentEnvVars          []corev1.EnvVar      `json:"agentEnvVars,omitempty"`
+	AgentEnvVars          []EnvVar             `json:"agentEnvVars,omitempty"`
 	ETCDSnapshotCreate    *ETCDSnapshotCreate  `json:"etcdSnapshotCreate,omitempty"`
 	ETCDSnapshotRestore   *ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
 	KubernetesVersion     string               `json:"kubernetesVersion,omitempty"`

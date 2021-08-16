@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/rancher/wrangler/pkg/yaml"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -236,10 +237,17 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.DisplayName = cluster.Name
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
 	spec.FleetWorkspaceName = cluster.Namespace
-	spec.AgentEnvVars = cluster.Spec.AgentEnvVars
 	spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
 	spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
 	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
+
+	spec.AgentEnvVars = nil
+	for _, env := range cluster.Spec.AgentEnvVars {
+		spec.AgentEnvVars = append(spec.AgentEnvVars, corev1.EnvVar{
+			Name:  env.Name,
+			Value: env.Value,
+		})
+	}
 
 	if cluster.Spec.RKEConfig != nil {
 		spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{

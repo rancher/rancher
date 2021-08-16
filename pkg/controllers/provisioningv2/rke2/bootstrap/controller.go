@@ -204,7 +204,7 @@ func (h *handler) getMachine(obj *rkev1.RKEBootstrap) (*capi.Machine, error) {
 	return nil, generic.ErrSkip
 }
 
-func (h *handler) getEnvVar(machine *capi.Machine) ([]corev1.EnvVar, error) {
+func (h *handler) getEnvVar(machine *capi.Machine) (result []corev1.EnvVar, _ error) {
 	capiCluster, err := h.capiClusters.Get(machine.Namespace, machine.Spec.ClusterName)
 	if apierror.IsNotFound(err) {
 		return nil, nil
@@ -221,7 +221,14 @@ func (h *handler) getEnvVar(machine *capi.Machine) ([]corev1.EnvVar, error) {
 		return nil, err
 	}
 
-	return cp.Spec.AgentEnvVars, nil
+	for _, env := range cp.Spec.AgentEnvVars {
+		result = append(result, corev1.EnvVar{
+			Name:  env.Name,
+			Value: env.Value,
+		})
+	}
+
+	return result, nil
 }
 
 func (h *handler) assignBootStrapSecret(machine *capi.Machine, obj *rkev1.RKEBootstrap) (*corev1.Secret, []runtime.Object, error) {
