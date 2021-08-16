@@ -204,7 +204,8 @@ func doAddCatalogs(management *config.ManagementContext, name, url, branch, helm
 	}
 
 	if bundledMode && obj.Name == utils.SystemLibraryName {
-		// force update the catalog cache on every startup
+		// force update the catalog cache on every startup; this ensures that setups using bundledMode can load new image
+		// into the ConfigMap when the bundled system-chart is updated (e.g. during Rancher upgrades) upon restarting Rancher
 		configMapInterface := management.Core.ConfigMaps("")
 		configMapLister := configMapInterface.Controller().Lister()
 		return manager.CreateOrUpdateSystemCatalogImageCache(obj, configMapInterface, configMapLister, true, true)
