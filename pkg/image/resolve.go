@@ -349,19 +349,16 @@ func getSourcesList(imageSources map[string]bool) string {
 	return strings.Join(sources, ",")
 }
 
-func CreateCatalogImageListConfigMap(cm *v1.ConfigMap, catalog *v3.Catalog) (err error) {
+func AddImagesToImageListConfigMap(cm *v1.ConfigMap, chartPath string) (err error) {
 	var windowsImages []string
 	var linuxImages []string
 
-	catalogHash := libhelm.CatalogSHA256Hash(catalog)
-	catalogChartPath := filepath.Join(libhelm.CatalogCache, catalogHash)
-
-	windowsImages, _, err = GetImages(catalogChartPath, "", nil, []string{}, nil, Windows)
+	windowsImages, _, err = GetImages(chartPath, "", nil, []string{}, nil, Windows)
 	if err != nil {
 		return
 	}
 
-	linuxImages, _, err = GetImages(catalogChartPath, "", nil, []string{}, nil, Linux)
+	linuxImages, _, err = GetImages(chartPath, "", nil, []string{}, nil, Linux)
 	if err != nil {
 		return
 	}
