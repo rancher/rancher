@@ -6,7 +6,7 @@ type ETCDSnapshotS3 struct {
 	Endpoint            string `json:"endpoint,omitempty"`
 	EndpointCA          string `json:"endpointCA,omitempty"`
 	SkipSSLVerify       bool   `json:"skipSSLVerify,omitempty"`
-	Bucket              string `json:"bucket,omitempty" wrangler:"required"`
+	Bucket              string `json:"bucket,omitempty"`
 	Region              string `json:"region,omitempty"`
 	CloudCredentialName string `json:"cloudCredentialName,omitempty"`
 	Folder              string `json:"folder,omitempty"`
