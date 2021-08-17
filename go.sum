@@ -983,8 +983,9 @@ github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4b
 github.com/rancher/aks-operator v1.0.1-rc18 h1:kXJEOUKBbjM1mT4DGFHO+hhqwxai/Fl0Tb6DlFD4xKI=
 github.com/rancher/aks-operator v1.0.1-rc18/go.mod h1:Nafxvj+HQOMXb418Oj6eFVOUf0fnq8e4RBqi9S+Q5WQ=
 github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
-github.com/rancher/apiserver v0.0.0-20210810230850-96c000dcb0b4 h1:5Eu7t/AyLh2LdxmIRT6QP3uzetJyJAmKdqyFggW0B60=
 github.com/rancher/apiserver v0.0.0-20210810230850-96c000dcb0b4/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
+github.com/rancher/apiserver v0.0.0-20210816223424-8ea91f0acd80 h1:sUEGPA7suvFVaywrA6N+QBetZRxdtqdZE196hRwLGiI=
+github.com/rancher/apiserver v0.0.0-20210816223424-8ea91f0acd80/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369 h1:1FLFZrLqnI4oJSI9dLnQfPBQIYrXI4yvKRkfujVnqiQ=
 github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369/go.mod h1:1/9aBa8mXEIinRiT6Qlv/zbt6Nv9uorv+kFVNYvpmiI=
 github.com/rancher/client-go v0.21.0-rancher.1 h1:WVy7jpVmdjIRVkgXpBRlNx4jnGkLCFS1Qu/hUFCOGN4=
@@ -1035,8 +1036,8 @@ github.com/rancher/rke v1.3.0-rc15 h1:o6ONqH/s3aJW97N0mvekOAyGX8UAwZ8yPY8jN93ctY
 github.com/rancher/rke v1.3.0-rc15/go.mod h1:HAdRKAo7OI5YvFSSP40ezrad1pXA7IuJgAW7S5PYg6Y=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20210810230939-e9222c6ccffa h1:D3YukwYj9ZTil1Ho3RnKD/apLiuyd8SXklkDmCcqyBo=
-github.com/rancher/steve v0.0.0-20210810230939-e9222c6ccffa/go.mod h1:A/bihZIJhWQMEh3Q8GmR/BEChAuekfh7Novbl1IntDg=
+github.com/rancher/steve v0.0.0-20210817050550-e70fca2a4266 h1:JxoN4lWvpuH5Yx5zBvlVqgI1Lz3x7Mqh5bG4oLSQMSU=
+github.com/rancher/steve v0.0.0-20210817050550-e70fca2a4266/go.mod h1:A/bihZIJhWQMEh3Q8GmR/BEChAuekfh7Novbl1IntDg=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007/go.mod h1:Ja346o44aTPWADc/5Jm93+KgctT6KtftuOosgz0F2AM=
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
