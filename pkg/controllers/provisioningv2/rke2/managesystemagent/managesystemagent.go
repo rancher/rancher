@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -25,6 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	generationSecretName = "system-agent-upgrade-generation"
 )
 
 type handler struct {
@@ -95,7 +100,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 		})
 	}
 
-	resources, err := ToResources(installer(len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0, secretName))
+	resources, err := ToResources(installer(len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0, secretName, strconv.Itoa(int(cluster.Spec.RedeploySystemAgentGeneration))))
 	if err != nil {
 		return nil, status, err
 	}
@@ -129,7 +134,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 	return result, status, nil
 }
 
-func installer(allWorkers bool, secretName string) []runtime.Object {
+func installer(allWorkers bool, secretName, generation string) []runtime.Object {
 	image := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
 	version := "latest"
 	if len(image) == 2 {
@@ -148,37 +153,38 @@ func installer(allWorkers bool, secretName string) []runtime.Object {
 		})
 	}
 
-	return []runtime.Object{
-		&upgradev1.Plan{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Plan",
-				APIVersion: "upgrade.cattle.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "system-agent-upgrader",
-				Namespace: namespaces.System,
-			},
-			Spec: upgradev1.PlanSpec{
-				Concurrency: 10,
-				Version:     version,
-				Tolerations: []corev1.Toleration{{
-					Operator: corev1.TolerationOpExists,
-				}},
-				NodeSelector:       &metav1.LabelSelector{},
-				ServiceAccountName: "system-agent-upgrader",
-				Upgrade: &upgradev1.ContainerSpec{
-					Image: settings.PrefixPrivateRegistry(image[0]),
-					Env:   env,
-					EnvFrom: []corev1.EnvFromSource{{
-						SecretRef: &corev1.SecretEnvSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: secretName,
-							},
+	plan := &upgradev1.Plan{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Plan",
+			APIVersion: "upgrade.cattle.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "system-agent-upgrader",
+			Namespace: namespaces.System,
+		},
+		Spec: upgradev1.PlanSpec{
+			Concurrency: 10,
+			Version:     version,
+			Tolerations: []corev1.Toleration{{
+				Operator: corev1.TolerationOpExists,
+			}},
+			NodeSelector:       &metav1.LabelSelector{},
+			ServiceAccountName: "system-agent-upgrader",
+			Upgrade: &upgradev1.ContainerSpec{
+				Image: settings.PrefixPrivateRegistry(image[0]),
+				Env:   env,
+				EnvFrom: []corev1.EnvFromSource{{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
 						},
-					}},
-				},
+					},
+				}},
 			},
 		},
+	}
+
+	objs := []runtime.Object{
 		&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "system-agent-upgrader",
@@ -211,6 +217,23 @@ func installer(allWorkers bool, secretName string) []runtime.Object {
 			},
 		},
 	}
+
+	if generation != "0" {
+		plan.Spec.Secrets = append(plan.Spec.Secrets, upgradev1.SecretSpec{
+			Name: generationSecretName,
+		})
+		objs = append(objs, &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      generationSecretName,
+				Namespace: namespaces.System,
+			},
+			StringData: map[string]string{
+				"generation": generation,
+			},
+		})
+	}
+
+	return append([]runtime.Object{plan}, objs...)
 }
 
 func ToResources(objs []runtime.Object) (result []v1alpha1.BundleResource, err error) {
