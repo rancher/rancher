@@ -19,6 +19,10 @@ const (
 	pathToMachineFiles = "/path/to/machine/files"
 )
 
+var (
+	oneThousand int64 = 1000
+)
+
 func getJobName(name string) string {
 	return name2.SafeConcatName(name, "machine", "provision")
 }
@@ -151,7 +155,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									SecretName:  args.BootstrapSecretName,
-									DefaultMode: &[]int32{0700}[0],
+									DefaultMode: &[]int32{0777}[0],
 									Optional:    &args.BootstrapOptional,
 								},
 							},
@@ -161,7 +165,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									SecretName:  "tls-ca-additional-volume",
-									DefaultMode: &[]int32{0400}[0],
+									DefaultMode: &[]int32{0444}[0],
 									Optional:    &[]bool{true}[0],
 								},
 							},
@@ -170,10 +174,19 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:            "machine",
+							Name: "machine",
+							SecurityContext: &corev1.SecurityContext{
+								RunAsUser:  &oneThousand,
+								RunAsGroup: &oneThousand,
+							},
+							WorkingDir:      "/tmp",
 							Image:           args.ImageName,
 							ImagePullPolicy: args.ImagePullPolicy,
 							Args:            args.Args,
+							Env: []corev1.EnvVar{{
+								Name:  "HOME",
+								Value: "/tmp",
+							}},
 							EnvFrom: []corev1.EnvFromSource{
 								{
 									SecretRef: &corev1.SecretEnvSource{

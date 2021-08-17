@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -205,8 +206,10 @@ func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, er
 					h.bootstrapController.Enqueue(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name)
 				} else if planner.IsOnlyEtcd(machine) {
 					message = "waiting for cluster agent to be available on a control plane node"
+					h.machines.EnqueueAfter(machine.Namespace, machine.Name, 2*time.Second)
 				} else {
 					message = "waiting for cluster agent to be available"
+					h.machines.EnqueueAfter(machine.Namespace, machine.Name, 2*time.Second)
 				}
 			}
 		}
