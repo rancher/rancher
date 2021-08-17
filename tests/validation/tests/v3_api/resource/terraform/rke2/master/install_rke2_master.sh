@@ -9,7 +9,6 @@ cat << EOF >/etc/rancher/rke2/config.yaml
 write-kubeconfig-mode: "0644"
 tls-san:
   - ${2}
-node-external-ip: ${4}
 node-name: ${hostname}
 EOF
 
@@ -17,6 +16,10 @@ if [ ! -z "${7}" ] && [[ "${7}" == *":"* ]]
 then
    echo "${7}"
    echo -e "${7}" >> /etc/rancher/rke2/config.yaml
+   if [[ "${7}" != *"cloud-provider-name"* ]]
+   then
+     echo -e "node-external-ip: ${4}" >> /etc/rancher/rke2/config.yaml
+   fi
    cat /etc/rancher/rke2/config.yaml
 fi
 

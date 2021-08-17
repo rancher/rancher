@@ -8,13 +8,16 @@ cat <<EOF >>/etc/rancher/rke2/config.yaml
 server: https://${3}:9345
 token:  "${4}"
 node-name: "${hostname}"
-node-external-ip: ${6}
 EOF
 
 if [ ! -z "${9}" ] && [[ "${9}" == *":"* ]]
 then
    echo "${9}"
    echo -e "${9}" >> /etc/rancher/rke2/config.yaml
+   if [[ "${9}" != *"cloud-provider-name"* ]]
+   then
+     echo -e "node-external-ip: ${6}" >> /etc/rancher/rke2/config.yaml
+   fi
    cat /etc/rancher/rke2/config.yaml
 fi
 
