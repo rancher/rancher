@@ -572,7 +572,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
-	sshKey, err := getSSHKey(nodeDir, keyPath, obj)
+	_, err = getSSHKey(nodeDir, keyPath, obj)
 	if err != nil {
 		return obj, err
 	}
@@ -603,7 +603,6 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		User:             sshUser,
 		Role:             roles(obj),
 		HostnameOverride: obj.Spec.RequestedHostname,
-		SSHKey:           sshKey,
 		Labels:           template.Labels,
 	}
 	obj.Status.InternalNodeStatus.Addresses = []v1.NodeAddress{
