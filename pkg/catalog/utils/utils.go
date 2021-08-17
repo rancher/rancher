@@ -2,9 +2,13 @@ package utils
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 )
 
 const (
@@ -78,4 +82,18 @@ func Contains(collection []string, key string) bool {
 
 func GetCatalogImageCacheName(catalogName string) string {
 	return fmt.Sprintf("%s-catalog-image-list", catalogName)
+}
+
+func GetCatalogChartPath(catalog *v3.Catalog, bundledMode bool) (string, error) {
+	if bundledMode {
+		switch catalog.Name {
+		case "helm3-library", "library", "system-library":
+			return filepath.Join(helmlib.InternalCatalog, catalog.Name), nil
+		case "rancher-charts", "rancher-partner-charts", "rancher-rke2-charts":
+			return filepath.Join(helmlib.InternalCatalog, "v2", catalog.Name), nil
+		default:
+			return "", fmt.Errorf("cannot find bundled catalog chart path for catalog %s", catalog.Name)
+		}
+	}
+	return filepath.Join(helmlib.CatalogCache, helmlib.CatalogSHA256Hash(catalog)), nil
 }
