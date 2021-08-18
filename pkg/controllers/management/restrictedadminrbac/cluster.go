@@ -2,10 +2,14 @@ package restrictedadminrbac
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
+	clusterv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	k8srbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +33,10 @@ func (r *rbaccontroller) clusterRBACSync(key string, cluster *v3.Cluster) (runti
 
 	var subjects []k8srbac.Subject
 	var returnErr error
+	var grbList []*v3.GlobalRoleBinding
 	for _, x := range grbs {
 		grb, _ := x.(*v3.GlobalRoleBinding)
+		grbList = append(grbList, grb)
 		restrictedAdminUserName := grb.UserName
 		subjects = append(subjects, k8srbac.Subject{
 			Kind: "User",
@@ -79,7 +85,12 @@ func (r *rbaccontroller) clusterRBACSync(key string, cluster *v3.Cluster) (runti
 		return nil, returnErr
 	}
 
-	return nil, r.createCRAndCRBForRestrictedAdminClusterAccess(cluster, subjects)
+	err = r.createCRAndCRBForRestrictedAdminClusterAccess(cluster, subjects)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, r.createRBForRestrictedAdminProvisioningClusterAccess(cluster, grbList)
 }
 
 /* createCRAndCRBForRestrictedAdminClusterAccess creates a CR with the resourceName field containing current cluster's ID. It also creates
@@ -154,6 +165,71 @@ func (r *rbaccontroller) createCRAndCRBForRestrictedAdminClusterAccess(cluster *
 			if err != nil && !k8serrors.IsAlreadyExists(err) {
 				returnErr = multierror.Append(returnErr, err)
 			}
+		}
+	}
+	return returnErr
+}
+
+/* createRBForRestrictedAdminProvisioningClusterAccess creates for all restrictedAdmin users, a RB to the cluster-admin Role
+created with the resourceName field containing the provisioning cluster's ID corresponding to the v3.cluster,
+This way all restricted admins become owners of the provisioning cluster*/
+func (r *rbaccontroller) createRBForRestrictedAdminProvisioningClusterAccess(cluster *v3.Cluster, grbList []*v3.GlobalRoleBinding) error {
+	var returnErr error
+	clusterName := cluster.Name
+
+	pClusters, err := r.provClusters.GetByIndex(clusterv2.ByCluster, clusterName)
+	if err != nil {
+		return err
+	}
+
+	if len(pClusters) == 0 {
+		// When no provisioning cluster is found, enqueue this v3.cluster to wait for
+		// the provisioning cluster to be created. If we don't try again
+		// these rbac permissions for the restrictedAdmin users won't be created until an
+		// update to the v3.cluster happens again.
+		logrus.Debugf("No provisioning cluster found for cluster %v in rbac handler for restrictedAdmin, enqueuing", clusterName)
+		r.clusters.Controller().EnqueueAfter(cluster.Namespace, clusterName, 10*time.Second)
+		return nil
+	}
+
+	provCluster := pClusters[0]
+	for _, grb := range grbList {
+		// The roleBinding name format: r-cluster-<cluster name>-admin-<subject name>
+		// Example: r-cluster-cluster1-admin-u-xyz
+		subject := k8srbac.Subject{
+			Kind: "User",
+			Name: grb.UserName,
+		}
+		rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), grb.UserName)
+		existingRb, err := r.rbLister.Get(provCluster.Namespace, rbName)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			returnErr = multierror.Append(returnErr, err)
+		}
+		if existingRb != nil {
+			continue
+		}
+		_, err = r.roleBindings.Create(&k8srbac.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      rbName,
+				Namespace: provCluster.Namespace,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: grb.APIVersion,
+						Kind:       grb.Kind,
+						Name:       grb.Name,
+						UID:        grb.UID,
+					},
+				},
+			},
+			RoleRef: k8srbac.RoleRef{
+				APIGroup: k8srbac.GroupName,
+				Kind:     "Role",
+				Name:     rbac.ProvisioningClusterAdminName(provCluster),
+			},
+			Subjects: []k8srbac.Subject{subject},
+		})
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			returnErr = multierror.Append(returnErr, err)
 		}
 	}
 	return returnErr

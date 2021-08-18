@@ -7,10 +7,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	k8srbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -245,4 +247,8 @@ func gatherRules(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.Role
 		}
 	}
 	return rules, nil
+}
+
+func ProvisioningClusterAdminName(cluster *provv1.Cluster) string {
+	return name.SafeConcatName("r-cluster", cluster.Name, "admin")
 }
