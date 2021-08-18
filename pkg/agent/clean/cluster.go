@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	"github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -93,6 +94,13 @@ func Cluster() error {
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return err
+	}
+
+	if rancherInstalled, err := isRancherInstalled(client); err != nil {
+		return fmt.Errorf("checking for %s/rancher service: %w", namespace.System, err)
+	} else if rancherInstalled {
+		logrus.Info("Rancher is installed, not performing cleanup")
+		return deleteJob(client)
 	}
 
 	var errors []error
@@ -430,4 +438,14 @@ func getProjectMonitoringNamespaces(client *kubernetes.Clientset) ([]string, err
 		list = append(list, ns.Name)
 	}
 	return list, nil
+}
+
+func isRancherInstalled(k8s kubernetes.Interface) (bool, error) {
+	_, err := k8s.CoreV1().Services(namespace.System).Get(context.Background(), "rancher", metav1.GetOptions{})
+	if apierror.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }
