@@ -31,9 +31,12 @@ import (
 	data2 "github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	rbacv1controllers "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -76,12 +79,15 @@ type Operations struct {
 	ops            catalogcontrollers.OperationClient
 	pods           corev1controllers.PodClient
 	apps           catalogcontrollers.AppClient
+	roles          rbacv1controllers.RoleClient
+	roleBindings   rbacv1controllers.RoleBindingClient
 	cg             proxy.ClientGetter
 }
 
 func NewOperations(
 	cg proxy.ClientGetter,
 	catalog catalogcontrollers.Interface,
+	rbac rbacv1controllers.Interface,
 	contentManager *content.Manager,
 	pods corev1controllers.PodClient) *Operations {
 	return &Operations{
@@ -93,6 +99,8 @@ func NewOperations(
 		clusterRepos:   catalog.ClusterRepo(),
 		ops:            catalog.Operation(),
 		apps:           catalog.App(),
+		roleBindings:   rbac.RoleBinding(),
+		roles:          rbac.Role(),
 	}
 }
 
@@ -663,8 +671,66 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		return nil, err
 	}
 
+	if err := s.createRoleAndRoleBindings(op, user.GetName()); err != nil {
+		return nil, err
+	}
+
 	op.Status = status
 	return s.ops.UpdateStatus(op)
+}
+
+func (s *Operations) createRoleAndRoleBindings(op *catalog.Operation, user string) error {
+	ownerRef := metav1.OwnerReference{
+		APIVersion: op.APIVersion,
+		Kind:       op.Kind,
+		Name:       op.Name,
+		UID:        op.UID,
+	}
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name.SafeConcatName(op.GetName(), user, "role"),
+			Namespace:       op.Namespace,
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"get"},
+				Resources:     []string{"operations"},
+				APIGroups:     []string{"catalog.cattle.io"},
+				ResourceNames: []string{op.Name},
+			},
+		},
+	}
+
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name.SafeConcatName(op.GetName(), user, "rolebinding"),
+			Namespace:       op.Namespace,
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				APIGroup: rbacv1.GroupName,
+				Kind:     rbacv1.UserKind,
+				Name:     user,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     role.Name,
+		},
+	}
+
+	if _, err := s.roles.Create(role); err != nil {
+		return err
+	}
+
+	if _, err := s.roleBindings.Create(roleBinding); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Operations) createNamespace(ctx context.Context, namespace, projectID string) (*v1.Namespace, error) {
