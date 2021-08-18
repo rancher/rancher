@@ -2,13 +2,18 @@ package rbac
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/types/slice"
+	clusterv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
+	k8srbac "k8s.io/api/rbac/v1"
 	v12 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,11 +61,16 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 	informer := workload.Management.Management.GlobalRoleBindings("").Controller().Informer()
 
 	h := &grbHandler{
-		clusterName:         workload.ClusterName,
-		grbIndexer:          informer.GetIndexer(),
-		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
-		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		grLister:            workload.Management.Management.GlobalRoles("").Controller().Lister(),
+		clusterName:                 workload.ClusterName,
+		grbIndexer:                  informer.GetIndexer(),
+		clusterRoleBindings:         workload.RBAC.ClusterRoleBindings(""),
+		crbLister:                   workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		grLister:                    workload.Management.Management.GlobalRoles("").Controller().Lister(),
+		rbLister:                    workload.Management.RBAC.RoleBindings("").Controller().Lister(),
+		roleBindings:                workload.Management.RBAC.RoleBindings(""),
+		globalroleBindingController: workload.Management.Management.GlobalRoleBindings("").Controller(),
+		clusters:                    workload.Management.Management.Clusters(""),
+		provClusters:                workload.Management.Wrangler.Provisioning.Cluster().Cache(),
 	}
 
 	return h.sync
@@ -69,11 +79,16 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 // grbHandler ensures the global admins have full access to every cluster. If a globalRoleBinding is created that uses
 // the admin role, then the user in that binding gets a clusterRoleBinding in every user cluster to the cluster-admin role
 type grbHandler struct {
-	clusterName         string
-	clusterRoleBindings rbacv1.ClusterRoleBindingInterface
-	crbLister           rbacv1.ClusterRoleBindingLister
-	grbIndexer          cache.Indexer
-	grLister            v3.GlobalRoleLister
+	clusterName                 string
+	clusterRoleBindings         rbacv1.ClusterRoleBindingInterface
+	crbLister                   rbacv1.ClusterRoleBindingLister
+	grbIndexer                  cache.Indexer
+	grLister                    v3.GlobalRoleLister
+	rbLister                    rbacv1.RoleBindingLister
+	roleBindings                rbacv1.RoleBindingInterface
+	globalroleBindingController v3.GlobalRoleBindingController
+	clusters                    v3.ClusterInterface
+	provClusters                provisioningcontrollers.ClusterCache
 }
 
 func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object, error) {
@@ -95,15 +110,29 @@ func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 
 	logrus.Debugf("%v is an admin role", obj.GlobalRoleName)
 
+	err = c.ensureClusterAdminBinding(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.ensureProvisioningClusterAdminBinding(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+func (c *grbHandler) ensureClusterAdminBinding(obj *v3.GlobalRoleBinding) error {
 	bindingName := rbac.GrbCRBName(obj)
 	b, err := c.crbLister.Get("", bindingName)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return obj, err
+		return err
 	}
 
 	if b != nil {
 		// binding exists, nothing to do
-		return obj, nil
+		return nil
 	}
 
 	_, err = c.clusterRoleBindings.Create(&v12.ClusterRoleBinding{
@@ -118,11 +147,67 @@ func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	})
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
-			return obj, err
+			return err
 		}
 	}
+	return nil
+}
 
-	return obj, nil
+func (c *grbHandler) ensureProvisioningClusterAdminBinding(obj *v3.GlobalRoleBinding) error {
+	pClusters, err := c.provClusters.GetByIndex(clusterv2.ByCluster, c.clusterName)
+	if err != nil {
+		return err
+	}
+
+	if len(pClusters) == 0 {
+		// When no provisioning cluster is found, enqueue the GRB to wait for
+		// the provisioning cluster to be created.
+		logrus.Debugf("No provisioning cluster found for cluster %v in GRB sync, enqueuing", c.clusterName)
+		c.globalroleBindingController.EnqueueAfter(obj.Namespace, obj.Name, 10*time.Second)
+		return nil
+	}
+
+	provCluster := pClusters[0]
+
+	subject := k8srbac.Subject{
+		Kind: "User",
+		Name: obj.UserName,
+	}
+	rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), subject.Name)
+
+	existingRb, err := c.rbLister.Get(provCluster.Namespace, rbName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if existingRb != nil {
+		return nil
+	}
+
+	_, err = c.roleBindings.Create(&k8srbac.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbName,
+			Namespace: provCluster.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: obj.APIVersion,
+					Kind:       obj.Kind,
+					Name:       obj.Name,
+					UID:        obj.UID,
+				},
+			},
+		},
+		RoleRef: k8srbac.RoleRef{
+			APIGroup: k8srbac.GroupName,
+			Kind:     "Role",
+			Name:     rbac.ProvisioningClusterAdminName(provCluster),
+		},
+		Subjects: []k8srbac.Subject{subject},
+	})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
 }
 
 // isAdminRole detects whether a GlobalRole has admin permissions or not.
