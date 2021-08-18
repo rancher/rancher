@@ -41,7 +41,9 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	}
 
 	// add nodeConfig link
+	canUpdateNode := false
 	if err := apiContext.AccessControl.CanDo(v3.NodeGroupVersionKind.Group, v3.NodeResource.Name, "update", apiContext, resource.Values, apiContext.Schema); err == nil {
+		canUpdateNode = true
 		resource.Links["nodeConfig"] = apiContext.URLBuilder.Link("nodeConfig", resource)
 	}
 
@@ -50,7 +52,7 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	customConfig := resource.Values["customConfig"]
 	if nodeTemplateID == nil {
 		delete(resource.Links, "nodeConfig")
-	} else {
+	} else if canUpdateNode {
 		resource.AddAction(apiContext, "scaledown")
 	}
 
@@ -276,7 +278,7 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 
 func updateNode(apiContext *types.APIContext, node map[string]interface{}, schema *types.Schema, actionName string) error {
 	if _, err := schema.Store.Update(apiContext, schema, node, apiContext.ID); err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
+		return err
 	}
 	return nil
 }
