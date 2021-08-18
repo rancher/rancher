@@ -3,7 +3,6 @@ package v1
 import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/genericcondition"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,10 +23,10 @@ type ClusterSpec struct {
 	ClusterAPIConfig *ClusterAPIConfig `json:"clusterAPIConfig,omitempty"`
 	RKEConfig        *RKEConfig        `json:"rkeConfig,omitempty"`
 
-	AgentEnvVars                         []corev1.EnvVar `json:"agentEnvVars,omitempty"`
-	DefaultPodSecurityPolicyTemplateName string          `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
-	DefaultClusterRoleForProjectMembers  string          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
-	EnableNetworkPolicy                  *bool           `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
+	AgentEnvVars                         []rkev1.EnvVar `json:"agentEnvVars,omitempty"`
+	DefaultPodSecurityPolicyTemplateName string         `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
+	DefaultClusterRoleForProjectMembers  string         `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	EnableNetworkPolicy                  *bool          `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
 
 	RedeploySystemAgentGeneration int64 `json:"redeploySystemAgentGeneration,omitempty"`
 }

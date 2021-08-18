@@ -11,6 +11,7 @@ import (
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
@@ -100,7 +101,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 		})
 	}
 
-	resources, err := ToResources(installer(len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0, secretName, strconv.Itoa(int(cluster.Spec.RedeploySystemAgentGeneration))))
+	resources, err := ToResources(installer(cluster.Spec.AgentEnvVars, len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0, secretName, strconv.Itoa(int(cluster.Spec.RedeploySystemAgentGeneration))))
 	if err != nil {
 		return nil, status, err
 	}
@@ -134,17 +135,20 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 	return result, status, nil
 }
 
-func installer(allWorkers bool, secretName, generation string) []runtime.Object {
+func installer(envs []rkev1.EnvVar, allWorkers bool, secretName, generation string) []runtime.Object {
 	image := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
 	version := "latest"
 	if len(image) == 2 {
 		version = image[1]
 	}
 
-	env := []corev1.EnvVar{{
-		Name:  "CATTLE_SERVER_QUERY",
-		Value: "?internal=true",
-	}}
+	var env []corev1.EnvVar
+	for _, e := range envs {
+		env = append(env, corev1.EnvVar{
+			Name:  e.Name,
+			Value: e.Value,
+		})
+	}
 
 	if allWorkers {
 		env = append(env, corev1.EnvVar{
