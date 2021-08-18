@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/steve/catalog"
 	"github.com/rancher/rancher/pkg/api/steve/clusters"
+	"github.com/rancher/rancher/pkg/api/steve/disallow"
 	"github.com/rancher/rancher/pkg/api/steve/machine"
 	"github.com/rancher/rancher/pkg/api/steve/navlinks"
 	"github.com/rancher/rancher/pkg/api/steve/settings"
@@ -21,6 +22,7 @@ func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) 
 	machine.Register(server, config)
 	navlinks.Register(ctx, server)
 	settings.Register(server)
+	disallow.Register(server)
 	return catalog.Register(ctx,
 		server,
 		config.HelmOperations,
