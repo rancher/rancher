@@ -806,24 +806,46 @@ func addLabels(config map[string]interface{}, machine *capi.Machine) error {
 	return nil
 }
 
-func addTaints(config map[string]interface{}, machine *capi.Machine) error {
+func getTaints(machine *capi.Machine, runtime string) (result []corev1.Taint, _ error) {
+	data := machine.Annotations[TaintsAnnotation]
+	if data != "" {
+		if err := json.Unmarshal([]byte(data), &result); err != nil {
+			return result, err
+		}
+	}
+
+	if runtime == RuntimeRKE2 {
+		if isEtcd(machine) && !isWorker(machine) {
+			result = append(result, corev1.Taint{
+				Key:    "node-role.kubernetes.io/etcd",
+				Effect: corev1.TaintEffectNoExecute,
+			})
+		}
+
+		if isControlPlane(machine) && !isWorker(machine) {
+			result = append(result, corev1.Taint{
+				Key:    "node-role.kubernetes.io/control-plane",
+				Effect: corev1.TaintEffectNoSchedule,
+			})
+		}
+	}
+
+	return
+}
+
+func addTaints(config map[string]interface{}, machine *capi.Machine, runtime string) error {
 	var (
-		taints      []corev1.Taint
 		taintString []string
 	)
 
-	data := machine.Annotations[TaintsAnnotation]
-	if data == "" {
-		return nil
-	}
-
-	if err := json.Unmarshal([]byte(data), &taints); err != nil {
+	taints, err := getTaints(machine, runtime)
+	if err != nil {
 		return err
 	}
 
 	for _, taint := range taints {
-		if taint.Key != "" && taint.Value != "" && taint.Effect != "" {
-			taintString = append(taintString, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
+		if taint.Key != "" {
+			taintString = append(taintString, taint.ToString())
 		}
 	}
 
@@ -870,7 +892,8 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		return nodePlan, err
 	}
 
-	if err := addTaints(config, machine); err != nil {
+	runtime := GetRuntime(controlPlane.Spec.KubernetesVersion)
+	if err := addTaints(config, machine, runtime); err != nil {
 		return nodePlan, err
 	}
 
