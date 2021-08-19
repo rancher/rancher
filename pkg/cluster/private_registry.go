@@ -7,6 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
+	"github.com/rancher/rke/util"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -40,7 +41,23 @@ func GenerateClusterPrivateRegistryDockerConfig(cluster *v3.Cluster) (string, er
 
 // This method generates base64 encoded credentials for the registry
 func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegistry) (string, error) {
-	if privateRegistry == nil || privateRegistry.User == "" || privateRegistry.Password == "" {
+	if privateRegistry == nil {
+		return "", nil
+	}
+
+	if privateRegistry.ECRCredentialPlugin != nil {
+		// generate ecr authConfig
+		authConfig, err := util.ECRCredentialPlugin(privateRegistry.ECRCredentialPlugin, privateRegistry.URL)
+		if err != nil {
+			return "", err
+		}
+		encodedJSON, err := json.Marshal(authConfig)
+		if err != nil {
+			return "", err
+		}
+		return base64.URLEncoding.EncodeToString(encodedJSON), nil
+	}
+	if privateRegistry.User == "" || privateRegistry.Password == "" {
 		return "", nil
 	}
 	authConfig := credentialprovider.DockerConfigJSON{
