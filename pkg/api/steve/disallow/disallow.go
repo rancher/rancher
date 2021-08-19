@@ -17,6 +17,19 @@ var (
 		"features": true,
 		"settings": true,
 	}
+	disallowGet = map[string]bool{
+		"pipelines":                 true,
+		"pipelineexecutions":        true,
+		"pipelinesettings":          true,
+		"preferences":               true,
+		"sourcecodecredentials":     true,
+		"sourcecodeproviderconfigs": true,
+		"sourcecoderepositories":    true,
+		"templatecontents":          true,
+		"templates":                 true,
+		"templateversions":          true,
+		"tokens":                    true,
+	}
 )
 
 func Register(server *steve.Server) {
@@ -32,6 +45,9 @@ func Register(server *steve.Server) {
 				}
 				if !allowPut[gr.Resource] {
 					attributes.AddDisallowMethods(schema, http.MethodPost)
+				}
+				if disallowGet[gr.Resource] {
+					attributes.AddDisallowMethods(schema, http.MethodGet)
 				}
 			}
 		},
