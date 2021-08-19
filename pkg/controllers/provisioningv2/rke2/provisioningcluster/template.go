@@ -1,6 +1,8 @@
 package provisioningcluster
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -119,7 +122,7 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	apiVersion := machinePool.NodeConfig.APIVersion
 	kind := machinePool.NodeConfig.Kind
 	if apiVersion == "" {
-		apiVersion = "rke-machine-config.cattle.io/v1"
+		apiVersion = defaultMachineConfigAPIVersion
 	}
 
 	gvk := schema.FromAPIVersionAndKind(apiVersion, kind)
@@ -160,13 +163,16 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 		machinePoolData.SetNested(secretName, "common", "cloudCredentialSecretName")
 	}
 
-	return &unstructured.Unstructured{
+	ustr := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       strings.TrimSuffix(kind, "Config") + "MachineTemplate",
 			"apiVersion": "rke-machine.cattle.io/v1",
 			"metadata": map[string]interface{}{
 				"name":      machinePoolName,
 				"namespace": cluster.Namespace,
+				"labels": map[string]interface{}{
+					apply.LabelPrune: "false",
+				},
 			},
 			"spec": map[string]interface{}{
 				"clusterName": cluster.Name,
@@ -175,7 +181,30 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 				},
 			},
 		},
-	}, nil
+	}
+	ustr.SetName(name.SafeConcatName(ustr.GetName(), createMachineTemplateHash(ustr.Object)))
+	return ustr, nil
+}
+
+func createMachineTemplateHash(dataMap map[string]interface{}) string {
+	ustr := &unstructured.Unstructured{Object: dataMap}
+	dataMap = ustr.DeepCopy().Object
+
+	name, _, _ := unstructured.NestedString(dataMap, "metadata", "name")
+	spec, _, _ := unstructured.NestedMap(dataMap, "spec", "template", "spec")
+	unstructured.RemoveNestedField(spec, "common")
+	planner.PruneEmpty(spec)
+
+	sha := sha256.New()
+	sha.Write([]byte(name))
+
+	// ignore errors, shouldn't happen
+	bytes, _ := json.Marshal(spec)
+
+	sha.Write(bytes)
+
+	hash := sha.Sum(nil)
+	return hex.EncodeToString(hash[:])[:8]
 }
 
 func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, dynamic *dynamic.Controller,
