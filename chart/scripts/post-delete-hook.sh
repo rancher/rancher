@@ -70,6 +70,15 @@ for namespace in ${namespaces}; do
   done
 done
 
+echo "Cleaning up Fleet resources..."
+for namespace in "cattle-fleet-system" "fleet-system"; do
+  for app in $(helm list -n "${namespace}" -q); do
+    if [[ "${app}" = "fleet-crd" ]] && [[ ! $(helm uninstall "${app}" -n "${namespace}") ]]; then
+      failed=("${failed[@]}" "${app}")
+    fi
+  done
+done
+
 echo "------ Summary ------"
 if [[ ${#succeeded[@]} -ne 0 ]]; then
   echo "Succeeded to uninstall the following apps:" "${succeeded[@]}"
