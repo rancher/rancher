@@ -549,7 +549,7 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 	}
 
 	if controlPlane.Spec.ETCD.DisableSnapshots {
-		config["etcd-disable-snapshot"] = true
+		config["etcd-disable-snapshots"] = true
 	}
 	if controlPlane.Spec.ETCD.SnapshotRetention > 0 {
 		config["etcd-snapshot-retention"] = controlPlane.Spec.ETCD.SnapshotRetention
