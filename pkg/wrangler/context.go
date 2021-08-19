@@ -49,6 +49,7 @@ import (
 	appsv1 "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/batch"
 	batchv1 "github.com/rancher/wrangler/pkg/generated/controllers/batch/v1"
+	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/rancher/wrangler/pkg/schemes"
@@ -219,6 +220,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
+	rbac, err := rbac.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	adminReg, err := admissionreg.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
@@ -274,6 +280,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 
 	helmop := helmop.NewOperations(cg,
 		helm.Catalog().V1(),
+		rbac.Rbac().V1(),
 		content,
 		steveControllers.Core.Pod())
 
