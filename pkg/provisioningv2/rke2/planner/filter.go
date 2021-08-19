@@ -19,8 +19,8 @@ func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKECont
 	)
 
 	for k, v := range config {
-		if v, ok := filterField(isServer, k, v, release); ok {
-			config[k] = v
+		if newV, ok := filterField(isServer, k, v, release); ok {
+			config[k] = newV
 		} else {
 			delete(config, k)
 		}

@@ -113,7 +113,7 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 	nodeLabelSelector := metav1.LabelSelector{MatchLabels: map[string]string{planner.MachineUIDLabel: string(machine.GetUID())}}
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Set(nodeLabelSelector.MatchLabels).String()})
 	if err != nil || len(nodes.Items) == 0 || nodes.Items[0].Spec.ProviderID == "" {
-		logrus.Infof("Failed to find providerID for selector %s in cluster %s/%s, machine %s: %v",
+		logrus.Infof("Searching for providerID for selector %s in cluster %s/%s, machine %s: %v",
 			labels.Set(nodeLabelSelector.MatchLabels), rancherCluster.Namespace, rancherCluster.Name, machine.Name, err)
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, nodeErrorEnqueueTime)
 		return bootstrap, nil

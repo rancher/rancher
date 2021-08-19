@@ -776,6 +776,28 @@ func addToken(config map[string]interface{}, machine *capi.Machine, secret plan.
 	}
 }
 
+func PruneEmpty(config map[string]interface{}) {
+	for k, v := range config {
+		if v == nil {
+			delete(config, k)
+		}
+		switch t := v.(type) {
+		case string:
+			if t == "" {
+				delete(config, k)
+			}
+		case []interface{}:
+			if len(t) == 0 {
+				delete(config, k)
+			}
+		case []string:
+			if len(t) == 0 {
+				delete(config, k)
+			}
+		}
+	}
+}
+
 func addAddresses(config map[string]interface{}, machine *capi.Machine) {
 	if data := machine.Annotations[AddressAnnotation]; data != "" {
 		config["node-external-ip"] = data
@@ -910,6 +932,8 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 			Path:    filePath,
 		})
 	}
+
+	PruneEmpty(config)
 
 	configData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {

@@ -255,6 +255,13 @@ func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, er
 }
 
 func (h *handler) getInfraMachineState(capiMachine *capi.Machine) (status corev1.ConditionStatus, reason, message, providerID string, err error) {
+	if capiMachine.Status.FailureReason != nil && capiMachine.Status.FailureMessage != nil {
+		return corev1.ConditionFalse, "MachineCreateFailed",
+			fmt.Sprintf("failed creating server (%s) in infrastructure provider: %s: %s",
+				capiMachine.Spec.InfrastructureRef.Kind,
+				*capiMachine.Status.FailureReason,
+				*capiMachine.Status.FailureMessage), "", nil
+	}
 	gvk := schema.FromAPIVersionAndKind(capiMachine.Spec.InfrastructureRef.APIVersion, capiMachine.Spec.InfrastructureRef.Kind)
 	machine, err := h.dynamic.Get(gvk, capiMachine.Namespace, capiMachine.Spec.InfrastructureRef.Name)
 	if apierror.IsNotFound(err) {
