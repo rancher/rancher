@@ -43,7 +43,7 @@ func Register(server *steve.Server) {
 				if !allowPut[gr.Resource] {
 					attributes.AddDisallowMethods(schema, http.MethodPut)
 				}
-				if !allowPut[gr.Resource] {
+				if !allowPost[gr.Resource] {
 					attributes.AddDisallowMethods(schema, http.MethodPost)
 				}
 				if disallowGet[gr.Resource] {
