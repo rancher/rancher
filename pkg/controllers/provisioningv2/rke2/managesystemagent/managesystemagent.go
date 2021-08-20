@@ -171,8 +171,19 @@ func installer(envs []rkev1.EnvVar, allWorkers bool, secretName, generation stri
 			Version:     version,
 			Tolerations: []corev1.Toleration{{
 				Operator: corev1.TolerationOpExists,
-			}},
-			NodeSelector:       &metav1.LabelSelector{},
+			},
+			},
+			NodeSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      corev1.LabelOSStable,
+						Operator: metav1.LabelSelectorOpIn,
+						Values: []string{
+							"linux",
+						},
+					},
+				},
+			},
 			ServiceAccountName: "system-agent-upgrader",
 			Upgrade: &upgradev1.ContainerSpec{
 				Image: settings.PrefixPrivateRegistry(image[0]),
