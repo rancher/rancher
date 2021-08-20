@@ -105,7 +105,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.3
 	github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08
 	github.com/rancher/lasso/controller-runtime v0.0.0-20210608205930-775fcaf2f523
-	github.com/rancher/machine v0.15.0-rancher67
+	github.com/rancher/machine v0.15.0-rancher68
 	github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
