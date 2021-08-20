@@ -7,14 +7,9 @@ import (
 	"github.com/moby/locker"
 	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"k8s.io/client-go/rest"
 )
-
-type ClusterContextGetter interface {
-	UserContext(string) (*config.UserContext, error)
-}
 
 type factory struct {
 	dialerFactory        dialer.Factory
@@ -24,10 +19,10 @@ type factory struct {
 	serverLock           *locker.Locker
 	servers              sync.Map
 	localConfig          *rest.Config
-	clusterContextGetter ClusterContextGetter
+	clusterContextGetter proxy.ClusterContextGetter
 }
 
-func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister, clusterContextGetter ClusterContextGetter) *factory {
+func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister, clusterContextGetter proxy.ClusterContextGetter) *factory {
 	return &factory{
 		dialerFactory:        dialer,
 		serverLock:           locker.New(),
@@ -80,9 +75,5 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *factory) newServer(c *v3.Cluster) (server, error) {
-	clusterContext, err := s.clusterContextGetter.UserContext(c.Name)
-	if err != nil {
-		return nil, err
-	}
-	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory, clusterContext)
+	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory, s.clusterContextGetter)
 }
