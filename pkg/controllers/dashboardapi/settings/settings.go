@@ -91,6 +91,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				Default: setting.Default,
 			}
 			if value != "" {
+				newSetting.Source = "env"
 				newSetting.Value = value
 			}
 			if newSetting.Value == "" {
@@ -110,6 +111,10 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			update := false
 			if obj.Default != setting.Default {
 				obj.Default = setting.Default
+				update = true
+			}
+			if value != "" && obj.Source != "env" {
+				obj.Source = "env"
 				update = true
 			}
 			if value != "" && obj.Value != value {
