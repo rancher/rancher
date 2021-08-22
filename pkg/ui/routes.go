@@ -35,7 +35,6 @@ func New(prefs v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegis
 	router.PathPrefix("/engines-dist").Handler(ember.ServeAsset())
 	router.PathPrefix("/static").Handler(ember.ServeAsset())
 	router.PathPrefix("/translations").Handler(ember.ServeAsset())
-	router.PathPrefix("/g").Handler(ember.IndexFile())
 	router.NotFoundHandler = vueIndexUnlessAPI()
 
 	return router
