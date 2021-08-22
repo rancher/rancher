@@ -20,7 +20,7 @@ func redirectAuth(rw http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	bytes, err := base64.RawURLEncoding.DecodeString(vars["state"])
 	if err != nil {
-		vueIndexUnlessAPI().ServeHTTP(rw, req)
+		emberIndexUnlessAPI().ServeHTTP(rw, req)
 		return
 	}
 
@@ -28,7 +28,7 @@ func redirectAuth(rw http.ResponseWriter, req *http.Request) {
 		To string `json:"to,omitempty"`
 	}{}
 	if err := json.Unmarshal(bytes, &input); err != nil || authToTarget[input.To] == "" {
-		vueIndexUnlessAPI().ServeHTTP(rw, req)
+		emberIndexUnlessAPI().ServeHTTP(rw, req)
 		return
 	}
 
