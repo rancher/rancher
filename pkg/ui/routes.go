@@ -9,11 +9,11 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 )
 
-func New(prefs v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrationTokenCache) http.Handler {
+func New(_ v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrationTokenCache) http.Handler {
 	router := mux.NewRouter()
 	router.UseEncodedPath()
 
-	router.Handle("/", vue.IndexFile())
+	router.Handle("/", PreferredIndex())
 	router.Handle("/cacerts", cacerts.Handler(clusterRegistrationTokenCache))
 	router.Handle("/asset-manifest.json", ember.ServeAsset())
 	router.Handle("/crossdomain.xml", ember.ServeAsset())
@@ -35,18 +35,23 @@ func New(prefs v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegis
 	router.PathPrefix("/engines-dist").Handler(ember.ServeAsset())
 	router.PathPrefix("/static").Handler(ember.ServeAsset())
 	router.PathPrefix("/translations").Handler(ember.ServeAsset())
-	router.PathPrefix("/g").Handler(ember.IndexFile())
-	router.NotFoundHandler = vueIndexUnlessAPI()
+	router.NotFoundHandler = emberIndexUnlessAPI()
 
 	return router
 }
 
-func vueIndexUnlessAPI() http.Handler {
+func emberIndexUnlessAPI() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if parse.IsBrowser(req, true) {
-			vueIndex.ServeHTTP(rw, req)
+			emberIndex.ServeHTTP(rw, req)
 		} else {
 			http.NotFound(rw, req)
 		}
+	})
+}
+
+func PreferredIndex() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		http.Redirect(rw, req, "/dashboard/", http.StatusFound)
 	})
 }
