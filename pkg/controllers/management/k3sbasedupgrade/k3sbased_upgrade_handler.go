@@ -171,7 +171,7 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 			if !v33.AppConditionForceUpgrade.IsUnknown(app) {
 				v33.AppConditionForceUpgrade.Unknown(app)
 			}
-			logrus.Warnln("force redeploying system-ugrade-controller")
+			logrus.Warnln("force redeploying system-upgrade-controller")
 			if _, err = appClient.Update(app); err != nil {
 				return err
 			}
