@@ -70,7 +70,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 				Secret: &corev1.SecretVolumeSource{
 					SecretName:  filesSecret.Name,
 					Items:       keysToPaths,
-					DefaultMode: &[]int32{0600}[0],
+					DefaultMode: &[]int32{0644}[0],
 				},
 			},
 		})
