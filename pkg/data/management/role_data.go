@@ -543,20 +543,11 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 		}
 
 		// persist the secret
-		bootstrapPasswordSecret.StringData = map[string]string{"bootstrapPassword": bootstrapPassword}
 		if bootstrapPasswordSecret.ObjectMeta.GetResourceVersion() != "" {
-			_, err = management.K8s.CoreV1().Secrets(cattleNamespace).Update(context.TODO(), bootstrapPasswordSecret, v1.UpdateOptions{})
-		} else {
-			// initialize the secret
-			bootstrapPasswordSecret.ObjectMeta = v1.ObjectMeta{
-				Name:      bootstrapPasswordSecretName,
-				Namespace: cattleNamespace,
+			bootstrapPasswordSecret.StringData = map[string]string{"bootstrapPassword": bootstrapPassword}
+			if _, err := management.K8s.CoreV1().Secrets(cattleNamespace).Update(context.TODO(), bootstrapPasswordSecret, v1.UpdateOptions{}); err != nil {
+				return "", err
 			}
-			_, err = management.K8s.CoreV1().Secrets(cattleNamespace).Create(context.TODO(), bootstrapPasswordSecret, v1.CreateOptions{})
-		}
-
-		if err != nil {
-			return "", err
 		}
 
 		hash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
