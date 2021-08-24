@@ -39,7 +39,7 @@ custom_cluster_add_edit = {"cluster": None, "aws_node": []}
 cluster_node_template_2 = {"cluster": [], "node_template": []}
 roles = [CLUSTER_MEMBER, CLUSTER_OWNER, PROJECT_OWNER, PROJECT_MEMBER,
          PROJECT_READ_ONLY]
-
+engine_install_url = "https://releases.rancher.com/install-docker/20.10.sh"
 
 def test_node_label_add():
     test_label = random_name()
@@ -1167,11 +1167,12 @@ def create_node_template_label(client, test_label, label_value):
     )
     node_template = client.create_node_template(
         digitaloceanConfig={"region": "nyc3",
-                            "size": "2gb",
-                            "image": "ubuntu-16-04-x64"},
+                            "size": "s-2vcpu-2gb-intel",
+                            "image": "ubuntu-18-04-x64"},
         name=random_name(),
         driver="digitalocean",
         cloudCredentialId=do_cloud_credential.id,
+        engineInstallURL=engine_install_url,
         useInternalIpAddress=True,
         labels={"cattle.io/creator": "norman", test_label: label_value})
     node_template = client.wait_success(node_template)

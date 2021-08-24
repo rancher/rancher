@@ -998,7 +998,7 @@ def node_template_do():
     )
     node_template = client.create_node_template(
         digitaloceanConfig={"region": "nyc3",
-                            "size": "2gb",
+                            "size": "s-2vcpu-2gb-intel",
                             "image": "ubuntu-18-04-x64"},
         name=random_name(),
         driver="digitalocean",
