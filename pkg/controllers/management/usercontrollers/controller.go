@@ -210,6 +210,13 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRole(userContext *config.U
 			APIGroups: []string{"batch"},
 			Resources: []string{"jobs"},
 		},
+		// The job checks for the presence of the rancher service first
+		rbacV1.PolicyRule{
+			Verbs:         []string{"get"},
+			APIGroups:     []string{""},
+			Resources:     []string{"services"},
+			ResourceNames: []string{"rancher"},
+		},
 	}
 	clusterRole := rbacV1.ClusterRole{
 		ObjectMeta: meta,
