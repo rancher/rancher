@@ -92,6 +92,7 @@ func LinuxInstallScript(token string, envVars []corev1.EnvVar, defaultHost strin
 %s
 %s
 %s
+CATTLE_AGENT_BINARY_BASE_URL=https://github.com/rancher/system-agent/releases/download/v0.0.1-alpha38
 
 %s
 `, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
