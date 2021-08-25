@@ -50,14 +50,7 @@ func generateMasterPlan(version string, concurrency int, drain bool, upgradeImag
 	}
 
 	// only select master nodes
-	masterPlan.Spec.NodeSelector = &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-
-			Key:      describe.LabelNodeRolePrefix + "master",
-			Operator: metav1.LabelSelectorOpIn,
-			Values:   []string{"true"},
-		}},
-	}
+	masterPlan.Spec.NodeSelector = masterPlanSelector()
 
 	masterPlan.Spec.Tolerations = []corev1.Toleration{{
 		Operator: corev1.TolerationOpExists,
@@ -85,12 +78,7 @@ func generateWorkerPlan(version string, concurrency int, drain bool, upgradeImag
 		Args:  []string{"prepare", masterPlanName},
 	}
 	// select all nodes that are not master
-	workerPlan.Spec.NodeSelector = &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      describe.LabelNodeRolePrefix + "master",
-			Operator: metav1.LabelSelectorOpDoesNotExist,
-		}},
-	}
+	workerPlan.Spec.NodeSelector = workerPlanSelector()
 
 	workerPlan.Spec.Tolerations = []corev1.Toleration{{
 		Operator: corev1.TolerationOpExists,
@@ -111,14 +99,7 @@ func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int
 	}
 
 	// only select master nodes
-	masterPlan.Spec.NodeSelector = &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-
-			Key:      describe.LabelNodeRolePrefix + "master",
-			Operator: metav1.LabelSelectorOpIn,
-			Values:   []string{"true"},
-		}},
-	}
+	masterPlan.Spec.NodeSelector = masterPlanSelector()
 
 	masterPlan.Spec.Tolerations = []corev1.Toleration{{
 		Operator: corev1.TolerationOpExists,
@@ -144,12 +125,7 @@ func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int
 		Args:  []string{"prepare", masterPlanName},
 	}
 
-	workerPlan.Spec.NodeSelector = &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      describe.LabelNodeRolePrefix + "master",
-			Operator: metav1.LabelSelectorOpDoesNotExist,
-		}},
-	}
+	workerPlan.Spec.NodeSelector = workerPlanSelector()
 
 	workerPlan.Spec.Tolerations = []corev1.Toleration{{
 		Operator: corev1.TolerationOpExists,
@@ -161,4 +137,36 @@ func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int
 // a valid k3s version needs to be converted to valid docker tag (v1.17.3+k3s1 => v1.17.3-k3s1)
 func parseVersion(v string) string {
 	return strings.Replace(v, "+", "-", -1)
+}
+
+// select only linux master nodes
+func masterPlanSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{{
+
+			Key:      describe.LabelNodeRolePrefix + "master",
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   []string{"true"},
+		},
+			{
+				Key:      corev1.LabelOSStable,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"linux"},
+			}},
+	}
+}
+
+// select all linux nodes that are not master
+func workerPlanSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{{
+			Key:      describe.LabelNodeRolePrefix + "master",
+			Operator: metav1.LabelSelectorOpDoesNotExist,
+		},
+			{
+				Key:      corev1.LabelOSStable,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"linux"},
+			}},
+	}
 }
