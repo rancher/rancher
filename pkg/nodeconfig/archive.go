@@ -42,7 +42,7 @@ func (t *TLSConfig) ToConfig() (*tls.Config, error) {
 	}, nil
 }
 
-func extractConfigJSON(extractedConfig string) (map[string]interface{}, error) {
+func ExtractConfigJSON(extractedConfig string) (map[string]interface{}, error) {
 	result := map[string]interface{}{}
 
 	configBytes, err := base64.StdEncoding.DecodeString(extractedConfig)
