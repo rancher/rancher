@@ -33,9 +33,6 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 		s3Cred s3Credential
 	)
 
-	args = append(args,
-		fmt.Sprintf("--%ss3", s.prefix))
-
 	credName := s3.CloudCredentialName
 	if credName == "" && controlPlane.Spec.ETCD != nil && controlPlane.Spec.ETCD.S3 != nil {
 		credName = controlPlane.Spec.ETCD.S3.CloudCredentialName
@@ -46,7 +43,9 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 		return
 	}
 
-	args = append(args, fmt.Sprintf("--%ss3-bucket=%s", s.prefix, first(s3.Bucket, s3Cred.Bucket)))
+	if s3.Bucket != "" || s3Cred.Bucket != "" {
+		args = append(args, fmt.Sprintf("--%ss3-bucket=%s", s.prefix, first(s3.Bucket, s3Cred.Bucket)))
+	}
 
 	if s3Cred.AccessKey != "" {
 		args = append(args, fmt.Sprintf("--%ss3-access-key=%s", s.prefix, s3Cred.AccessKey))
@@ -77,6 +76,11 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 			Path:    filePath,
 		})
 		args = append(args, fmt.Sprintf("--%ss3-endpoint-ca=%s", s.prefix, filePath))
+	}
+
+	if len(args) > 0 {
+		args = append(args,
+			fmt.Sprintf("--%ss3", s.prefix))
 	}
 
 	return
