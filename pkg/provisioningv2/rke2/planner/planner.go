@@ -14,12 +14,14 @@ import (
 	"strings"
 
 	"github.com/moby/locker"
+	"github.com/rancher/norman/types/values"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -798,13 +800,32 @@ func PruneEmpty(config map[string]interface{}) {
 	}
 }
 
-func addAddresses(config map[string]interface{}, machine *capi.Machine) {
-	if data := machine.Annotations[AddressAnnotation]; data != "" {
-		config["node-external-ip"] = data
-	}
-
+func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, machine *capi.Machine) {
 	if data := machine.Annotations[InternalAddressAnnotation]; data != "" {
 		config["node-ip"] = data
+	}
+
+	if data := machine.Annotations[AddressAnnotation]; data != "" {
+		config["node-external-ip"] = data
+		// Don't check for an IP address from the secret if it is already provided.
+		return
+	}
+
+	if machine.Annotations["objectset.rio.cattle.io/id"] == "unmanaged-machine" || machine.Spec.InfrastructureRef.Kind == "PodMachine" {
+		// Unmanaged machines won't have a state secret,
+		// and PodMachine's IP address is not external
+		return
+	}
+
+	secret, err := secrets.Get(machine.Spec.InfrastructureRef.Namespace, name.SafeConcatName(machine.Spec.InfrastructureRef.Name, "machine", "state"))
+	if err == nil && secret != nil && len(secret.Data["extractedConfig"]) != 0 {
+		driverConfig, err := nodeconfig.ExtractConfigJSON(base64.StdEncoding.EncodeToString(secret.Data["extractedConfig"]))
+		if err == nil && len(driverConfig) != 0 {
+			ipAddress := convert.ToString(values.GetValueN(driverConfig, "Driver", "IPAddress"))
+			if ipAddress != "" {
+				config["node-external-ip"] = ipAddress
+			}
+		}
 	}
 }
 
@@ -908,7 +929,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	addRoleConfig(config, controlPlane, machine, initNode, joinServer)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, machine)
 	addToken(config, machine, secret)
-	addAddresses(config, machine)
+	addAddresses(p.secretCache, config, machine)
 
 	if err := addLabels(config, machine); err != nil {
 		return nodePlan, err

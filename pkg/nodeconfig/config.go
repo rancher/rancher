@@ -293,7 +293,7 @@ func (m *NodeConfig) getConfig() (map[string]interface{}, error) {
 		return nil, nil
 	}
 
-	return extractConfigJSON(data)
+	return ExtractConfigJSON(data)
 }
 
 func buildBaseHostDir(nodeName string, clusterID string) (string, string, error) {
