@@ -179,14 +179,9 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 								RunAsUser:  &oneThousand,
 								RunAsGroup: &oneThousand,
 							},
-							WorkingDir:      "/tmp",
 							Image:           args.ImageName,
 							ImagePullPolicy: args.ImagePullPolicy,
 							Args:            args.Args,
-							Env: []corev1.EnvVar{{
-								Name:  "HOME",
-								Value: "/tmp",
-							}},
 							EnvFrom: []corev1.EnvFromSource{
 								{
 									SecretRef: &corev1.SecretEnvSource{
