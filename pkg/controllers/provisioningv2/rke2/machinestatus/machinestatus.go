@@ -195,6 +195,11 @@ func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, er
 		return machine, err
 	}
 
+	// This is a temporary solution until RKE2 Windows nodes support system-agent functionality.
+	if os, ok := machine.GetLabels()["cattle.io/os"]; ok && os == "windows" {
+		return h.setMachineCondition(machine, Provisioned, corev1.ConditionTrue, "WindowsNode", "windows nodes don't currently support plans")
+	}
+
 	if status == "" {
 		status, reason, message = planner.GetPlanStatusReasonMessage(machine, plan)
 	}
