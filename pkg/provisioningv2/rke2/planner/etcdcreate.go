@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"errors"
 	"fmt"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -56,7 +57,7 @@ func (e *etcdCreate) startOrRestartCreate(controlPlane *rkev1.RKEControlPlane, s
 	return nil
 }
 
-func (e *etcdCreate) etcdCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, snapshot *rkev1.ETCDSnapshotCreate) error {
+func (e *etcdCreate) etcdCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, snapshot *rkev1.ETCDSnapshotCreate) []error {
 	servers := collect(clusterPlan, func(machine *capi.Machine) bool {
 		if !isEtcd(machine) || machine.Status.NodeRef == nil {
 			return false
@@ -66,16 +67,21 @@ func (e *etcdCreate) etcdCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan
 	})
 
 	if len(servers) == 0 {
-		return fmt.Errorf("failed to find node to perform etcd snapshot")
+		return []error{errors.New("failed to find node to perform etcd snapshot")}
 	}
 
-	server := servers[0]
-	createPlan, err := e.createPlan(controlPlane, snapshot, server.Machine.Status.NodeRef.Name)
-	if err != nil {
-		return err
-	}
+	var errs []error
 
-	return assignAndCheckPlan(e.store, "etcd snapshot", server, createPlan)
+	for _, server := range servers {
+		createPlan, err := e.createPlan(controlPlane, snapshot, server.Machine.Status.NodeRef.Name)
+		if err != nil {
+			return []error{err}
+		}
+		if err := assignAndCheckPlan(e.store, "etcd snapshot", server, createPlan, 3); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
 }
 
 func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshotCreate, nodeName string) (plan.NodePlan, error) {
@@ -106,32 +112,62 @@ func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *r
 	})
 }
 
-func (e *etcdCreate) Create(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
+func (e *etcdCreate) Create(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) []error {
 	if !Provisioned.IsTrue(controlPlane) && controlPlane.Status.ETCDSnapshotCreatePhase == "" {
 		return nil
 	}
 
 	if controlPlane.Spec.ETCDSnapshotCreate == nil {
-		return e.resetEtcdCreateState(controlPlane)
+		if err := e.resetEtcdCreateState(controlPlane); err != nil {
+			return []error{err}
+		}
+		return nil
 	}
 
 	return e.createSnapshot(controlPlane, clusterPlan, controlPlane.Spec.ETCDSnapshotCreate)
 }
 
-func (e *etcdCreate) createSnapshot(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, snapshot *rkev1.ETCDSnapshotCreate) error {
+func (e *etcdCreate) createSnapshot(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, snapshot *rkev1.ETCDSnapshotCreate) []error {
 	if err := e.startOrRestartCreate(controlPlane, snapshot); err != nil {
-		return err
+		return []error{err}
 	}
 
 	switch controlPlane.Status.ETCDSnapshotCreatePhase {
 	case rkev1.ETCDSnapshotPhaseStarted:
-		if err := e.etcdCreate(controlPlane, clusterPlan, snapshot); err != nil {
-			return err
+		var stateSet bool
+		var finErrs []error
+		if errs := e.etcdCreate(controlPlane, clusterPlan, snapshot); len(errs) > 0 {
+			for _, err := range errs {
+				if err == nil {
+					continue
+				}
+				finErrs = append(finErrs, err)
+				var errWaiting ErrWaiting
+				if !errors.As(err, &errWaiting) {
+					// we have a failed snapshot from a node.
+					if !stateSet {
+						if err := e.setState(controlPlane, snapshot, rkev1.ETCDSnapshotPhaseFailed); err != nil {
+							finErrs = append(finErrs, err)
+						} else {
+							stateSet = true
+						}
+					}
+				}
+			}
+			return finErrs
 		}
-		return e.setState(controlPlane, snapshot, rkev1.ETCDSnapshotPhaseFinished)
+		if err := e.setState(controlPlane, snapshot, rkev1.ETCDSnapshotPhaseFinished); err != nil {
+			return []error{err}
+		}
+		return nil
+	case rkev1.ETCDSnapshotPhaseFailed:
+		fallthrough
 	case rkev1.ETCDSnapshotPhaseFinished:
 		return nil
 	default:
-		return e.setState(controlPlane, snapshot, rkev1.ETCDSnapshotPhaseStarted)
+		if err := e.setState(controlPlane, snapshot, rkev1.ETCDSnapshotPhaseStarted); err != nil {
+			return []error{err}
+		}
+		return nil
 	}
 }
