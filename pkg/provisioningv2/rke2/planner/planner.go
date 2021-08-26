@@ -489,7 +489,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 					draining = append(draining, entry.Machine.Name)
 				}
 			}
-		} else if !entry.Plan.InSync {
+		} else if !entry.Plan.InSync && entry.Machine.Labels["cattle.io/os"] != "windows" {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 		} else {
 			if ok, err := p.undrain(entry.Machine); err != nil {
