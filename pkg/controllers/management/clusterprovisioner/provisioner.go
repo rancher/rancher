@@ -1053,7 +1053,8 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverK3s ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
-		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD {
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD ||
+		(cluster.Status.Driver == apimgmtv3.ClusterDriverImported && IsOwnedByProvisioningCluster(cluster)) {
 		return nil //no-op
 	}
 	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
@@ -1094,4 +1095,8 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 		}
 	}
 	return nil
+}
+
+func IsOwnedByProvisioningCluster(cluster *v3.Cluster) bool {
+	return strings.HasPrefix(cluster.Annotations["objectset.rio.cattle.io/owner-gvk"], "provisioning.cattle.io/v1, Kind=Cluster")
 }
